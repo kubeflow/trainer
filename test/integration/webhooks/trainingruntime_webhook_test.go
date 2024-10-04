@@ -40,7 +40,7 @@ var _ = ginkgo.Describe("TrainingRuntime Webhook", ginkgo.Ordered, func() {
 	ginkgo.BeforeAll(func() {
 		fwk = &framework.Framework{}
 		cfg = fwk.Init()
-		ctx, k8sClient = fwk.RunManager(cfg)
+		ctx, k8sClient = fwk.RunManager(cfg, false)
 	})
 	ginkgo.AfterAll(func() {
 		fwk.Teardown()
@@ -86,7 +86,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 	ginkgo.BeforeAll(func() {
 		fwk = &framework.Framework{}
 		cfg = fwk.Init()
-		ctx, k8sClient = fwk.RunManager(cfg)
+		ctx, k8sClient = fwk.RunManager(cfg, false)
 	})
 	ginkgo.AfterAll(func() {
 		fwk.Teardown()

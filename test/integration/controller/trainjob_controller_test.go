@@ -51,7 +51,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 	ginkgo.BeforeAll(func() {
 		fwk = &framework.Framework{}
 		cfg = fwk.Init()
-		ctx, k8sClient = fwk.RunManager(cfg)
+		ctx, k8sClient = fwk.RunManager(cfg, true)
 	})
 	ginkgo.AfterAll(func() {
 		fwk.Teardown()
@@ -123,6 +123,13 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 			ginkgo.It("Should succeed to create TrainJob with TrainingRuntime", func() {
 				ginkgo.By("Creating TrainingRuntime and TrainJob")
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func() error {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)
+					if err != nil {
+						return err
+					}
+					return nil
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
 				ginkgo.By("Checking if the appropriate JobSet and PodGroup are created")
@@ -165,6 +172,13 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 			ginkgo.It("Should succeeded to update JobSet only when TrainJob is suspended", func() {
 				ginkgo.By("Creating TrainingRuntime and suspended TrainJob")
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func() error {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)
+					if err != nil {
+						return err
+					}
+					return nil
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
 				ginkgo.By("Checking if JobSet and PodGroup are created")
@@ -297,6 +311,13 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Obj()).
 					Obj()
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func() error {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)
+					if err != nil {
+						return err
+					}
+					return nil
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
 				ginkgo.By("Checking if the appropriate JobSet is created")
@@ -353,6 +374,13 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 			ginkgo.It("Should succeeded to reconcile TrainJob conditions with Complete condition", func() {
 				ginkgo.By("Creating TrainingRuntime and suspended TrainJob")
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func() error {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)
+					if err != nil {
+						return err
+					}
+					return nil
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
 				ginkgo.By("Checking if JobSet and PodGroup are created")
@@ -447,6 +475,13 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 			ginkgo.It("Should succeeded to reconcile TrainJob conditions with Failed condition", func() {
 				ginkgo.By("Creating TrainingRuntime and suspended TrainJob")
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func() error {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)
+					if err != nil {
+						return err
+					}
+					return nil
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
 				ginkgo.By("Checking if JobSet and PodGroup are created")
@@ -564,6 +599,13 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Obj()).
 					Obj()
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func() error {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)
+					if err != nil {
+						return err
+					}
+					return nil
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
 				ginkgo.By("Checking if the appropriate JobSet is created")
@@ -714,6 +756,13 @@ alpha-trainer-node-0-1.alpha slots=8
 			ginkgo.It("Should succeeded to reconcile TrainJob conditions with Complete condition", func() {
 				ginkgo.By("Creating TrainingRuntime and suspended TrainJob")
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func() error {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)
+					if err != nil {
+						return err
+					}
+					return nil
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
 				ginkgo.By("Checking if JobSet, ConfigMap, and Secret are created")
@@ -809,6 +858,13 @@ alpha-trainer-node-0-1.alpha slots=8
 			ginkgo.It("Should succeeded to reconcile TrainJob conditions with Failed condition", func() {
 				ginkgo.By("Creating TrainingRuntime and suspended TrainJob")
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func() error {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)
+					if err != nil {
+						return err
+					}
+					return nil
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
 				ginkgo.By("Checking if JobSet, ConfigMap, and Secret are created")

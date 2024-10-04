@@ -27,12 +27,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
@@ -53,6 +56,7 @@ var _ framework.WatchExtensionPlugin = (*JobSet)(nil)
 var _ framework.PodNetworkPlugin = (*JobSet)(nil)
 var _ framework.ComponentBuilderPlugin = (*JobSet)(nil)
 var _ framework.TerminalConditionPlugin = (*JobSet)(nil)
+var _ framework.CustomValidationPlugin = (*JobSet)(nil)
 
 const Name = constants.JobSetKind
 
@@ -69,6 +73,44 @@ func New(ctx context.Context, client client.Client, _ client.FieldIndexer) (fram
 
 func (j *JobSet) Name() string {
 	return Name
+}
+
+func (j *JobSet) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+
+	var allErrs field.ErrorList
+	specPath := field.NewPath("spec")
+	runtimeRefPath := specPath.Child("runtimeRef")
+
+	jobSet, ok := runtimeJobTemplate.(*jobsetv1alpha2.JobSet)
+	if !ok {
+		return nil, nil
+	}
+
+	rJobContainerNames := make(map[string]sets.Set[string])
+	for _, rJob := range jobSet.Spec.ReplicatedJobs {
+		rJobContainerNames[rJob.Name] = sets.New[string]()
+		for _, c := range rJob.Template.Spec.Template.Spec.Containers {
+			rJobContainerNames[rJob.Name].Insert(c.Name)
+		}
+	}
+
+	if newObj.Spec.ModelConfig != nil && newObj.Spec.ModelConfig.Input != nil {
+		if containerSet, ok := rJobContainerNames[constants.JobInitializer]; !ok {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input modelConfig", constants.JobInitializer)))
+		} else if !containerSet.Has(constants.ContainerModelInitializer) {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ContainerModelInitializer, constants.JobInitializer)))
+		}
+	}
+
+	if newObj.Spec.DatasetConfig != nil {
+		if containerSet, ok := rJobContainerNames[constants.JobInitializer]; !ok {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.JobInitializer)))
+		} else if !containerSet.Has(constants.ContainerDatasetInitializer) {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ContainerDatasetInitializer, constants.JobInitializer)))
+		}
+
+	}
+	return nil, allErrs
 }
 
 func (j *JobSet) ReconcilerBuilders() []runtime.ReconcilerBuilder {
