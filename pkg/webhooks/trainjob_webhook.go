@@ -18,8 +18,10 @@ package webhooks
 
 import (
 	"context"
+	"fmt"
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -43,12 +45,31 @@ func setupWebhookForTrainJob(mgr ctrl.Manager, run map[string]runtime.Runtime) e
 
 var _ webhook.CustomValidator = (*TrainJobWebhook)(nil)
 
-func (w *TrainJobWebhook) ValidateCreate(context.Context, apiruntime.Object) (admission.Warnings, error) {
-	return nil, nil
+func (w *TrainJobWebhook) ValidateCreate(ctx context.Context, obj apiruntime.Object) (admission.Warnings, error) {
+	trainJob := obj.(*trainer.TrainJob)
+	log := ctrl.LoggerFrom(ctx).WithName("trainJob-webhook")
+	log.V(5).Info("Validating create", "TrainJob", klog.KObj(trainJob))
+	runtimeRefGK := runtime.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
+	runtime, ok := w.runtimes[runtimeRefGK]
+	if !ok {
+		return nil, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
+	}
+	warnings, errors := runtime.ValidateObjects(ctx, nil, trainJob)
+	return warnings, errors.ToAggregate()
 }
 
-func (w *TrainJobWebhook) ValidateUpdate(context.Context, apiruntime.Object, apiruntime.Object) (admission.Warnings, error) {
-	return nil, nil
+func (w *TrainJobWebhook) ValidateUpdate(ctx context.Context, oldObj apiruntime.Object, newObj apiruntime.Object) (admission.Warnings, error) {
+	oldTrainJob := oldObj.(*trainer.TrainJob)
+	newTrainJob := newObj.(*trainer.TrainJob)
+	log := ctrl.LoggerFrom(ctx).WithName("trainJob-webhook")
+	log.V(5).Info("Validating update", "TrainJob", klog.KObj(newTrainJob))
+	runtimeRefGK := runtime.RuntimeRefToRuntimeRegistryKey(newTrainJob.Spec.RuntimeRef)
+	runtime, ok := w.runtimes[runtimeRefGK]
+	if !ok {
+		return nil, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
+	}
+	warnings, errors := runtime.ValidateObjects(ctx, oldTrainJob, newTrainJob)
+	return warnings, errors.ToAggregate()
 }
 
 func (w *TrainJobWebhook) ValidateDelete(context.Context, apiruntime.Object) (admission.Warnings, error) {

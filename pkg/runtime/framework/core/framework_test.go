@@ -87,6 +87,7 @@ func TestNew(t *testing.T) {
 				customValidationPlugins: []framework.CustomValidationPlugin{
 					&mpi.MPI{},
 					&torch.Torch{},
+					&jobset.JobSet{},
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
 					&coscheduling.CoScheduling{},
@@ -423,7 +424,9 @@ func TestRunCustomValidationPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			warnings, errs := fwk.RunCustomValidationPlugins(tc.oldObj, tc.newObj)
+			runtimeInfo := runtime.NewInfo()
+			jobSetTemplate := testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test")
+			warnings, errs := fwk.RunCustomValidationPlugins(jobSetTemplate, runtimeInfo, tc.oldObj, tc.newObj)
 			if diff := cmp.Diff(tc.wantWarnings, warnings, cmpopts.SortSlices(func(a, b string) bool { return a < b })); len(diff) != 0 {
 				t.Errorf("Unexpected warninigs (-want,+got):\n%s", diff)
 			}

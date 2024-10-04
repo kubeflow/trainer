@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
@@ -51,9 +52,38 @@ func (t *Torch) Name() string {
 	return Name
 }
 
-// TODO: Need to implement validations for Torch policy.
-func (t *Torch) Validate(oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
-	return nil, nil
+func (t *Torch) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	var allErrs field.ErrorList
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicy == nil || runtimeInfo.RuntimePolicy.MLPolicy.Torch == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
+		return nil, allErrs
+	}
+
+	specPath := field.NewPath("spec")
+
+	if newObj.Spec.Trainer != nil {
+		numProcPerNodePath := specPath.Child("trainer").Child("numProcPerNode")
+		numProcPerNode := *newObj.Spec.Trainer.NumProcPerNode
+		if numProcPerNode.Type == intstr.String {
+			allowed := sets.New("auto", "cpu", "gpu")
+			if !allowed.Has(numProcPerNode.StrVal) {
+				allErrs = append(allErrs, field.Invalid(numProcPerNodePath, newObj.Spec.Trainer.NumProcPerNode, fmt.Sprintf("must have an int value or %v", allowed.UnsortedList())))
+			}
+		}
+
+		torchEnvs := sets.New[string]()
+		for _, env := range newObj.Spec.Trainer.Env {
+			if constants.TorchRunReservedEnvNames.Has(env.Name) {
+				torchEnvs.Insert(env.Name)
+			}
+		}
+
+		if torchEnvs.Len() > 0 {
+			trainerEnvsPath := specPath.Child("trainer").Child("env")
+			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %s", strings.Join(torchEnvs.UnsortedList(), ", "))))
+		}
+	}
+
+	return nil, allErrs
 }
 
 // TODO (andreyvelich): Add support for PyTorch elastic when JobSet supports Elastic Jobs.
@@ -109,7 +139,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 
 	// Update envs for Info object.
 	// Add PyTorch distributed "PET_" values for torchrun
-	// TODO (andreyvelich): Add validation to check that TrainJob doesn't have "PET_" envs.
 	// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 	var trainerContainer *runtime.Container

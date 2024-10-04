@@ -42,7 +42,7 @@ import (
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	controller "github.com/kubeflow/trainer/pkg/controller"
+	"github.com/kubeflow/trainer/pkg/controller"
 	runtimecore "github.com/kubeflow/trainer/pkg/runtime/core"
 	kubeflowwebhooks "github.com/kubeflow/trainer/pkg/webhooks"
 )
@@ -72,7 +72,7 @@ func (f *Framework) Init() *rest.Config {
 	return cfg
 }
 
-func (f *Framework) RunManager(cfg *rest.Config) (context.Context, client.Client) {
+func (f *Framework) RunManager(cfg *rest.Config, startControllers bool) (context.Context, client.Client) {
 	webhookInstallOpts := &f.testEnv.WebhookInstallOptions
 	gomega.ExpectWithOffset(1, trainer.AddToScheme(scheme.Scheme)).NotTo(gomega.HaveOccurred())
 	gomega.ExpectWithOffset(1, jobsetv1alpha2.AddToScheme(scheme.Scheme)).NotTo(gomega.HaveOccurred())
@@ -113,6 +113,20 @@ func (f *Framework) RunManager(cfg *rest.Config) (context.Context, client.Client
 	})
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), "controller", failedCtrlName)
 	gomega.ExpectWithOffset(1, failedCtrlName).To(gomega.BeEmpty())
+
+	if startControllers {
+		failedCtrlName, err := controller.SetupControllers(mgr, runtimes, ctrlpkg.Options{
+			// controller-runtime v0.19+ validates controller names are unique, to make sure
+			// exported Prometheus metrics for each controller do not conflict. The current check
+			// relies on static state that's not compatible with testing execution model.
+			// See the following resources for more context:
+			// https://github.com/kubernetes-sigs/controller-runtime/pull/2902#issuecomment-2284194683
+			// https://github.com/kubernetes-sigs/controller-runtime/issues/2994
+			SkipNameValidation: ptr.To(true),
+		})
+		gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), "controller", failedCtrlName)
+		gomega.ExpectWithOffset(1, failedCtrlName).To(gomega.BeEmpty())
+	}
 
 	failedWebhookName, err := kubeflowwebhooks.Setup(mgr, runtimes)
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), "webhook", failedWebhookName)

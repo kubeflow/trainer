@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/runtime"
@@ -69,14 +70,18 @@ func (r *ClusterTrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBu
 }
 
 func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	clusterTrainingRuntime := &trainer.ClusterTrainingRuntime{}
 	if err := r.client.Get(ctx, client.ObjectKey{
-		Namespace: old.Namespace,
-		Name:      old.Spec.RuntimeRef.Name,
+		Name: new.Spec.RuntimeRef.Name,
 	}, &trainer.ClusterTrainingRuntime{}); err != nil {
 		return nil, field.ErrorList{
-			field.Invalid(field.NewPath("spec", "RuntimeRef"), old.Spec.RuntimeRef,
+			field.Invalid(field.NewPath("spec", "RuntimeRef"), new.Spec.RuntimeRef,
 				fmt.Sprintf("%v: specified clusterTrainingRuntime must be created before the TrainJob is created", err)),
 		}
 	}
-	return r.framework.RunCustomValidationPlugins(old, new)
+	info, _ := r.runtimeInfo(ctx, new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy)
+	jobSetTemplate := jobsetv1alpha2.JobSet{
+		Spec: clusterTrainingRuntime.Spec.Template.Spec,
+	}
+	return r.framework.RunCustomValidationPlugins(jobSetTemplate.DeepCopy(), info, old, new)
 }
