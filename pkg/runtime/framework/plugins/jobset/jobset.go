@@ -18,23 +18,23 @@ package jobset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/ptr"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
@@ -85,38 +85,43 @@ func (j *JobSet) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	}
 }
 
-func (j *JobSet) Build(ctx context.Context, runtimeJobTemplate client.Object, info *runtime.Info, trainJob *trainer.TrainJob) ([]client.Object, error) {
-	if runtimeJobTemplate == nil || info == nil || trainJob == nil {
+func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
+	if info == nil || trainJob == nil {
 		return nil, fmt.Errorf("runtime info or object is missing")
 	}
 
-	raw, ok := runtimeJobTemplate.(*jobsetv1alpha2.JobSet)
-	if !ok {
-		return nil, nil
+	// Get the runtime as unstructured from the TrainJob ref
+	runtimeJobTemplate := &unstructured.Unstructured{}
+	runtimeJobTemplate.SetAPIVersion(trainer.GroupVersion.String())
+	runtimeJobTemplate.SetKind(*trainJob.Spec.RuntimeRef.Kind)
+	err := j.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, runtimeJobTemplate)
+	if err != nil {
+		return nil, err
 	}
 
-	var jobSetBuilder *Builder
-	oldJobSet := &jobsetv1alpha2.JobSet{}
-	if err := j.client.Get(ctx, client.ObjectKeyFromObject(trainJob), oldJobSet); err != nil {
-		if !apierrors.IsNotFound(err) {
+	// Populate the JobSet template spec apply configuration
+	jobSetTemplateSpec := &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{}
+	if jobSetSpec, ok, err := unstructured.NestedFieldCopy(runtimeJobTemplate.Object, "spec", "template", "spec"); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, fmt.Errorf("trainJob runtime %s does not have a spec.template.spec field", trainJob.Spec.RuntimeRef.Name)
+	} else {
+		if raw, err := json.Marshal(jobSetSpec); err != nil {
+			return nil, err
+		} else if err := json.Unmarshal(raw, jobSetTemplateSpec); err != nil {
 			return nil, err
 		}
-		jobSetBuilder = NewBuilder(client.ObjectKeyFromObject(trainJob), trainer.JobSetTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels:      info.Labels,
-				Annotations: info.Annotations,
-			},
-			Spec: raw.Spec,
-		})
-		oldJobSet = nil
-	} else {
-		jobSetBuilder = &Builder{
-			JobSet: *oldJobSet.DeepCopy(),
-		}
 	}
+
+	// Init the JobSet apply configuration from the runtime template spec
+	jobSetBuilder := NewBuilder(jobsetv1alpha2ac.JobSet(trainJob.Name, trainJob.Namespace).
+		WithLabels(maps.Clone(info.Labels)).
+		WithAnnotations(maps.Clone(info.Annotations)).
+		WithSpec(jobSetTemplateSpec))
 
 	// TODO (andreyvelich): Add support for the PodSpecOverride.
 	// TODO (andreyvelich): Refactor the builder with wrappers for PodSpec.
+	// Apply the runtime info
 	jobSet := jobSetBuilder.
 		Initializer(trainJob).
 		Launcher(info, trainJob).
@@ -124,24 +129,17 @@ func (j *JobSet) Build(ctx context.Context, runtimeJobTemplate client.Object, in
 		PodLabels(info.PodLabels).
 		Suspend(trainJob.Spec.Suspend).
 		Build()
-	if err := ctrlutil.SetControllerReference(trainJob, jobSet, j.scheme); err != nil {
-		return nil, err
-	}
 
-	if needsCreateOrUpdate(oldJobSet, jobSet, ptr.Deref(trainJob.Spec.Suspend, false)) {
-		return []client.Object{jobSet}, nil
-	}
-	return nil, nil
-}
+	// Set the TrainJob as owner
+	jobSet.WithOwnerReferences(metav1ac.OwnerReference().
+		WithAPIVersion(trainer.GroupVersion.String()).
+		WithKind(trainer.TrainJobKind).
+		WithName(trainJob.Name).
+		WithUID(trainJob.UID).
+		WithController(true).
+		WithBlockOwnerDeletion(true))
 
-func needsCreateOrUpdate(old, new *jobsetv1alpha2.JobSet, trainJobIsSuspended bool) bool {
-	return old == nil ||
-		(!trainJobIsSuspended && jobSetIsSuspended(old) && !jobSetIsSuspended(new)) ||
-		(trainJobIsSuspended && (!equality.Semantic.DeepEqual(old.Spec, new.Spec) || !maps.Equal(old.Labels, new.Labels) || !maps.Equal(old.Annotations, new.Annotations)))
-}
-
-func jobSetIsSuspended(jobSet *jobsetv1alpha2.JobSet) bool {
-	return ptr.Deref(jobSet.Spec.Suspend, false)
+	return []any{jobSet}, nil
 }
 
 func (j *JobSet) TerminalCondition(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error) {

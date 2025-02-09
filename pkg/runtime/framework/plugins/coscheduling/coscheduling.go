@@ -20,18 +20,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -39,15 +36,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	schedulerpluginsv1alpha1ac "sigs.k8s.io/scheduler-plugins/pkg/generated/applyconfiguration/scheduling/v1alpha1"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
 	runtimeindexer "github.com/kubeflow/trainer/pkg/runtime/indexer"
@@ -105,7 +101,7 @@ func (c *CoScheduling) EnforcePodGroupPolicy(info *runtime.Info, trainJob *train
 	return nil
 }
 
-func (c *CoScheduling) Build(ctx context.Context, _ client.Object, info *runtime.Info, trainJob *trainer.TrainJob) ([]client.Object, error) {
+func (c *CoScheduling) Build(_ context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
 	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || info.RuntimePolicy.PodGroupPolicy.Coscheduling == nil || trainJob == nil {
 		return nil, nil
 	}
@@ -121,41 +117,23 @@ func (c *CoScheduling) Build(ctx context.Context, _ client.Object, info *runtime
 			totalResources[resName] = current
 		}
 	}
-	newPG := &schedulerpluginsv1alpha1.PodGroup{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: schedulerpluginsv1alpha1.SchemeGroupVersion.String(),
-			Kind:       constants.PodGroupKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      trainJob.Name,
-			Namespace: trainJob.Namespace,
-		},
-		Spec: schedulerpluginsv1alpha1.PodGroupSpec{
-			ScheduleTimeoutSeconds: info.RuntimePolicy.PodGroupPolicy.Coscheduling.ScheduleTimeoutSeconds,
-			MinMember:              totalMembers,
-			MinResources:           totalResources,
-		},
-	}
-	if err := ctrlutil.SetControllerReference(trainJob, newPG, c.scheme); err != nil {
-		return nil, err
-	}
-	oldPG := &schedulerpluginsv1alpha1.PodGroup{}
-	if err := c.client.Get(ctx, client.ObjectKeyFromObject(newPG), oldPG); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, err
-		}
-		oldPG = nil
-	}
-	if needsCreateOrUpdate(oldPG, newPG, ptr.Deref(trainJob.Spec.Suspend, false)) {
-		return []client.Object{newPG}, nil
-	}
-	return nil, nil
-}
 
-func needsCreateOrUpdate(old, new *schedulerpluginsv1alpha1.PodGroup, trainJobIsSuspended bool) bool {
-	return old == nil ||
-		trainJobIsSuspended &&
-			(!equality.Semantic.DeepEqual(old.Spec, new.Spec) || !maps.Equal(old.Labels, new.Labels) || !maps.Equal(old.Annotations, new.Annotations))
+	podGroup := schedulerpluginsv1alpha1ac.PodGroup(trainJob.Name, trainJob.Namespace)
+
+	podGroup.WithSpec(schedulerpluginsv1alpha1ac.PodGroupSpec().
+		WithScheduleTimeoutSeconds(totalMembers).
+		WithMinResources(totalResources).
+		WithScheduleTimeoutSeconds(*info.RuntimePolicy.PodGroupPolicy.Coscheduling.ScheduleTimeoutSeconds))
+
+	podGroup.WithOwnerReferences(metav1ac.OwnerReference().
+		WithAPIVersion(trainer.GroupVersion.String()).
+		WithKind(trainer.TrainJobKind).
+		WithName(trainJob.Name).
+		WithUID(trainJob.UID).
+		WithController(true).
+		WithBlockOwnerDeletion(true))
+
+	return []any{podGroup}, nil
 }
 
 type PodGroupRuntimeClassHandler struct {

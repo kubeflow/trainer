@@ -114,32 +114,18 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 		if gvk, err = apiutil.GVKForObject(obj.DeepCopyObject(), r.client.Scheme()); err != nil {
 			return buildFailed, err
 		}
+
 		logKeysAndValues := []any{
 			"groupVersionKind", gvk.String(),
 			"namespace", obj.GetNamespace(),
 			"name", obj.GetName(),
 		}
-		// TODO (tenzen-y): Ideally, we should use the SSA instead of checking existence.
-		// Non-empty resourceVersion indicates UPDATE operation.
-		var creationErr error
-		var created bool
-		if obj.GetResourceVersion() == "" {
-			creationErr = r.client.Create(ctx, obj)
-			created = creationErr == nil
+
+		if err := r.client.Patch(ctx, obj, client.Apply, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
+			return buildFailed, err
 		}
-		switch {
-		case created:
-			log.V(5).Info("Succeeded to create object", logKeysAndValues...)
-			continue
-		case client.IgnoreAlreadyExists(creationErr) != nil:
-			return creationFailed, creationErr
-		default:
-			// This indicates CREATE operation has not been performed or the object has already existed in the cluster.
-			if err = r.client.Update(ctx, obj); err != nil {
-				return updateFailed, err
-			}
-			log.V(5).Info("Succeeded to update object", logKeysAndValues...)
-		}
+
+		log.V(5).Info("Succeeded to update object", logKeysAndValues...)
 	}
 	return creationSucceeded, nil
 }

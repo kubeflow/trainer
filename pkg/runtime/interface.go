@@ -20,6 +20,7 @@ import (
 	"context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -32,7 +33,7 @@ import (
 type ReconcilerBuilder func(*builder.Builder, client.Client, cache.Cache) *builder.Builder
 
 type Runtime interface {
-	NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error)
+	NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]*unstructured.Unstructured, error)
 	TerminalCondition(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error)
 	EventHandlerRegistrars() []ReconcilerBuilder
 	ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList)

@@ -22,11 +22,11 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/runtime"
@@ -71,7 +71,7 @@ func NewTrainingRuntime(ctx context.Context, c client.Client, indexer client.Fie
 	return trainingRuntimeFactory, nil
 }
 
-func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error) {
+func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]*unstructured.Unstructured, error) {
 	var trainingRuntime trainer.TrainingRuntime
 	err := r.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, &trainingRuntime)
 	if err != nil {
@@ -82,7 +82,7 @@ func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.Trai
 
 func (r *TrainingRuntime) buildObjects(
 	ctx context.Context, trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
-) ([]client.Object, error) {
+) ([]*unstructured.Unstructured, error) {
 	propagationLabels := jobSetTemplateSpec.Labels
 	if propagationLabels == nil && trainJob.Spec.Labels != nil {
 		propagationLabels = make(map[string]string, len(trainJob.Spec.Labels))
@@ -121,11 +121,7 @@ func (r *TrainingRuntime) buildObjects(
 		return nil, err
 	}
 
-	jobSetTemplate := jobsetv1alpha2.JobSet{
-		Spec: jobSetTemplateSpec.Spec,
-	}
-
-	return r.framework.RunComponentBuilderPlugins(ctx, jobSetTemplate.DeepCopy(), info, trainJob)
+	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
 }
 
 func (r *TrainingRuntime) TerminalCondition(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error) {

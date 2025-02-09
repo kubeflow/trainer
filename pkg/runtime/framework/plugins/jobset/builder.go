@@ -17,13 +17,11 @@ limitations under the License.
 package jobset
 
 import (
-	"maps"
-
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/utils/ptr"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
@@ -31,104 +29,63 @@ import (
 )
 
 type Builder struct {
-	jobsetv1alpha2.JobSet
+	*jobsetv1alpha2ac.JobSetApplyConfiguration
 }
 
-func NewBuilder(objectKey client.ObjectKey, jobSetTemplateSpec trainer.JobSetTemplateSpec) *Builder {
+func NewBuilder(jobSet *jobsetv1alpha2ac.JobSetApplyConfiguration) *Builder {
 	return &Builder{
-		JobSet: jobsetv1alpha2.JobSet{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: jobsetv1alpha2.SchemeGroupVersion.String(),
-				Kind:       constants.JobSetKind,
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:   objectKey.Namespace,
-				Name:        objectKey.Name,
-				Labels:      maps.Clone(jobSetTemplateSpec.Labels),
-				Annotations: maps.Clone(jobSetTemplateSpec.Annotations),
-			},
-			Spec: *jobSetTemplateSpec.Spec.DeepCopy(),
-		},
+		JobSetApplyConfiguration: jobSet,
 	}
-}
-
-// mergeInitializerEnvs merges the TrainJob and Runtime Pod envs.
-func mergeInitializerEnvs(storageUri *string, trainJobEnvs, containerEnv []corev1.EnvVar) []corev1.EnvVar {
-	envNames := sets.New[string]()
-	var envs []corev1.EnvVar
-	// Add the Storage URI env.
-	if storageUri != nil {
-		envNames.Insert(InitializerEnvStorageUri)
-		envs = append(envs, corev1.EnvVar{
-			Name:  InitializerEnvStorageUri,
-			Value: *storageUri,
-		})
-	}
-	// Add the rest TrainJob envs.
-	// TODO (andreyvelich): Validate that TrainJob dataset and model envs don't have the STORAGE_URI env.
-	for _, e := range trainJobEnvs {
-		envNames.Insert(e.Name)
-		envs = append(envs, e)
-	}
-
-	// TrainJob envs take precedence over the TrainingRuntime envs.
-	for _, e := range containerEnv {
-		if !envNames.Has(e.Name) {
-			envs = append(envs, e)
-		}
-	}
-	return envs
 }
 
 // Initializer updates JobSet values for the initializer Job.
 func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
-		if rJob.Name == constants.JobInitializer {
+		if *rJob.Name == constants.JobInitializer {
 			// TODO (andreyvelich): Currently, we use initContainers for the initializers.
 			// Once JobSet supports execution policy for the ReplicatedJobs, we should migrate to containers.
 			// Ref: https://github.com/kubernetes-sigs/jobset/issues/672
 			for j, container := range rJob.Template.Spec.Template.Spec.InitContainers {
 				// Update values for the dataset initializer container.
-				if container.Name == constants.ContainerDatasetInitializer && trainJob.Spec.DatasetConfig != nil {
+				if *container.Name == constants.ContainerDatasetInitializer && trainJob.Spec.DatasetConfig != nil {
+					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].Env
 					// Update the dataset initializer envs.
-					b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].Env = mergeInitializerEnvs(
-						trainJob.Spec.DatasetConfig.StorageUri,
-						trainJob.Spec.DatasetConfig.Env,
-						container.Env,
-					)
+					if storageUri := trainJob.Spec.DatasetConfig.StorageUri; storageUri != nil {
+						upsertEnvVars(env, corev1.EnvVar{
+							Name:  InitializerEnvStorageUri,
+							Value: *storageUri,
+						})
+					}
+					upsertEnvVars(env, trainJob.Spec.DatasetConfig.Env...)
 					// Update the dataset initializer secret reference.
 					if trainJob.Spec.DatasetConfig.SecretRef != nil {
-						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].EnvFrom = append(
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].EnvFrom,
-							corev1.EnvFromSource{
-								SecretRef: &corev1.SecretEnvSource{
-									LocalObjectReference: *trainJob.Spec.DatasetConfig.SecretRef,
-								},
-							},
-						)
+						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].
+							WithEnvFrom(corev1ac.EnvFromSource().
+								WithSecretRef(corev1ac.SecretEnvSource().
+									WithName(trainJob.Spec.DatasetConfig.SecretRef.Name)))
 					}
 				}
 				// TODO (andreyvelich): Add the model exporter when we support it.
 				// Update values for the model initializer container.
-				if container.Name == constants.ContainerModelInitializer && trainJob.Spec.ModelConfig != nil && trainJob.Spec.ModelConfig.Input != nil {
+				if *container.Name == constants.ContainerModelInitializer &&
+					trainJob.Spec.ModelConfig != nil &&
+					trainJob.Spec.ModelConfig.Input != nil {
 					// Update the model initializer envs.
-					b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].Env = mergeInitializerEnvs(
-						trainJob.Spec.ModelConfig.Input.StorageUri,
-						trainJob.Spec.ModelConfig.Input.Env,
-						container.Env,
-					)
+					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].Env
+					if storageUri := trainJob.Spec.ModelConfig.Input.StorageUri; storageUri != nil {
+						upsertEnvVars(env, corev1.EnvVar{
+							Name:  InitializerEnvStorageUri,
+							Value: *storageUri,
+						})
+					}
+					upsertEnvVars(env, trainJob.Spec.ModelConfig.Input.Env...)
 					// Update the model initializer secret reference.
 					if trainJob.Spec.ModelConfig.Input.SecretRef != nil {
-						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].EnvFrom = append(
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].EnvFrom,
-							corev1.EnvFromSource{
-								SecretRef: &corev1.SecretEnvSource{
-									LocalObjectReference: *trainJob.Spec.ModelConfig.Input.SecretRef,
-								},
-							},
-						)
+						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].
+							WithEnvFrom(corev1ac.EnvFromSource().
+								WithSecretRef(corev1ac.SecretEnvSource().
+									WithName(trainJob.Spec.ModelConfig.Input.SecretRef.Name)))
 					}
-
 				}
 			}
 		}
@@ -184,7 +141,7 @@ func (b *Builder) Launcher(info *runtime.Info, trainJob *trainer.TrainJob) *Buil
 // Trainer updates JobSet values for the trainer Job.
 func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
-		if rJob.Name == constants.JobTrainerNode {
+		if *rJob.Name == constants.JobTrainerNode {
 			// Update the Parallelism and Completions values for the Trainer Job.
 			b.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = info.Trainer.NumNodes
 			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.Trainer.NumNodes
@@ -195,42 +152,33 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 
 			// Update values for the Trainer container.
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
-				if container.Name == constants.ContainerTrainer {
+				if *container.Name == constants.ContainerTrainer {
 					// Update values from the TrainJob trainer.
 					if trainJob.Spec.Trainer != nil {
-						if trainJob.Spec.Trainer.Image != nil {
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Image = *trainJob.Spec.Trainer.Image
+						if image := trainJob.Spec.Trainer.Image; image != nil {
+							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Image = image
 						}
-						if trainJob.Spec.Trainer.Command != nil {
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Command = trainJob.Spec.Trainer.Command
+						if command := trainJob.Spec.Trainer.Command; command != nil {
+							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Command = command
 						}
-						if trainJob.Spec.Trainer.Args != nil {
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = trainJob.Spec.Trainer.Args
+						if args := trainJob.Spec.Trainer.Args; args != nil {
+							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = args
 						}
-						if trainJob.Spec.Trainer.ResourcesPerNode != nil {
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Resources = *trainJob.Spec.Trainer.ResourcesPerNode
+						if resourcesPerNode := trainJob.Spec.Trainer.ResourcesPerNode; resourcesPerNode != nil {
+							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
+								WithResources(corev1ac.ResourceRequirements().
+									WithRequests(resourcesPerNode.Requests).
+									WithLimits(resourcesPerNode.Limits))
 						}
 					}
 					// Update values from the Info object.
-					if info.Trainer.Env != nil {
+					if env := info.Trainer.Env; env != nil {
 						// Update JobSet envs from the Info.
-						envNames := sets.New[string]()
-						for _, env := range info.Trainer.Env {
-							envNames.Insert(env.Name)
-						}
-						trainerEnvs := info.Trainer.Env
-						// Info envs take precedence over the TrainingRuntime envs.
-						for _, env := range container.Env {
-							if !envNames.Has(env.Name) {
-								trainerEnvs = append(trainerEnvs, env)
-							}
-						}
-						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env = trainerEnvs
+						upsertEnvVars(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env, env...)
 					}
 					// Update the Trainer container port.
-					if info.Trainer.ContainerPort != nil {
-						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports = append(
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *info.Trainer.ContainerPort)
+					if port := info.Trainer.ContainerPort; port != nil {
+						upsertPorts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *port)
 					}
 					// Update the Trainer container volume mounts.
 					if info.Trainer.VolumeMounts != nil {
@@ -245,9 +193,10 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 }
 
 // TODO: Supporting merge labels would be great.
+
 func (b *Builder) PodLabels(labels map[string]string) *Builder {
 	for i := range b.Spec.ReplicatedJobs {
-		b.Spec.ReplicatedJobs[i].Template.Spec.Template.Labels = labels
+		b.Spec.ReplicatedJobs[i].Template.Spec.Template.WithLabels(labels)
 	}
 	return b
 }
@@ -259,6 +208,83 @@ func (b *Builder) Suspend(suspend *bool) *Builder {
 
 // TODO: Need to support all TrainJob fields.
 
-func (b *Builder) Build() *jobsetv1alpha2.JobSet {
-	return &b.JobSet
+func (b *Builder) Build() *jobsetv1alpha2ac.JobSetApplyConfiguration {
+	return b.JobSetApplyConfiguration
+}
+
+func upsertEnvVars(envVarList *[]corev1ac.EnvVarApplyConfiguration, envVars ...corev1.EnvVar) {
+	for _, e := range envVars {
+		envVar := corev1ac.EnvVar().WithName(e.Name)
+		if from := e.ValueFrom; from != nil {
+			source := corev1ac.EnvVarSource()
+			if ref := from.FieldRef; ref != nil {
+				source.WithFieldRef(corev1ac.ObjectFieldSelector().WithFieldPath(ref.FieldPath))
+			}
+			if ref := from.ResourceFieldRef; ref != nil {
+				source.WithResourceFieldRef(corev1ac.ResourceFieldSelector().
+					WithContainerName(ref.ContainerName).
+					WithResource(ref.Resource).
+					WithDivisor(ref.Divisor))
+			}
+			if ref := from.ConfigMapKeyRef; ref != nil {
+				key := corev1ac.ConfigMapKeySelector().WithKey(ref.Key).WithName(ref.Name)
+				if optional := ref.Optional; optional != nil {
+					key.WithOptional(*optional)
+				}
+				source.WithConfigMapKeyRef(key)
+			}
+			if ref := from.SecretKeyRef; ref != nil {
+				key := corev1ac.SecretKeySelector().WithKey(ref.Key).WithName(ref.Name)
+				if optional := ref.Optional; optional != nil {
+					key.WithOptional(*optional)
+				}
+				source.WithSecretKeyRef(key)
+			}
+			envVar.WithValueFrom(source)
+		} else {
+			envVar.WithValue(e.Value)
+		}
+		upsert(envVarList, envVar, byEnvVarName)
+	}
+}
+
+func upsertPorts(portList *[]corev1ac.ContainerPortApplyConfiguration, ports ...corev1.ContainerPort) {
+	for _, p := range ports {
+		port := corev1ac.ContainerPort()
+		if p.ContainerPort > 0 {
+			port.WithContainerPort(p.ContainerPort)
+		}
+		if p.HostPort > 0 {
+			port.WithHostPort(p.HostPort)
+		}
+		if p.HostIP != "" {
+			port.WithHostIP(p.HostIP)
+		}
+		if p.Name != "" {
+			port.WithName(p.Name)
+		}
+		if p.Protocol != "" {
+			port.WithProtocol(p.Protocol)
+		}
+		upsert(portList, port, byContainerPortOrName)
+	}
+}
+
+func byEnvVarName(a, b corev1ac.EnvVarApplyConfiguration) bool {
+	return ptr.Equal(a.Name, b.Name)
+}
+
+func byContainerPortOrName(a, b corev1ac.ContainerPortApplyConfiguration) bool {
+	return ptr.Equal(a.ContainerPort, b.ContainerPort) || ptr.Equal(a.Name, b.Name)
+}
+
+type compare[T any] func(T, T) bool
+
+func upsert[T any](items *[]T, item *T, predicate compare[T]) {
+	for i, t := range *items {
+		if predicate(t, *item) {
+			(*items)[i] = *item
+		}
+	}
+	*items = append(*items, *item)
 }

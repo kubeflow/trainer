@@ -511,7 +511,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 			if err = fwk.RunEnforceMLPolicyPlugins(tc.runtimeInfo, tc.trainJob); err != nil {
 				t.Fatal(err)
 			}
-			objs, err := fwk.RunComponentBuilderPlugins(ctx, tc.runtimeJobTemplate, tc.runtimeInfo, tc.trainJob)
+			objs, err := fwk.RunComponentBuilderPlugins(ctx, tc.runtimeInfo, tc.trainJob)
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}

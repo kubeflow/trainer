@@ -209,7 +209,7 @@ func (m *MPI) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	}
 }
 
-func (m *MPI) Build(ctx context.Context, runtimeJobTemplate client.Object, info *runtime.Info, trainJob *trainer.TrainJob) ([]client.Object, error) {
+func (m *MPI) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
 	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.MPI == nil {
 		return nil, nil
 	}
@@ -224,7 +224,7 @@ func (m *MPI) Build(ctx context.Context, runtimeJobTemplate client.Object, info 
 		return nil, fmt.Errorf("failed to build ConfigMap with hostfile. Error: %v", err)
 	}
 
-	return []client.Object{secret, configMap}, nil
+	return []any{secret, configMap}, nil
 }
 
 func (m *MPI) buildSSHAuthSecret(ctx context.Context, trainJob *trainer.TrainJob) (*corev1.Secret, error) {

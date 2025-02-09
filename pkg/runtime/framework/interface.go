@@ -21,7 +21,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
@@ -54,7 +53,7 @@ type EnforceMLPolicyPlugin interface {
 
 type ComponentBuilderPlugin interface {
 	Plugin
-	Build(ctx context.Context, runtimeJobTemplate client.Object, info *runtime.Info, trainJob *trainer.TrainJob) ([]client.Object, error)
+	Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error)
 }
 
 type TerminalConditionPlugin interface {
