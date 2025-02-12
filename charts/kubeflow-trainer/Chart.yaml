@@ -14,9 +14,29 @@
 # limitations under the License.
 #
 
-resources:
-  - serviceaccount.yaml
-  - clusterrole.yaml
-  - clusterrolebinding.yaml
-  - role.yaml
-  - rolebinding.yaml
+apiVersion: v2
+
+name: kubeflow-trainer
+
+description: A Helm chart for deploying Kubeflow trainer on Kubernetes.
+
+version: 2.0.0
+
+appVersion: 2.0.0
+
+type: application
+
+dependencies:
+- name: jobset
+  repository: oci://us-central1-docker.pkg.dev/k8s-staging-images/charts
+  version: v0.8.0
+  condition: jobset.install
+
+keywords:
+- kubeflow trainer
+
+home: https://github.com/kubeflow/trainer
+
+maintainers:
+- name: ChenYi015
+  url: https://github.com/ChenYi015

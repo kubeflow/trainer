@@ -11,6 +11,27 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
+REPO := github.com/kubeflow/trainer
+TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
+
+# Location to install tool binaries
+LOCALBIN ?= $(PROJECT_DIR)/bin
+
+# Tool versions
+CONTROLLER_GEN_VERSION ?= v0.17.2
+ENVTEST_VERSION ?= release-0.20
+ENVTEST_K8S_VERSION ?= 1.31
+HELM_VERSION ?= v3.15.3
+HELM_UNITTEST_VERSION ?= 0.5.1
+HELM_DOCS_VERSION ?= v1.14.2
+
+# Tool binaries
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+HELM ?= $(LOCALBIN)/helm
+HELM_DOCS ?= $(LOCALBIN)/helm-docs
+
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
@@ -28,24 +49,6 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
-
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-
-# Tool Binaries
-LOCALBIN ?= $(PROJECT_DIR)/bin
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST ?= $(LOCALBIN)/setup-envtest
-
-ENVTEST_K8S_VERSION ?= 1.32
-
-# Instructions to download tools for development.
-.PHONY: envtest
-envtest: ## Download the setup-envtest binary if required.
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.20
-
-.PHONY: controller-gen
-controller-gen: ## Download the controller-gen binary if required.
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.2
 
 # Download external CRDs for Go integration testings.
 EXTERNAL_CRDS_DIR ?= $(PROJECT_DIR)/manifests/external-crds
@@ -65,11 +68,14 @@ scheduler-plugins-crd: ## Copy the CRDs from the Scheduler Plugins repository to
 # Instructions for code generation.
 .PHONY: manifests
 manifests: controller-gen ## Generate manifests.
+	# Skip outputing the RBAC and webhook manifests as we will sync them from the manifests templated by the Helm chart.
 	$(CONTROLLER_GEN) "crd:generateEmbeddedObjectMeta=true" rbac:roleName=kubeflow-trainer-controller-manager webhook \
 		paths="./pkg/apis/trainer/v1alpha1/...;./pkg/controller/...;./pkg/runtime/...;./pkg/webhooks/...;./pkg/util/cert/..." \
 		output:crd:artifacts:config=manifests/base/crds \
 		output:rbac:artifacts:config=manifests/base/rbac \
-		output:webhook:artifacts:config=manifests/base/webhook
+		output:rbac:none \
+		output:webhook:artifacts:config=manifests/base/webhook \
+		output:webhook:none
 
 .PHONY: generate
 generate: go-mod-download manifests ## Generate APIs and SDK.
@@ -124,3 +130,49 @@ test-python-integration: ## Run Python integration test.
 	pip install -r ./cmd/initializer/dataset/requirements.txt
 
 	pytest ./test/integration/initializer
+
+##@ Helm
+
+.PHONY: sync-manifests
+sync-manifests: ## Sync Kustomize manifests from manifests templated from Helm chart.
+	$(HELM) dependency update $(TRAINER_CHART_DIR)
+	hack/sync-manifests.sh
+
+.PHONY: helm-unittest
+helm-unittest: helm-unittest-plugin ## Run Helm chart unittests.
+	$(HELM) unittest $(TRAINER_CHART_DIR) --strict --file "tests/**/*_test.yaml"
+
+.PHONY: helm-lint
+helm-lint: ## Run Helm chart lint test.
+	docker run --rm --workdir /workspace --volume "$$(pwd):/workspace" quay.io/helmpack/chart-testing:latest ct lint --target-branch master --validate-maintainers=false
+
+.PHONY: helm-docs
+helm-docs: helm-docs-plugin ## Generates markdown documentation for helm charts from requirements and values files.
+	$(HELM_DOCS) --sort-values-order=file
+
+##@ Dependencies
+
+.PHONY: envtest
+envtest: ## Download the setup-envtest binary if necessary.
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
+
+.PHONY: controller-gen
+controller-gen: ## Download the controller-gen binary if necessary.
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION)
+
+.PHONY: helm
+helm: $(HELM) ## Download helm locally if necessary.
+$(HELM): $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install helm.sh/helm/v3/cmd/helm@$(HELM_VERSION)
+
+.PHONY: helm-unittest-plugin
+helm-unittest-plugin: helm ## Download helm unittest plugin locally if necessary.
+	if [ -z "$(shell $(HELM) plugin list | grep unittest)" ]; then \
+		echo "Installing helm unittest plugin"; \
+		$(HELM) plugin install https://github.com/helm-unittest/helm-unittest.git --version $(HELM_UNITTEST_VERSION); \
+	fi
+
+.PHONY: helm-docs-plugin
+helm-docs-plugin: $(HELM_DOCS) ## Download helm-docs plugin locally if necessary.
+$(HELM_DOCS): $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install github.com/norwoodj/helm-docs/cmd/helm-docs@$(HELM_DOCS_VERSION)
