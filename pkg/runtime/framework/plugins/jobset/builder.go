@@ -26,6 +26,7 @@ import (
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
+	"github.com/kubeflow/trainer/pkg/util/apply"
 )
 
 type Builder struct {
@@ -214,59 +215,13 @@ func (b *Builder) Build() *jobsetv1alpha2ac.JobSetApplyConfiguration {
 
 func upsertEnvVars(envVarList *[]corev1ac.EnvVarApplyConfiguration, envVars ...corev1.EnvVar) {
 	for _, e := range envVars {
-		envVar := corev1ac.EnvVar().WithName(e.Name)
-		if from := e.ValueFrom; from != nil {
-			source := corev1ac.EnvVarSource()
-			if ref := from.FieldRef; ref != nil {
-				source.WithFieldRef(corev1ac.ObjectFieldSelector().WithFieldPath(ref.FieldPath))
-			}
-			if ref := from.ResourceFieldRef; ref != nil {
-				source.WithResourceFieldRef(corev1ac.ResourceFieldSelector().
-					WithContainerName(ref.ContainerName).
-					WithResource(ref.Resource).
-					WithDivisor(ref.Divisor))
-			}
-			if ref := from.ConfigMapKeyRef; ref != nil {
-				key := corev1ac.ConfigMapKeySelector().WithKey(ref.Key).WithName(ref.Name)
-				if optional := ref.Optional; optional != nil {
-					key.WithOptional(*optional)
-				}
-				source.WithConfigMapKeyRef(key)
-			}
-			if ref := from.SecretKeyRef; ref != nil {
-				key := corev1ac.SecretKeySelector().WithKey(ref.Key).WithName(ref.Name)
-				if optional := ref.Optional; optional != nil {
-					key.WithOptional(*optional)
-				}
-				source.WithSecretKeyRef(key)
-			}
-			envVar.WithValueFrom(source)
-		} else {
-			envVar.WithValue(e.Value)
-		}
-		upsert(envVarList, envVar, byEnvVarName)
+		upsert(envVarList, apply.EnvVar(e), byEnvVarName)
 	}
 }
 
 func upsertPorts(portList *[]corev1ac.ContainerPortApplyConfiguration, ports ...corev1.ContainerPort) {
 	for _, p := range ports {
-		port := corev1ac.ContainerPort()
-		if p.ContainerPort > 0 {
-			port.WithContainerPort(p.ContainerPort)
-		}
-		if p.HostPort > 0 {
-			port.WithHostPort(p.HostPort)
-		}
-		if p.HostIP != "" {
-			port.WithHostIP(p.HostIP)
-		}
-		if p.Name != "" {
-			port.WithName(p.Name)
-		}
-		if p.Protocol != "" {
-			port.WithProtocol(p.Protocol)
-		}
-		upsert(portList, port, byContainerPortOrName)
+		upsert(portList, apply.ContainerPort(p), byContainerPortOrName)
 	}
 }
 
