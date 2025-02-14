@@ -18,7 +18,6 @@ package jobset
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
@@ -97,40 +96,27 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 // Launcher updates JobSet values for the launcher Job.
 func (b *Builder) Launcher(info *runtime.Info, trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
-		if rJob.Name == constants.JobLauncher {
+		if *rJob.Name == constants.JobLauncher {
 
-			// Update the volumes for the launcher Job.
-			b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes = append(
-				b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes...)
+			// Update the volumes for the Trainer Job.
+			upsertVolumes(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes...)
 
 			// Update values for the launcher container.
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
-				if container.Name == constants.ContainerLauncher {
+				if *container.Name == constants.ContainerLauncher {
 					// Update values from the Info object.
-					if info.Trainer.Env != nil {
+					if env := info.Trainer.Env; env != nil {
 						// Update JobSet envs from the Info.
-						envNames := sets.New[string]()
-						for _, env := range info.Trainer.Env {
-							envNames.Insert(env.Name)
-						}
-						trainerEnvs := info.Trainer.Env
-						// Info envs take precedence over the TrainingRuntime envs.
-						for _, env := range container.Env {
-							if !envNames.Has(env.Name) {
-								trainerEnvs = append(trainerEnvs, env)
-							}
-						}
-						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env = trainerEnvs
+						upsertEnvVars(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env, env...)
 					}
+
 					// Update the launcher container port.
-					if info.Trainer.ContainerPort != nil {
-						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports = append(
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *info.Trainer.ContainerPort)
+					if port := info.Trainer.ContainerPort; port != nil {
+						upsertPorts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *port)
 					}
 					// Update the launcher container volume mounts.
-					if info.Trainer.VolumeMounts != nil {
-						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts = append(
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, info.Trainer.VolumeMounts...)
+					if mounts := info.Trainer.VolumeMounts; mounts != nil {
+						upsertVolumeMounts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, mounts...)
 					}
 				}
 			}
@@ -148,8 +134,7 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.Trainer.NumNodes
 
 			// Update the volumes for the Trainer Job.
-			b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes = append(
-				b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes...)
+			upsertVolumes(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes...)
 
 			// Update values for the Trainer container.
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
@@ -188,9 +173,8 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 						upsertPorts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *port)
 					}
 					// Update the Trainer container volume mounts.
-					if info.Trainer.VolumeMounts != nil {
-						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts = append(
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, info.Trainer.VolumeMounts...)
+					if mounts := info.Trainer.VolumeMounts; mounts != nil {
+						upsertVolumeMounts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, mounts...)
 					}
 				}
 			}
@@ -231,12 +215,32 @@ func upsertPorts(portList *[]corev1ac.ContainerPortApplyConfiguration, ports ...
 	}
 }
 
+func upsertVolumes(volumeList *[]corev1ac.VolumeApplyConfiguration, volumes ...corev1.Volume) {
+	for _, v := range volumes {
+		upsert(volumeList, apply.Volume(v), byVolumeName)
+	}
+}
+
+func upsertVolumeMounts(mountList *[]corev1ac.VolumeMountApplyConfiguration, mounts ...corev1.VolumeMount) {
+	for _, m := range mounts {
+		upsert(mountList, apply.VolumeMount(m), byVolumeMountName)
+	}
+}
+
 func byEnvVarName(a, b corev1ac.EnvVarApplyConfiguration) bool {
 	return ptr.Equal(a.Name, b.Name)
 }
 
 func byContainerPortOrName(a, b corev1ac.ContainerPortApplyConfiguration) bool {
 	return ptr.Equal(a.ContainerPort, b.ContainerPort) || ptr.Equal(a.Name, b.Name)
+}
+
+func byVolumeName(a, b corev1ac.VolumeApplyConfiguration) bool {
+	return ptr.Equal(a.Name, b.Name)
+}
+
+func byVolumeMountName(a, b corev1ac.VolumeMountApplyConfiguration) bool {
+	return ptr.Equal(a.Name, b.Name)
 }
 
 type compare[T any] func(T, T) bool

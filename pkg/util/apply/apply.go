@@ -151,3 +151,25 @@ func Conditions(c ...metav1.Condition) []*metav1ac.ConditionApplyConfiguration {
 	}
 	return conditions
 }
+
+func Volume(v corev1.Volume) *corev1ac.VolumeApplyConfiguration {
+	volume := corev1ac.Volume().WithName(v.Name)
+	// FIXME
+	return volume
+}
+
+func VolumeMount(m corev1.VolumeMount) *corev1ac.VolumeMountApplyConfiguration {
+	volumeMount := corev1ac.VolumeMount().WithName(m.Name)
+	if m.MountPath != "" {
+		volumeMount.WithMountPath(m.MountPath)
+	}
+	return volumeMount
+}
+
+func VolumeMounts(v ...corev1.VolumeMount) []*corev1ac.VolumeMountApplyConfiguration {
+	var mounts []*corev1ac.VolumeMountApplyConfiguration
+	for _, mount := range v {
+		mounts = append(mounts, VolumeMount(mount))
+	}
+	return mounts
+}
