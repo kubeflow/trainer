@@ -121,7 +121,7 @@ func (c *CoScheduling) Build(_ context.Context, info *runtime.Info, trainJob *tr
 	podGroup := schedulerpluginsv1alpha1ac.PodGroup(trainJob.Name, trainJob.Namespace)
 
 	podGroup.WithSpec(schedulerpluginsv1alpha1ac.PodGroupSpec().
-		WithScheduleTimeoutSeconds(totalMembers).
+		WithMinMember(totalMembers).
 		WithMinResources(totalResources).
 		WithScheduleTimeoutSeconds(*info.RuntimePolicy.PodGroupPolicy.Coscheduling.ScheduleTimeoutSeconds))
 
