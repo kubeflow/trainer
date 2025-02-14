@@ -239,6 +239,7 @@ func upsert[T any](items *[]T, item *T, predicate compare[T]) {
 	for i, t := range *items {
 		if predicate(t, *item) {
 			(*items)[i] = *item
+			return
 		}
 	}
 	*items = append(*items, *item)
