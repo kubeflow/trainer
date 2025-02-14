@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -389,17 +390,17 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		registry           fwkplugins.Registry
-		runtimeInfo        *runtime.Info
-		trainJob           *trainer.TrainJob
-		runtimeJobTemplate client.Object
-		wantRuntimeInfo    *runtime.Info
-		wantObjs           []client.Object
-		wantError          error
+		registry        fwkplugins.Registry
+		runtimeInfo     *runtime.Info
+		trainingRuntime *trainer.TrainingRuntime
+		trainJob        *trainer.TrainJob
+		wantRuntimeInfo *runtime.Info
+		wantObjs        []k8sruntime.Object
+		wantError       error
 	}{
 		"succeeded to build PodGroup and JobSet with NumNodes from TrainJob": {
-			registry:           fwkplugins.NewRegistry(),
-			runtimeJobTemplate: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").DeepCopy(),
+			registry:        fwkplugins.NewRegistry(),
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").DeepCopy(),
 			runtimeInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicy: &trainer.MLPolicy{
@@ -431,6 +432,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 			},
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
 				Trainer(
 					testingutil.MakeTrainJobTrainerWrapper().
 						NumNodes(100).
@@ -468,7 +470,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 					},
 				},
 			},
-			wantObjs: []client.Object{
+			wantObjs: []k8sruntime.Object{
 				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
 					SchedulingTimeout(300).
 					MinMember(101). // 101 replicas = 100 Trainer nodes + 1 Initializer.
@@ -489,7 +491,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 		"an empty registry": {},
 	}
 	cmpOpts := []cmp.Option{
-		cmpopts.SortSlices(func(a, b client.Object) bool {
+		cmpopts.SortSlices(func(a, b k8sruntime.Object) bool {
 			return a.GetObjectKind().GroupVersionKind().String() < b.GetObjectKind().GroupVersionKind().String()
 		}),
 		cmpopts.EquateEmpty(),
@@ -498,9 +500,14 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
-			clientBuilder := testingutil.NewClientBuilder()
 
-			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder))
+			clientBuilder := testingutil.NewClientBuilder()
+			if tc.trainingRuntime != nil {
+				clientBuilder.WithObjects(tc.trainingRuntime)
+			}
+			c := clientBuilder.Build()
+
+			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -512,13 +519,21 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				t.Fatal(err)
 			}
 			objs, err := fwk.RunComponentBuilderPlugins(ctx, tc.runtimeInfo, tc.trainJob)
+
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}
+
 			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo); len(diff) != 0 {
 				t.Errorf("Unexpected runtime.Info (-want,+got)\n%s", diff)
 			}
-			if diff := cmp.Diff(tc.wantObjs, objs, cmpOpts...); len(diff) != 0 {
+
+			resultObjs, err := testingutil.UnstructuredToObject(c.Scheme(), objs...)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
 			}
 		})
@@ -654,14 +669,18 @@ func TestTerminalConditionPlugins(t *testing.T) {
 			if tc.jobSet != nil {
 				clientBuilder = clientBuilder.WithObjects(tc.jobSet)
 			}
-			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder))
+			c := clientBuilder.Build()
+
+			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder))
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			gotCond, gotErr := fwk.RunTerminalConditionPlugins(ctx, tc.trainJob)
 			if diff := cmp.Diff(tc.wantError, gotErr, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
+
 			if diff := cmp.Diff(tc.wantCondition, gotCond); len(diff) != 0 {
 				t.Errorf("Unexpected terminal condition (-want,+got):\n%s", diff)
 			}

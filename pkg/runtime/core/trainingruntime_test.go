@@ -26,8 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
@@ -45,7 +45,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 	cases := map[string]struct {
 		trainingRuntime *trainer.TrainingRuntime
 		trainJob        *trainer.TrainJob
-		wantObjs        []client.Object
+		wantObjs        []runtime.Object
 		wantError       error
 	}{
 		// Test cases for the PlainML MLPolicy.
@@ -73,7 +73,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						Obj(),
 				).
 				Obj(),
-			wantObjs: []client.Object{
+			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					InitContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					NumNodes(30).
@@ -137,7 +137,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						Obj(),
 				).
 				Obj(),
-			wantObjs: []client.Object{
+			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					NumNodes(100).
 					ContainerTrainer("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
@@ -205,7 +205,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						Obj(),
 				).
 				Obj(),
-			wantObjs: []client.Object{
+			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					NumNodes(100).
 					ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
@@ -278,7 +278,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						Obj(),
 				).
 				Obj(),
-			wantObjs: []client.Object{
+			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					NumNodes(30).
 					ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
@@ -355,7 +355,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						Obj(),
 				).
 				Obj(),
-			wantObjs: []client.Object{
+			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					NumNodes(100).
 					ContainerTrainer("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
@@ -418,8 +418,11 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 		},
 	}
 	cmpOpts := []cmp.Option{
-		cmpopts.SortSlices(func(a, b client.Object) bool {
+		cmpopts.SortSlices(func(a, b runtime.Object) bool {
 			return a.GetObjectKind().GroupVersionKind().String() < b.GetObjectKind().GroupVersionKind().String()
+		}),
+		cmpopts.SortSlices(func(a, b corev1.EnvVar) bool {
+			return a.Name < b.Name
 		}),
 		cmpopts.EquateEmpty(),
 		cmpopts.SortMaps(func(a, b string) bool { return a < b }),
@@ -432,16 +435,24 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			if tc.trainingRuntime != nil {
 				clientBuilder.WithObjects(tc.trainingRuntime)
 			}
+			c := clientBuilder.Build()
 
-			trainingRuntime, err := NewTrainingRuntime(ctx, clientBuilder.Build(), testingutil.AsIndex(clientBuilder))
+			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder))
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			objs, err := trainingRuntime.NewObjects(ctx, tc.trainJob)
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
-			if diff := cmp.Diff(tc.wantObjs, objs, cmpOpts...); len(diff) != 0 {
+
+			resultObjs, err := testingutil.UnstructuredToObject(c.Scheme(), objs...)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
 			}
 		})

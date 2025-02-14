@@ -204,7 +204,6 @@ func (j *JobSetWrapper) InitContainerDatasetInitializerEnvFrom(envFrom []corev1.
 			for k, container := range rJob.Template.Spec.Template.Spec.InitContainers {
 				if container.Name == constants.ContainerDatasetInitializer {
 					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[k].EnvFrom = envFrom
-
 				}
 			}
 		}
@@ -218,7 +217,6 @@ func (j *JobSetWrapper) InitContainerModelInitializerEnv(env []corev1.EnvVar) *J
 			for k, container := range rJob.Template.Spec.Template.Spec.InitContainers {
 				if container.Name == constants.ContainerModelInitializer {
 					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[k].Env = env
-
 				}
 			}
 		}
@@ -232,7 +230,6 @@ func (j *JobSetWrapper) InitContainerModelInitializerEnvFrom(envFrom []corev1.En
 			for k, container := range rJob.Template.Spec.Template.Spec.InitContainers {
 				if container.Name == constants.ContainerModelInitializer {
 					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[k].EnvFrom = envFrom
-
 				}
 			}
 		}

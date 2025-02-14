@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/runtime"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
@@ -41,7 +41,7 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 	cases := map[string]struct {
 		trainJob               *trainer.TrainJob
 		clusterTrainingRuntime *trainer.ClusterTrainingRuntime
-		wantObjs               []client.Object
+		wantObjs               []runtime.Object
 		wantError              error
 	}{
 		"succeeded to build PodGroup and JobSet with NumNodes from the Runtime and container from the Trainer.": {
@@ -63,7 +63,7 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 						Obj(),
 				).
 				Obj(),
-			wantObjs: []client.Object{
+			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					InitContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					NumNodes(100).
@@ -95,7 +95,7 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 		},
 	}
 	cmpOpts := []cmp.Option{
-		cmpopts.SortSlices(func(a, b client.Object) bool {
+		cmpopts.SortSlices(func(a, b runtime.Object) bool {
 			return a.GetObjectKind().GroupVersionKind().String() < b.GetObjectKind().GroupVersionKind().String()
 		}),
 		cmpopts.EquateEmpty(),
@@ -109,8 +109,9 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 			if tc.clusterTrainingRuntime != nil {
 				clientBuilder.WithObjects(tc.clusterTrainingRuntime)
 			}
+			c := clientBuilder.Build()
 
-			trainingRuntime, err := NewTrainingRuntime(ctx, clientBuilder.Build(), testingutil.AsIndex(clientBuilder))
+			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -120,15 +121,22 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 				t.Fatal("Failed type assertion from Runtime interface to TrainingRuntime")
 			}
 
-			clTrainingRuntime, err := NewClusterTrainingRuntime(ctx, clientBuilder.Build(), testingutil.AsIndex(clientBuilder))
+			clTrainingRuntime, err := NewClusterTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder))
 			if err != nil {
 				t.Fatal(err)
 			}
+
 			objs, err := clTrainingRuntime.NewObjects(ctx, tc.trainJob)
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
-			if diff := cmp.Diff(tc.wantObjs, objs, cmpOpts...); len(diff) != 0 {
+
+			resultObjs, err := testingutil.UnstructuredToObject(c.Scheme(), objs...)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
 			}
 		})
