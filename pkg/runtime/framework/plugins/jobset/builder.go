@@ -165,11 +165,17 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 						if args := trainJob.Spec.Trainer.Args; args != nil {
 							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = args
 						}
-						if resourcesPerNode := trainJob.Spec.Trainer.ResourcesPerNode; resourcesPerNode != nil {
+						if resourcesPerNode := trainJob.Spec.Trainer.ResourcesPerNode; resourcesPerNode != nil &&
+							(resourcesPerNode.Limits != nil || resourcesPerNode.Requests != nil) {
+							requirements := corev1ac.ResourceRequirements()
+							if limits := resourcesPerNode.Limits; limits != nil {
+								requirements.WithLimits(limits)
+							}
+							if requests := resourcesPerNode.Requests; requests != nil {
+								requirements.WithRequests(requests)
+							}
 							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
-								WithResources(corev1ac.ResourceRequirements().
-									WithRequests(resourcesPerNode.Requests).
-									WithLimits(resourcesPerNode.Limits))
+								WithResources(requirements)
 						}
 					}
 					// Update values from the Info object.
