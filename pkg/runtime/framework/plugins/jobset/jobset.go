@@ -93,9 +93,19 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 	// Get the runtime as unstructured from the TrainJob ref
 	runtimeJobTemplate := &unstructured.Unstructured{}
 	runtimeJobTemplate.SetAPIVersion(trainer.GroupVersion.String())
-	runtimeJobTemplate.SetKind(*trainJob.Spec.RuntimeRef.Kind)
-	err := j.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, runtimeJobTemplate)
-	if err != nil {
+
+	if kind := trainJob.Spec.RuntimeRef.Kind; kind != nil {
+		runtimeJobTemplate.SetKind(*kind)
+	} else {
+		runtimeJobTemplate.SetKind(trainer.ClusterTrainingRuntimeKind)
+	}
+
+	key := client.ObjectKey{Name: trainJob.Spec.RuntimeRef.Name}
+	if runtimeJobTemplate.GetKind() == trainer.TrainingRuntimeKind {
+		key.Namespace = trainJob.Namespace
+	}
+
+	if err := j.client.Get(ctx, key, runtimeJobTemplate); err != nil {
 		return nil, err
 	}
 
