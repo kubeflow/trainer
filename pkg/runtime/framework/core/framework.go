@@ -117,13 +117,15 @@ func (f *Framework) RunCustomValidationPlugins(oldObj, newObj *trainer.TrainJob)
 func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]*unstructured.Unstructured, error) {
 	var objs []*unstructured.Unstructured
 	for _, plugin := range f.componentBuilderPlugins {
-		if component, err := plugin.Build(ctx, info, trainJob); err != nil {
+		if components, err := plugin.Build(ctx, info, trainJob); err != nil {
 			return nil, err
-		} else if component != nil {
-			if content, err := k8sruntime.DefaultUnstructuredConverter.ToUnstructured(component); err != nil {
-				return nil, err
-			} else {
-				objs = append(objs, &unstructured.Unstructured{Object: content})
+		} else if components != nil {
+			for _, component := range components {
+				if content, err := k8sruntime.DefaultUnstructuredConverter.ToUnstructured(component); err != nil {
+					return nil, err
+				} else {
+					objs = append(objs, &unstructured.Unstructured{Object: content})
+				}
 			}
 		}
 	}
