@@ -26,6 +26,7 @@ import (
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
+	"github.com/kubeflow/trainer/pkg/util/apply"
 )
 
 var _ framework.EnforceMLPolicyPlugin = (*PlainML)(nil)
@@ -57,7 +58,7 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 
 	// Add envs from the TrainJob.
 	if trainJob.Spec.Trainer != nil {
-		info.Trainer.Env = append(info.Trainer.Env, trainJob.Spec.Trainer.Env...)
+		apply.UpsertEnvVars(&info.Trainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...))
 	}
 
 	// Update total Pod requests for the PodGroupPolicy plugin.

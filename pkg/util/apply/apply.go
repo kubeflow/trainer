@@ -18,37 +18,66 @@ package apply
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
-	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
-func ContainerPort(p corev1.ContainerPort) *corev1ac.ContainerPortApplyConfiguration {
-	port := corev1ac.ContainerPort()
-	if p.ContainerPort > 0 {
-		port.WithContainerPort(p.ContainerPort)
+func UpsertEnvVar(envVarList *[]corev1ac.EnvVarApplyConfiguration, envVar ...*corev1ac.EnvVarApplyConfiguration) {
+	for _, e := range envVar {
+		upsert(envVarList, *e, byEnvVarName)
 	}
-	if p.HostPort > 0 {
-		port.WithHostPort(p.HostPort)
-	}
-	if p.HostIP != "" {
-		port.WithHostIP(p.HostIP)
-	}
-	if p.Name != "" {
-		port.WithName(p.Name)
-	}
-	if p.Protocol != "" {
-		port.WithProtocol(p.Protocol)
-	}
-	return port
 }
 
-func ContainerPorts(p ...corev1.ContainerPort) []*corev1ac.ContainerPortApplyConfiguration {
-	var ports []*corev1ac.ContainerPortApplyConfiguration
-	for _, port := range p {
-		ports = append(ports, ContainerPort(port))
+func UpsertEnvVars(envVarList *[]corev1ac.EnvVarApplyConfiguration, envVars []corev1ac.EnvVarApplyConfiguration) {
+	for _, e := range envVars {
+		upsert(envVarList, e, byEnvVarName)
 	}
-	return ports
+}
+
+func UpsertPort(portList *[]corev1ac.ContainerPortApplyConfiguration, port ...*corev1ac.ContainerPortApplyConfiguration) {
+	for _, p := range port {
+		upsert(portList, *p, byContainerPortOrName)
+	}
+}
+
+func UpsertVolumes(volumeList *[]corev1ac.VolumeApplyConfiguration, volumes []corev1ac.VolumeApplyConfiguration) {
+	for _, v := range volumes {
+		upsert(volumeList, v, byVolumeName)
+	}
+}
+
+func UpsertVolumeMounts(mountList *[]corev1ac.VolumeMountApplyConfiguration, mounts []corev1ac.VolumeMountApplyConfiguration) {
+	for _, m := range mounts {
+		upsert(mountList, m, byVolumeMountName)
+	}
+}
+
+func byEnvVarName(a, b corev1ac.EnvVarApplyConfiguration) bool {
+	return ptr.Equal(a.Name, b.Name)
+}
+
+func byContainerPortOrName(a, b corev1ac.ContainerPortApplyConfiguration) bool {
+	return ptr.Equal(a.ContainerPort, b.ContainerPort) || ptr.Equal(a.Name, b.Name)
+}
+
+func byVolumeName(a, b corev1ac.VolumeApplyConfiguration) bool {
+	return ptr.Equal(a.Name, b.Name)
+}
+
+func byVolumeMountName(a, b corev1ac.VolumeMountApplyConfiguration) bool {
+	return ptr.Equal(a.Name, b.Name)
+}
+
+type compare[T any] func(T, T) bool
+
+func upsert[T any](items *[]T, item T, predicate compare[T]) {
+	for i, t := range *items {
+		if predicate(t, item) {
+			(*items)[i] = item
+			return
+		}
+	}
+	*items = append(*items, item)
 }
 
 func EnvVar(e corev1.EnvVar) *corev1ac.EnvVarApplyConfiguration {
@@ -85,91 +114,10 @@ func EnvVar(e corev1.EnvVar) *corev1ac.EnvVarApplyConfiguration {
 	return envVar
 }
 
-func EnvVars(e ...corev1.EnvVar) []*corev1ac.EnvVarApplyConfiguration {
-	var envs []*corev1ac.EnvVarApplyConfiguration
+func EnvVars(e ...corev1.EnvVar) []corev1ac.EnvVarApplyConfiguration {
+	var envs []corev1ac.EnvVarApplyConfiguration
 	for _, env := range e {
-		envs = append(envs, EnvVar(env))
+		envs = append(envs, *EnvVar(env))
 	}
 	return envs
-}
-
-func EnvFromSource(e corev1.EnvFromSource) *corev1ac.EnvFromSourceApplyConfiguration {
-	envVarFrom := corev1ac.EnvFromSource()
-	if e.Prefix != "" {
-		envVarFrom.WithPrefix(e.Prefix)
-	}
-	if ref := e.ConfigMapRef; ref != nil {
-		source := corev1ac.ConfigMapEnvSource().WithName(ref.Name)
-		if ref.Optional != nil {
-			source.WithOptional(*ref.Optional)
-		}
-		envVarFrom.WithConfigMapRef(source)
-	}
-	if ref := e.SecretRef; ref != nil {
-		source := corev1ac.SecretEnvSource().WithName(ref.Name)
-		if ref.Optional != nil {
-			source.WithOptional(*ref.Optional)
-		}
-		envVarFrom.WithSecretRef(source)
-	}
-	return envVarFrom
-}
-
-func EnvFromSources(e ...corev1.EnvFromSource) []*corev1ac.EnvFromSourceApplyConfiguration {
-	var envs []*corev1ac.EnvFromSourceApplyConfiguration
-	for _, env := range e {
-		envs = append(envs, EnvFromSource(env))
-	}
-	return envs
-}
-
-func Condition(c metav1.Condition) *metav1ac.ConditionApplyConfiguration {
-	condition := metav1ac.Condition().
-		WithObservedGeneration(c.ObservedGeneration)
-	if c.Type != "" {
-		condition.WithType(c.Type)
-	}
-	if c.Message != "" {
-		condition.WithMessage(c.Message)
-	}
-	if c.Reason != "" {
-		condition.WithReason(c.Reason)
-	}
-	if c.Status != "" {
-		condition.WithStatus(c.Status)
-	}
-	if !c.LastTransitionTime.IsZero() {
-		condition.WithLastTransitionTime(c.LastTransitionTime)
-	}
-	return condition
-}
-
-func Conditions(c ...metav1.Condition) []*metav1ac.ConditionApplyConfiguration {
-	var conditions []*metav1ac.ConditionApplyConfiguration
-	for _, condition := range c {
-		conditions = append(conditions, Condition(condition))
-	}
-	return conditions
-}
-
-func Volume(v corev1.Volume) *corev1ac.VolumeApplyConfiguration {
-	volume := corev1ac.Volume().WithName(v.Name)
-	// FIXME
-	return volume
-}
-
-func VolumeMount(m corev1.VolumeMount) *corev1ac.VolumeMountApplyConfiguration {
-	volumeMount := corev1ac.VolumeMount().WithName(m.Name)
-	if m.MountPath != "" {
-		volumeMount.WithMountPath(m.MountPath)
-	}
-	return volumeMount
-}
-
-func VolumeMounts(v ...corev1.VolumeMount) []*corev1ac.VolumeMountApplyConfiguration {
-	var mounts []*corev1ac.VolumeMountApplyConfiguration
-	for _, mount := range v {
-		mounts = append(mounts, VolumeMount(mount))
-	}
-	return mounts
 }

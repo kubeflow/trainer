@@ -30,7 +30,6 @@ import (
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
@@ -44,6 +43,7 @@ import (
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
+	"github.com/kubeflow/trainer/pkg/util/apply"
 )
 
 type MPI struct {
@@ -96,49 +96,35 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 	info.Trainer.NumProcPerNode = numProcPerNode
 
 	// Add Secret and ConfigMap volumes to the Info object
-	info.Volumes = []corev1.Volume{
-		{
-			Name: constants.MPISSHAuthVolumeName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: trainJob.Name + constants.MPISSHAuthSecretSuffix,
-					Items: []corev1.KeyToPath{
-						{
-							Key:  corev1.SSHAuthPrivateKey,
-							Path: constants.MPISSHPrivateKeyFile,
-						},
-						{
-							Key:  constants.MPISSHPublicKey,
-							Path: constants.MPISSHPublicKeyFile,
-						},
-						{
-							Key:  constants.MPISSHPublicKey,
-							Path: constants.MPISSHAuthorizedKeys,
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: constants.MPIHostfileVolumeName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: trainJob.Name + constants.MPIHostfileConfigMapSuffix,
-					},
-				},
-			},
-		},
+	info.Volumes = []corev1ac.VolumeApplyConfiguration{
+		*corev1ac.Volume().
+			WithName(constants.MPISSHAuthVolumeName).
+			WithSecret(corev1ac.SecretVolumeSource().
+				WithSecretName(trainJob.Name+constants.MPISSHAuthSecretSuffix).
+				WithItems(
+					corev1ac.KeyToPath().
+						WithKey(corev1.SSHAuthPrivateKey).
+						WithPath(constants.MPISSHPrivateKeyFile),
+					corev1ac.KeyToPath().
+						WithKey(constants.MPISSHPublicKey).
+						WithPath(constants.MPISSHPublicKeyFile),
+					corev1ac.KeyToPath().
+						WithKey(constants.MPISSHPublicKey).
+						WithPath(constants.MPISSHAuthorizedKeys),
+				)),
+		*corev1ac.Volume().
+			WithName(constants.MPIHostfileVolumeName).
+			WithConfigMap(corev1ac.ConfigMapVolumeSource().
+				WithName(trainJob.Name + constants.MPIHostfileConfigMapSuffix)),
 	}
-	info.VolumeMounts = []corev1.VolumeMount{
-		{
-			Name:      constants.MPISSHAuthVolumeName,
-			MountPath: info.RuntimePolicy.MLPolicy.MPI.SSHAuthMountPath,
-		},
-		{
-			Name:      constants.MPIHostfileVolumeName,
-			MountPath: constants.MPIHostfileDir,
-		},
+
+	info.VolumeMounts = []corev1ac.VolumeMountApplyConfiguration{
+		*corev1ac.VolumeMount().
+			WithName(constants.MPISSHAuthVolumeName).
+			WithMountPath(info.RuntimePolicy.MLPolicy.MPI.SSHAuthMountPath),
+		*corev1ac.VolumeMount().
+			WithName(constants.MPIHostfileVolumeName).
+			WithMountPath(constants.MPIHostfileDir),
 	}
 
 	// Update envs for Info object.
@@ -146,39 +132,23 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 	// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 	// TODO (andreyvelich): Support other MPI implementations.
-	var infoEnvs []corev1.EnvVar
+
+	if trainJob.Spec.Trainer != nil {
+		info.Trainer.Env = apply.EnvVars(trainJob.Spec.Trainer.Env...)
+	}
+
 	switch info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
 	case trainer.MPIImplementationOpenMPI:
-		infoEnvs = append(infoEnvs, []corev1.EnvVar{
-			{
-				Name:  constants.OpenMPIEnvHostFileLocation,
-				Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),
-			}}...)
+		apply.UpsertEnvVar(&info.Trainer.Env, corev1ac.EnvVar().
+			WithName(constants.OpenMPIEnvHostFileLocation).
+			WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)))
 	default:
 		return fmt.Errorf("MPI implementation for %s doesn't supported", info.RuntimePolicy.MLPolicy.MPI.MPIImplementation)
 	}
 
-	// Set for all Info envs.
-	envNames := sets.New[string]()
-	for _, env := range infoEnvs {
-		envNames.Insert(env.Name)
-	}
-	// Info envs take precedence over TrainJob envs.
-	if trainJob.Spec.Trainer != nil {
-		for _, env := range trainJob.Spec.Trainer.Env {
-			if !envNames.Has(env.Name) {
-				info.Trainer.Env = append(info.Trainer.Env, corev1.EnvVar{Name: env.Name, Value: env.Value})
-			}
-		}
-	}
-
-	// Insert MPI distributed envs into the list end.
-	info.Trainer.Env = append(info.Trainer.Env, infoEnvs...)
-
 	// Add container port for the headless service.
-	info.Trainer.ContainerPort = &corev1.ContainerPort{
-		ContainerPort: constants.ContainerTrainerPort,
-	}
+	info.Trainer.ContainerPort = corev1ac.ContainerPort().
+		WithContainerPort(constants.ContainerTrainerPort)
 
 	// Update total Pod requests for the PodGroupPolicy plugin.
 	for rName := range info.TotalRequests {

@@ -20,6 +20,7 @@ import (
 	"maps"
 
 	corev1 "k8s.io/api/core/v1"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	kueuelr "sigs.k8s.io/kueue/pkg/util/limitrange"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
@@ -47,10 +48,10 @@ type Trainer struct {
 	NumProcPerNode string
 	// TODO (andreyvelich). Potentially, we can use map for env and sort it to improve code.
 	// Context: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823267183
-	Env           []corev1.EnvVar
-	ContainerPort *corev1.ContainerPort
-	Volumes       []corev1.Volume
-	VolumeMounts  []corev1.VolumeMount
+	Env           []corev1ac.EnvVarApplyConfiguration
+	ContainerPort *corev1ac.ContainerPortApplyConfiguration
+	Volumes       []corev1ac.VolumeApplyConfiguration
+	VolumeMounts  []corev1ac.VolumeMountApplyConfiguration
 }
 
 // TODO (andreyvelich): Potentially, we can add ScheduleTimeoutSeconds to the Scheduler for consistency.

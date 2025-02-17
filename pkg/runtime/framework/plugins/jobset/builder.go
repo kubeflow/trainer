@@ -17,9 +17,7 @@ limitations under the License.
 package jobset
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
-	"k8s.io/utils/ptr"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
@@ -51,12 +49,11 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].Env
 					// Update the dataset initializer envs.
 					if storageUri := trainJob.Spec.DatasetConfig.StorageUri; storageUri != nil {
-						upsertEnvVars(env, corev1.EnvVar{
-							Name:  InitializerEnvStorageUri,
-							Value: *storageUri,
-						})
+						apply.UpsertEnvVar(env, corev1ac.EnvVar().
+							WithName(InitializerEnvStorageUri).
+							WithValue(*storageUri))
 					}
-					upsertEnvVars(env, trainJob.Spec.DatasetConfig.Env...)
+					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.DatasetConfig.Env...))
 					// Update the dataset initializer secret reference.
 					if trainJob.Spec.DatasetConfig.SecretRef != nil {
 						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].
@@ -73,12 +70,11 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 					// Update the model initializer envs.
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].Env
 					if storageUri := trainJob.Spec.ModelConfig.Input.StorageUri; storageUri != nil {
-						upsertEnvVars(env, corev1.EnvVar{
-							Name:  InitializerEnvStorageUri,
-							Value: *storageUri,
-						})
+						apply.UpsertEnvVar(env, corev1ac.EnvVar().
+							WithName(InitializerEnvStorageUri).
+							WithValue(*storageUri))
 					}
-					upsertEnvVars(env, trainJob.Spec.ModelConfig.Input.Env...)
+					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.ModelConfig.Input.Env...))
 					// Update the model initializer secret reference.
 					if trainJob.Spec.ModelConfig.Input.SecretRef != nil {
 						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].
@@ -99,7 +95,7 @@ func (b *Builder) Launcher(info *runtime.Info, trainJob *trainer.TrainJob) *Buil
 		if *rJob.Name == constants.JobLauncher {
 
 			// Update the volumes for the Trainer Job.
-			upsertVolumes(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes...)
+			apply.UpsertVolumes(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes)
 
 			// Update values for the launcher container.
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
@@ -107,16 +103,16 @@ func (b *Builder) Launcher(info *runtime.Info, trainJob *trainer.TrainJob) *Buil
 					// Update values from the Info object.
 					if env := info.Trainer.Env; env != nil {
 						// Update JobSet envs from the Info.
-						upsertEnvVars(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env, env...)
+						apply.UpsertEnvVars(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env, env)
 					}
 
 					// Update the launcher container port.
 					if port := info.Trainer.ContainerPort; port != nil {
-						upsertPorts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *port)
+						apply.UpsertPort(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, port)
 					}
 					// Update the launcher container volume mounts.
 					if mounts := info.Trainer.VolumeMounts; mounts != nil {
-						upsertVolumeMounts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, mounts...)
+						apply.UpsertVolumeMounts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, mounts)
 					}
 				}
 			}
@@ -134,7 +130,7 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.Trainer.NumNodes
 
 			// Update the volumes for the Trainer Job.
-			upsertVolumes(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes...)
+			apply.UpsertVolumes(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes)
 
 			// Update values for the Trainer container.
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
@@ -166,15 +162,15 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 					// Update values from the Info object.
 					if env := info.Trainer.Env; env != nil {
 						// Update JobSet envs from the Info.
-						upsertEnvVars(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env, env...)
+						apply.UpsertEnvVars(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env, env)
 					}
 					// Update the Trainer container port.
 					if port := info.Trainer.ContainerPort; port != nil {
-						upsertPorts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *port)
+						apply.UpsertPort(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, port)
 					}
 					// Update the Trainer container volume mounts.
 					if mounts := info.Trainer.VolumeMounts; mounts != nil {
-						upsertVolumeMounts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, mounts...)
+						apply.UpsertVolumeMounts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, mounts)
 					}
 				}
 			}
@@ -201,56 +197,4 @@ func (b *Builder) Suspend(suspend *bool) *Builder {
 
 func (b *Builder) Build() *jobsetv1alpha2ac.JobSetApplyConfiguration {
 	return b.JobSetApplyConfiguration
-}
-
-func upsertEnvVars(envVarList *[]corev1ac.EnvVarApplyConfiguration, envVars ...corev1.EnvVar) {
-	for _, e := range envVars {
-		upsert(envVarList, apply.EnvVar(e), byEnvVarName)
-	}
-}
-
-func upsertPorts(portList *[]corev1ac.ContainerPortApplyConfiguration, ports ...corev1.ContainerPort) {
-	for _, p := range ports {
-		upsert(portList, apply.ContainerPort(p), byContainerPortOrName)
-	}
-}
-
-func upsertVolumes(volumeList *[]corev1ac.VolumeApplyConfiguration, volumes ...corev1.Volume) {
-	for _, v := range volumes {
-		upsert(volumeList, apply.Volume(v), byVolumeName)
-	}
-}
-
-func upsertVolumeMounts(mountList *[]corev1ac.VolumeMountApplyConfiguration, mounts ...corev1.VolumeMount) {
-	for _, m := range mounts {
-		upsert(mountList, apply.VolumeMount(m), byVolumeMountName)
-	}
-}
-
-func byEnvVarName(a, b corev1ac.EnvVarApplyConfiguration) bool {
-	return ptr.Equal(a.Name, b.Name)
-}
-
-func byContainerPortOrName(a, b corev1ac.ContainerPortApplyConfiguration) bool {
-	return ptr.Equal(a.ContainerPort, b.ContainerPort) || ptr.Equal(a.Name, b.Name)
-}
-
-func byVolumeName(a, b corev1ac.VolumeApplyConfiguration) bool {
-	return ptr.Equal(a.Name, b.Name)
-}
-
-func byVolumeMountName(a, b corev1ac.VolumeMountApplyConfiguration) bool {
-	return ptr.Equal(a.Name, b.Name)
-}
-
-type compare[T any] func(T, T) bool
-
-func upsert[T any](items *[]T, item *T, predicate compare[T]) {
-	for i, t := range *items {
-		if predicate(t, *item) {
-			(*items)[i] = *item
-			return
-		}
-	}
-	*items = append(*items, *item)
 }

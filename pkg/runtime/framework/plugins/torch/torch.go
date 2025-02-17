@@ -20,10 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -32,6 +31,7 @@ import (
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
+	"github.com/kubeflow/trainer/pkg/util/apply"
 )
 
 type Torch struct{}
@@ -77,54 +77,33 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	// TODO (andreyvelich): Add validation to check that TrainJob doesn't have "PET_" envs.
 	// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
-
-	infoEnvs := []corev1.EnvVar{
-		{
-			Name:  constants.TorchEnvNumNodes,
-			Value: fmt.Sprintf("%d", ptr.Deref(numNodes, 1)),
-		},
-		{
-			Name:  constants.TorchEnvNumProcPerNode,
-			Value: numProcPerNode.String(),
-		},
-		{
-			Name: constants.TorchEnvNodeRank,
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: constants.JobCompletionIndexFieldPath,
-				},
-			},
-		},
-		{
-			Name:  constants.TorchEnvMasterAddr,
-			Value: fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.JobTrainerNode, trainJob.Name),
-		},
-		{
-			Name:  constants.TorchEnvMasterPort,
-			Value: fmt.Sprintf("%d", constants.ContainerTrainerPort),
-		},
-	}
-
-	// Set for all Info envs.
-	envNames := sets.New[string]()
-	for _, env := range infoEnvs {
-		envNames.Insert(env.Name)
-	}
-	// Info envs take precedence over TrainJob envs.
 	if trainJob.Spec.Trainer != nil {
-		for _, env := range trainJob.Spec.Trainer.Env {
-			if !envNames.Has(env.Name) {
-				info.Trainer.Env = append(info.Trainer.Env, corev1.EnvVar{Name: env.Name, Value: env.Value})
-			}
-		}
+		info.Trainer.Env = apply.EnvVars(trainJob.Spec.Trainer.Env...)
 	}
-	// Insert Torch distributed envs into the list end.
-	info.Trainer.Env = append(info.Trainer.Env, infoEnvs...)
+
+	apply.UpsertEnvVar(&info.Trainer.Env,
+		corev1ac.EnvVar().
+			WithName(constants.TorchEnvNumNodes).
+			WithValue(fmt.Sprintf("%d", ptr.Deref(numNodes, 1))),
+		corev1ac.EnvVar().
+			WithName(constants.TorchEnvNumProcPerNode).
+			WithValue(numProcPerNode.String()),
+		corev1ac.EnvVar().
+			WithName(constants.TorchEnvNodeRank).
+			WithValueFrom(corev1ac.EnvVarSource().
+				WithFieldRef(corev1ac.ObjectFieldSelector().
+					WithFieldPath(constants.JobCompletionIndexFieldPath))),
+		corev1ac.EnvVar().
+			WithName(constants.TorchEnvMasterAddr).
+			WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.JobTrainerNode, trainJob.Name)),
+		corev1ac.EnvVar().
+			WithName(constants.TorchEnvMasterPort).
+			WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+	)
 
 	// Add container port for the headless service.
-	info.Trainer.ContainerPort = &corev1.ContainerPort{
-		ContainerPort: constants.ContainerTrainerPort,
-	}
+	info.Trainer.ContainerPort = corev1ac.ContainerPort().
+		WithContainerPort(constants.ContainerTrainerPort)
 
 	// Update total Pod requests for the PodGroupPolicy plugin.
 	for rName := range info.TotalRequests {
