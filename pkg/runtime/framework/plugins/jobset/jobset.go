@@ -23,12 +23,14 @@ import (
 	"maps"
 
 	"github.com/go-logr/logr"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -88,6 +90,20 @@ func (j *JobSet) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
 	if info == nil || trainJob == nil {
 		return nil, fmt.Errorf("runtime info or object is missing")
+	}
+
+	// Do not update the JobSet if it already exists and is not suspended
+	oldJobSet := &jobsetv1alpha2.JobSet{}
+	if err := j.client.Get(ctx, client.ObjectKeyFromObject(trainJob), oldJobSet); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		oldJobSet = nil
+	}
+	if oldJobSet != nil &&
+		!ptr.Deref(trainJob.Spec.Suspend, false) &&
+		!ptr.Deref(oldJobSet.Spec.Suspend, false) {
+		return nil, nil
 	}
 
 	// Get the runtime as unstructured from the TrainJob ref
