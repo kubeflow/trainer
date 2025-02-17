@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -105,24 +107,37 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) (objsOpState, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	objs, err := runtime.NewObjects(ctx, trainJob)
+	objects, err := runtime.NewObjects(ctx, trainJob)
 	if err != nil {
 		return buildFailed, err
 	}
-	for _, obj := range objs {
-		var gvk schema.GroupVersionKind
-		if gvk, err = apiutil.GVKForObject(obj.DeepCopyObject(), r.client.Scheme()); err != nil {
-			return buildFailed, err
-		}
-
-		logKeysAndValues := []any{
-			"groupVersionKind", gvk.String(),
-			"namespace", obj.GetNamespace(),
-			"name", obj.GetName(),
+	for _, object := range objects {
+		// TODO (astefanutti): Remove conversion to unstructured when the runtime.ApplyConfiguration
+		//  interface becomes available and first-class SSA method is added to the controller-runtime
+		// client. See https://github.com/kubernetes/kubernetes/pull/129313
+		var obj client.Object
+		if o, ok := object.(client.Object); ok {
+			obj = o
+		} else {
+			if u, err := k8sruntime.DefaultUnstructuredConverter.ToUnstructured(object); err != nil {
+				return buildFailed, err
+			} else {
+				obj = &unstructured.Unstructured{Object: u}
+			}
 		}
 
 		if err := r.client.Patch(ctx, obj, client.Apply, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
 			return buildFailed, err
+		}
+
+		var gvk schema.GroupVersionKind
+		if gvk, err = apiutil.GVKForObject(obj.DeepCopyObject(), r.client.Scheme()); err != nil {
+			return buildFailed, err
+		}
+		logKeysAndValues := []any{
+			"groupVersionKind", gvk.String(),
+			"namespace", obj.GetNamespace(),
+			"name", obj.GetName(),
 		}
 
 		log.V(5).Info("Succeeded to update object", logKeysAndValues...)

@@ -528,7 +528,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				t.Errorf("Unexpected runtime.Info (-want,+got)\n%s", diff)
 			}
 
-			resultObjs, err := testingutil.UnstructuredToObject(c.Scheme(), objs...)
+			resultObjs, err := testingutil.ToObject(c.Scheme(), objs...)
 			if err != nil {
 				t.Fatal(err)
 			}

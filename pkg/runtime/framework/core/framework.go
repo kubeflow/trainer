@@ -21,8 +21,6 @@ import (
 	"errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -114,19 +112,13 @@ func (f *Framework) RunCustomValidationPlugins(oldObj, newObj *trainer.TrainJob)
 	return aggregatedWarnings, aggregatedErrors
 }
 
-func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]*unstructured.Unstructured, error) {
-	var objs []*unstructured.Unstructured
+func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
+	var objs []any
 	for _, plugin := range f.componentBuilderPlugins {
 		if components, err := plugin.Build(ctx, info, trainJob); err != nil {
 			return nil, err
 		} else if components != nil {
-			for _, component := range components {
-				if content, err := k8sruntime.DefaultUnstructuredConverter.ToUnstructured(component); err != nil {
-					return nil, err
-				} else {
-					objs = append(objs, &unstructured.Unstructured{Object: content})
-				}
-			}
+			objs = append(objs, components...)
 		}
 	}
 	return objs, nil

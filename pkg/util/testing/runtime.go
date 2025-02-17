@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func UnstructuredToObject(s *runtime.Scheme, objects ...*unstructured.Unstructured) ([]runtime.Object, error) {
+func ToObject(s *runtime.Scheme, objects ...any) ([]runtime.Object, error) {
 	var objs []runtime.Object
 	for _, obj := range objects {
 		if o, err := toObject(s, obj); err != nil {
@@ -36,21 +36,24 @@ func UnstructuredToObject(s *runtime.Scheme, objects ...*unstructured.Unstructur
 	return objs, nil
 }
 
-func toObject(s *runtime.Scheme, obj runtime.Object) (runtime.Object, error) {
-	u, isUnstructured := obj.(runtime.Unstructured)
-	if !isUnstructured {
-		return obj, nil
+func toObject(s *runtime.Scheme, obj any) (runtime.Object, error) {
+	if o, ok := obj.(runtime.Object); ok {
+		return o, nil
 	}
-	gvk := obj.GetObjectKind().GroupVersionKind()
+	var u *unstructured.Unstructured
+	if o, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj); err != nil {
+		return nil, err
+	} else {
+		u = &unstructured.Unstructured{Object: o}
+	}
+	gvk := u.GetObjectKind().GroupVersionKind()
 	if !s.Recognizes(gvk) {
-		return obj, nil
+		return nil, fmt.Errorf("%s is not a recognized schema", gvk.GroupVersion().String())
 	}
-
 	typed, err := s.New(gvk)
 	if err != nil {
 		return nil, fmt.Errorf("scheme recognizes %s but failed to produce an object for it: %w", gvk, err)
 	}
-
 	raw, err := json.Marshal(u)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize %T: %w", raw, err)
@@ -58,6 +61,5 @@ func toObject(s *runtime.Scheme, obj runtime.Object) (runtime.Object, error) {
 	if err := json.Unmarshal(raw, typed); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal the content of %T into %T: %w", u, typed, err)
 	}
-
 	return typed, nil
 }
