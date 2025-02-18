@@ -32,7 +32,11 @@ import (
 type ReconcilerBuilder func(*builder.Builder, client.Client, cache.Cache) *builder.Builder
 
 type Runtime interface {
-	NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error)
+
+	// TODO (astefanutti): Change the return type from []any to []runtime.ApplyConfiguration when
+	// https://github.com/kubernetes/kubernetes/pull/129313 becomes available
+
+	NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]any, error)
 	TerminalCondition(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error)
 	EventHandlerRegistrars() []ReconcilerBuilder
 	ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList)

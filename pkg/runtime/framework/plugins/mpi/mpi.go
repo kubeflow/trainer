@@ -25,28 +25,25 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"maps"
 	"strconv"
 
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
+	"github.com/kubeflow/trainer/pkg/util/apply"
 )
 
 type MPI struct {
@@ -99,49 +96,35 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 	info.Trainer.NumProcPerNode = numProcPerNode
 
 	// Add Secret and ConfigMap volumes to the Info object
-	info.Volumes = []corev1.Volume{
-		{
-			Name: constants.MPISSHAuthVolumeName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: trainJob.Name + constants.MPISSHAuthSecretSuffix,
-					Items: []corev1.KeyToPath{
-						{
-							Key:  corev1.SSHAuthPrivateKey,
-							Path: constants.MPISSHPrivateKeyFile,
-						},
-						{
-							Key:  constants.MPISSHPublicKey,
-							Path: constants.MPISSHPublicKeyFile,
-						},
-						{
-							Key:  constants.MPISSHPublicKey,
-							Path: constants.MPISSHAuthorizedKeys,
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: constants.MPIHostfileVolumeName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: trainJob.Name + constants.MPIHostfileConfigMapSuffix,
-					},
-				},
-			},
-		},
+	info.Volumes = []corev1ac.VolumeApplyConfiguration{
+		*corev1ac.Volume().
+			WithName(constants.MPISSHAuthVolumeName).
+			WithSecret(corev1ac.SecretVolumeSource().
+				WithSecretName(trainJob.Name+constants.MPISSHAuthSecretSuffix).
+				WithItems(
+					corev1ac.KeyToPath().
+						WithKey(corev1.SSHAuthPrivateKey).
+						WithPath(constants.MPISSHPrivateKeyFile),
+					corev1ac.KeyToPath().
+						WithKey(constants.MPISSHPublicKey).
+						WithPath(constants.MPISSHPublicKeyFile),
+					corev1ac.KeyToPath().
+						WithKey(constants.MPISSHPublicKey).
+						WithPath(constants.MPISSHAuthorizedKeys),
+				)),
+		*corev1ac.Volume().
+			WithName(constants.MPIHostfileVolumeName).
+			WithConfigMap(corev1ac.ConfigMapVolumeSource().
+				WithName(trainJob.Name + constants.MPIHostfileConfigMapSuffix)),
 	}
-	info.VolumeMounts = []corev1.VolumeMount{
-		{
-			Name:      constants.MPISSHAuthVolumeName,
-			MountPath: info.RuntimePolicy.MLPolicy.MPI.SSHAuthMountPath,
-		},
-		{
-			Name:      constants.MPIHostfileVolumeName,
-			MountPath: constants.MPIHostfileDir,
-		},
+
+	info.VolumeMounts = []corev1ac.VolumeMountApplyConfiguration{
+		*corev1ac.VolumeMount().
+			WithName(constants.MPISSHAuthVolumeName).
+			WithMountPath(info.RuntimePolicy.MLPolicy.MPI.SSHAuthMountPath),
+		*corev1ac.VolumeMount().
+			WithName(constants.MPIHostfileVolumeName).
+			WithMountPath(constants.MPIHostfileDir),
 	}
 
 	// Update envs for Info object.
@@ -149,39 +132,23 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 	// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 	// TODO (andreyvelich): Support other MPI implementations.
-	infoEnvs := []corev1.EnvVar{}
+
+	if trainJob.Spec.Trainer != nil {
+		info.Trainer.Env = apply.EnvVars(trainJob.Spec.Trainer.Env...)
+	}
+
 	switch info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
 	case trainer.MPIImplementationOpenMPI:
-		infoEnvs = append(infoEnvs, []corev1.EnvVar{
-			{
-				Name:  constants.OpenMPIEnvHostFileLocation,
-				Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),
-			}}...)
+		apply.UpsertEnvVar(&info.Trainer.Env, corev1ac.EnvVar().
+			WithName(constants.OpenMPIEnvHostFileLocation).
+			WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)))
 	default:
 		return fmt.Errorf("MPI implementation for %s doesn't supported", info.RuntimePolicy.MLPolicy.MPI.MPIImplementation)
 	}
 
-	// Set for all Info envs.
-	envNames := sets.New[string]()
-	for _, env := range infoEnvs {
-		envNames.Insert(env.Name)
-	}
-	// Info envs take precedence over TrainJob envs.
-	if trainJob.Spec.Trainer != nil {
-		for _, env := range trainJob.Spec.Trainer.Env {
-			if !envNames.Has(env.Name) {
-				info.Trainer.Env = append(info.Trainer.Env, corev1.EnvVar{Name: env.Name, Value: env.Value})
-			}
-		}
-	}
-
-	// Insert MPI distributed envs into the list end.
-	info.Trainer.Env = append(info.Trainer.Env, infoEnvs...)
-
 	// Add container port for the headless service.
-	info.Trainer.ContainerPort = &corev1.ContainerPort{
-		ContainerPort: constants.ContainerTrainerPort,
-	}
+	info.Trainer.ContainerPort = corev1ac.ContainerPort().
+		WithContainerPort(constants.ContainerTrainerPort)
 
 	// Update total Pod requests for the PodGroupPolicy plugin.
 	for rName := range info.TotalRequests {
@@ -209,25 +176,25 @@ func (m *MPI) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	}
 }
 
-func (m *MPI) Build(ctx context.Context, runtimeJobTemplate client.Object, info *runtime.Info, trainJob *trainer.TrainJob) ([]client.Object, error) {
+func (m *MPI) Build(_ context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
 	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.MPI == nil {
 		return nil, nil
 	}
 
-	secret, err := m.buildSSHAuthSecret(ctx, trainJob)
+	secret, err := m.buildSSHAuthSecret(trainJob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build Secret with SSH auth keys. Error: %v", err)
 	}
 
-	configMap, err := m.buildHostFileConfigMap(ctx, info, trainJob)
+	configMap, err := m.buildHostFileConfigMap(info, trainJob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build ConfigMap with hostfile. Error: %v", err)
 	}
 
-	return []client.Object{secret, configMap}, nil
+	return []any{secret, configMap}, nil
 }
 
-func (m *MPI) buildSSHAuthSecret(ctx context.Context, trainJob *trainer.TrainJob) (*corev1.Secret, error) {
+func (m *MPI) buildSSHAuthSecret(trainJob *trainer.TrainJob) (*corev1ac.SecretApplyConfiguration, error) {
 	// Generate SSH private and public keys.
 	privateKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	if err != nil {
@@ -250,40 +217,25 @@ func (m *MPI) buildSSHAuthSecret(ctx context.Context, trainJob *trainer.TrainJob
 	}
 
 	// Create Secret to store ssh keys.
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      trainJob.Name + constants.MPISSHAuthSecretSuffix,
-			Namespace: trainJob.Namespace,
-		},
-		Type: corev1.SecretTypeSSHAuth,
-		Data: map[string][]byte{
+	secret := corev1ac.Secret(trainJob.Name+constants.MPISSHAuthSecretSuffix, trainJob.Namespace).
+		WithType(corev1.SecretTypeSSHAuth).
+		WithData(map[string][]byte{
 			corev1.SSHAuthPrivateKey:  privatePEM,
 			constants.MPISSHPublicKey: ssh.MarshalAuthorizedKey(publicKey),
-		},
-	}
-	if err := ctrlutil.SetControllerReference(trainJob, secret, m.scheme); err != nil {
-		return nil, err
-	}
-	oldSecret := &corev1.Secret{}
-	if err := m.client.Get(ctx, client.ObjectKeyFromObject(secret), oldSecret); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, err
-		}
-		oldSecret = nil
-	}
-	if needsCreateOrUpdateSecret(oldSecret, secret, ptr.Deref(trainJob.Spec.Suspend, false)) {
-		return secret, nil
-	}
-	return nil, nil
+		})
+
+	secret.WithOwnerReferences(metav1ac.OwnerReference().
+		WithAPIVersion(trainer.GroupVersion.String()).
+		WithKind(trainer.TrainJobKind).
+		WithName(trainJob.Name).
+		WithUID(trainJob.UID).
+		WithController(true).
+		WithBlockOwnerDeletion(true))
+
+	return secret, nil
 }
 
-func needsCreateOrUpdateSecret(old, new *corev1.Secret, trainJobIsSuspended bool) bool {
-	return old == nil ||
-		trainJobIsSuspended &&
-			(!equality.Semantic.DeepEqual(old.Data, new.Data) || !maps.Equal(old.Labels, new.Labels) || !maps.Equal(old.Annotations, new.Annotations))
-}
-
-func (m *MPI) buildHostFileConfigMap(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) (*corev1.ConfigMap, error) {
+func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.TrainJob) (*corev1ac.ConfigMapApplyConfiguration, error) {
 	// Generate hostfile for the MPI communication.
 	var hostfile bytes.Buffer
 	// TODO (andreyvelich): Support other MPI implementations.
@@ -296,33 +248,18 @@ func (m *MPI) buildHostFileConfigMap(ctx context.Context, info *runtime.Info, tr
 	}
 
 	// Create ConfigMap to store hostfile.
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      trainJob.Name + constants.MPIHostfileConfigMapSuffix,
-			Namespace: trainJob.Namespace,
-		},
-		Data: map[string]string{
+	configMap := corev1ac.ConfigMap(trainJob.Name+constants.MPIHostfileConfigMapSuffix, trainJob.Namespace).
+		WithData(map[string]string{
 			constants.MPIHostfileName: hostfile.String(),
-		},
-	}
-	if err := ctrlutil.SetControllerReference(trainJob, configMap, m.scheme); err != nil {
-		return nil, err
-	}
-	oldConfigMap := &corev1.ConfigMap{}
-	if err := m.client.Get(ctx, client.ObjectKeyFromObject(configMap), oldConfigMap); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, err
-		}
-		oldConfigMap = nil
-	}
-	if needsCreateOrUpdateConfigMap(oldConfigMap, configMap, ptr.Deref(trainJob.Spec.Suspend, false)) {
-		return configMap, nil
-	}
-	return nil, nil
-}
+		})
 
-func needsCreateOrUpdateConfigMap(old, new *corev1.ConfigMap, trainJobIsSuspended bool) bool {
-	return old == nil ||
-		trainJobIsSuspended &&
-			(!equality.Semantic.DeepEqual(old.Data, new.Data) || !maps.Equal(old.Labels, new.Labels) || !maps.Equal(old.Annotations, new.Annotations))
+	configMap.WithOwnerReferences(metav1ac.OwnerReference().
+		WithAPIVersion(trainer.GroupVersion.String()).
+		WithKind(trainer.TrainJobKind).
+		WithName(trainJob.Name).
+		WithUID(trainJob.UID).
+		WithController(true).
+		WithBlockOwnerDeletion(true))
+
+	return configMap, nil
 }

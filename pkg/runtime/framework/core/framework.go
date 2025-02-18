@@ -112,15 +112,13 @@ func (f *Framework) RunCustomValidationPlugins(oldObj, newObj *trainer.TrainJob)
 	return aggregatedWarnings, aggregatedErrors
 }
 
-func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, runtimeJobTemplate client.Object, info *runtime.Info, trainJob *trainer.TrainJob) ([]client.Object, error) {
-	var objs []client.Object
+func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
+	var objs []any
 	for _, plugin := range f.componentBuilderPlugins {
-		obj, err := plugin.Build(ctx, runtimeJobTemplate, info, trainJob)
-		if err != nil {
+		if components, err := plugin.Build(ctx, info, trainJob); err != nil {
 			return nil, err
-		}
-		if obj != nil {
-			objs = append(objs, obj...)
+		} else if components != nil {
+			objs = append(objs, components...)
 		}
 	}
 	return objs, nil
