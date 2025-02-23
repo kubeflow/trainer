@@ -129,12 +129,17 @@ Currently, `torchtune` has limited support for multi-node training (but will com
 
 ### Modification to `train` API
 
-We plan to modify `train` API to:
+As we discussed in [Github](https://github.com/kubeflow/trainer/pull/2410#discussion_r1963832826), `train` API mainly executes two types of training tasks:
+
+1. **Training with custom function/image**: A self-contained function/image that encapsulates the entire model training process.
+2. **Config-driven appproach with existing Trainer**: A trainer that already includes fine-tuning logic, requiring only parameter adjustments.
+
+So we plan to modify `train` API to:
 
 ```python
 def train(
     trainer: Optional[CustomTrainer],
-    fine_tuning_config: Optional[Union[TorchTuneConfig, NeMoConfig]],
+    fine_tuning_config: Optional[Union[TorchTuneConfig]],
     dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
     model_config: Optional[types.HuggingFaceModelInputConfig] = None,
     runtime_ref: Optional[str] = "llm-finetuning-torchtune",
@@ -150,15 +155,15 @@ class CustomTrainer:
     num_nodes: Optional[int] = None
     resources_per_node: Optional[int] = None
 
-@dataclass
-class NeMoConfig:
-    lr: Optional[float] = None
-
 ```
 
-### `torchtune` Config in SDK
+`trainer` defines the parameters for Type 1 tasks, and will support custom function in the initial stage.
 
-We will add the fine-tuning configurations for `torchtune` in `Trainer` dataclass.
+`fine_tuning_config` defines the parameters for LLM fine-tuning task in Type 2, and will support fine-tuning with `torchtune` in the early stage.
+
+### Propagate `torchtune` settings with SDK
+
+#### Option1: Allow users to specify `recipe` and `config`
 
 | Parameters | Type | What is it? |
 | - | - | - |
@@ -167,9 +172,8 @@ We will add the fine-tuning configurations for `torchtune` in `Trainer` dataclas
 | dtype | Optional[str] | The underlying data type used to represent the model and optimizer parameters. Currently, we only support `bf16` and `fp32`. |
 | batch_size | Optional[int] | The number of samples processed before updating model weights. |
 | epochs | Optional[int] | The number of samples processed before updating model weights. |
-| gradient_accumulation_steps | Optional[int] | The number of batches accumulated before updating model weights. |
 | loss | Optional[str] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
-| peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including Lora, AdapterPrompt, PrefixTuning, etc. |
+| peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
 | dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, eMultimodalDataset]] | Configuration for dataset preprocessing. |
 
 ```
@@ -178,16 +182,10 @@ We will add the fine-tuning configurations for `torchtune` in `Trainer` dataclas
 class TorchtuneConfig:
     recipe: str
     config: str
-    device: Optional[str] = None
     dtype: Optional[str] = None
     batch_size: Optional[int] = None
     epochs: Optional[int] = None
     loss: Optional[str] = None
-    optimizer_config: Optional[OptimizerConfig] = None
-    scheduler_config: Optional[SchedulerConfig] = None
-    gradient_accumulation_steps: Optional[int] = None
-    enable_activation_checkpointing: Optional[bool] = False
-    enable_activation_offloading: Optional[bool] = False
     peft_config: Optional[Union[LoraConfig]] = None
     dataset_preprocess_config: Optional[
         Union[TorchtuneInstructDataset, TorchtuneChatDataset, TorchtuneMultimodalDataset],
@@ -195,7 +193,13 @@ class TorchtuneConfig:
 
 ```
 
-**LoRA Config**
+#### Option2: Do not allow users to specify `recipe` and `config`
+
+If we adopt this option, we need to discard `recipe` and `config` fields in `TorchtuneConfig` compared to option 1.
+
+### Support some common PEFT mechanisms
+
+We need to support some common PEFT mechnisms like LoRA, QLoRA, DoRA to allow users to optimize the memory usage when they are fine-tuning the LLMs. This is crucial for users who have limited resources and want to fine-tune their model at the minimum cost.
 
 The *LoraConfig* represents the config of LoRA we use to fine-tune the model.
 
