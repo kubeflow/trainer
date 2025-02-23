@@ -127,6 +127,35 @@ And also, we need to modify the exsiting torch plugin to handle config override 
 
 Currently, `torchtune` has limited support for multi-node training (but will coming soon). So, I would propose that we use 1 PyTorch Nodes and 1 GPU by default. Users can specify `num_nodes` to increase PyTorch Nodes and `resource_per_node` to increase the GPU number in the `Trainer` field.
 
+### Modification to `train` API
+
+We plan to modify `train` API to:
+
+```python
+def train(
+    trainer: Optional[CustomTrainer],
+    fine_tuning_config: Optional[Union[TorchTuneConfig, NeMoConfig]],
+    dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
+    model_config: Optional[types.HuggingFaceModelInputConfig] = None,
+    runtime_ref: Optional[str] = "llm-finetuning-torchtune",
+) -> str:
+    pass
+
+@dataclass
+class CustomTrainer:
+    func: Optional[Callable] = None
+    func_args: Optional[Dict] = None
+    packages_to_install: Optional[List[str]] = None
+    pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
+    num_nodes: Optional[int] = None
+    resources_per_node: Optional[int] = None
+
+@dataclass
+class NeMoConfig:
+    lr: Optional[float] = None
+
+```
+
 ### `torchtune` Config in SDK
 
 We will add the fine-tuning configurations for `torchtune` in `Trainer` dataclass.
@@ -135,27 +164,15 @@ We will add the fine-tuning configurations for `torchtune` in `Trainer` dataclas
 | - | - | - |
 | recipe | str | The name of recipe in `torchtune` we choose. |
 | config | str | The name of config in `torchtune` we chooose. |
-| device | Optional[str] | The device type, e.g. `cuda`. |
 | dtype | Optional[str] | The underlying data type used to represent the model and optimizer parameters. Currently, we only support `bf16` and `fp32`. |
 | batch_size | Optional[int] | The number of samples processed before updating model weights. |
 | epochs | Optional[int] | The number of samples processed before updating model weights. |
 | gradient_accumulation_steps | Optional[int] | The number of batches accumulated before updating model weights. |
 | loss | Optional[str] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
-| optimizer_config | Optional[OptimizerConfig] | Configuration for the optimizer. |
-| scheduler_config | Optional[SchedulerConfig] | Configuration for the scheduler. |
-| enable_activation_checkpointing | Optional[bool] | Whether to enable activation checkpointing. |
-| enable_activation_offloading | Optional[bool] | Whether to enable activation offloading. |
 | peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including Lora, AdapterPrompt, PrefixTuning, etc. |
 | dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, eMultimodalDataset]] | Configuration for dataset preprocessing. |
 
-```python
-@dataclass
-class Trainer:
-    custom_training_config: Optional[CustomTrainingConfig] = None
-    fine_tuning_config: Optional[Union[TorchtuneConfig]] = None
-    num_nodes: Optional[int] = None
-    resources_per_node: Optional[dict] = None
-
+```
 # TorchtuneConfig DataClass
 @dataclass
 class TorchtuneConfig:
@@ -175,52 +192,6 @@ class TorchtuneConfig:
     dataset_preprocess_config: Optional[
         Union[TorchtuneInstructDataset, TorchtuneChatDataset, TorchtuneMultimodalDataset],
     ] = None
-
-# CustomTrainingConfig dataclass
-@dataclass
-class CustomTrainingConfig:
-    func: Optional[Callable] = None
-    func_args: Optional[Dict] = None
-    packages_to_install: Optional[List[str]] = None
-    pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
-
-```
-
-**Optimizer Config**
-
-The *OptimizerConfig* represents the config of Optimizer we use to fine-tune the model.
-
-| Parameters | Type | What is it? |
-| - | - | - |
-| component | Optional[str] | The optimizer we use, e.g. `torch.optim.AdmW`. |
-| fused | Optional[bool] | Whether to fuse optimizer step into backward pass. |
-| weight_decay | Optional[float] | The rate for weight decay. |
-| lr | Optional[float] | The learning rate. |
-
-```python
-@dataclass
-class OptimizerConfig:
-    component: Optional[str] = None,
-    fused: Optional[bool] = None,
-    weight_decay: Optional[float] = None,
-    lr: Optional[float] = None,
-
-```
-
-**Scheduler Config**
-
-The *SchedulerConfig* represents the config of Scheduler we use to fine-tune the model.
-
- Parameters | Type | What is it? |
-| - | - | - |
-| component | Optional[str] | The scheduler we use, e.g. `torchtune.training.lr_schedulers.get_cosine_schedule_with_warmup`. |
-| num_warmup_steps | Optional[int] | The number of warnup steps for the scheduler. |
-
-```python
-@dataclass
-class SchedulerConfig
-    component: Optional[str] = None
-    num_warmup_steps: Optional[int] = None
 
 ```
 
