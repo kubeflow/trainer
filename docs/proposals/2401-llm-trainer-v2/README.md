@@ -83,7 +83,6 @@ job_id = TrainingClient().train(
         fine_tuning_config=TorchTuneConfig(
             recipe="lora_finetune_single_device",
             config="llama3_2/1B_lora_single_device",
-            device="cuda",
             dtype="bf16",
             batch_size=1,
             epochs=1,
