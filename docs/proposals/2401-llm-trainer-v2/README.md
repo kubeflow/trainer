@@ -308,6 +308,25 @@ class TorchtuneConfig:
 
 ```
 
+In this way, we just need to create one `ClusterTrainingRuntime` for LLM fine-tuning with `torchtune`. Like we showed in the [example](#compliment-torch-plugin). And we will put this `ClusterTrainingRuntime` under:
+
+```
+manifests/
+|-- base/
+|   |-- runtimes/
+|   |   |-- pretraining/
+|   |   |   |-- kustomization.yaml
+|   |   |   |-- mpi_distributed.yaml                    # MPI Distributed Runtime
+|   |   |   |-- torch_distributed.yaml                  # PyTorch Distributed Runtime
+|   |   |-- posttraining/
+|   |   |   |-- kustomization.yaml
+|   |   |   |-- torchtune_llm_finetuning.yaml           # Torchtune LLM Fine-tuning Runtime
+|   |-- crds/
+|   |-- . . .
+|-- overlays/
+|-- third-party/
+```
+
 #### Option2: Do not allow users to specify `recipe` and `config`
 
 If we adopt this option, we need to discard `recipe` and `config` fields in `TorchtuneConfig` compared to option 1.
