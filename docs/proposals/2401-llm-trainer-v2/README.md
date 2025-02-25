@@ -187,7 +187,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
     if !trainJob.IsLaunchedByTorchtune() {
         // Original env-based parameters mutation
         // Update envs for Info object.
-	    // Add PyTorch distributed "PET_" values for torchrun
+        // Add PyTorch distributed "PET_" values for torchrun
         // TBA
     } else {
         // CLI-based parameters mutation
@@ -205,13 +205,13 @@ Related changes:
 
 ```go
 type Trainer struct {
-	NumNodes       *int32
-	NumProcPerNode string
-	Env           []corev1.EnvVar
+    NumNodes       *int32
+    NumProcPerNode string
+    Env           []corev1.EnvVar
     Args          []string
-	ContainerPort *corev1.ContainerPort
-	Volumes       []corev1.Volume
-	VolumeMounts  []corev1.VolumeMount
+    ContainerPort *corev1.ContainerPort
+    Volumes       []corev1.Volume
+    VolumeMounts  []corev1.VolumeMount
 }
 ```
 
@@ -225,13 +225,13 @@ if info.Trainer.Args != nil {
     var args []string
     copy(args, info.Trainer.Args)
     b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = append(
-		args, b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports...)
+        args, b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports...)
 }
 
 // Update the Trainer container port.
 if info.Trainer.ContainerPort != nil {
-	b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports = append(
-		b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *info.Trainer.ContainerPort)
+    b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports = append(
+        b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *info.Trainer.ContainerPort)
 }
 
 // ...
@@ -292,7 +292,7 @@ We natively support all `recipe` and `config` supported by `torchtune`, since `t
 | peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
 | dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, MultimodalDataset]] | Configuration for dataset preprocessing. |
 
-```
+```python
 # TorchtuneConfig DataClass
 @dataclass
 class TorchtuneConfig:
