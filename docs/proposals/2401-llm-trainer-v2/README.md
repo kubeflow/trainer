@@ -100,7 +100,7 @@ job_id = TrainingClient().train(
 
 ## Design Details
 
-### `torchtune` Plugin
+### Compliment `torch` Plugin
 
 **How to Handle Override in Configs**
 
@@ -119,15 +119,72 @@ tune run --nnodes=1 --nproc-per-node=4 lora_finetune_distributed \
 
 ```
 
-This provides us with a chance to mutate these parameters by overriding the `commands` and `args` fields in the Trainer Node, like [this](https://github.com/Electronic-Waste/kubeflow-llm-trainer/blob/main/torchtune-llm-finetuning.yaml).
+The CLI-based way allows us to mutate these parameters by overriding the `command` and `args` fields in the Trainer Node. By specifying override parameters in the TrainJob `.spec.trainer.command` and `.spec.trainer.args` fields, we can easily mutate these parameters, just like:
+
+```YAML
+apiVersion: kubeflow.org/v2alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: torchtune-llm-finetuning
+  labels:
+    training.kubeflow.org/phase: post-training
+spec:
+  mlPolicy:
+    numNodes: 1
+    torch:
+      numProcPerNode: auto
+  template:
+    spec:
+      replicatedJobs:
+        - name: Node
+          template:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: trainer
+                      image: <pytorch+cuda+torchtune image>
+                      command:
+                        - tune ls
+...
+---
+apiVersion: kubeflow.org/v2alpha1
+kind: TrainJob
+metadata:
+  name: tune-llama-with-alpaca
+  namespace: tenant-alpha
+spec:
+  runtimeRef:
+    name: torchtune-llm-finetuning
+  trainer:
+    command:
+      - tune run
+    args:
+      - --nnodes=1
+      - --nproc_per_node=4
+      - lora_finetune_single_device
+      - --config
+      - llama3_2/1B_lora
+      - model.lora_attn_modules=[q_proj,k_proj,v_proj]
+      - model.apply_lora_to_mlp=True
+      - model.lora_rank=64
+      - model.lora_alpha=128
+    resourcesPerNode:
+      requests:
+        nvidia.com/gpu: 2
+    numProcPerNode: 2
+...
+```
+
+**How to perform mutation in the runtime plugin**
 
 And also, we need to modify the exsiting torch plugin to handle config override for `torchtune`, since currently torch plugin passes the distributed arguments by environment variables that begins with `PET_`, which is not allowed by `torchtune`. However, `torchtune` can share the same ML Policy with `torchrun` because `torchtune` is fully compatible with these distributed parameters.
 
 **How to Determine Default Resources**
 
-Currently, `torchtune` has limited support for multi-node training (but will coming soon). So, I would propose that we use 1 PyTorch Nodes and 1 GPU by default. Users can specify `num_nodes` to increase PyTorch Nodes and `resource_per_node` to increase the GPU number in the `Trainer` field.
+Currently, `torchtune` has limited support for multi-node training (but will coming soon). So, I would propose that we use 1 PyTorch node and 1 GPU by default. Users can specify `num_nodes` and `resource_per_node` in the `Trainer` field to increase PyTorch nodes and GPU number.
 
-### Modification to `train` API
+### Modify the `train` API
 
 As we discussed in [Github](https://github.com/kubeflow/trainer/pull/2410#discussion_r1963832826), `train` API mainly executes two types of training tasks:
 
@@ -142,7 +199,7 @@ def train(
     fine_tuning_config: Optional[Union[TorchTuneConfig]],
     dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
     model_config: Optional[types.HuggingFaceModelInputConfig] = None,
-    runtime_ref: Optional[str] = "llm-finetuning-torchtune",
+    runtime_ref: Optional[str] = "torchtune-llm-finetuning",
 ) -> str:
     pass
 
@@ -157,9 +214,9 @@ class CustomTrainer:
 
 ```
 
-`trainer` defines the parameters for Type 1 tasks, and will support custom function in the initial stage.
+`trainer` defines the parameters for Type 1 tasks, and will add support for custom function in the initial stage.
 
-`fine_tuning_config` defines the parameters for LLM fine-tuning task in Type 2, and will support fine-tuning with `torchtune` in the early stage.
+`fine_tuning_config` defines the parameters for LLM fine-tuning task in Type 2, and will add support for fine-tuning with `torchtune` in the early stage.
 
 ### Propagate `torchtune` settings with SDK
 
