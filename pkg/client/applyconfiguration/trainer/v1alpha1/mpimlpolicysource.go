@@ -17,16 +17,16 @@
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 )
 
 // MPIMLPolicySourceApplyConfiguration represents a declarative configuration of the MPIMLPolicySource type for use
 // with apply.
 type MPIMLPolicySourceApplyConfiguration struct {
-	NumProcPerNode    *int32                      `json:"numProcPerNode,omitempty"`
-	MPIImplementation *v1alpha1.MPIImplementation `json:"mpiImplementation,omitempty"`
-	SSHAuthMountPath  *string                     `json:"sshAuthMountPath,omitempty"`
-	RunLauncherAsNode *bool                       `json:"runLauncherAsNode,omitempty"`
+	NumProcPerNode    *int32                             `json:"numProcPerNode,omitempty"`
+	MPIImplementation *trainerv1alpha1.MPIImplementation `json:"mpiImplementation,omitempty"`
+	SSHAuthMountPath  *string                            `json:"sshAuthMountPath,omitempty"`
+	RunLauncherAsNode *bool                              `json:"runLauncherAsNode,omitempty"`
 }
 
 // MPIMLPolicySourceApplyConfiguration constructs a declarative configuration of the MPIMLPolicySource type for use with
@@ -46,7 +46,7 @@ func (b *MPIMLPolicySourceApplyConfiguration) WithNumProcPerNode(value int32) *M
 // WithMPIImplementation sets the MPIImplementation field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MPIImplementation field is set to the value of the last call.
-func (b *MPIMLPolicySourceApplyConfiguration) WithMPIImplementation(value v1alpha1.MPIImplementation) *MPIMLPolicySourceApplyConfiguration {
+func (b *MPIMLPolicySourceApplyConfiguration) WithMPIImplementation(value trainerv1alpha1.MPIImplementation) *MPIMLPolicySourceApplyConfiguration {
 	b.MPIImplementation = &value
 	return b
 }

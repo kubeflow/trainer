@@ -41,11 +41,11 @@ ENVTEST_K8S_VERSION ?= 1.31
 # Instructions to download tools for development.
 .PHONY: envtest
 envtest: ## Download the setup-envtest binary if required.
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.19
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.20
 
 .PHONY: controller-gen
 controller-gen: ## Download the controller-gen binary if required.
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.5
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.2
 
 # Download external CRDs for Go integration testings.
 EXTERNAL_CRDS_DIR ?= $(PROJECT_DIR)/manifests/external-crds

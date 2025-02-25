@@ -17,13 +17,13 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	apistrainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	versioned "github.com/kubeflow/trainer/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/kubeflow/trainer/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/kubeflow/trainer/pkg/client/listers/trainer/v1alpha1"
+	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/listers/trainer/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -34,7 +34,7 @@ import (
 // TrainJobs.
 type TrainJobInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.TrainJobLister
+	Lister() trainerv1alpha1.TrainJobLister
 }
 
 type trainJobInformer struct {
@@ -69,7 +69,7 @@ func NewFilteredTrainJobInformer(client versioned.Interface, namespace string, r
 				return client.TrainerV1alpha1().TrainJobs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&trainerv1alpha1.TrainJob{},
+		&apistrainerv1alpha1.TrainJob{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,9 +80,9 @@ func (f *trainJobInformer) defaultInformer(client versioned.Interface, resyncPer
 }
 
 func (f *trainJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&trainerv1alpha1.TrainJob{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistrainerv1alpha1.TrainJob{}, f.defaultInformer)
 }
 
-func (f *trainJobInformer) Lister() v1alpha1.TrainJobLister {
-	return v1alpha1.NewTrainJobLister(f.Informer().GetIndexer())
+func (f *trainJobInformer) Lister() trainerv1alpha1.TrainJobLister {
+	return trainerv1alpha1.NewTrainJobLister(f.Informer().GetIndexer())
 }

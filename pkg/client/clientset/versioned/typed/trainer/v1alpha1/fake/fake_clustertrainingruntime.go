@@ -17,133 +17,35 @@
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/applyconfiguration/trainer/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	typedtrainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/clientset/versioned/typed/trainer/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeClusterTrainingRuntimes implements ClusterTrainingRuntimeInterface
-type FakeClusterTrainingRuntimes struct {
+// fakeClusterTrainingRuntimes implements ClusterTrainingRuntimeInterface
+type fakeClusterTrainingRuntimes struct {
+	*gentype.FakeClientWithListAndApply[*v1alpha1.ClusterTrainingRuntime, *v1alpha1.ClusterTrainingRuntimeList, *trainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration]
 	Fake *FakeTrainerV1alpha1
 }
 
-var clustertrainingruntimesResource = v1alpha1.SchemeGroupVersion.WithResource("clustertrainingruntimes")
-
-var clustertrainingruntimesKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterTrainingRuntime")
-
-// Get takes name of the clusterTrainingRuntime, and returns the corresponding clusterTrainingRuntime object, and an error if there is any.
-func (c *FakeClusterTrainingRuntimes) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterTrainingRuntime, err error) {
-	emptyResult := &v1alpha1.ClusterTrainingRuntime{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(clustertrainingruntimesResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeClusterTrainingRuntimes(fake *FakeTrainerV1alpha1) typedtrainerv1alpha1.ClusterTrainingRuntimeInterface {
+	return &fakeClusterTrainingRuntimes{
+		gentype.NewFakeClientWithListAndApply[*v1alpha1.ClusterTrainingRuntime, *v1alpha1.ClusterTrainingRuntimeList, *trainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration](
+			fake.Fake,
+			"",
+			v1alpha1.SchemeGroupVersion.WithResource("clustertrainingruntimes"),
+			v1alpha1.SchemeGroupVersion.WithKind("ClusterTrainingRuntime"),
+			func() *v1alpha1.ClusterTrainingRuntime { return &v1alpha1.ClusterTrainingRuntime{} },
+			func() *v1alpha1.ClusterTrainingRuntimeList { return &v1alpha1.ClusterTrainingRuntimeList{} },
+			func(dst, src *v1alpha1.ClusterTrainingRuntimeList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.ClusterTrainingRuntimeList) []*v1alpha1.ClusterTrainingRuntime {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.ClusterTrainingRuntimeList, items []*v1alpha1.ClusterTrainingRuntime) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.ClusterTrainingRuntime), err
-}
-
-// List takes label and field selectors, and returns the list of ClusterTrainingRuntimes that match those selectors.
-func (c *FakeClusterTrainingRuntimes) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ClusterTrainingRuntimeList, err error) {
-	emptyResult := &v1alpha1.ClusterTrainingRuntimeList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(clustertrainingruntimesResource, clustertrainingruntimesKind, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.ClusterTrainingRuntimeList{ListMeta: obj.(*v1alpha1.ClusterTrainingRuntimeList).ListMeta}
-	for _, item := range obj.(*v1alpha1.ClusterTrainingRuntimeList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested clusterTrainingRuntimes.
-func (c *FakeClusterTrainingRuntimes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(clustertrainingruntimesResource, opts))
-}
-
-// Create takes the representation of a clusterTrainingRuntime and creates it.  Returns the server's representation of the clusterTrainingRuntime, and an error, if there is any.
-func (c *FakeClusterTrainingRuntimes) Create(ctx context.Context, clusterTrainingRuntime *v1alpha1.ClusterTrainingRuntime, opts v1.CreateOptions) (result *v1alpha1.ClusterTrainingRuntime, err error) {
-	emptyResult := &v1alpha1.ClusterTrainingRuntime{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(clustertrainingruntimesResource, clusterTrainingRuntime, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.ClusterTrainingRuntime), err
-}
-
-// Update takes the representation of a clusterTrainingRuntime and updates it. Returns the server's representation of the clusterTrainingRuntime, and an error, if there is any.
-func (c *FakeClusterTrainingRuntimes) Update(ctx context.Context, clusterTrainingRuntime *v1alpha1.ClusterTrainingRuntime, opts v1.UpdateOptions) (result *v1alpha1.ClusterTrainingRuntime, err error) {
-	emptyResult := &v1alpha1.ClusterTrainingRuntime{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(clustertrainingruntimesResource, clusterTrainingRuntime, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.ClusterTrainingRuntime), err
-}
-
-// Delete takes name of the clusterTrainingRuntime and deletes it. Returns an error if one occurs.
-func (c *FakeClusterTrainingRuntimes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(clustertrainingruntimesResource, name, opts), &v1alpha1.ClusterTrainingRuntime{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeClusterTrainingRuntimes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(clustertrainingruntimesResource, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.ClusterTrainingRuntimeList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched clusterTrainingRuntime.
-func (c *FakeClusterTrainingRuntimes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterTrainingRuntime, err error) {
-	emptyResult := &v1alpha1.ClusterTrainingRuntime{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clustertrainingruntimesResource, name, pt, data, opts, subresources...), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.ClusterTrainingRuntime), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied clusterTrainingRuntime.
-func (c *FakeClusterTrainingRuntimes) Apply(ctx context.Context, clusterTrainingRuntime *trainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterTrainingRuntime, err error) {
-	if clusterTrainingRuntime == nil {
-		return nil, fmt.Errorf("clusterTrainingRuntime provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(clusterTrainingRuntime)
-	if err != nil {
-		return nil, err
-	}
-	name := clusterTrainingRuntime.Name
-	if name == nil {
-		return nil, fmt.Errorf("clusterTrainingRuntime.Name must be provided to Apply")
-	}
-	emptyResult := &v1alpha1.ClusterTrainingRuntime{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clustertrainingruntimesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.ClusterTrainingRuntime), err
 }

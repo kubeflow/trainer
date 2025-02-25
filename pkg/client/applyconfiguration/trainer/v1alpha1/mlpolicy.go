@@ -41,7 +41,7 @@ func (b *MLPolicyApplyConfiguration) WithNumNodes(value int32) *MLPolicyApplyCon
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Torch field is set to the value of the last call.
 func (b *MLPolicyApplyConfiguration) WithTorch(value *TorchMLPolicySourceApplyConfiguration) *MLPolicyApplyConfiguration {
-	b.Torch = value
+	b.MLPolicySourceApplyConfiguration.Torch = value
 	return b
 }
 
@@ -49,6 +49,6 @@ func (b *MLPolicyApplyConfiguration) WithTorch(value *TorchMLPolicySourceApplyCo
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MPI field is set to the value of the last call.
 func (b *MLPolicyApplyConfiguration) WithMPI(value *MPIMLPolicySourceApplyConfiguration) *MLPolicyApplyConfiguration {
-	b.MPI = value
+	b.MLPolicySourceApplyConfiguration.MPI = value
 	return b
 }

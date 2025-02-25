@@ -17,10 +17,10 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/applyconfiguration/trainer/v1alpha1"
+	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	applyconfigurationtrainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/applyconfiguration/trainer/v1alpha1"
 	scheme "github.com/kubeflow/trainer/pkg/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,36 +36,37 @@ type TrainJobsGetter interface {
 
 // TrainJobInterface has methods to work with TrainJob resources.
 type TrainJobInterface interface {
-	Create(ctx context.Context, trainJob *v1alpha1.TrainJob, opts v1.CreateOptions) (*v1alpha1.TrainJob, error)
-	Update(ctx context.Context, trainJob *v1alpha1.TrainJob, opts v1.UpdateOptions) (*v1alpha1.TrainJob, error)
+	Create(ctx context.Context, trainJob *trainerv1alpha1.TrainJob, opts v1.CreateOptions) (*trainerv1alpha1.TrainJob, error)
+	Update(ctx context.Context, trainJob *trainerv1alpha1.TrainJob, opts v1.UpdateOptions) (*trainerv1alpha1.TrainJob, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, trainJob *v1alpha1.TrainJob, opts v1.UpdateOptions) (*v1alpha1.TrainJob, error)
+	UpdateStatus(ctx context.Context, trainJob *trainerv1alpha1.TrainJob, opts v1.UpdateOptions) (*trainerv1alpha1.TrainJob, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.TrainJob, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.TrainJobList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*trainerv1alpha1.TrainJob, error)
+	List(ctx context.Context, opts v1.ListOptions) (*trainerv1alpha1.TrainJobList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.TrainJob, err error)
-	Apply(ctx context.Context, trainJob *trainerv1alpha1.TrainJobApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.TrainJob, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *trainerv1alpha1.TrainJob, err error)
+	Apply(ctx context.Context, trainJob *applyconfigurationtrainerv1alpha1.TrainJobApplyConfiguration, opts v1.ApplyOptions) (result *trainerv1alpha1.TrainJob, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, trainJob *trainerv1alpha1.TrainJobApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.TrainJob, err error)
+	ApplyStatus(ctx context.Context, trainJob *applyconfigurationtrainerv1alpha1.TrainJobApplyConfiguration, opts v1.ApplyOptions) (result *trainerv1alpha1.TrainJob, err error)
 	TrainJobExpansion
 }
 
 // trainJobs implements TrainJobInterface
 type trainJobs struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.TrainJob, *v1alpha1.TrainJobList, *trainerv1alpha1.TrainJobApplyConfiguration]
+	*gentype.ClientWithListAndApply[*trainerv1alpha1.TrainJob, *trainerv1alpha1.TrainJobList, *applyconfigurationtrainerv1alpha1.TrainJobApplyConfiguration]
 }
 
 // newTrainJobs returns a TrainJobs
 func newTrainJobs(c *TrainerV1alpha1Client, namespace string) *trainJobs {
 	return &trainJobs{
-		gentype.NewClientWithListAndApply[*v1alpha1.TrainJob, *v1alpha1.TrainJobList, *trainerv1alpha1.TrainJobApplyConfiguration](
+		gentype.NewClientWithListAndApply[*trainerv1alpha1.TrainJob, *trainerv1alpha1.TrainJobList, *applyconfigurationtrainerv1alpha1.TrainJobApplyConfiguration](
 			"trainjobs",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.TrainJob { return &v1alpha1.TrainJob{} },
-			func() *v1alpha1.TrainJobList { return &v1alpha1.TrainJobList{} }),
+			func() *trainerv1alpha1.TrainJob { return &trainerv1alpha1.TrainJob{} },
+			func() *trainerv1alpha1.TrainJobList { return &trainerv1alpha1.TrainJobList{} },
+		),
 	}
 }

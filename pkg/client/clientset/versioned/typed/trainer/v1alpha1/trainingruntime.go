@@ -17,10 +17,10 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/applyconfiguration/trainer/v1alpha1"
+	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	applyconfigurationtrainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/applyconfiguration/trainer/v1alpha1"
 	scheme "github.com/kubeflow/trainer/pkg/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,32 +36,33 @@ type TrainingRuntimesGetter interface {
 
 // TrainingRuntimeInterface has methods to work with TrainingRuntime resources.
 type TrainingRuntimeInterface interface {
-	Create(ctx context.Context, trainingRuntime *v1alpha1.TrainingRuntime, opts v1.CreateOptions) (*v1alpha1.TrainingRuntime, error)
-	Update(ctx context.Context, trainingRuntime *v1alpha1.TrainingRuntime, opts v1.UpdateOptions) (*v1alpha1.TrainingRuntime, error)
+	Create(ctx context.Context, trainingRuntime *trainerv1alpha1.TrainingRuntime, opts v1.CreateOptions) (*trainerv1alpha1.TrainingRuntime, error)
+	Update(ctx context.Context, trainingRuntime *trainerv1alpha1.TrainingRuntime, opts v1.UpdateOptions) (*trainerv1alpha1.TrainingRuntime, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.TrainingRuntime, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.TrainingRuntimeList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*trainerv1alpha1.TrainingRuntime, error)
+	List(ctx context.Context, opts v1.ListOptions) (*trainerv1alpha1.TrainingRuntimeList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.TrainingRuntime, err error)
-	Apply(ctx context.Context, trainingRuntime *trainerv1alpha1.TrainingRuntimeApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.TrainingRuntime, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *trainerv1alpha1.TrainingRuntime, err error)
+	Apply(ctx context.Context, trainingRuntime *applyconfigurationtrainerv1alpha1.TrainingRuntimeApplyConfiguration, opts v1.ApplyOptions) (result *trainerv1alpha1.TrainingRuntime, err error)
 	TrainingRuntimeExpansion
 }
 
 // trainingRuntimes implements TrainingRuntimeInterface
 type trainingRuntimes struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.TrainingRuntime, *v1alpha1.TrainingRuntimeList, *trainerv1alpha1.TrainingRuntimeApplyConfiguration]
+	*gentype.ClientWithListAndApply[*trainerv1alpha1.TrainingRuntime, *trainerv1alpha1.TrainingRuntimeList, *applyconfigurationtrainerv1alpha1.TrainingRuntimeApplyConfiguration]
 }
 
 // newTrainingRuntimes returns a TrainingRuntimes
 func newTrainingRuntimes(c *TrainerV1alpha1Client, namespace string) *trainingRuntimes {
 	return &trainingRuntimes{
-		gentype.NewClientWithListAndApply[*v1alpha1.TrainingRuntime, *v1alpha1.TrainingRuntimeList, *trainerv1alpha1.TrainingRuntimeApplyConfiguration](
+		gentype.NewClientWithListAndApply[*trainerv1alpha1.TrainingRuntime, *trainerv1alpha1.TrainingRuntimeList, *applyconfigurationtrainerv1alpha1.TrainingRuntimeApplyConfiguration](
 			"trainingruntimes",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.TrainingRuntime { return &v1alpha1.TrainingRuntime{} },
-			func() *v1alpha1.TrainingRuntimeList { return &v1alpha1.TrainingRuntimeList{} }),
+			func() *trainerv1alpha1.TrainingRuntime { return &trainerv1alpha1.TrainingRuntime{} },
+			func() *trainerv1alpha1.TrainingRuntimeList { return &trainerv1alpha1.TrainingRuntimeList{} },
+		),
 	}
 }

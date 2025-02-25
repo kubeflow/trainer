@@ -17,10 +17,10 @@
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // TrainJobLister helps list TrainJobs.
@@ -28,7 +28,7 @@ import (
 type TrainJobLister interface {
 	// List lists all TrainJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.TrainJob, err error)
+	List(selector labels.Selector) (ret []*trainerv1alpha1.TrainJob, err error)
 	// TrainJobs returns an object that can list and get TrainJobs.
 	TrainJobs(namespace string) TrainJobNamespaceLister
 	TrainJobListerExpansion
@@ -36,17 +36,17 @@ type TrainJobLister interface {
 
 // trainJobLister implements the TrainJobLister interface.
 type trainJobLister struct {
-	listers.ResourceIndexer[*v1alpha1.TrainJob]
+	listers.ResourceIndexer[*trainerv1alpha1.TrainJob]
 }
 
 // NewTrainJobLister returns a new TrainJobLister.
 func NewTrainJobLister(indexer cache.Indexer) TrainJobLister {
-	return &trainJobLister{listers.New[*v1alpha1.TrainJob](indexer, v1alpha1.Resource("trainjob"))}
+	return &trainJobLister{listers.New[*trainerv1alpha1.TrainJob](indexer, trainerv1alpha1.Resource("trainjob"))}
 }
 
 // TrainJobs returns an object that can list and get TrainJobs.
 func (s *trainJobLister) TrainJobs(namespace string) TrainJobNamespaceLister {
-	return trainJobNamespaceLister{listers.NewNamespaced[*v1alpha1.TrainJob](s.ResourceIndexer, namespace)}
+	return trainJobNamespaceLister{listers.NewNamespaced[*trainerv1alpha1.TrainJob](s.ResourceIndexer, namespace)}
 }
 
 // TrainJobNamespaceLister helps list and get TrainJobs.
@@ -54,15 +54,15 @@ func (s *trainJobLister) TrainJobs(namespace string) TrainJobNamespaceLister {
 type TrainJobNamespaceLister interface {
 	// List lists all TrainJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.TrainJob, err error)
+	List(selector labels.Selector) (ret []*trainerv1alpha1.TrainJob, err error)
 	// Get retrieves the TrainJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.TrainJob, error)
+	Get(name string) (*trainerv1alpha1.TrainJob, error)
 	TrainJobNamespaceListerExpansion
 }
 
 // trainJobNamespaceLister implements the TrainJobNamespaceLister
 // interface.
 type trainJobNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.TrainJob]
+	listers.ResourceIndexer[*trainerv1alpha1.TrainJob]
 }
