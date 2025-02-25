@@ -99,7 +99,7 @@ job_id = TrainingClient().train(
 
 ## Design Details
 
-### Compliment `torch` Plugin
+### Complement `torch` Plugin
 
 **How to Handle Override in Configs**
 
