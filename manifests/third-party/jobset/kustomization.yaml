@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - https://github.com/kubernetes-sigs/jobset/releases/download/v0.7.3/manifests.yaml
+
+# Config for the JobSet manager.
+configMapGenerator:
+  - name: jobset-manager-config
+    files:
+      - jobset_manager_config.yaml
+    options:
+      disableNameSuffixHash: true
+
+# Add required patches.
+patches:
+  # Remove namespace from the JobSet release manifests.
+  - path: patches/jobset_remove_namespace.yaml
+    target:
+      group: ""
+      version: v1
+      kind: Namespace
+  # Add custom manager config to the JobSet.
+  - path: patches/jobset_config_patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment

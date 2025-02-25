@@ -1,5 +1,5 @@
 /*
-Copyright 2021 kubeflow.org.
+Copyright 2024 The Kubeflow Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,25 +19,18 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
-	kubeflowv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 )
 
-// Generate OpenAPI spec definitions for API resources
+// Generate Kubeflow Training OpenAPI specification.
 func main() {
-	if len(os.Args) <= 1 {
-		klog.Fatal("Supply a version")
-	}
-	version := os.Args[1]
-	if !strings.HasPrefix(version, "v") {
-		version = "v" + version
-	}
+
 	var oAPIDefs = map[string]common.OpenAPIDefinition{}
 	defs := spec.Definitions{}
 
@@ -45,7 +38,7 @@ func main() {
 		return spec.MustCreateRef("#/definitions/" + common.EscapeJsonPointer(swaggify(name)))
 	}
 
-	for k, v := range kubeflowv1.GetOpenAPIDefinitions(refCallback) {
+	for k, v := range trainer.GetOpenAPIDefinitions(refCallback) {
 		oAPIDefs[k] = v
 	}
 
@@ -59,9 +52,7 @@ func main() {
 			Paths:       &spec.Paths{Paths: map[string]spec.PathItem{}},
 			Info: &spec.Info{
 				InfoProps: spec.InfoProps{
-					Title:       "Kubeflow Training SDK",
-					Description: "Python SDK for Kubeflow Training",
-					Version:     version,
+					Title: "Kubeflow Trainer OpenAPI Spec",
 				},
 			},
 		},
@@ -74,11 +65,10 @@ func main() {
 }
 
 func swaggify(name string) string {
-	name = strings.Replace(name, "github.com/kubeflow/training-operator/pkg/apis/", "", -1)
+	name = strings.Replace(name, "github.com/kubeflow/trainer/pkg/apis/", "", -1)
+	name = strings.Replace(name, "sigs.k8s.io/jobset/api/", "", -1)
 	name = strings.Replace(name, "k8s.io/api/core/", "", -1)
 	name = strings.Replace(name, "k8s.io/apimachinery/pkg/apis/meta/", "", -1)
-	name = strings.Replace(name, "k8s.io/apimachinery/pkg/api/resource", "", -1)
-	name = strings.Replace(name, "k8s.io/apimachinery/pkg/", "", -1)
 	name = strings.Replace(name, "/", ".", -1)
 	return name
 }

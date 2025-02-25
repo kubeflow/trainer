@@ -1,4 +1,6 @@
-# Releasing the Training Operator
+# Releasing the Kubeflow Trainer
+
+TODO (andreyvelich): Update this doc for Kubeflow Trainer V2.
 
 ## Prerequisite
 

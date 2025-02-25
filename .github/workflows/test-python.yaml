@@ -1,24 +1,31 @@
-name: Python Test
+name: Unit and Integration Test - Python
 
 on:
   - push
   - pull_request
 
 jobs:
-  python-test:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+      - uses: pre-commit/action@v3.0.1
+
+  test:
     name: Test
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}:${PYTHONPATH}
 
     strategy:
       fail-fast: false
       matrix:
-        # TODO (tenzen-y): Once we resolve this compatibility issue, we will test against all Python versions.
-        # REF: https://github.com/kubeflow/training-operator/issues/2096
-        # python-version: ["3.8", "3.9", "3.10", "3.11"]
-        python-version: ["3.10", "3.11"]
+        # Python version to run unit and integration tests.
+        python-version: ["3.11"]
 
     steps:
-      - name: Check out code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -26,10 +33,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
+      - name: Run Python unit tests
         run: |
-          pip install pytest python-dateutil urllib3 kubernetes
-          pip install -U './sdk/python[huggingface]'
+          make test-python
 
-      - name: Run unit test for training sdk
-        run: pytest ./sdk/python/kubeflow/training/api/training_client_test.py
+      - name: Run Python integration tests.
+        run: |
+          make test-python-integration

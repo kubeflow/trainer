@@ -10,19 +10,19 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-kubeflow-org-v1-jaxjob
+      path: /validate-trainer-kubeflow-org-v1alpha1-clustertrainingruntime
   failurePolicy: Fail
-  name: validator.jaxjob.training-operator.kubeflow.org
+  name: validator.clustertrainingruntime.trainer.kubeflow.org
   rules:
   - apiGroups:
-    - kubeflow.org
+    - trainer.kubeflow.org
     apiVersions:
-    - v1
+    - v1alpha1
     operations:
     - CREATE
     - UPDATE
     resources:
-    - jaxjobs
+    - clustertrainingruntimes
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -30,19 +30,19 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-kubeflow-org-v1-paddlejob
+      path: /validate-trainer-kubeflow-org-v1alpha1-trainingruntime
   failurePolicy: Fail
-  name: validator.paddlejob.training-operator.kubeflow.org
+  name: validator.trainingruntime.trainer.kubeflow.org
   rules:
   - apiGroups:
-    - kubeflow.org
+    - trainer.kubeflow.org
     apiVersions:
-    - v1
+    - v1alpha1
     operations:
     - CREATE
     - UPDATE
     resources:
-    - paddlejobs
+    - trainingruntimes
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -50,57 +50,17 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-kubeflow-org-v1-pytorchjob
+      path: /validate-trainer-kubeflow-org-v1alpha1-trainjob
   failurePolicy: Fail
-  name: validator.pytorchjob.training-operator.kubeflow.org
+  name: validator.trainjob.trainer.kubeflow.org
   rules:
   - apiGroups:
-    - kubeflow.org
+    - trainer.kubeflow.org
     apiVersions:
-    - v1
+    - v1alpha1
     operations:
     - CREATE
     - UPDATE
     resources:
-    - pytorchjobs
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-kubeflow-org-v1-tfjob
-  failurePolicy: Fail
-  name: validator.tfjob.training-operator.kubeflow.org
-  rules:
-  - apiGroups:
-    - kubeflow.org
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - tfjobs
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-kubeflow-org-v1-xgboostjob
-  failurePolicy: Fail
-  name: validator.xgboostjob.training-operator.kubeflow.org
-  rules:
-  - apiGroups:
-    - kubeflow.org
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - xgboostjobs
+    - trainjobs
   sideEffects: None

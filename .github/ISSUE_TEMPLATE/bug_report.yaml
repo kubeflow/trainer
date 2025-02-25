@@ -1,11 +1,11 @@
 name: Bug Report
-description: Tell us about a problem you are experiencing with Training Operator
+description: Tell us about a problem you are experiencing with Kubeflow Trainer
 labels: ["kind/bug", "lifecycle/needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this Training Operator bug report!
+        Thanks for taking the time to fill out this Kubeflow Trainer bug report!
   - type: textarea
     id: problem
     attributes:
@@ -31,14 +31,14 @@ body:
         $ kubectl version
 
         ```
-        Training Operator version:
+        Kubeflow Trainer version:
         ```bash
-        $ kubectl get pods -n kubeflow -l control-plane=kubeflow-training-operator -o jsonpath="{.items[*].spec.containers[*].image}"
+        $ kubectl get pods -n kubeflow -l app.kubernetes.io/name=trainer -o jsonpath="{.items[*].spec.containers[*].image}"
 
         ```
-        Training Operator Python SDK version:
+        Kubeflow Python SDK version:
         ```bash
-        $ pip show kubeflow-training
+        $ pip show kubeflow
 
         ```
     validations:

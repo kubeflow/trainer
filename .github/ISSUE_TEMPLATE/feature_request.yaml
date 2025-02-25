@@ -1,18 +1,18 @@
 name: Feature Request
-description: Suggest an idea for Training Operator
+description: Suggest an idea for Kubeflow Trainer
 labels: ["kind/feature", "lifecycle/needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this Training Operator feature request!
+        Thanks for taking the time to fill out this Kubeflow Trainer feature request!
   - type: textarea
     id: feature
     attributes:
       label: What you would like to be added?
       description: |
-        A clear and concise description of what you want to add to Training Operator.
-        Please consider to write Training Operator enhancement proposal if it is a large feature request.
+        A clear and concise description of what you want to add to Kubeflow Trainer.
+        Please consider to write Kubeflow Enhancement Proposal (KEP) if it is a large feature request.
     validations:
       required: true
   - type: textarea

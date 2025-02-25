@@ -1,6 +1,0 @@
-numpy>=1.16.3
-Cython>=0.29.4
-requests>=2.21.0
-urllib3>=1.21.1
-scipy>=1.4.1
-xgboost==1.5.2

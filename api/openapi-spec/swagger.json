@@ -1,0 +1,804 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Kubeflow Trainer OpenAPI Spec"
+  },
+  "paths": {},
+  "definitions": {
+    "trainer.v1alpha1.ClusterTrainingRuntime": {
+      "description": "ClusterTrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced by TrainJob that created in *any* namespace.",
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Standard object's metadata.",
+          "default": {},
+          "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "spec": {
+          "description": "Specification of the desired ClusterTrainingRuntime.",
+          "default": {},
+          "$ref": "#/definitions/trainer.v1alpha1.TrainingRuntimeSpec"
+        }
+      }
+    },
+    "trainer.v1alpha1.ClusterTrainingRuntimeList": {
+      "description": "ClusterTrainingRuntimeList is a collection of cluster training runtimes.",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "description": "List of ClusterTrainingRuntimes.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/trainer.v1alpha1.ClusterTrainingRuntime"
+          }
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Standard list metadata.",
+          "default": {},
+          "$ref": "#/definitions/v1.ListMeta"
+        }
+      }
+    },
+    "trainer.v1alpha1.ContainerOverride": {
+      "description": "ContainerOverride represents parameters that can be overridden using PodSpecOverrides. Parameters from the Trainer, DatasetConfig, and ModelConfig will take precedence.",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "args": {
+          "description": "Arguments to the entrypoint for the training container.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "default": ""
+          },
+          "x-kubernetes-list-type": "atomic"
+        },
+        "command": {
+          "description": "Entrypoint commands for the training container.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "default": ""
+          },
+          "x-kubernetes-list-type": "atomic"
+        },
+        "env": {
+          "description": "List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1.EnvVar"
+          },
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "envFrom": {
+          "description": "List of sources to populate environment variables in the container. These   values will be merged with the TrainingRuntime's environments.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1.EnvFromSource"
+          },
+          "x-kubernetes-list-type": "atomic"
+        },
+        "name": {
+          "description": "Name for the container. TrainingRuntime must have this container.",
+          "type": "string",
+          "default": ""
+        },
+        "volumeMounts": {
+          "description": "Pod volumes to mount into the container's filesystem.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1.VolumeMount"
+          },
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        }
+      }
+    },
+    "trainer.v1alpha1.CoschedulingPodGroupPolicySource": {
+      "description": "CoschedulingPodGroupPolicySource represents configuration for coscheduling plugin. The number of min members in the PodGroupSpec is always equal to the number of nodes.",
+      "type": "object",
+      "properties": {
+        "scheduleTimeoutSeconds": {
+          "description": "Time threshold to schedule PodGroup for gang-scheduling. If the scheduling timeout is equal to 0, the default value is used. Defaults to 60 seconds.",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "trainer.v1alpha1.DatasetConfig": {
+      "description": "DatasetConfig represents the desired dataset configuration. When this API is used, the training runtime must have the `dataset-initializer` container in the `Initializer` Job.",
+      "type": "object",
+      "properties": {
+        "env": {
+          "description": "List of environment variables to set in the dataset initializer container. These values will be merged with the TrainingRuntime's dataset initializer environments.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1.EnvVar"
+          },
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "secretRef": {
+          "description": "Reference to the secret with credentials to download dataset. Secret must be created in the TrainJob's namespace.",
+          "$ref": "#/definitions/v1.LocalObjectReference"
+        },
+        "storageUri": {
+          "description": "Storage uri for the dataset provider.",
+          "type": "string"
+        }
+      }
+    },
+    "trainer.v1alpha1.InputModel": {
+      "description": "InputModel represents the desired pre-trained model configuration.",
+      "type": "object",
+      "properties": {
+        "env": {
+          "description": "List of environment variables to set in the model initializer container. These values will be merged with the TrainingRuntime's model initializer environments.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1.EnvVar"
+          },
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "secretRef": {
+          "description": "Reference to the secret with credentials to download model. Secret must be created in the TrainJob's namespace.",
+          "$ref": "#/definitions/v1.LocalObjectReference"
+        },
+        "storageUri": {
+          "description": "Storage uri for the model provider.",
+          "type": "string"
+        }
+      }
+    },
+    "trainer.v1alpha1.JobSetTemplateSpec": {
+      "description": "JobSetTemplateSpec represents a template of the desired JobSet.",
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "description": "Metadata for custom JobSet's labels and annotations. JobSet name and namespace is equal to the TrainJob's name and namespace.",
+          "default": {},
+          "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "spec": {
+          "description": "Specification of the desired JobSet which will be created from TrainJob.",
+          "default": {},
+          "$ref": "#/definitions/jobset.v1alpha2.JobSetSpec"
+        }
+      }
+    },
+    "trainer.v1alpha1.JobStatus": {
+      "type": "object",
+      "required": [
+        "name",
+        "ready",
+        "succeeded",
+        "failed",
+        "active",
+        "suspended"
+      ],
+      "properties": {
+        "active": {
+          "description": "Active is the number of child Jobs with at least 1 pod in a running or pending state which are not marked for deletion.",
+          "type": "integer",
+          "format": "int32",
+          "default": 0
+        },
+        "failed": {
+          "description": "Failed is the number of failed child Jobs.",
+          "type": "integer",
+          "format": "int32",
+          "default": 0
+        },
+        "name": {
+          "description": "Name of the child Job.",
+          "type": "string",
+          "default": ""
+        },
+        "ready": {
+          "description": "Ready is the number of child Jobs where the number of ready pods and completed pods is greater than or equal to the total expected pod count for the child Job.",
+          "type": "integer",
+          "format": "int32",
+          "default": 0
+        },
+        "succeeded": {
+          "description": "Succeeded is the number of successfully completed child Jobs.",
+          "type": "integer",
+          "format": "int32",
+          "default": 0
+        },
+        "suspended": {
+          "description": "Suspended is the number of child Jobs which are in a suspended state.",
+          "type": "integer",
+          "format": "int32",
+          "default": 0
+        }
+      }
+    },
+    "trainer.v1alpha1.MLPolicy": {
+      "description": "MLPolicy represents configuration for the model trining with ML-specific parameters.",
+      "type": "object",
+      "properties": {
+        "mpi": {
+          "description": "Configuration for the MPI Runtime.",
+          "$ref": "#/definitions/trainer.v1alpha1.MPIMLPolicySource"
+        },
+        "numNodes": {
+          "description": "Number of training nodes. Defaults to 1.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "torch": {
+          "description": "Configuration for the PyTorch runtime.",
+          "$ref": "#/definitions/trainer.v1alpha1.TorchMLPolicySource"
+        }
+      }
+    },
+    "trainer.v1alpha1.MLPolicySource": {
+      "description": "MLPolicySource represents the runtime-specific configuration for various technologies. One of the following specs can be set.",
+      "type": "object",
+      "properties": {
+        "mpi": {
+          "description": "Configuration for the MPI Runtime.",
+          "$ref": "#/definitions/trainer.v1alpha1.MPIMLPolicySource"
+        },
+        "torch": {
+          "description": "Configuration for the PyTorch runtime.",
+          "$ref": "#/definitions/trainer.v1alpha1.TorchMLPolicySource"
+        }
+      }
+    },
+    "trainer.v1alpha1.MPIMLPolicySource": {
+      "description": "MPIMLPolicySource represents a MPI runtime configuration.",
+      "type": "object",
+      "properties": {
+        "mpiImplementation": {
+          "description": "Implementation name for the MPI to create the appropriate hostfile. Defaults to OpenMPI.",
+          "type": "string"
+        },
+        "numProcPerNode": {
+          "description": "Number of processes per node. This value is equal to the number of slots for each node in the hostfile.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "runLauncherAsNode": {
+          "description": "Whether to run training process on the launcher Job. Defaults to false.",
+          "type": "boolean"
+        },
+        "sshAuthMountPath": {
+          "description": "Directory where SSH keys are mounted. Defaults to /root/.ssh.",
+          "type": "string"
+        }
+      }
+    },
+    "trainer.v1alpha1.ModelConfig": {
+      "description": "ModelConfig represents the desired model configuration.",
+      "type": "object",
+      "properties": {
+        "input": {
+          "description": "Configuration of the pre-trained model. When this API is used, the training runtime must have the `model-initializer` container in the `Initializer` Job.",
+          "$ref": "#/definitions/trainer.v1alpha1.InputModel"
+        },
+        "output": {
+          "description": "Configuration of the trained model. When this API is used, the training runtime must have the `model-exporter` container in the `Exporter` Job.",
+          "$ref": "#/definitions/trainer.v1alpha1.OutputModel"
+        }
+      }
+    },
+    "trainer.v1alpha1.OutputModel": {
+      "description": "OutputModel represents the desired trained model configuration.",
+      "type": "object",
+      "properties": {
+        "env": {
+          "description": "List of environment variables to set in the model exporter container. These values will be merged with the TrainingRuntime's model exporter environments.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1.EnvVar"
+          },
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "secretRef": {
+          "description": "Reference to the secret with credentials to export model. Secret must be created in the TrainJob's namespace.",
+          "$ref": "#/definitions/v1.LocalObjectReference"
+        },
+        "storageUri": {
+          "description": "Storage uri for the model exporter.",
+          "type": "string"
+        }
+      }
+    },
+    "trainer.v1alpha1.PodGroupPolicy": {
+      "description": "PodGroupPolicy represents a PodGroup configuration for gang-scheduling.",
+      "type": "object",
+      "properties": {
+        "coscheduling": {
+          "description": "Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.",
+          "$ref": "#/definitions/trainer.v1alpha1.CoschedulingPodGroupPolicySource"
+        }
+      }
+    },
+    "trainer.v1alpha1.PodGroupPolicySource": {
+      "description": "PodGroupPolicySource represents supported plugins for gang-scheduling. Only one of its members may be specified.",
+      "type": "object",
+      "properties": {
+        "coscheduling": {
+          "description": "Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.",
+          "$ref": "#/definitions/trainer.v1alpha1.CoschedulingPodGroupPolicySource"
+        }
+      }
+    },
+    "trainer.v1alpha1.PodSpecOverride": {
+      "description": "PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.",
+      "type": "object",
+      "required": [
+        "targetJobs"
+      ],
+      "properties": {
+        "containers": {
+          "description": "Overrides for the containers in the desired job templates.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/trainer.v1alpha1.ContainerOverride"
+          },
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "initContainers": {
+          "description": "Overrides for the init container in the desired job templates.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/trainer.v1alpha1.ContainerOverride"
+          },
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "nodeSelector": {
+          "description": "Override for the node selector to place Pod on the specific mode.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "serviceAccountName": {
+          "description": "Override for the service account.",
+          "type": "string"
+        },
+        "targetJobs": {
+          "description": "TrainJobs is the training job replicas in the training runtime template to apply the overrides.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/trainer.v1alpha1.PodSpecOverrideTargetJob"
+          },
+          "x-kubernetes-list-type": "atomic"
+        },
+        "tolerations": {
+          "description": "Override for the Pod's tolerations.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1.Toleration"
+          },
+          "x-kubernetes-list-type": "atomic"
+        },
+        "volumes": {
+          "description": "Overrides for the Pod volume configuration.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1.Volume"
+          },
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        }
+      }
+    },
+    "trainer.v1alpha1.PodSpecOverrideTargetJob": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "description": "Name is the target training job name for which the PodSpec is overridden.",
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "trainer.v1alpha1.RuntimeRef": {
+      "description": "RuntimeRef represents the reference to the existing training runtime.",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "apiGroup": {
+          "description": "APIGroup of the runtime being referenced. Defaults to `trainer.kubeflow.org`.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind of the runtime being referenced. Defaults to ClusterTrainingRuntime.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the runtime being referenced. When namespaced-scoped TrainingRuntime is used, the TrainJob must have the same namespace as the deployed runtime.",
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "trainer.v1alpha1.TorchElasticPolicy": {
+      "description": "TorchElasticPolicy represents a configuration for the PyTorch elastic training. If this policy is set, the `.spec.numNodes` parameter must be omitted, since min and max node is used to configure the `torchrun` CLI argument: `--nnodes=minNodes:maxNodes`. Only `c10d` backend is supported for the Rendezvous communication.",
+      "type": "object",
+      "properties": {
+        "maxNodes": {
+          "description": "Upper limit for the number of nodes to which training job can scale up.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxRestarts": {
+          "description": "How many times the training job can be restarted. This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and the `.spec.failurePolicy.maxRestarts` parameter of the training Job.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "metrics": {
+          "description": "Specification which are used to calculate the desired number of nodes. See the individual metric source types for more information about how each type of metric must respond. The HPA will be created to perform auto-scaling.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/k8s.io.api.autoscaling.v2.MetricSpec"
+          },
+          "x-kubernetes-list-type": "atomic"
+        },
+        "minNodes": {
+          "description": "Lower limit for the number of nodes to which training job can scale down.",
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "trainer.v1alpha1.TorchMLPolicySource": {
+      "description": "TorchMLPolicySource represents a PyTorch runtime configuration.",
+      "type": "object",
+      "properties": {
+        "elasticPolicy": {
+          "description": "Elastic policy for the PyTorch training.",
+          "$ref": "#/definitions/trainer.v1alpha1.TorchElasticPolicy"
+        },
+        "numProcPerNode": {
+          "description": "Number of processes per node. This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI. Supported values: `auto`, `cpu`, `gpu`, or int value. Defaults to `auto`.",
+          "$ref": "#/definitions/k8s.io.apimachinery.pkg.util.intstr.IntOrString"
+        }
+      }
+    },
+    "trainer.v1alpha1.TrainJob": {
+      "description": "TrainJob represents configuration of a training job.",
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Standard object's metadata.",
+          "default": {},
+          "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "spec": {
+          "description": "Specification of the desired TrainJob.",
+          "default": {},
+          "$ref": "#/definitions/trainer.v1alpha1.TrainJobSpec"
+        },
+        "status": {
+          "description": "Current status of TrainJob.",
+          "default": {},
+          "$ref": "#/definitions/trainer.v1alpha1.TrainJobStatus"
+        }
+      }
+    },
+    "trainer.v1alpha1.TrainJobList": {
+      "description": "TrainJobList is a collection of training jobs.",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "description": "List of TrainJobs.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/trainer.v1alpha1.TrainJob"
+          }
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Standard list metadata.",
+          "default": {},
+          "$ref": "#/definitions/v1.ListMeta"
+        }
+      }
+    },
+    "trainer.v1alpha1.TrainJobSpec": {
+      "description": "TrainJobSpec represents specification of the desired TrainJob.",
+      "type": "object",
+      "required": [
+        "runtimeRef"
+      ],
+      "properties": {
+        "annotations": {
+          "description": "Annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "datasetConfig": {
+          "description": "Configuration of the training dataset.",
+          "$ref": "#/definitions/trainer.v1alpha1.DatasetConfig"
+        },
+        "labels": {
+          "description": "Labels to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "managedBy": {
+          "description": "ManagedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`",
+          "type": "string"
+        },
+        "modelConfig": {
+          "description": "Configuration of the pre-trained and trained model.",
+          "$ref": "#/definitions/trainer.v1alpha1.ModelConfig"
+        },
+        "podSpecOverrides": {
+          "description": "Custom overrides for the training runtime.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/trainer.v1alpha1.PodSpecOverride"
+          },
+          "x-kubernetes-list-type": "atomic"
+        },
+        "runtimeRef": {
+          "description": "Reference to the training runtime. The field is immutable.",
+          "default": {},
+          "$ref": "#/definitions/trainer.v1alpha1.RuntimeRef"
+        },
+        "suspend": {
+          "description": "Whether the controller should suspend the running TrainJob. Defaults to false.",
+          "type": "boolean"
+        },
+        "trainer": {
+          "description": "Configuration of the desired trainer.",
+          "$ref": "#/definitions/trainer.v1alpha1.Trainer"
+        }
+      }
+    },
+    "trainer.v1alpha1.TrainJobStatus": {
+      "description": "TrainJobStatus represents the current status of TrainJob.",
+      "type": "object",
+      "properties": {
+        "conditions": {
+          "description": "Conditions for the TrainJob.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1.Condition"
+          },
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "type",
+          "x-kubernetes-patch-strategy": "merge"
+        },
+        "jobsStatus": {
+          "description": "JobsStatus tracks the child Jobs in TrainJob.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/trainer.v1alpha1.JobStatus"
+          },
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        }
+      }
+    },
+    "trainer.v1alpha1.Trainer": {
+      "description": "Trainer represents the desired trainer configuration. Every training runtime contains `trainer` container which represents Trainer.",
+      "type": "object",
+      "properties": {
+        "args": {
+          "description": "Arguments to the entrypoint for the training container.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "default": ""
+          },
+          "x-kubernetes-list-type": "atomic"
+        },
+        "command": {
+          "description": "Entrypoint commands for the training container.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "default": ""
+          },
+          "x-kubernetes-list-type": "atomic"
+        },
+        "env": {
+          "description": "List of environment variables to set in the training container. These values will be merged with the TrainingRuntime's trainer environments.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/v1.EnvVar"
+          },
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "image": {
+          "description": "Docker image for the training container.",
+          "type": "string"
+        },
+        "numNodes": {
+          "description": "Number of training nodes.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "numProcPerNode": {
+          "description": "Number of processes/workers/slots on every training node. For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set. For the MPI runtime only int value can be set.",
+          "$ref": "#/definitions/k8s.io.apimachinery.pkg.util.intstr.IntOrString"
+        },
+        "resourcesPerNode": {
+          "description": "Compute resources for each training node.",
+          "$ref": "#/definitions/v1.ResourceRequirements"
+        }
+      }
+    },
+    "trainer.v1alpha1.TrainingRuntime": {
+      "description": "TrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a namespaced-scoped and can be referenced by TrainJob that created in the *same* namespace as the TrainingRuntime.",
+      "type": "object",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Standard object's metadata.",
+          "default": {},
+          "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "spec": {
+          "description": "Specification of the desired TrainingRuntime.",
+          "default": {},
+          "$ref": "#/definitions/trainer.v1alpha1.TrainingRuntimeSpec"
+        }
+      }
+    },
+    "trainer.v1alpha1.TrainingRuntimeList": {
+      "description": "TrainingRuntimeList is a collection of training runtimes.",
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "description": "List of TrainingRuntimes.",
+          "type": "array",
+          "items": {
+            "default": {},
+            "$ref": "#/definitions/trainer.v1alpha1.TrainingRuntime"
+          }
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Standard list metadata.",
+          "default": {},
+          "$ref": "#/definitions/v1.ListMeta"
+        }
+      }
+    },
+    "trainer.v1alpha1.TrainingRuntimeSpec": {
+      "description": "TrainingRuntimeSpec represents a specification of the desired training runtime.",
+      "type": "object",
+      "required": [
+        "template"
+      ],
+      "properties": {
+        "mlPolicy": {
+          "description": "Configuration for the model training with ML-specific parameters.",
+          "$ref": "#/definitions/trainer.v1alpha1.MLPolicy"
+        },
+        "podGroupPolicy": {
+          "description": "Configuration for the PodGroup to enable gang-scheduling via supported plugins.",
+          "$ref": "#/definitions/trainer.v1alpha1.PodGroupPolicy"
+        },
+        "template": {
+          "description": "JobSet template which will be used by TrainJob.",
+          "default": {},
+          "$ref": "#/definitions/trainer.v1alpha1.JobSetTemplateSpec"
+        }
+      }
+    }
+  }
+}

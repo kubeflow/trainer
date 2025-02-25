@@ -1,52 +1,25 @@
 # pkg and bin directories currently contain build artifacts
 # only so we exclude them.
 bin/
-/tf-operator
-vendor/
-testbin/*
 manifests/external-crds/
-cover.out
 
 # IDEs
 .vscode/
 __debug_bin
+.idea/
+.DS_Store
+.swp
+*~
+
+# Jupyter Notebooks.
+**/.ipynb_checkpoints
 
 # Python cache files
 __pycache__/
+*.egg-info/
 
-# Emacs temporary files
-*~
-
-# VIM temporary files.
-.swp
-
-# Other temporary files
-.DS_Store
-
-# Files created by Gogland IDE
-.idea/
-
-# Exclude wheel files for now.
-# The only wheel file is the TF wheel one which is quite large.
-# We don't want to check that into source control because it could be
-# quite large.
-*.whl
-
-# Bazel files
-**/bazel-*
-# Examples egg
-examples/tf_sample/tf_sample.egg-info/
-examples/.ipynb_checkpoints/
-
-**/.ipynb_checkpoints
-
-# openapi-codegen tools and auto generated files but useless
+# OpenAPI Generator CLI JAR file
 hack/python-sdk/openapi-generator-cli.jar
-hack/python-sdk-v2/openapi-generator-cli.jar
 
 # Coverage
 cover.out
-
-/training-operator
-
-data/

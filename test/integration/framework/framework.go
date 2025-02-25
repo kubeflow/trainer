@@ -32,7 +32,7 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
+	ctrlpkg "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -41,10 +41,10 @@ import (
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
-	kubeflowv2 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v2alpha1"
-	controllerv2 "github.com/kubeflow/training-operator/pkg/controller.v2"
-	runtimecore "github.com/kubeflow/training-operator/pkg/runtime.v2/core"
-	webhookv2 "github.com/kubeflow/training-operator/pkg/webhook.v2"
+	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	controller "github.com/kubeflow/trainer/pkg/controller"
+	runtimecore "github.com/kubeflow/trainer/pkg/runtime/core"
+	kubeflowwebhooks "github.com/kubeflow/trainer/pkg/webhooks"
 )
 
 type Framework struct {
@@ -57,12 +57,12 @@ func (f *Framework) Init() *rest.Config {
 	ginkgo.By("bootstrapping test environment")
 	f.testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "..", "manifests", "v2", "base", "crds"),
+			filepath.Join("..", "..", "..", "manifests", "base", "crds"),
 			filepath.Join("..", "..", "..", "manifests", "external-crds", "scheduler-plugins", "crd.yaml"),
 			filepath.Join("..", "..", "..", "manifests", "external-crds", "jobset-operator"),
 		},
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{filepath.Join("..", "..", "..", "manifests", "v2", "base", "webhook", "manifests.yaml")},
+			Paths: []string{filepath.Join("..", "..", "..", "manifests", "base", "webhook", "manifests.yaml")},
 		},
 		ErrorIfCRDPathMissing: true,
 	}
@@ -74,7 +74,7 @@ func (f *Framework) Init() *rest.Config {
 
 func (f *Framework) RunManager(cfg *rest.Config) (context.Context, client.Client) {
 	webhookInstallOpts := &f.testEnv.WebhookInstallOptions
-	gomega.ExpectWithOffset(1, kubeflowv2.AddToScheme(scheme.Scheme)).NotTo(gomega.HaveOccurred())
+	gomega.ExpectWithOffset(1, trainer.AddToScheme(scheme.Scheme)).NotTo(gomega.HaveOccurred())
 	gomega.ExpectWithOffset(1, jobsetv1alpha2.AddToScheme(scheme.Scheme)).NotTo(gomega.HaveOccurred())
 	gomega.ExpectWithOffset(1, schedulerpluginsv1alpha1.AddToScheme(scheme.Scheme)).NotTo(gomega.HaveOccurred())
 
@@ -102,7 +102,7 @@ func (f *Framework) RunManager(cfg *rest.Config) (context.Context, client.Client
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
 	gomega.ExpectWithOffset(1, runtimes).NotTo(gomega.BeNil())
 
-	failedCtrlName, err := controllerv2.SetupControllers(mgr, runtimes, controller.Options{
+	failedCtrlName, err := controller.SetupControllers(mgr, runtimes, ctrlpkg.Options{
 		// controller-runtime v0.19+ validates controller names are unique, to make sure
 		// exported Prometheus metrics for each controller do not conflict. The current check
 		// relies on static state that's not compatible with testing execution model.
@@ -114,7 +114,7 @@ func (f *Framework) RunManager(cfg *rest.Config) (context.Context, client.Client
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), "controller", failedCtrlName)
 	gomega.ExpectWithOffset(1, failedCtrlName).To(gomega.BeEmpty())
 
-	failedWebhookName, err := webhookv2.Setup(mgr, runtimes)
+	failedWebhookName, err := kubeflowwebhooks.Setup(mgr, runtimes)
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), "webhook", failedWebhookName)
 	gomega.ExpectWithOffset(1, failedWebhookName).To(gomega.BeEmpty())
 

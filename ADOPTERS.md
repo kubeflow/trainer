@@ -1,6 +1,8 @@
-# Adopters of Kubeflow Training Operator
+# Adopters of Kubeflow Trainer
 
-This page contains a list of organizations who are using Kubeflow Training Operator. If you'd like to be included here, please send a pull request which modifies this file. Please keep the list in alphabetical order.
+This page contains a list of organizations who are using Kubeflow Trainer.
+If you'd like to be included here, please send a pull request which modifies this file.
+Please keep the list in alphabetical order.
 
 | Organization | Contact |
 | ------------ | ------- |

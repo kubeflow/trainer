@@ -17,12 +17,10 @@
 package fake
 
 import (
-	applyconfiguration "github.com/kubeflow/training-operator/pkg/client/applyconfiguration"
-	clientset "github.com/kubeflow/training-operator/pkg/client/clientset/versioned"
-	kubeflowv1 "github.com/kubeflow/training-operator/pkg/client/clientset/versioned/typed/kubeflow.org/v1"
-	fakekubeflowv1 "github.com/kubeflow/training-operator/pkg/client/clientset/versioned/typed/kubeflow.org/v1/fake"
-	kubeflowv2alpha1 "github.com/kubeflow/training-operator/pkg/client/clientset/versioned/typed/kubeflow.org/v2alpha1"
-	fakekubeflowv2alpha1 "github.com/kubeflow/training-operator/pkg/client/clientset/versioned/typed/kubeflow.org/v2alpha1/fake"
+	applyconfiguration "github.com/kubeflow/trainer/pkg/client/applyconfiguration"
+	clientset "github.com/kubeflow/trainer/pkg/client/clientset/versioned"
+	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/clientset/versioned/typed/trainer/v1alpha1"
+	faketrainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/clientset/versioned/typed/trainer/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -116,12 +114,7 @@ var (
 	_ testing.FakeClient  = &Clientset{}
 )
 
-// KubeflowV1 retrieves the KubeflowV1Client
-func (c *Clientset) KubeflowV1() kubeflowv1.KubeflowV1Interface {
-	return &fakekubeflowv1.FakeKubeflowV1{Fake: &c.Fake}
-}
-
-// KubeflowV2alpha1 retrieves the KubeflowV2alpha1Client
-func (c *Clientset) KubeflowV2alpha1() kubeflowv2alpha1.KubeflowV2alpha1Interface {
-	return &fakekubeflowv2alpha1.FakeKubeflowV2alpha1{Fake: &c.Fake}
+// TrainerV1alpha1 retrieves the TrainerV1alpha1Client
+func (c *Clientset) TrainerV1alpha1() trainerv1alpha1.TrainerV1alpha1Interface {
+	return &faketrainerv1alpha1.FakeTrainerV1alpha1{Fake: &c.Fake}
 }

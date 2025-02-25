@@ -1,5 +1,7 @@
 # Developer Guide
 
+# TODO (andreyvelich): This doc needs to be updated for Kubeflow Trainer V2
+
 Kubeflow Training Operator is currently at v1.
 
 ## Requirements
@@ -47,38 +49,49 @@ Running the operator locally (as opposed to deploying it on a K8s cluster) is co
 First, you need to run a Kubernetes cluster locally. We recommend [Kind](https://kind.sigs.k8s.io).
 
 You can create a `kind` cluster by running
+
 ```sh
 kind create cluster
 ```
+
 This will load your kubernetes config file with the new cluster.
 
 After creating the cluster, you can check the nodes with the code below which should show you the kind-control-plane.
+
 ```sh
 kubectl get nodes
 ```
+
 The output should look something like below:
+
 ```
 $ kubectl get nodes
 NAME                 STATUS   ROLES           AGE   VERSION
 kind-control-plane   Ready    control-plane   32s   v1.27.3
 ```
+
 Note, that for the example job below, the PyTorchJob uses the `kubeflow` namespace.
 
 From here we can apply the manifests to the cluster.
+
 ```sh
-kubectl apply -k "github.com/kubeflow/training-operator/manifests/overlays/standalone"
+kubectl apply --server-side -k "github.com/kubeflow/training-operator/manifests/overlays/standalone"
 ```
 
 Then we can patch it with the latest operator image.
+
 ```sh
 kubectl patch -n kubeflow deployments training-operator --type json -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "kubeflow/training-operator:latest"}]'
 ```
+
 Then we can run the job with the following command.
 
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/kubeflow/training-operator/master/examples/pytorch/simple.yaml
 ```
+
 And we can see the output of the job from the logs, which may take some time to produce but should look something like below.
+
 ```
 $ kubectl logs -n kubeflow -l training.kubeflow.org/job-name=pytorch-simple --follow
 Defaulted container "pytorch" out of: pytorch, init-pytorch (init)
@@ -110,12 +123,15 @@ Now that you confirmed you can spin up an operator locally, you can try to test 
 You do this by building a new operator image and loading it into your kind cluster.
 
 ### Build Operator Image
+
 ```sh
 make docker-build IMG=my-username/training-operator:my-pr-01
 ```
+
 You can swap `my-username/training-operator:my-pr-01` with whatever you would like.
 
 ## Load docker image
+
 ```sh
 kind load docker-image my-username/training-operator:my-pr-01
 ```
@@ -126,21 +142,28 @@ kind load docker-image my-username/training-operator:my-pr-01
 cd ./manifests/overlays/standalone
 kustomize edit set image my-username/training-operator=my-username/training-operator:my-pr-01
 ```
+
 Update the `newTag` key in `./manifests/overlayes/standalone/kustimization.yaml` with the new image.
 
 Deploy the operator with:
+
 ```sh
 kubectl apply -k ./manifests/overlays/standalone
 ```
+
 And now we can submit jobs to the operator.
+
 ```sh
 kubectl patch -n kubeflow deployments training-operator --type json -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "my-username/training-operator:my-pr-01"}]'
 kubectl apply -f https://raw.githubusercontent.com/kubeflow/training-operator/master/examples/pytorch/simple.yaml
 ```
+
 You should be able to see a pod for your training operator running in your namespace using
+
 ```
 kubectl logs -n kubeflow -l training.kubeflow.org/job-name=pytorch-simple
 ```
+
 ## Go version
 
 On ubuntu the default go package appears to be gccgo-go which has problems see [issue](https://github.com/golang/go/issues/15429) golang-go package is also really old so install from golang tarballs instead.

@@ -1,10 +1,49 @@
-name: Go generate Test
+name: Unit and Integration Test - Go
 
 on:
   - push
   - pull_request
 
 jobs:
+  generate:
+    name: Generate
+    runs-on: ubuntu-latest
+    env:
+      GOPATH: ${{ github.workspace }}/go
+    defaults:
+      run:
+        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
+
+      - name: Check Go modules
+        run: |
+          go mod tidy
+          git diff --exit-code || (echo 'Please run "go mod tidy" to sync Go modules' && exit 1);
+      - name: Check auto-generated assets
+        run: |
+          make generate
+          git diff --exit-code || (echo 'Please run "make generate" to generate assets' && exit 1);
+      - name: Check go fmt
+        run: |
+          make fmt
+          git diff --exit-code || (echo 'Please run "make fmt" to verify gofmt' && exit 1);
+      - name: Check go fmt
+        run: |
+          make vet
+          git diff --exit-code || (echo 'Please run "make vet" to verify govet' && exit 1);
+      - name: Check golangci lint
+        run: |
+          make golangci-lint
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -12,35 +51,36 @@ jobs:
       GOPATH: ${{ github.workspace }}/go
     defaults:
       run:
-        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/training-operator
+        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Kubernetes versions for setup-envtest integration tests.
+        kubernetes-version: ["1.29.3", "1.30.0", "1.31.0"]
 
     steps:
-      - name: Check out code
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          path: ${{ env.GOPATH }}/src/github.com/kubeflow/training-operator
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/training-operator/go.mod
+          go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
 
-      - name: Check Go modules
+      - name: Run Go unit tests
         run: |
-          go mod tidy && pushd hack/swagger && go mod tidy && popd && git add go.* &&
-          git diff --cached --exit-code || (echo 'Please run "go mod tidy" to sync Go modules' && exit 1);
-      - name: Check auto-generated assets
+          make test
+
+      - name: Run Go integration tests
         run: |
-          make generate && git add pkg sdk manifests &&
-          git diff --cached --exit-code || (echo 'Please run "make generate" to generate assets' && exit 1);
-      - name: Verify gofmt
-        run: |
-          make fmt && git add pkg cmd &&
-          git diff --cached --exit-code || (echo 'Please run "make fmt" to verify gofmt' && exit 1);
-      - name: Verify govet
-        run: |
-          make vet && git add pkg cmd &&
-          git diff --cached --exit-code || (echo 'Please run "make vet" to verify govet' && exit 1);
-      - name: Verify golint
-        run: |
-          make golangci-lint
+          make test-integration ENVTEST_K8S_VERSION=${{ matrix.kubernetes-version }}
+
+      - name: Coveralls report
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: cover.out
+          working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+          parallel: true

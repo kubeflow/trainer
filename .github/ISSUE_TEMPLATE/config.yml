@@ -1,12 +1,12 @@
 blank_issues_enabled: true
 
 contact_links:
-  - name: Training Operator Documentation
-    url: https://www.kubeflow.org/docs/components/training/
+  - name: Kubeflow Trainer Documentation
+    url: https://www.kubeflow.org/docs/components/trainer/
     about: Much help can be found in the docs
-  - name: Kubeflow Training Operator Slack Channel
+  - name: Kubeflow Trainer Slack Channel
     url: https://www.kubeflow.org/docs/about/community/#kubeflow-slack-channels
-    about: Ask the Training Operator community on CNCF Slack
-  - name: Kubeflow Training Operator Community Meeting
+    about: Ask the Kubeflow Trainer community on CNCF Slack
+  - name: Kubeflow Training and AutoML WG Community Meeting
     url: https://bit.ly/2PWVCkV
     about: Join the Kubeflow Training working group meeting

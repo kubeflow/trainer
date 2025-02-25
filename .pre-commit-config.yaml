@@ -23,20 +23,9 @@ repos:
       - id: flake8
 exclude: |
   (?x)^(
-    pkg/apis/kubeflow.org/v1/openapi_generated.go|
-    pkg/apis/kubeflow.org/v1/zz_.*|
+    docs/images/.*|
     pkg/client/.*|
-    test_job/apis/test_job/v1/.*generated.*.go|
-    test_job/client/.*|
-    docs/api/.*|
-    hack/python-sdk/post_gen.py|
-    sdk/python/kubeflow/training/[^/]*.py|
-    sdk/python/kubeflow/training/models/.*|
-    sdk/python/test/.*|
-    sdk/python/docs/.*|
-    sdk/python/.openapi-generator/VERSION|
-    sdk/python/kubeflow/__init__.py|
-    sdk_v2/kubeflow/training/[^/]*.py|
-    sdk_v2/kubeflow/training/models/.*|
-    sdk_v2/docs/.*
+    sdk/kubeflow/trainer/[^/]*.py|
+    sdk/kubeflow/trainer/models/.*|
+    sdk/docs/.*
   )$

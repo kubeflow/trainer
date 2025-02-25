@@ -2,7 +2,7 @@ import argparse
 
 from github import Github
 
-REPO_NAME = "kubeflow/training-operator"
+REPO_NAME = "kubeflow/trainer"
 CHANGELOG_FILE = "CHANGELOG.md"
 
 parser = argparse.ArgumentParser()
@@ -54,7 +54,7 @@ change_log = [
     "# [{}]({}) ({})".format(current_release, release_url, release_date),
     "\n\n",
     "## TODO: Group PRs into Breaking Changes, New Features, Bug fixes, Misc, etc. "
-    + "For example: [v1.7.0](https://github.com/kubeflow/training-operator/releases/tag/v1.7.0)",
+    + "For example: [v1.7.0](https://github.com/kubeflow/trainer/releases/tag/v1.7.0)",
     "\n\n",
     pr_list,
     "\n" "[Full Changelog]({})\n".format(comparison.html_url),

@@ -1,112 +1,68 @@
-# Kubeflow Training Operator
+# Kubeflow Trainer
 
 [![Build Status](https://github.com/kubeflow/training-operator/actions/workflows/test-go.yaml/badge.svg?branch=master)](https://github.com/kubeflow/training-operator/actions/workflows/test-go.yaml?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/kubeflow/training-operator/badge.svg?branch=master)](https://coveralls.io/github/kubeflow/training-operator?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubeflow/training-operator)](https://goreportcard.com/report/github.com/kubeflow/training-operator)
 
+<h1 align="center">
+    <img src="./docs/images/trainer-logo.svg" alt="logo" width="200">
+  <br>
+</h1>
+
 ## Overview
 
-Kubeflow Training Operator is a Kubernetes-native project for fine-tuning and
-scalable distributed training of machine learning (ML) models created with various ML frameworks
-such as PyTorch, TensorFlow, HuggingFace, [JAX](https://jax.readthedocs.io/en/latest/), DeepSpeed, XGBoost, PaddlePaddle and others.
+Kubeflow Trainer is a Kubernetes-native project designed for large language models (LLMs)
+fine-tuning and enabling scalable, distributed training of machine learning (ML) models across
+various frameworks, including PyTorch, JAX, TensorFlow, and others.
 
-You can run high-performance computing (HPC) tasks with the Training Operator and `MPIJob` since it
-supports running Message Passing Interface (MPI) on Kubernetes which is heavily used for HPC.
-The Training Operator implements the V1 API version of MPI Operator. For the MPI Operator V2 version,
-please follow [this guide](https://www.kubeflow.org/docs/components/training/user-guides/mpi/) to
-install MPI Operator V2.
+You can integrate other ML libraries such as [HuggingFace](https://huggingface.co),
+[DeepSpeed](https://github.com/microsoft/DeepSpeed), or [Megatron-LM](https://github.com/NVIDIA/Megatron-LM)
+with Kubeflow Training to orchestrate their ML training on Kubernetes.
 
-The Training Operator allows you to use Kubernetes workloads to effectively train your large models
-via [Kubernetes Custom Resources APIs](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
-or using the Training Operator Python SDK.
+Kubeflow Trainer allows you effortlessly develop your LLMs with the Kubeflow Python SDK and
+build Kubernetes-native Training Runtimes with Kubernetes Custom Resources APIs.
 
-## Prerequisites
+<h1 align="center">
+    <img src="./docs/images/trainer-tech-stack.drawio.svg" alt="logo" width="500">
+  <br>
+</h1>
 
-Please check [the official Kubeflow documentation](https://www.kubeflow.org/docs/components/training/installation/#prerequisites)
-for prerequisites to install the Training Operator.
+## Kubeflow Trainer Introduction
 
-## Installation
+The following KubeCon + CloudNativeCon 2024 talk provides an overview of Kubeflow Trainer capabilities:
 
-Please follow [the Kubeflow Training Operator guide](https://www.kubeflow.org/docs/components/training/installation/#installing-the-training-operator)
-for the detailed instructions on how to install Training Operator.
-
-### Installing the Control Plane
-
-Run the following command to install the latest stable release of the Training Operator control plane: `v1.8.0`.
-
-```bash
-kubectl apply --server-side -k "github.com/kubeflow/training-operator.git/manifests/overlays/standalone?ref=v1.8.0"
-```
-
-Run the following command to install the latest changes of the Training Operator control plane:
-
-```bash
-kubectl apply --server-side -k "github.com/kubeflow/training-operator/manifests/overlays/standalone"
-```
-
-### Installing the Python SDK
-
-The Training Operator [implements a Python SDK](https://pypi.org/project/kubeflow-training/)
-to simplify creation of distributed training and fine-tuning jobs for Data Scientists.
-
-Run the following command to install the latest stable release of the Training SDK:
-
-```
-pip install -U kubeflow-training
-```
+[![Kubeflow Trainer](https://img.youtube.com/vi/Lgy4ir1AhYw/0.jpg)](https://www.youtube.com/watch?v=Lgy4ir1AhYw)
 
 ## Getting Started
 
-Please refer to [the getting started guide](https://www.kubeflow.org/docs/components/training/getting-started/#getting-started-with-pytorchjob)
-to quickly create your first distributed training job using the Python SDK.
-
-If you want to work directly with Kubernetes Custom Resources provided by Training Operator,
-follow [the PyTorchJob MNIST guide](https://www.kubeflow.org/docs/components/training/pytorch/#creating-a-pytorch-training-job).
+Please check [the official Kubeflow documentation](https://www.kubeflow.org/docs/components/trainer/getting-started)
+to install and get started with Kubeflow Trainer.
 
 ## Community
 
 The following links provide information on how to get involved in the community:
 
-- Attend [the bi-weekly AutoML and Training Working Group](https://bit.ly/2PWVCkV) community meeting.
 - Join our [`#kubeflow-training` Slack channel](https://www.kubeflow.org/docs/about/community/#kubeflow-slack).
-- Check out [who is using the Training Operator](ADOPTERS.md).
-
-This is a part of Kubeflow, so please see [readme in kubeflow/kubeflow](https://github.com/kubeflow/kubeflow#get-involved) to get in touch with the community.
+- Attend [the bi-weekly AutoML and Training Working Group](https://bit.ly/2PWVCkV) community meeting.
+- Check out [who is using Kubeflow Trainer](ADOPTERS.md).
 
 ## Contributing
 
 Please refer to the [CONTRIBUTING guide](CONTRIBUTING.md).
 
-## Change Log
+## Changelog
 
 Please refer to the [CHANGELOG](CHANGELOG.md).
 
-## Version Matrix
+## Kubeflow Training Operator V1
 
-The following table lists the most recent few versions of the operator.
+Kubeflow Trainer project is currently in <strong>alpha</strong> status, and APIs may change.
+If you are using Kubeflow Training Operator V1, please refer [to this migration document](https://www.kubeflow.org/docs/components/trainer/operator-guides/migration/).
 
-| Operator Version       | API Version | Kubernetes Version |
-| ---------------------- | ----------- | ------------------ |
-| `v1.4.x`               | `v1`        | 1.23+              |
-| `v1.5.x`               | `v1`        | 1.23+              |
-| `v1.6.x`               | `v1`        | 1.23+              |
-| `v1.7.x`               | `v1`        | 1.25+              |
-| `v1.8.x`               | `v1`        | 1.27+              |
-| `latest` (master HEAD) | `v1`        | 1.27+              |
+Kubeflow Community will maintain the Training Operator V1 source code at
+[the `release-1.9` branch](https://github.com/kubeflow/training-operator/tree/release-1.9).
 
-## Reference
-
-For a complete reference of the custom resource definitions, please refer to the API Definition.
-
-- [TensorFlow API Definition](pkg/apis/kubeflow.org/v1/tensorflow_types.go)
-- [PyTorch API Definition](pkg/apis/kubeflow.org/v1/pytorch_types.go)
-- [XGBoost API Definition](pkg/apis/kubeflow.org/v1/xgboost_types.go)
-- [MPI API Definition](pkg/apis/kubeflow.org/v1/mpi_types.go)
-- [PaddlePaddle API Definition](pkg/apis/kubeflow.org/v1/paddlepaddle_types.go)
-- [JAX API Definition](pkg/apis/kubeflow.org/v1/jax_types.go)
-
-For details on the Training Operator custom resources APIs, refer to
-[the following API documentation](docs/api/kubeflow.org_v1_generated.asciidoc)
+You can find the documentation for Kubeflow Training Operator V1 in [these guides](https://www.kubeflow.org/docs/components/trainer/legacy-v1).
 
 ## Acknowledgement
 

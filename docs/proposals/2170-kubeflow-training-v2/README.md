@@ -363,7 +363,7 @@ type RuntimeRef struct {
 	Name string `json:"name"`
 
 	// APIGroup of the runtime being referenced.
-	// Defaults to `kubeflow.org`.
+	// Defaults to `trainer.kubeflow.org`.
 	APIGroup *string `json:"apiGroup,omitempty"`
 
 	// Kind of the runtime being referenced.
@@ -462,7 +462,7 @@ This table explains the rationale for each `TrainJob` parameter:
 ### Example of TrainJob
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: TrainJob
 metadata:
   name: torch-ddp
@@ -520,7 +520,7 @@ TrainingClient().train(
 This example shows how to create `TrainJob` to fine-tune LLama 7b:
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: TrainJob
 metadata:
   name: tune-llama-with-yelp
@@ -761,7 +761,7 @@ After initial implementation of `TrainJob` and `TrainingRuntime`, we will suppor
 export the trained model. The following runtime can be implemented:
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: torch-tune-llama-7b-export
@@ -927,7 +927,7 @@ This example shows how to override the user-identity for the sidecar container a
 trainer container.
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: TrainJob
 metadata:
   name: pytorch-distributed
@@ -1126,7 +1126,7 @@ The following example shows example of runtime with gang-scheduling using cosche
 scheduler is not the same as `PodGroup` plugin.
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: torch-distributed-multi-node
@@ -1279,7 +1279,7 @@ Kubeflow community are planning to support the following runtimes.
 Initially, we will maintain only multi-node multi-worker runtime and PyTorch Elastic.
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: torch-distributed-multi-node
@@ -1311,7 +1311,7 @@ spec:
 Example of usage:
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: TrainJob
 metadata:
   name: torch-test
@@ -1332,7 +1332,7 @@ spec:
 Training runtime for PyTorch Elastic:
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: torch-distributed-elastic
@@ -1376,7 +1376,7 @@ The following runtimes can be maintained in the future.
 Single worker training:
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: torch-simple
@@ -1399,7 +1399,7 @@ spec:
 Single node multi worker training:
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: torch-distributed-single-worker
@@ -1437,7 +1437,7 @@ for Fine-Tuning with PyTorch.
 The following runtime can be used for the Llama 7b model.
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: torch-tune-llama-7b
@@ -1522,7 +1522,7 @@ spec:
 The following runtime can be used for Gemma fine-tuning.
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: torch-tune-gemma-7b
@@ -1638,7 +1638,7 @@ and [DeepSpeed](https://www.deepspeed.ai/training/) using the MPI Runtime.
 Example of simple OpenMPI runtime:
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: deepspeed
@@ -1739,7 +1739,7 @@ spec:
 ```
 
 ```yaml
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v2alpha1
 kind: TrainingRuntime
 metadata:
   name: torch-distributed-multi-node

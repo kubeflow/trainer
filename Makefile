@@ -1,8 +1,3 @@
-# Image URL to use all building/pushing image targets
-IMG ?= kubeflow/training-operator:latest
-# CRD generation options
-CRD_OPTIONS ?= "crd:generateEmbeddedObjectMeta=true,maxDescLen=400"
-
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -15,8 +10,6 @@ endif
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
-
-all: build
 
 ##@ General
 
@@ -36,117 +29,98 @@ help: ## Display this help.
 
 ##@ Development
 
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=training-operator webhook paths="./pkg/apis/kubeflow.org/v1/..." \
+PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
+
+# Tool Binaries
+LOCALBIN ?= $(PROJECT_DIR)/bin
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+
+ENVTEST_K8S_VERSION ?= 1.31
+
+# Instructions to download tools for development.
+.PHONY: envtest
+envtest: ## Download the setup-envtest binary if required.
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.19
+
+.PHONY: controller-gen
+controller-gen: ## Download the controller-gen binary if required.
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.5
+
+# Download external CRDs for Go integration testings.
+EXTERNAL_CRDS_DIR ?= $(PROJECT_DIR)/manifests/external-crds
+
+JOBSET_ROOT = $(shell go list -m -mod=readonly -f "{{.Dir}}" sigs.k8s.io/jobset)
+.PHONY: jobset-operator-crd
+jobset-operator-crd: ## Copy the CRDs from the JobSet repository to the manifests/external-crds directory.
+	mkdir -p $(EXTERNAL_CRDS_DIR)/jobset-operator/
+	cp -f $(JOBSET_ROOT)/config/components/crd/bases/* $(EXTERNAL_CRDS_DIR)/jobset-operator/
+
+SCHEDULER_PLUGINS_ROOT = $(shell go list -m -f "{{.Dir}}" sigs.k8s.io/scheduler-plugins)
+.PHONY: scheduler-plugins-crd
+scheduler-plugins-crd: ## Copy the CRDs from the Scheduler Plugins repository to the manifests/external-crds directory.
+	mkdir -p $(EXTERNAL_CRDS_DIR)/scheduler-plugins/
+	cp -f $(SCHEDULER_PLUGINS_ROOT)/manifests/coscheduling/* $(EXTERNAL_CRDS_DIR)/scheduler-plugins
+
+# Instructions for code generation.
+.PHONY: manifests
+manifests: controller-gen ## Generate manifests.
+	$(CONTROLLER_GEN) "crd:generateEmbeddedObjectMeta=true" rbac:roleName=kubeflow-trainer-controller-manager webhook \
+		paths="./pkg/apis/trainer/v1alpha1/...;./pkg/controller/...;./pkg/runtime/...;./pkg/webhooks/...;./pkg/util/cert/..." \
 		output:crd:artifacts:config=manifests/base/crds \
 		output:rbac:artifacts:config=manifests/base/rbac \
 		output:webhook:artifacts:config=manifests/base/webhook
-	$(CONTROLLER_GEN) "crd:generateEmbeddedObjectMeta=true" rbac:roleName=training-operator-v2 webhook \
-		paths="./pkg/apis/kubeflow.org/v2alpha1/...;./pkg/controller.v2/...;./pkg/runtime.v2/...;./pkg/webhook.v2/...;./pkg/cert/..." \
-		output:crd:artifacts:config=manifests/v2/base/crds \
-		output:rbac:artifacts:config=manifests/v2/base/rbac \
-		output:webhook:artifacts:config=manifests/v2/base/webhook
 
-generate: go-mod-download manifests ## Generate apidoc, sdk and code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+.PHONY: generate
+generate: go-mod-download manifests ## Generate APIs and SDK.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh
 	hack/python-sdk/gen-sdk.sh
-	hack/python-sdk-v2/gen-sdk.sh
-	$(MAKE) apidoc
 
-apidoc:
-	hack/generate-apidoc.sh
+.PHONY: go-mod-download
+go-mod-download: ## Run go mod download to download modules.
+	go mod download
 
-fmt: ## Run go fmt against code.
+# Instructions for code formatting.
+.PHONY: fmt
+fmt: ## Run go fmt against the code.
 	go fmt ./...
 
-vet: ## Run go vet against code.
+.PHONY: vet
+vet: ## Run go vet against the code.
 	go vet ./...
 
 GOLANGCI_LINT=$(shell which golangci-lint)
-golangci-lint:
+.PHONY: golangci-lint
+golangci-lint: ## Run golangci-lint to verify Go files.
 ifeq ($(GOLANGCI_LINT),)
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.61.0
 	$(info golangci-lint has been installed)
 endif
 	golangci-lint run --timeout 5m --go 1.23 ./...
 
-ENVTEST_K8S_VERSION ?= 1.31
-HAS_SETUP_ENVTEST := $(shell command -v setup-envtest;)
+# Instructions to run tests.
+.PHONY: test
+test: ## Run Go unit test.
+	go test $(shell go list ./... | grep -v '/test/') -coverprofile cover.out
 
-testall: manifests generate fmt vet golangci-lint test ## Run tests.
+.PHONY: test-integration
+test-integration: envtest jobset-operator-crd scheduler-plugins-crd ## Run Go integration test.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./test/... -coverprofile cover.out
 
-test: envtest
-	KUBEBUILDER_ASSETS="$(shell setup-envtest use $(ENVTEST_K8S_VERSION) -p path)" \
-		go test ./pkg/apis/kubeflow.org/v1/... ./pkg/cert/... ./pkg/common/... ./pkg/config/... ./pkg/controller.v1/... ./pkg/core/... ./pkg/util/... ./pkg/webhooks/... -coverprofile cover.out
+test-python: ## Run Python unit test.
+	export PYTHONPATH=$(PROJECT_DIR)
+	pip install pytest
+	pip install -r ./cmd/initializer/dataset/requirements.txt
+	pip install ./sdk
 
-.PHONY: test-integrationv2
-test-integrationv2: envtest jobset-operator-crd scheduler-plugins-crd
-	KUBEBUILDER_ASSETS="$(shell setup-envtest use $(ENVTEST_K8S_VERSION) -p path)" go test ./test/... -coverprofile cover.out
+	pytest ./pkg/initializer/dataset
+	pytest ./pkg/initializer/model
+	pytest ./pkg/initializer/utils
 
-.PHONY: testv2
-testv2:
-	go test ./pkg/apis/kubeflow.org/v2alpha1/... ./pkg/controller.v2/... ./pkg/runtime.v2/... ./pkg/webhook.v2/... ./pkg/util.v2/... -coverprofile cover.out
+test-python-integration: ## Run Python integration test.
+	export PYTHONPATH=$(PROJECT_DIR)
+	pip install pytest
+	pip install -r ./cmd/initializer/dataset/requirements.txt
 
-envtest:
-ifndef HAS_SETUP_ENVTEST
-	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.19
-	@echo "setup-envtest has been installed"
-endif
-	@echo "setup-envtest has already installed"
-
-build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/training-operator.v1/main.go
-
-run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/training-operator.v1/main.go
-
-docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} -f build/images/training-operator/Dockerfile .
-
-docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
-
-##@ Deployment
-
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build manifests/base/crds | kubectl apply --server-side -f -
-
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build manifests/base/crds | kubectl delete -f -
-
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd manifests/overlays/standalone && $(KUSTOMIZE) edit set image kubeflow/training-operator=${IMG}
-	$(KUSTOMIZE) build manifests/overlays/standalone | kubectl apply -f -
-
-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build manifests/overlays/standalone | kubectl delete -f -
-
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-
-.PHONY: go-mod-download
-go-mod-download:
-	go mod download
-
-CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
-controller-gen: ## Download controller-gen locally if necessary.
-	GOBIN=$(PROJECT_DIR)/bin go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.5
-
-KUSTOMIZE = $(shell pwd)/bin/kustomize
-kustomize: ## Download kustomize locally if necessary.
-	GOBIN=$(PROJECT_DIR)/bin go install sigs.k8s.io/kustomize/kustomize/v5@v5.4.3
-
-## Download external CRDs for the integration testings.
-EXTERNAL_CRDS_DIR ?= $(PROJECT_DIR)/manifests/external-crds
-
-JOBSET_ROOT = $(shell go list -m -mod=readonly -f "{{.Dir}}" sigs.k8s.io/jobset)
-.PHONY: jobset-operator-crd
-jobset-operator-crd: ## Copy the CRDs from the jobset-operator to the manifests/external-crds directory.
-	mkdir -p $(EXTERNAL_CRDS_DIR)/jobset-operator/
-	cp -f $(JOBSET_ROOT)/config/components/crd/bases/* $(EXTERNAL_CRDS_DIR)/jobset-operator/
-
-SCHEDULER_PLUGINS_ROOT = $(shell go list -m -f "{{.Dir}}" sigs.k8s.io/scheduler-plugins)
-.PHONY: scheduler-plugins-crd
-scheduler-plugins-crd:
-	mkdir -p $(EXTERNAL_CRDS_DIR)/scheduler-plugins/
-	cp -f $(SCHEDULER_PLUGINS_ROOT)/manifests/coscheduling/* $(EXTERNAL_CRDS_DIR)/scheduler-plugins
+	pytest ./test/integration/initializer

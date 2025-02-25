@@ -1,0 +1,29 @@
+name: E2E Test
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  e2e-test:
+    name: E2E Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        kubernetes-version: ["1.29.3", "1.30.0", "1.31.0"]
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          echo "TODO (andreyvelich): Implement E2E Tests"
+          # pip install -U './sdk'

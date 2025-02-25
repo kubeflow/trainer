@@ -1,5 +1,5 @@
-# Training Operator Documentation
+# Kubeflow Trainer Documentation
 
-Welcome to Kubeflow Training Operator!
+Welcome to Kubeflow Trainer!
 
-The Training Operator documentation is available on [kubeflow.org](https://www.kubeflow.org/docs/components/training/).
+The Kubeflow Trainer documentation is available on [kubeflow.org](https://www.kubeflow.org/docs/components/trainer/).
