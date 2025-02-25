@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -117,14 +117,14 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 		// client. See https://github.com/kubernetes/kubernetes/pull/129313
 		var obj client.Object
 		if o, ok := object.(client.Object); ok {
-			obj = o
-		} else {
-			if u, err := k8sruntime.DefaultUnstructuredConverter.ToUnstructured(object); err != nil {
-				return buildFailed, err
-			} else {
-				obj = &unstructured.Unstructured{Object: u}
-			}
+			return buildFailed, fmt.Errorf("unsupported type client.Object for component: %v", o)
 		}
+
+		u, err := apiruntime.DefaultUnstructuredConverter.ToUnstructured(object)
+		if err != nil {
+			return buildFailed, err
+		}
+		obj = &unstructured.Unstructured{Object: u}
 
 		if err := r.client.Patch(ctx, obj, client.Apply, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
 			return buildFailed, err

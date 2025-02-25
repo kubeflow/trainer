@@ -28,10 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/apply"
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
-	"github.com/kubeflow/trainer/pkg/util/apply"
 )
 
 type Torch struct{}

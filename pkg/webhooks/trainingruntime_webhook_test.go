@@ -23,6 +23,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
+
+	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
 )
 
 func TestValidateReplicatedJobs(t *testing.T) {
@@ -31,24 +33,14 @@ func TestValidateReplicatedJobs(t *testing.T) {
 		wantError field.ErrorList
 	}{
 		"valid replicatedJobs": {
-			rJobs: []jobsetv1alpha2.ReplicatedJob{
-				{
-					Replicas: 1,
-				},
-				{
-					Replicas: 1,
-				},
-			},
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				Replicas(1).
+				Obj().Spec.ReplicatedJobs,
 		},
 		"invalid replicas": {
-			rJobs: []jobsetv1alpha2.ReplicatedJob{
-				{
-					Replicas: 2,
-				},
-				{
-					Replicas: 2,
-				},
-			},
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				Replicas(2).
+				Obj().Spec.ReplicatedJobs,
 			wantError: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("replicas"),
 					"2", ""),

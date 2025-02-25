@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -395,7 +394,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 		trainingRuntime *trainer.TrainingRuntime
 		trainJob        *trainer.TrainJob
 		wantRuntimeInfo *runtime.Info
-		wantObjs        []k8sruntime.Object
+		wantObjs        []apiruntime.Object
 		wantError       error
 	}{
 		"succeeded to build PodGroup and JobSet with NumNodes from TrainJob": {
@@ -470,7 +469,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 					},
 				},
 			},
-			wantObjs: []k8sruntime.Object{
+			wantObjs: []apiruntime.Object{
 				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
 					SchedulingTimeout(300).
 					MinMember(101). // 101 replicas = 100 Trainer nodes + 1 Initializer.
@@ -491,7 +490,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 		"an empty registry": {},
 	}
 	cmpOpts := []cmp.Option{
-		cmpopts.SortSlices(func(a, b k8sruntime.Object) bool {
+		cmpopts.SortSlices(func(a, b apiruntime.Object) bool {
 			return a.GetObjectKind().GroupVersionKind().String() < b.GetObjectKind().GroupVersionKind().String()
 		}),
 		cmpopts.EquateEmpty(),
@@ -530,7 +529,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 
 			resultObjs, err := testingutil.ToObject(c.Scheme(), objs...)
 			if err != nil {
-				t.Fatal(err)
+				t.Errorf("Pipeline built unrecognizable objects: %v", err)
 			}
 
 			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {

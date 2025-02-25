@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubeflow Authors.
+Copyright 2025 The Kubeflow Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,11 +27,11 @@ import (
 func ToObject(s *runtime.Scheme, objects ...any) ([]runtime.Object, error) {
 	var objs []runtime.Object
 	for _, obj := range objects {
-		if o, err := toObject(s, obj); err != nil {
+		o, err := toObject(s, obj)
+		if err != nil {
 			return nil, err
-		} else {
-			objs = append(objs, o)
 		}
+		objs = append(objs, o)
 	}
 	return objs, nil
 }
@@ -40,12 +40,14 @@ func toObject(s *runtime.Scheme, obj any) (runtime.Object, error) {
 	if o, ok := obj.(runtime.Object); ok {
 		return o, nil
 	}
+
 	var u *unstructured.Unstructured
-	if o, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj); err != nil {
+	o, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
 		return nil, err
-	} else {
-		u = &unstructured.Unstructured{Object: o}
 	}
+	u = &unstructured.Unstructured{Object: o}
+
 	gvk := u.GetObjectKind().GroupVersionKind()
 	if !s.Recognizes(gvk) {
 		return nil, fmt.Errorf("%s is not a recognized schema", gvk.GroupVersion().String())
@@ -54,6 +56,7 @@ func toObject(s *runtime.Scheme, obj any) (runtime.Object, error) {
 	if err != nil {
 		return nil, fmt.Errorf("scheme recognizes %s but failed to produce an object for it: %w", gvk, err)
 	}
+
 	raw, err := json.Marshal(u)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize %T: %w", raw, err)
@@ -61,5 +64,6 @@ func toObject(s *runtime.Scheme, obj any) (runtime.Object, error) {
 	if err := json.Unmarshal(raw, typed); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal the content of %T into %T: %w", u, typed, err)
 	}
+
 	return typed, nil
 }

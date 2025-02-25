@@ -133,7 +133,7 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 
 			resultObjs, err := testingutil.ToObject(c.Scheme(), objs...)
 			if err != nil {
-				t.Fatal(err)
+				t.Errorf("Pipeline built unrecognizable objects: %v", err)
 			}
 
 			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {

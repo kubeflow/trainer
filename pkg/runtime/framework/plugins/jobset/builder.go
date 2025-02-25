@@ -21,9 +21,9 @@ import (
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/apply"
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
-	"github.com/kubeflow/trainer/pkg/util/apply"
 )
 
 type Builder struct {

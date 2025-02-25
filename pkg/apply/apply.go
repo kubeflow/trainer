@@ -22,33 +22,33 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func UpsertEnvVar(envVarList *[]corev1ac.EnvVarApplyConfiguration, envVar ...*corev1ac.EnvVarApplyConfiguration) {
+func UpsertEnvVar(envVars *[]corev1ac.EnvVarApplyConfiguration, envVar ...*corev1ac.EnvVarApplyConfiguration) {
 	for _, e := range envVar {
-		upsert(envVarList, *e, byEnvVarName)
+		upsert(envVars, *e, byEnvVarName)
 	}
 }
 
-func UpsertEnvVars(envVarList *[]corev1ac.EnvVarApplyConfiguration, envVars []corev1ac.EnvVarApplyConfiguration) {
-	for _, e := range envVars {
-		upsert(envVarList, e, byEnvVarName)
+func UpsertEnvVars(envVars *[]corev1ac.EnvVarApplyConfiguration, upEnvVars []corev1ac.EnvVarApplyConfiguration) {
+	for _, e := range upEnvVars {
+		upsert(envVars, e, byEnvVarName)
 	}
 }
 
-func UpsertPort(portList *[]corev1ac.ContainerPortApplyConfiguration, port ...*corev1ac.ContainerPortApplyConfiguration) {
+func UpsertPort(ports *[]corev1ac.ContainerPortApplyConfiguration, port ...*corev1ac.ContainerPortApplyConfiguration) {
 	for _, p := range port {
-		upsert(portList, *p, byContainerPortOrName)
+		upsert(ports, *p, byContainerPortOrName)
 	}
 }
 
-func UpsertVolumes(volumeList *[]corev1ac.VolumeApplyConfiguration, volumes []corev1ac.VolumeApplyConfiguration) {
-	for _, v := range volumes {
-		upsert(volumeList, v, byVolumeName)
+func UpsertVolumes(volumes *[]corev1ac.VolumeApplyConfiguration, upVolumes []corev1ac.VolumeApplyConfiguration) {
+	for _, v := range upVolumes {
+		upsert(volumes, v, byVolumeName)
 	}
 }
 
-func UpsertVolumeMounts(mountList *[]corev1ac.VolumeMountApplyConfiguration, mounts []corev1ac.VolumeMountApplyConfiguration) {
-	for _, m := range mounts {
-		upsert(mountList, m, byVolumeMountName)
+func UpsertVolumeMounts(mounts *[]corev1ac.VolumeMountApplyConfiguration, upMounts []corev1ac.VolumeMountApplyConfiguration) {
+	for _, m := range upMounts {
+		upsert(mounts, m, byVolumeMountName)
 	}
 }
 
