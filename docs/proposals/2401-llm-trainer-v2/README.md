@@ -180,6 +180,64 @@ spec:
 
 And also, we need to modify the exsiting torch plugin to handle config override for `torchtune`, since currently torch plugin passes the distributed arguments by environment variables that begins with `PET_`, which is not allowed by `torchtune`. However, `torchtune` can share the same ML Policy with `torchrun` because `torchtune` is fully compatible with these distributed parameters.
 
+We will add CLI-based parameters mutation to `pkg/runtime/framework/torch/torch.go` while still supporting env-based parameters mutation with `PET_`:
+
+```go
+func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
+    // ...
+    if !trainJob.IsLaunchedByTorchtune() {
+        // Original env-based parameters mutation
+        // Update envs for Info object.
+	    // Add PyTorch distributed "PET_" values for torchrun
+        // TBA
+    } else {
+        // CLI-based parameters mutation
+        // Add PyTorch distributed values to Info.Args,
+        // which will be inserted in front of Args of Trainer Node.
+        // TBA
+    }
+    // ...
+}
+```
+
+Related changes:
+
+1. Add `Args` fields to Info (`pkg/runtime/runtime.go`).
+
+```go
+type Trainer struct {
+	NumNodes       *int32
+	NumProcPerNode string
+	Env           []corev1.EnvVar
+    Args          []string
+	ContainerPort *corev1.ContainerPort
+	Volumes       []corev1.Volume
+	VolumeMounts  []corev1.VolumeMount
+}
+```
+
+2. Insert `Info.Args` in front of Args of Trainer Node (`pkg/runtime/framework/plugins/jobest/builder.go`)
+
+```go
+// ...
+
+// Update the Trainer args.
+if info.Trainer.Args != nil {
+    var args []string
+    copy(args, info.Trainer.Args)
+    b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = append(
+		args, b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports...)
+}
+
+// Update the Trainer container port.
+if info.Trainer.ContainerPort != nil {
+	b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports = append(
+		b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *info.Trainer.ContainerPort)
+}
+
+// ...
+```
+
 **How to Determine Default Resources**
 
 Currently, `torchtune` has limited support for multi-node training (but will coming soon). So, I would propose that we use 1 PyTorch node and 1 GPU by default. Users can specify `num_nodes` and `resource_per_node` in the `Trainer` field to increase PyTorch nodes and GPU number.
