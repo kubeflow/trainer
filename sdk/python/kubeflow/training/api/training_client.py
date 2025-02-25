@@ -354,6 +354,8 @@ class TrainingClient(object):
         env_vars: Optional[
             Union[Dict[str, str], List[Union[models.V1EnvVar, models.V1EnvVar]]]
         ] = None,
+        volumes: Optional[List[models.V1Volume]] = None,
+        volume_mounts: Optional[List[models.V1VolumeMount]] = None,
     ):
         """Create the Training Job.
         Job can be created using one of the following options:
@@ -418,6 +420,8 @@ class TrainingClient(object):
                 https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1EnvVar.md)
                 or a kubernetes.client.models.V1EnvFromSource (documented here:
                 https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1EnvFromSource.md)
+            volumes: Volume(s) to be attached to the replicas.
+            volume_mounts: VolumeMount(s) specifying where to mount the volume(s) into the replicas.
 
         Raises:
             ValueError: Invalid input parameters.
@@ -446,6 +450,12 @@ class TrainingClient(object):
         if job_kind not in constants.JOB_PARAMETERS:
             raise ValueError(
                 f"Job kind must be one of these: {constants.JOB_PARAMETERS.keys()}"
+            )
+
+        if len(volumes or []) != len(volume_mounts or []):
+            raise ValueError(
+                "Volumes and VolumeMounts must be the same length: "
+                f"{len(volumes or [])} vs. {len(volume_mounts or [])}"
             )
 
         # If Training function or base image is set, configure Job template.
@@ -496,11 +506,13 @@ class TrainingClient(object):
                 args=args,
                 resources=resources_per_worker,
                 env_vars=env_vars,
+                volume_mounts=volume_mounts,
             )
 
             # Get Pod template spec using the above container.
             pod_template_spec = utils.get_pod_template_spec(
                 containers=[container_spec],
+                volumes=volumes,
             )
 
             # Configure template for different Jobs.

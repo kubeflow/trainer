@@ -22,6 +22,8 @@ from kubernetes.client import (
     V1ObjectMeta,
     V1PodSpec,
     V1PodTemplateSpec,
+    V1Volume,
+    V1VolumeMount,
 )
 
 TEST_NAME = "test"
@@ -142,6 +144,8 @@ def create_job(
     args=None,
     num_workers=2,
     env_vars=None,
+    volumes=None,
+    volume_mounts=None,
 ):
     # Handle env_vars as either a dict or a list
     if env_vars:
@@ -158,6 +162,7 @@ def create_job(
         command=command,
         args=args,
         env=env_vars,
+        volume_mounts=volume_mounts,
     )
 
     master = KubeflowOrgV1ReplicaSpec(
@@ -166,7 +171,10 @@ def create_job(
             metadata=V1ObjectMeta(
                 annotations={constants.ISTIO_SIDECAR_INJECTION: "false"}
             ),
-            spec=V1PodSpec(containers=[container]),
+            spec=V1PodSpec(
+                containers=[container],
+                volumes=volumes,
+            ),
         ),
     )
 
@@ -180,7 +188,10 @@ def create_job(
                 metadata=V1ObjectMeta(
                     annotations={constants.ISTIO_SIDECAR_INJECTION: "false"}
                 ),
-                spec=V1PodSpec(containers=[container]),
+                spec=V1PodSpec(
+                    containers=[container],
+                    volumes=volumes,
+                ),
             ),
         )
 
@@ -529,6 +540,35 @@ test_data_create_job = [
         create_job(
             env_vars=[V1EnvVar(name="ENV_VAR", value="env_value")], num_workers=2
         ),
+    ),
+    (
+        "create job with a volume and a volume mount",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "volumes": [V1Volume(name="vol")],
+            "volume_mounts": [V1VolumeMount(name="vol", mount_path="/mnt")],
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            volumes=[V1Volume(name="vol")],
+            volume_mounts=[V1VolumeMount(name="vol", mount_path="/mnt")],
+        ),
+    ),
+    (
+        "invalid number of volume mount",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "volumes": [V1Volume(name="vol")],
+        },
+        ValueError,
+        None,
     ),
 ]
 
