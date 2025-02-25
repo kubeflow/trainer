@@ -1,23 +1,23 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kubeflow-training-admin-v2
+  name: kubeflow-trainer-admin
   labels:
-    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-admin-v2: "true"
+    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-admin: "true"
 aggregationRule:
   clusterRoleSelectors:
     - matchLabels:
-        rbac.authorization.kubeflow.org/aggregate-to-kubeflow-training-admin-v2: "true"
+        rbac.authorization.kubeflow.org/aggregate-to-kubeflow-trainer-admin: "true"
 rules: []
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kubeflow-training-edit-v2
+  name: kubeflow-trainer-edit
   labels:
-    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-edit-v2: "true"
-    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-training-admin-v2: "true"
+    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-edit: "true"
+    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-trainer-admin: "true"
 rules:
   - apiGroups:
       - kubeflow.org
@@ -62,9 +62,9 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kubeflow-training-view-v2
+  name: kubeflow-trainer-view
   labels:
-    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-view-v2: "true"
+    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-view: "true"
 rules:
   - apiGroups:
       - kubeflow.org
