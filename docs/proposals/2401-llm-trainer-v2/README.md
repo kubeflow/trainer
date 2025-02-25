@@ -276,6 +276,8 @@ class CustomTrainer:
 
 `fine_tuning_config` defines the parameters for LLM fine-tuning task in Type 2, and will add support for fine-tuning with `torchtune` in the early stage.
 
+We natively support all `recipe` and `config` supported by `torchtune`, since `torchtune` has already provided us with default `config`. We just cannot mutate them if we do not support the corresponding mutation config.
+
 ### Propagate `torchtune` settings with SDK
 
 #### Option1: Allow users to specify `recipe` and `config`
@@ -289,7 +291,7 @@ class CustomTrainer:
 | epochs | Optional[int] | The number of samples processed before updating model weights. |
 | loss | Optional[str] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
 | peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
-| dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, eMultimodalDataset]] | Configuration for dataset preprocessing. |
+| dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, MultimodalDataset]] | Configuration for dataset preprocessing. |
 
 ```
 # TorchtuneConfig DataClass
@@ -303,7 +305,7 @@ class TorchtuneConfig:
     loss: Optional[str] = None
     peft_config: Optional[Union[LoraConfig]] = None
     dataset_preprocess_config: Optional[
-        Union[TorchtuneInstructDataset, TorchtuneChatDataset, TorchtuneMultimodalDataset],
+        Union[InstructDataset, ChatDataset, MultimodalDataset],
     ] = None
 
 ```
@@ -330,6 +332,33 @@ manifests/
 #### Option2: Do not allow users to specify `recipe` and `config`
 
 If we adopt this option, we need to discard `recipe` and `config` fields in `TorchtuneConfig` compared to option 1.
+
+Also we need to create directories for each LLMs and  `ClusterTrainingRuntime`s for each config file, which might be too complex for us to maintain (~100 `ClusterTrainingRuntimes`).
+
+```
+manifests/
+|-- base/
+|   |-- runtimes/
+|   |   |-- pretraining/
+|   |   |   |-- kustomization.yaml
+|   |   |   |-- mpi_distributed.yaml                    # MPI Distributed Runtime
+|   |   |   |-- torch_distributed.yaml                  # PyTorch Distributed Runtime
+|   |   |-- posttraining/
+|   |   |   |-- kustomization.yaml
+|   |   |   |-- llama2/
+|   |   |   |   |-- kustomization.yaml
+|   |   |   |   |-- 13B_full_torchtune.yaml             # Torchtune Full Fine-tuning Runtime for Llama2 13B
+|   |   |   |   |-- . . .                               # (+10 ClusterTrainingRuntimes)
+|   |   |   |-- llama3/
+|   |   |   |   |-- kustomization.yaml
+|   |   |   |   |-- 70B_lora_torchtune.yaml             # Torchtune LoRA Fine-tuning Runtime for Llama3 70B
+|   |   |   |   |-- . . .                               # (+10 ClusterTrainingRuntimes)
+|   |   |   |-- . . .
+|   |-- crds/
+|   |-- . . .
+|-- overlays/
+|-- third-party/
+```
 
 ### Support some common PEFT mechanisms
 
