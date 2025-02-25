@@ -497,6 +497,17 @@ class MultimodalDataset:
 
 As for the tokenzier, `torchtune` has specified it in every training configs, such as [this](https://github.com/pytorch/torchtune/blob/e6cba2532d51a53936c7646bd4cdaa6b2b57ed66/recipes/configs/llama3_2/1B_lora_single_device.yaml#L29-L33). We're going to gracefully add custom tokenizer support in the future, once users request it.
 
+## Test Plan
+
+### Testing Environment
+
+For the GPU testing environment, hopefully, we will accquire GPU infra ([#2432](https://github.com/kubeflow/trainer/issues/2432)) from CNCF.
+
+### E2e Test
+
+For e2e tests, we will initially create a set of Jupyter Notebook examples including full fine-tuning and LoRA fine-tuning.
+We will use [papermill](https://github.com/nteract/papermill) to execute these notebooks as e2e tests, ensuring the functionality of both the control plane and the SDK.
+
 ## Implementation History
 
 - 2025-01-31: Create KEP-2401 doc
