@@ -79,17 +79,15 @@ job_id = TrainingClient().train(
     dataset_config=HuggingFaceDatasetConfig(
         storage_uri="tatsu-lab/alpaca",
     ),
-    trainer=Trainer(
-        fine_tuning_config=TorchTuneConfig(
-            recipe="lora_finetune_single_device",
-            config="llama3_2/1B_lora_single_device",
-            dtype="bf16",
-            batch_size=1,
-            epochs=1,
-            peft_config=LoraConfig(
-                lora_rank=64,
-                lora_alpha=128,
-            ),
+    fine_tuning_config=TorchTuneConfig(
+        recipe="lora_finetune_single_device",
+        config="llama3_2/1B_lora_single_device",
+        dtype="bf16",
+        batch_size=1,
+        epochs=1,
+        peft_config=LoraConfig(
+            lora_rank=64,
+            lora_alpha=128,
         ),
         num_nodes=5,
     ),
@@ -267,7 +265,7 @@ class CustomTrainer:
     packages_to_install: Optional[List[str]] = None
     pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
     num_nodes: Optional[int] = None
-    resources_per_node: Optional[int] = None
+    resources_per_node: Optional[Dict] = None
 
 ```
 
@@ -291,6 +289,8 @@ We natively support all `recipe` and `config` supported by `torchtune`, since `t
 | loss | Optional[str] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
 | peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
 | dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, MultimodalDataset]] | Configuration for dataset preprocessing. |
+| num_nodes | Optional[int] | The number of PyTorch Nodes in training |
+| resource_per_node | Optional[Dict] | The resource for each PyTorch Node |
 
 ```python
 # TorchtuneConfig DataClass
@@ -306,6 +306,8 @@ class TorchtuneConfig:
     dataset_preprocess_config: Optional[
         Union[InstructDataset, ChatDataset, MultimodalDataset],
     ] = None
+    num_nodes: Optional[int] = None,
+    resources_per_node: Optional[Dict] = None,
 
 ```
 
