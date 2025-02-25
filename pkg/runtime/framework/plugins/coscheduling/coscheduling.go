@@ -25,6 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -101,8 +102,20 @@ func (c *CoScheduling) EnforcePodGroupPolicy(info *runtime.Info, trainJob *train
 	return nil
 }
 
-func (c *CoScheduling) Build(_ context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
+func (c *CoScheduling) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
 	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || info.RuntimePolicy.PodGroupPolicy.Coscheduling == nil || trainJob == nil {
+		return nil, nil
+	}
+
+	// Do not update the PodGroup if it already exists and the TrainJob is not suspended
+	oldPodGroup := &schedulerpluginsv1alpha1.PodGroup{}
+	if err := c.client.Get(ctx, client.ObjectKeyFromObject(trainJob), oldPodGroup); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		oldPodGroup = nil
+	}
+	if oldPodGroup != nil && !ptr.Deref(trainJob.Spec.Suspend, false) {
 		return nil, nil
 	}
 
