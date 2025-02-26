@@ -97,9 +97,7 @@ job_id = TrainingClient().train(
 
 ## Design Details
 
-### Complement `torch` Plugin
-
-**How to Handle Override in Configs**
+### Config Override
 
 As is shown in the official guides, we can pass distributed arguments to `torchtune` and override some parameters in the config, like:
 
@@ -173,9 +171,13 @@ spec:
 ...
 ```
 
+The trainer image will be built with packages related to PyTorch, CUDA, Torchtune. And we will maintain its Dockerfile under `cmd/trainers/torchtune/`.
+
+### Complement `torch` Plugin
+
 **How to perform mutation in the runtime plugin**
 
-And also, we need to modify the exsiting torch plugin to handle config override for `torchtune`, since currently torch plugin passes the distributed arguments by environment variables that begins with `PET_`, which is not allowed by `torchtune`. However, `torchtune` can share the same ML Policy with `torchrun` because `torchtune` is fully compatible with these distributed parameters.
+We need to modify the exsiting torch plugin to handle config override for `torchtune`, since currently torch plugin passes the distributed arguments by environment variables that begins with `PET_`, which is not allowed by `torchtune`. However, `torchtune` can share the same ML Policy with `torchrun` because `torchtune` is fully compatible with these distributed parameters.
 
 We will add CLI-based parameters mutation to `pkg/runtime/framework/torch/torch.go` while still supporting env-based parameters mutation with `PET_`:
 
