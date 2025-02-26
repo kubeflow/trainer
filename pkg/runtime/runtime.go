@@ -46,12 +46,10 @@ type RuntimePolicy struct {
 type Trainer struct {
 	NumNodes       *int32
 	NumProcPerNode string
-	// TODO (andreyvelich). Potentially, we can use map for env and sort it to improve code.
-	// Context: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823267183
-	Env           []corev1ac.EnvVarApplyConfiguration
-	ContainerPort *corev1ac.ContainerPortApplyConfiguration
-	Volumes       []corev1ac.VolumeApplyConfiguration
-	VolumeMounts  []corev1ac.VolumeMountApplyConfiguration
+	Env            []corev1ac.EnvVarApplyConfiguration
+	ContainerPort  *corev1ac.ContainerPortApplyConfiguration
+	Volumes        []corev1ac.VolumeApplyConfiguration
+	VolumeMounts   []corev1ac.VolumeMountApplyConfiguration
 }
 
 // TODO (andreyvelich): Potentially, we can add ScheduleTimeoutSeconds to the Scheduler for consistency.
