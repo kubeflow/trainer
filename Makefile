@@ -36,7 +36,7 @@ LOCALBIN ?= $(PROJECT_DIR)/bin
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
-ENVTEST_K8S_VERSION ?= 1.31
+ENVTEST_K8S_VERSION ?= 1.32
 
 # Instructions to download tools for development.
 .PHONY: envtest
