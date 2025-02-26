@@ -1,3 +1,4 @@
+# Source: kubeflow-trainer/templates/runtimes/pretraining/torch-distributed.yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
@@ -19,7 +20,7 @@ spec:
                 spec:
                   containers:
                     - name: trainer
-                      image: pytorch/pytorch:2.5.0-cuda12.4-cudnn9-runtime
+                      image: docker.io/pytorch/pytorch:2.5.0-cuda12.4-cudnn9-runtime
                       command:
                         - /bin/bash
                         - -c

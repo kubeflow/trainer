@@ -62,7 +62,7 @@ func (f *Framework) Init() *rest.Config {
 			filepath.Join("..", "..", "..", "manifests", "external-crds", "jobset-operator"),
 		},
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{filepath.Join("..", "..", "..", "manifests", "base", "webhook", "manifests.yaml")},
+			Paths: []string{filepath.Join("..", "..", "..", "manifests", "base", "webhook", "validatingwebhookconfiguration.yaml")},
 		},
 		ErrorIfCRDPathMissing: true,
 	}
