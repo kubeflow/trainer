@@ -317,13 +317,10 @@ In this way, we just need to create one `ClusterTrainingRuntime` for LLM fine-tu
 manifests/
 |-- base/
 |   |-- runtimes/
-|   |   |-- pretraining/
-|   |   |   |-- kustomization.yaml
-|   |   |   |-- mpi_distributed.yaml                    # MPI Distributed Runtime
-|   |   |   |-- torch_distributed.yaml                  # PyTorch Distributed Runtime
-|   |   |-- posttraining/
-|   |   |   |-- kustomization.yaml
-|   |   |   |-- torchtune_llm_finetuning.yaml           # Torchtune LLM Fine-tuning Runtime
+|   |   |-- kustomization.yaml
+|   |   |-- mpi_distributed.yaml                    # MPI Distributed Runtime
+|   |   |-- torch_distributed.yaml                  # PyTorch Distributed Runtime
+|   |   |-- torchtune_llm_finetuning.yaml           # Torchtune LLM Fine-tuning Runtime
 |   |-- crds/
 |   |-- . . .
 |-- overlays/
