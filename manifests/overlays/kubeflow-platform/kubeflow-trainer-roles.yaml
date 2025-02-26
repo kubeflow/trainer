@@ -40,15 +40,17 @@ rules:
     verbs:
       - get
   - apiGroups:
+    - ""
+    resources:
+      - pods
+    verbs:
+      - list
+  - apiGroups:
       - ""
     resources:
-      - persistentvolumeclaims
+      - pods/log
     verbs:
-      - create
-      - delete
       - get
-      - list
-      - watch
   - apiGroups:
       - ""
     resources:
