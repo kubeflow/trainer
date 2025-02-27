@@ -279,12 +279,10 @@ We natively support all `recipe` and `config` supported by `torchtune`, since `t
 
 ### Propagate `torchtune` settings with SDK
 
-#### Option1: Allow users to specify `recipe` and `config`
+#### `TorchtuneConfig` API Design
 
 | Parameters | Type | What is it? |
 | - | - | - |
-| recipe | str | The name of recipe in `torchtune` we choose. |
-| config | str | The name of config in `torchtune` we chooose. |
 | dtype | Optional[str] | The underlying data type used to represent the model and optimizer parameters. Currently, we only support `bf16` and `fp32`. |
 | batch_size | Optional[int] | The number of samples processed before updating model weights. |
 | epochs | Optional[int] | The number of samples processed before updating model weights. |
@@ -298,8 +296,6 @@ We natively support all `recipe` and `config` supported by `torchtune`, since `t
 # TorchtuneConfig DataClass
 @dataclass
 class TorchtuneConfig:
-    recipe: str
-    config: str
     dtype: Optional[str] = None
     batch_size: Optional[int] = None
     epochs: Optional[int] = None
@@ -313,27 +309,10 @@ class TorchtuneConfig:
 
 ```
 
-In this way, we just need to create one `ClusterTrainingRuntime` for LLM fine-tuning with `torchtune`. Like we showed in the [example](#compliment-torch-plugin). And we will put this `ClusterTrainingRuntime` under:
+#### Create Map from `TorchtuneConfig` to specific recipes and configs
 
-```
-manifests/
-|-- base/
-|   |-- runtimes/
-|   |   |-- kustomization.yaml
-|   |   |-- mpi_distributed.yaml                    # MPI Distributed Runtime
-|   |   |-- torch_distributed.yaml                  # PyTorch Distributed Runtime
-|   |   |-- torchtune_llm_finetuning.yaml           # Torchtune LLM Fine-tuning Runtime
-|   |-- crds/
-|   |-- . . .
-|-- overlays/
-|-- third-party/
-```
 
-#### Option2: Do not allow users to specify `recipe` and `config`
-
-If we adopt this option, we need to discard `recipe` and `config` fields in `TorchtuneConfig` compared to option 1.
-
-Also we need to create directories for each LLMs and  `ClusterTrainingRuntime`s for each config file, which might be too complex for us to maintain (~100 `ClusterTrainingRuntimes`).
+### Maintain ClusterTrainingRuntimes in Manifests
 
 ```
 manifests/
@@ -635,7 +614,61 @@ accelerate configuration saved at /home/xxx/.cache/huggingface/accelerate/defaul
 $ accelerate launch {my_script.py}
 ```
 
-### Backend Design - `torchrun`
+### Design Details - `torchtune`
+
+#### Allow users to specify `recipe` and `config` in `TorchtuneConfig`
+
+> This option is abandoned because we prefer to fine-tune LLMs with just `runtime` specified, which would provide better user experience.
+
+| Parameters | Type | What is it? |
+| - | - | - |
+| recipe | str | The name of recipe in `torchtune` we choose. |
+| config | str | The name of config in `torchtune` we chooose. |
+| dtype | Optional[str] | The underlying data type used to represent the model and optimizer parameters. Currently, we only support `bf16` and `fp32`. |
+| batch_size | Optional[int] | The number of samples processed before updating model weights. |
+| epochs | Optional[int] | The number of samples processed before updating model weights. |
+| loss | Optional[str] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
+| peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
+| dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, MultimodalDataset]] | Configuration for dataset preprocessing. |
+| num_nodes | Optional[int] | The number of PyTorch Nodes in training |
+| resource_per_node | Optional[Dict] | The resource for each PyTorch Node |
+
+```python
+# TorchtuneConfig DataClass
+@dataclass
+class TorchtuneConfig:
+    recipe: str
+    config: str
+    dtype: Optional[str] = None
+    batch_size: Optional[int] = None
+    epochs: Optional[int] = None
+    loss: Optional[str] = None
+    peft_config: Optional[Union[LoraConfig]] = None
+    dataset_preprocess_config: Optional[
+        Union[InstructDataset, ChatDataset, MultimodalDataset],
+    ] = None
+    num_nodes: Optional[int] = None,
+    resources_per_node: Optional[Dict] = None,
+
+```
+
+In this way, we just need to create one `ClusterTrainingRuntime` for LLM fine-tuning with `torchtune`. Like we showed in the [example](#compliment-torch-plugin). And we will put this `ClusterTrainingRuntime` under:
+
+```
+manifests/
+|-- base/
+|   |-- runtimes/
+|   |   |-- kustomization.yaml
+|   |   |-- mpi_distributed.yaml                    # MPI Distributed Runtime
+|   |   |-- torch_distributed.yaml                  # PyTorch Distributed Runtime
+|   |   |-- torchtune_llm_finetuning.yaml           # Torchtune LLM Fine-tuning Runtime
+|   |-- crds/
+|   |-- . . .
+|-- overlays/
+|-- third-party/
+```
+
+### Design Details - `torchrun`
 
 #### Multiple Frameworks Support
 
