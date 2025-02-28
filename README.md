@@ -11,6 +11,9 @@
 
 ## Overview
 
+> [!NOTE]
+> The Kubeflow Trainer APIs are still evolving, and we are preparing to release a stable version soon. If you want to use the stable release of Kubeflow Training Operator V1, please check [this section](#kubeflow-training-operator-v1).
+
 Kubeflow Trainer is a Kubernetes-native project designed for large language models (LLMs)
 fine-tuning and enabling scalable, distributed training of machine learning (ML) models across
 various frameworks, including PyTorch, JAX, TensorFlow, and others.
@@ -35,8 +38,18 @@ The following KubeCon + CloudNativeCon 2024 talk provides an overview of Kubeflo
 
 ## Getting Started
 
-Please check [the official Kubeflow documentation](https://www.kubeflow.org/docs/components/trainer/getting-started)
-to install and get started with Kubeflow Trainer.
+You can simply run these commands to install the latest Kubeflow Trainer if your Kubernetes cluster is ready:
+
+```bash
+kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/manager?ref=master"
+kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/runtimes?ref=master"
+```
+
+Please check [the installation guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/installation/) for more information.
+
+To get started with Kubeflow Trainer, see our [Getting Started Tutorial](https://www.kubeflow.org/docs/components/trainer/getting-started).
+
+If you are using Kubeflow Training Operator V1, please refer to this [migration document](/docs/components/trainer/operator-guides/migration).
 
 ## Community
 
@@ -56,12 +69,16 @@ Please refer to the [CHANGELOG](CHANGELOG.md).
 
 ## Kubeflow Training Operator V1
 
-Kubeflow Trainer project is currently in <strong>alpha</strong> status, and APIs may change.
-If you are using Kubeflow Training Operator V1, please refer [to this migration document](https://www.kubeflow.org/docs/components/trainer/operator-guides/migration/).
+Kubeflow Trainer project is currently in <strong>alpha</strong> status, and APIs may change. You can install the stable release of the Kubeflow Training Operator V1 with:
+
+```bash
+kubectl apply --server-side -k "github.com/kubeflow/training-operator.git/manifests/overlays/standalone?ref=v1.9.0"
+```
+
+For more details, please check [this guide](https://www.kubeflow.org/docs/components/trainer/legacy-v1/installation/) to install and get started with Kubeflow Training Operator V1.
 
 Kubeflow Community will maintain the Training Operator V1 source code at
 [the `release-1.9` branch](https://github.com/kubeflow/training-operator/tree/release-1.9).
-
 You can find the documentation for Kubeflow Training Operator V1 in [these guides](https://www.kubeflow.org/docs/components/trainer/legacy-v1).
 
 ## Acknowledgement
