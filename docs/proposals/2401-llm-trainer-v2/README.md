@@ -331,28 +331,43 @@ As we mentioned above, we will create a map from (`TorchtuneConfig`, `num_nodes`
 
 **How to Select `config`**
 
-Extract model info in `runtime_ref`, and select corresponding config file according to the `recipe`.
+We will create one `ClusterTrainingRuntime` for one model. In this way, we can extract the model info in `runtime_ref`, and select corresponding config file according to the `recipe`.
 
 ### Maintain ClusterTrainingRuntimes in Manifests
+
+According to our design in [this section](#propagate-torchtune-settings-with-sdk), we will create one `ClusterTrainingRuntime` for one model. We can maintain these `ClusterTraingRuntimes` under `manifests/base/runtimes`:
 
 ```
 manifests/
 |-- base/
 |   |-- runtimes/
-|   |   |-- pretraining/
+|   |   |-- kustomization.yaml
+|   |   |-- mpi_distributed.yaml                    # MPI Distributed Runtime
+|   |   |-- torch_distributed.yaml                  # PyTorch Distributed Runtime
+|   |   |-- torchtune/                              # Torchtune Fine-tuning Runtimes
 |   |   |   |-- kustomization.yaml
-|   |   |   |-- mpi_distributed.yaml                    # MPI Distributed Runtime
-|   |   |   |-- torch_distributed.yaml                  # PyTorch Distributed Runtime
-|   |   |-- posttraining/
-|   |   |   |-- kustomization.yaml
-|   |   |   |-- llama2/
-|   |   |   |   |-- kustomization.yaml
-|   |   |   |   |-- 13B_full_torchtune.yaml             # Torchtune Full Fine-tuning Runtime for Llama2 13B
-|   |   |   |   |-- . . .                               # (+10 ClusterTrainingRuntimes)
-|   |   |   |-- llama3/
-|   |   |   |   |-- kustomization.yaml
-|   |   |   |   |-- 70B_lora_torchtune.yaml             # Torchtune LoRA Fine-tuning Runtime for Llama3 70B
-|   |   |   |   |-- . . .                               # (+10 ClusterTrainingRuntimes)
+|   |   |   |-- gemma2/
+|   |   |   |   |-- torchtune_gemma2_2B_finetuning.yaml
+|   |   |   |   |-- torchtune_gemma2_7B_finetuning.yaml
+|   |   |   |   |-- torchtune_gemma2_27B_finetuning.yaml
+|   |   |   |-- llama3_1/
+|   |   |   |   |-- torchtune_llama3_1_8B_finetuning.yaml
+|   |   |   |   |-- torchtune_llama3_1_70B_finetuning.yaml
+|   |   |   |-- llama3_2/
+|   |   |   |   |-- torchtune_llama3_2_1B_finetuning.yaml
+|   |   |   |   |-- torchtune_llama3_2_3B_finetuning.yaml
+|   |   |   |-- llama3_2_vision/
+|   |   |   |   |-- torchtune_llama3_2_vision_11B_finetuning.yaml
+|   |   |   |   |-- torchtune_llama3_2_vision_90B_finetuning.yaml
+|   |   |   |-- llama3_3/
+|   |   |   |   |-- torchtune_llama3_3_70B_finetuning.yaml
+|   |   |   |-- mistral/
+|   |   |   |   |-- torchtune_mistral_7B_finetuning.yaml
+|   |   |   |-- qwen2_5/
+|   |   |   |   |-- torchtune_qwen_0.5B_finetuning.yaml
+|   |   |   |   |-- torchtune_qwen_1.5B_finetuning.yaml
+|   |   |   |   |-- torchtune_qwen_3B_finetuning.yaml
+|   |   |   |   |-- torchtune_qwen_7B_finetuning.yaml
 |   |   |   |-- . . .
 |   |-- crds/
 |   |-- . . .
