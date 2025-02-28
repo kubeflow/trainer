@@ -323,8 +323,8 @@ As we mentioned above, we will create a map from (`TorchtuneConfig`, `num_nodes`
 
 **How to Select `recipe`**
 
-1. `peft_config == None` && `num_nodes == 1`: Use `full_finetune_single_device`.
-2. `peft_config == None` && `num_nodes > 1`: Use `full_finetune_distributed`.
+1. `peft_config == None` && `num_nodes == 1` && `nproc_per_node == 1`: Use `full_finetune_single_device`.
+2. `peft_config == None` && (`num_nodes >= 1` || `nproc_per_node > 1`): Use `full_finetune_distributed`.
 3. `type(peft_confg) == LoraConfig` && `num_nodes == 1`: Use `lora_finetune_single_device`.
 4. `type(peft_confg) == LoraConfig` && `num_nodes > 1`: Use `lora_finetune_distributed`
 5. TBA if we want to support more fine-tuning techniques.
