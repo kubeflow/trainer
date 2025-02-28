@@ -1,6 +1,8 @@
 {
   "packageName": "kubeflow.trainer",
   "typeMappings": {
+    "K8sIoApiAutoscalingV2MetricSpec": "V2MetricSpec",
+    "K8sIoApimachineryPkgUtilIntstrIntOrString": "Union[int, str]",
     "V1Time": "datetime"
   }
 }

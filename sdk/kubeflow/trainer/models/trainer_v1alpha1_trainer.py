@@ -38,7 +38,7 @@ class TrainerV1alpha1Trainer(object):
         'env': 'list[V1EnvVar]',
         'image': 'str',
         'num_nodes': 'int',
-        'num_proc_per_node': 'K8sIoApimachineryPkgUtilIntstrIntOrString',
+        'num_proc_per_node': 'Union[int, str]',
         'resources_per_node': 'V1ResourceRequirements'
     }
 
@@ -203,7 +203,7 @@ class TrainerV1alpha1Trainer(object):
 
 
         :return: The num_proc_per_node of this TrainerV1alpha1Trainer.  # noqa: E501
-        :rtype: K8sIoApimachineryPkgUtilIntstrIntOrString
+        :rtype: Union[int, str]
         """
         return self._num_proc_per_node
 
@@ -213,7 +213,7 @@ class TrainerV1alpha1Trainer(object):
 
 
         :param num_proc_per_node: The num_proc_per_node of this TrainerV1alpha1Trainer.  # noqa: E501
-        :type: K8sIoApimachineryPkgUtilIntstrIntOrString
+        :type: Union[int, str]
         """
 
         self._num_proc_per_node = num_proc_per_node
