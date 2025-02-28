@@ -28,6 +28,7 @@ By now, Kubeflow Training Operator V1 has implemented a [Trainer for LLM](../200
 
 - Build LLM fine-tuning recipes with `torchtune` and Kubeflow Trainer ClusterTrainingRuntime.
 - Update the Kubeflow Python SDK to support flexible LLM fine-tuning with configurable parameters.
+- Create community-supported `ClusterTrainingRuntime` for fine-tuning various foundational models (e.g. Mistral, LLama-70b, Gemma-7b).
 
 ### Non-Goals
 
@@ -80,8 +81,6 @@ job_id = TrainingClient().train(
         storage_uri="tatsu-lab/alpaca",
     ),
     fine_tuning_config=TorchTuneConfig(
-        recipe="lora_finetune_single_device",
-        config="llama3_2/1B_lora_single_device",
         dtype="bf16",
         batch_size=1,
         epochs=1,
@@ -256,7 +255,7 @@ def train(
     fine_tuning_config: Optional[Union[TorchTuneConfig]],
     dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
     model_config: Optional[types.HuggingFaceModelInputConfig] = None,
-    runtime_ref: Optional[str] = "torchtune-llm-finetuning",
+    runtime_ref: Optional[str] = None,
 ) -> str:
     pass
 
@@ -278,6 +277,15 @@ class CustomTrainer:
 We natively support all `recipe` and `config` supported by `torchtune`, since `torchtune` has already provided us with default `config`. We just cannot mutate them if we do not support the corresponding mutation config.
 
 ### Propagate `torchtune` settings with SDK
+
+To provide a better user experience, we need to offer a simple SDK that allows users to easily modify config files. So, we introduce `TorchtuneConfig` dataclass and create map from (`TorchtuneConfig`, `num_nodes`, `runtime_ref`) to dedicated `recipe` and `config` used by `torchtune`. Then, users can fine-tune their LLMs without any knowledge about `torchtune`.
+
+```python
+# By default we can fine-tune models without any additional configurations from users
+TrainerClient().train(
+  runtime_ref="torchtune-llama-3.3-70b"
+)
+```
 
 #### `TorchtuneConfig` API Design
 
