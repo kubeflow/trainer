@@ -278,7 +278,7 @@ We natively support all `recipe` and `config` supported by `torchtune`, since `t
 
 ### Propagate `torchtune` settings with SDK
 
-To provide a better user experience, we need to offer a simple SDK that allows users to easily modify config files. So, we introduce `TorchtuneConfig` dataclass and create map from (`TorchtuneConfig`, `num_nodes`, `runtime_ref`) to dedicated `recipe` and `config` used by `torchtune`. Then, users can fine-tune their LLMs without any knowledge about `torchtune`.
+To provide a better user experience, we need to offer a simple SDK that allows users to easily modify config files. So, we introduce `TorchtuneConfig` dataclass and create a map from (`TorchtuneConfig`, `num_nodes`, `runtime_ref`) to dedicated `recipe` and `config`. Then, users can fine-tune their LLMs without any knowledge about `torchtune`.
 
 ```python
 # By default we can fine-tune models without any additional configurations from users
@@ -319,6 +319,19 @@ class TorchtuneConfig:
 
 #### Create Map from `TorchtuneConfig` to specific recipes and configs
 
+As we mentioned above, we will create a map from (`TorchtuneConfig`, `num_nodes`, `runtime_ref`) to dedicated `recipe` and `config`. This will allow users to fine-tune their LLMs without knowing about `torchtune`'s recipes and configs.
+
+**How to Select `recipe`**
+
+1. `peft_config == None` && `num_nodes == 1`: Use `full_finetune_single_device`.
+2. `peft_config == None` && `num_nodes > 1`: Use `full_finetune_distributed`.
+3. `type(peft_confg) == LoraConfig` && `num_nodes == 1`: Use `lora_finetune_single_device`.
+4. `type(peft_confg) == LoraConfig` && `num_nodes > 1`: Use `lora_finetune_distributed`
+5. TBA if we want to support more fine-tuning techniques.
+
+**How to Select `config`**
+
+Extract model info in `runtime_ref`, and select corresponding config file according to the `recipe`.
 
 ### Maintain ClusterTrainingRuntimes in Manifests
 
