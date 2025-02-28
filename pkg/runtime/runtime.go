@@ -21,7 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
-	kueuelr "sigs.k8s.io/kueue/pkg/util/limitrange"
+	resourcehelpers "k8s.io/component-helpers/resource"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 )
@@ -109,7 +109,7 @@ func WithPodSpecReplicas(replicaName string, replicas int32, podSpec corev1.PodS
 		o.podSpecReplicas = append(o.podSpecReplicas, podSpecReplica{
 			name:     replicaName,
 			replicas: replicas,
-			podSpec:  podSpec,
+			podSpec:  *podSpec.DeepCopy(),
 		})
 	}
 }
@@ -131,9 +131,8 @@ func NewInfo(opts ...InfoOption) *Info {
 
 	for _, spec := range options.podSpecReplicas {
 		info.TotalRequests[spec.name] = TotalResourceRequest{
-			Replicas: spec.replicas,
-			// TODO: Need to address LimitRange and RuntimeClass.
-			PodRequests: kueuelr.TotalRequests(&spec.podSpec),
+			Replicas:    spec.replicas,
+			PodRequests: resourcehelpers.PodRequests(&corev1.Pod{Spec: spec.podSpec}, resourcehelpers.PodResourcesOptions{}),
 		}
 	}
 	if options.labels != nil {
