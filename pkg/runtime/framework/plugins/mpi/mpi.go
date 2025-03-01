@@ -58,8 +58,8 @@ var _ framework.ComponentBuilderPlugin = (*MPI)(nil)
 
 const Name = "MPI"
 
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;get;list;update;watch
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;get;list;update;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;get;list;watch;update;patch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;get;list;watch;update;patch
 
 func New(_ context.Context, client client.Client, _ client.FieldIndexer) (framework.Plugin, error) {
 	return &MPI{

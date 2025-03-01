@@ -13,6 +13,7 @@ rules:
   - create
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -32,6 +33,8 @@ rules:
   - create
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - scheduling.x-k8s.io
@@ -41,6 +44,8 @@ rules:
   - create
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - trainer.kubeflow.org
