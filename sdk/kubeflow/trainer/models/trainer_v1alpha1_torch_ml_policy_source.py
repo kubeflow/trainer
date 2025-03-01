@@ -34,7 +34,7 @@ class TrainerV1alpha1TorchMLPolicySource(object):
     """
     openapi_types = {
         'elastic_policy': 'TrainerV1alpha1TorchElasticPolicy',
-        'num_proc_per_node': 'Union[int, str]'
+        'num_proc_per_node': 'object'
     }
 
     attribute_map = {
@@ -84,7 +84,7 @@ class TrainerV1alpha1TorchMLPolicySource(object):
 
 
         :return: The num_proc_per_node of this TrainerV1alpha1TorchMLPolicySource.  # noqa: E501
-        :rtype: Union[int, str]
+        :rtype: object
         """
         return self._num_proc_per_node
 
@@ -94,7 +94,7 @@ class TrainerV1alpha1TorchMLPolicySource(object):
 
 
         :param num_proc_per_node: The num_proc_per_node of this TrainerV1alpha1TorchMLPolicySource.  # noqa: E501
-        :type: Union[int, str]
+        :type: object
         """
 
         self._num_proc_per_node = num_proc_per_node
