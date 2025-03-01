@@ -35,7 +35,7 @@ class TrainerV1alpha1TorchElasticPolicy(object):
     openapi_types = {
         'max_nodes': 'int',
         'max_restarts': 'int',
-        'metrics': 'list[K8sIoApiAutoscalingV2MetricSpec]',
+        'metrics': 'list[V2MetricSpec]',
         'min_nodes': 'int'
     }
 
@@ -120,7 +120,7 @@ class TrainerV1alpha1TorchElasticPolicy(object):
         Specification which are used to calculate the desired number of nodes. See the individual metric source types for more information about how each type of metric must respond. The HPA will be created to perform auto-scaling.  # noqa: E501
 
         :return: The metrics of this TrainerV1alpha1TorchElasticPolicy.  # noqa: E501
-        :rtype: list[K8sIoApiAutoscalingV2MetricSpec]
+        :rtype: list[V2MetricSpec]
         """
         return self._metrics
 
@@ -131,7 +131,7 @@ class TrainerV1alpha1TorchElasticPolicy(object):
         Specification which are used to calculate the desired number of nodes. See the individual metric source types for more information about how each type of metric must respond. The HPA will be created to perform auto-scaling.  # noqa: E501
 
         :param metrics: The metrics of this TrainerV1alpha1TorchElasticPolicy.  # noqa: E501
-        :type: list[K8sIoApiAutoscalingV2MetricSpec]
+        :type: list[V2MetricSpec]
         """
 
         self._metrics = metrics
