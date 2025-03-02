@@ -371,7 +371,7 @@ func TestRunCustomValidationPlugins(t *testing.T) {
 			}
 			warnings, errs := fwk.RunCustomValidationPlugins(tc.oldObj, tc.newObj)
 			if diff := cmp.Diff(tc.wantWarnings, warnings, cmpopts.SortSlices(func(a, b string) bool { return a < b })); len(diff) != 0 {
-				t.Errorf("Unexpected warninigs (-want,+got):\n%s", diff)
+				t.Errorf("Unexpected warnings (-want,+got):\n%s", diff)
 			}
 			if diff := cmp.Diff(tc.wantError, errs, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
