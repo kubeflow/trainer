@@ -43,6 +43,9 @@ from kubeflow.trainer.models.trainer_v1alpha1_training_runtime import TrainerV1a
 from kubeflow.trainer.models.trainer_v1alpha1_training_runtime_list import TrainerV1alpha1TrainingRuntimeList
 from kubeflow.trainer.models.trainer_v1alpha1_training_runtime_spec import TrainerV1alpha1TrainingRuntimeSpec
 
-# Import Kubernetes and JobSet models for the serialization. 
+# Import Kubernetes and JobSet models for the serialization.
+from kubernetes.client import *
+from jobset.models import *
+# Import Kubernetes and JobSet models for the serialization.
 from kubernetes.client import *
 from jobset.models import *
