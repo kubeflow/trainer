@@ -70,8 +70,8 @@ git checkout ${SDK_OUTPUT_PATH}/kubeflow/trainer/__init__.py
 # fi
 
 # Kubeflow models must have Kubernetes models to perform serialization.
-cat <<EOF >>${SDK_OUTPUT_PATH}/kubeflow/trainer/models/__init__.py
-# Import Kubernetes and JobSet models for the serialization.
-from kubernetes.client import *
-from jobset.models import *
-EOF
+# cat <<EOF >>${SDK_OUTPUT_PATH}/kubeflow/trainer/models/__init__.py
+# # Import Kubernetes and JobSet models for the serialization.
+# from kubernetes.client import *
+# from jobset.models import *
+# EOF
