@@ -540,7 +540,7 @@ def load_model_checkpoint(
         model (torch.nn.Module):
             The model to load the checkpoint weights into
         optimizer (torch.optim.Optimizer):
-            The optimizer to load the checkpoint weigths into
+            The optimizer to load the checkpoint weights into
 
     Returns:
         Tuple[int, torch.nn.Module, torch.optim.Optimizer]:
@@ -638,7 +638,7 @@ def train(
             Size of intermediate representations.
             Defaults to 256.
         dropout (float, optional):
-            Amout of Dropout to use. Defaults to 0.1.
+            Amount of Dropout to use. Defaults to 0.1.
         batch_size (int, optional):
             The minibatch size. Defaults to 8.
         num_iterations (int, optional):
