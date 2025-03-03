@@ -25,9 +25,8 @@ from kubernetes import client, config, watch
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils
-from kubeflow.trainer.models.trainer_v1alpha1_cluster_training_runtime import (
-    TrainerV1alpha1ClusterTrainingRuntime,
-)
+
+import kubeflow.trainer.models as models
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +188,7 @@ class TrainerClient:
         train_job_name = random.choice(string.ascii_lowercase) + uuid.uuid4().hex[:11]
 
         # Build the Trainer.
-        trainer_crd = models.TrainerV1alpha1Trainer()
+        trainer_crd = TrainerV1alpha1Trainer()
 
         # Add number of nodes to the Trainer.
         if trainer and trainer.num_nodes:
@@ -222,16 +221,14 @@ class TrainerClient:
                 trainer.fine_tuning_config.peft_config
             )
 
-        train_job = models.TrainerV1alpha1TrainJob(
+        train_job = TrainerV1alpha1TrainJob(
             api_version=constants.API_VERSION,
             kind=constants.TRAINJOB_KIND,
             metadata=client.V1ObjectMeta(name=train_job_name),
-            spec=models.TrainerV1alpha1TrainJobSpec(
-                runtime_ref=models.TrainerV1alpha1RuntimeRef(name=runtime_ref),
+            spec=TrainerV1alpha1TrainJobSpec(
+                runtime_ref=TrainerV1alpha1RuntimeRef(name=runtime_ref),
                 trainer=(
-                    trainer_crd
-                    if trainer_crd != models.TrainerV1alpha1Trainer()
-                    else None
+                    trainer_crd if trainer_crd != TrainerV1alpha1Trainer() else None
                 ),
                 dataset_config=utils.get_dataset_config(dataset_config),
                 model_config=utils.get_model_config(model_config),
@@ -323,7 +320,7 @@ class TrainerClient:
             )
 
             trainjob = self.api_client.deserialize(
-                utils.FakeResponse(thread.get(constants.DEFAULT_TIMEOUT)),  # type: ignore
+                utils.FakeResponse(thread.get(constants.DEFAULT_TIMEOUT)),
                 models.TrainerV1alpha1TrainJob,
             )
 

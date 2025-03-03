@@ -20,10 +20,21 @@ import textwrap
 import threading
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-# from kubeflow.trainer import models
+from kubernetes import client, config
+
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
-from kubernetes import client, config
+
+from kubeflow.trainer.models.trainer_v1alpha1_dataset_config import (
+    TrainerV1alpha1DatasetConfig,
+)
+from kubeflow.trainer.models.trainer_v1alpha1_model_config import (
+    TrainerV1alpha1ModelConfig,
+)
+
+from kubeflow.trainer.models.trainer_v1alpha1_model_config import (
+    TrainerV1alpha1ModelConfig,
+)
 
 
 def is_running_in_k8s() -> bool:
@@ -222,42 +233,42 @@ def get_lora_config(lora_config: types.LoraConfig) -> List[client.V1EnvVar]:
     return [env]
 
 
-# def get_dataset_config(
-#     dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
-# ) -> Optional[models.TrainerV1alpha1DatasetConfig]:
-#     """
-#     Get the TrainJob DatasetConfig from the given config.
-#     """
-#     if dataset_config is None:
-#         return None
+def get_dataset_config(
+    dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
+) -> Optional[TrainerV1alpha1DatasetConfig]:
+    """
+    Get the TrainJob DatasetConfig from the given config.
+    """
+    if dataset_config is None:
+        return None
 
-#     # TODO (andreyvelich): Support more parameters.
-#     ds_config = models.TrainerV1alpha1DatasetConfig(
-#         storage_uri=(
-#             dataset_config.storage_uri
-#             if dataset_config.storage_uri.startswith("hf://")
-#             else "hf://" + dataset_config.storage_uri
-#         )
-#     )
+    # TODO (andreyvelich): Support more parameters.
+    ds_config = TrainerV1alpha1DatasetConfig(
+        storage_uri=(
+            dataset_config.storage_uri
+            if dataset_config.storage_uri.startswith("hf://")
+            else "hf://" + dataset_config.storage_uri
+        )
+    )
 
-#     return ds_config
+    return ds_config
 
 
-# def get_model_config(
-#     model_config: Optional[types.HuggingFaceModelInputConfig] = None,
-# ) -> Optional[models.TrainerV1alpha1ModelConfig]:
-#     """
-#     Get the TrainJob ModelConfig from the given config.
-#     """
-#     if model_config is None:
-#         return None
+def get_model_config(
+    model_config: Optional[types.HuggingFaceModelInputConfig] = None,
+) -> Optional[TrainerV1alpha1ModelConfig]:
+    """
+    Get the TrainJob ModelConfig from the given config.
+    """
+    if model_config is None:
+        return None
 
-#     # TODO (andreyvelich): Support more parameters.
-#     m_config = models.TrainerV1alpha1ModelConfig(
-#         input=models.TrainerV1alpha1InputModel(storage_uri=model_config.storage_uri)
-#     )
+    # TODO (andreyvelich): Support more parameters.
+    m_config = TrainerV1alpha1ModelConfig(
+        input=TrainerV1alpha1InputModel(storage_uri=model_config.storage_uri)
+    )
 
-#     return m_config
+    return m_config
 
 
 def wrap_log_stream(q: queue.Queue, log_stream: Any):

@@ -37,25 +37,14 @@ docker run --rm \
   -c "local/${SWAGGER_CODEGEN_CONF}" \
   -o "local/${SDK_OUTPUT_PATH}" \
   -p=packageVersion="${SDK_VERSION}" \
-  --global-property models,modelTests=false
-# --global-property apiTests=false,modelTests=false,supportingFiles=README.md,models
+  --global-property models,modelTests=false,supportingFiles=__init__.py
 
 # sleep 4
 
 echo "Removing unused files for the Python SDK"
 rm -rf ${SDK_OUTPUT_PATH}/.openapi-generator
-# rm -rf ${SDK_OUTPUT_PATH}/.github
-# rm -rf ${SDK_OUTPUT_PATH}/.gitignore
-# rm -rf ${SDK_OUTPUT_PATH}/.gitlab-ci.yml
-# rm -rf ${SDK_OUTPUT_PATH}/git_push.sh
-# rm -rf ${SDK_OUTPUT_PATH}/.openapi-generator-ignore
-# rm -rf ${SDK_OUTPUT_PATH}/.travis.yml
-# rm -rf ${SDK_OUTPUT_PATH}/requirements.txt
-# rm -rf ${SDK_OUTPUT_PATH}/setup.cfg
-# rm -rf ${SDK_OUTPUT_PATH}/setup.py
-# rm -rf ${SDK_OUTPUT_PATH}/test-requirements.txt
-# rm -rf ${SDK_OUTPUT_PATH}/tox.ini
-# rm -rf ${SDK_OUTPUT_PATH}/kubeflow/trainer/py.typed
+rm -rf ${SDK_OUTPUT_PATH}/.github
+rm -rf ${SDK_OUTPUT_PATH}/test
 
 # Revert manually created files.
 # git checkout ${SDK_OUTPUT_PATH}/README.md
