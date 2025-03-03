@@ -108,33 +108,3 @@ func swaggify(name string) string {
 	name = strings.Replace(name, "/", ".", -1)
 	return name
 }
-
-// func getRefDefinition(name, k8sVersion, jobSetVersion string) string {
-// 	k8sOpenAPISpec := fmt.Sprintf("https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/%s/api/openapi-spec/swagger.json", k8sVersion)
-// 	jobSetOpenAPISpec := fmt.Sprintf("https://raw.githubusercontent.com/kubernetes-sigs/jobset/refs/tags/%s/hack/python-sdk/swagger.json", jobSetVersion)
-
-// 	// This is required for the correct definitions.
-// 	name = strings.Replace(name, "/", ".", -1)
-
-// 	name = strings.Replace(name, "k8s.io", "io.k8s", -1)
-
-// 	name = strings.Replace(name, "sigs.k8s.io.jobset.api.", "", -1)
-
-// // Replacement for Kubeflow Trainer APIs.
-// if strings.HasPrefix(name, "github.com.kubeflow.trainer") {
-// 	name = strings.Replace(name, "github.com.kubeflow.trainer.pkg.apis.", "", -1)
-// 	name = "#/definitions/" + name
-
-// } else if strings.HasPrefix(name, "k8s.io") {
-// 	// Replacement for Kubernetes APIs
-// 	name = strings.Replace(name, "k8s.io", "io.k8s", -1)
-// 	name = k8sOpenAPISpec + "#/definitions/" + name
-
-// } else if strings.HasPrefix(name, "sigs.k8s.io") {
-// 	// Replacement for the JobSet APIs.
-// 	name = strings.Replace(name, "sigs.k8s.io.jobset.api.", "", -1)
-// 	name = jobSetOpenAPISpec + "#/definitions/" + name
-// }
-
-// 	return name
-// }
