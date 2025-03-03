@@ -289,8 +289,11 @@ const (
 	// TrainJobFailed means that the actual jobs have failed its execution.
 	TrainJobFailed string = "Failed"
 
-	// TrainJobCreated means that the actual jobs creation has succeeded.
-	TrainJobCreated string = "Created"
+	// TrainJobInitialized means the TrainJob has been initialized.
+	TrainJobInitialized string = "Initialized"
+
+	// TrainJobComponentsCreated means the components (e.g., JobSet, Jobs) have been created.
+	TrainJobComponentsCreated string = "ComponentsCreated"
 )
 
 const (
@@ -302,9 +305,13 @@ const (
 	// When the TrainJob suspension is changed from True to False, this is added.
 	TrainJobResumedReason string = "Resumed"
 
-	// TrainJobJobsCreationSucceededReason is the "Created" condition reason.
-	// When the creating objects succeeded after building succeeded, this is added.
-	TrainJobJobsCreationSucceededReason string = "JobsCreationSucceeded"
+	// TrainJobInitializedReason is the "Initialized" condition reason.
+	// When the TrainJob is initialized, this is added.
+	TrainJobInitializedReason string = "Initialized"
+
+	// TrainJobComponentsCreatedReason is the "ComponentsCreated" condition reason.
+	// When the components are created, this is added.
+	TrainJobComponentsCreatedReason string = "ComponentsCreated"
 
 	// TrainJobJobsBuildFailedReason is the "Created" condition reason.
 	// When the building objects based on the TrainJob and the specified runtime failed,
@@ -314,6 +321,14 @@ const (
 	// TrainJobJobsCreationFailedReason is "Created" condition reason.
 	// When the creating objects failed even though building succeeded, this is added.
 	TrainJobJobsCreationFailedReason string = "JobsCreationFailed"
+
+  // TrainJobFailedReason is the "Failed" condition reason.
+	// When the actual jobs failed, this is added.
+	TrainJobFailedReason string = "Failed"
+
+	// TrainJobCompleteReason is the "Complete" condition reason.
+	// When the actual jobs completed, this is added.
+	TrainJobCompleteReason string = "Complete"
 )
 
 type TrainJobSpec struct {
@@ -930,27 +945,41 @@ trainer container.
 apiVersion: trainer.kubeflow.org/v2alpha1
 kind: TrainJob
 metadata:
-  name: pytorch-distributed
+  name: torch-ddp
   namespace: tenant-alpha
 spec:
   runtimeRef:
-    name: pytorch-distributed-gpu
+    name: torch-distributed-multi-node
   trainer:
     image: docker.io/custom-training
-  podSpecOverrides:
-    - targetJobs:
-        - name: node
-      containers:
-        - name: user-identity
-          value: 123
-        - name: trainer
-          volumeMounts:
-            - name: user-123-volume
-              mountPath: /workspace
-      volumes:
-        - name: user-123-volume
-          persistentVolumeClaim:
-            claimName: user-123-volume
+    command:
+      - torchrun train.py
+    numNodes: 5
+    resourcesPerNode:
+      requests:
+        nvidia.com/gpu: 2
+status:
+  conditions:
+    - type: Initialized
+      status: "True"
+      lastTransitionTime: "2024-07-16T12:00:00Z"
+      reason: Initialized
+      message: TrainJob has been initialized.
+    - type: ComponentsCreated
+      status: "True"
+      lastTransitionTime: "2024-07-16T12:01:00Z"
+      reason: ComponentsCreated
+      message: Components have been created.
+    - type: Suspended
+      status: "False"
+      lastTransitionTime: "2024-07-16T12:02:00Z"
+      reason: Resumed
+      message: TrainJob is not suspended.
+    - type: Complete
+      status: "False"
+      lastTransitionTime: "2024-07-16T12:03:00Z"
+      reason: Running
+      message: TrainJob is running.
 ```
 
 ### State Transition
@@ -963,13 +992,22 @@ instead of computing from JobSet conditions.
 
 ```mermaid
 stateDiagram-v2
-    #CREATION
-    state created_choice <<choice>>
-    [*] --> created_choice: TrainJob is submitted.
-    created_choice --> Created=True: Succeeded to build and deploy Jobs.
-    created_choice --> Created=False: Failed to build and deploy Jobs.
-    Created=False --> Created=False: Wait for updated appropriate TrainJob.
-    Created=False --> Created=True: Succeeded to build and deploy Jobs.
+     #INITIALIZATION
+    state initialized_choice <<choice>>
+    [*] --> initialized_choice: TrainJob is submitted.
+    initialized_choice --> Initialized=True: Succeeded to initialize TrainJob.
+    initialized_choice --> Initialized=False: Failed to initialize TrainJob.
+    Initialized=False --> Initialized=False: Wait for updated appropriate TrainJob.
+    Initialized=False --> Initialized=True: Succeeded to initialize TrainJob.
+
+    #COMPONENTS CREATION
+    state components_created_choice <<choice>>
+    Initialized=True --> components_created_choice: Handle components creation.
+    components_created_choice --> ComponentsCreated=True: Succeeded to create components.
+    ComponentsCreated=True --> ComponentsCreated=True: Wait for components to be ready.
+    components_created_choice --> ComponentsCreated=False: Failed to create components.
+    ComponentsCreated=False --> ComponentsCreated=False: Wait for updated appropriate TrainJob.
+    ComponentsCreated=False --> ComponentsCreated=True: Succeeded to create components.
 
     #SUSPENSION
     state suspended_choice <<choice>>
