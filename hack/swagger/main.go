@@ -62,9 +62,6 @@ func main() {
 	defs := spec.Definitions{}
 
 	refCallback := func(name string) spec.Ref {
-		// return spec.MustCreateRef("#/definitions/" + common.EscapeJsonPointer(swaggify(name, k8sVersion, jobSetVersion)))
-		// return spec.MustCreateRef(getRefDefinition(name, k8sVersion, jobSetVersion))
-
 		if strings.HasPrefix(name, "k8s.io") {
 			return spec.MustCreateRef(k8sOpenAPISpec + "#/definitions/" + swaggify(name))
 		} else if strings.HasPrefix(name, "sigs.k8s.io/jobset") {
@@ -103,7 +100,6 @@ func main() {
 func swaggify(name string) string {
 	name = strings.Replace(name, "github.com/kubeflow/trainer/pkg/apis/", "", -1)
 	name = strings.Replace(name, "sigs.k8s.io/jobset/api/", "", -1)
-
 	name = strings.Replace(name, "k8s.io", "io.k8s", -1)
 	name = strings.Replace(name, "/", ".", -1)
 	return name

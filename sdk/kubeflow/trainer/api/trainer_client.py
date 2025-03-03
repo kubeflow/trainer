@@ -20,13 +20,11 @@ import string
 import uuid
 from typing import Dict, List, Optional
 
-from kubernetes import client, config, watch
-
 import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils
-
+from kubernetes import client, config, watch
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +70,6 @@ class TrainerClient:
         k8s_client = client.ApiClient(client_configuration)
         self.custom_api = client.CustomObjectsApi(k8s_client)
         self.core_api = client.CoreV1Api(k8s_client)
-        # self.api_client = ApiClient()
 
         self.namespace = namespace
 
