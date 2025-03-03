@@ -40,9 +40,9 @@ docker run --rm \
   --global-property models,modelTests=false,supportingFiles=__init__.py
 
 echo "Removing unused files for the Python SDK"
-rm -rf ${SDK_OUTPUT_PATH}/.openapi-generator
-rm -rf ${SDK_OUTPUT_PATH}/.github
-rm -rf ${SDK_OUTPUT_PATH}/test
+git clean -f ${SDK_OUTPUT_PATH}/.openapi-generator
+git clean -f ${SDK_OUTPUT_PATH}/.github
+git clean -f ${SDK_OUTPUT_PATH}/test
 
 # Revert manually created files.
 git checkout ${SDK_OUTPUT_PATH}/kubeflow/trainer/__init__.py
