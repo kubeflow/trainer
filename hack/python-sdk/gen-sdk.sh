@@ -28,8 +28,8 @@ TRAINER_ROOT="$(pwd)"
 SWAGGER_CODEGEN_CONF="hack/python-sdk/swagger_config.json"
 SWAGGER_CODEGEN_FILE="api/openapi-spec/swagger.json"
 
-# We need to add user to allow container override existing files.
 echo "Generating Python SDK for Kubeflow Trainer V2 ..."
+# We need to add user to allow container override existing files.
 docker run --user "$(id -u)":"$(id -g)" --rm \
   -v "${TRAINER_ROOT}:/local" docker.io/openapitools/openapi-generator-cli:${OPENAPI_GENERATOR_VERSION} generate \
   -g python \

@@ -20,11 +20,10 @@ import textwrap
 import threading
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from kubernetes import config
-
 import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
+from kubernetes import config
 
 
 def is_running_in_k8s() -> bool:
