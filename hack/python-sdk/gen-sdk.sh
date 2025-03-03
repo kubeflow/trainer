@@ -43,7 +43,7 @@ docker run --rm \
 # sleep 4
 
 echo "Removing unused files for the Python SDK"
-# rm -rf ${SDK_OUTPUT_PATH}/.openapi-generator
+rm -rf ${SDK_OUTPUT_PATH}/.openapi-generator
 # rm -rf ${SDK_OUTPUT_PATH}/.github
 # rm -rf ${SDK_OUTPUT_PATH}/.gitignore
 # rm -rf ${SDK_OUTPUT_PATH}/.gitlab-ci.yml
@@ -58,9 +58,9 @@ echo "Removing unused files for the Python SDK"
 # rm -rf ${SDK_OUTPUT_PATH}/kubeflow/trainer/py.typed
 
 # Revert manually created files.
-git checkout ${SDK_OUTPUT_PATH}/README.md
-git checkout ${SDK_OUTPUT_PATH}/pyproject.toml
-git checkout ${SDK_OUTPUT_PATH}/kubeflow/trainer/__init__.py
+# git checkout ${SDK_OUTPUT_PATH}/README.md
+# git checkout ${SDK_OUTPUT_PATH}/pyproject.toml
+# git checkout ${SDK_OUTPUT_PATH}/kubeflow/trainer/__init__.py
 
 # # Manually modify the SDK version in the __init__.py file.
 # if [[ $(uname) == "Darwin" ]]; then

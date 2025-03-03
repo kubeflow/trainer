@@ -6,8 +6,8 @@ DatasetConfig represents the desired dataset configuration. When this API is use
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**env** | [**List[V1EnvVar]**](V1EnvVar.md) | List of environment variables to set in the dataset initializer container. These values will be merged with the TrainingRuntime&#39;s dataset initializer environments. | [optional] 
-**secret_ref** | [**V1LocalObjectReference**](V1LocalObjectReference.md) |  | [optional] 
+**env** | [**List[IoK8sApiCoreV1EnvVar]**](IoK8sApiCoreV1EnvVar.md) | List of environment variables to set in the dataset initializer container. These values will be merged with the TrainingRuntime&#39;s dataset initializer environments. | [optional] 
+**secret_ref** | [**IoK8sApiCoreV1LocalObjectReference**](IoK8sApiCoreV1LocalObjectReference.md) |  | [optional] 
 **storage_uri** | **str** | Storage uri for the dataset provider. | [optional] 
 
 ## Example

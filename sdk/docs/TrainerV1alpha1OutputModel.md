@@ -6,8 +6,8 @@ OutputModel represents the desired trained model configuration.
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**env** | [**List[V1EnvVar]**](V1EnvVar.md) | List of environment variables to set in the model exporter container. These values will be merged with the TrainingRuntime&#39;s model exporter environments. | [optional] 
-**secret_ref** | [**V1LocalObjectReference**](V1LocalObjectReference.md) |  | [optional] 
+**env** | [**List[IoK8sApiCoreV1EnvVar]**](IoK8sApiCoreV1EnvVar.md) | List of environment variables to set in the model exporter container. These values will be merged with the TrainingRuntime&#39;s model exporter environments. | [optional] 
+**secret_ref** | [**IoK8sApiCoreV1LocalObjectReference**](IoK8sApiCoreV1LocalObjectReference.md) |  | [optional] 
 **storage_uri** | **str** | Storage uri for the model exporter. | [optional] 
 
 ## Example

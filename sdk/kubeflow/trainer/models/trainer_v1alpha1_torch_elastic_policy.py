@@ -19,6 +19,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow.trainer.models.io_k8s_api_autoscaling_v2_metric_spec import IoK8sApiAutoscalingV2MetricSpec
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -28,7 +29,7 @@ class TrainerV1alpha1TorchElasticPolicy(BaseModel):
     """ # noqa: E501
     max_nodes: Optional[StrictInt] = Field(default=None, description="Upper limit for the number of nodes to which training job can scale up.", alias="maxNodes")
     max_restarts: Optional[StrictInt] = Field(default=None, description="How many times the training job can be restarted. This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and the `.spec.failurePolicy.maxRestarts` parameter of the training Job.", alias="maxRestarts")
-    metrics: Optional[List[V2MetricSpec]] = Field(default=None, description="Specification which are used to calculate the desired number of nodes. See the individual metric source types for more information about how each type of metric must respond. The HPA will be created to perform auto-scaling.")
+    metrics: Optional[List[IoK8sApiAutoscalingV2MetricSpec]] = Field(default=None, description="Specification which are used to calculate the desired number of nodes. See the individual metric source types for more information about how each type of metric must respond. The HPA will be created to perform auto-scaling.")
     min_nodes: Optional[StrictInt] = Field(default=None, description="Lower limit for the number of nodes to which training job can scale down.", alias="minNodes")
     __properties: ClassVar[List[str]] = ["maxNodes", "maxRestarts", "metrics", "minNodes"]
 
@@ -92,7 +93,7 @@ class TrainerV1alpha1TorchElasticPolicy(BaseModel):
         _obj = cls.model_validate({
             "maxNodes": obj.get("maxNodes"),
             "maxRestarts": obj.get("maxRestarts"),
-            "metrics": [V2MetricSpec.from_dict(_item) for _item in obj["metrics"]] if obj.get("metrics") is not None else None,
+            "metrics": [IoK8sApiAutoscalingV2MetricSpec.from_dict(_item) for _item in obj["metrics"]] if obj.get("metrics") is not None else None,
             "minNodes": obj.get("minNodes")
         })
         return _obj

@@ -8,11 +8,11 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **args** | **List[str]** | Arguments to the entrypoint for the training container. | [optional] 
 **command** | **List[str]** | Entrypoint commands for the training container. | [optional] 
-**env** | [**List[V1EnvVar]**](V1EnvVar.md) | List of environment variables to set in the training container. These values will be merged with the TrainingRuntime&#39;s trainer environments. | [optional] 
+**env** | [**List[IoK8sApiCoreV1EnvVar]**](IoK8sApiCoreV1EnvVar.md) | List of environment variables to set in the training container. These values will be merged with the TrainingRuntime&#39;s trainer environments. | [optional] 
 **image** | **str** | Docker image for the training container. | [optional] 
 **num_nodes** | **int** | Number of training nodes. | [optional] 
-**num_proc_per_node** | [**object**](K8sIoApimachineryPkgUtilIntstrIntOrString.md) |  | [optional] 
-**resources_per_node** | [**V1ResourceRequirements**](V1ResourceRequirements.md) |  | [optional] 
+**num_proc_per_node** | **str** | IntOrString is a type that can hold an int32 or a string.  When used in JSON or YAML marshalling and unmarshalling, it produces or consumes the inner type.  This allows you to have, for example, a JSON field that can accept a name or number. | [optional] 
+**resources_per_node** | [**IoK8sApiCoreV1ResourceRequirements**](IoK8sApiCoreV1ResourceRequirements.md) |  | [optional] 
 
 ## Example
 

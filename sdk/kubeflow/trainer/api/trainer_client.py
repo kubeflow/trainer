@@ -20,12 +20,14 @@ import string
 import uuid
 from typing import Dict, List, Optional
 
-from kubeflow.trainer import models
-from kubeflow.trainer.api_client import ApiClient
+from kubernetes import client, config, watch
+
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils
-from kubernetes import client, config, watch
+from kubeflow.trainer.models.trainer_v1alpha1_cluster_training_runtime import (
+    TrainerV1alpha1ClusterTrainingRuntime,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,7 @@ class TrainerClient:
         k8s_client = client.ApiClient(client_configuration)
         self.custom_api = client.CustomObjectsApi(k8s_client)
         self.core_api = client.CoreV1Api(k8s_client)
-        self.api_client = ApiClient()
+        # self.api_client = ApiClient()
 
         self.namespace = namespace
 
@@ -100,18 +102,15 @@ class TrainerClient:
             response = thread.get(constants.DEFAULT_TIMEOUT)
             for item in response["items"]:
 
-                runtime = self.api_client.deserialize(
-                    utils.FakeResponse(item),
-                    models.TrainerV1alpha1ClusterTrainingRuntime,
-                )
-                ml_policy = runtime.spec.ml_policy  # type: ignore
-                metadata = runtime.metadata  # type: ignore
+                runtime = TrainerV1alpha1ClusterTrainingRuntime.from_dict(item)
+                ml_policy = runtime.spec.ml_policy
+                metadata = runtime.metadata
 
                 # TODO (andreyvelich): Currently, the labels must be presented.
                 if metadata.labels:
                     # Get the Trainer container resources.
                     resources = None
-                    for job in runtime.spec.template.spec.replicated_jobs:  # type: ignore
+                    for job in runtime.spec.template.spec.replicated_jobs:
                         if job.name == constants.JOB_TRAINER_NODE:
                             pod_spec = job.template.spec.template.spec
                             for container in pod_spec.containers:
@@ -473,98 +472,98 @@ class TrainerClient:
             f"{constants.TRAINJOB_KIND} {self.namespace}/{name} has been deleted"
         )
 
-    def __get_trainjob_from_crd(
-        self,
-        trainjob_crd: models.TrainerV1alpha1TrainJob,
-    ) -> types.TrainJob:
+    # def __get_trainjob_from_crd(
+    #     self,
+    #     trainjob_crd: models.TrainerV1alpha1TrainJob,
+    # ) -> types.TrainJob:
 
-        name = trainjob_crd.metadata.name  # type: ignore
-        namespace = trainjob_crd.metadata.namespace  # type: ignore
+    #     name = trainjob_crd.metadata.name  # type: ignore
+    #     namespace = trainjob_crd.metadata.namespace  # type: ignore
 
-        # Construct the TrainJob from the CRD.
-        train_job = types.TrainJob(
-            name=name,
-            runtime_ref=trainjob_crd.spec.runtime_ref.name,  # type: ignore
-            creation_timestamp=trainjob_crd.metadata.creation_timestamp,  # type: ignore
-            components=[],
-        )
+    #     # Construct the TrainJob from the CRD.
+    #     train_job = types.TrainJob(
+    #         name=name,
+    #         runtime_ref=trainjob_crd.spec.runtime_ref.name,  # type: ignore
+    #         creation_timestamp=trainjob_crd.metadata.creation_timestamp,  # type: ignore
+    #         components=[],
+    #     )
 
-        # Add the TrainJob components, e.g. trainer nodes and initializer.
-        try:
-            response = self.core_api.list_namespaced_pod(
-                namespace,
-                label_selector=f"{constants.JOBSET_NAME_KEY}={name}",
-                async_req=True,
-            ).get(constants.DEFAULT_TIMEOUT)
+    #     # Add the TrainJob components, e.g. trainer nodes and initializer.
+    #     try:
+    #         response = self.core_api.list_namespaced_pod(
+    #             namespace,
+    #             label_selector=f"{constants.JOBSET_NAME_KEY}={name}",
+    #             async_req=True,
+    #         ).get(constants.DEFAULT_TIMEOUT)
 
-            for pod in response.items:
-                labels = pod.metadata.labels
+    #         for pod in response.items:
+    #             labels = pod.metadata.labels
 
-                # Component can be Trainer or Initializer.
-                if labels[constants.REPLICATED_JOB_KEY] == constants.JOB_TRAINER_NODE:
-                    name = f"{constants.JOB_TRAINER_NODE}-{labels[constants.JOB_INDEX_KEY]}"
-                else:
-                    name = labels[constants.REPLICATED_JOB_KEY]
+    #             # Component can be Trainer or Initializer.
+    #             if labels[constants.REPLICATED_JOB_KEY] == constants.JOB_TRAINER_NODE:
+    #                 name = f"{constants.JOB_TRAINER_NODE}-{labels[constants.JOB_INDEX_KEY]}"
+    #             else:
+    #                 name = labels[constants.REPLICATED_JOB_KEY]
 
-                # TODO (andreyvelich): This can be refactored once we use containers for init Job.
-                # Initializer Pod must have the dataset and/or model initializer containers.
-                if name == constants.JOB_INITIALIZER:
-                    device_count = "0"
-                    # TODO (andreyvelich): Currently, we use the InitContainers for initializers.
-                    for container in pod.spec.init_containers:
-                        if (
-                            container.name == constants.CONTAINER_DATASET_INITIALIZER
-                            or container.name == constants.CONTAINER_MODEL_INITIALIZER
-                        ):
-                            device, dc = utils.get_container_devices(
-                                container.resources
-                            )
-                            # If resources are not set in containers, we can't get the device.
-                            if device == constants.UNKNOWN:
-                                device_count = device
-                                break
-                            device_count = str(int(device_count) + int(dc))
-                # Trainer Pod must have the trainer container.
-                else:
-                    for container in pod.spec.containers:
-                        if container.name == constants.CONTAINER_TRAINER:
-                            num_procs = None
-                            # Get the num procs per node if it is set.
-                            for env in container.env:
-                                if env.name == constants.TORCH_ENV_NUM_PROC_PER_NODE:
-                                    num_procs = env.value
-                            device, device_count = utils.get_container_devices(
-                                container.resources, num_procs
-                            )
+    #             # TODO (andreyvelich): This can be refactored once we use containers for init Job.
+    #             # Initializer Pod must have the dataset and/or model initializer containers.
+    #             if name == constants.JOB_INITIALIZER:
+    #                 device_count = "0"
+    #                 # TODO (andreyvelich): Currently, we use the InitContainers for initializers.
+    #                 for container in pod.spec.init_containers:
+    #                     if (
+    #                         container.name == constants.CONTAINER_DATASET_INITIALIZER
+    #                         or container.name == constants.CONTAINER_MODEL_INITIALIZER
+    #                     ):
+    #                         device, dc = utils.get_container_devices(
+    #                             container.resources
+    #                         )
+    #                         # If resources are not set in containers, we can't get the device.
+    #                         if device == constants.UNKNOWN:
+    #                             device_count = device
+    #                             break
+    #                         device_count = str(int(device_count) + int(dc))
+    #             # Trainer Pod must have the trainer container.
+    #             else:
+    #                 for container in pod.spec.containers:
+    #                     if container.name == constants.CONTAINER_TRAINER:
+    #                         num_procs = None
+    #                         # Get the num procs per node if it is set.
+    #                         for env in container.env:
+    #                             if env.name == constants.TORCH_ENV_NUM_PROC_PER_NODE:
+    #                                 num_procs = env.value
+    #                         device, device_count = utils.get_container_devices(
+    #                             container.resources, num_procs
+    #                         )
 
-                c = types.Component(
-                    name=name,
-                    status=pod.status.phase if pod.status else None,  # type: ignore
-                    device=device,
-                    device_count=device_count,
-                    pod_name=pod.metadata.name,
-                )
+    #             c = types.Component(
+    #                 name=name,
+    #                 status=pod.status.phase if pod.status else None,  # type: ignore
+    #                 device=device,
+    #                 device_count=device_count,
+    #                 pod_name=pod.metadata.name,
+    #             )
 
-                train_job.components.append(c)
-        except multiprocessing.TimeoutError:
-            raise TimeoutError(
-                f"Timeout to list {constants.TRAINJOB_KIND}'s components: {namespace}/{name}"
-            )
-        except Exception:
-            raise RuntimeError(
-                f"Failed to list {constants.TRAINJOB_KIND}'s components: {namespace}/{name}"
-            )
+    #             train_job.components.append(c)
+    #     except multiprocessing.TimeoutError:
+    #         raise TimeoutError(
+    #             f"Timeout to list {constants.TRAINJOB_KIND}'s components: {namespace}/{name}"
+    #         )
+    #     except Exception:
+    #         raise RuntimeError(
+    #             f"Failed to list {constants.TRAINJOB_KIND}'s components: {namespace}/{name}"
+    #         )
 
-        # Add the TrainJob status.
-        # TODO (andreyvelich): Discuss how we should show TrainJob status to SDK users.
-        if trainjob_crd.status:
-            for c in trainjob_crd.status.conditions:  # type: ignore
-                if c.type == "Created" and c.status == "True":
-                    status = "Created"
-                elif c.type == "Complete" and c.status == "True":
-                    status = "Succeeded"
-                elif c.type == "Failed" and c.status == "True":
-                    status = "Failed"
-            train_job.status = status
+    #     # Add the TrainJob status.
+    #     # TODO (andreyvelich): Discuss how we should show TrainJob status to SDK users.
+    #     if trainjob_crd.status:
+    #         for c in trainjob_crd.status.conditions:  # type: ignore
+    #             if c.type == "Created" and c.status == "True":
+    #                 status = "Created"
+    #             elif c.type == "Complete" and c.status == "True":
+    #                 status = "Succeeded"
+    #             elif c.type == "Failed" and c.status == "True":
+    #                 status = "Failed"
+    #         train_job.status = status
 
-        return train_job
+    #     return train_job

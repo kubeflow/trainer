@@ -19,6 +19,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow.trainer.models.io_k8s_apimachinery_pkg_apis_meta_v1_condition import IoK8sApimachineryPkgApisMetaV1Condition
 from kubeflow.trainer.models.trainer_v1alpha1_job_status import TrainerV1alpha1JobStatus
 from typing import Optional, Set
 from typing_extensions import Self
@@ -27,7 +28,7 @@ class TrainerV1alpha1TrainJobStatus(BaseModel):
     """
     TrainJobStatus represents the current status of TrainJob.
     """ # noqa: E501
-    conditions: Optional[List[V1Condition]] = Field(default=None, description="Conditions for the TrainJob.")
+    conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = Field(default=None, description="Conditions for the TrainJob.")
     jobs_status: Optional[List[TrainerV1alpha1JobStatus]] = Field(default=None, description="JobsStatus tracks the child Jobs in TrainJob.", alias="jobsStatus")
     __properties: ClassVar[List[str]] = ["conditions", "jobsStatus"]
 
@@ -96,7 +97,7 @@ class TrainerV1alpha1TrainJobStatus(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "conditions": [V1Condition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
+            "conditions": [IoK8sApimachineryPkgApisMetaV1Condition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
             "jobsStatus": [TrainerV1alpha1JobStatus.from_dict(_item) for _item in obj["jobsStatus"]] if obj.get("jobsStatus") is not None else None
         })
         return _obj

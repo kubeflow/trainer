@@ -19,6 +19,8 @@ import json
 
 from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow.trainer.models.io_k8s_apimachinery_pkg_apis_meta_v1_object_meta import IoK8sApimachineryPkgApisMetaV1ObjectMeta
+from kubeflow.trainer.models.jobset_v1alpha2_job_set_spec import JobsetV1alpha2JobSetSpec
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -26,7 +28,7 @@ class TrainerV1alpha1JobSetTemplateSpec(BaseModel):
     """
     JobSetTemplateSpec represents a template of the desired JobSet.
     """ # noqa: E501
-    metadata: Optional[V1ObjectMeta] = None
+    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = None
     spec: Optional[JobsetV1alpha2JobSetSpec] = None
     __properties: ClassVar[List[str]] = ["metadata", "spec"]
 
@@ -87,7 +89,7 @@ class TrainerV1alpha1JobSetTemplateSpec(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "metadata": V1ObjectMeta.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
+            "metadata": IoK8sApimachineryPkgApisMetaV1ObjectMeta.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
             "spec": JobsetV1alpha2JobSetSpec.from_dict(obj["spec"]) if obj.get("spec") is not None else None
         })
         return _obj

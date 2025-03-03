@@ -11,8 +11,8 @@ Name | Type | Description | Notes
 **node_selector** | **Dict[str, str]** | Override for the node selector to place Pod on the specific mode. | [optional] 
 **service_account_name** | **str** | Override for the service account. | [optional] 
 **target_jobs** | [**List[TrainerV1alpha1PodSpecOverrideTargetJob]**](TrainerV1alpha1PodSpecOverrideTargetJob.md) | TrainJobs is the training job replicas in the training runtime template to apply the overrides. | 
-**tolerations** | [**List[V1Toleration]**](V1Toleration.md) | Override for the Pod&#39;s tolerations. | [optional] 
-**volumes** | [**List[V1Volume]**](V1Volume.md) | Overrides for the Pod volume configuration. | [optional] 
+**tolerations** | [**List[IoK8sApiCoreV1Toleration]**](IoK8sApiCoreV1Toleration.md) | Override for the Pod&#39;s tolerations. | [optional] 
+**volumes** | [**List[IoK8sApiCoreV1Volume]**](IoK8sApiCoreV1Volume.md) | Overrides for the Pod volume configuration. | [optional] 
 
 ## Example
 

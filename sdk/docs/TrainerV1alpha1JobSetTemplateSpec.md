@@ -6,7 +6,7 @@ JobSetTemplateSpec represents a template of the desired JobSet.
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**metadata** | [**V1ObjectMeta**](V1ObjectMeta.md) |  | [optional] 
+**metadata** | [**IoK8sApimachineryPkgApisMetaV1ObjectMeta**](IoK8sApimachineryPkgApisMetaV1ObjectMeta.md) |  | [optional] 
 **spec** | [**JobsetV1alpha2JobSetSpec**](JobsetV1alpha2JobSetSpec.md) |  | [optional] 
 
 ## Example

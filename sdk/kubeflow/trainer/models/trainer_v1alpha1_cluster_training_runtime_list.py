@@ -19,6 +19,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow.trainer.models.io_k8s_apimachinery_pkg_apis_meta_v1_list_meta import IoK8sApimachineryPkgApisMetaV1ListMeta
 from kubeflow.trainer.models.trainer_v1alpha1_cluster_training_runtime import TrainerV1alpha1ClusterTrainingRuntime
 from typing import Optional, Set
 from typing_extensions import Self
@@ -30,7 +31,7 @@ class TrainerV1alpha1ClusterTrainingRuntimeList(BaseModel):
     api_version: Optional[StrictStr] = Field(default=None, description="APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources", alias="apiVersion")
     items: List[TrainerV1alpha1ClusterTrainingRuntime] = Field(description="List of ClusterTrainingRuntimes.")
     kind: Optional[StrictStr] = Field(default=None, description="Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds")
-    metadata: Optional[V1ListMeta] = None
+    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ListMeta] = None
     __properties: ClassVar[List[str]] = ["apiVersion", "items", "kind", "metadata"]
 
     model_config = ConfigDict(
@@ -97,7 +98,7 @@ class TrainerV1alpha1ClusterTrainingRuntimeList(BaseModel):
             "apiVersion": obj.get("apiVersion"),
             "items": [TrainerV1alpha1ClusterTrainingRuntime.from_dict(_item) for _item in obj["items"]] if obj.get("items") is not None else None,
             "kind": obj.get("kind"),
-            "metadata": V1ListMeta.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None
+            "metadata": IoK8sApimachineryPkgApisMetaV1ListMeta.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None
         })
         return _obj
 

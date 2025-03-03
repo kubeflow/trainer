@@ -19,6 +19,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow.trainer.models.io_k8s_apimachinery_pkg_apis_meta_v1_object_meta import IoK8sApimachineryPkgApisMetaV1ObjectMeta
 from kubeflow.trainer.models.trainer_v1alpha1_training_runtime_spec import TrainerV1alpha1TrainingRuntimeSpec
 from typing import Optional, Set
 from typing_extensions import Self
@@ -29,7 +30,7 @@ class TrainerV1alpha1TrainingRuntime(BaseModel):
     """ # noqa: E501
     api_version: Optional[StrictStr] = Field(default=None, description="APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources", alias="apiVersion")
     kind: Optional[StrictStr] = Field(default=None, description="Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds")
-    metadata: Optional[V1ObjectMeta] = None
+    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = None
     spec: Optional[TrainerV1alpha1TrainingRuntimeSpec] = None
     __properties: ClassVar[List[str]] = ["apiVersion", "kind", "metadata", "spec"]
 
@@ -92,7 +93,7 @@ class TrainerV1alpha1TrainingRuntime(BaseModel):
         _obj = cls.model_validate({
             "apiVersion": obj.get("apiVersion"),
             "kind": obj.get("kind"),
-            "metadata": V1ObjectMeta.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
+            "metadata": IoK8sApimachineryPkgApisMetaV1ObjectMeta.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
             "spec": TrainerV1alpha1TrainingRuntimeSpec.from_dict(obj["spec"]) if obj.get("spec") is not None else None
         })
         return _obj

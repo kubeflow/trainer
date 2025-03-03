@@ -19,6 +19,8 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow.trainer.models.io_k8s_api_core_v1_toleration import IoK8sApiCoreV1Toleration
+from kubeflow.trainer.models.io_k8s_api_core_v1_volume import IoK8sApiCoreV1Volume
 from kubeflow.trainer.models.trainer_v1alpha1_container_override import TrainerV1alpha1ContainerOverride
 from kubeflow.trainer.models.trainer_v1alpha1_pod_spec_override_target_job import TrainerV1alpha1PodSpecOverrideTargetJob
 from typing import Optional, Set
@@ -33,8 +35,8 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
     node_selector: Optional[Dict[str, StrictStr]] = Field(default=None, description="Override for the node selector to place Pod on the specific mode.", alias="nodeSelector")
     service_account_name: Optional[StrictStr] = Field(default=None, description="Override for the service account.", alias="serviceAccountName")
     target_jobs: List[TrainerV1alpha1PodSpecOverrideTargetJob] = Field(description="TrainJobs is the training job replicas in the training runtime template to apply the overrides.", alias="targetJobs")
-    tolerations: Optional[List[V1Toleration]] = Field(default=None, description="Override for the Pod's tolerations.")
-    volumes: Optional[List[V1Volume]] = Field(default=None, description="Overrides for the Pod volume configuration.")
+    tolerations: Optional[List[IoK8sApiCoreV1Toleration]] = Field(default=None, description="Override for the Pod's tolerations.")
+    volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="Overrides for the Pod volume configuration.")
     __properties: ClassVar[List[str]] = ["containers", "initContainers", "nodeSelector", "serviceAccountName", "targetJobs", "tolerations", "volumes"]
 
     model_config = ConfigDict(
@@ -128,8 +130,8 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
             "nodeSelector": obj.get("nodeSelector"),
             "serviceAccountName": obj.get("serviceAccountName"),
             "targetJobs": [TrainerV1alpha1PodSpecOverrideTargetJob.from_dict(_item) for _item in obj["targetJobs"]] if obj.get("targetJobs") is not None else None,
-            "tolerations": [V1Toleration.from_dict(_item) for _item in obj["tolerations"]] if obj.get("tolerations") is not None else None,
-            "volumes": [V1Volume.from_dict(_item) for _item in obj["volumes"]] if obj.get("volumes") is not None else None
+            "tolerations": [IoK8sApiCoreV1Toleration.from_dict(_item) for _item in obj["tolerations"]] if obj.get("tolerations") is not None else None,
+            "volumes": [IoK8sApiCoreV1Volume.from_dict(_item) for _item in obj["volumes"]] if obj.get("volumes") is not None else None
         })
         return _obj
 

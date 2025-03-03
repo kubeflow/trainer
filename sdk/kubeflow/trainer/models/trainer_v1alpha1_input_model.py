@@ -19,6 +19,8 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow.trainer.models.io_k8s_api_core_v1_env_var import IoK8sApiCoreV1EnvVar
+from kubeflow.trainer.models.io_k8s_api_core_v1_local_object_reference import IoK8sApiCoreV1LocalObjectReference
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -26,8 +28,8 @@ class TrainerV1alpha1InputModel(BaseModel):
     """
     InputModel represents the desired pre-trained model configuration.
     """ # noqa: E501
-    env: Optional[List[V1EnvVar]] = Field(default=None, description="List of environment variables to set in the model initializer container. These values will be merged with the TrainingRuntime's model initializer environments.")
-    secret_ref: Optional[V1LocalObjectReference] = Field(default=None, alias="secretRef")
+    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="List of environment variables to set in the model initializer container. These values will be merged with the TrainingRuntime's model initializer environments.")
+    secret_ref: Optional[IoK8sApiCoreV1LocalObjectReference] = Field(default=None, alias="secretRef")
     storage_uri: Optional[StrictStr] = Field(default=None, description="Storage uri for the model provider.", alias="storageUri")
     __properties: ClassVar[List[str]] = ["env", "secretRef", "storageUri"]
 
@@ -92,8 +94,8 @@ class TrainerV1alpha1InputModel(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "env": [V1EnvVar.from_dict(_item) for _item in obj["env"]] if obj.get("env") is not None else None,
-            "secretRef": V1LocalObjectReference.from_dict(obj["secretRef"]) if obj.get("secretRef") is not None else None,
+            "env": [IoK8sApiCoreV1EnvVar.from_dict(_item) for _item in obj["env"]] if obj.get("env") is not None else None,
+            "secretRef": IoK8sApiCoreV1LocalObjectReference.from_dict(obj["secretRef"]) if obj.get("secretRef") is not None else None,
             "storageUri": obj.get("storageUri")
         })
         return _obj

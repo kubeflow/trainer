@@ -19,6 +19,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow.trainer.models.io_k8s_apimachinery_pkg_apis_meta_v1_object_meta import IoK8sApimachineryPkgApisMetaV1ObjectMeta
 from kubeflow.trainer.models.trainer_v1alpha1_train_job_spec import TrainerV1alpha1TrainJobSpec
 from kubeflow.trainer.models.trainer_v1alpha1_train_job_status import TrainerV1alpha1TrainJobStatus
 from typing import Optional, Set
@@ -30,7 +31,7 @@ class TrainerV1alpha1TrainJob(BaseModel):
     """ # noqa: E501
     api_version: Optional[StrictStr] = Field(default=None, description="APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources", alias="apiVersion")
     kind: Optional[StrictStr] = Field(default=None, description="Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds")
-    metadata: Optional[V1ObjectMeta] = None
+    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = None
     spec: Optional[TrainerV1alpha1TrainJobSpec] = None
     status: Optional[TrainerV1alpha1TrainJobStatus] = None
     __properties: ClassVar[List[str]] = ["apiVersion", "kind", "metadata", "spec", "status"]
@@ -97,7 +98,7 @@ class TrainerV1alpha1TrainJob(BaseModel):
         _obj = cls.model_validate({
             "apiVersion": obj.get("apiVersion"),
             "kind": obj.get("kind"),
-            "metadata": V1ObjectMeta.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
+            "metadata": IoK8sApimachineryPkgApisMetaV1ObjectMeta.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
             "spec": TrainerV1alpha1TrainJobSpec.from_dict(obj["spec"]) if obj.get("spec") is not None else None,
             "status": TrainerV1alpha1TrainJobStatus.from_dict(obj["status"]) if obj.get("status") is not None else None
         })

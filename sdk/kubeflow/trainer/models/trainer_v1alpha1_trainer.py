@@ -19,6 +19,8 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow.trainer.models.io_k8s_api_core_v1_env_var import IoK8sApiCoreV1EnvVar
+from kubeflow.trainer.models.io_k8s_api_core_v1_resource_requirements import IoK8sApiCoreV1ResourceRequirements
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -28,11 +30,11 @@ class TrainerV1alpha1Trainer(BaseModel):
     """ # noqa: E501
     args: Optional[List[StrictStr]] = Field(default=None, description="Arguments to the entrypoint for the training container.")
     command: Optional[List[StrictStr]] = Field(default=None, description="Entrypoint commands for the training container.")
-    env: Optional[List[V1EnvVar]] = Field(default=None, description="List of environment variables to set in the training container. These values will be merged with the TrainingRuntime's trainer environments.")
+    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="List of environment variables to set in the training container. These values will be merged with the TrainingRuntime's trainer environments.")
     image: Optional[StrictStr] = Field(default=None, description="Docker image for the training container.")
     num_nodes: Optional[StrictInt] = Field(default=None, description="Number of training nodes.", alias="numNodes")
-    num_proc_per_node: Optional[object] = Field(default=None, alias="numProcPerNode")
-    resources_per_node: Optional[V1ResourceRequirements] = Field(default=None, alias="resourcesPerNode")
+    num_proc_per_node: Optional[StrictStr] = Field(default=None, description="IntOrString is a type that can hold an int32 or a string.  When used in JSON or YAML marshalling and unmarshalling, it produces or consumes the inner type.  This allows you to have, for example, a JSON field that can accept a name or number.", alias="numProcPerNode")
+    resources_per_node: Optional[IoK8sApiCoreV1ResourceRequirements] = Field(default=None, alias="resourcesPerNode")
     __properties: ClassVar[List[str]] = ["args", "command", "env", "image", "numNodes", "numProcPerNode", "resourcesPerNode"]
 
     model_config = ConfigDict(
@@ -81,9 +83,6 @@ class TrainerV1alpha1Trainer(BaseModel):
                 if _item_env:
                     _items.append(_item_env.to_dict())
             _dict['env'] = _items
-        # override the default output from pydantic by calling `to_dict()` of num_proc_per_node
-        if self.num_proc_per_node:
-            _dict['numProcPerNode'] = self.num_proc_per_node.to_dict()
         # override the default output from pydantic by calling `to_dict()` of resources_per_node
         if self.resources_per_node:
             _dict['resourcesPerNode'] = self.resources_per_node.to_dict()
@@ -101,11 +100,11 @@ class TrainerV1alpha1Trainer(BaseModel):
         _obj = cls.model_validate({
             "args": obj.get("args"),
             "command": obj.get("command"),
-            "env": [V1EnvVar.from_dict(_item) for _item in obj["env"]] if obj.get("env") is not None else None,
+            "env": [IoK8sApiCoreV1EnvVar.from_dict(_item) for _item in obj["env"]] if obj.get("env") is not None else None,
             "image": obj.get("image"),
             "numNodes": obj.get("numNodes"),
-            "numProcPerNode": object.from_dict(obj["numProcPerNode"]) if obj.get("numProcPerNode") is not None else None,
-            "resourcesPerNode": V1ResourceRequirements.from_dict(obj["resourcesPerNode"]) if obj.get("resourcesPerNode") is not None else None
+            "numProcPerNode": obj.get("numProcPerNode"),
+            "resourcesPerNode": IoK8sApiCoreV1ResourceRequirements.from_dict(obj["resourcesPerNode"]) if obj.get("resourcesPerNode") is not None else None
         })
         return _obj
 

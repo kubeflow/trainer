@@ -7,7 +7,7 @@ TorchMLPolicySource represents a PyTorch runtime configuration.
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **elastic_policy** | [**TrainerV1alpha1TorchElasticPolicy**](TrainerV1alpha1TorchElasticPolicy.md) |  | [optional] 
-**num_proc_per_node** | [**object**](K8sIoApimachineryPkgUtilIntstrIntOrString.md) |  | [optional] 
+**num_proc_per_node** | **str** | IntOrString is a type that can hold an int32 or a string.  When used in JSON or YAML marshalling and unmarshalling, it produces or consumes the inner type.  This allows you to have, for example, a JSON field that can accept a name or number. | [optional] 
 
 ## Example
 

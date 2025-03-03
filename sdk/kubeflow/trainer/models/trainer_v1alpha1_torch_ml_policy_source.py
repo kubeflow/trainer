@@ -17,7 +17,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow.trainer.models.trainer_v1alpha1_torch_elastic_policy import TrainerV1alpha1TorchElasticPolicy
 from typing import Optional, Set
@@ -28,7 +28,7 @@ class TrainerV1alpha1TorchMLPolicySource(BaseModel):
     TorchMLPolicySource represents a PyTorch runtime configuration.
     """ # noqa: E501
     elastic_policy: Optional[TrainerV1alpha1TorchElasticPolicy] = Field(default=None, alias="elasticPolicy")
-    num_proc_per_node: Optional[object] = Field(default=None, alias="numProcPerNode")
+    num_proc_per_node: Optional[StrictStr] = Field(default=None, description="IntOrString is a type that can hold an int32 or a string.  When used in JSON or YAML marshalling and unmarshalling, it produces or consumes the inner type.  This allows you to have, for example, a JSON field that can accept a name or number.", alias="numProcPerNode")
     __properties: ClassVar[List[str]] = ["elasticPolicy", "numProcPerNode"]
 
     model_config = ConfigDict(
@@ -73,9 +73,6 @@ class TrainerV1alpha1TorchMLPolicySource(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of elastic_policy
         if self.elastic_policy:
             _dict['elasticPolicy'] = self.elastic_policy.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of num_proc_per_node
-        if self.num_proc_per_node:
-            _dict['numProcPerNode'] = self.num_proc_per_node.to_dict()
         return _dict
 
     @classmethod
@@ -89,7 +86,7 @@ class TrainerV1alpha1TorchMLPolicySource(BaseModel):
 
         _obj = cls.model_validate({
             "elasticPolicy": TrainerV1alpha1TorchElasticPolicy.from_dict(obj["elasticPolicy"]) if obj.get("elasticPolicy") is not None else None,
-            "numProcPerNode": object.from_dict(obj["numProcPerNode"]) if obj.get("numProcPerNode") is not None else None
+            "numProcPerNode": obj.get("numProcPerNode")
         })
         return _obj
 

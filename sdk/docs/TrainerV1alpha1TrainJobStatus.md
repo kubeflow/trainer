@@ -6,7 +6,7 @@ TrainJobStatus represents the current status of TrainJob.
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**conditions** | [**List[V1Condition]**](V1Condition.md) | Conditions for the TrainJob. | [optional] 
+**conditions** | [**List[IoK8sApimachineryPkgApisMetaV1Condition]**](IoK8sApimachineryPkgApisMetaV1Condition.md) | Conditions for the TrainJob. | [optional] 
 **jobs_status** | [**List[TrainerV1alpha1JobStatus]**](TrainerV1alpha1JobStatus.md) | JobsStatus tracks the child Jobs in TrainJob. | [optional] 
 
 ## Example
