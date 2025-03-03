@@ -56,7 +56,11 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				RuntimeSpec(
 					testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
 						InitContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-						NumNodes(100).
+						WithMLPolicy(
+							testingutil.MakeMLPolicyWrapper().
+								WithNumNodes(100).
+								Obj(),
+						).
 						ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 						PodGroupPolicyCoschedulingSchedulingTimeout(120).
 						Obj(),
@@ -100,7 +104,11 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 		"succeeded to build JobSet with NumNodes from the Runtime and container from the TrainJob.": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-					NumNodes(100).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(100).
+							Obj(),
+					).
 					ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					ContainerTrainerEnv(
 						[]corev1.EnvVar{
@@ -132,7 +140,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 									Name:  "TRAIN_JOB_CUSTOM",
 									Value: "test:trainjob",
 								},
-							},
+							}...,
 						).
 						Obj(),
 				).
@@ -165,7 +173,11 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
 					InitContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					NumNodes(100).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(100).
+							Obj(),
+					).
 					ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Obj(),
 			).Obj(),
@@ -264,7 +276,12 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 		"succeeded to build JobSet with Torch values from the TrainJob": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-					TorchPolicy(100, intstr.FromString("auto")).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(100).
+							TorchPolicy("auto", nil).
+							Obj(),
+					).
 					ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Obj(),
 			).Obj(),
@@ -318,7 +335,12 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 		"succeeded to build JobSet with Torch values from the Runtime and envs.": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-					TorchPolicy(100, intstr.FromString("auto")).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(100).
+							TorchPolicy("auto", nil).
+							Obj(),
+					).
 					ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					ContainerTrainerEnv(
 						[]corev1.EnvVar{
@@ -350,7 +372,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 									Name:  "TRAIN_JOB_CUSTOM",
 									Value: "test:trainjob",
 								},
-							},
+							}...,
 						).
 						Obj(),
 				).

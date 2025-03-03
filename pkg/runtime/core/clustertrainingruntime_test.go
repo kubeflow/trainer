@@ -48,7 +48,11 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Spec).
 					InitContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					NumNodes(100).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(100).
+							Obj(),
+					).
 					ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					PodGroupPolicyCoschedulingSchedulingTimeout(120).
 					Obj(),
