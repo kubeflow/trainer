@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -30,12 +31,44 @@ import (
 
 // Generate Kubeflow Training OpenAPI specification.
 func main() {
+	// Get Kubernetes and JobSet version
+	var k8sVersion string
+	var jobSetVersion string
+
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		fmt.Println("Failed to read build info")
+		return
+	}
+
+	for _, dep := range info.Deps {
+		if dep.Path == "k8s.io/api" {
+			k8sVersion = strings.Replace(dep.Version, "v0.", "v1.", -1)
+		} else if dep.Path == "sigs.k8s.io/jobset" {
+			jobSetVersion = dep.Version
+		}
+	}
+	if k8sVersion == "" || jobSetVersion == "" {
+		fmt.Println("OpenAPI spec generation failed. Unable to get Kubernetes and JobSet version")
+		return
+	}
+
+	k8sOpenAPISpec := fmt.Sprintf("https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/%s/api/openapi-spec/swagger.json", k8sVersion)
+	// jobSetOpenAPISpec := fmt.Sprintf("https://raw.githubusercontent.com/kubernetes-sigs/jobset/refs/tags/%s/hack/python-sdk/swagger.json", jobSetVersion)
+	// TODO (andreyvelich): Use the JobSet source when PR is merged.
+	jobSetOpenAPISpec := "https://raw.githubusercontent.com/andreyvelich/jobset/refs/heads/fix-swagger-ref/hack/python-sdk/swagger.json"
 
 	var oAPIDefs = map[string]common.OpenAPIDefinition{}
 	defs := spec.Definitions{}
 
 	refCallback := func(name string) spec.Ref {
-		return spec.MustCreateRef("#/definitions/" + common.EscapeJsonPointer(swaggify(name)))
+		if strings.HasPrefix(name, "k8s.io") {
+			return spec.MustCreateRef(k8sOpenAPISpec + "#/definitions/" + swaggify(name))
+		} else if strings.HasPrefix(name, "sigs.k8s.io/jobset") {
+			return spec.MustCreateRef(jobSetOpenAPISpec + "#/definitions/" + swaggify(name))
+		}
+		return spec.MustCreateRef("#/definitions/" + swaggify(name))
+
 	}
 
 	for k, v := range trainer.GetOpenAPIDefinitions(refCallback) {
@@ -67,8 +100,7 @@ func main() {
 func swaggify(name string) string {
 	name = strings.Replace(name, "github.com/kubeflow/trainer/pkg/apis/", "", -1)
 	name = strings.Replace(name, "sigs.k8s.io/jobset/api/", "", -1)
-	name = strings.Replace(name, "k8s.io/api/core/", "", -1)
-	name = strings.Replace(name, "k8s.io/apimachinery/pkg/apis/meta/", "", -1)
+	name = strings.Replace(name, "k8s.io", "io.k8s", -1)
 	name = strings.Replace(name, "/", ".", -1)
 	return name
 }

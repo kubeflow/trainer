@@ -20,7 +20,7 @@
         "metadata": {
           "description": "Standard object's metadata.",
           "default": {},
-          "$ref": "#/definitions/v1.ObjectMeta"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
         },
         "spec": {
           "description": "Specification of the desired ClusterTrainingRuntime.",
@@ -55,7 +55,7 @@
         "metadata": {
           "description": "Standard list metadata.",
           "default": {},
-          "$ref": "#/definitions/v1.ListMeta"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
         }
       }
     },
@@ -89,7 +89,7 @@
           "type": "array",
           "items": {
             "default": {},
-            "$ref": "#/definitions/v1.EnvVar"
+            "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.EnvVar"
           },
           "x-kubernetes-list-map-keys": [
             "name"
@@ -101,7 +101,7 @@
           "type": "array",
           "items": {
             "default": {},
-            "$ref": "#/definitions/v1.EnvFromSource"
+            "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.EnvFromSource"
           },
           "x-kubernetes-list-type": "atomic"
         },
@@ -115,7 +115,7 @@
           "type": "array",
           "items": {
             "default": {},
-            "$ref": "#/definitions/v1.VolumeMount"
+            "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.VolumeMount"
           },
           "x-kubernetes-list-map-keys": [
             "name"
@@ -144,7 +144,7 @@
           "type": "array",
           "items": {
             "default": {},
-            "$ref": "#/definitions/v1.EnvVar"
+            "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.EnvVar"
           },
           "x-kubernetes-list-map-keys": [
             "name"
@@ -153,7 +153,7 @@
         },
         "secretRef": {
           "description": "Reference to the secret with credentials to download dataset. Secret must be created in the TrainJob's namespace.",
-          "$ref": "#/definitions/v1.LocalObjectReference"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.LocalObjectReference"
         },
         "storageUri": {
           "description": "Storage uri for the dataset provider.",
@@ -170,7 +170,7 @@
           "type": "array",
           "items": {
             "default": {},
-            "$ref": "#/definitions/v1.EnvVar"
+            "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.EnvVar"
           },
           "x-kubernetes-list-map-keys": [
             "name"
@@ -179,7 +179,7 @@
         },
         "secretRef": {
           "description": "Reference to the secret with credentials to download model. Secret must be created in the TrainJob's namespace.",
-          "$ref": "#/definitions/v1.LocalObjectReference"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.LocalObjectReference"
         },
         "storageUri": {
           "description": "Storage uri for the model provider.",
@@ -194,12 +194,12 @@
         "metadata": {
           "description": "Metadata for custom JobSet's labels and annotations. JobSet name and namespace is equal to the TrainJob's name and namespace.",
           "default": {},
-          "$ref": "#/definitions/v1.ObjectMeta"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
         },
         "spec": {
           "description": "Specification of the desired JobSet which will be created from TrainJob.",
           "default": {},
-          "$ref": "#/definitions/jobset.v1alpha2.JobSetSpec"
+          "$ref": "https://raw.githubusercontent.com/andreyvelich/jobset/refs/heads/fix-swagger-ref/hack/python-sdk/swagger.json#/definitions/jobset.v1alpha2.JobSetSpec"
         }
       }
     },
@@ -330,7 +330,7 @@
           "type": "array",
           "items": {
             "default": {},
-            "$ref": "#/definitions/v1.EnvVar"
+            "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.EnvVar"
           },
           "x-kubernetes-list-map-keys": [
             "name"
@@ -339,7 +339,7 @@
         },
         "secretRef": {
           "description": "Reference to the secret with credentials to export model. Secret must be created in the TrainJob's namespace.",
-          "$ref": "#/definitions/v1.LocalObjectReference"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.LocalObjectReference"
         },
         "storageUri": {
           "description": "Storage uri for the model exporter.",
@@ -424,7 +424,7 @@
           "type": "array",
           "items": {
             "default": {},
-            "$ref": "#/definitions/v1.Toleration"
+            "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.Toleration"
           },
           "x-kubernetes-list-type": "atomic"
         },
@@ -433,7 +433,7 @@
           "type": "array",
           "items": {
             "default": {},
-            "$ref": "#/definitions/v1.Volume"
+            "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.Volume"
           },
           "x-kubernetes-list-map-keys": [
             "name"
@@ -496,7 +496,7 @@
           "type": "array",
           "items": {
             "default": {},
-            "$ref": "#/definitions/k8s.io.api.autoscaling.v2.MetricSpec"
+            "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.autoscaling.v2.MetricSpec"
           },
           "x-kubernetes-list-type": "atomic"
         },
@@ -517,7 +517,7 @@
         },
         "numProcPerNode": {
           "description": "Number of processes per node. This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI. Supported values: `auto`, `cpu`, `gpu`, or int value. Defaults to `auto`.",
-          "$ref": "#/definitions/k8s.io.apimachinery.pkg.util.intstr.IntOrString"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
         }
       }
     },
@@ -536,7 +536,7 @@
         "metadata": {
           "description": "Standard object's metadata.",
           "default": {},
-          "$ref": "#/definitions/v1.ObjectMeta"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
         },
         "spec": {
           "description": "Specification of the desired TrainJob.",
@@ -576,7 +576,7 @@
         "metadata": {
           "description": "Standard list metadata.",
           "default": {},
-          "$ref": "#/definitions/v1.ListMeta"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
         }
       }
     },
@@ -648,7 +648,7 @@
           "type": "array",
           "items": {
             "default": {},
-            "$ref": "#/definitions/v1.Condition"
+            "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
           },
           "x-kubernetes-list-map-keys": [
             "type"
@@ -698,7 +698,7 @@
           "type": "array",
           "items": {
             "default": {},
-            "$ref": "#/definitions/v1.EnvVar"
+            "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.EnvVar"
           },
           "x-kubernetes-list-map-keys": [
             "name"
@@ -716,11 +716,11 @@
         },
         "numProcPerNode": {
           "description": "Number of processes/workers/slots on every training node. For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set. For the MPI runtime only int value can be set.",
-          "$ref": "#/definitions/k8s.io.apimachinery.pkg.util.intstr.IntOrString"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
         },
         "resourcesPerNode": {
           "description": "Compute resources for each training node.",
-          "$ref": "#/definitions/v1.ResourceRequirements"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.ResourceRequirements"
         }
       }
     },
@@ -739,7 +739,7 @@
         "metadata": {
           "description": "Standard object's metadata.",
           "default": {},
-          "$ref": "#/definitions/v1.ObjectMeta"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
         },
         "spec": {
           "description": "Specification of the desired TrainingRuntime.",
@@ -774,7 +774,7 @@
         "metadata": {
           "description": "Standard list metadata.",
           "default": {},
-          "$ref": "#/definitions/v1.ListMeta"
+          "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/v1.32.2/api/openapi-spec/swagger.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
         }
       }
     },
