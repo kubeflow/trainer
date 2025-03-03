@@ -35,7 +35,7 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
     dataset_config: Optional[TrainerV1alpha1DatasetConfig] = Field(default=None, alias="datasetConfig")
     labels: Optional[Dict[str, StrictStr]] = Field(default=None, description="Labels to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
     managed_by: Optional[StrictStr] = Field(default=None, description="ManagedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`", alias="managedBy")
-    model_config: Optional[TrainerV1alpha1ModelConfig] = Field(default=None, alias="modelConfig")
+    model_config_crd: Optional[TrainerV1alpha1ModelConfig] = Field(default=None, alias="modelConfig")
     pod_spec_overrides: Optional[List[TrainerV1alpha1PodSpecOverride]] = Field(default=None, description="Custom overrides for the training runtime.", alias="podSpecOverrides")
     runtime_ref: TrainerV1alpha1RuntimeRef = Field(alias="runtimeRef")
     suspend: Optional[StrictBool] = Field(default=None, description="Whether the controller should suspend the running TrainJob. Defaults to false.")
@@ -84,9 +84,9 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of dataset_config
         if self.dataset_config:
             _dict['datasetConfig'] = self.dataset_config.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of model_config
-        if self.model_config:
-            _dict['modelConfig'] = self.model_config.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of model_config_crd
+        if self.model_config_crd:
+            _dict['modelConfig'] = self.model_config_crd.to_dict()
         # override the default output from pydantic by calling `to_dict()` of each item in pod_spec_overrides (list)
         _items = []
         if self.pod_spec_overrides:

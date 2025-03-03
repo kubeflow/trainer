@@ -39,28 +39,30 @@ docker run --rm \
   -p=packageVersion="${SDK_VERSION}" \
   --global-property models,modelTests=false,supportingFiles=__init__.py
 
-# sleep 4
-
 echo "Removing unused files for the Python SDK"
 rm -rf ${SDK_OUTPUT_PATH}/.openapi-generator
 rm -rf ${SDK_OUTPUT_PATH}/.github
 rm -rf ${SDK_OUTPUT_PATH}/test
 
 # Revert manually created files.
-# git checkout ${SDK_OUTPUT_PATH}/README.md
-# git checkout ${SDK_OUTPUT_PATH}/pyproject.toml
-# git checkout ${SDK_OUTPUT_PATH}/kubeflow/trainer/__init__.py
+git checkout ${SDK_OUTPUT_PATH}/kubeflow/trainer/__init__.py
 
-# # Manually modify the SDK version in the __init__.py file.
-# if [[ $(uname) == "Darwin" ]]; then
-#   sed -i '' -e "s/__version__.*/__version__ = \"${SDK_VERSION}\"/" ${SDK_OUTPUT_PATH}/kubeflow/trainer/__init__.py
-# else
-#   sed -i -e "s/__version__.*/__version__ = \"${SDK_VERSION}\"/" ${SDK_OUTPUT_PATH}/kubeflow/trainer/__init__.py
-# fi
+# Manually modify the SDK version in the __init__.py file.
+if [[ $(uname) == "Darwin" ]]; then
+  sed -i '' -e "s/__version__.*/__version__ = \"${SDK_VERSION}\"/" ${SDK_OUTPUT_PATH}/kubeflow/trainer/__init__.py
+else
+  sed -i -e "s/__version__.*/__version__ = \"${SDK_VERSION}\"/" ${SDK_OUTPUT_PATH}/kubeflow/trainer/__init__.py
+fi
 
-# Kubeflow models must have Kubernetes models to perform serialization.
-# cat <<EOF >>${SDK_OUTPUT_PATH}/kubeflow/trainer/models/__init__.py
-# # Import Kubernetes and JobSet models for the serialization.
-# from kubernetes.client import *
-# from jobset.models import *
-# EOF
+# The `model_config` property conflicts with Pydantic name.
+# Therefore, we rename it to `model_config_crd`
+TRAINJOB_SPEC_MODEL=${SDK_OUTPUT_PATH}/kubeflow/trainer/models/trainer_v1alpha1_train_job_spec.py
+if [[ $(uname) == "Darwin" ]]; then
+  sed -i '' -e "s/model_config/model_config_crd/" ${TRAINJOB_SPEC_MODEL}
+  sed -i '' -e "s/model_config_crd = ConfigDict/model_config = ConfigDict/" ${TRAINJOB_SPEC_MODEL}
+  sed -i '' -e "s/kubeflow.trainer.models.trainer_v1alpha1_model_config_crd/kubeflow.trainer.models.trainer_v1alpha1_model_config/" ${TRAINJOB_SPEC_MODEL}
+else
+  sed -i -e "s/model_config/model_config_crd/" ${TRAINJOB_SPEC_MODEL}
+  sed -i -e "s/model_config_crd = ConfigDict/model_config = ConfigDict/" ${TRAINJOB_SPEC_MODEL}
+  sed -i -e "s/kubeflow.trainer.models.trainer_v1alpha1_model_config_crd/kubeflow.trainer.models.trainer_v1alpha1_model_config/" ${TRAINJOB_SPEC_MODEL}
+fi
