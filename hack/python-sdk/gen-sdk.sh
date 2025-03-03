@@ -30,7 +30,7 @@ SWAGGER_CODEGEN_FILE="api/openapi-spec/swagger.json"
 
 # We need to add user to allow container override existing files.
 echo "Generating Python SDK for Kubeflow Trainer V2 ..."
-docker run --rm \
+docker run --user "$(id -u)":"$(id -g)" --rm \
   -v "${TRAINER_ROOT}:/local" docker.io/openapitools/openapi-generator-cli:${OPENAPI_GENERATOR_VERSION} generate \
   -g python \
   -i "local/${SWAGGER_CODEGEN_FILE}" \
@@ -40,7 +40,6 @@ docker run --rm \
   --global-property models,modelTests=false,modelDocs=false,supportingFiles=__init__.py
 
 echo "Removing unused files for the Python SDK"
-chmod 777 ${SDK_OUTPUT_PATH}/.openapi-generator
 git clean -f ${SDK_OUTPUT_PATH}/.openapi-generator
 git clean -f ${SDK_OUTPUT_PATH}/.github
 git clean -f ${SDK_OUTPUT_PATH}/test
