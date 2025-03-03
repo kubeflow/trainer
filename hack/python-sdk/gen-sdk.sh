@@ -37,9 +37,10 @@ docker run --rm \
   -c "local/${SWAGGER_CODEGEN_CONF}" \
   -o "local/${SDK_OUTPUT_PATH}" \
   -p=packageVersion="${SDK_VERSION}" \
-  --global-property models,modelTests=false,supportingFiles=__init__.py
+  --global-property models,modelTests=false,modelDocs=false,supportingFiles=__init__.py
 
 echo "Removing unused files for the Python SDK"
+chmod 777 ${SDK_OUTPUT_PATH}/.openapi-generator
 git clean -f ${SDK_OUTPUT_PATH}/.openapi-generator
 git clean -f ${SDK_OUTPUT_PATH}/.github
 git clean -f ${SDK_OUTPUT_PATH}/test
