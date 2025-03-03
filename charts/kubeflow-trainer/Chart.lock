@@ -1,0 +1,6 @@
+dependencies:
+- name: jobset
+  repository: oci://us-central1-docker.pkg.dev/k8s-staging-images/charts
+  version: v0.8.0
+digest: sha256:236ca952c5f5b967f849f33d104ed112de9a939b1ddacc9c03778822dfcb822a
+generated: "2025-03-03T10:23:37.760252+08:00"

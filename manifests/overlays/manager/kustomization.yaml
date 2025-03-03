@@ -1,3 +1,19 @@
+#
+# Copyright 2024 The Kubeflow authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -7,19 +23,7 @@ namespace: kubeflow-system
 resources:
   - namespace.yaml
   - ../../base/crds
-  - ../../base/manager
   - ../../base/rbac
+  - ../../base/controller
   - ../../base/webhook
   - ../../third-party/jobset # Comment this line if JobSet is installed on the Kubernetes cluster.
-
-# Update the Kubeflow Trainer controller manager image tag.
-images:
-  - name: kubeflow/trainer-controller-manager
-    newTag: latest
-
-# Secret for the Kubeflow Training webhook.
-secretGenerator:
-  - name: kubeflow-trainer-webhook-cert
-    namespace: kubeflow-system
-    options:
-      disableNameSuffixHash: true
