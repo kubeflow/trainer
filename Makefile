@@ -142,3 +142,7 @@ test-e2e: ## Run Go e2e test.
 .PHONY: test-e2e-notebook
 test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
 	papermill $(NOTEBOOK_INPUT) $(NOTEBOOK_OUTPUT) --execution-timeout $(TIMEOUT)
+	echo -e "\n\n\n------------------------"
+	echo "Notebook is finished"
+	cat trainer_output.ipynb
+	cat $(NOTEBOOK_OUTPUT)

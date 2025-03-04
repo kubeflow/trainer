@@ -58,11 +58,8 @@ jobs:
       - name: Run e2e test for example Notebooks.
         run: |
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb TIMEOUT=900
-          echo -e "\n\n\n------------------------"
-          echo "Notebook is finished"
-          cat trainer_output.ipynb
-          echo -e "\n\n\n------------------------"
 
+          echo -e "\n\n\nCheck Kubernetes resources"
           set -x
           kubectl describe pod
           kubectl describe trainjob
