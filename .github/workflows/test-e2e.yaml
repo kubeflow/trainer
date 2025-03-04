@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         # Kubernetes versions for e2e tests on Kind cluster.
-        kubernetes-version: ["1.29.3", "1.30.0", "1.31.0"]
+        kubernetes-version: ["1.29.0", "1.30.0", "1.31.0"]
 
     steps:
       - name: Check out code
@@ -61,7 +61,6 @@ jobs:
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb TIMEOUT=900
 
           echo -e "\n\n\nCheck Kubernetes resources"
-          set -x
           kubectl describe pod
           kubectl describe trainjob
           kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
