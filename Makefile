@@ -29,14 +29,16 @@ help: ## Display this help.
 
 ##@ Development
 
+K8S_VERSION ?= 1.32.0
+
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # Tool Binaries
 LOCALBIN ?= $(PROJECT_DIR)/bin
+
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
-
-K8S_VERSION ?= 1.32.0
+KIND ?= $(LOCALBIN)/kind
 
 # Instructions to download tools for development.
 .PHONY: envtest
@@ -46,6 +48,10 @@ envtest: ## Download the setup-envtest binary if required.
 .PHONY: controller-gen
 controller-gen: ## Download the controller-gen binary if required.
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.2
+
+.PHONY: kind
+kind: ## Download Kind binary if required.
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind@$(shell go list -m -f '{{.Version}}' sigs.k8s.io/kind)
 
 # Download external CRDs for Go integration testings.
 EXTERNAL_CRDS_DIR ?= $(PROJECT_DIR)/manifests/external-crds
@@ -128,8 +134,8 @@ test-python-integration: ## Run Python integration test.
 	pytest ./test/integration/initializer
 
 .PHONY: test-e2e-setup-cluster
-test-e2e-setup-cluster: ## Setup Kind cluster for e2e test.
-	K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
+test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.
+	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
 
 .PHONY: test-e2e
 test-e2e: ## Run Go e2e test.
@@ -138,7 +144,7 @@ test-e2e: ## Run Go e2e test.
 # Input and output location for Notebooks executed with Papermill.
 NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
 NOTEBOOK_OUTPUT=$(PROJECT_DIR)/trainer_output.ipynb
-TIMEOUT=900
+PAPERMILL_TIMEOUT=900
 .PHONY: test-e2e-notebook
 test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
-	NOTEBOOK_INPUT=$(NOTEBOOK_INPUT) NOTEBOOK_OUTPUT=$(NOTEBOOK_OUTPUT) TIMEOUT=$(TIMEOUT) ./hack/e2e-run-notebook.sh
+	NOTEBOOK_INPUT=$(NOTEBOOK_INPUT) NOTEBOOK_OUTPUT=$(NOTEBOOK_OUTPUT) PAPERMILL_TIMEOUT=$(PAPERMILL_TIMEOUT) ./hack/e2e-run-notebook.sh

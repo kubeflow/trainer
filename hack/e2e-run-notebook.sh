@@ -31,8 +31,8 @@ if [ -z "${NOTEBOOK_OUTPUT}" ]; then
     exit 1
 fi
 
-if [ -z "${TIMEOUT}" ]; then
-    echo "TIMEOUT env variable must be set to run this script."
+if [ -z "${PAPERMILL_TIMEOUT}" ]; then
+    echo "PAPERMILL_TIMEOUT env variable must be set to run this script."
     exit 1
 fi
 
@@ -46,4 +46,4 @@ print_results() {
     kubectl wait trainjob --for=condition=Complete --all --timeout 3s
 }
 
-papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" --execution-timeout "${TIMEOUT}" && print_results || (print_results && exit 1)
+papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" --execution-timeout "${PAPERMILL_TIMEOUT}" && print_results || (print_results && exit 1)

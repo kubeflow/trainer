@@ -21,7 +21,8 @@ set -o nounset
 set -o pipefail
 set -x
 
-# Kubernetes version for Kind cluster.
+# Configure variables.
+KIND=${KIND:-./bin/kind}
 K8S_VERSION=${K8S_VERSION:-1.32.0}
 KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
 NAMESPACE="kubeflow-system"
@@ -38,7 +39,7 @@ cd manifests/overlays/manager
 kustomize edit set image kubeflow/trainer-controller-manager=${CONTROLLER_MANAGER_CI_IMAGE}
 
 echo "Create Kind cluster and load Kubeflow Trainer images"
-cat <<EOF | kind create cluster --image "${KIND_NODE_VERSION}" --config=-
+cat <<EOF | ${KIND} create cluster --image "${KIND_NODE_VERSION}" --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -49,7 +50,7 @@ nodes:
   - role: worker
   - role: worker
 EOF
-kind load docker-image ${CONTROLLER_MANAGER_CI_IMAGE}
+${KIND} load docker-image ${CONTROLLER_MANAGER_CI_IMAGE}
 
 echo "Deploy Kubeflow Trainer control plane"
 kubectl apply --server-side -k .
