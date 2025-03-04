@@ -208,14 +208,16 @@ Related changes:
 1. Add `Args` fields to Info (`pkg/runtime/runtime.go`).
 
 ```go
+// We use SSA to reconcile TrainJob now.
+// Ref: https://github.com/kubeflow/trainer/pull/2431
 type Trainer struct {
     NumNodes       *int32
     NumProcPerNode string
-    Env           []corev1.EnvVar
-    Args          []string
-    ContainerPort *corev1.ContainerPort
-    Volumes       []corev1.Volume
-    VolumeMounts  []corev1.VolumeMount
+    Args           []string
+    Env            []corev1ac.EnvVarApplyConfiguration
+    ContainerPort  *corev1ac.ContainerPortApplyConfiguration
+    Volumes        []corev1ac.VolumeApplyConfiguration
+    VolumeMounts   []corev1ac.VolumeMountApplyConfiguration
 }
 ```
 
@@ -225,17 +227,13 @@ type Trainer struct {
 // ...
 
 // Update the Trainer args.
-if info.Trainer.Args != nil {
-    var args []string
-    copy(args, info.Trainer.Args)
-    b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = append(
-        args, b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports...)
+if args := info.Trainer.Args; args != nil {
+    apply.UpsertArg(b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args, args)
 }
 
 // Update the Trainer container port.
-if info.Trainer.ContainerPort != nil {
-    b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports = append(
-        b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *info.Trainer.ContainerPort)
+if port := info.Trainer.ContainerPort; port != nil {
+    apply.UpsertPort(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, port)
 }
 
 // ...
