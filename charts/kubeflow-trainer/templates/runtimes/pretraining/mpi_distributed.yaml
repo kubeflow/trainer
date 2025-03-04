@@ -1,26 +1,26 @@
-#
-# Copyright 2024 The Kubeflow Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+{{/*
+Copyright 2024 The Kubeflow authors.
 
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+
+{{- if .Values.runtime.preTraining.mpiDistributed.enable -}}
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: mpi-distributed
   labels:
     training.kubeflow.org/phase: pre-training
-    app.kubernetes.io/managed-by: Kustomize
 spec:
   mlPolicy:
     numNodes: 1
@@ -40,7 +40,7 @@ spec:
                 spec:
                   containers:
                     - name: launcher
-                      image: docker.io/busybox:latest
+                      image: {{ include "trainer.runtime.preTraining.mpiDistributed.image" . }}
                       command:
                         - /bin/sh
                         - -c
@@ -52,8 +52,9 @@ spec:
                 spec:
                   containers:
                     - name: trainer
-                      image: docker.io/busybox:latest
+                      image: {{ include "trainer.runtime.preTraining.mpiDistributed.image" . }}
                       command:
                         - /bin/sh
                         - -c
                         - "echo 'launcher runs for 10 seconds' && sleep 100"
+{{- end }}
