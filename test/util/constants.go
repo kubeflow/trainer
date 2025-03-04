@@ -17,14 +17,16 @@ limitations under the License.
 package util
 
 import (
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"time"
 )
 
 const (
 	Timeout            = 5 * time.Second
+	TimeoutE2E         = 10 * time.Minute // E2Es require a longer timeout due to large image pull
 	ConsistentDuration = time.Second
 	Interval           = time.Millisecond * 250
 )

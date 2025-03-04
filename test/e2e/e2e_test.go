@@ -6,8 +6,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
 	"github.com/kubeflow/trainer/test/util"
 )
@@ -28,7 +30,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 		// Wait for namespace to exist before proceeding with test.
 		gomega.Eventually(func(g gomega.Gomega) {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ns), ns)).Should(gomega.Succeed())
-		}, timeout, interval).Should(gomega.Succeed())
+		}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 	})
 
 	// Delete test namespace after each test.
@@ -52,11 +54,24 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 
 			// Wait for TrainJob to be in Succeeded status.
 			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
-				gomega.Eventually(func(g gomega.Gomega) bool {
-					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(gomega.Succeed())
-					g.Expect(trainJob.Status.Conditions).Should(gomega.ContainElement(gomega.BeComparableTo(metav1.Condition{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue}, util.IgnoreConditions)))
-					return false
-				}, timeout, interval).Should(gomega.Equal(true))
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
+						{
+							Type:    trainer.TrainJobCreated,
+							Status:  metav1.ConditionTrue,
+							Reason:  trainer.TrainJobJobsCreationSucceededReason,
+							Message: constants.TrainJobJobsCreationSucceededMessage,
+						},
+						{
+							Type:    trainer.TrainJobComplete,
+							Status:  metav1.ConditionTrue,
+							Reason:  jobsetconsts.AllJobsCompletedReason,
+							Message: jobsetconsts.AllJobsCompletedMessage,
+						},
+					}, util.IgnoreConditions))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 		})
 	})

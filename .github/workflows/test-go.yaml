@@ -57,7 +57,7 @@ jobs:
       fail-fast: false
       matrix:
         # Kubernetes versions for setup-envtest integration tests.
-        kubernetes-version: ["1.29.14", "1.30.0", "1.31.0"]
+        kubernetes-version: ["1.29.3", "1.30.0", "1.31.0"]
 
     steps:
       - name: Checkout code

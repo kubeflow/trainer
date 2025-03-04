@@ -19,7 +19,6 @@ package e2e
 import (
 	"context"
 	"testing"
-	"time"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/onsi/ginkgo/v2"
@@ -27,11 +26,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-)
-
-const (
-	timeout  = 10 * time.Minute
-	interval = time.Millisecond * 250
 )
 
 var (
