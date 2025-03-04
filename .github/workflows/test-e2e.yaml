@@ -57,14 +57,14 @@ jobs:
 
       - name: Run e2e test for example Notebooks.
         run: |
-          set -x
-          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=-
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb TIMEOUT=900
           echo -e "\n\n\n------------------------"
           echo "Notebook is finished"
+          cat trainer_output.ipynb
+          echo -e "\n\n\n------------------------"
 
+          set -x
           kubectl describe pod
           kubectl describe trainjob
           kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
-
-          echo "Check that all TrainJobs are Complete"
           kubectl wait trainjob --for=condition=Complete --all --timeout 3s
