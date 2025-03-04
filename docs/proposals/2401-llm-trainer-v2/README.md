@@ -105,7 +105,7 @@ As is shown in the official guides, we can pass distributed arguments to `torcht
 # Official document: https://pytorch.org/torchtune/main/tune_cli.html#run-a-recipe
 # Proof from source code: https://github.com/pytorch/torchtune/blob/75965d4281b9b76c454630d015221b9933c77bf3/torchtune/_cli/run.py#L113-L118
 tune run --nnodes=1 --nproc-per-node=4 lora_finetune_distributed \
-    --config llama3/8B_lora \
+    --config llama3_1/8B_lora \
     model.lora_attn_modules=[q_proj,k_proj,v_proj] \
     model.apply_lora_to_mlp=True \
     model.lora_rank=64 \
@@ -116,11 +116,12 @@ tune run --nnodes=1 --nproc-per-node=4 lora_finetune_distributed \
 The CLI-based way allows us to mutate these parameters by overriding the `command` and `args` fields in the Trainer Node. By specifying override parameters in the TrainJob `.spec.trainer.command` and `.spec.trainer.args` fields, we can easily mutate these parameters, just like:
 
 ```YAML
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
-  name: torchtune-llm-finetuning
+  name: torchtune-llama3.1-8B-finetuning
   labels:
+    trainer.runtime.kubeflow.org/type: torchtune
     training.kubeflow.org/phase: post-training
 spec:
   mlPolicy:
@@ -139,26 +140,30 @@ spec:
                     - name: trainer
                       image: <pytorch+cuda+torchtune image>
                       command:
-                        - tune ls
+                        - tune run
+                      args:
+                        - full_finetune_single_device
+                        - --config
+                        - llama3_1/8B_full_single_device
 ...
 ---
-apiVersion: kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainJob
 metadata:
-  name: tune-llama-with-alpaca
+  name: tune-llama-lora-with-alpaca
   namespace: tenant-alpha
 spec:
   runtimeRef:
-    name: torchtune-llm-finetuning
+    name: torchtune-llama3.1-8B-finetuning
   trainer:
     command:
       - tune run
     args:
       - --nnodes=1
       - --nproc_per_node=4
-      - lora_finetune_single_device
+      - lora_finetune_distributed
       - --config
-      - llama3_2/1B_lora
+      - llama3_1/8B_full
       - model.lora_attn_modules=[q_proj,k_proj,v_proj]
       - model.apply_lora_to_mlp=True
       - model.lora_rank=64
