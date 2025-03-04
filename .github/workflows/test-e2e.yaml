@@ -49,7 +49,7 @@ jobs:
 
       - name: Setup cluster
         run: |
-          make test-e2e-setup-cluster
+          make test-e2e-setup-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
 
       - name: Run e2e with Go
         run: |

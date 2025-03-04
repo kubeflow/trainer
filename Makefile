@@ -133,7 +133,7 @@ test-python-integration: ## Run Python integration test.
 
 .PHONY: test-e2e-setup-cluster
 test-e2e-setup-cluster: ## Setup Kind cluster for e2e test.
-	E2E_K8S_VERSION=$(E2E_K8S_VERSION) ./hack/e2e-setup-cluster.sh
+	K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
 
 .PHONY: test-e2e
 test-e2e: ## Run Go e2e test.
