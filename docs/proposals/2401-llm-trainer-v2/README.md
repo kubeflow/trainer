@@ -278,7 +278,7 @@ We natively support all `recipe` and `config` supported by `torchtune`, since `t
 
 ### Propagate `torchtune` settings with SDK
 
-To provide a better user experience, we need to offer a simple SDK that allows users to easily modify config files. So, we introduce `TorchtuneConfig` dataclass and create a map from (`TorchtuneConfig`, `num_nodes`, `runtime_ref`) to dedicated `recipe` and `config`. Then, users can fine-tune their LLMs without any knowledge about `torchtune`.
+To provide a better user experience, we need to offer a simple SDK that allows users to easily modify config files. So, we introduce `TorchTuneConfig` dataclass and create a map from (`TorchTuneConfig`, `num_nodes`, `runtime_ref`) to dedicated `recipe` and `config`. Then, users can fine-tune their LLMs without any knowledge about `torchtune`.
 
 ```python
 # By default we can fine-tune models without any additional configurations from users
@@ -287,7 +287,7 @@ TrainerClient().train(
 )
 ```
 
-#### `TorchtuneConfig` API Design
+#### `TorchTuneConfig` API Design
 
 | Parameters | Type | What is it? |
 | - | - | - |
@@ -301,9 +301,9 @@ TrainerClient().train(
 | resource_per_node | Optional[Dict] | The resource for each PyTorch Node |
 
 ```python
-# TorchtuneConfig DataClass
+# TorchTuneConfig DataClass
 @dataclass
-class TorchtuneConfig:
+class TorchTuneConfig:
     dtype: Optional[str] = None
     batch_size: Optional[int] = None
     epochs: Optional[int] = None
@@ -317,9 +317,9 @@ class TorchtuneConfig:
 
 ```
 
-#### Create Map from `TorchtuneConfig` to specific recipes and configs
+#### Create Map from `TorchTuneConfig` to specific recipes and configs
 
-As we mentioned above, we will create a map from (`TorchtuneConfig`, `num_nodes`, `runtime_ref`) to dedicated `recipe` and `config`. This will allow users to fine-tune their LLMs without knowing about `torchtune`'s recipes and configs.
+As we mentioned above, we will create a map from (`TorchTuneConfig`, `num_nodes`, `runtime_ref`) to dedicated `recipe` and `config`. This will allow users to fine-tune their LLMs without knowing about `torchtune`'s recipes and configs.
 
 **How to Select `recipe`**
 
@@ -451,7 +451,7 @@ volumes:
 
 ### Dataset Preprocess / Tokenizer
 
-`torchtune` has supported several types of [dataset classes](https://pytorch.org/torchtune/main/basics/datasets_overview.html), including Instruct, Chat, Multimodal, which will preprocess dataests for us automatically. We just need to configure it in the SDK and override it to the config:
+`torchtune` has supported several types of [dataset classes](https://pytorch.org/torchtune/main/basics/datasets_overview.html), including Instruct, Chat, Multimodal, which will preprocess the dataest for us automatically. We just need to configure it in the SDK and override it to the config:
 
 **Instruct Dataset**
 
@@ -638,7 +638,7 @@ $ accelerate launch {my_script.py}
 
 ### Design Details - `torchtune`
 
-#### Allow users to specify `recipe` and `config` in `TorchtuneConfig`
+#### Allow users to specify `recipe` and `config` in `TorchTuneConfig`
 
 > This option is abandoned because we prefer to fine-tune LLMs with just `runtime` specified, which would provide better user experience.
 
@@ -656,9 +656,9 @@ $ accelerate launch {my_script.py}
 | resource_per_node | Optional[Dict] | The resource for each PyTorch Node |
 
 ```python
-# TorchtuneConfig DataClass
+# TorchTuneConfig DataClass
 @dataclass
-class TorchtuneConfig:
+class TorchTuneConfig:
     recipe: str
     config: str
     dtype: Optional[str] = None
