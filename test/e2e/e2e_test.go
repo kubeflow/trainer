@@ -5,10 +5,11 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
+	"github.com/kubeflow/trainer/test/util"
 )
 
 var _ = ginkgo.Describe("TrainJob e2e", func() {
@@ -26,7 +27,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 
 		// Wait for namespace to exist before proceeding with test.
 		gomega.Eventually(func(g gomega.Gomega) {
-			g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Namespace, Name: ns.Name}, ns)).Shoud(gomega.Succeeded())
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ns), ns)).Should(gomega.Succeed())
 		}, timeout, interval).Should(gomega.Succeed())
 	})
 
@@ -41,8 +42,9 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 		// Verify `torch-distributed` ClusterTrainingRuntime.
 		ginkgo.It("should create TrainJob with PyTorch runtime reference", func() {
 			// Create a TrainJob.
-			trainJob := testTrainJob(ns.Name, "torch-distributed")
-			trainJobKey := types.NamespacedName{Name: trainJob.Name, Namespace: trainJob.Namespace}
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "torch-distributed").
+				Obj()
 
 			ginkgo.By("Create a TrainJob with torch-distributed runtime reference", func() {
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
@@ -50,22 +52,12 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 
 			// Wait for TrainJob to be in Succeeded status.
 			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
-				gomega.Eventually(func() bool {
-					gomega.Expect(k8sClient.Get(ctx, trainJobKey, trainJob)).Should(gomega.Succeed())
-					for _, c := range trainJob.Status.Conditions {
-						if c.Type == trainer.TrainJobComplete && c.Status == metav1.ConditionTrue {
-							return true
-						}
-					}
+				gomega.Eventually(func(g gomega.Gomega) bool {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(gomega.Succeed())
+					g.Expect(trainJob.Status.Conditions).Should(gomega.ContainElement(gomega.BeComparableTo(metav1.Condition{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue}, util.IgnoreConditions)))
 					return false
 				}, timeout, interval).Should(gomega.Equal(true))
 			})
 		})
 	})
 })
-
-func testTrainJob(namespace, runtimeRef string) *trainer.TrainJob {
-	return testingutil.MakeTrainJobWrapper(namespace, "e2e-test").
-		RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeRef).
-		Obj()
-}
