@@ -25,12 +25,8 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 		gomega.Expect(k8sClient.Create(ctx, ns)).To(gomega.Succeed())
 
 		// Wait for namespace to exist before proceeding with test.
-		gomega.Eventually(func() error {
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Namespace, Name: ns.Name}, ns)
-			if err != nil {
-				return err
-			}
-			return nil
+		gomega.Eventually(func(g gomega.Gomega) {
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Namespace, Name: ns.Name}, ns)).Shoud(gomega.Succeeded())
 		}, timeout, interval).Should(gomega.Succeed())
 	})
 
