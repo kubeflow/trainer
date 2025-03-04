@@ -14,6 +14,7 @@
 
 import inspect
 import json
+import math
 import os
 import queue
 import textwrap
@@ -120,6 +121,31 @@ def get_resources_per_node(resources_per_node: dict) -> client.V1ResourceRequire
         limits=resources,
     )
     return resources
+
+
+# TODO (andreyvelich): Move this part to the Kubeflow Trainer torch plugins.
+# Ref issue: https://github.com/kubeflow/trainer/issues/2407
+def get_num_proc_per_node(resources_per_node: dict) -> object:
+    """
+    Get the Trainer numProcPerNode from the given resources.
+    """
+
+    resources = {k.lower(): v for k, v in resources_per_node.items()}
+    # NumProcPerNode is equal to number of GPUs or CPUs, otherwise set it to `auto`
+    for key, value in resources.items():
+        if "gpu" in key:
+            return value
+
+    for key, value in resources.items():
+        if "cpu" in key:
+            # For now, we can't convert milliCPUs to the numProcPerNode.
+            try:
+                value = math.ceil(int(value))
+                return value
+            except Exception:
+                pass
+
+    return "auto"
 
 
 def get_args_using_train_func(

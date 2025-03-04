@@ -36,7 +36,11 @@ LOCALBIN ?= $(PROJECT_DIR)/bin
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
-ENVTEST_K8S_VERSION ?= 1.32
+K8S_VERSION ?= 1.32
+
+# Input and output location for Notebooks executed with Papermill.
+NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
+NOTEBOOK_OUTPUT=$(PROJECT_DIR)/trainer_output.ipynb
 
 # Instructions to download tools for development.
 .PHONY: envtest
@@ -106,8 +110,9 @@ test: ## Run Go unit test.
 
 .PHONY: test-integration
 test-integration: envtest jobset-operator-crd scheduler-plugins-crd ## Run Go integration test.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./test/... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(K8S_VERSION) -p path)" go test ./test/integration/... -coverprofile cover.out
 
+.PHONY: test-python
 test-python: ## Run Python unit test.
 	export PYTHONPATH=$(PROJECT_DIR)
 	pip install pytest
@@ -118,9 +123,22 @@ test-python: ## Run Python unit test.
 	pytest ./pkg/initializer/model
 	pytest ./pkg/initializer/utils
 
+.PHONY: test-python-integration
 test-python-integration: ## Run Python integration test.
 	export PYTHONPATH=$(PROJECT_DIR)
 	pip install pytest
 	pip install -r ./cmd/initializer/dataset/requirements.txt
 
 	pytest ./test/integration/initializer
+
+.PHONY: test-e2e-setup-cluster
+test-e2e-setup-cluster: ## Setup Kind cluster for e2e test.
+	E2E_K8S_VERSION=$(E2E_K8S_VERSION) ./hack/e2e-setup-cluster.sh
+
+.PHONY: test-e2e
+test-e2e: ## Run Go e2e test.
+	go test ./test/e2e/...
+
+.PHONY: test-e2e-notebook
+test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
+	papermill $(NOTEBOOK_INPUT) $(NOTEBOOK_OUTPUT)

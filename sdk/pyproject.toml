@@ -31,8 +31,9 @@ classifiers = [
 ]
 dependencies = [
     "kubernetes>=27.2.0",
-    "pydantic>=2.10.0",
-    "jobset @ git+https://github.com/kubernetes-sigs/jobset.git@v0.8.0#subdirectory=sdk/python",
+    # TODO (andreyvelich): Update JobSet to v0.8.0 once this PR is merged: https://github.com/kubeflow/trainer/pull/2466
+    # "pydantic>=2.10.0",
+    "jobset @ git+https://github.com/kubernetes-sigs/jobset.git@v0.7.2#subdirectory=sdk/python",
 ]
 
 [project.urls]

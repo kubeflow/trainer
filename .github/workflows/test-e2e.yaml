@@ -7,7 +7,13 @@ on:
 jobs:
   e2e-test:
     name: E2E Test
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: ubuntu-latest-16-cores
+    env:
+      GOPATH: ${{ github.workspace }}/go
+    defaults:
+      run:
+        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
     strategy:
       fail-fast: false
@@ -17,13 +23,48 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+        with:
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.11
 
       - name: Install dependencies
         run: |
-          echo "TODO (andreyvelich): Implement E2E Tests"
-          # pip install -U './sdk'
+          echo "Install Kind"
+          go install sigs.k8s.io/kind@v0.27.0
+
+          echo "Install Papermill"
+          pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
+
+          echo "Install Kubeflow SDK"
+          pip install ./sdk
+
+      - name: Setup cluster
+        run: |
+          make test-e2e-setup-cluster
+
+      - name: Run e2e with Go
+        run: |
+          make test-e2e
+
+      - name: Run e2e test for example Notebooks.
+        run: |
+          set -x
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=-
+          echo -e "\n\n\n------------------------"
+          echo "Notebook is finished"
+
+          kubectl describe pod
+          kubectl describe trainjob
+          kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
+
+          echo "Check that all TrainJobs are Complete"
+          kubectl wait trainjob --for=condition=Complete --all --timeout 3s
