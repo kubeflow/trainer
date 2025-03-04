@@ -76,7 +76,7 @@ jobs:
 
       - name: Run Go integration tests
         run: |
-          make test-integration ENVTEST_K8S_VERSION=${{ matrix.kubernetes-version }}
+          make test-integration K8S_VERSION=${{ matrix.kubernetes-version }}
 
       - name: Coveralls report
         uses: shogo82148/actions-goveralls@v1

@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This shell is used to auto generate some useful tools for k8s, such as clientset, lister, informer and so on.
-# We don't use this tool to generate deepcopy because kubebuilder (controller-tools) has covered that part.
+# This shell is used to auto generate some useful tools for k8s, such as clientset, lister, informer.
 
 set -o errexit
 set -o nounset
