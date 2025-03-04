@@ -347,13 +347,13 @@ manifests/
 |   |   |-- torchtune/                              # Torchtune Fine-tuning Runtimes
 |   |   |   |-- kustomization.yaml
 |   |   |   |-- llama3_1/
-|   |   |   |   |-- torchtune_llama3_1_8B_finetuning.yaml
-|   |   |   |   |-- torchtune_llama3_1_70B_finetuning.yaml
+|   |   |   |   |-- 8B_finetuning.yaml
+|   |   |   |   |-- 70B_finetuning.yaml
 |   |   |   |-- llama3_2/
-|   |   |   |   |-- torchtune_llama3_2_1B_finetuning.yaml
-|   |   |   |   |-- torchtune_llama3_2_3B_finetuning.yaml
+|   |   |   |   |-- 1B_finetuning.yaml
+|   |   |   |   |-- 3B_finetuning.yaml
 |   |   |   |-- llama3_3/
-|   |   |   |   |-- torchtune_llama3_3_70B_finetuning.yaml
+|   |   |   |   |-- 70B_finetuning.yaml
 |   |   |   |-- . . .
 |   |-- crds/
 |   |-- . . .
