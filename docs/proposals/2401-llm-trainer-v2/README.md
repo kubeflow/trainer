@@ -175,7 +175,7 @@ spec:
 ...
 ```
 
-The trainer image will be built with packages related to PyTorch, CUDA, Torchtune. And we will maintain its Dockerfile under `cmd/trainers/torchtune/`.
+The trainer image will be built with packages related to PyTorch, CUDA, TorchTune. And we will maintain its Dockerfile under `cmd/trainers/torchtune/`.
 
 ### Complement `torch` Plugin
 
@@ -188,10 +188,10 @@ We will add CLI-based parameters mutation to `pkg/runtime/framework/torch/torch.
 ```go
 func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
     // ...
-    if !trainJob.IsLaunchedByTorchtune() {
+    if !trainJob.IsLaunchedByTorchTune() {
         // Original env-based parameters mutation
         // Update envs for Info object.
-        // Add PyTorch distributed "PET_" values for torchrun
+        // Add PyTorch distributed "PET_" values for torchrun.
         // TBA
     } else {
         // CLI-based parameters mutation
@@ -256,8 +256,8 @@ So we plan to modify `train` API to:
 
 ```python
 def train(
-    trainer: Optional[CustomTrainer],
-    fine_tuning_config: Optional[Union[TorchTuneConfig]],
+    trainer: Optional[CustomTrainer] = None,
+    fine_tuning_config: Optional[Union[TorchTuneConfig]] = None,
     dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
     model_config: Optional[types.HuggingFaceModelInputConfig] = None,
     runtime_ref: Optional[str] = None,
@@ -349,7 +349,7 @@ manifests/
 |   |   |-- kustomization.yaml
 |   |   |-- mpi_distributed.yaml                    # MPI Distributed Runtime
 |   |   |-- torch_distributed.yaml                  # PyTorch Distributed Runtime
-|   |   |-- torchtune/                              # Torchtune Fine-tuning Runtimes
+|   |   |-- torchtune/                              # TorchTune Fine-tuning Runtimes
 |   |   |   |-- kustomization.yaml
 |   |   |   |-- llama3_1/
 |   |   |   |   |-- 8B_finetuning.yaml
@@ -688,7 +688,7 @@ manifests/
 |   |   |-- kustomization.yaml
 |   |   |-- mpi_distributed.yaml                    # MPI Distributed Runtime
 |   |   |-- torch_distributed.yaml                  # PyTorch Distributed Runtime
-|   |   |-- torchtune_llm_finetuning.yaml           # Torchtune LLM Fine-tuning Runtime
+|   |   |-- torchtune_llm_finetuning.yaml           # TorchTune LLM Fine-tuning Runtime
 |   |-- crds/
 |   |-- . . .
 |-- overlays/
