@@ -59,9 +59,3 @@ jobs:
       - name: Run e2e test for example Notebooks.
         run: |
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb TIMEOUT=900
-
-          echo -e "\n\n\nCheck Kubernetes resources"
-          kubectl describe pod
-          kubectl describe trainjob
-          kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
-          kubectl wait trainjob --for=condition=Complete --all --timeout 3s

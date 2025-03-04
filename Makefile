@@ -38,10 +38,6 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 K8S_VERSION ?= 1.32.0
 
-# Input and output location for Notebooks executed with Papermill.
-NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
-NOTEBOOK_OUTPUT=$(PROJECT_DIR)/trainer_output.ipynb
-
 # Instructions to download tools for development.
 .PHONY: envtest
 envtest: ## Download the setup-envtest binary if required.
@@ -139,10 +135,10 @@ test-e2e-setup-cluster: ## Setup Kind cluster for e2e test.
 test-e2e: ## Run Go e2e test.
 	go test ./test/e2e/...
 
+# Input and output location for Notebooks executed with Papermill.
+NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
+NOTEBOOK_OUTPUT=$(PROJECT_DIR)/trainer_output.ipynb
+TIMEOUT=900
 .PHONY: test-e2e-notebook
 test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
-	papermill $(NOTEBOOK_INPUT) $(NOTEBOOK_OUTPUT) --execution-timeout $(TIMEOUT)
-	echo -e "\n\n\n------------------------"
-	echo "Notebook is finished"
-	cat trainer_output.ipynb
-	cat $(NOTEBOOK_OUTPUT)
+	NOTEBOOK_INPUT=$(NOTEBOOK_INPUT) NOTEBOOK_OUTPUT=$(NOTEBOOK_OUTPUT) TIMEOUT=$(TIMEOUT) ./hack/e2e-run-notebook.sh
