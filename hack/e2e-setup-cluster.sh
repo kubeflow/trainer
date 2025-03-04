@@ -22,8 +22,8 @@ set -o pipefail
 set -x
 
 # Kubernetes version for Kind cluster.
-K8S_VERSION=${K8S_VERSION:-v1.32.0}
-KIND_NODE_VERSION=kindest/node:${K8S_VERSION}
+K8S_VERSION=${K8S_VERSION:-1.32.0}
+KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
 NAMESPACE="kubeflow-system"
 TIMEOUT="5m"
 

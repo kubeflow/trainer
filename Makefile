@@ -36,7 +36,7 @@ LOCALBIN ?= $(PROJECT_DIR)/bin
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
-K8S_VERSION ?= 1.32
+K8S_VERSION ?= 1.32.0
 
 # Input and output location for Notebooks executed with Papermill.
 NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
