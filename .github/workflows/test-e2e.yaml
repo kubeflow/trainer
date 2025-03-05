@@ -55,6 +55,7 @@ jobs:
 
       - name: Run e2e test for example Notebooks
         run: |
+          mkdir artifacts
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/${{ matrix.kubernetes-version }}_mnist.ipynb TIMEOUT=900
 
       # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
