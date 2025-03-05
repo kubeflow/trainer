@@ -58,15 +58,13 @@ jobs:
 
       - name: Run e2e test for example Notebooks.
         run: |
-          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./mnist_output.ipynb TIMEOUT=900
-          ls -la
-          pwd
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./mnist_output_${{ matrix.kubernetes-version }}.ipynb TIMEOUT=900
 
       # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
       - name: Upload notebook
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mnist_output.ipynb
-          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/mnist_output.ipynb
+          name: mnist_output_${{ matrix.kubernetes-version }}.ipynb
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/mnist_output_${{ matrix.kubernetes-version }}.ipynb
           retention-days: 1
