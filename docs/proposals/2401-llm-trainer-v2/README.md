@@ -241,16 +241,16 @@ if port := info.Trainer.ContainerPort; port != nil {
 
 **How to Determine Default Resources**
 
-Currently, `torchtune` has limited support for multi-node training (but will coming soon). So, I would propose that we use 1 PyTorch node and 1 GPU by default. Users can specify `num_nodes` and `resource_per_node` in the `Trainer` field to increase PyTorch nodes and GPU number.
+Currently, `torchtune` has limited support for multi-node training (but support is coming soon). So, I would propose that we use 1 PyTorch node and 1 GPU by default. Users can specify `num_nodes` and `resource_per_node` in the `Trainer` field to increase PyTorch nodes and GPU number.
 
 ### Modify the `train` API
 
-As we discussed in [Github](https://github.com/kubeflow/trainer/pull/2410#discussion_r1963832826), `train` API mainly executes two types of training tasks:
+As we discussed in [Github](https://github.com/kubeflow/trainer/pull/2410#discussion_r1963832826), the `train` API mainly executes two types of training tasks:
 
-1. **Training with custom function/image**: A self-contained function/image that encapsulates the entire model training process.
-2. **Config-driven appproach with existing Trainer**: A trainer that already includes fine-tuning logic, requiring only parameter adjustments.
+1. **Type 1: Training with custom function/image**: A self-contained function/image that encapsulates the entire model training process.
+2. **Type 2: Config-driven approach with existing Trainer**: A trainer that already includes fine-tuning logic, requiring only parameter adjustments.
 
-So we plan to modify `train` API to:
+So we plan to modify the `train` API to:
 
 ```python
 def train(
