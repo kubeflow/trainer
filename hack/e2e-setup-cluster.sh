@@ -66,11 +66,21 @@ echo "Wait for Kubeflow Trainer to be ready"
       exit 1
   )
 
-echo "Deploy Kubeflow Trainer runtimes"
-cd ../runtimes && kubectl apply --server-side -k .
+print_cluster_info() {
+  kubectl version
+  kubectl cluster-info
+  kubectl get nodes
+  kubectl get pods -n ${NAMESPACE}
+  kubectl describe pod -n ${NAMESPACE}
+}
 
-kubectl version
-kubectl cluster-info
-kubectl get nodes
-kubectl get pods -n ${NAMESPACE}
-kubectl describe pod -n ${NAMESPACE}
+# TODO (andreyvelich): Currently, we print manager logs due to flaky test.
+echo "Deploy Kubeflow Trainer runtimes"
+cd ../runtimes && kubectl apply --server-side -k . || (
+  kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer &&
+    print_cluster_info &&
+    exit 1
+)
+
+
+print_cluster_info
