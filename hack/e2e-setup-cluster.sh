@@ -39,17 +39,7 @@ cd manifests/overlays/manager
 kustomize edit set image kubeflow/trainer-controller-manager=${CONTROLLER_MANAGER_CI_IMAGE}
 
 echo "Create Kind cluster and load Kubeflow Trainer images"
-cat <<EOF | ${KIND} create cluster --image "${KIND_NODE_VERSION}" --config=-
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-  - role: control-plane
-  - role: control-plane
-  - role: worker
-  - role: worker
-  - role: worker
-  - role: worker
-EOF
+${KIND} create cluster --image "${KIND_NODE_VERSION}"
 ${KIND} load docker-image ${CONTROLLER_MANAGER_CI_IMAGE}
 
 echo "Deploy Kubeflow Trainer control plane"
@@ -83,6 +73,8 @@ echo "Deploy Kubeflow Trainer runtimes"
 )
 
 # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
-${KIND} load docker-image docker.io/pytorch/pytorch:2.5.0-cuda12.4-cudnn9-runtime
+TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.5.0-cuda12.4-cudnn9-runtime
+docker pull ${TORCH_RUNTIME_IMAGE}
+${KIND} load docker-image ${TORCH_RUNTIME_IMAGE}
 
 print_cluster_info
