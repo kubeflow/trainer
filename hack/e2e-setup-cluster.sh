@@ -39,7 +39,14 @@ cd manifests/overlays/manager
 kustomize edit set image kubeflow/trainer-controller-manager=${CONTROLLER_MANAGER_CI_IMAGE}
 
 echo "Create Kind cluster and load Kubeflow Trainer images"
-${KIND} create cluster --image "${KIND_NODE_VERSION}"
+cat <<EOF | ${KIND} create cluster --image "${KIND_NODE_VERSION}" --config=-
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+  - role: worker
+EOF
+
 ${KIND} load docker-image ${CONTROLLER_MANAGER_CI_IMAGE}
 
 echo "Deploy Kubeflow Trainer control plane"
