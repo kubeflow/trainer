@@ -144,7 +144,7 @@ test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.
 	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
 
 .PHONY: test-e2e
-test-e2e: ## Run Go e2e test.
+test-e2e: ginkgo ## Run Go e2e test.
 	$(GINKGO) -v ./test/e2e/...
 
 # Input and output location for Notebooks executed with Papermill.
