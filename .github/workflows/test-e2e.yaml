@@ -51,7 +51,7 @@ jobs:
 
       - name: Run e2e with Go
         run: |
-          make test-e2e
+          make test-e2e || kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
 
       - name: Run e2e test for example Notebooks
         run: |
