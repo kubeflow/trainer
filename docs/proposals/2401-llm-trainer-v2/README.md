@@ -349,14 +349,28 @@ manifests/
 |   |   |-- torch_distributed.yaml                  # PyTorch Distributed Runtime
 |   |   |-- torchtune/                              # TorchTune Fine-tuning Runtimes
 |   |   |   |-- kustomization.yaml
+|   |   |   |-- gemma2/
+|   |   |   |   |-- torchtune_gemma2_2B_finetuning.yaml
+|   |   |   |   |-- torchtune_gemma2_7B_finetuning.yaml
+|   |   |   |   |-- torchtune_gemma2_27B_finetuning.yaml
 |   |   |   |-- llama3_1/
-|   |   |   |   |-- 8B_finetuning.yaml
-|   |   |   |   |-- 70B_finetuning.yaml
+|   |   |   |   |-- torchtune_llama3_1_8B_finetuning.yaml
+|   |   |   |   |-- torchtune_llama3_1_70B_finetuning.yaml
 |   |   |   |-- llama3_2/
-|   |   |   |   |-- 1B_finetuning.yaml
-|   |   |   |   |-- 3B_finetuning.yaml
+|   |   |   |   |-- torchtune_llama3_2_1B_finetuning.yaml
+|   |   |   |   |-- torchtune_llama3_2_3B_finetuning.yaml
+|   |   |   |-- llama3_2_vision/
+|   |   |   |   |-- torchtune_llama3_2_vision_11B_finetuning.yaml
+|   |   |   |   |-- torchtune_llama3_2_vision_90B_finetuning.yaml
 |   |   |   |-- llama3_3/
-|   |   |   |   |-- 70B_finetuning.yaml
+|   |   |   |   |-- torchtune_llama3_3_70B_finetuning.yaml
+|   |   |   |-- mistral/
+|   |   |   |   |-- torchtune_mistral_7B_finetuning.yaml
+|   |   |   |-- qwen2_5/
+|   |   |   |   |-- torchtune_qwen_0.5B_finetuning.yaml
+|   |   |   |   |-- torchtune_qwen_1.5B_finetuning.yaml
+|   |   |   |   |-- torchtune_qwen_3B_finetuning.yaml
+|   |   |   |   |-- torchtune_qwen_7B_finetuning.yaml
 |   |   |   |-- . . .
 |   |-- crds/
 |   |-- . . .
