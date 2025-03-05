@@ -96,7 +96,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 	info.Trainer.NumProcPerNode = numProcPerNode
 
 	// Add Secret and ConfigMap volumes to the Info object
-	info.Volumes = []corev1ac.VolumeApplyConfiguration{
+	info.Trainer.Volumes = []corev1ac.VolumeApplyConfiguration{
 		*corev1ac.Volume().
 			WithName(constants.MPISSHAuthVolumeName).
 			WithSecret(corev1ac.SecretVolumeSource().
@@ -118,7 +118,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 				WithName(trainJob.Name + constants.MPIHostfileConfigMapSuffix)),
 	}
 
-	info.VolumeMounts = []corev1ac.VolumeMountApplyConfiguration{
+	info.Trainer.VolumeMounts = []corev1ac.VolumeMountApplyConfiguration{
 		*corev1ac.VolumeMount().
 			WithName(constants.MPISSHAuthVolumeName).
 			WithMountPath(*info.RuntimePolicy.MLPolicy.MPI.SSHAuthMountPath),

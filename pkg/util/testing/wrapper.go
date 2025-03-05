@@ -848,3 +848,98 @@ func (p *SchedulerPluginsPodGroupWrapper) ControllerReference(gvk schema.GroupVe
 func (p *SchedulerPluginsPodGroupWrapper) Obj() *schedulerpluginsv1alpha1.PodGroup {
 	return &p.PodGroup
 }
+
+type ConfigMapWrapper struct {
+	corev1.ConfigMap
+}
+
+func MakeConfigMapWrapper(name, ns string) *ConfigMapWrapper {
+	return &ConfigMapWrapper{
+		ConfigMap: corev1.ConfigMap{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: corev1.SchemeGroupVersion.String(),
+				Kind:       "ConfigMap",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+		},
+	}
+}
+
+func (c *ConfigMapWrapper) WithData(data map[string]string) *ConfigMapWrapper {
+	if c.Data == nil {
+		c.Data = make(map[string]string, len(data))
+	}
+	for k, v := range data {
+		c.Data[k] = v
+	}
+	return c
+}
+
+func (c *ConfigMapWrapper) OwnerReference(gvk schema.GroupVersionKind, name, uid string) *ConfigMapWrapper {
+	c.OwnerReferences = append(c.OwnerReferences, metav1.OwnerReference{
+		APIVersion:         gvk.GroupVersion().String(),
+		Kind:               gvk.Kind,
+		Name:               name,
+		UID:                types.UID(uid),
+		Controller:         ptr.To(true),
+		BlockOwnerDeletion: ptr.To(true),
+	})
+	return c
+}
+
+func (c *ConfigMapWrapper) Obj() *corev1.ConfigMap {
+	return &c.ConfigMap
+}
+
+type SecretWrapper struct {
+	corev1.Secret
+}
+
+func MakeSecretWrapper(name, ns string) *SecretWrapper {
+	return &SecretWrapper{
+		Secret: corev1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: corev1.SchemeGroupVersion.String(),
+				Kind:       "Secret",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+		},
+	}
+}
+
+func (s *SecretWrapper) WithType(t corev1.SecretType) *SecretWrapper {
+	s.Type = t
+	return s
+}
+
+func (s *SecretWrapper) WithData(data map[string][]byte) *SecretWrapper {
+	if s.Data == nil {
+		s.Data = make(map[string][]byte, len(data))
+	}
+	for k, v := range data {
+		s.Data[k] = v
+	}
+	return s
+}
+
+func (s *SecretWrapper) OwnerReference(gvk schema.GroupVersionKind, name, uid string) *SecretWrapper {
+	s.OwnerReferences = append(s.OwnerReferences, metav1.OwnerReference{
+		APIVersion:         gvk.GroupVersion().String(),
+		Kind:               gvk.Kind,
+		Name:               name,
+		UID:                types.UID(uid),
+		Controller:         ptr.To(true),
+		BlockOwnerDeletion: ptr.To(true),
+	})
+	return s
+}
+
+func (s *SecretWrapper) Obj() *corev1.Secret {
+	return &s.Secret
+}
