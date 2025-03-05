@@ -121,7 +121,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 	info.VolumeMounts = []corev1ac.VolumeMountApplyConfiguration{
 		*corev1ac.VolumeMount().
 			WithName(constants.MPISSHAuthVolumeName).
-			WithMountPath(info.RuntimePolicy.MLPolicy.MPI.SSHAuthMountPath),
+			WithMountPath(*info.RuntimePolicy.MLPolicy.MPI.SSHAuthMountPath),
 		*corev1ac.VolumeMount().
 			WithName(constants.MPIHostfileVolumeName).
 			WithMountPath(constants.MPIHostfileDir),
@@ -137,13 +137,13 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		info.Trainer.Env = apply.EnvVars(trainJob.Spec.Trainer.Env...)
 	}
 
-	switch info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
+	switch *info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
 	case trainer.MPIImplementationOpenMPI:
 		apply.UpsertEnvVar(&info.Trainer.Env, corev1ac.EnvVar().
 			WithName(constants.OpenMPIEnvHostFileLocation).
 			WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)))
 	default:
-		return fmt.Errorf("MPI implementation for %s doesn't supported", info.RuntimePolicy.MLPolicy.MPI.MPIImplementation)
+		return fmt.Errorf("MPI implementation for %v doesn't supported", info.RuntimePolicy.MLPolicy.MPI.MPIImplementation)
 	}
 
 	// Add container port for the headless service.
@@ -240,7 +240,7 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 	var hostfile bytes.Buffer
 	// TODO (andreyvelich): Support other MPI implementations.
 	for i := range *info.Trainer.NumNodes {
-		switch info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
+		switch *info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
 		case trainer.MPIImplementationOpenMPI:
 			// hostfile.WriteString(fmt.Sprintf("%s-%s-0-%s.%s.%s.svc slots=%s\n", trainJob.Name, constants.JobTrainerNode, i, trainJob.Name, trainJob.Namespace, info.NumProcPerNode))
 			hostfile.WriteString(fmt.Sprintf("%s-%s-0-%d.%s slots=%s\n", trainJob.Name, constants.JobTrainerNode, i, info.NumProcPerNode, trainJob.Name))

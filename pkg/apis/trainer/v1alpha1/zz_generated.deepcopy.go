@@ -311,6 +311,16 @@ func (in *MPIMLPolicySource) DeepCopyInto(out *MPIMLPolicySource) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.MPIImplementation != nil {
+		in, out := &in.MPIImplementation, &out.MPIImplementation
+		*out = new(MPIImplementation)
+		**out = **in
+	}
+	if in.SSHAuthMountPath != nil {
+		in, out := &in.SSHAuthMountPath, &out.SSHAuthMountPath
+		*out = new(string)
+		**out = **in
+	}
 	if in.RunLauncherAsNode != nil {
 		in, out := &in.RunLauncherAsNode, &out.RunLauncherAsNode
 		*out = new(bool)

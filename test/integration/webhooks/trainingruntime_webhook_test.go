@@ -189,7 +189,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					runtime.Spec.MLPolicy = &trainer.MLPolicy{
 						MLPolicySource: trainer.MLPolicySource{
 							MPI: &trainer.MPIMLPolicySource{
-								MPIImplementation: trainer.MPIImplementationOpenMPI,
+								MPIImplementation: ptr.To(trainer.MPIImplementationOpenMPI),
 								RunLauncherAsNode: ptr.To(false),
 							},
 						},

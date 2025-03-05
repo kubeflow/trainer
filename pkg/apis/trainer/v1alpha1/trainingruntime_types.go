@@ -216,11 +216,11 @@ type MPIMLPolicySource struct {
 	// Implementation name for the MPI to create the appropriate hostfile.
 	// Defaults to OpenMPI.
 	// +kubebuilder:default=OpenMPI
-	MPIImplementation MPIImplementation `json:"mpiImplementation,omitempty"`
+	MPIImplementation *MPIImplementation `json:"mpiImplementation,omitempty"`
 
 	// Directory where SSH keys are mounted.
 	// Defaults to /root/.ssh.
-	SSHAuthMountPath string `json:"sshAuthMountPath,omitempty"`
+	SSHAuthMountPath *string `json:"sshAuthMountPath,omitempty"`
 
 	// Whether to run training process on the launcher Job.
 	// Defaults to false.
