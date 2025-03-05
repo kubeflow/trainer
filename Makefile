@@ -143,7 +143,7 @@ test-e2e: ## Run Go e2e test.
 
 # Input and output location for Notebooks executed with Papermill.
 NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
-NOTEBOOK_OUTPUT=$(PROJECT_DIR)/trainer_output.ipynb
+NOTEBOOK_OUTPUT=$(PROJECT_DIR)/artifacts/trainer_output.ipynb
 PAPERMILL_TIMEOUT=900
 .PHONY: test-e2e-notebook
 test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
