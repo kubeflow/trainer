@@ -199,7 +199,7 @@
         "spec": {
           "description": "Specification of the desired JobSet which will be created from TrainJob.",
           "default": {},
-          "$ref": "https://raw.githubusercontent.com/andreyvelich/jobset/refs/heads/fix-swagger-ref/hack/python-sdk/swagger.json#/definitions/jobset.v1alpha2.JobSetSpec"
+          "$ref": "https://raw.githubusercontent.com/kubernetes-sigs/jobset/d5c7bcebe739a4577e30944370c2d7a68321a929/hack/python-sdk/swagger.json#/definitions/jobset.v1alpha2.JobSetSpec"
         }
       }
     },

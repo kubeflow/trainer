@@ -54,9 +54,9 @@ func main() {
 	}
 
 	k8sOpenAPISpec := fmt.Sprintf("https://raw.githubusercontent.com/kubernetes/kubernetes/refs/tags/%s/api/openapi-spec/swagger.json", k8sVersion)
+	// TODO (andreyvelich): Use the release version once this JobSet commit is released: d5c7bce.
 	// jobSetOpenAPISpec := fmt.Sprintf("https://raw.githubusercontent.com/kubernetes-sigs/jobset/refs/tags/%s/hack/python-sdk/swagger.json", jobSetVersion)
-	// TODO (andreyvelich): Use the JobSet source when PR is merged.
-	jobSetOpenAPISpec := "https://raw.githubusercontent.com/andreyvelich/jobset/refs/heads/fix-swagger-ref/hack/python-sdk/swagger.json"
+	jobSetOpenAPISpec := "https://raw.githubusercontent.com/kubernetes-sigs/jobset/d5c7bcebe739a4577e30944370c2d7a68321a929/hack/python-sdk/swagger.json"
 
 	var oAPIDefs = map[string]common.OpenAPIDefinition{}
 	defs := spec.Definitions{}
