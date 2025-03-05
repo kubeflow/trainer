@@ -21,10 +21,10 @@ import textwrap
 import threading
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from kubeflow.trainer import models
+import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
-from kubernetes import client, config
+from kubernetes import config
 
 
 def is_running_in_k8s() -> bool:
@@ -42,18 +42,9 @@ def get_default_target_namespace() -> str:
         return f.readline()
 
 
-class FakeResponse:
-    """Fake object of RESTResponse to deserialize
-    Ref) https://github.com/kubeflow/katib/pull/1630#discussion_r697877815
-    Ref) https://github.com/kubernetes-client/python/issues/977#issuecomment-592030030
-    """
-
-    def __init__(self, obj):
-        self.data = json.dumps(obj)
-
-
 def get_container_devices(
-    resources: Optional[client.V1ResourceRequirements], num_procs: Optional[str] = None
+    resources: Optional[models.IoK8sApiCoreV1ResourceRequirements],
+    num_procs: Optional[str] = None,
 ) -> Tuple[str, str]:
     """
     Get the device type and device count for the given container.
@@ -106,7 +97,9 @@ def validate_trainer(trainer: types.Trainer):
 
 
 # TODO (andreyvelich): Discuss if we want to support V1ResourceRequirements resources as input.
-def get_resources_per_node(resources_per_node: dict) -> client.V1ResourceRequirements:
+def get_resources_per_node(
+    resources_per_node: dict,
+) -> models.IoK8sApiCoreV1ResourceRequirements:
     """
     Get the Trainer resources for the training node from the given dict.
     """
@@ -116,7 +109,7 @@ def get_resources_per_node(resources_per_node: dict) -> client.V1ResourceRequire
     if "gpu" in resources:
         resources["nvidia.com/gpu"] = resources.pop("gpu")
 
-    resources = client.V1ResourceRequirements(
+    resources = models.IoK8sApiCoreV1ResourceRequirements(
         requests=resources,
         limits=resources,
     )
@@ -237,12 +230,12 @@ def get_script_for_python_packages(
     return script_for_python_packages
 
 
-def get_lora_config(lora_config: types.LoraConfig) -> List[client.V1EnvVar]:
+def get_lora_config(lora_config: types.LoraConfig) -> List[models.IoK8sApiCoreV1EnvVar]:
     """
     Get the TrainJob env from the given Lora config.
     """
 
-    env = client.V1EnvVar(
+    env = models.IoK8sApiCoreV1EnvVar(
         name=constants.ENV_LORA_CONFIG, value=json.dumps(lora_config.__dict__)
     )
     return [env]
@@ -259,7 +252,7 @@ def get_dataset_config(
 
     # TODO (andreyvelich): Support more parameters.
     ds_config = models.TrainerV1alpha1DatasetConfig(
-        storage_uri=(
+        storageUri=(
             dataset_config.storage_uri
             if dataset_config.storage_uri.startswith("hf://")
             else "hf://" + dataset_config.storage_uri
@@ -280,7 +273,7 @@ def get_model_config(
 
     # TODO (andreyvelich): Support more parameters.
     m_config = models.TrainerV1alpha1ModelConfig(
-        input=models.TrainerV1alpha1InputModel(storage_uri=model_config.storage_uri)
+        input=models.TrainerV1alpha1InputModel(storageUri=model_config.storage_uri)
     )
 
     return m_config

@@ -20,8 +20,7 @@ import string
 import uuid
 from typing import Dict, List, Optional
 
-from kubeflow.trainer import models
-from kubeflow.trainer.api_client import ApiClient
+import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils
@@ -71,7 +70,6 @@ class TrainerClient:
         k8s_client = client.ApiClient(client_configuration)
         self.custom_api = client.CustomObjectsApi(k8s_client)
         self.core_api = client.CoreV1Api(k8s_client)
-        self.api_client = ApiClient()
 
         self.namespace = namespace
 
@@ -100,12 +98,12 @@ class TrainerClient:
             response = thread.get(constants.DEFAULT_TIMEOUT)
             for item in response["items"]:
 
-                runtime = self.api_client.deserialize(
-                    utils.FakeResponse(item),
-                    models.TrainerV1alpha1ClusterTrainingRuntime,
+                runtime = models.TrainerV1alpha1ClusterTrainingRuntime.from_dict(item)
+
+                ml_policy: models.TrainerV1alpha1MLPolicy = runtime.spec.ml_policy  # type: ignore
+                metadata: models.IoK8sApimachineryPkgApisMetaV1ObjectMeta = (
+                    runtime.metadata  # type: ignore
                 )
-                ml_policy = runtime.spec.ml_policy  # type: ignore
-                metadata = runtime.metadata  # type: ignore
 
                 # TODO (andreyvelich): Currently, the labels must be presented.
                 if metadata.labels:
@@ -113,7 +111,10 @@ class TrainerClient:
                     resources = None
                     for job in runtime.spec.template.spec.replicated_jobs:  # type: ignore
                         if job.name == constants.JOB_TRAINER_NODE:
-                            pod_spec = job.template.spec.template.spec
+                            pod_spec: models.IoK8sApiCoreV1PodSpec = (
+                                job.template.spec.template.spec  # type: ignore
+                            )
+
                             for container in pod_spec.containers:
                                 if container.name == constants.CONTAINER_TRAINER:
                                     resources = container.resources
@@ -131,12 +132,12 @@ class TrainerClient:
                     )
                     if accelerator_count != constants.UNKNOWN:
                         accelerator_count = str(
-                            int(accelerator_count) * int(ml_policy.num_nodes)
+                            int(accelerator_count) * int(ml_policy.num_nodes)  # type: ignore
                         )
 
                     result.append(
                         types.Runtime(
-                            name=metadata.name,
+                            name=metadata.name,  # type: ignore
                             phase=(
                                 metadata.labels[constants.PHASE_KEY]
                                 if constants.PHASE_KEY in metadata.labels
@@ -230,18 +231,20 @@ class TrainerClient:
             )
 
         train_job = models.TrainerV1alpha1TrainJob(
-            api_version=constants.API_VERSION,
+            apiVersion=constants.API_VERSION,
             kind=constants.TRAINJOB_KIND,
-            metadata=client.V1ObjectMeta(name=train_job_name),
+            metadata=models.IoK8sApimachineryPkgApisMetaV1ObjectMeta(
+                name=train_job_name
+            ),
             spec=models.TrainerV1alpha1TrainJobSpec(
-                runtime_ref=models.TrainerV1alpha1RuntimeRef(name=runtime_ref),
+                runtimeRef=models.TrainerV1alpha1RuntimeRef(name=runtime_ref),
                 trainer=(
                     trainer_crd
                     if trainer_crd != models.TrainerV1alpha1Trainer()
                     else None
                 ),
-                dataset_config=utils.get_dataset_config(dataset_config),
-                model_config=utils.get_model_config(model_config),
+                datasetConfig=utils.get_dataset_config(dataset_config),
+                modelConfig=utils.get_model_config(model_config),
             ),
         )
 
@@ -252,7 +255,7 @@ class TrainerClient:
                 constants.VERSION,
                 self.namespace,
                 constants.TRAINJOB_PLURAL,
-                train_job,
+                train_job.to_dict(),
             )
         except multiprocessing.TimeoutError:
             raise TimeoutError(
@@ -299,10 +302,8 @@ class TrainerClient:
                     and item["spec"]["runtimeRef"]["name"] != runtime_ref
                 ):
                     continue
-                trainjob = self.api_client.deserialize(
-                    utils.FakeResponse(item),
-                    models.TrainerV1alpha1TrainJob,
-                )
+
+                trainjob = models.TrainerV1alpha1TrainJob.from_dict(item)
                 result.append(self.__get_trainjob_from_crd(trainjob))  # type: ignore
 
         except multiprocessing.TimeoutError:
@@ -329,9 +330,8 @@ class TrainerClient:
                 async_req=True,
             )
 
-            trainjob = self.api_client.deserialize(
-                utils.FakeResponse(thread.get(constants.DEFAULT_TIMEOUT)),  # type: ignore
-                models.TrainerV1alpha1TrainJob,
+            trainjob = models.TrainerV1alpha1TrainJob.from_dict(
+                thread.get(constants.DEFAULT_TIMEOUT)  # type: ignore
             )
 
         except multiprocessing.TimeoutError:
@@ -484,8 +484,8 @@ class TrainerClient:
         trainjob_crd: models.TrainerV1alpha1TrainJob,
     ) -> types.TrainJob:
 
-        name = trainjob_crd.metadata.name  # type: ignore
-        namespace = trainjob_crd.metadata.namespace  # type: ignore
+        name: str = trainjob_crd.metadata.name  # type: ignore
+        namespace: str = trainjob_crd.metadata.namespace  # type: ignore
 
         # Construct the TrainJob from the CRD.
         train_job = types.TrainJob(
@@ -563,8 +563,8 @@ class TrainerClient:
 
         # Add the TrainJob status.
         # TODO (andreyvelich): Discuss how we should show TrainJob status to SDK users.
-        if trainjob_crd.status:
-            for c in trainjob_crd.status.conditions:  # type: ignore
+        if trainjob_crd.status and trainjob_crd.status.conditions:
+            for c in trainjob_crd.status.conditions:
                 if c.type == "Created" and c.status == "True":
                     status = "Created"
                 elif c.type == "Complete" and c.status == "True":

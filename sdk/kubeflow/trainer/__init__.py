@@ -17,19 +17,17 @@ from __future__ import absolute_import
 
 __version__ = "0.1.0"
 
-# Import the public API client.
+# Import the Kubeflow Trainer client.
 from kubeflow.trainer.api.trainer_client import TrainerClient
 
-# Import the Trainer configs.
-from kubeflow.trainer.types.types import Trainer
-from kubeflow.trainer.types.types import FineTuningConfig
-from kubeflow.trainer.types.types import LoraConfig
-
-# Import the Dataset configs.
-from kubeflow.trainer.types.types import HuggingFaceDatasetConfig
-
-# Import the Model configs.
-from kubeflow.trainer.types.types import HuggingFaceModelInputConfig
-
-# Import constants for users.
+# Import the Kubeflow Trainer constants.
 from kubeflow.trainer.constants.constants import DATASET_PATH, MODEL_PATH
+
+# Import the Kubeflow Trainer types.
+from kubeflow.trainer.types.types import (
+    FineTuningConfig,
+    HuggingFaceDatasetConfig,
+    HuggingFaceModelInputConfig,
+    LoraConfig,
+    Trainer,
+)

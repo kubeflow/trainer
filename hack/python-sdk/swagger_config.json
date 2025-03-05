@@ -1,8 +1,4 @@
 {
   "packageName": "kubeflow.trainer",
-  "typeMappings": {
-    "K8sIoApiAutoscalingV2MetricSpec": "V2MetricSpec",
-    "K8sIoApimachineryPkgUtilIntstrIntOrString": "object",
-    "V1Time": "datetime"
-  }
+  "typeMappings": {}
 }
