@@ -36,11 +36,17 @@ PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 # Tool Binaries
 LOCALBIN ?= $(PROJECT_DIR)/bin
 
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+GINKGO ?= $(LOCALBIN)/ginkgo
 ENVTEST ?= $(LOCALBIN)/setup-envtest
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 KIND ?= $(LOCALBIN)/kind
 
 # Instructions to download tools for development.
+
+.PHONY: ginkgo
+ginkgo: ## Download the ginkgo binary if required.
+	GOBIN=$(LOCALBIN) go install github.com/onsi/ginkgo/v2/ginkgo@$(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
+
 .PHONY: envtest
 envtest: ## Download the setup-envtest binary if required.
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.20
@@ -139,7 +145,7 @@ test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.
 
 .PHONY: test-e2e
 test-e2e: ## Run Go e2e test.
-	go test ./test/e2e/...
+	$(GINKGO) -v ./test/e2e/...
 
 # Input and output location for Notebooks executed with Papermill.
 NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
