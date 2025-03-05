@@ -680,6 +680,11 @@ func MakeTrainingRuntimeSpecWrapper(spec trainer.TrainingRuntimeSpec) *TrainingR
 	}
 }
 
+func (s *TrainingRuntimeSpecWrapper) JobSetSpec(spec jobsetv1alpha2.JobSetSpec) *TrainingRuntimeSpecWrapper {
+	s.Template.Spec = spec
+	return s
+}
+
 func (s *TrainingRuntimeSpecWrapper) WithMLPolicy(mlPolicy *trainer.MLPolicy) *TrainingRuntimeSpecWrapper {
 	s.MLPolicy = mlPolicy
 	return s
@@ -779,14 +784,14 @@ func (m *MLPolicyWrapper) TorchPolicy(numProcPerNode string, elasticPolicy *trai
 	return m
 }
 
-func (m *MLPolicyWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation *trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsWorker bool) *MLPolicyWrapper {
+func (m *MLPolicyWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation *trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsWorker *bool) *MLPolicyWrapper {
 	if m.MLPolicySource.MPI == nil {
 		m.MLPolicySource.MPI = &trainer.MPIMLPolicySource{}
 	}
 	m.MLPolicySource.MPI.NumProcPerNode = numProcPerNode
 	m.MLPolicySource.MPI.MPIImplementation = MPImplementation
 	m.MLPolicySource.MPI.SSHAuthMountPath = sshAuthMountPath
-	m.MLPolicySource.MPI.RunLauncherAsNode = &runLauncherAsWorker
+	m.MLPolicySource.MPI.RunLauncherAsNode = runLauncherAsWorker
 	return m
 }
 

@@ -78,7 +78,7 @@ func TestPlainML(t *testing.T) {
 				runtime.WithMLPolicy(
 					utiltesting.MakeMLPolicyWrapper().
 						WithNumNodes(100).
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, false).
+						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(false)).
 						Obj(),
 				),
 			),
@@ -87,7 +87,7 @@ func TestPlainML(t *testing.T) {
 				runtime.WithMLPolicy(
 					utiltesting.MakeMLPolicyWrapper().
 						WithNumNodes(100).
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, false).
+						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(false)).
 						Obj(),
 				),
 			),

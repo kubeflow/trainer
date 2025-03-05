@@ -173,30 +173,122 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 						Replicas(1).Obj().Spec
 					return runtime
 				}),
-
 			ginkgo.Entry("Should succeed to default mpi.mpiImplementation=OpenMPI",
 				func() *trainer.TrainingRuntime {
-					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
-					runtime.Spec.MLPolicy = &trainer.MLPolicy{
-						MLPolicySource: trainer.MLPolicySource{
-							MPI: &trainer.MPIMLPolicySource{},
-						},
-					}
-					return runtime
+					return testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(
+							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									MPIPolicy(nil, nil, ptr.To("/usr/dir"), ptr.To(false)).
+									Obj(),
+							).
+							JobSetSpec(
+								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
+									Replicas(1).
+									Obj().
+									Spec,
+							).
+							Obj(),
+						).
+						Obj()
 				},
 				func() *trainer.TrainingRuntime {
-					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
-					runtime.Spec.MLPolicy = &trainer.MLPolicy{
-						MLPolicySource: trainer.MLPolicySource{
-							MPI: &trainer.MPIMLPolicySource{
-								MPIImplementation: ptr.To(trainer.MPIImplementationOpenMPI),
-								RunLauncherAsNode: ptr.To(false),
-							},
-						},
-					}
-					runtime.Spec.Template.Spec = testingutil.MakeJobSetWrapper(ns.Name, "runtime").
-						Replicas(1).Obj().Spec
-					return runtime
+					return testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(
+							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+									Obj(),
+							).
+							JobSetSpec(
+								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
+									Replicas(1).
+									Obj().
+									Spec,
+							).
+							Obj(),
+						).
+						Obj()
+				}),
+			ginkgo.Entry("Should succeed to default mpi.sshAuthMountPath=/root/.ssh",
+				func() *trainer.TrainingRuntime {
+					return testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(
+							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(false)).
+									Obj(),
+							).
+							JobSetSpec(
+								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
+									Replicas(1).
+									Obj().
+									Spec,
+							).
+							Obj(),
+						).
+						Obj()
+				},
+				func() *trainer.TrainingRuntime {
+					return testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(
+							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+									Obj(),
+							).
+							JobSetSpec(
+								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
+									Replicas(1).
+									Obj().
+									Spec,
+							).
+							Obj(),
+						).
+						Obj()
+				}),
+			ginkgo.Entry("Should succeed to default mpi.runLauncherAsNode=false",
+				func() *trainer.TrainingRuntime {
+					return testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(
+							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), nil).
+									Obj(),
+							).
+							JobSetSpec(
+								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
+									Replicas(1).
+									Obj().
+									Spec,
+							).
+							Obj(),
+						).
+						Obj()
+				},
+				func() *trainer.TrainingRuntime {
+					return testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(
+							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+									Obj(),
+							).
+							JobSetSpec(
+								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
+									Replicas(1).
+									Obj().
+									Spec,
+							).
+							Obj(),
+						).
+						Obj()
 				}),
 		)
 	})

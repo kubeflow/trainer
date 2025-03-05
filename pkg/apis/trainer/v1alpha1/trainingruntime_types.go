@@ -220,6 +220,7 @@ type MPIMLPolicySource struct {
 
 	// Directory where SSH keys are mounted.
 	// Defaults to /root/.ssh.
+	// +kubebuilder:default=/root/.ssh
 	SSHAuthMountPath *string `json:"sshAuthMountPath,omitempty"`
 
 	// Whether to run training process on the launcher Job.

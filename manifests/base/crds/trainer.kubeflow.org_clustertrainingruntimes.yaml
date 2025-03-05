@@ -68,6 +68,7 @@ spec:
                           Defaults to false.
                         type: boolean
                       sshAuthMountPath:
+                        default: /root/.ssh
                         description: |-
                           Directory where SSH keys are mounted.
                           Defaults to /root/.ssh.
