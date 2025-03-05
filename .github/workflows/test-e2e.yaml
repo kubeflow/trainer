@@ -58,7 +58,9 @@ jobs:
 
       - name: Run e2e test for example Notebooks.
         run: |
-          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb TIMEOUT=900
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./mnist_output.ipynb TIMEOUT=900
+          ls -la
+          pwd
 
       # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
       - name: Upload notebook
@@ -66,5 +68,5 @@ jobs:
         if: always()
         with:
           name: mnist_output.ipynb
-          path: trainer_output.ipynb
+          path: ./mnist_output.ipynb
           retention-days: 1

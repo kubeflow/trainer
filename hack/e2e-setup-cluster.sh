@@ -76,11 +76,13 @@ print_cluster_info() {
 
 # TODO (andreyvelich): Currently, we print manager logs due to flaky test.
 echo "Deploy Kubeflow Trainer runtimes"
-cd ../runtimes && kubectl apply --server-side -k . || (
-  kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer &&
+(cd ../runtimes && kubectl apply --server-side -k .) || (
+  kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
     print_cluster_info &&
     exit 1
 )
 
+# TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
+${KIND} load docker-image docker.io/pytorch/pytorch:2.5.0-cuda12.4-cudnn9-runtime
 
 print_cluster_info

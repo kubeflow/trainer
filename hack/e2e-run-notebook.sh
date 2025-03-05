@@ -39,11 +39,13 @@ fi
 print_results() {
     echo -e "Notebook Output\n"
     cat "${NOTEBOOK_OUTPUT}"
-    echo -e "Check Kubernetes resources\n"
+    echo -e "\n\nCheck Kubernetes resources\n\n"
+    kubectl get pods
     kubectl describe pod
     kubectl describe trainjob
     kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
     kubectl wait trainjob --for=condition=Complete --all --timeout 3s
 }
 
-papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" --execution-timeout "${PAPERMILL_TIMEOUT}" && print_results || (print_results && exit 1)
+(papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" --execution-timeout "${PAPERMILL_TIMEOUT}" && print_results) ||
+    (print_results && exit 1)
