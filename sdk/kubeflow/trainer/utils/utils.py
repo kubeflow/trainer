@@ -105,7 +105,7 @@ def get_resources_per_node(
     """
 
     # Convert all keys in resources to lowercase.
-    resources = {k.lower(): v for k, v in resources_per_node.items()}
+    resources = {k.lower(): str(v) for k, v in resources_per_node.items()}
     if "gpu" in resources:
         resources["nvidia.com/gpu"] = resources.pop("gpu")
 
@@ -118,7 +118,7 @@ def get_resources_per_node(
 
 # TODO (andreyvelich): Move this part to the Kubeflow Trainer torch plugins.
 # Ref issue: https://github.com/kubeflow/trainer/issues/2407
-def get_num_proc_per_node(resources_per_node: dict) -> object:
+def get_num_proc_per_node(resources_per_node: dict) -> str:
     """
     Get the Trainer numProcPerNode from the given resources.
     """
@@ -127,14 +127,14 @@ def get_num_proc_per_node(resources_per_node: dict) -> object:
     # NumProcPerNode is equal to number of GPUs or CPUs, otherwise set it to `auto`
     for key, value in resources.items():
         if "gpu" in key:
-            return value
+            return str(value)
 
     for key, value in resources.items():
         if "cpu" in key:
             # For now, we can't convert milliCPUs to the numProcPerNode.
             try:
                 value = math.ceil(int(value))
-                return value
+                return str(value)
             except Exception:
                 pass
 
