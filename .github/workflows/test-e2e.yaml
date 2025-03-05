@@ -39,9 +39,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          echo "Install Kind"
-          go install sigs.k8s.io/kind@v0.27.0
-
           echo "Install Papermill"
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
 
