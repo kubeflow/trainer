@@ -98,7 +98,7 @@ job_id = TrainingClient().train(
 
 ![](./llm-lifcycle-torchtune.png)
 
-### `torchtune` Config Override in `TrainJob` and `TrainingRuntime`
+### `Torchtune` Config Override in `TrainJob` and `TrainingRuntime`
 
 As is shown in the official guides, we can pass distributed arguments to `torchtune` and override some parameters in the config, like:
 
@@ -257,7 +257,7 @@ class TorchTuneConfig:
 
 ### Complement `torch` Plugin
 
-#### Perform Mutation in `torch` plugin
+#### Perform Mutation in `torch` Plugin
 
 We need to modify the exsiting torch plugin to handle config override for `torchtune`, since currently torch plugin passes the distributed arguments by environment variables that begins with `PET_`, which is not allowed by `torchtune`. However, `torchtune` can share the same ML Policy with `torchrun` because `torchtune` is fully compatible with these distributed parameters.
 
@@ -317,7 +317,7 @@ if port := info.Trainer.ContainerPort; port != nil {
 // ...
 ```
 
-#### Create Map from `TorchTuneConfig` to specific recipes and configs
+#### Create Map from `TorchTuneConfig` to Specific Recipes and Configs
 
 We will create a map from (`TorchTuneConfig`, `num_nodes`, `nproc_per_node`, `runtime_ref`) to dedicated `recipe` and `config` in the server side. This will allow users to fine-tune their LLMs without knowing about `torchtune`'s recipes and configs and prevent SDK from changing frequently.
 
@@ -386,7 +386,7 @@ manifests/
 |-- third-party/
 ```
 
-### Support some common PEFT mechanisms
+### Support Some Common PEFT Mechanisms
 
 We need to support some common PEFT mechnisms like LoRA, QLoRA, DoRA to allow users to optimize the memory usage when they are fine-tuning the LLMs. This is crucial for users who have limited resources and want to fine-tune their model at the minimum cost.
 
