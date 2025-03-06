@@ -90,7 +90,7 @@ job_id = TrainingClient().train(
         ),
         num_nodes=5,
     ),
-    runtime_ref=llm_runtime,
+    runtime_ref="torchtune-llama3.1-8B-finetuning",
 )
 ```
 
@@ -179,7 +179,7 @@ The trainer image will be built with packages related to PyTorch, CUDA, TorchTun
 
 ### Complement `torch` Plugin
 
-**How to perform mutation in the runtime plugin**
+#### Perform Mutation in `torch` plugin**
 
 We need to modify the exsiting torch plugin to handle config override for `torchtune`, since currently torch plugin passes the distributed arguments by environment variables that begins with `PET_`, which is not allowed by `torchtune`. However, `torchtune` can share the same ML Policy with `torchrun` because `torchtune` is fully compatible with these distributed parameters.
 
@@ -239,7 +239,7 @@ if port := info.Trainer.ContainerPort; port != nil {
 // ...
 ```
 
-**How to Determine Default Resources**
+#### Determine Default Resources
 
 Currently, `torchtune` has limited support for multi-node training (but support is coming soon). So, I would propose that we use 1 PyTorch node and 1 GPU by default. Users can specify `num_nodes` and `resource_per_node` in the `Trainer` field to increase PyTorch nodes and GPU number.
 
@@ -328,13 +328,23 @@ As we mentioned above, we will create a map from (`TorchTuneConfig`, `num_nodes`
 
 1. `peft_config == None` && `num_nodes == 1` && `nproc_per_node == 1`: Use `full_finetune_single_device`.
 2. `peft_config == None` && (`num_nodes >= 1` || `nproc_per_node > 1`): Use `full_finetune_distributed`.
-3. `type(peft_confg) == LoraConfig` && `num_nodes == 1`: Use `lora_finetune_single_device`.
-4. `type(peft_confg) == LoraConfig` && `num_nodes > 1`: Use `lora_finetune_distributed`
+3. `type(peft_confg) == LoraConfig` && `nproc_per_node == 1`: Use `lora_finetune_single_device`.
+4. `type(peft_confg) == LoraConfig` && `nproc_per_node > 1`: Use `lora_finetune_distributed`.
 5. TBA if we want to support more fine-tuning techniques.
 
 **How to Select `config`**
 
 We will create one `ClusterTrainingRuntime` for one model. In this way, we can extract the model info in `runtime_ref`, and select corresponding config file according to the `recipe`.
+
+#### Validate Fine-Tuning Configurations
+
+In order to ensure the validity of the configurations propagated by SDK, we plan to add some validating requirements to the TrainJob Webhook. We'll check:
+
+1. Model name in `model_config` is consistent with the `runtime_ref` used for fine-tuning.
+2. Model referenced by `runtime_ref` supports multi-node fine-tuning if `num_nodes > 1`.
+3. Model referenced by `runtime_ref` supports full fine-tuning if using the full fine-tuning recipe.
+4. Model referenced by `runtime_ref` supports LoRA fine-tuning if using the LoRA fine-tuning recipe.
+5. TBA...
 
 ### Maintain ClusterTrainingRuntimes in Manifests
 
