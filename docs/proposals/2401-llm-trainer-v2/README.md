@@ -96,8 +96,6 @@ job_id = TrainingClient().train(
 
 ## Design Details
 
-Overview of our design is shown in the diagram below:
-
 ![](./llm-lifcycle-torchtune.png)
 
 ### Config Override
