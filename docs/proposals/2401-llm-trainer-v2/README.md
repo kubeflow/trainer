@@ -98,7 +98,7 @@ job_id = TrainingClient().train(
 
 ![](./llm-lifcycle-torchtune.png)
 
-### Config Override
+### `torchtune` Config Override in `TrainJob` and `TrainingRuntime`
 
 As is shown in the official guides, we can pass distributed arguments to `torchtune` and override some parameters in the config, like:
 
@@ -123,8 +123,7 @@ kind: ClusterTrainingRuntime
 metadata:
   name: torchtune-llama3.1-8B-finetuning
   labels:
-    trainer.runtime.kubeflow.org/type: torchtune
-    training.kubeflow.org/phase: post-training
+    runtime.trainer.kubeflow.org/phase: post-training
 spec:
   mlPolicy:
     numNodes: 1
@@ -179,7 +178,86 @@ spec:
 
 The trainer image will be built with packages related to PyTorch, CUDA, TorchTune. And we will maintain its Dockerfile under `cmd/trainers/torchtune/`.
 
+### Propagte `torchtune` Settings with SDK
+
+To provide a better user experience, we need to offer a simple SDK that allows users to easily modify config files. So, we introduce `TorchTuneConfig` dataclass in SDK. Then, users can fine-tune their LLMs without any knowledge about `torchtune`.
+
+```python
+# By default we can fine-tune models without any additional configurations from users
+TrainerClient().train(
+    runtime_ref="torchtune-llama-3.3-70b"
+)
+```
+
+#### Modify the `train` API
+
+As we discussed in [Github](https://github.com/kubeflow/trainer/pull/2410#discussion_r1963832826), the `train` API mainly executes two types of training tasks:
+
+1. **Type 1: Training with custom function/image**: A self-contained function/image that encapsulates the entire model training process.
+2. **Type 2: Config-driven approach with existing Trainer**: A trainer that already includes fine-tuning logic, requiring only parameter adjustments.
+
+So we plan to modify the `train` API to:
+
+```python
+def train(
+    trainer: Optional[CustomTrainer] = None,
+    fine_tuning_config: Optional[Union[TorchTuneConfig]] = None,
+    dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
+    model_config: Optional[types.HuggingFaceModelInputConfig] = None,
+    runtime_ref: Optional[str] = None,
+) -> str:
+    pass
+
+@dataclass
+class CustomTrainer:
+    func: Optional[Callable] = None
+    func_args: Optional[Dict] = None
+    packages_to_install: Optional[List[str]] = None
+    pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
+    num_nodes: Optional[int] = None
+    resources_per_node: Optional[Dict] = None
+
+```
+
+`trainer` defines the parameters for Type 1 tasks, and will add support for custom function in the initial stage.
+
+`fine_tuning_config` defines the parameters for LLM fine-tuning task in Type 2, and will add support for fine-tuning with `torchtune` in the early stage.
+
+We natively support all `recipe` and `config` supported by `torchtune`, since `torchtune` has already provided us with default `config`. We just cannot mutate them if we do not support the corresponding mutation config.
+
+#### `TorchTuneConfig` API Design
+
+| Parameters | Type | What is it? |
+| - | - | - |
+| dtype | Optional[str] | The underlying data type used to represent the model and optimizer parameters. Currently, we only support `bf16` and `fp32`. |
+| batch_size | Optional[int] | The number of samples processed before updating model weights. |
+| epochs | Optional[int] | The number of samples processed before updating model weights. |
+| loss | Optional[str] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
+| peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
+| dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, MultimodalDataset]] | Configuration for dataset preprocessing. |
+| num_nodes | Optional[int] | The number of PyTorch Nodes in training |
+| resource_per_node | Optional[Dict] | The resource for each PyTorch Node |
+
+```python
+# TorchTuneConfig DataClass
+@dataclass
+class TorchTuneConfig:
+    dtype: Optional[str] = None
+    batch_size: Optional[int] = None
+    epochs: Optional[int] = None
+    loss: Optional[str] = None
+    peft_config: Optional[Union[LoraConfig]] = None
+    dataset_preprocess_config: Optional[
+        Union[InstructDataset, ChatDataset, MultimodalDataset],
+    ] = None
+    num_nodes: Optional[int] = None,
+    resources_per_node: Optional[Dict] = None,
+
+```
+
 ### Complement `torch` Plugin
+
+We'll do the
 
 #### Perform Mutation in `torch` plugin**
 
@@ -241,90 +319,9 @@ if port := info.Trainer.ContainerPort; port != nil {
 // ...
 ```
 
-#### Determine Default Resources
-
-Currently, `torchtune` has limited support for multi-node training (but support is coming soon). So, I would propose that we use 1 PyTorch node and 1 GPU by default. Users can specify `num_nodes` and `resource_per_node` in the `Trainer` field to increase PyTorch nodes and GPU number.
-
-### Modify the `train` API
-
-As we discussed in [Github](https://github.com/kubeflow/trainer/pull/2410#discussion_r1963832826), the `train` API mainly executes two types of training tasks:
-
-1. **Type 1: Training with custom function/image**: A self-contained function/image that encapsulates the entire model training process.
-2. **Type 2: Config-driven approach with existing Trainer**: A trainer that already includes fine-tuning logic, requiring only parameter adjustments.
-
-So we plan to modify the `train` API to:
-
-```python
-def train(
-    trainer: Optional[CustomTrainer] = None,
-    fine_tuning_config: Optional[Union[TorchTuneConfig]] = None,
-    dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
-    model_config: Optional[types.HuggingFaceModelInputConfig] = None,
-    runtime_ref: Optional[str] = None,
-) -> str:
-    pass
-
-@dataclass
-class CustomTrainer:
-    func: Optional[Callable] = None
-    func_args: Optional[Dict] = None
-    packages_to_install: Optional[List[str]] = None
-    pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
-    num_nodes: Optional[int] = None
-    resources_per_node: Optional[Dict] = None
-
-```
-
-`trainer` defines the parameters for Type 1 tasks, and will add support for custom function in the initial stage.
-
-`fine_tuning_config` defines the parameters for LLM fine-tuning task in Type 2, and will add support for fine-tuning with `torchtune` in the early stage.
-
-We natively support all `recipe` and `config` supported by `torchtune`, since `torchtune` has already provided us with default `config`. We just cannot mutate them if we do not support the corresponding mutation config.
-
-### Propagate `torchtune` settings with SDK
-
-To provide a better user experience, we need to offer a simple SDK that allows users to easily modify config files. So, we introduce `TorchTuneConfig` dataclass and create a map from (`TorchTuneConfig`, `num_nodes`, `runtime_ref`) to dedicated `recipe` and `config`. Then, users can fine-tune their LLMs without any knowledge about `torchtune`.
-
-```python
-# By default we can fine-tune models without any additional configurations from users
-TrainerClient().train(
-    runtime_ref="torchtune-llama-3.3-70b"
-)
-```
-
-#### `TorchTuneConfig` API Design
-
-| Parameters | Type | What is it? |
-| - | - | - |
-| dtype | Optional[str] | The underlying data type used to represent the model and optimizer parameters. Currently, we only support `bf16` and `fp32`. |
-| batch_size | Optional[int] | The number of samples processed before updating model weights. |
-| epochs | Optional[int] | The number of samples processed before updating model weights. |
-| loss | Optional[str] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
-| peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
-| dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, MultimodalDataset]] | Configuration for dataset preprocessing. |
-| num_nodes | Optional[int] | The number of PyTorch Nodes in training |
-| resource_per_node | Optional[Dict] | The resource for each PyTorch Node |
-
-```python
-# TorchTuneConfig DataClass
-@dataclass
-class TorchTuneConfig:
-    dtype: Optional[str] = None
-    batch_size: Optional[int] = None
-    epochs: Optional[int] = None
-    loss: Optional[str] = None
-    peft_config: Optional[Union[LoraConfig]] = None
-    dataset_preprocess_config: Optional[
-        Union[InstructDataset, ChatDataset, MultimodalDataset],
-    ] = None
-    num_nodes: Optional[int] = None,
-    resources_per_node: Optional[Dict] = None,
-
-```
-
 #### Create Map from `TorchTuneConfig` to specific recipes and configs
 
-As we mentioned above, we will create a map from (`TorchTuneConfig`, `num_nodes`, `runtime_ref`) to dedicated `recipe` and `config`. This will allow users to fine-tune their LLMs without knowing about `torchtune`'s recipes and configs.
+We will create a map from (`TorchTuneConfig`, `num_nodes`, `nproc_per_node`, `runtime_ref`) to dedicated `recipe` and `config` in the server side. This will allow users to fine-tune their LLMs without knowing about `torchtune`'s recipes and configs and prevent SDK from changing frequently.
 
 - How to Select `recipe`
 
@@ -340,21 +337,14 @@ We will create one `ClusterTrainingRuntime` for one model. In this way, we can e
 
 #### Validate Fine-Tuning Configurations
 
-In order to ensure the validity of the configurations propagated by SDK, we plan to add some validating requirements to the TrainJob Webhook. We'll check:
+In order to ensure the validity of the configurations propagated by SDK, we plan to add some validating requirements to the TrainJob Webhook. We'll implement validations in torch plugin [`CustomValidationPlugin`](https://github.com/kubeflow/trainer/blob/1f443729ebdb3e792d4b9cd2b242f33b0e86fe14/pkg/runtime/framework/interface.go#L34-L37):
 
-1. Model name in `model_config` is consistent with the `runtime_ref` used for fine-tuning.
-2. Model referenced by `runtime_ref` supports multi-node fine-tuning if `num_nodes > 1`.
-3. Model referenced by `runtime_ref` supports full fine-tuning if using the full fine-tuning recipe.
-4. Model referenced by `runtime_ref` supports LoRA fine-tuning if using the LoRA fine-tuning recipe.
-5. TBA...
+1. The ClusterTrainingRuntime referenced by `runtime_ref` exists in the control plane.
+2. TBA...
 
-We will do the validation in `pkg/runtime/framework/torch/torch.go`:
+#### Determine Default Resources
 
-```Go
-func (t *Torch) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
-    // Validation logic here
-}
-```
+Currently, `torchtune` has limited support for multi-node training (but support is coming soon). So, we'd better use 1 PyTorch node and 1 GPU by default. Users can specify `num_nodes` and `resource_per_node` in the `Trainer` field to increase PyTorch nodes and GPU number.
 
 ### Maintain ClusterTrainingRuntimes in Manifests
 
@@ -613,7 +603,7 @@ Huggingface Accelerate CLI is a simplified distributed training launch tool, whi
 If time permitted, it would be great to build our impacts among junior learners by a simple distributed training backend.
 
 ```python
-import torch
+  import torch
   import torch.nn.functional as F
   from datasets import load_dataset
 + from accelerate import Accelerator
