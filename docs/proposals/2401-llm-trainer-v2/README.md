@@ -537,7 +537,7 @@ We will use [papermill](https://github.com/nteract/papermill) to execute these n
 ## Implementation History
 
 - 2025-01-31: Create KEP-2401 doc
-- 2025-03-05: KEP-2401 1st version & Start implementation
+- 2025-03-07: KEP-2401 1st version & Start implementation
 
 ## Alternatives
 
