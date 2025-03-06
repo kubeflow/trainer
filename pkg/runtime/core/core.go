@@ -31,12 +31,25 @@ import (
 func New(ctx context.Context, client client.Client, indexer client.FieldIndexer) (map[string]runtime.Runtime, error) {
 	registry := NewRuntimeRegistry()
 	runtimes := make(map[string]runtime.Runtime, len(registry))
-	for name, factory := range registry {
-		r, err := factory(ctx, client, indexer)
-		if err != nil {
-			return nil, fmt.Errorf("initializing runtime %q: %w", name, err)
+	for name, registrar := range registry {
+		for _, dep := range registrar.dependencies {
+			depRegistrar, depExist := registry[dep]
+			_, depRegistered := runtimes[dep]
+			if depExist && !depRegistered {
+				r, err := depRegistrar.factory(ctx, client, indexer)
+				if err != nil {
+					return nil, fmt.Errorf("initializing runtime %q on which %q depends: %w", dep, name, err)
+				}
+				runtimes[dep] = r
+			}
 		}
-		runtimes[name] = r
+		if _, ok := runtimes[name]; !ok {
+			r, err := registrar.factory(ctx, client, indexer)
+			if err != nil {
+				return nil, fmt.Errorf("initializing runtime %q: %w", name, err)
+			}
+			runtimes[name] = r
+		}
 	}
 	return runtimes, nil
 }
