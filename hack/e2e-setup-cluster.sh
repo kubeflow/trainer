@@ -30,20 +30,30 @@ TIMEOUT="5m"
 
 # Kubeflow Trainer images.
 # TODO (andreyvelich): Support initializers images.
-CONTROLLER_MANAGER_CI_IMAGE=trainer-controller-manager:test
+CONTROLLER_MANAGER_CI_IMAGE_NAME="kubeflow/trainer-controller-manager"
+CONTROLLER_MANAGER_CI_IMAGE_TAG="test"
+CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
 echo "Build Kubeflow Trainer images"
 docker build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
-
-echo "Set the image in Kustomize overlay"
-cd manifests/overlays/manager
-kustomize edit set image kubeflow/trainer-controller-manager=${CONTROLLER_MANAGER_CI_IMAGE}
 
 echo "Create Kind cluster and load Kubeflow Trainer images"
 ${KIND} create cluster --image "${KIND_NODE_VERSION}"
 ${KIND} load docker-image ${CONTROLLER_MANAGER_CI_IMAGE}
 
 echo "Deploy Kubeflow Trainer control plane"
-kubectl apply --server-side -k .
+E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
+mkdir -p "${E2E_MANIFESTS_DIR}"
+cat <<EOF > "${E2E_MANIFESTS_DIR}/kustomization.yaml"
+  apiVersion: kustomize.config.k8s.io/v1beta1
+  kind: Kustomization
+  resources:
+  - ../../../manifests/overlays/manager
+  images:
+  - name: "${CONTROLLER_MANAGER_CI_IMAGE_NAME}"
+    newTag: "${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
+EOF
+
+kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
 
 # We should wait until Deployment is in Ready status.
 echo "Wait for Kubeflow Trainer to be ready"
@@ -66,7 +76,7 @@ print_cluster_info() {
 
 # TODO (andreyvelich): Currently, we print manager logs due to flaky test.
 echo "Deploy Kubeflow Trainer runtimes"
-(cd ../runtimes && kubectl apply --server-side -k .) || (
+kubectl apply --server-side -k manifests/overlays/runtimes || (
   kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
     print_cluster_info &&
     exit 1
