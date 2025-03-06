@@ -257,9 +257,7 @@ class TorchTuneConfig:
 
 ### Complement `torch` Plugin
 
-We'll do the
-
-#### Perform Mutation in `torch` plugin**
+#### Perform Mutation in `torch` plugin
 
 We need to modify the exsiting torch plugin to handle config override for `torchtune`, since currently torch plugin passes the distributed arguments by environment variables that begins with `PET_`, which is not allowed by `torchtune`. However, `torchtune` can share the same ML Policy with `torchrun` because `torchtune` is fully compatible with these distributed parameters.
 
