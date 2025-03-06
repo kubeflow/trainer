@@ -27,7 +27,7 @@ class TrainerV1alpha1MPIMLPolicySource(BaseModel):
     MPIMLPolicySource represents a MPI runtime configuration.
     """ # noqa: E501
     mpi_implementation: Optional[StrictStr] = Field(default=None, description="Implementation name for the MPI to create the appropriate hostfile. Defaults to OpenMPI.", alias="mpiImplementation")
-    num_proc_per_node: Optional[StrictInt] = Field(default=None, description="Number of processes per node. This value is equal to the number of slots for each node in the hostfile.", alias="numProcPerNode")
+    num_proc_per_node: Optional[StrictInt] = Field(default=None, description="Number of processes per node. This value is equal to the number of slots for each node in the hostfile. Defaults to 1.", alias="numProcPerNode")
     run_launcher_as_node: Optional[StrictBool] = Field(default=None, description="Whether to run training process on the launcher Job. Defaults to false.", alias="runLauncherAsNode")
     ssh_auth_mount_path: Optional[StrictStr] = Field(default=None, description="Directory where SSH keys are mounted. Defaults to /root/.ssh.", alias="sshAuthMountPath")
     __properties: ClassVar[List[str]] = ["mpiImplementation", "numProcPerNode", "runLauncherAsNode", "sshAuthMountPath"]

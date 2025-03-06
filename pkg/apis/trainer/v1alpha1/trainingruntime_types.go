@@ -211,6 +211,8 @@ type TorchElasticPolicy struct {
 type MPIMLPolicySource struct {
 	// Number of processes per node.
 	// This value is equal to the number of slots for each node in the hostfile.
+	// Defaults to 1.
+	// +kubebuilder:default=1
 	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
 
 	// Implementation name for the MPI to create the appropriate hostfile.

@@ -180,7 +180,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(nil, nil, ptr.To("/usr/dir"), ptr.To(false)).
+									MPIPolicy(ptr.To[int32](1), nil, ptr.To("/usr/dir"), ptr.To(false)).
 									Obj(),
 							).
 							JobSetSpec(
@@ -199,7 +199,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
 									Obj(),
 							).
 							JobSetSpec(
@@ -219,7 +219,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(false)).
+									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(false)).
 									Obj(),
 							).
 							JobSetSpec(
@@ -238,7 +238,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
 									Obj(),
 							).
 							JobSetSpec(
@@ -258,7 +258,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), nil).
+									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), nil).
 									Obj(),
 							).
 							JobSetSpec(
@@ -277,7 +277,46 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
+									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+									Obj(),
+							).
+							JobSetSpec(
+								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
+									Replicas(1).
+									Obj().
+									Spec,
+							).
+							Obj(),
+						).
+						Obj()
+				}),
+			ginkgo.Entry("Should succeed to default mpi.numProcPerNode=1",
+				func() *trainer.TrainingRuntime {
+					return testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(
+							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
 									MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+									Obj(),
+							).
+							JobSetSpec(
+								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
+									Replicas(1).
+									Obj().
+									Spec,
+							).
+							Obj(),
+						).
+						Obj()
+				},
+				func() *trainer.TrainingRuntime {
+					return testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(
+							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
 									Obj(),
 							).
 							JobSetSpec(

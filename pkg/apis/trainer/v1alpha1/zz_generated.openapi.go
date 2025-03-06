@@ -558,7 +558,7 @@ func schema_pkg_apis_trainer_v1alpha1_MPIMLPolicySource(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"numProcPerNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Number of processes per node. This value is equal to the number of slots for each node in the hostfile.",
+							Description: "Number of processes per node. This value is equal to the number of slots for each node in the hostfile. Defaults to 1.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

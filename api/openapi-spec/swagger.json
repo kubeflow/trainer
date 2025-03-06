@@ -293,7 +293,7 @@
           "type": "string"
         },
         "numProcPerNode": {
-          "description": "Number of processes per node. This value is equal to the number of slots for each node in the hostfile.",
+          "description": "Number of processes per node. This value is equal to the number of slots for each node in the hostfile. Defaults to 1.",
           "type": "integer",
           "format": "int32"
         },

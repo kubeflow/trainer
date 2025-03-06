@@ -56,9 +56,11 @@ spec:
                           Defaults to OpenMPI.
                         type: string
                       numProcPerNode:
+                        default: 1
                         description: |-
                           Number of processes per node.
                           This value is equal to the number of slots for each node in the hostfile.
+                          Defaults to 1.
                         format: int32
                         type: integer
                       runLauncherAsNode:
