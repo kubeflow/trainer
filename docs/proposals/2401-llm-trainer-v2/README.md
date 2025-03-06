@@ -96,6 +96,10 @@ job_id = TrainingClient().train(
 
 ## Design Details
 
+Overview of our design is shown in the diagram below:
+
+![](./llm-lifcycle-torchtune.png)
+
 ### Config Override
 
 As is shown in the official guides, we can pass distributed arguments to `torchtune` and override some parameters in the config, like:
