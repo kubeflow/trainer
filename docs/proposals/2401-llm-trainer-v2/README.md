@@ -286,7 +286,7 @@ To provide a better user experience, we need to offer a simple SDK that allows u
 ```python
 # By default we can fine-tune models without any additional configurations from users
 TrainerClient().train(
-  runtime_ref="torchtune-llama-3.3-70b"
+    runtime_ref="torchtune-llama-3.3-70b"
 )
 ```
 
@@ -345,6 +345,14 @@ In order to ensure the validity of the configurations propagated by SDK, we plan
 3. Model referenced by `runtime_ref` supports full fine-tuning if using the full fine-tuning recipe.
 4. Model referenced by `runtime_ref` supports LoRA fine-tuning if using the LoRA fine-tuning recipe.
 5. TBA...
+
+We will do the validation in `pkg/runtime/framework/torch/torch.go`:
+
+```Go
+func (t *Torch) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+    // Validation logic here
+}
+```
 
 ### Maintain ClusterTrainingRuntimes in Manifests
 
