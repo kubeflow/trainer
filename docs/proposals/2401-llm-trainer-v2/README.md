@@ -324,7 +324,7 @@ class TorchTuneConfig:
 
 As we mentioned above, we will create a map from (`TorchTuneConfig`, `num_nodes`, `runtime_ref`) to dedicated `recipe` and `config`. This will allow users to fine-tune their LLMs without knowing about `torchtune`'s recipes and configs.
 
-**How to Select `recipe`**
+- How to Select `recipe`
 
 1. `peft_config == None` && `num_nodes == 1` && `nproc_per_node == 1`: Use `full_finetune_single_device`.
 2. `peft_config == None` && (`num_nodes >= 1` || `nproc_per_node > 1`): Use `full_finetune_distributed`.
@@ -332,7 +332,7 @@ As we mentioned above, we will create a map from (`TorchTuneConfig`, `num_nodes`
 4. `type(peft_confg) == LoraConfig` && `nproc_per_node > 1`: Use `lora_finetune_distributed`.
 5. TBA if we want to support more fine-tuning techniques.
 
-**How to Select `config`**
+- How to Select `config`
 
 We will create one `ClusterTrainingRuntime` for one model. In this way, we can extract the model info in `runtime_ref`, and select corresponding config file according to the `recipe`.
 
