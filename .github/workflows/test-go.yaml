@@ -1,7 +1,6 @@
 name: Unit and Integration Test - Go
 
 on:
-  - push
   - pull_request
 
 jobs:

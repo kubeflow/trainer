@@ -108,6 +108,12 @@ DATASET_PATH = os.path.join(WORKSPACE_PATH, "dataset")
 # The path where initializer downloads model.
 MODEL_PATH = os.path.join(WORKSPACE_PATH, "model")
 
+# The Job name for the launcher (e.g. mpirun launcher).
+JOB_LAUNCHER = "launcher"
+
+# The container name for the launcher
+CONTAINER_LAUNCHER = "launcher"
+
 # The Job name for the trainer nodes.
 JOB_TRAINER_NODE = "trainer-node"
 

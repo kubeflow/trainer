@@ -1,7 +1,6 @@
 name: E2E Test
 
 on:
-  - push
   - pull_request
 
 jobs:

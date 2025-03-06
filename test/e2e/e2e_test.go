@@ -9,9 +9,13 @@ import (
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
 	"github.com/kubeflow/trainer/test/util"
+)
+
+const (
+	torchRuntime = "torch-distributed"
+	mpiRuntime   = "mpi-distributed"
 )
 
 var _ = ginkgo.Describe("TrainJob e2e", func() {
@@ -45,7 +49,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 		ginkgo.It("should create TrainJob with PyTorch runtime reference", func() {
 			// Create a TrainJob.
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "torch-distributed").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
 				Obj()
 
 			ginkgo.By("Create a TrainJob with torch-distributed runtime reference", func() {
@@ -55,15 +59,35 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 			// Wait for TrainJob to be in Succeeded status.
 			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
-					gotTrainJob := &trainer.TrainJob{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
-					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(gomega.Succeed())
+					g.Expect(trainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
 						{
-							Type:    trainer.TrainJobCreated,
+							Type:    trainer.TrainJobComplete,
 							Status:  metav1.ConditionTrue,
-							Reason:  trainer.TrainJobJobsCreationSucceededReason,
-							Message: constants.TrainJobJobsCreationSucceededMessage,
+							Reason:  jobsetconsts.AllJobsCompletedReason,
+							Message: jobsetconsts.AllJobsCompletedMessage,
 						},
+					}, util.IgnoreConditions))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+		})
+		// TODO (andreyvelich): This should be changed to DeepSpeed and MLX runtimes.
+		// Verify `mpi-distributed` ClusterTrainingRuntime.
+		ginkgo.It("should create TrainJob with MPI runtime reference", func() {
+			// Create a TrainJob.
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), mpiRuntime).
+				Obj()
+
+			ginkgo.By("Create a TrainJob with mpi-distributed runtime reference", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			// Wait for TrainJob to be in Succeeded status.
+			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(gomega.Succeed())
+					g.Expect(trainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
 						{
 							Type:    trainer.TrainJobComplete,
 							Status:  metav1.ConditionTrue,

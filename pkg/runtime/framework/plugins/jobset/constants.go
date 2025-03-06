@@ -15,12 +15,6 @@ const (
 )
 
 var (
-	// This is the temporary container that we use in the initializer ReplicatedJob.
-	// TODO (andreyvelich): Once JobSet supports execution policy, we can remove it.
-	ContainerBusyBox corev1.Container = corev1.Container{
-		Name:  "busybox",
-		Image: "busybox:stable-glibc",
-	}
 
 	// VolumeMountModelInitializer is the volume mount for the model initializer container.
 	// TODO (andreyvelich): Add validation to check that initializer ReplicatedJob has the following volumes.

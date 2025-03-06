@@ -1,7 +1,6 @@
 name: Unit and Integration Test - Python
 
 on:
-  - push
   - pull_request
 
 jobs:

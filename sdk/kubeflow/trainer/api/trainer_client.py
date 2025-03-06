@@ -106,7 +106,7 @@ class TrainerClient:
                 )
 
                 # TODO (andreyvelich): Currently, the labels must be presented.
-                if metadata.labels:
+                if metadata.labels and ml_policy.num_nodes:
                     # Get the Trainer container resources.
                     resources = None
                     for job in runtime.spec.template.spec.replicated_jobs:  # type: ignore
@@ -119,21 +119,24 @@ class TrainerClient:
                                 if container.name == constants.CONTAINER_TRAINER:
                                     resources = container.resources
 
-                    # TODO (andreyvelich): Currently, only Torch is supported for NumProcPerNode.
-                    num_procs = (
-                        ml_policy.torch.num_proc_per_node if ml_policy.torch else None
-                    )
-
                     # Get the accelerator for the Trainer nodes.
                     # TODO (andreyvelich): Currently, we get the accelerator type from
                     # the runtime labels.
-                    _, accelerator_count = utils.get_container_devices(
-                        resources, num_procs
-                    )
-                    if accelerator_count != constants.UNKNOWN:
-                        accelerator_count = str(
-                            int(accelerator_count) * int(ml_policy.num_nodes)  # type: ignore
-                        )
+                    _, accelerator_count = utils.get_container_devices(resources)
+
+                    # NumProcPerNode from Torch or MPI overrides accelerator count.
+                    if (
+                        ml_policy.torch
+                        and ml_policy.torch.num_proc_per_node
+                        and ml_policy.torch.num_proc_per_node.isdigit()
+                    ):
+                        accelerator_count = ml_policy.torch.num_proc_per_node
+
+                    elif ml_policy.mpi and ml_policy.mpi.num_proc_per_node:
+                        accelerator_count = str(ml_policy.mpi.num_proc_per_node)
+
+                    if accelerator_count.isdigit():
+                        accelerator_count = int(accelerator_count) * ml_policy.num_nodes
 
                     result.append(
                         types.Runtime(
@@ -148,7 +151,7 @@ class TrainerClient:
                                 if constants.ACCELERATOR_KEY in metadata.labels
                                 else constants.UNKNOWN
                             ),
-                            accelerator_count=accelerator_count,
+                            accelerator_count=str(accelerator_count),
                         )
                     )
 
@@ -495,63 +498,60 @@ class TrainerClient:
             components=[],
         )
 
+        # Select Pods created by appropriate JobSet, and Initializer, Launcher, or Trainer Job.
+        label_selector = "{}={},{} in ({}, {}, {})".format(
+            constants.JOBSET_NAME_KEY,
+            name,
+            constants.REPLICATED_JOB_KEY,
+            constants.JOB_INITIALIZER,
+            constants.JOB_LAUNCHER,
+            constants.JOB_TRAINER_NODE,
+        )
+
         # Add the TrainJob components, e.g. trainer nodes and initializer.
         try:
             response = self.core_api.list_namespaced_pod(
                 namespace,
-                label_selector=f"{constants.JOBSET_NAME_KEY}={name}",
+                label_selector=label_selector,
                 async_req=True,
             ).get(constants.DEFAULT_TIMEOUT)
 
             for pod in response.items:
                 labels = pod.metadata.labels
+                # The Pods might have these containers:
+                # dataset-initializer, model-initializer, launcher, and trainer
+                for c in pod.spec.containers:
+                    device, device_count = utils.get_container_devices(c.resources)
+                    if c.name == constants.CONTAINER_TRAINER:
+                        # For Trainer numProcPerNode overrides container resources.
+                        for env in c.env:
+                            if (
+                                env.name == constants.TORCH_ENV_NUM_PROC_PER_NODE
+                                and env.value.isdigit()
+                            ):
+                                device_count = env.value
+                        # For Trainer node Job, component name is equal to <Job_Name>-<Index>
+                        component_name = "{}-{}".format(
+                            constants.JOB_TRAINER_NODE,
+                            labels[constants.JOB_INDEX_KEY],
+                        )
+                    elif (
+                        c.name == constants.CONTAINER_DATASET_INITIALIZER
+                        or c.name == constants.CONTAINER_MODEL_INITIALIZER
+                        or c.name == constants.CONTAINER_LAUNCHER
+                    ):
+                        # For Initializer or Launcher Job, component is equal to container name.
+                        component_name = c.name
 
-                # Component can be Trainer or Initializer.
-                if labels[constants.REPLICATED_JOB_KEY] == constants.JOB_TRAINER_NODE:
-                    name = f"{constants.JOB_TRAINER_NODE}-{labels[constants.JOB_INDEX_KEY]}"
-                else:
-                    name = labels[constants.REPLICATED_JOB_KEY]
-
-                # TODO (andreyvelich): This can be refactored once we use containers for init Job.
-                # Initializer Pod must have the dataset and/or model initializer containers.
-                if name == constants.JOB_INITIALIZER:
-                    device_count = "0"
-                    # TODO (andreyvelich): Currently, we use the InitContainers for initializers.
-                    for container in pod.spec.init_containers:
-                        if (
-                            container.name == constants.CONTAINER_DATASET_INITIALIZER
-                            or container.name == constants.CONTAINER_MODEL_INITIALIZER
-                        ):
-                            device, dc = utils.get_container_devices(
-                                container.resources
-                            )
-                            # If resources are not set in containers, we can't get the device.
-                            if device == constants.UNKNOWN:
-                                device_count = device
-                                break
-                            device_count = str(int(device_count) + int(dc))
-                # Trainer Pod must have the trainer container.
-                else:
-                    for container in pod.spec.containers:
-                        if container.name == constants.CONTAINER_TRAINER:
-                            num_procs = None
-                            # Get the num procs per node if it is set.
-                            for env in container.env:
-                                if env.name == constants.TORCH_ENV_NUM_PROC_PER_NODE:
-                                    num_procs = env.value
-                            device, device_count = utils.get_container_devices(
-                                container.resources, num_procs
-                            )
-
-                c = types.Component(
-                    name=name,
+                component = types.Component(
+                    name=component_name,
                     status=pod.status.phase if pod.status else None,  # type: ignore
                     device=device,
                     device_count=device_count,
                     pod_name=pod.metadata.name,
                 )
 
-                train_job.components.append(c)
+                train_job.components.append(component)
         except multiprocessing.TimeoutError:
             raise TimeoutError(
                 f"Timeout to list {constants.TRAINJOB_KIND}'s components: {namespace}/{name}"

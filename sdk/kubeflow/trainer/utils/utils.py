@@ -44,7 +44,6 @@ def get_default_target_namespace() -> str:
 
 def get_container_devices(
     resources: Optional[models.IoK8sApiCoreV1ResourceRequirements],
-    num_procs: Optional[str] = None,
 ) -> Tuple[str, str]:
     """
     Get the device type and device count for the given container.
@@ -74,10 +73,6 @@ def get_container_devices(
         raise Exception(
             f"Unknown device type in the container resources: {resources.limits}"
         )
-
-    # Num procs override the container resources for the Trainer node.
-    if num_procs and num_procs.isdigit():
-        device_count = num_procs
 
     return device, device_count
 

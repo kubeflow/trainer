@@ -14,9 +14,6 @@ spec:
       sshAuthMountPath: /root/.ssh
   template:
     spec:
-      # TODO (andreyvelich): Use dependsOn when it is released.
-      startupPolicy:
-        startupPolicyOrder: InOrder
       replicatedJobs:
         - name: launcher
           template:
@@ -30,8 +27,11 @@ spec:
                       command:
                         - /bin/sh
                         - -c
-                        - "echo 'launcher runs for 10 seconds' && sleep 100"
+                        - "echo 'launcher runs for 15 seconds' && sleep 15"
         - name: trainer-node
+          dependsOn:
+            - name: launcher
+              status: Ready
           template:
             spec:
               template:
@@ -42,4 +42,4 @@ spec:
                       command:
                         - /bin/sh
                         - -c
-                        - "echo 'launcher runs for 10 seconds' && sleep 100"
+                        - "echo 'trainer node runs for 15 seconds' && sleep 15"

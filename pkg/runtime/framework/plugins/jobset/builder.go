@@ -40,13 +40,10 @@ func NewBuilder(jobSet *jobsetv1alpha2ac.JobSetApplyConfiguration) *Builder {
 func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
 		if *rJob.Name == constants.JobInitializer {
-			// TODO (andreyvelich): Currently, we use initContainers for the initializers.
-			// Once JobSet supports execution policy for the ReplicatedJobs, we should migrate to containers.
-			// Ref: https://github.com/kubernetes-sigs/jobset/issues/672
-			for j, container := range rJob.Template.Spec.Template.Spec.InitContainers {
+			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
 				// Update values for the dataset initializer container.
 				if *container.Name == constants.ContainerDatasetInitializer && trainJob.Spec.DatasetConfig != nil {
-					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].Env
+					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
 					// Update the dataset initializer envs.
 					if storageUri := trainJob.Spec.DatasetConfig.StorageUri; storageUri != nil {
 						apply.UpsertEnvVar(env, corev1ac.EnvVar().
@@ -56,7 +53,7 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.DatasetConfig.Env...))
 					// Update the dataset initializer secret reference.
 					if trainJob.Spec.DatasetConfig.SecretRef != nil {
-						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].
+						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
 							WithEnvFrom(corev1ac.EnvFromSource().
 								WithSecretRef(corev1ac.SecretEnvSource().
 									WithName(trainJob.Spec.DatasetConfig.SecretRef.Name)))
@@ -68,7 +65,7 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 					trainJob.Spec.ModelConfig != nil &&
 					trainJob.Spec.ModelConfig.Input != nil {
 					// Update the model initializer envs.
-					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].Env
+					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
 					if storageUri := trainJob.Spec.ModelConfig.Input.StorageUri; storageUri != nil {
 						apply.UpsertEnvVar(env, corev1ac.EnvVar().
 							WithName(InitializerEnvStorageUri).
@@ -77,7 +74,7 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.ModelConfig.Input.Env...))
 					// Update the model initializer secret reference.
 					if trainJob.Spec.ModelConfig.Input.SecretRef != nil {
-						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].
+						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
 							WithEnvFrom(corev1ac.EnvFromSource().
 								WithSecretRef(corev1ac.SecretEnvSource().
 									WithName(trainJob.Spec.ModelConfig.Input.SecretRef.Name)))

@@ -55,7 +55,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				Annotation("conflictAnnotation", "overridden").
 				RuntimeSpec(
 					testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-						InitContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						ContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 						WithMLPolicy(
 							testingutil.MakeMLPolicyWrapper().
 								WithNumNodes(100).
@@ -79,7 +79,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				Obj(),
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
-					InitContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					ContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					NumNodes(30).
 					ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Suspend(true).
@@ -92,10 +92,8 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					MinMember(31). // 31 replicas = 30 Trainer nodes + 1 Initializer.
 					MinResources(corev1.ResourceList{
-						// Every replica has 1 CPU = 31 CPUs in total.
-						// Initializer uses InitContainers which execute sequentially.
-						// Thus, the MinResources is equal to the maximum from the initContainer resources.
-						corev1.ResourceCPU: resource.MustParse("31"),
+						// Trainer node has 30 CPUs + 2 CPUs from 2 initializer containers.
+						corev1.ResourceCPU: resource.MustParse("32"),
 					}).
 					SchedulingTimeout(120).
 					Obj(),
@@ -172,7 +170,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 		"succeeded to build JobSet with dataset and model initializer from the TrainJob.": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-					InitContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					ContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					WithMLPolicy(
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
@@ -221,8 +219,8 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					NumNodes(100).
 					ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					InitContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					InitContainerDatasetInitializerEnv(
+					ContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					ContainerDatasetInitializerEnv(
 						[]corev1.EnvVar{
 							{
 								Name:  jobsetplugin.InitializerEnvStorageUri,
@@ -234,7 +232,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							},
 						},
 					).
-					InitContainerDatasetInitializerEnvFrom(
+					ContainerDatasetInitializerEnvFrom(
 						[]corev1.EnvFromSource{
 							{
 								SecretRef: &corev1.SecretEnvSource{
@@ -245,7 +243,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							},
 						},
 					).
-					InitContainerModelInitializerEnv(
+					ContainerModelInitializerEnv(
 						[]corev1.EnvVar{
 							{
 								Name:  jobsetplugin.InitializerEnvStorageUri,
@@ -257,7 +255,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							},
 						},
 					).
-					InitContainerModelInitializerEnvFrom(
+					ContainerModelInitializerEnvFrom(
 						[]corev1.EnvFromSource{
 							{
 								SecretRef: &corev1.SecretEnvSource{
