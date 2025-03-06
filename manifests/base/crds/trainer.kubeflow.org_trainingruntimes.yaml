@@ -54,6 +54,8 @@ spec:
                         description: |-
                           Implementation name for the MPI to create the appropriate hostfile.
                           Defaults to OpenMPI.
+                        enum:
+                        - OpenMPI
                         type: string
                       numProcPerNode:
                         description: |-

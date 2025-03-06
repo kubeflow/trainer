@@ -216,6 +216,7 @@ type MPIMLPolicySource struct {
 	// Implementation name for the MPI to create the appropriate hostfile.
 	// Defaults to OpenMPI.
 	// +kubebuilder:default=OpenMPI
+	// +kubebuilder:validation:Enum=OpenMPI
 	MPIImplementation *MPIImplementation `json:"mpiImplementation,omitempty"`
 
 	// Directory where SSH keys are mounted.
