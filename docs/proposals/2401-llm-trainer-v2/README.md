@@ -358,27 +358,27 @@ manifests/
 |   |   |-- torchtune/                              # TorchTune Fine-tuning Runtimes
 |   |   |   |-- kustomization.yaml
 |   |   |   |-- gemma2/
-|   |   |   |   |-- 2B_finetuning.yaml
-|   |   |   |   |-- 7B_finetuning.yaml
-|   |   |   |   |-- 27B_finetuning.yaml
+|   |   |   |   |-- gemma_2B.yaml
+|   |   |   |   |-- gemma_7B.yaml
+|   |   |   |   |-- gemma_27B.yaml
 |   |   |   |-- llama3_1/
-|   |   |   |   |-- 8B_finetuning.yaml
-|   |   |   |   |-- 70B_finetuning.yaml
+|   |   |   |   |-- llama3_1_8B.yaml
+|   |   |   |   |-- llama3_1_70B.yaml
 |   |   |   |-- llama3_2/
-|   |   |   |   |-- 1B_finetuning.yaml
-|   |   |   |   |-- 3B_finetuning.yaml
+|   |   |   |   |-- llama3_2_1B.yaml
+|   |   |   |   |-- llama3_2_3B.yaml
 |   |   |   |-- llama3_2_vision/
-|   |   |   |   |-- 11B_finetuning.yaml
-|   |   |   |   |-- 90B_finetuning.yaml
+|   |   |   |   |-- llama3_2_vision_11B.yaml
+|   |   |   |   |-- llama3_2_vision_90B.yaml
 |   |   |   |-- llama3_3/
-|   |   |   |   |-- 70B_finetuning.yaml
+|   |   |   |   |-- llama3_3_70B.yaml
 |   |   |   |-- mistral/
-|   |   |   |   |-- 7B_finetuning.yaml
+|   |   |   |   |-- mistral_7B.yaml
 |   |   |   |-- qwen2_5/
-|   |   |   |   |-- 0.5B_finetuning.yaml
-|   |   |   |   |-- 1.5B_finetuning.yaml
-|   |   |   |   |-- 3B_finetuning.yaml
-|   |   |   |   |-- 7B_finetuning.yaml
+|   |   |   |   |-- qwen2_5_0.5B.yaml
+|   |   |   |   |-- qwen2_5_1.5B.yaml
+|   |   |   |   |-- qwen2_5_3B.yaml
+|   |   |   |   |-- qwen2_5_7B.yaml
 |   |   |   |-- . . .
 |   |-- crds/
 |   |-- . . .
