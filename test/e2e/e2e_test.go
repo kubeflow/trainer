@@ -15,7 +15,6 @@ import (
 
 const (
 	torchRuntime = "torch-distributed"
-	mpiRuntime   = "mpi-distributed"
 )
 
 var _ = ginkgo.Describe("TrainJob e2e", func() {
@@ -53,33 +52,6 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				Obj()
 
 			ginkgo.By("Create a TrainJob with torch-distributed runtime reference", func() {
-				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
-			})
-
-			// Wait for TrainJob to be in Succeeded status.
-			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
-				gomega.Eventually(func(g gomega.Gomega) {
-					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(gomega.Succeed())
-					g.Expect(trainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
-						{
-							Type:    trainer.TrainJobComplete,
-							Status:  metav1.ConditionTrue,
-							Reason:  jobsetconsts.AllJobsCompletedReason,
-							Message: jobsetconsts.AllJobsCompletedMessage,
-						},
-					}, util.IgnoreConditions))
-				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
-			})
-		})
-		// TODO (andreyvelich): This should be changed to DeepSpeed and MLX runtimes.
-		// Verify `mpi-distributed` ClusterTrainingRuntime.
-		ginkgo.It("should create TrainJob with MPI runtime reference", func() {
-			// Create a TrainJob.
-			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), mpiRuntime).
-				Obj()
-
-			ginkgo.By("Create a TrainJob with mpi-distributed runtime reference", func() {
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 			})
 

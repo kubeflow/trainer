@@ -150,8 +150,8 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					testingutil.MakeSchedulerPluginsPodGroup(ns.Name, trainJobKey.Name).
 						MinMember(101). // 101 replicas = 100 Trainer nodes + 1 Initializer.
 						MinResources(corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("101"), // 1 CPU and 4Gi per replica.
-							corev1.ResourceMemory: resource.MustParse("404Gi"),
+							corev1.ResourceCPU:    resource.MustParse("102"), // 100 CPUs for Trainer + 2 CPUs for Initializer.
+							corev1.ResourceMemory: resource.MustParse("408Gi"),
 						}).
 						SchedulingTimeout(100).
 						ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
@@ -205,8 +205,8 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					testingutil.MakeSchedulerPluginsPodGroup(ns.Name, trainJobKey.Name).
 						MinMember(101).
 						MinResources(corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("101"), // 1 CPU and 4Gi per 101 replica.
-							corev1.ResourceMemory: resource.MustParse("404Gi"),
+							corev1.ResourceCPU:    resource.MustParse("102"), // 100 CPUs for Trainer + 2 CPUs for Initializer.
+							corev1.ResourceMemory: resource.MustParse("408Gi"),
 						}).
 						SchedulingTimeout(100).
 						ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
