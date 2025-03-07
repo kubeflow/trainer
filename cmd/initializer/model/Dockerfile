@@ -18,4 +18,4 @@ COPY LICENSE LICENSE
 COPY README.md README.md
 RUN pip install ./sdk
 
-ENTRYPOINT ["python", "-m", "pkg.initializer_.model"]
+ENTRYPOINT ["python", "-m", "pkg.initializer.model"]
