@@ -3,7 +3,7 @@ kind: ClusterTrainingRuntime
 metadata:
   name: torch-distributed
   labels:
-    trainer.kubeflow.org/phase: pre-training
+    runtime.trainer.kubeflow.org/phase: pre-training
 spec:
   mlPolicy:
     numNodes: 1
