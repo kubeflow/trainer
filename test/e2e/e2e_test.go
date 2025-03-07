@@ -9,6 +9,7 @@ import (
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
 	"github.com/kubeflow/trainer/test/util"
 )
@@ -58,8 +59,15 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 			// Wait for TrainJob to be in Succeeded status.
 			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
-					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(gomega.Succeed())
-					g.Expect(trainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
+						{
+							Type:    trainer.TrainJobCreated,
+							Status:  metav1.ConditionTrue,
+							Reason:  trainer.TrainJobJobsCreationSucceededReason,
+							Message: constants.TrainJobJobsCreationSucceededMessage,
+						},
 						{
 							Type:    trainer.TrainJobComplete,
 							Status:  metav1.ConditionTrue,
