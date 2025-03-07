@@ -4,7 +4,7 @@ kind: ClusterTrainingRuntime
 metadata:
   name: mpi-distributed
   labels:
-    runtime.trainer.kubeflow.org/phase: pre-training
+    trainer.kubeflow.org/phase: pre-training
 spec:
   mlPolicy:
     numNodes: 1

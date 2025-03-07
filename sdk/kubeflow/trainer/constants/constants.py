@@ -33,7 +33,7 @@ CLUSTER_TRAINING_RUNTIME_PLURAL = "clustertrainingruntimes"
 
 # The label key to identify training phase where TrainingRuntime should be used.
 # For example, runtime for the pre-training or post-training.
-PHASE_KEY = "runtime.trainer.kubeflow.org/phase"
+PHASE_KEY = "trainer.kubeflow.org/phase"
 
 # The value indicates that runtime can be used for the model pre-training.
 PHASE_PRE_TRAINING = "pre-training"
