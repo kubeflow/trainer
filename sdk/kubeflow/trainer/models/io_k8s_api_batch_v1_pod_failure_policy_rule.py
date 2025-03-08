@@ -101,7 +101,7 @@ class IoK8sApiBatchV1PodFailurePolicyRule(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "action": obj.get("action") if obj.get("action") is not None else 'Count',
+            "action": obj.get("action"),
             "onExitCodes": IoK8sApiBatchV1PodFailurePolicyOnExitCodesRequirement.from_dict(obj["onExitCodes"]) if obj.get("onExitCodes") is not None else None,
             "onPodConditions": [IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern.from_dict(_item) for _item in obj["onPodConditions"]] if obj.get("onPodConditions") is not None else None
         })

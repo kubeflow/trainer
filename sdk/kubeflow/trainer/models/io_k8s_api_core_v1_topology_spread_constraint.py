@@ -125,7 +125,7 @@ class IoK8sApiCoreV1TopologySpreadConstraint(BaseModel):
             "nodeAffinityPolicy": obj.get("nodeAffinityPolicy"),
             "nodeTaintsPolicy": obj.get("nodeTaintsPolicy"),
             "topologyKey": obj.get("topologyKey") if obj.get("topologyKey") is not None else '',
-            "whenUnsatisfiable": obj.get("whenUnsatisfiable") if obj.get("whenUnsatisfiable") is not None else 'DoNotSchedule'
+            "whenUnsatisfiable": obj.get("whenUnsatisfiable")
         })
         return _obj
 

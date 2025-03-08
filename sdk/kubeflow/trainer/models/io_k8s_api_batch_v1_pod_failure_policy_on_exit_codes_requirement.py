@@ -90,7 +90,7 @@ class IoK8sApiBatchV1PodFailurePolicyOnExitCodesRequirement(BaseModel):
 
         _obj = cls.model_validate({
             "containerName": obj.get("containerName"),
-            "operator": obj.get("operator") if obj.get("operator") is not None else 'In',
+            "operator": obj.get("operator"),
             "values": obj.get("values")
         })
         return _obj

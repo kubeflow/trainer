@@ -89,7 +89,7 @@ class IoK8sApiCoreV1SeccompProfile(BaseModel):
 
         _obj = cls.model_validate({
             "localhostProfile": obj.get("localhostProfile"),
-            "type": obj.get("type") if obj.get("type") is not None else 'Localhost'
+            "type": obj.get("type")
         })
         return _obj
 
