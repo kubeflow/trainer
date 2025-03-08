@@ -319,7 +319,7 @@ class TrainerClient:
             response = thread.get(constants.DEFAULT_TIMEOUT)
 
             trainjob_list = models.TrainerV1alpha1TrainJobList.from_dict(response)
-            if trainjob_list is None:
+            if not trainjob_list:
                 return result
 
             for trainjob in trainjob_list.items:
@@ -564,7 +564,7 @@ class TrainerClient:
 
             # Convert Pod to the correct format.
             pod_list = models.IoK8sApiCoreV1PodList.from_dict(response.to_dict())
-            if pod_list is None:
+            if not pod_list:
                 return train_job
 
             for pod in pod_list.items:
@@ -585,11 +585,14 @@ class TrainerClient:
                                 ):
                                     device_count = env.value
                         # For Trainer node Job, component name is equal to <Job_Name>-<Index>
-                        if pod.metadata and pod.metadata.labels:
-                            component_name = "{}-{}".format(
-                                constants.JOB_TRAINER_NODE,
-                                pod.metadata.labels[constants.JOB_INDEX_KEY],
+                        if not pod.metadata.labels:
+                            raise Exception(
+                                f"TrainJob Pod labels are invalid: {pod.metadata.labels}"
                             )
+                        component_name = "{}-{}".format(
+                            constants.JOB_TRAINER_NODE,
+                            pod.metadata.labels[constants.JOB_INDEX_KEY],
+                        )
                     elif (
                         c.name == constants.CONTAINER_DATASET_INITIALIZER
                         or c.name == constants.CONTAINER_MODEL_INITIALIZER
