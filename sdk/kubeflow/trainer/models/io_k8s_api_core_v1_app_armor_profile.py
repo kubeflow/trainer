@@ -89,7 +89,7 @@ class IoK8sApiCoreV1AppArmorProfile(BaseModel):
 
         _obj = cls.model_validate({
             "localhostProfile": obj.get("localhostProfile"),
-            "type": obj.get("type") if obj.get("type") is not None else 
+            "type": obj.get("type") if obj.get("type") is not None else 'Localhost'
         })
         return _obj
 

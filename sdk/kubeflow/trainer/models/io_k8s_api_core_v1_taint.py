@@ -91,7 +91,7 @@ class IoK8sApiCoreV1Taint(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "effect": obj.get("effect") if obj.get("effect") is not None else ,
+            "effect": obj.get("effect") if obj.get("effect") is not None else 'NoExecute',
             "key": obj.get("key") if obj.get("key") is not None else '',
             "timeAdded": obj.get("timeAdded"),
             "value": obj.get("value")

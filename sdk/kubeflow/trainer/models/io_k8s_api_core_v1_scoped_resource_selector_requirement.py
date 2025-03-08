@@ -96,8 +96,8 @@ class IoK8sApiCoreV1ScopedResourceSelectorRequirement(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "operator": obj.get("operator") if obj.get("operator") is not None else ,
-            "scopeName": obj.get("scopeName") if obj.get("scopeName") is not None else ,
+            "operator": obj.get("operator") if obj.get("operator") is not None else 'DoesNotExist',
+            "scopeName": obj.get("scopeName") if obj.get("scopeName") is not None else 'BestEffort',
             "values": obj.get("values")
         })
         return _obj

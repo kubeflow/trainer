@@ -91,7 +91,7 @@ class IoK8sApiCoreV1PortStatus(BaseModel):
         _obj = cls.model_validate({
             "error": obj.get("error"),
             "port": obj.get("port") if obj.get("port") is not None else 0,
-            "protocol": obj.get("protocol") if obj.get("protocol") is not None else 
+            "protocol": obj.get("protocol") if obj.get("protocol") is not None else 'SCTP'
         })
         return _obj
 

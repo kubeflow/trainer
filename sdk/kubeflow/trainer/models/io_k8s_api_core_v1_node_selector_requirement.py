@@ -90,7 +90,7 @@ class IoK8sApiCoreV1NodeSelectorRequirement(BaseModel):
 
         _obj = cls.model_validate({
             "key": obj.get("key") if obj.get("key") is not None else '',
-            "operator": obj.get("operator") if obj.get("operator") is not None else ,
+            "operator": obj.get("operator") if obj.get("operator") is not None else 'DoesNotExist',
             "values": obj.get("values")
         })
         return _obj

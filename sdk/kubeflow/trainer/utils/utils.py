@@ -19,7 +19,7 @@ import os
 import queue
 import textwrap
 import threading
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
@@ -44,7 +44,7 @@ def get_default_target_namespace() -> str:
 
 def get_container_devices(
     resources: Optional[models.IoK8sApiCoreV1ResourceRequirements],
-) -> Tuple[str, str]:
+) -> Tuple[str, Union[str, float]]:
     """
     Get the device type and device count for the given container.
     """
@@ -62,17 +62,19 @@ def get_container_devices(
     # TODO (andreyvelich): Support other resource labels (e.g. NPUs).
     if constants.NVIDIA_GPU_LABEL in resources.limits:
         device = constants.GPU_DEVICE_TYPE
-        device_count = resources.limits[constants.NVIDIA_GPU_LABEL]
+        device_count = resources.limits[constants.NVIDIA_GPU_LABEL].actual_instance
     elif constants.TPU_LABEL in resources.limits:
         device = constants.TPU_DEVICE_TYPE
-        device_count = resources.limits[constants.TPU_LABEL]
+        device_count = resources.limits[constants.TPU_LABEL].actual_instance
     elif constants.CPU_LABEL in resources.limits:
         device = constants.CPU_DEVICE_TYPE
-        device_count = resources.limits[constants.CPU_LABEL]
+        device_count = resources.limits[constants.CPU_LABEL].actual_instance
     else:
         raise Exception(
             f"Unknown device type in the container resources: {resources.limits}"
         )
+    if device_count is None:
+        raise Exception(f"Failed to get device count for resources: {resources.limits}")
 
     return device, device_count
 
@@ -100,7 +102,10 @@ def get_resources_per_node(
     """
 
     # Convert all keys in resources to lowercase.
-    resources = {k.lower(): str(v) for k, v in resources_per_node.items()}
+    resources = {
+        k.lower(): models.IoK8sApimachineryPkgApiResourceQuantity(v)
+        for k, v in resources_per_node.items()
+    }
     if "gpu" in resources:
         resources["nvidia.com/gpu"] = resources.pop("gpu")
 

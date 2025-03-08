@@ -88,7 +88,7 @@ class IoK8sApiCoreV1ModifyVolumeStatus(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "status": obj.get("status") if obj.get("status") is not None else ,
+            "status": obj.get("status") if obj.get("status") is not None else 'InProgress',
             "targetVolumeAttributesClassName": obj.get("targetVolumeAttributesClassName")
         })
         return _obj

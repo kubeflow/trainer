@@ -45,6 +45,15 @@ func main() {
 	for defName, val := range oAPIDefs {
 		// Exclude InternalEvent from the OpenAPI spec since it requires runtime.Object dependency.
 		if defName != "k8s.io/apimachinery/pkg/apis/meta/v1.InternalEvent" {
+			// OpenAPI generator incorrectly creates models if enum doesn't have default value.
+			// Therefore, we make the default equal to the first enum value.
+			// Kubernetes OpenAPI spec doesn't have enums: https://github.com/kubernetes/kubernetes/issues/109177
+			for property, schema := range val.Schema.Properties {
+				if schema.Enum != nil && schema.Default == "" {
+					schema.Default = schema.Enum[0]
+					val.Schema.SetProperty(property, schema)
+				}
+			}
 			defs[swaggify(defName)] = val.Schema
 		}
 	}

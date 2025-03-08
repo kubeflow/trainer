@@ -14,6 +14,7 @@
 
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Callable, Dict, List, Optional
 
 from kubeflow.trainer.constants import constants
@@ -32,7 +33,7 @@ class Runtime:
 @dataclass
 class Component:
     name: str
-    status: str
+    status: Optional[str]
     device: str
     device_count: str
     pod_name: str
@@ -44,7 +45,7 @@ class Component:
 class TrainJob:
     name: str
     runtime_ref: str
-    creation_timestamp: str
+    creation_timestamp: datetime
     components: List[Component]
     status: Optional[str] = "Unknown"
 
