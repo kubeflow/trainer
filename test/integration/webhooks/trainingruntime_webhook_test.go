@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
 	"github.com/kubeflow/trainer/test/integration/framework"
 	"github.com/kubeflow/trainer/test/util"
@@ -185,7 +186,9 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 						},
 					}
 					runtime.Spec.Template.Spec = testingutil.MakeJobSetWrapper(ns.Name, "runtime").
-						Replicas(1).Obj().Spec
+						Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+						Obj().
+						Spec
 					return runtime
 				}),
 			ginkgo.Entry("Should succeed to default mpi.mpiImplementation=OpenMPI",
@@ -200,7 +203,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1).
+									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -219,7 +222,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1).
+									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -239,7 +242,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1).
+									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -258,7 +261,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1).
+									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -278,7 +281,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1).
+									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -297,7 +300,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1).
+									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -317,7 +320,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1).
+									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -336,7 +339,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1).
+									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).

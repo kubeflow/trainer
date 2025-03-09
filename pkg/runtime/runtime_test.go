@@ -23,16 +23,22 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 
 	"github.com/kubeflow/trainer/pkg/constants"
+	jobsetplgconsts "github.com/kubeflow/trainer/pkg/runtime/framework/plugins/jobset/constants"
+	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 )
 
 func TestNewInfo(t *testing.T) {
-
 	cases := map[string]struct {
-		infoOpts []InfoOption
-		wantInfo *Info
+		infoOpts  []InfoOption
+		wantInfo  *Info
+		wantError error
 	}{
 		"all arguments are specified": {
 			infoOpts: []InfoOption{
@@ -74,8 +80,26 @@ func TestNewInfo(t *testing.T) {
 								corev1.ResourceCPU: resource.MustParse("25"),
 							},
 						},
+						Env: []corev1.EnvVar{{
+							Name:  "TEST",
+							Value: "TEST",
+						}},
+						Ports: []corev1.ContainerPort{{
+							Name:          "http",
+							Protocol:      corev1.ProtocolTCP,
+							ContainerPort: 8080,
+						}},
+						VolumeMounts: []corev1.VolumeMount{{
+							Name:      "TEST",
+							ReadOnly:  true,
+							MountPath: "/var",
+						}},
 					}},
 				}),
+				WithTemplateSpecObjApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](
+					utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "trainJob").Obj(),
+					"spec",
+				),
 			},
 			wantInfo: &Info{
 				Labels: map[string]string{
@@ -100,7 +124,114 @@ func TestNewInfo(t *testing.T) {
 						},
 					},
 				},
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{
+						{
+							Name:               constants.JobInitializer,
+							CountForNonTrainer: ptr.To[int32](1),
+							Containers:         make([]Container, 1),
+						},
+						{
+							Name: constants.JobTrainerNode,
+							Containers: []Container{{
+								Env: []corev1ac.EnvVarApplyConfiguration{{
+									Name:  ptr.To("TEST"),
+									Value: ptr.To("TEST"),
+								}},
+								Ports: []corev1ac.ContainerPortApplyConfiguration{{
+									Name:          ptr.To("http"),
+									Protocol:      ptr.To(corev1.ProtocolTCP),
+									ContainerPort: ptr.To[int32](8080),
+								}},
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{{
+									Name:      ptr.To("TEST"),
+									ReadOnly:  ptr.To(true),
+									MountPath: ptr.To("/var"),
+								}},
+							}},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.JobInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.ContainerDatasetInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath("/workspace/dataset"),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+													corev1ac.Container().
+														WithName(constants.ContainerModelInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath("/workspace/model"),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.JobTrainerNode).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.ContainerTrainer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath("/workspace/dataset"),
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath("/workspace/model"),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
 			},
+		},
+		"invalid template spec": {
+			infoOpts: []InfoOption{
+				WithTemplateSpecObjApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](
+					utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "trainJob").Obj(),
+					"invalid",
+				),
+			},
+			wantError: errorTemplateSpecPathNotFound,
 		},
 		"all arguments are not specified": {
 			wantInfo: &Info{Scheduler: &Scheduler{TotalRequests: map[string]TotalResourceRequest{}}},
@@ -112,7 +243,10 @@ func TestNewInfo(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			info := NewInfo(tc.infoOpts...)
+			info, err := NewInfo(tc.infoOpts...)
+			if diff := cmp.Diff(err, tc.wantError, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
 			if diff := cmp.Diff(tc.wantInfo, info, cmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected runtime.Info (-want,+got):\n%s", diff)
 			}

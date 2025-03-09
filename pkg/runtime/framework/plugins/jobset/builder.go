@@ -18,12 +18,14 @@ package jobset
 
 import (
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/utils/ptr"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/apply"
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
+	jobsetplgconsts "github.com/kubeflow/trainer/pkg/runtime/framework/plugins/jobset/constants"
 )
 
 type Builder struct {
@@ -40,17 +42,21 @@ func NewBuilder(jobSet *jobsetv1alpha2ac.JobSetApplyConfiguration) *Builder {
 func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
 		if *rJob.Name == constants.JobInitializer {
+			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
+			// REF: https://github.com/kubeflow/trainer/issues/2318
+			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
+
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
 				// Update values for the dataset initializer container.
 				if *container.Name == constants.ContainerDatasetInitializer && trainJob.Spec.DatasetConfig != nil {
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
 					// Update the dataset initializer envs.
 					if storageUri := trainJob.Spec.DatasetConfig.StorageUri; storageUri != nil {
-						apply.UpsertEnvVar(env, corev1ac.EnvVar().
-							WithName(InitializerEnvStorageUri).
+						apply.UpsertEnvVar(env, *corev1ac.EnvVar().
+							WithName(jobsetplgconsts.InitializerEnvStorageUri).
 							WithValue(*storageUri))
 					}
-					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.DatasetConfig.Env...))
+					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.DatasetConfig.Env...)...)
 					// Update the dataset initializer secret reference.
 					if trainJob.Spec.DatasetConfig.SecretRef != nil {
 						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
@@ -67,11 +73,11 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 					// Update the model initializer envs.
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
 					if storageUri := trainJob.Spec.ModelConfig.Input.StorageUri; storageUri != nil {
-						apply.UpsertEnvVar(env, corev1ac.EnvVar().
-							WithName(InitializerEnvStorageUri).
+						apply.UpsertEnvVar(env, *corev1ac.EnvVar().
+							WithName(jobsetplgconsts.InitializerEnvStorageUri).
 							WithValue(*storageUri))
 					}
-					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.ModelConfig.Input.Env...))
+					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.ModelConfig.Input.Env...)...)
 					// Update the model initializer secret reference.
 					if trainJob.Spec.ModelConfig.Input.SecretRef != nil {
 						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
@@ -87,32 +93,12 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 }
 
 // Launcher updates JobSet values for the launcher Job.
-func (b *Builder) Launcher(info *runtime.Info, trainJob *trainer.TrainJob) *Builder {
+func (b *Builder) Launcher() *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
 		if *rJob.Name == constants.JobLauncher {
-
-			// Update the volumes for the Trainer Job.
-			apply.UpsertVolumes(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes)
-
-			// Update values for the launcher container.
-			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
-				if *container.Name == constants.ContainerLauncher {
-					// Update values from the Info object.
-					if env := info.Trainer.Env; env != nil {
-						// Update JobSet envs from the Info.
-						apply.UpsertEnvVars(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env, env)
-					}
-
-					// Update the launcher container port.
-					if port := info.Trainer.ContainerPort; port != nil {
-						apply.UpsertPort(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, port)
-					}
-					// Update the launcher container volume mounts.
-					if mounts := info.Trainer.VolumeMounts; mounts != nil {
-						apply.UpsertVolumeMounts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, mounts)
-					}
-				}
-			}
+			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
+			// REF: https://github.com/kubeflow/trainer/issues/2318
+			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
 		}
 	}
 	return b
@@ -122,12 +108,64 @@ func (b *Builder) Launcher(info *runtime.Info, trainJob *trainer.TrainJob) *Buil
 func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
 		if *rJob.Name == constants.JobTrainerNode {
+			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
+			// REF: https://github.com/kubeflow/trainer/issues/2318
+			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
+			// Update the Parallelism and Completions values for the Trainer Job.
+			b.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = info.RuntimePolicy.MLPolicy.NumNodes
+			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.RuntimePolicy.MLPolicy.NumNodes
+
+			// Update values for the Trainer container.
+			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
+				if *container.Name == constants.ContainerTrainer {
+					// Update values from the TrainJob trainer.
+					if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
+						if image := jobTrainer.Image; image != nil {
+							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Image = image
+						}
+						if command := jobTrainer.Command; command != nil {
+							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Command = command
+						}
+						if args := jobTrainer.Args; args != nil {
+							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = args
+						}
+						if resourcesPerNode := jobTrainer.ResourcesPerNode; resourcesPerNode != nil &&
+							(resourcesPerNode.Limits != nil || resourcesPerNode.Requests != nil) {
+							requirements := corev1ac.ResourceRequirements()
+							if limits := resourcesPerNode.Limits; limits != nil {
+								requirements.WithLimits(limits)
+							}
+							if requests := resourcesPerNode.Requests; requests != nil {
+								requirements.WithRequests(requests)
+							}
+							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
+								WithResources(requirements)
+						}
+						apply.UpsertEnvVars(
+							&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env,
+							apply.EnvVars(jobTrainer.Env...)...,
+						)
+					}
+				}
+			}
+		}
+	}
+	return b
+}
+
+// DeprecatedTrainer updates JobSet values for the trainer Job.
+func (b *Builder) DeprecatedTrainer(info *runtime.Info, trainJob *trainer.TrainJob) *Builder {
+	for i, rJob := range b.Spec.ReplicatedJobs {
+		if *rJob.Name == constants.JobTrainerNode {
+			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
+			// REF: https://github.com/kubeflow/trainer/issues/2318
+			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
 			// Update the Parallelism and Completions values for the Trainer Job.
 			b.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = info.Trainer.NumNodes
 			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.Trainer.NumNodes
 
 			// Update the volumes for the Trainer Job.
-			apply.UpsertVolumes(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes)
+			apply.UpsertVolumes(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes...)
 
 			// Update values for the Trainer container.
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
@@ -159,15 +197,15 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 					// Update values from the Info object.
 					if env := info.Trainer.Env; env != nil {
 						// Update JobSet envs from the Info.
-						apply.UpsertEnvVars(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env, env)
+						apply.UpsertEnvVars(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env, env...)
 					}
 					// Update the Trainer container port.
 					if port := info.Trainer.ContainerPort; port != nil {
-						apply.UpsertPort(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, port)
+						apply.UpsertPort(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *port)
 					}
 					// Update the Trainer container volume mounts.
-					if mounts := info.Trainer.VolumeMounts; mounts != nil {
-						apply.UpsertVolumeMounts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, mounts)
+					if mounts := info.Trainer.VolumeMounts; len(mounts) != 0 {
+						apply.UpsertVolumeMounts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, mounts...)
 					}
 				}
 			}

@@ -18,7 +18,6 @@ package jobset
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"maps"
 
@@ -26,7 +25,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
@@ -52,6 +50,7 @@ type JobSet struct {
 }
 
 var _ framework.WatchExtensionPlugin = (*JobSet)(nil)
+var _ framework.PodNetworkPlugin = (*JobSet)(nil)
 var _ framework.ComponentBuilderPlugin = (*JobSet)(nil)
 var _ framework.TerminalConditionPlugin = (*JobSet)(nil)
 
@@ -87,9 +86,46 @@ func (j *JobSet) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	}
 }
 
+func (j *JobSet) IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) error {
+	if info == nil || trainJob == nil {
+		return nil
+	}
+	spec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+	if !ok {
+		return nil
+	}
+	subDomain := trainJob.Name
+	if jobSetNet := spec.Network; jobSetNet != nil && jobSetNet.Subdomain != nil {
+		subDomain = *jobSetNet.Subdomain
+	}
+	for rJobIdx, rJob := range spec.ReplicatedJobs {
+		// TODO: Support multiple replicas for replicated Jobs.
+		// REF: https://github.com/kubeflow/trainer/issues/2318
+		podCount := info.TemplateSpec.PodSets[rJobIdx].CountForNonTrainer
+		if *rJob.Name == constants.JobTrainerNode {
+			podCount = info.RuntimePolicy.MLPolicy.NumNodes
+		}
+		rJobReplicas := 1
+		info.TemplateSpec.PodSets[rJobIdx].Endpoints = func(yield func(string) bool) {
+			for podIdx := range ptr.Deref(podCount, 1) {
+				endpoint := fmt.Sprintf("%s-%s-%d-%d.%s", trainJob.Name, *rJob.Name, rJobReplicas-1, podIdx, subDomain)
+				if !yield(endpoint) {
+					return
+				}
+			}
+		}
+	}
+	info.SyncPodSetsToTemplateSpec()
+	return nil
+}
+
 func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
 	if info == nil || trainJob == nil {
 		return nil, fmt.Errorf("runtime info or object is missing")
+	}
+	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+	if !ok {
+		return nil, nil
 	}
 
 	// Do not update the JobSet if it already exists and is not suspended
@@ -106,55 +142,32 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		return nil, nil
 	}
 
-	// Get the runtime as unstructured from the TrainJob ref
-	runtimeJobTemplate := &unstructured.Unstructured{}
-	runtimeJobTemplate.SetAPIVersion(trainer.GroupVersion.String())
-
-	if kind := trainJob.Spec.RuntimeRef.Kind; kind != nil {
-		runtimeJobTemplate.SetKind(*kind)
-	} else {
-		runtimeJobTemplate.SetKind(trainer.ClusterTrainingRuntimeKind)
-	}
-
-	key := client.ObjectKey{Name: trainJob.Spec.RuntimeRef.Name}
-	if runtimeJobTemplate.GetKind() == trainer.TrainingRuntimeKind {
-		key.Namespace = trainJob.Namespace
-	}
-
-	if err := j.client.Get(ctx, key, runtimeJobTemplate); err != nil {
-		return nil, err
-	}
-
-	// Populate the JobSet template spec apply configuration
-	jobSetTemplateSpec := &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{}
-	if jobSetSpec, ok, err := unstructured.NestedFieldCopy(runtimeJobTemplate.Object, "spec", "template", "spec"); err != nil {
-		return nil, err
-	} else if !ok {
-		return nil, fmt.Errorf("trainJob runtime %s does not have a spec.template.spec field", trainJob.Spec.RuntimeRef.Name)
-	} else {
-		if raw, err := json.Marshal(jobSetSpec); err != nil {
-			return nil, err
-		} else if err := json.Unmarshal(raw, jobSetTemplateSpec); err != nil {
-			return nil, err
-		}
-	}
-
 	// Init the JobSet apply configuration from the runtime template spec
 	jobSetBuilder := NewBuilder(jobsetv1alpha2ac.JobSet(trainJob.Name, trainJob.Namespace).
 		WithLabels(maps.Clone(info.Labels)).
 		WithAnnotations(maps.Clone(info.Annotations)).
-		WithSpec(jobSetTemplateSpec))
+		WithSpec(jobSetSpec))
 
 	// TODO (andreyvelich): Add support for the PodSpecOverride.
 	// TODO (andreyvelich): Refactor the builder with wrappers for PodSpec.
-	// Apply the runtime info
-	jobSet := jobSetBuilder.
-		Initializer(trainJob).
-		Launcher(info, trainJob).
-		Trainer(info, trainJob).
-		PodLabels(info.PodLabels).
-		Suspend(trainJob.Spec.Suspend).
-		Build()
+	// TODO: Once we remove deprecated runtime.Info.Trainer, we should remove JobSet Builder with DeprecatedTrainer().
+	var jobSet *jobsetv1alpha2ac.JobSetApplyConfiguration
+	if info.RuntimePolicy.MLPolicy != nil && info.RuntimePolicy.MLPolicy.MPI != nil {
+		jobSet = jobSetBuilder.
+			Initializer(trainJob).
+			Launcher().
+			Trainer(info, trainJob).
+			PodLabels(info.PodLabels).
+			Suspend(trainJob.Spec.Suspend).
+			Build()
+	} else {
+		jobSet = jobSetBuilder.
+			Initializer(trainJob).
+			DeprecatedTrainer(info, trainJob).
+			PodLabels(info.PodLabels).
+			Suspend(trainJob.Spec.Suspend).
+			Build()
+	}
 
 	// Set the TrainJob as owner
 	jobSet.WithOwnerReferences(metav1ac.OwnerReference().
