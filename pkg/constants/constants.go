@@ -110,7 +110,18 @@ const (
 
 	// Distributed envs for mpirun.
 	// Values for OpenMPI implementation.
+
+	// OpenMPIEnvHostFileLocation is the OpenMPI default hostfile env key.
 	OpenMPIEnvHostFileLocation string = "OMPI_MCA_orte_default_hostfile"
+
+	// OpenMPIEnvRSHArgs is the env key for the OpenMPI rsh arguments.
+	OpenMPIEnvRSHArgs string = "OMPI_MCA_plm_rsh_args"
+
+	// OpenMPIEnvKeepFQDNHostNames is the env key for OpenMPI if FQDN should be kept.
+	OpenMPIEnvKeepFQDNHostNames string = "OMPI_MCA_orte_keep_fqdn_hostnames"
+
+	// OpenMPIEnvDefaultSlots is the OpenMPI default number of slots env key.
+	OpenMPIEnvDefaultSlots string = "OMPI_MCA_orte_set_default_slots"
 )
 
 var (

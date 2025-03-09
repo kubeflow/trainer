@@ -28,6 +28,7 @@ import (
 	"strconv"
 
 	"golang.org/x/crypto/ssh"
+
 	corev1 "k8s.io/api/core/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -46,6 +47,8 @@ import (
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
 )
 
+// TODO : Support MPICH and IntelMPI implementations.
+
 type MPI struct {
 	client client.Client
 	scheme *apiruntime.Scheme
@@ -55,6 +58,11 @@ var _ framework.CustomValidationPlugin = (*MPI)(nil)
 var _ framework.EnforceMLPolicyPlugin = (*MPI)(nil)
 var _ framework.WatchExtensionPlugin = (*MPI)(nil)
 var _ framework.ComponentBuilderPlugin = (*MPI)(nil)
+
+var (
+	errorFailedToBuildConfigMap = fmt.Errorf("failed to build hostfile configMap")
+	errorFailedToBuildSecret    = fmt.Errorf("failed to build SSH Auth secret")
+)
 
 const Name = "MPI"
 
@@ -73,6 +81,10 @@ func (m *MPI) Name() string {
 }
 
 // TODO: Need to implement validations for MPI Policy.
+// TODO (andreyvelich): Add validation to check that TrainJob doesn't have MPI envs.
+// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
+// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
+
 func (m *MPI) Validate(oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	return nil, nil
 }
@@ -83,72 +95,100 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 	}
 
 	// TrainJob contains the actual information for the Trainer.
-	numNodes := info.RuntimePolicy.MLPolicy.NumNodes
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		numNodes = trainJob.Spec.Trainer.NumNodes
+		info.RuntimePolicy.MLPolicy.NumNodes = trainJob.Spec.Trainer.NumNodes
 	}
-	info.Trainer.NumNodes = numNodes
 
-	numProcPerNode := strconv.Itoa(int(*info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode))
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
-		numProcPerNode = (*trainJob.Spec.Trainer.NumProcPerNode).String()
+		info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode = ptr.To(int32(trainJob.Spec.Trainer.NumProcPerNode.IntValue()))
 	}
-	info.Trainer.NumProcPerNode = numProcPerNode
 
 	// Add Secret and ConfigMap volumes to the Info object
-	info.Trainer.Volumes = []corev1ac.VolumeApplyConfiguration{
-		*corev1ac.Volume().
-			WithName(constants.MPISSHAuthVolumeName).
-			WithSecret(corev1ac.SecretVolumeSource().
-				WithSecretName(trainJob.Name+constants.MPISSHAuthSecretSuffix).
-				WithItems(
-					corev1ac.KeyToPath().
-						WithKey(corev1.SSHAuthPrivateKey).
-						WithPath(constants.MPISSHPrivateKeyFile),
-					corev1ac.KeyToPath().
-						WithKey(constants.MPISSHPublicKey).
-						WithPath(constants.MPISSHPublicKeyFile),
-					corev1ac.KeyToPath().
-						WithKey(constants.MPISSHPublicKey).
-						WithPath(constants.MPISSHAuthorizedKeys),
-				)),
-		*corev1ac.Volume().
-			WithName(constants.MPIHostfileVolumeName).
-			WithConfigMap(corev1ac.ConfigMapVolumeSource().
-				WithName(trainJob.Name + constants.MPIHostfileConfigMapSuffix)),
+	for psIdx, ps := range info.TemplateSpec.PodSets {
+		if ps.Name != constants.JobTrainerNode && ps.Name != constants.JobLauncher {
+			continue
+		}
+		apply.UpsertVolumes(
+			&info.TemplateSpec.PodSets[psIdx].Volumes,
+			[]corev1ac.VolumeApplyConfiguration{
+				*corev1ac.Volume().
+					WithName(constants.MPISSHAuthVolumeName).
+					WithSecret(corev1ac.SecretVolumeSource().
+						WithSecretName(fmt.Sprintf("%s%s", trainJob.Name, constants.MPISSHAuthSecretSuffix)).
+						WithItems(
+							corev1ac.KeyToPath().
+								WithKey(corev1.SSHAuthPrivateKey).
+								WithPath(constants.MPISSHPrivateKeyFile),
+							corev1ac.KeyToPath().
+								WithKey(constants.MPISSHPublicKey).
+								WithPath(constants.MPISSHPublicKeyFile),
+							corev1ac.KeyToPath().
+								WithKey(constants.MPISSHPublicKey).
+								WithPath(constants.MPISSHAuthorizedKeys),
+						),
+					),
+			}...,
+		)
+		if ps.Name == constants.JobLauncher {
+			apply.UpsertVolumes(
+				&info.TemplateSpec.PodSets[psIdx].Volumes,
+				[]corev1ac.VolumeApplyConfiguration{
+					*corev1ac.Volume().
+						WithName(constants.MPIHostfileVolumeName).
+						WithConfigMap(corev1ac.ConfigMapVolumeSource().
+							WithName(fmt.Sprintf("%s%s", trainJob.Name, constants.MPIHostfileConfigMapSuffix)).
+							WithItems(
+								corev1ac.KeyToPath().
+									WithKey(constants.MPIHostfileName).
+									WithPath(constants.MPIHostfileName).
+									WithMode(0444),
+							),
+						),
+				}...,
+			)
+		}
+		for cIdx, container := range ps.Containers {
+			if container.Name != constants.JobLauncher && container.Name != constants.JobTrainerNode {
+				continue
+			}
+			apply.UpsertVolumeMounts(
+				&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].VolumeMounts,
+				[]corev1ac.VolumeMountApplyConfiguration{
+					*corev1ac.VolumeMount().
+						WithName(constants.MPISSHAuthVolumeName).
+						WithMountPath(*info.RuntimePolicy.MLPolicy.MPI.SSHAuthMountPath),
+				}...,
+			)
+			if ps.Name == constants.JobLauncher && container.Name == constants.ContainerLauncher {
+				apply.UpsertVolumeMounts(
+					&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].VolumeMounts,
+					*corev1ac.VolumeMount().
+						WithName(constants.MPIHostfileVolumeName).
+						WithMountPath(constants.MPIHostfileDir),
+				)
+				switch *info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
+				case trainer.MPIImplementationOpenMPI:
+					apply.UpsertEnvVars(
+						&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Env,
+						*corev1ac.EnvVar().
+							WithName(constants.OpenMPIEnvHostFileLocation).
+							WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+						*corev1ac.EnvVar().
+							WithName(constants.OpenMPIEnvKeepFQDNHostNames).
+							WithValue("true"),
+						*corev1ac.EnvVar().
+							WithName(constants.OpenMPIEnvDefaultSlots).
+							WithValue(strconv.Itoa(int(*info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode))),
+						*corev1ac.EnvVar().
+							WithName(constants.OpenMPIEnvRSHArgs).
+							WithValue("-o ConnectionAttempts=10"),
+					)
+				default:
+					return fmt.Errorf("MPI implementation for %v doesn't supported", info.RuntimePolicy.MLPolicy.MPI.MPIImplementation)
+				}
+			}
+		}
 	}
-
-	info.Trainer.VolumeMounts = []corev1ac.VolumeMountApplyConfiguration{
-		*corev1ac.VolumeMount().
-			WithName(constants.MPISSHAuthVolumeName).
-			WithMountPath(*info.RuntimePolicy.MLPolicy.MPI.SSHAuthMountPath),
-		*corev1ac.VolumeMount().
-			WithName(constants.MPIHostfileVolumeName).
-			WithMountPath(constants.MPIHostfileDir),
-	}
-
-	// Update envs for Info object.
-	// TODO (andreyvelich): Add validation to check that TrainJob doesn't have MPI envs.
-	// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
-	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
-	// TODO (andreyvelich): Support other MPI implementations.
-
-	if trainJob.Spec.Trainer != nil {
-		info.Trainer.Env = apply.EnvVars(trainJob.Spec.Trainer.Env...)
-	}
-
-	switch *info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
-	case trainer.MPIImplementationOpenMPI:
-		apply.UpsertEnvVar(&info.Trainer.Env, corev1ac.EnvVar().
-			WithName(constants.OpenMPIEnvHostFileLocation).
-			WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)))
-	default:
-		return fmt.Errorf("MPI implementation for %v doesn't supported", info.RuntimePolicy.MLPolicy.MPI.MPIImplementation)
-	}
-
-	// Add container port for the headless service.
-	info.Trainer.ContainerPort = corev1ac.ContainerPort().
-		WithContainerPort(constants.ContainerTrainerPort)
 
 	// Update total Pod requests for the PodGroupPolicy plugin.
 	for rName := range info.TotalRequests {
@@ -156,12 +196,12 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		// TODO (andreyvelich): Add support for total requests from the TrainJob's ResourcesPerNode.
 		if rName == constants.JobTrainerNode {
 			info.TotalRequests[rName] = runtime.TotalResourceRequest{
-				Replicas:    ptr.Deref(numNodes, constants.DefaultJobReplicas),
+				Replicas:    ptr.Deref(info.RuntimePolicy.MLPolicy.NumNodes, constants.DefaultJobReplicas),
 				PodRequests: info.TotalRequests[rName].PodRequests,
 			}
 		}
 	}
-
+	info.SyncPodSetsToTemplateSpec()
 	return nil
 }
 
@@ -176,90 +216,96 @@ func (m *MPI) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	}
 }
 
-func (m *MPI) Build(_ context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
+func (m *MPI) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
 	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.MPI == nil {
 		return nil, nil
 	}
 
-	secret, err := m.buildSSHAuthSecret(trainJob)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build Secret with SSH auth keys. Error: %v", err)
-	}
+	var objects []any
 
+	// SSHAuthSecret is immutable.
+	if err := m.client.Get(ctx, client.ObjectKey{Name: sshAuthSecretName(trainJob.Name), Namespace: trainJob.Namespace}, &corev1.Secret{}); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return nil, err
+		}
+		secret, err := m.buildSSHAuthSecret(trainJob)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", errorFailedToBuildSecret, err)
+		}
+		objects = append(objects, secret)
+	}
 	configMap, err := m.buildHostFileConfigMap(info, trainJob)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build ConfigMap with hostfile. Error: %v", err)
+		return nil, fmt.Errorf("%w: %w", errorFailedToBuildConfigMap, err)
 	}
-
-	return []any{secret, configMap}, nil
+	return append(objects, configMap), nil
 }
 
 func (m *MPI) buildSSHAuthSecret(trainJob *trainer.TrainJob) (*corev1ac.SecretApplyConfiguration, error) {
-	// Generate SSH private and public keys.
 	privateKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate private SSH key, Error: %v", err)
+		return nil, err
 	}
-
 	privateDER, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to covert private SSH key to DER format. Error: %v", err)
+		return nil, err
 	}
-
 	privatePEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "EC PRIVATE KEY",
 		Bytes: privateDER,
 	})
-
 	publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate public SSH key. Error:  %v", err)
+		return nil, err
 	}
-
-	// Create Secret to store ssh keys.
-	secret := corev1ac.Secret(trainJob.Name+constants.MPISSHAuthSecretSuffix, trainJob.Namespace).
+	return corev1ac.Secret(sshAuthSecretName(trainJob.Name), trainJob.Namespace).
 		WithType(corev1.SecretTypeSSHAuth).
 		WithData(map[string][]byte{
 			corev1.SSHAuthPrivateKey:  privatePEM,
 			constants.MPISSHPublicKey: ssh.MarshalAuthorizedKey(publicKey),
-		})
+		}).
+		WithImmutable(true).
+		WithOwnerReferences(metav1ac.OwnerReference().
+			WithAPIVersion(trainer.GroupVersion.String()).
+			WithKind(trainer.TrainJobKind).
+			WithName(trainJob.Name).
+			WithUID(trainJob.UID).
+			WithController(true).
+			WithBlockOwnerDeletion(true)), nil
+}
 
-	secret.WithOwnerReferences(metav1ac.OwnerReference().
-		WithAPIVersion(trainer.GroupVersion.String()).
-		WithKind(trainer.TrainJobKind).
-		WithName(trainJob.Name).
-		WithUID(trainJob.UID).
-		WithController(true).
-		WithBlockOwnerDeletion(true))
-
-	return secret, nil
+func sshAuthSecretName(trainJobName string) string {
+	return fmt.Sprintf("%s%s", trainJobName, constants.MPISSHAuthSecretSuffix)
 }
 
 func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.TrainJob) (*corev1ac.ConfigMapApplyConfiguration, error) {
-	// Generate hostfile for the MPI communication.
-	var hostfile bytes.Buffer
-	// TODO (andreyvelich): Support other MPI implementations.
-	for i := range *info.Trainer.NumNodes {
+	var hostFile bytes.Buffer
+	runLauncherAsWorker := ptr.Deref(info.RuntimePolicy.MLPolicy.MPI.RunLauncherAsNode, false)
+	slots := ptr.Deref(info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode, 1)
+	for _, ps := range info.TemplateSpec.PodSets {
+		if !isTrainerNode(runLauncherAsWorker, ps) {
+			continue
+		}
 		switch *info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
 		case trainer.MPIImplementationOpenMPI:
-			// hostfile.WriteString(fmt.Sprintf("%s-%s-0-%s.%s.%s.svc slots=%s\n", trainJob.Name, constants.JobTrainerNode, i, trainJob.Name, trainJob.Namespace, info.NumProcPerNode))
-			hostfile.WriteString(fmt.Sprintf("%s-%s-0-%d.%s slots=%s\n", trainJob.Name, constants.JobTrainerNode, i, info.NumProcPerNode, trainJob.Name))
+			for e := range ps.Endpoints {
+				hostFile.WriteString(fmt.Sprintf("%s slots=%d\n", e, slots))
+			}
 		}
 	}
-
-	// Create ConfigMap to store hostfile.
-	configMap := corev1ac.ConfigMap(trainJob.Name+constants.MPIHostfileConfigMapSuffix, trainJob.Namespace).
+	return corev1ac.ConfigMap(fmt.Sprintf("%s%s", trainJob.Name, constants.MPIHostfileConfigMapSuffix), trainJob.Namespace).
 		WithData(map[string]string{
-			constants.MPIHostfileName: hostfile.String(),
-		})
+			constants.MPIHostfileName: hostFile.String(),
+		}).
+		WithOwnerReferences(metav1ac.OwnerReference().
+			WithAPIVersion(trainer.GroupVersion.String()).
+			WithKind(trainer.TrainJobKind).
+			WithName(trainJob.Name).
+			WithUID(trainJob.UID).
+			WithController(true).
+			WithBlockOwnerDeletion(true)), nil
+}
 
-	configMap.WithOwnerReferences(metav1ac.OwnerReference().
-		WithAPIVersion(trainer.GroupVersion.String()).
-		WithKind(trainer.TrainJobKind).
-		WithName(trainJob.Name).
-		WithUID(trainJob.UID).
-		WithController(true).
-		WithBlockOwnerDeletion(true))
-
-	return configMap, nil
+func isTrainerNode(runLauncherAsWorker bool, ps runtime.PodSet) bool {
+	return (runLauncherAsWorker && ps.Name == constants.JobLauncher) || ps.Name == constants.JobTrainerNode
 }

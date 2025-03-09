@@ -45,52 +45,52 @@ func TestPlainML(t *testing.T) {
 	}{
 		"no action when info is null": {},
 		"no action when mlPolicy is null": {
-			info: runtime.NewInfo(
-				runtime.WithLabels(map[string]string{"key": "value"}),
-			),
-			wantInfo: runtime.NewInfo(
-				runtime.WithLabels(map[string]string{"key": "value"}),
-			),
+			info: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+			},
+			wantInfo: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+			},
 		},
 		"no action when mlPolicy torch is not null": {
-			info: runtime.NewInfo(
-				runtime.WithLabels(map[string]string{"key": "value"}),
-				runtime.WithMLPolicy(
-					utiltesting.MakeMLPolicyWrapper().
+			info: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
 						WithNumNodes(100).
 						TorchPolicy("auto", nil).
 						Obj(),
-				),
-			),
-			wantInfo: runtime.NewInfo(
-				runtime.WithLabels(map[string]string{"key": "value"}),
-				runtime.WithMLPolicy(
-					utiltesting.MakeMLPolicyWrapper().
+				},
+			},
+			wantInfo: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
 						WithNumNodes(100).
 						TorchPolicy("auto", nil).
 						Obj(),
-				),
-			),
+				},
+			},
 		},
 		"no action when mlPolicy mpi is not null": {
-			info: runtime.NewInfo(
-				runtime.WithLabels(map[string]string{"key": "value"}),
-				runtime.WithMLPolicy(
-					utiltesting.MakeMLPolicyWrapper().
+			info: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
 						WithNumNodes(100).
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(false)).
 						Obj(),
-				),
-			),
-			wantInfo: runtime.NewInfo(
-				runtime.WithLabels(map[string]string{"key": "value"}),
-				runtime.WithMLPolicy(
-					utiltesting.MakeMLPolicyWrapper().
+				},
+			},
+			wantInfo: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
 						WithNumNodes(100).
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(false)).
 						Obj(),
-				),
-			),
+				},
+			},
 		},
 		"trainJob trainer numNodes are respected rather than runtimeInfo": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
@@ -98,11 +98,16 @@ func TestPlainML(t *testing.T) {
 					utiltesting.MakeTrainJobTrainerWrapper().NumNodes(200).Obj(),
 				).
 				Obj(),
-			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
-					utiltesting.MakeMLPolicyWrapper().WithNumNodes(100).Obj(),
-				),
-			),
+			info: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().WithNumNodes(100).Obj(),
+				},
+				Scheduler: &runtime.Scheduler{
+					TotalRequests: make(map[string]runtime.TotalResourceRequest),
+				},
+			},
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
