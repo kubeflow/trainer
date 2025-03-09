@@ -89,7 +89,7 @@ jobs:
           push: true
           tag-prefix: ${{ inputs.tag-prefix }}
 
-      - name: Test Build For Component ${{ inputs.component-name }} to Dockerhub
+      - name: Test Build For Component ${{ inputs.component-name }} from Dockerhub
         if: steps.publish.outcome == 'skipped'
         uses: ./.github/workflows/template-publish-image
         with:
@@ -100,7 +100,7 @@ jobs:
           push: false
           tag-prefix: ${{ inputs.tag-prefix }}
 
-      - name: Test Build For Component ${{ inputs.component-name }} to GHCR
+      - name: Test Build For Component ${{ inputs.component-name }} from GHCR
         if: steps.publish.outcome == 'skipped'
         uses: ./.github/workflows/template-publish-image
         with:
