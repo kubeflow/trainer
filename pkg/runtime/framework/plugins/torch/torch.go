@@ -19,6 +19,7 @@ package torch
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -32,6 +33,7 @@ import (
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type Torch struct{}
@@ -70,6 +72,46 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicy.Torch.NumProcPerNode, intstr.FromString("auto"))
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
 		numProcPerNode = ptr.Deref(trainJob.Spec.Trainer.NumProcPerNode, intstr.FromString("auto"))
+	}
+
+	// Cap nproc_per_node based on CPU resources when set to "auto" and no GPU is requested
+	if numProcPerNode.String() == "auto" && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
+		// Check if GPU is requested
+		hasGPU := false
+		for resourceName := range trainJob.Spec.Trainer.ResourcesPerNode.Limits {
+			if strings.Contains(strings.ToLower(string(resourceName)), "gpu") {
+				hasGPU = true
+				break
+			}
+		}
+		if !hasGPU {
+			for resourceName := range trainJob.Spec.Trainer.ResourcesPerNode.Requests {
+				if strings.Contains(strings.ToLower(string(resourceName)), "gpu") {
+					hasGPU = true
+					break
+				}
+			}
+		}
+
+		// If no GPU is requested, use CPU limit or default to 1
+		if !hasGPU {
+			cpuLimit := int32(1) // Default to 1 if no CPU limit is specified
+
+			// First check limits, then requests
+			if cpuQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Limits[corev1.ResourceCPU]; ok {
+				cpuLimit = int32(cpuQuantity.Value())
+			} else if cpuQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Requests[corev1.ResourceCPU]; ok {
+				cpuLimit = int32(cpuQuantity.Value())
+			}
+
+			// Ensure at least 1 process
+			if cpuLimit < 1 {
+				cpuLimit = 1
+			}
+
+			numProcPerNode = intstr.FromInt(int(cpuLimit))
+			fmt.Printf("CPU-only device detected with nproc_per_node=auto, capping to CPU limit: %d\n", cpuLimit)
+		}
 	}
 
 	// Update envs for Info object.
