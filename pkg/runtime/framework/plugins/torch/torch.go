@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -95,22 +96,29 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 
 		// If no GPU is requested, use CPU limit or default to 1
 		if !hasGPU {
-			cpuLimit := int32(1) // Default to 1 if no CPU limit is specified
+			// Default to 1 core
+			cpuQuantity := resource.MustParse("1")
 
 			// First check limits, then requests
-			if cpuQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Limits[corev1.ResourceCPU]; ok {
-				cpuLimit = int32(cpuQuantity.Value())
-			} else if cpuQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Requests[corev1.ResourceCPU]; ok {
-				cpuLimit = int32(cpuQuantity.Value())
+			if limitQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Limits[corev1.ResourceCPU]; ok {
+				cpuQuantity = limitQuantity
+			} else if requestQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Requests[corev1.ResourceCPU]; ok {
+				cpuQuantity = requestQuantity
 			}
 
 			// Ensure at least 1 process
-			if cpuLimit < 1 {
-				cpuLimit = 1
+			if cpuQuantity.Cmp(resource.MustParse("1")) < 0 {
+				cpuQuantity = resource.MustParse("1")
 			}
 
-			numProcPerNode = intstr.FromInt(int(cpuLimit))
-			fmt.Printf("CPU-only device detected with nproc_per_node=auto, capping to CPU limit: %d\n", cpuLimit)
+			// Round up to whole cores
+			cpuQuantity.RoundUp(0) // Scale 0 means whole units (cores)
+
+			// Get the value as an integer
+			cpuValue := cpuQuantity.Value()
+
+			numProcPerNode = intstr.FromInt(int(cpuValue))
+			fmt.Printf("CPU-only device detected with nproc_per_node=auto, capping to CPU limit: %d\n", cpuValue)
 		}
 	}
 

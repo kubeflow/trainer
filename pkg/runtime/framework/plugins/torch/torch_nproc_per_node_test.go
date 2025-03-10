@@ -32,7 +32,7 @@ import (
 	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
 )
 
-func TestTorch_EnforceMLPolicy_NumProcPerNode(t *testing.T) {
+func TestTorch_EnforceMLPolicy_NumProcPerNode_Issue2407(t *testing.T) {
 	tests := []struct {
 		name     string
 		trainJob *trainer.TrainJob
@@ -59,10 +59,10 @@ func TestTorch_EnforceMLPolicy_NumProcPerNode(t *testing.T) {
 						Obj(),
 				),
 			),
-			want: "4",
+			want: "4", // Should be capped to CPU limit
 		},
 		{
-			name: "nproc_per_node=auto with CPU request",
+			name: "nproc_per_node=auto with no CPU resources",
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
@@ -82,74 +82,7 @@ func TestTorch_EnforceMLPolicy_NumProcPerNode(t *testing.T) {
 			want: "1", // Default to 1 when no CPU resources specified
 		},
 		{
-			name: "nproc_per_node=auto with GPU request",
-			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
-				Trainer(
-					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("auto")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
-							"nvidia.com/gpu": resource.MustParse("2"),
-						}).
-						Obj(),
-				).
-				Obj(),
-			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
-					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
-						Obj(),
-				),
-			),
-			want: "auto", // Keep auto when GPU is requested
-		},
-		{
-			name: "nproc_per_node=auto with both CPU and GPU",
-			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
-				Trainer(
-					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("auto")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
-							corev1.ResourceCPU: resource.MustParse("8"),
-							"nvidia.com/gpu":   resource.MustParse("2"),
-						}).
-						Obj(),
-				).
-				Obj(),
-			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
-					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
-						Obj(),
-				),
-			),
-			want: "auto", // Keep auto when GPU is requested
-		},
-		{
-			name: "nproc_per_node explicitly set",
-			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
-				Trainer(
-					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromInt(3)).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
-							corev1.ResourceCPU: resource.MustParse("8"),
-						}).
-						Obj(),
-				).
-				Obj(),
-			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
-					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
-						Obj(),
-				),
-			),
-			want: "3", // Explicit value should be preserved
-		},
-		{
-			name: "Issue #2407: nproc_per_node=auto with low CPU limit",
+			name: "nproc_per_node=auto with low CPU limit",
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
@@ -171,7 +104,7 @@ func TestTorch_EnforceMLPolicy_NumProcPerNode(t *testing.T) {
 			want: "2", // Should be capped to CPU limit (2) even if actual CPU count is higher
 		},
 		{
-			name: "Issue #2407: nproc_per_node=auto with CPU request but no limit",
+			name: "nproc_per_node=auto with CPU request but no limit",
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
@@ -191,6 +124,116 @@ func TestTorch_EnforceMLPolicy_NumProcPerNode(t *testing.T) {
 				),
 			),
 			want: "3", // Should use CPU request when no limit is set
+		},
+		{
+			name: "nproc_per_node=auto with millicore CPU limit",
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumProcPerNode(intstr.FromString("auto")).
+						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("2.5"), // 2.5 CPU cores
+						}).
+						Obj(),
+				).
+				Obj(),
+			info: runtime.NewInfo(
+				runtime.WithMLPolicy(
+					utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				),
+			),
+			want: "3", // Should round up to 3 for 2.5 cores
+		},
+		{
+			name: "nproc_per_node=auto with fractional CPU limit",
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumProcPerNode(intstr.FromString("auto")).
+						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("0.7"), // 0.7 CPU cores
+						}).
+						Obj(),
+				).
+				Obj(),
+			info: runtime.NewInfo(
+				runtime.WithMLPolicy(
+					utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				),
+			),
+			want: "1", // Should round up to 1 for 0.7 cores
+		},
+		{
+			name: "nproc_per_node=auto with GPU request should remain auto",
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumProcPerNode(intstr.FromString("auto")).
+						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+							"nvidia.com/gpu": resource.MustParse("2"),
+						}).
+						Obj(),
+				).
+				Obj(),
+			info: runtime.NewInfo(
+				runtime.WithMLPolicy(
+					utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				),
+			),
+			want: "auto", // Keep auto when GPU is requested
+		},
+		{
+			name: "explicitly set nproc_per_node should be preserved",
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumProcPerNode(intstr.FromInt(3)).
+						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("8"),
+						}).
+						Obj(),
+				).
+				Obj(),
+			info: runtime.NewInfo(
+				runtime.WithMLPolicy(
+					utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				),
+			),
+			want: "3", // Explicit value should be preserved
+		},
+		{
+			name: "nproc_per_node=auto with millicore CPU limit in m format",
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumProcPerNode(intstr.FromString("auto")).
+						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("2500m"), // 2.5 CPU cores in millicore format
+						}).
+						Obj(),
+				).
+				Obj(),
+			info: runtime.NewInfo(
+				runtime.WithMLPolicy(
+					utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				),
+			),
+			want: "3", // Should round up to 3 for 2500m (2.5) cores
 		},
 	}
 
