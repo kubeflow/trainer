@@ -58,7 +58,7 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 
 	// Add envs from the TrainJob.
 	if trainJob.Spec.Trainer != nil {
-		apply.UpsertEnvVars(&info.Trainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...))
+		apply.UpsertEnvVars(&info.Trainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 	}
 
 	// Update total Pod requests for the PodGroupPolicy plugin.
