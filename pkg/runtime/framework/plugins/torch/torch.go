@@ -19,7 +19,9 @@ package torch
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -32,6 +34,7 @@ import (
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type Torch struct{}
@@ -70,6 +73,53 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicy.Torch.NumProcPerNode, intstr.FromString("auto"))
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
 		numProcPerNode = ptr.Deref(trainJob.Spec.Trainer.NumProcPerNode, intstr.FromString("auto"))
+	}
+
+	// Cap nproc_per_node based on CPU resources when set to "auto" and no GPU is requested
+	if numProcPerNode.String() == "auto" && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
+		// Check if GPU is requested
+		hasGPU := false
+		for resourceName := range trainJob.Spec.Trainer.ResourcesPerNode.Limits {
+			if strings.Contains(strings.ToLower(string(resourceName)), "gpu") {
+				hasGPU = true
+				break
+			}
+		}
+		if !hasGPU {
+			for resourceName := range trainJob.Spec.Trainer.ResourcesPerNode.Requests {
+				if strings.Contains(strings.ToLower(string(resourceName)), "gpu") {
+					hasGPU = true
+					break
+				}
+			}
+		}
+
+		// If no GPU is requested, use CPU limit or default to 1
+		if !hasGPU {
+			// Default to 1 core
+			cpuQuantity := resource.MustParse("1")
+
+			// First check limits, then requests
+			if limitQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Limits[corev1.ResourceCPU]; ok {
+				cpuQuantity = limitQuantity
+			} else if requestQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Requests[corev1.ResourceCPU]; ok {
+				cpuQuantity = requestQuantity
+			}
+
+			// Ensure at least 1 process
+			if cpuQuantity.Cmp(resource.MustParse("1")) < 0 {
+				cpuQuantity = resource.MustParse("1")
+			}
+
+			// Round up to whole cores
+			cpuQuantity.RoundUp(0) // Scale 0 means whole units (cores)
+
+			// Get the value as an integer
+			cpuValue := cpuQuantity.Value()
+
+			numProcPerNode = intstr.FromInt(int(cpuValue))
+			fmt.Printf("CPU-only device detected with nproc_per_node=auto, capping to CPU limit: %d\n", cpuValue)
+		}
 	}
 
 	// Update envs for Info object.
