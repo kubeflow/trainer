@@ -123,7 +123,7 @@ kind: ClusterTrainingRuntime
 metadata:
   name: torchtune-llama3.1-8B-finetuning
   labels:
-    runtime.trainer.kubeflow.org/phase: post-training
+    trainer.kubeflow.org/phase: post-training
 spec:
   mlPolicy:
     numNodes: 1
@@ -261,61 +261,13 @@ class TorchTuneConfig:
 
 We need to modify the exsiting torch plugin to handle config override for `torchtune`, since currently torch plugin passes the distributed arguments by environment variables that begins with `PET_`, which is not allowed by `torchtune`. However, `torchtune` can share the same ML Policy with `torchrun` because `torchtune` is fully compatible with these distributed parameters.
 
-We will add CLI-based parameters mutation to `pkg/runtime/framework/torch/torch.go` while still supporting env-based parameters mutation with `PET_`:
-
-```go
-func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
-    // ...
-    if !trainJob.IsLaunchedByTorchTune() {
-        // Original env-based parameters mutation
-        // Update envs for Info object.
-        // Add PyTorch distributed "PET_" values for torchrun.
-        // TBA
-    } else {
-        // CLI-based parameters mutation
-        // Add PyTorch distributed values to Info.Args,
-        // which will be inserted in front of Args of Trainer Node.
-        // TBA
-    }
-    // ...
-}
-```
+We will add CLI-based parameters mutation to `EnforceMLPolicy()` in `pkg/runtime/framework/torch/torch.go` while still supporting env-based parameters mutation with `PET_`:
 
 Related changes:
 
-1. Add `Args` fields to Info (`pkg/runtime/runtime.go`).
+1. Store container arguments to internal runtime Information (`pkg/runtime/runtime.go`).
 
-```go
-// We use SSA to reconcile TrainJob now.
-// Ref: https://github.com/kubeflow/trainer/pull/2431
-type Trainer struct {
-    NumNodes       *int32
-    NumProcPerNode string
-    Args           []string
-    Env            []corev1ac.EnvVarApplyConfiguration
-    ContainerPort  *corev1ac.ContainerPortApplyConfiguration
-    Volumes        []corev1ac.VolumeApplyConfiguration
-    VolumeMounts   []corev1ac.VolumeMountApplyConfiguration
-}
-```
-
-2. Insert `Info.Args` in front of Args of Trainer Node (`pkg/runtime/framework/plugins/jobest/builder.go`)
-
-```go
-// ...
-
-// Update the Trainer args.
-if args := info.Trainer.Args; args != nil {
-    apply.UpsertArg(b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args, args)
-}
-
-// Update the Trainer container port.
-if port := info.Trainer.ContainerPort; port != nil {
-    apply.UpsertPort(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, port)
-}
-
-// ...
-```
+2. Insert container arguments in front of Args of Trainer Node (`pkg/runtime/framework/plugins/jobest/builder.go`)
 
 #### Create Map from `TorchTuneConfig` to Specific Recipes and Configs
 
@@ -327,7 +279,6 @@ We will create a map from (`TorchTuneConfig`, `num_nodes`, `nproc_per_node`, `ru
 2. `peft_config == None` && (`num_nodes >= 1` || `nproc_per_node > 1`): Use `full_finetune_distributed`.
 3. `type(peft_confg) == LoraConfig` && `nproc_per_node == 1`: Use `lora_finetune_single_device`.
 4. `type(peft_confg) == LoraConfig` && `nproc_per_node > 1`: Use `lora_finetune_distributed`.
-5. TBA if we want to support more fine-tuning techniques.
 
 - How to Select `config`
 
@@ -338,7 +289,6 @@ We will create one `ClusterTrainingRuntime` for one model. In this way, we can e
 In order to ensure the validity of the configurations propagated by SDK, we plan to add some validating requirements to the TrainJob Webhook. We'll implement validations in torch plugin [`CustomValidationPlugin`](https://github.com/kubeflow/trainer/blob/1f443729ebdb3e792d4b9cd2b242f33b0e86fe14/pkg/runtime/framework/interface.go#L34-L37):
 
 1. The ClusterTrainingRuntime referenced by `runtime_ref` exists in the control plane.
-2. TBA...
 
 #### Determine Default Resources
 
