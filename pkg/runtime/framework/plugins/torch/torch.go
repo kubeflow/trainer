@@ -118,7 +118,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			cpuValue := cpuQuantity.Value()
 
 			numProcPerNode = intstr.FromInt(int(cpuValue))
-			fmt.Printf("CPU-only device detected with nproc_per_node=auto, capping to CPU limit: %d\n", cpuValue)
 		}
 	}
 
