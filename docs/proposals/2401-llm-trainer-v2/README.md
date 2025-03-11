@@ -292,7 +292,7 @@ In that case, we plan to design `Runtime` dataclass as the following:
 ```python
 # Runtime DataClass
 @dataclass
-class Runtimne:
+class Runtime:
     name: str
     method: str
     framework: str
