@@ -79,20 +79,6 @@ def get_container_devices(
     return device, device_count
 
 
-# TODO (andreyvelich): Discuss how to make this validation easier for users.
-def validate_trainer(trainer: types.Trainer):
-    """
-    Validate that trainer has the correct configuration.
-    """
-
-    if (
-        trainer.func or trainer.func_args or trainer.packages_to_install
-    ) and trainer.fine_tuning_config:
-        raise ValueError(
-            "Trainer function parameters and fine tuning config can't be set together"
-        )
-
-
 # TODO (andreyvelich): Discuss if we want to support V1ResourceRequirements resources as input.
 def get_resources_per_node(
     resources_per_node: dict,

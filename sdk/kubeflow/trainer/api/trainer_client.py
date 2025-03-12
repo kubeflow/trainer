@@ -204,9 +204,6 @@ class TrainerClient:
             RuntimeError: Failed to create TrainJobs.
         """
 
-        if trainer:
-            utils.validate_trainer(trainer)
-
         # Generate unique name for the TrainJob.
         # TODO (andreyvelich): Discuss this TrainJob name generation.
         train_job_name = random.choice(string.ascii_lowercase) + uuid.uuid4().hex[:11]
