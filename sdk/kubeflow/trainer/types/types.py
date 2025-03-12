@@ -57,12 +57,14 @@ class CustomTrainer:
         that encapsulates the entire model training process.
 
     Args:
-        func: The function that encapsulates the entire model training process.
-        func_args: The arguments to pass to the function.
-        packages_to_install: A list of Python packages to install before running the function.
-        pip_index_url: The PyPI URL from which to install Python packages.
-        num_nodes: The number of nodes to use for training.
-        resources_per_node: The computing resources to allocate per node.
+        func (`Optional[Callable]`):
+            The function that encapsulates the entire model training process.
+        func_args (`Optional[Dict]`): The arguments to pass to the function.
+        packages_to_install (`Optional[List[str]]`):
+            A list of Python packages to install before running the function.
+        pip_index_url (`str`): The PyPI URL from which to install Python packages.
+        num_nodes (`Optional[int]`): The number of nodes to use for training.
+        resources_per_node (`Optional[Dict]`): The computing resources to allocate per node.
     """
 
     func: Optional[Callable] = None
@@ -70,7 +72,7 @@ class CustomTrainer:
     packages_to_install: Optional[List[str]] = None
     pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
     num_nodes: Optional[int] = None
-    resources_per_node: Optional[dict] = None
+    resources_per_node: Optional[Dict] = None
 
 
 # Configuration for the HuggingFace dataset provider.
