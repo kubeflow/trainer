@@ -433,14 +433,14 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 										*corev1ac.VolumeMount().
 											WithName(jobsetplgconsts.VolumeNameInitializer).
-											WithMountPath("/workspace/dataset"),
+											WithMountPath(constants.DatasetMountPath),
 									},
 								},
 								{
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 										*corev1ac.VolumeMount().
 											WithName(jobsetplgconsts.VolumeNameInitializer).
-											WithMountPath("/workspace/model"),
+											WithMountPath("constants.ModelMountPath"),
 									},
 								},
 							},
@@ -458,10 +458,10 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
-										WithMountPath("/workspace/dataset"),
+										WithMountPath(constants.DatasetMountPath),
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
-										WithMountPath("/workspace/model"),
+										WithMountPath("constants.ModelMountPath"),
 								},
 							}},
 						},
@@ -480,14 +480,14 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("/workspace/dataset"),
+																WithMountPath(constants.DatasetMountPath),
 														),
 													corev1ac.Container().
 														WithName(constants.ContainerModelInitializer).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("/workspace/model"),
+																WithMountPath("constants.ModelMountPath"),
 														),
 												).
 												WithVolumes(
@@ -512,10 +512,10 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("/workspace/dataset"),
+																WithMountPath(constants.DatasetMountPath),
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("/workspace/model"),
+																WithMountPath("constants.ModelMountPath"),
 														),
 												).
 												WithVolumes(
@@ -588,14 +588,14 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("/workspace/dataset"),
+																WithMountPath(constants.DatasetMountPath),
 														),
 													corev1ac.Container().
 														WithName(constants.ContainerModelInitializer).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("/workspace/model"),
+																WithMountPath("constants.ModelMountPath"),
 														),
 												).
 												WithVolumes(
@@ -631,10 +631,10 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("/workspace/dataset"),
+																WithMountPath(constants.DatasetMountPath),
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("/workspace/model"),
+																WithMountPath("constants.ModelMountPath"),
 														),
 												).
 												WithVolumes(
@@ -656,14 +656,14 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 										*corev1ac.VolumeMount().
 											WithName(jobsetplgconsts.VolumeNameInitializer).
-											WithMountPath("/workspace/dataset"),
+											WithMountPath(constants.DatasetMountPath),
 									},
 								},
 								{
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 										*corev1ac.VolumeMount().
 											WithName(jobsetplgconsts.VolumeNameInitializer).
-											WithMountPath("/workspace/model"),
+											WithMountPath("constants.ModelMountPath"),
 									},
 								},
 							},
@@ -681,10 +681,10 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
-										WithMountPath("/workspace/dataset"),
+										WithMountPath(constants.DatasetMountPath),
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
-										WithMountPath("/workspace/model"),
+										WithMountPath("constants.ModelMountPath"),
 								},
 							}},
 						},

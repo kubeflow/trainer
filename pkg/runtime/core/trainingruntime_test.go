@@ -580,8 +580,8 @@ test-job-trainer-node-0-1.test-job slots=8
 							Value: "8",
 						},
 						corev1.EnvVar{
-							Name:  constants.OpenMPIEnvRSHArgs,
-							Value: "-o ConnectionAttempts=10",
+							Name:  constants.OpenMPIEnvKeyRSHArgs,
+							Value: constants.OpenMPIEnvDefaultValueRSHArgs,
 						},
 					).
 					ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).

@@ -662,8 +662,8 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									Value: "8",
 								},
 								corev1.EnvVar{
-									Name:  constants.OpenMPIEnvRSHArgs,
-									Value: "-o ConnectionAttempts=10",
+									Name:  constants.OpenMPIEnvKeyRSHArgs,
+									Value: constants.OpenMPIEnvDefaultValueRSHArgs,
 								},
 							).
 							Env(constants.JobTrainerNode, constants.ContainerTrainer,

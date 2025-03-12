@@ -61,14 +61,14 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 												Name: constants.ContainerDatasetInitializer,
 												VolumeMounts: []corev1.VolumeMount{{
 													Name:      jobsetplgconsts.VolumeNameInitializer,
-													MountPath: "/workspace/dataset",
+													MountPath: constants.DatasetMountPath,
 												}},
 											},
 											{
 												Name: constants.ContainerModelInitializer,
 												VolumeMounts: []corev1.VolumeMount{{
 													Name:      jobsetplgconsts.VolumeNameInitializer,
-													MountPath: "/workspace/model",
+													MountPath: "constants.ModelMountPath",
 												}},
 											},
 										},
@@ -97,11 +97,11 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 												VolumeMounts: []corev1.VolumeMount{
 													{
 														Name:      jobsetplgconsts.VolumeNameInitializer,
-														MountPath: "/workspace/dataset",
+														MountPath: constants.DatasetMountPath,
 													},
 													{
 														Name:      jobsetplgconsts.VolumeNameInitializer,
-														MountPath: "/workspace/model",
+														MountPath: "constants.ModelMountPath",
 													},
 												},
 											},
@@ -622,14 +622,14 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 														Name: constants.ContainerDatasetInitializer,
 														VolumeMounts: []corev1.VolumeMount{{
 															Name:      jobsetplgconsts.VolumeNameInitializer,
-															MountPath: "/workspace/dataset",
+															MountPath: constants.DatasetMountPath,
 														}},
 													},
 													{
 														Name: constants.ContainerModelInitializer,
 														VolumeMounts: []corev1.VolumeMount{{
 															Name:      jobsetplgconsts.VolumeNameInitializer,
-															MountPath: "/workspace/model",
+															MountPath: "constants.ModelMountPath",
 														}},
 													},
 												},
@@ -658,11 +658,11 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 														VolumeMounts: []corev1.VolumeMount{
 															{
 																Name:      jobsetplgconsts.VolumeNameInitializer,
-																MountPath: "/workspace/dataset",
+																MountPath: constants.DatasetMountPath,
 															},
 															{
 																Name:      jobsetplgconsts.VolumeNameInitializer,
-																MountPath: "/workspace/model",
+																MountPath: "constants.ModelMountPath",
 															},
 														},
 													},
@@ -742,14 +742,14 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 														Name: constants.ContainerDatasetInitializer,
 														VolumeMounts: []corev1.VolumeMount{{
 															Name:      jobsetplgconsts.VolumeNameInitializer,
-															MountPath: "/workspace/dataset",
+															MountPath: constants.DatasetMountPath,
 														}},
 													},
 													{
 														Name: constants.ContainerModelInitializer,
 														VolumeMounts: []corev1.VolumeMount{{
 															Name:      jobsetplgconsts.VolumeNameInitializer,
-															MountPath: "/workspace/model",
+															MountPath: "constants.ModelMountPath",
 														}},
 													},
 												},
@@ -778,11 +778,11 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 														VolumeMounts: []corev1.VolumeMount{
 															{
 																Name:      jobsetplgconsts.VolumeNameInitializer,
-																MountPath: "/workspace/dataset",
+																MountPath: constants.DatasetMountPath,
 															},
 															{
 																Name:      jobsetplgconsts.VolumeNameInitializer,
-																MountPath: "/workspace/model",
+																MountPath: "constants.ModelMountPath",
 															},
 														},
 													},

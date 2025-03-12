@@ -180,8 +180,8 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 							WithName(constants.OpenMPIEnvDefaultSlots).
 							WithValue(strconv.Itoa(int(*info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode))),
 						*corev1ac.EnvVar().
-							WithName(constants.OpenMPIEnvRSHArgs).
-							WithValue("-o ConnectionAttempts=10"),
+							WithName(constants.OpenMPIEnvKeyRSHArgs).
+							WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 					)
 				default:
 					return fmt.Errorf("MPI implementation for %v doesn't supported", info.RuntimePolicy.MLPolicy.MPI.MPIImplementation)
