@@ -189,7 +189,7 @@ class TrainerClient:
     def train(
         self,
         runtime_ref: str,
-        trainer: Optional[types.Trainer] = None,
+        trainer: Optional[types.CustomTrainer] = None,
         dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
         model_config: Optional[types.HuggingFaceModelInputConfig] = None,
     ) -> str:

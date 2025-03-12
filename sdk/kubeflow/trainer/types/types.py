@@ -62,25 +62,25 @@ class LoraConfig:
     )
 
 
+# Configuration for the custom trainer.
 @dataclass
-class FineTuningConfig:
-    # TODO (andreyvelich): Add more configs once we support them, e.g. QLoRA.
-    peft_config: Optional[LoraConfig] = None
+class CustomTrainer:
+    """Custom Trainer configuration. Configure the self-contained function
+        that encapsulates the entire model training process.
 
-
-# Configuration for the Trainer.
-# TODO (andreyvelich): Discuss what values should be on the Trainer.
-@dataclass
-class Trainer:
-    """Trainer configuration.
-    TODO: Add the description
+    Fields:
+        func: The function that encapsulates the entire model training process.
+        func_args: The arguments to pass to the function.
+        packages_to_install: A list of packages to install before running the function.
+        pip_index_url: The URL of the pip index to use when installing packages.
+        num_nodes: The number of nodes to use for training.
+        resources_per_node: The resources to allocate per node.
     """
 
     func: Optional[Callable] = None
     func_args: Optional[Dict] = None
     packages_to_install: Optional[List[str]] = None
     pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
-    fine_tuning_config: Optional[FineTuningConfig] = None
     num_nodes: Optional[int] = None
     resources_per_node: Optional[dict] = None
 
