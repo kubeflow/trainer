@@ -1,8 +1,6 @@
 # Developer Guide
 
-# TODO (andreyvelich): This doc needs to be updated for Kubeflow Trainer V2
-
-Kubeflow Training Operator is currently at v1.
+# TODO (Trainer V2 Update):  The testing and local Docker image building instructions need to be updated for Kubeflow Trainer V2. The current instructions in the repository are based on the Training Operator V1 and may not be directly applicable to the Trainer V2 project..
 
 ## Requirements
 
@@ -14,31 +12,6 @@ Kubeflow Training Operator is currently at v1.
 - [Lima](https://github.com/lima-vm/lima?tab=readme-ov-file#adopters) (an alternative to DockerDesktop) (0.21.0 or later)
   - [Colima](https://github.com/abiosoft/colima) (Lima specifically for MacOS) (0.6.8 or later)
 - [pre-commit](https://pre-commit.com/)
-
-Note for Lima the link is to the Adopters, which supports several different container environments.
-
-## Building the operator
-
-Create a symbolic link inside your GOPATH to the location you checked out the code
-
-```sh
-mkdir -p $(go env GOPATH)/src/github.com/kubeflow
-ln -sf ${GIT_TRAINING} $(go env GOPATH)/src/github.com/kubeflow/training-operator
-```
-
-- GIT_TRAINING should be the location where you checked out https://github.com/kubeflow/training-operator
-
-Install dependencies
-
-```sh
-go mod tidy
-```
-
-Build the library
-
-```sh
-go install github.com/kubeflow/training-operator/cmd/training-operator.v1
-```
 
 ## Running the Operator Locally
 
@@ -70,57 +43,69 @@ NAME                 STATUS   ROLES           AGE   VERSION
 kind-control-plane   Ready    control-plane   32s   v1.27.3
 ```
 
-Note, that for the example job below, the PyTorchJob uses the `kubeflow` namespace.
-
 From here we can apply the manifests to the cluster.
 
 ```sh
-kubectl apply --server-side -k "github.com/kubeflow/training-operator/manifests/overlays/standalone"
+kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/runtimes?ref=master"
 ```
 
-Then we can patch it with the latest operator image.
+### Submit a Sample Job
+
+You can submit a sample job using a TrainJob:
+
+```yaml
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: pytorch-mnist-example
+spec:
+  runtimeRef:
+    name: torch-distributed
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+```
+
+Apply the job:
 
 ```sh
-kubectl patch -n kubeflow deployments training-operator --type json -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "kubeflow/training-operator:latest"}]'
+kubectl apply -f pytorch-job.yaml
 ```
 
-Then we can run the job with the following command.
+Check the job status:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/kubeflow/training-operator/master/examples/pytorch/simple.yaml
+kubectl get trainjobs
+kubectl describe trainjob pytorch-mnist-example
 ```
 
-And we can see the output of the job from the logs, which may take some time to produce but should look something like below.
+## Building the Operator
 
-```
-$ kubectl logs -n kubeflow -l training.kubeflow.org/job-name=pytorch-simple --follow
-Defaulted container "pytorch" out of: pytorch, init-pytorch (init)
-2024-04-19T19:00:29Z INFO     Train Epoch: 1 [4480/60000 (7%)]	loss=2.2295
-2024-04-19T19:00:32Z INFO     Train Epoch: 1 [5120/60000 (9%)]	loss=2.1790
-2024-04-19T19:00:35Z INFO     Train Epoch: 1 [5760/60000 (10%)]	loss=2.1150
-2024-04-19T19:00:38Z INFO     Train Epoch: 1 [6400/60000 (11%)]	loss=2.0294
-2024-04-19T19:00:41Z INFO     Train Epoch: 1 [7040/60000 (12%)]	loss=1.9156
-2024-04-19T19:00:44Z INFO     Train Epoch: 1 [7680/60000 (13%)]	loss=1.7949
-2024-04-19T19:00:47Z INFO     Train Epoch: 1 [8320/60000 (14%)]	loss=1.5567
-2024-04-19T19:00:50Z INFO     Train Epoch: 1 [8960/60000 (15%)]	loss=1.3715
-2024-04-19T19:00:54Z INFO     Train Epoch: 1 [9600/60000 (16%)]	loss=1.3385
-2024-04-19T19:00:57Z INFO     Train Epoch: 1 [10240/60000 (17%)]	loss=1.1650
-2024-04-19T19:00:29Z INFO     Train Epoch: 1 [4480/60000 (7%)]	loss=2.2295
-2024-04-19T19:00:32Z INFO     Train Epoch: 1 [5120/60000 (9%)]	loss=2.1790
-2024-04-19T19:00:35Z INFO     Train Epoch: 1 [5760/60000 (10%)]	loss=2.1150
-2024-04-19T19:00:38Z INFO     Train Epoch: 1 [6400/60000 (11%)]	loss=2.0294
-2024-04-19T19:00:41Z INFO     Train Epoch: 1 [7040/60000 (12%)]	loss=1.9156
-2024-04-19T19:00:44Z INFO     Train Epoch: 1 [7680/60000 (13%)]	loss=1.7949
-2024-04-19T19:00:47Z INFO     Train Epoch: 1 [8320/60000 (14%)]	loss=1.5567
-2024-04-19T19:00:50Z INFO     Train Epoch: 1 [8960/60000 (15%)]	loss=1.3715
-2024-04-19T19:00:53Z INFO     Train Epoch: 1 [9600/60000 (16%)]	loss=1.3385
-2024-04-19T19:00:57Z INFO     Train Epoch: 1 [10240/60000 (17%)]	loss=1.1650
+### Create Symbolic Link
+
+Create a symbolic link inside your GOPATH to the location you checked out the code:
+
+```sh
+mkdir -p $(go env GOPATH)/src/github.com/kubeflow
+ln -sf ${GIT_TRAINER} $(go env GOPATH)/src/github.com/kubeflow/trainer
 ```
 
-## Testing changes locally
+- `GIT_TRAINER` should be the location where you checked out the Kubeflow Trainer repository
 
-Now that you confirmed you can spin up an operator locally, you can try to test your local changes to the operator.
-You do this by building a new operator image and loading it into your kind cluster.
+### Install Dependencies
+
+```sh
+go mod tidy
+```
+
+### Build the Controller Manager
+
+```sh
+go build -o bin/manager cmd/trainer-controller-manager/main.go
+```
+
+## Testing Changes Locally
+
+**TODO**: The following section needs to be updated for Kubeflow Trainer V2:
 
 ### Build Operator Image
 
@@ -128,84 +113,48 @@ You do this by building a new operator image and loading it into your kind clust
 make docker-build IMG=my-username/training-operator:my-pr-01
 ```
 
-You can swap `my-username/training-operator:my-pr-01` with whatever you would like.
-
-## Load docker image
+### Load Docker Image
 
 ```sh
 kind load docker-image my-username/training-operator:my-pr-01
 ```
 
-## Modify operator image with new one
+### Modify Operator Image
 
 ```sh
 cd ./manifests/overlays/standalone
 kustomize edit set image my-username/training-operator=my-username/training-operator:my-pr-01
 ```
 
-Update the `newTag` key in `./manifests/overlayes/standalone/kustimization.yaml` with the new image.
-
-Deploy the operator with:
+### Deploy Operator
 
 ```sh
 kubectl apply -k ./manifests/overlays/standalone
 ```
 
-And now we can submit jobs to the operator.
+### Submit Jobs
 
 ```sh
 kubectl patch -n kubeflow deployments training-operator --type json -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "my-username/training-operator:my-pr-01"}]'
 kubectl apply -f https://raw.githubusercontent.com/kubeflow/training-operator/master/examples/pytorch/simple.yaml
 ```
 
-You should be able to see a pod for your training operator running in your namespace using
+## Go Version
 
-```
-kubectl logs -n kubeflow -l training.kubeflow.org/job-name=pytorch-simple
-```
-
-## Go version
-
-On ubuntu the default go package appears to be gccgo-go which has problems see [issue](https://github.com/golang/go/issues/15429) golang-go package is also really old so install from golang tarballs instead.
+On ubuntu the default go package appears to be gccgo-go which has problems. It's recommended to install Go from official tarballs.
 
 ## Generate Python SDK
 
 To generate Python SDK for the operator, run:
 
-```
+```sh
 ./hack/python-sdk/gen-sdk.sh
-```
-
-This command will re-generate the api and model files together with the documentation and model tests.
-The following files/folders in `sdk/python` are auto-generated and should not be modified directly:
-
-```
-sdk/python/docs
-sdk/python/kubeflow/training/models
-sdk/python/kubeflow/training/*.py
-sdk/python/test/*.py
-```
-
-The Training Operator client and public APIs are located here:
-
-```
-sdk/python/kubeflow/training/api
 ```
 
 ## Code Style
 
 ### pre-commit
 
-Make sure to install [pre-commit](https://pre-commit.com/) (`pip install
-pre-commit`) and run `pre-commit install` from the root of the repository at
-least once before creating git commits.
+Make sure to install [pre-commit](https://pre-commit.com/) (`pip install pre-commit`) and run `pre-commit install` from the root of the repository at least once before creating git commits.
 
-The pre-commit [hooks](../../.pre-commit-config.yaml) ensure code quality and
-consistency. They are executed in CI. PRs that fail to comply with the hooks
-will not be able to pass the corresponding CI gate. The hooks are only executed
-against staged files unless you run `pre-commit run --all`, in which case,
-they'll be executed against every file in the repository.
-
-Specific programmatically generated files listed in the `exclude` field in
-[.pre-commit-config.yaml](../../.pre-commit-config.yaml) are deliberately
-excluded from the hooks.
+The pre-commit hooks ensure code quality and consistency. They are executed in CI. PRs that fail to comply with the hooks will not be able to pass the corresponding CI gate.
