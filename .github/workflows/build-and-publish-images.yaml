@@ -38,47 +38,47 @@ jobs:
       - name: Free-Up Disk Space
         uses: ./.github/workflows/free-up-disk-space
 
-      # - name: Docker Login
-      #   # Trigger workflow only for kubeflow/trainer repository with specific branch (master, v.*-branch, release-*) or tag (v.*).
-      #   if: >-
-      #     github.repository == 'kubeflow/trainer' &&
-      #     (github.ref == 'refs/heads/master' || (startsWith(github.ref, 'refs/heads/v') && endsWith(github.ref, '-branch')) || startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/tags/v'))
-      #   uses: docker/login-action@v3
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Docker Login
+        # Trigger workflow only for kubeflow/trainer repository with specific branch (master, v.*-branch, release-*) or tag (v.*).
+        if: >-
+          github.repository == 'kubeflow/trainer' &&
+          (github.ref == 'refs/heads/master' || (startsWith(github.ref, 'refs/heads/v') && endsWith(github.ref, '-branch')) || startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: GHCR Login
         # Trigger workflow only for kubeflow/trainer repository with specific branch (master, v.*-branch, release-*) or tag (v.*).
-        # if: >-
-        #   github.repository == 'kubeflow/trainer' &&
-        #   (github.ref == 'refs/heads/master' || (startsWith(github.ref, 'refs/heads/v') && endsWith(github.ref, '-branch')) || startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/tags/v'))
+        if: >-
+          github.repository == 'kubeflow/trainer' &&
+          (github.ref == 'refs/heads/master' || (startsWith(github.ref, 'refs/heads/v') && endsWith(github.ref, '-branch')) || startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/tags/v'))
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # - name: Publish Component ${{ inputs.component-name }} to Dockerhub
-      #   # Trigger workflow only for kubeflow/trainer repository with specific branch (master, v.*-branch, release-*) or tag (v.*).
-      #   if: >-
-      #     github.repository == 'kubeflow/trainer' &&
-      #     (github.ref == 'refs/heads/master' || (startsWith(github.ref, 'refs/heads/v') && endsWith(github.ref, '-branch')) || startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/tags/v'))
-      #   id: publish-dockerhub
-      #   uses: ./.github/workflows/template-publish-image
-      #   with:
-      #     image: docker.io/kubeflow/${{ inputs.component-name }}
-      #     dockerfile: ${{ inputs.dockerfile }}
-      #     platforms: ${{ inputs.platforms }}
-      #     context: ${{ inputs.context }}
-      #     push: true
-      #     tag-prefix: ${{ inputs.tag-prefix }}
+      - name: Publish Component ${{ inputs.component-name }} to Dockerhub
+        # Trigger workflow only for kubeflow/trainer repository with specific branch (master, v.*-branch, release-*) or tag (v.*).
+        if: >-
+          github.repository == 'kubeflow/trainer' &&
+          (github.ref == 'refs/heads/master' || (startsWith(github.ref, 'refs/heads/v') && endsWith(github.ref, '-branch')) || startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/tags/v'))
+        id: publish-dockerhub
+        uses: ./.github/workflows/template-publish-image
+        with:
+          image: docker.io/kubeflow/${{ inputs.component-name }}
+          dockerfile: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          context: ${{ inputs.context }}
+          push: true
+          tag-prefix: ${{ inputs.tag-prefix }}
 
       - name: Publish Component ${{ inputs.component-name }} to GHCR
         # Trigger workflow only for kubeflow/trainer repository with specific branch (master, v.*-branch, release-*) or tag (v.*).
-        # if: >-
-        #   github.repository == 'kubeflow/trainer' &&
-        #   (github.ref == 'refs/heads/master' || (startsWith(github.ref, 'refs/heads/v') && endsWith(github.ref, '-branch')) || startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/tags/v'))
+        if: >-
+          github.repository == 'kubeflow/trainer' &&
+          (github.ref == 'refs/heads/master' || (startsWith(github.ref, 'refs/heads/v') && endsWith(github.ref, '-branch')) || startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/tags/v'))
         id: publish-ghcr
         uses: ./.github/workflows/template-publish-image
         with:
@@ -89,22 +89,22 @@ jobs:
           push: true
           tag-prefix: ${{ inputs.tag-prefix }}
 
-      # - name: Test Build For Component ${{ inputs.component-name }} from Dockerhub
-      #   if: steps.publish-dockerhub.outcome == 'skipped'
-      #   uses: ./.github/workflows/template-publish-image
-      #   with:
-      #     image: docker.io/kubeflow/${{ inputs.component-name }}
-      #     dockerfile: ${{ inputs.dockerfile }}
-      #     platforms: ${{ inputs.platforms }}
-      #     context: ${{ inputs.context }}
-      #     push: false
-      #     tag-prefix: ${{ inputs.tag-prefix }}
+      - name: Test Build For Component ${{ inputs.component-name }} from Dockerhub
+        if: steps.publish-dockerhub.outcome == 'skipped'
+        uses: ./.github/workflows/template-publish-image
+        with:
+          image: docker.io/kubeflow/${{ inputs.component-name }}
+          dockerfile: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          context: ${{ inputs.context }}
+          push: false
+          tag-prefix: ${{ inputs.tag-prefix }}
 
       - name: Test Build For Component ${{ inputs.component-name }} from GHCR
         if: steps.publish-ghcr.outcome == 'skipped'
         uses: ./.github/workflows/template-publish-image
         with:
-          image: ghcr.io/kubeflow/trainergit s/${{ inputs.component-name }}
+          image: ghcr.io/kubeflow/trainer/${{ inputs.component-name }}
           dockerfile: ${{ inputs.dockerfile }}
           platforms: ${{ inputs.platforms }}
           context: ${{ inputs.context }}
