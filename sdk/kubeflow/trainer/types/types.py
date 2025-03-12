@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, Dict, List, Optional
 
@@ -48,18 +48,6 @@ class TrainJob:
     creation_timestamp: datetime
     components: List[Component]
     status: Optional[str] = "Unknown"
-
-
-# Configuration for the Lora to configure parameter efficient fine-tuning.
-@dataclass
-class LoraConfig:
-    r: Optional[int] = field(
-        default=None, metadata={"help": "Lora attention dimension"}
-    )
-    lora_alpha: Optional[int] = field(default=None, metadata={"help": "Lora alpha"})
-    lora_dropout: Optional[float] = field(
-        default=None, metadata={"help": "Lora dropout"}
-    )
 
 
 # Configuration for the custom trainer.
