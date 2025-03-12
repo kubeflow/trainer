@@ -7,7 +7,7 @@ metadata:
     trainer.kubeflow.org/phase: pre-training
 spec:
   mlPolicy:
-    numNodes: 2
+    numNodes: 1
     mpi:
       numProcPerNode: 1
       mpiImplementation: OpenMPI
