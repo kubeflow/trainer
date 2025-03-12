@@ -111,8 +111,6 @@ def get_resources_per_node(
     return resources
 
 
-# TODO (andreyvelich): Move this part to the Kubeflow Trainer torch plugins.
-# Ref issue: https://github.com/kubeflow/trainer/issues/2407
 def get_num_proc_per_node(resources_per_node: dict) -> str:
     """
     Get the Trainer numProcPerNode from the given resources.

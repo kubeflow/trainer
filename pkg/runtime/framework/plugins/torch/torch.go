@@ -121,6 +121,32 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		}
 	}
 
+	// Handle "cpu" value - always use CPU resources regardless of GPU presence
+	if numProcPerNode.String() == "cpu" && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
+		// Default to 1 core
+		cpuQuantity := resource.MustParse("1")
+
+		// First check limits, then requests
+		if limitQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Limits[corev1.ResourceCPU]; ok {
+			cpuQuantity = limitQuantity
+		} else if requestQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Requests[corev1.ResourceCPU]; ok {
+			cpuQuantity = requestQuantity
+		}
+
+		// Ensure at least 1 process
+		if cpuQuantity.Cmp(resource.MustParse("1")) < 0 {
+			cpuQuantity = resource.MustParse("1")
+		}
+
+		// Round up to whole cores
+		cpuQuantity.RoundUp(0) // Scale 0 means whole units (cores)
+
+		// Get the value as an integer
+		cpuValue := cpuQuantity.Value()
+
+		numProcPerNode = intstr.FromInt(int(cpuValue))
+	}
+
 	// Update envs for Info object.
 	// Add PyTorch distributed "PET_" values for torchrun
 	// TODO (andreyvelich): Add validation to check that TrainJob doesn't have "PET_" envs.
