@@ -17,28 +17,17 @@ limitations under the License.
 package runtime
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
 	"iter"
 	"maps"
-	"strings"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/apply"
-	"github.com/kubeflow/trainer/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
-	resourcehelpers "k8s.io/component-helpers/resource"
+
+	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/constants"
 )
 
 var (
-	errorTemplateSpecPathNotFound = errors.New("template spec path not found")
-
 	defaultPodSetsSyncer = func(*Info) {}
 	syncPodSets          = defaultPodSetsSyncer
 )
@@ -119,94 +108,76 @@ type InfoOptions struct {
 	templateSpec    TemplateSpec
 }
 
-type InfoOption func(options *InfoOptions) error
+type InfoOption func(options *InfoOptions)
 
 var defaultOptions = InfoOptions{}
 
+// DEPRECATED: Replace all podSpecReplica usage with PodSet
+// once we remove TotalResourceRequest.
+
 type podSpecReplica struct {
-	count   int32
-	name    string
-	podSpec corev1.PodSpec
+	count             int32
+	name              string
+	podSpecApply      *corev1ac.PodSpecApplyConfiguration
+	singlePodRequests corev1.ResourceList
 }
 
 func WithLabels(labels map[string]string) InfoOption {
-	return func(o *InfoOptions) error {
+	return func(o *InfoOptions) {
 		o.labels = maps.Clone(labels)
-		return nil
 	}
 }
 
 func WithAnnotations(annotations map[string]string) InfoOption {
-	return func(o *InfoOptions) error {
+	return func(o *InfoOptions) {
 		o.annotations = maps.Clone(annotations)
-		return nil
 	}
 }
 
 func WithMLPolicy(mlPolicy *trainer.MLPolicy) InfoOption {
-	return func(o *InfoOptions) error {
+	return func(o *InfoOptions) {
 		o.runtimePolicy.MLPolicy = mlPolicy
-		return nil
 	}
 }
 
 func WithPodGroupPolicy(pgPolicy *trainer.PodGroupPolicy) InfoOption {
-	return func(o *InfoOptions) error {
+	return func(o *InfoOptions) {
 		o.runtimePolicy.PodGroupPolicy = pgPolicy
-		return nil
 	}
 }
 
-func WithPodSpecReplicas(replicaName string, count int32, podSpec corev1.PodSpec) InfoOption {
-	return func(o *InfoOptions) error {
+// DEPRECATED: Replace WithPodSpecReplicas with WithTemplateSpec
+// once we remove TotalResourceRequest.
+
+func WithPodSpecReplicas(
+	replicaName string, count int32, singlePodRequest corev1.ResourceList, podSpecApply *corev1ac.PodSpecApplyConfiguration,
+) InfoOption {
+	return func(o *InfoOptions) {
 		o.podSpecReplicas = append(o.podSpecReplicas, podSpecReplica{
-			name:    replicaName,
-			count:   max(count, 1),
-			podSpec: *podSpec.DeepCopy(),
+			name:              replicaName,
+			count:             max(count, 1),
+			podSpecApply:      podSpecApply,
+			singlePodRequests: singlePodRequest,
 		})
-		return nil
 	}
 }
 
-func WithTemplateSpecObjApply[A any](obj client.Object, fields ...string) InfoOption {
-	return func(o *InfoOptions) error {
-		u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-		if err != nil {
-			return err
-		}
-		templateSpec, ok, err := unstructured.NestedFieldCopy(u, fields...)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return fmt.Errorf("%w: '.%s'", errorTemplateSpecPathNotFound, strings.Join(fields, "."))
-		}
-		raw, err := json.Marshal(templateSpec)
-		if err != nil {
-			return err
-		}
-		var objApply *A
-		if err = json.Unmarshal(raw, &objApply); err != nil {
-			return err
-		}
+func WithTemplateSpec(objApply any) InfoOption {
+	return func(o *InfoOptions) {
 		o.templateSpec.ObjApply = objApply
-		return nil
 	}
 }
 
 func WithPodSetSyncer(syncer func(*Info)) InfoOption {
-	return func(o *InfoOptions) error {
+	return func(o *InfoOptions) {
 		syncPodSets = syncer
-		return nil
 	}
 }
 
-func NewInfo(opts ...InfoOption) (*Info, error) {
+func NewInfo(opts ...InfoOption) *Info {
 	options := defaultOptions
 	for _, opt := range opts {
-		if err := opt(&options); err != nil {
-			return nil, err
-		}
+		opt(&options)
 	}
 
 	info := &Info{
@@ -222,21 +193,21 @@ func NewInfo(opts ...InfoOption) (*Info, error) {
 	for _, spec := range options.podSpecReplicas {
 		info.TotalRequests[spec.name] = TotalResourceRequest{
 			Replicas:    spec.count,
-			PodRequests: resourcehelpers.PodRequests(&corev1.Pod{Spec: spec.podSpec}, resourcehelpers.PodResourcesOptions{}),
+			PodRequests: spec.singlePodRequests,
 		}
 		ps := PodSet{
 			Name:    spec.name,
-			Volumes: apply.Volumes(spec.podSpec.Volumes...),
+			Volumes: spec.podSpecApply.Volumes,
 		}
 		if spec.name != constants.JobTrainerNode {
 			ps.CountForNonTrainer = &spec.count
 		}
-		for _, container := range spec.podSpec.Containers {
+		for _, container := range spec.podSpecApply.Containers {
 			ps.Containers = append(ps.Containers, Container{
-				Name:         container.Name,
-				Env:          apply.EnvVars(container.Env...),
-				Ports:        apply.ContainerPorts(container.Ports...),
-				VolumeMounts: apply.VolumeMounts(container.VolumeMounts...),
+				Name:         *container.Name,
+				Env:          container.Env,
+				Ports:        container.Ports,
+				VolumeMounts: container.VolumeMounts,
 			})
 		}
 		info.TemplateSpec.PodSets = append(info.TemplateSpec.PodSets, ps)
@@ -247,7 +218,7 @@ func NewInfo(opts ...InfoOption) (*Info, error) {
 	if options.annotations != nil {
 		info.Annotations = options.annotations
 	}
-	return info, nil
+	return info
 }
 
 func (i *Info) SyncPodSetsToTemplateSpec() {

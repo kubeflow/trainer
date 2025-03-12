@@ -17,9 +17,21 @@ limitations under the License.
 package apply
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var (
+	errorTemplateSpecPathNotFound = errors.New("template spec path not found")
 )
 
 func UpsertEnvVar(envVars *[]corev1ac.EnvVarApplyConfiguration, envVar ...corev1ac.EnvVarApplyConfiguration) {
@@ -122,123 +134,25 @@ func EnvVars(e ...corev1.EnvVar) []corev1ac.EnvVarApplyConfiguration {
 	return envs
 }
 
-func Volume(v corev1.Volume) *corev1ac.VolumeApplyConfiguration {
-	vol := corev1ac.Volume().
-		WithName(v.Name)
-	if pvc := v.VolumeSource.PersistentVolumeClaim; pvc != nil {
-		vol.WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
-			WithClaimName(pvc.ClaimName).
-			WithReadOnly(pvc.ReadOnly))
+func FromTypedObjWithFields[A any](typed client.Object, fields ...string) (*A, error) {
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(typed)
+	if err != nil {
+		return nil, err
 	}
-	if sec := v.VolumeSource.Secret; sec != nil {
-		secSource := corev1ac.SecretVolumeSource().WithSecretName(sec.SecretName)
-		if sec.Optional != nil {
-			secSource.WithOptional(*sec.Optional)
-		}
-		if sec.DefaultMode != nil {
-			secSource.WithDefaultMode(*sec.DefaultMode)
-		}
-		var secItems []*corev1ac.KeyToPathApplyConfiguration
-		for _, item := range sec.Items {
-			keyToPath := corev1ac.KeyToPath().WithKey(item.Key).WithPath(item.Path)
-			if item.Mode != nil {
-				keyToPath.WithMode(*item.Mode)
-			}
-			secItems = append(secItems, keyToPath)
-		}
-		secSource.WithItems(secItems...)
-		vol.WithSecret(secSource)
+	templateSpec, ok, err := unstructured.NestedFieldCopy(u, fields...)
+	if err != nil {
+		return nil, err
 	}
-	if cm := v.VolumeSource.ConfigMap; cm != nil {
-		cmSource := corev1ac.ConfigMapVolumeSource().WithName(cm.Name)
-		if cm.Optional != nil {
-			cmSource.WithOptional(*cm.Optional)
-		}
-		if cm.DefaultMode != nil {
-			cmSource.WithDefaultMode(*cm.DefaultMode)
-		}
-		var cmItems []*corev1ac.KeyToPathApplyConfiguration
-		for _, item := range cm.Items {
-			keyToPath := corev1ac.KeyToPath().WithKey(item.Key).WithPath(item.Path)
-			if item.Mode != nil {
-				keyToPath.WithMode(*item.Mode)
-			}
-			cmItems = append(cmItems, keyToPath)
-		}
-		cmSource.WithItems(cmItems...)
-		vol.WithConfigMap(cmSource)
+	if !ok {
+		return nil, fmt.Errorf("%w: '.%s'", errorTemplateSpecPathNotFound, strings.Join(fields, "."))
 	}
-	// TODO: Add other volume sources
-	// Remaining items:
-	// - HostPath
-	// - EmptyDir
-	// - NFS
-	// - ISCSI
-	// - DownwardAPI
-	// - FC
-	// - Projected
-	// - CSI
-	// - Ephemeral
-	// - Image
-	return vol
-}
-
-func Volumes(v ...corev1.Volume) []corev1ac.VolumeApplyConfiguration {
-	var vols []corev1ac.VolumeApplyConfiguration
-	for _, vol := range v {
-		vols = append(vols, *Volume(vol))
+	raw, err := json.Marshal(templateSpec)
+	if err != nil {
+		return nil, err
 	}
-	return vols
-}
-
-func VolumeMount(vm corev1.VolumeMount) *corev1ac.VolumeMountApplyConfiguration {
-	volMount := corev1ac.VolumeMount().
-		WithName(vm.Name).
-		WithReadOnly(vm.ReadOnly).
-		WithMountPath(vm.MountPath)
-	if len(vm.SubPath) != 0 {
-		volMount.WithSubPath(vm.SubPath)
+	var objApply *A
+	if err = json.Unmarshal(raw, &objApply); err != nil {
+		return nil, err
 	}
-	if len(vm.SubPathExpr) != 0 {
-		volMount.WithSubPathExpr(vm.SubPathExpr)
-	}
-	if vm.MountPropagation != nil {
-		volMount.WithMountPropagation(*vm.MountPropagation)
-	}
-	if vm.RecursiveReadOnly != nil {
-		volMount.WithRecursiveReadOnly(*vm.RecursiveReadOnly)
-	}
-	return volMount
-}
-
-func VolumeMounts(vm ...corev1.VolumeMount) []corev1ac.VolumeMountApplyConfiguration {
-	var volMounts []corev1ac.VolumeMountApplyConfiguration
-	for _, volMount := range vm {
-		volMounts = append(volMounts, *VolumeMount(volMount))
-	}
-	return volMounts
-}
-
-func ContainerPort(p corev1.ContainerPort) *corev1ac.ContainerPortApplyConfiguration {
-	port := corev1ac.ContainerPort().
-		WithName(p.Name).
-		WithProtocol(p.Protocol)
-	if p.ContainerPort != 0 {
-		port.WithContainerPort(p.ContainerPort)
-	}
-	if len(p.HostIP) != 0 {
-		port.WithHostIP(p.HostIP)
-	}
-	if p.HostPort != 0 {
-		port.WithHostPort(p.HostPort)
-	}
-	return port
-}
-
-func ContainerPorts(p ...corev1.ContainerPort) []corev1ac.ContainerPortApplyConfiguration {
-	var ports []corev1ac.ContainerPortApplyConfiguration
-	for _, port := range p {
-		ports = append(ports, *ContainerPort(port))
-	}
-	return ports
+	return objApply, nil
 }

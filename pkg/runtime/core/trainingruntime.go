@@ -23,9 +23,11 @@ import (
 
 	"github.com/kubeflow/trainer/pkg/apply"
 	"github.com/kubeflow/trainer/pkg/constants"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	resourcehelpers "k8s.io/component-helpers/resource"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -103,35 +105,42 @@ func (r *TrainingRuntime) buildObjects(
 		// The JobSetTemplateSpec annotations are overridden by the TrainJob Annotations (.spec.annotations).
 		propagationAnnotations[k] = v
 	}
+	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: jobsetv1alpha2.GroupVersion.String(),
+			Kind:       "JobSet",
+		},
+		Spec: jobSetTemplateSpec.Spec,
+	}, "spec")
+	if err != nil {
+		return nil, err
+	}
+
 	opts := []runtime.InfoOption{
 		runtime.WithLabels(propagationLabels),
 		runtime.WithAnnotations(propagationAnnotations),
 		runtime.WithMLPolicy(mlPolicy),
 		runtime.WithPodGroupPolicy(podGroupPolicy),
-		runtime.WithTemplateSpecObjApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: jobsetv1alpha2.SchemeGroupVersion.String(),
-				Kind:       "JobSet",
-			},
-			Spec: jobSetTemplateSpec.Spec,
-		}, "spec"),
+		runtime.WithTemplateSpec(jobSetSpecApply),
 		runtime.WithPodSetSyncer(syncPodSets),
 	}
 
-	for _, rJob := range jobSetTemplateSpec.Spec.ReplicatedJobs {
+	for i, rJob := range jobSetSpecApply.ReplicatedJobs {
 		// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 		// REF: https://github.com/kubeflow/trainer/issues/2318
 		count := ptr.Deref(rJob.Template.Spec.Parallelism, 1)
-		if rJob.Name == constants.JobTrainerNode {
+		if *rJob.Name == constants.JobTrainerNode {
 			count = ptr.Deref(mlPolicy.NumNodes, 1)
 		}
-		opts = append(opts, runtime.WithPodSpecReplicas(rJob.Name, count, rJob.Template.Spec.Template.Spec))
+		opts = append(opts, runtime.WithPodSpecReplicas(
+			*rJob.Name,
+			count,
+			resourcehelpers.PodRequests(&corev1.Pod{Spec: *jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.DeepCopy()}, resourcehelpers.PodResourcesOptions{}),
+			rJob.Template.Spec.Template.Spec),
+		)
 	}
 
-	info, err := runtime.NewInfo(opts...)
-	if err != nil {
-		return nil, err
-	}
+	info := runtime.NewInfo(opts...)
 
 	if err = r.framework.RunEnforceMLPolicyPlugins(info, trainJob); err != nil {
 		return nil, err
