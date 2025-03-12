@@ -64,7 +64,7 @@ jobs:
         if: >-
           github.repository == 'kubeflow/training-operator' &&
           (github.ref == 'refs/heads/release-1.9' || (startsWith(github.ref, 'refs/heads/v') && endsWith(github.ref, '-branch')) || startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/tags/v'))
-        id: publish
+        id: publish-dockerhub
         uses: ./.github/workflows/template-publish-image
         with:
           image: docker.io/kubeflow/${{ inputs.component-name }}
@@ -80,7 +80,7 @@ jobs:
           (github.repository == 'kubeflow/training-operator' &&
           (github.ref == 'refs/heads/release-1.9' || (startsWith(github.ref, 'refs/heads/v') && endsWith(github.ref, '-branch')) || startsWith(github.ref, 'refs/heads/release-') || startsWith(github.ref, 'refs/tags/v'))) ||
           github.event_name == 'pull_request'
-        id: publish
+        id: publish-ghcr
         uses: ./.github/workflows/template-publish-image
         with:
           image: ghcr.io/kubeflow/training-operator/${{ inputs.component-name }}
@@ -91,7 +91,7 @@ jobs:
           tag-prefix: ${{ inputs.tag-prefix }}
 
       - name: Test Build For Component ${{ inputs.component-name }} from Dockerhub
-        if: steps.publish.outcome == 'skipped'
+        if: steps.publish-dockerhub.outcome == 'skipped'
         uses: ./.github/workflows/template-publish-image
         with:
           image: docker.io/kubeflow/${{ inputs.component-name }}
@@ -102,7 +102,7 @@ jobs:
           tag-prefix: ${{ inputs.tag-prefix }}
 
       - name: Test Build For Component ${{ inputs.component-name }} from GHCR
-        if: steps.publish.outcome == 'skipped'
+        if: steps.publish-ghcr.outcome == 'skipped'
         uses: ./.github/workflows/template-publish-image
         with:
           image: ghcr.io/kubeflow/training-operator/${{ inputs.component-name }}
