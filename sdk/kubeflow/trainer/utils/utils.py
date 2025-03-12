@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import inspect
-import json
 import math
 import os
 import queue
@@ -214,17 +213,6 @@ def get_script_for_python_packages(
     )
 
     return script_for_python_packages
-
-
-def get_lora_config(lora_config: types.LoraConfig) -> List[models.IoK8sApiCoreV1EnvVar]:
-    """
-    Get the TrainJob env from the given Lora config.
-    """
-
-    env = models.IoK8sApiCoreV1EnvVar(
-        name=constants.ENV_LORA_CONFIG, value=json.dumps(lora_config.__dict__)
-    )
-    return [env]
 
 
 def get_dataset_config(
