@@ -482,7 +482,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 					Obj(),
 			},
 		},
-		"runLauncherAsWorker is true": {
+		"runLauncherAsNode is true": {
 			info: &runtime.Info{
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),

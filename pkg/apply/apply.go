@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	errorTemplateSpecPathNotFound = errors.New("template spec path not found")
+	errorRequestedFieldPathNotFound = errors.New("requested field path not found")
 )
 
 func UpsertEnvVar(envVars *[]corev1ac.EnvVarApplyConfiguration, envVar ...corev1ac.EnvVarApplyConfiguration) {
@@ -139,14 +139,14 @@ func FromTypedObjWithFields[A any](typed client.Object, fields ...string) (*A, e
 	if err != nil {
 		return nil, err
 	}
-	templateSpec, ok, err := unstructured.NestedFieldCopy(u, fields...)
+	uObj, ok, err := unstructured.NestedFieldCopy(u, fields...)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return nil, fmt.Errorf("%w: '.%s'", errorTemplateSpecPathNotFound, strings.Join(fields, "."))
+		return nil, fmt.Errorf("%w: '.%s'", errorRequestedFieldPathNotFound, strings.Join(fields, "."))
 	}
-	raw, err := json.Marshal(templateSpec)
+	raw, err := json.Marshal(uObj)
 	if err != nil {
 		return nil, err
 	}

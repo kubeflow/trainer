@@ -271,10 +271,10 @@ func sshAuthSecretName(trainJobName string) string {
 
 func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.TrainJob) *corev1ac.ConfigMapApplyConfiguration {
 	var hostFile bytes.Buffer
-	runLauncherAsWorker := ptr.Deref(info.RuntimePolicy.MLPolicy.MPI.RunLauncherAsNode, false)
+	runLauncherAsNode := ptr.Deref(info.RuntimePolicy.MLPolicy.MPI.RunLauncherAsNode, false)
 	slots := ptr.Deref(info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode, 1)
 	for _, ps := range info.TemplateSpec.PodSets {
-		if !isTrainerNode(runLauncherAsWorker, ps) {
+		if !isTrainerNode(runLauncherAsNode, ps) {
 			continue
 		}
 		switch *info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
@@ -297,6 +297,6 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 			WithBlockOwnerDeletion(true))
 }
 
-func isTrainerNode(runLauncherAsWorker bool, ps runtime.PodSet) bool {
-	return (runLauncherAsWorker && ps.Name == constants.JobLauncher) || ps.Name == constants.JobTrainerNode
+func isTrainerNode(runLauncherAsNode bool, ps runtime.PodSet) bool {
+	return (runLauncherAsNode && ps.Name == constants.JobLauncher) || ps.Name == constants.JobTrainerNode
 }

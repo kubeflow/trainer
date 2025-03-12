@@ -975,14 +975,14 @@ func (m *MLPolicyWrapper) TorchPolicy(numProcPerNode string, elasticPolicy *trai
 	return m
 }
 
-func (m *MLPolicyWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation *trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsWorker *bool) *MLPolicyWrapper {
+func (m *MLPolicyWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation *trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsNode *bool) *MLPolicyWrapper {
 	if m.MLPolicySource.MPI == nil {
 		m.MLPolicySource.MPI = &trainer.MPIMLPolicySource{}
 	}
 	m.MLPolicySource.MPI.NumProcPerNode = numProcPerNode
 	m.MLPolicySource.MPI.MPIImplementation = MPImplementation
 	m.MLPolicySource.MPI.SSHAuthMountPath = sshAuthMountPath
-	m.MLPolicySource.MPI.RunLauncherAsNode = runLauncherAsWorker
+	m.MLPolicySource.MPI.RunLauncherAsNode = runLauncherAsNode
 	return m
 }
 
