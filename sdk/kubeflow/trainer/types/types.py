@@ -56,13 +56,13 @@ class CustomTrainer:
     """Custom Trainer configuration. Configure the self-contained function
         that encapsulates the entire model training process.
 
-    Fields:
+    Args:
         func: The function that encapsulates the entire model training process.
         func_args: The arguments to pass to the function.
-        packages_to_install: A list of packages to install before running the function.
-        pip_index_url: The URL of the pip index to use when installing packages.
+        packages_to_install: A list of Python packages to install before running the function.
+        pip_index_url: The PyPI URL from which to install Python packages.
         num_nodes: The number of nodes to use for training.
-        resources_per_node: The resources to allocate per node.
+        resources_per_node: The computing resources to allocate per node.
     """
 
     func: Optional[Callable] = None
