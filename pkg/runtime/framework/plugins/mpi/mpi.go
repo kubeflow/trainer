@@ -59,11 +59,6 @@ var _ framework.EnforceMLPolicyPlugin = (*MPI)(nil)
 var _ framework.WatchExtensionPlugin = (*MPI)(nil)
 var _ framework.ComponentBuilderPlugin = (*MPI)(nil)
 
-var (
-	errorFailedToBuildConfigMap = fmt.Errorf("failed to build hostfile configMap")
-	errorFailedToBuildSecret    = fmt.Errorf("failed to build SSH Auth secret")
-)
-
 const Name = "MPI"
 
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;get;list;watch;update;patch
@@ -230,15 +225,11 @@ func (m *MPI) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.T
 		}
 		secret, err := m.buildSSHAuthSecret(trainJob)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %w", errorFailedToBuildSecret, err)
+			return nil, fmt.Errorf("failed to build SSH Auth secret: %w", err)
 		}
 		objects = append(objects, secret)
 	}
-	configMap, err := m.buildHostFileConfigMap(info, trainJob)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errorFailedToBuildConfigMap, err)
-	}
-	return append(objects, configMap), nil
+	return append(objects, m.buildHostFileConfigMap(info, trainJob)), nil
 }
 
 func (m *MPI) buildSSHAuthSecret(trainJob *trainer.TrainJob) (*corev1ac.SecretApplyConfiguration, error) {
@@ -278,7 +269,7 @@ func sshAuthSecretName(trainJobName string) string {
 	return fmt.Sprintf("%s%s", trainJobName, constants.MPISSHAuthSecretSuffix)
 }
 
-func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.TrainJob) (*corev1ac.ConfigMapApplyConfiguration, error) {
+func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.TrainJob) *corev1ac.ConfigMapApplyConfiguration {
 	var hostFile bytes.Buffer
 	runLauncherAsWorker := ptr.Deref(info.RuntimePolicy.MLPolicy.MPI.RunLauncherAsNode, false)
 	slots := ptr.Deref(info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode, 1)
@@ -303,7 +294,7 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 			WithName(trainJob.Name).
 			WithUID(trainJob.UID).
 			WithController(true).
-			WithBlockOwnerDeletion(true)), nil
+			WithBlockOwnerDeletion(true))
 }
 
 func isTrainerNode(runLauncherAsWorker bool, ps runtime.PodSet) bool {
