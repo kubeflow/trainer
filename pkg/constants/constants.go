@@ -32,6 +32,12 @@ const (
 	// ContainerDatasetInitializer is the container name for the dataset initializer.
 	ContainerDatasetInitializer string = "dataset-initializer"
 
+	// DatasetMountPath is the volumeMount path for dataset.
+	DatasetMountPath string = "/workspace/dataset"
+
+	// ModelMountPath is the volumeMount path for model.
+	ModelMountPath string = "/workspace/model"
+
 	// PodGroupKind is the Kind name for the PodGroup.
 	PodGroupKind string = "PodGroup"
 
@@ -110,7 +116,21 @@ const (
 
 	// Distributed envs for mpirun.
 	// Values for OpenMPI implementation.
+
+	// OpenMPIEnvHostFileLocation is the OpenMPI default hostfile env key.
 	OpenMPIEnvHostFileLocation string = "OMPI_MCA_orte_default_hostfile"
+
+	// OpenMPIEnvKeyRSHArgs is the env key for the OpenMPI rsh arguments.
+	OpenMPIEnvKeyRSHArgs string = "OMPI_MCA_plm_rsh_args"
+
+	// OpenMPIEnvDefaultValueRSHArgs is the default env valur for the OpenMPI rsh arguments.
+	OpenMPIEnvDefaultValueRSHArgs string = "-o ConnectionAttempts=10"
+
+	// OpenMPIEnvKeepFQDNHostNames is the env key for OpenMPI if FQDN should be kept.
+	OpenMPIEnvKeepFQDNHostNames string = "OMPI_MCA_orte_keep_fqdn_hostnames"
+
+	// OpenMPIEnvDefaultSlots is the OpenMPI default number of slots env key.
+	OpenMPIEnvDefaultSlots string = "OMPI_MCA_orte_set_default_slots"
 )
 
 var (

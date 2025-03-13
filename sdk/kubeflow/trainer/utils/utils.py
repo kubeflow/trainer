@@ -13,13 +13,12 @@
 # limitations under the License.
 
 import inspect
-import json
 import math
 import os
 import queue
 import textwrap
 import threading
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
@@ -44,7 +43,7 @@ def get_default_target_namespace() -> str:
 
 def get_container_devices(
     resources: Optional[models.IoK8sApiCoreV1ResourceRequirements],
-) -> Tuple[str, str]:
+) -> Tuple[str, Union[str, float]]:
     """
     Get the device type and device count for the given container.
     """
@@ -62,33 +61,21 @@ def get_container_devices(
     # TODO (andreyvelich): Support other resource labels (e.g. NPUs).
     if constants.NVIDIA_GPU_LABEL in resources.limits:
         device = constants.GPU_DEVICE_TYPE
-        device_count = resources.limits[constants.NVIDIA_GPU_LABEL]
+        device_count = resources.limits[constants.NVIDIA_GPU_LABEL].actual_instance
     elif constants.TPU_LABEL in resources.limits:
         device = constants.TPU_DEVICE_TYPE
-        device_count = resources.limits[constants.TPU_LABEL]
+        device_count = resources.limits[constants.TPU_LABEL].actual_instance
     elif constants.CPU_LABEL in resources.limits:
         device = constants.CPU_DEVICE_TYPE
-        device_count = resources.limits[constants.CPU_LABEL]
+        device_count = resources.limits[constants.CPU_LABEL].actual_instance
     else:
         raise Exception(
             f"Unknown device type in the container resources: {resources.limits}"
         )
+    if device_count is None:
+        raise Exception(f"Failed to get device count for resources: {resources.limits}")
 
     return device, device_count
-
-
-# TODO (andreyvelich): Discuss how to make this validation easier for users.
-def validate_trainer(trainer: types.Trainer):
-    """
-    Validate that trainer has the correct configuration.
-    """
-
-    if (
-        trainer.func or trainer.func_args or trainer.packages_to_install
-    ) and trainer.fine_tuning_config:
-        raise ValueError(
-            "Trainer function parameters and fine tuning config can't be set together"
-        )
 
 
 # TODO (andreyvelich): Discuss if we want to support V1ResourceRequirements resources as input.
@@ -100,7 +87,10 @@ def get_resources_per_node(
     """
 
     # Convert all keys in resources to lowercase.
-    resources = {k.lower(): str(v) for k, v in resources_per_node.items()}
+    resources = {
+        k.lower(): models.IoK8sApimachineryPkgApiResourceQuantity(v)
+        for k, v in resources_per_node.items()
+    }
     if "gpu" in resources:
         resources["nvidia.com/gpu"] = resources.pop("gpu")
 
@@ -198,17 +188,6 @@ def get_script_for_python_packages(
     )
 
     return script_for_python_packages
-
-
-def get_lora_config(lora_config: types.LoraConfig) -> List[models.IoK8sApiCoreV1EnvVar]:
-    """
-    Get the TrainJob env from the given Lora config.
-    """
-
-    env = models.IoK8sApiCoreV1EnvVar(
-        name=constants.ENV_LORA_CONFIG, value=json.dumps(lora_config.__dict__)
-    )
-    return [env]
 
 
 def get_dataset_config(

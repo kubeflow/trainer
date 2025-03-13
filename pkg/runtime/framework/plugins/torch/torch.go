@@ -117,21 +117,21 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 
 	apply.UpsertEnvVar(&info.Trainer.Env,
-		corev1ac.EnvVar().
+		*corev1ac.EnvVar().
 			WithName(constants.TorchEnvNumNodes).
 			WithValue(fmt.Sprintf("%d", ptr.Deref(numNodes, 1))),
-		corev1ac.EnvVar().
+		*corev1ac.EnvVar().
 			WithName(constants.TorchEnvNumProcPerNode).
 			WithValue(numProcPerNode.String()),
-		corev1ac.EnvVar().
+		*corev1ac.EnvVar().
 			WithName(constants.TorchEnvNodeRank).
 			WithValueFrom(corev1ac.EnvVarSource().
 				WithFieldRef(corev1ac.ObjectFieldSelector().
 					WithFieldPath(constants.JobCompletionIndexFieldPath))),
-		corev1ac.EnvVar().
+		*corev1ac.EnvVar().
 			WithName(constants.TorchEnvMasterAddr).
 			WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.JobTrainerNode, trainJob.Name)),
-		corev1ac.EnvVar().
+		*corev1ac.EnvVar().
 			WithName(constants.TorchEnvMasterPort).
 			WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 	)

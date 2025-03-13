@@ -100,22 +100,37 @@ class TrainerClient:
 
                 runtime = models.TrainerV1alpha1ClusterTrainingRuntime.from_dict(item)
 
-                ml_policy: models.TrainerV1alpha1MLPolicy = runtime.spec.ml_policy  # type: ignore
-                metadata: models.IoK8sApimachineryPkgApisMetaV1ObjectMeta = (
-                    runtime.metadata  # type: ignore
-                )
+                if not (
+                    runtime
+                    and runtime.metadata
+                    and runtime.spec
+                    and runtime.spec.ml_policy
+                ):
+                    raise Exception(f"Runtime object is invalid: {runtime}")
+
+                ml_policy = runtime.spec.ml_policy
+                metadata = runtime.metadata
 
                 # TODO (andreyvelich): Currently, the labels must be presented.
-                if metadata.labels and ml_policy.num_nodes:
+                if metadata.name and metadata.labels and ml_policy.num_nodes:
+                    if not (
+                        runtime.spec.template.spec
+                        and runtime.spec.template.spec.replicated_jobs
+                    ):
+                        raise Exception(
+                            f"Runtime Job template is invalid: {runtime.spec.template.spec}"
+                        )
                     # Get the Trainer container resources.
                     resources = None
-                    for job in runtime.spec.template.spec.replicated_jobs:  # type: ignore
+                    for job in runtime.spec.template.spec.replicated_jobs:
                         if job.name == constants.JOB_TRAINER_NODE:
-                            pod_spec: models.IoK8sApiCoreV1PodSpec = (
-                                job.template.spec.template.spec  # type: ignore
-                            )
-
-                            for container in pod_spec.containers:
+                            if not (
+                                job.template.spec and job.template.spec.template.spec
+                            ):
+                                raise Exception(
+                                    f"JobSet template is invalid: {runtime.spec.template.spec}"
+                                )
+                            for container in job.template.spec.template.spec.containers:
                                 if container.name == constants.CONTAINER_TRAINER:
                                     resources = container.resources
 
@@ -128,19 +143,22 @@ class TrainerClient:
                     if (
                         ml_policy.torch
                         and ml_policy.torch.num_proc_per_node
-                        and ml_policy.torch.num_proc_per_node.isdigit()
+                        and isinstance(
+                            ml_policy.torch.num_proc_per_node.actual_instance, int
+                        )
                     ):
-                        accelerator_count = ml_policy.torch.num_proc_per_node
-
+                        accelerator_count = (
+                            ml_policy.torch.num_proc_per_node.actual_instance
+                        )
                     elif ml_policy.mpi and ml_policy.mpi.num_proc_per_node:
-                        accelerator_count = str(ml_policy.mpi.num_proc_per_node)
+                        accelerator_count = ml_policy.mpi.num_proc_per_node
 
-                    if accelerator_count.isdigit():
-                        accelerator_count = int(accelerator_count) * ml_policy.num_nodes
+                    if isinstance(accelerator_count, (float, int)):
+                        accelerator_count = accelerator_count * ml_policy.num_nodes
 
                     result.append(
                         types.Runtime(
-                            name=metadata.name,  # type: ignore
+                            name=metadata.name,
                             phase=(
                                 metadata.labels[constants.PHASE_KEY]
                                 if constants.PHASE_KEY in metadata.labels
@@ -171,7 +189,7 @@ class TrainerClient:
     def train(
         self,
         runtime_ref: str,
-        trainer: Optional[types.Trainer] = None,
+        trainer: Optional[types.CustomTrainer] = None,
         dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
         model_config: Optional[types.HuggingFaceModelInputConfig] = None,
     ) -> str:
@@ -185,9 +203,6 @@ class TrainerClient:
             TimeoutError: Timeout to create TrainJobs.
             RuntimeError: Failed to create TrainJobs.
         """
-
-        if trainer:
-            utils.validate_trainer(trainer)
 
         # Generate unique name for the TrainJob.
         # TODO (andreyvelich): Discuss this TrainJob name generation.
@@ -208,8 +223,10 @@ class TrainerClient:
 
         # Set numProcPerNode to the Trainer.
         if trainer and trainer.resources_per_node:
-            trainer_crd.num_proc_per_node = utils.get_num_proc_per_node(
-                trainer.resources_per_node
+            trainer_crd.num_proc_per_node = (
+                models.IoK8sApimachineryPkgUtilIntstrIntOrString(
+                    utils.get_num_proc_per_node(trainer.resources_per_node)
+                )
             )
 
         # Add command and args to the Trainer if training function is set.
@@ -221,16 +238,6 @@ class TrainerClient:
                 trainer.func_args,
                 trainer.packages_to_install,
                 trainer.pip_index_url,
-            )
-
-        # Add the Lora config to the Trainer envs.
-        if (
-            trainer
-            and trainer.fine_tuning_config
-            and trainer.fine_tuning_config.peft_config
-        ):
-            trainer_crd.env = utils.get_lora_config(
-                trainer.fine_tuning_config.peft_config
             )
 
         train_job = models.TrainerV1alpha1TrainJob(
@@ -298,16 +305,21 @@ class TrainerClient:
             )
             response = thread.get(constants.DEFAULT_TIMEOUT)
 
-            for item in response["items"]:
+            trainjob_list = models.TrainerV1alpha1TrainJobList.from_dict(response)
+            if not trainjob_list:
+                return result
+
+            for trainjob in trainjob_list.items:
                 # If runtime ref is set, we check the TrainJob's runtime.
                 if (
                     runtime_ref is not None
-                    and item["spec"]["runtimeRef"]["name"] != runtime_ref
+                    and trainjob.spec
+                    and trainjob.spec.runtime_ref
+                    and trainjob.spec.runtime_ref.name != runtime_ref
                 ):
                     continue
 
-                trainjob = models.TrainerV1alpha1TrainJob.from_dict(item)
-                result.append(self.__get_trainjob_from_crd(trainjob))  # type: ignore
+                result.append(self.__get_trainjob_from_crd(trainjob))
 
         except multiprocessing.TimeoutError:
             raise TimeoutError(
@@ -487,16 +499,37 @@ class TrainerClient:
         trainjob_crd: models.TrainerV1alpha1TrainJob,
     ) -> types.TrainJob:
 
-        name: str = trainjob_crd.metadata.name  # type: ignore
-        namespace: str = trainjob_crd.metadata.namespace  # type: ignore
+        if not (
+            trainjob_crd.metadata
+            and trainjob_crd.metadata.name
+            and trainjob_crd.metadata.namespace
+            and trainjob_crd.spec
+            and trainjob_crd.metadata.creation_timestamp
+        ):
+            raise Exception(f"TrainJob CRD is invalid: {trainjob_crd}")
+
+        name = trainjob_crd.metadata.name
+        namespace = trainjob_crd.metadata.namespace
 
         # Construct the TrainJob from the CRD.
         train_job = types.TrainJob(
             name=name,
-            runtime_ref=trainjob_crd.spec.runtime_ref.name,  # type: ignore
-            creation_timestamp=trainjob_crd.metadata.creation_timestamp,  # type: ignore
+            runtime_ref=trainjob_crd.spec.runtime_ref.name,
+            creation_timestamp=trainjob_crd.metadata.creation_timestamp,
             components=[],
         )
+
+        # Add the TrainJob status.
+        # TODO (andreyvelich): Discuss how we should show TrainJob status to SDK users.
+        if trainjob_crd.status and trainjob_crd.status.conditions:
+            for c in trainjob_crd.status.conditions:
+                if c.type == "Created" and c.status == "True":
+                    status = "Created"
+                elif c.type == "Complete" and c.status == "True":
+                    status = "Succeeded"
+                elif c.type == "Failed" and c.status == "True":
+                    status = "Failed"
+            train_job.status = status
 
         # Select Pods created by appropriate JobSet, and Initializer, Launcher, or Trainer Job.
         label_selector = "{}={},{} in ({}, {}, {})".format(
@@ -516,24 +549,36 @@ class TrainerClient:
                 async_req=True,
             ).get(constants.DEFAULT_TIMEOUT)
 
-            for pod in response.items:
-                labels = pod.metadata.labels
-                # The Pods might have these containers:
+            # Convert Pod to the correct format.
+            pod_list = models.IoK8sApiCoreV1PodList.from_dict(response.to_dict())
+            if not pod_list:
+                return train_job
+
+            for pod in pod_list.items:
+                if not (pod.metadata and pod.metadata.name and pod.spec):
+                    raise Exception(f"TrainJob Pod is invalid: {pod}")
+                # The TrainJob Pods might have these containers:
                 # dataset-initializer, model-initializer, launcher, and trainer
                 for c in pod.spec.containers:
                     device, device_count = utils.get_container_devices(c.resources)
                     if c.name == constants.CONTAINER_TRAINER:
                         # For Trainer numProcPerNode overrides container resources.
-                        for env in c.env:
-                            if (
-                                env.name == constants.TORCH_ENV_NUM_PROC_PER_NODE
-                                and env.value.isdigit()
-                            ):
-                                device_count = env.value
+                        if c.env:
+                            for env in c.env:
+                                if (
+                                    env.name == constants.TORCH_ENV_NUM_PROC_PER_NODE
+                                    and env.value
+                                    and env.value.isdigit()
+                                ):
+                                    device_count = env.value
                         # For Trainer node Job, component name is equal to <Job_Name>-<Index>
+                        if not pod.metadata.labels:
+                            raise Exception(
+                                f"TrainJob Pod labels are invalid: {pod.metadata.labels}"
+                            )
                         component_name = "{}-{}".format(
                             constants.JOB_TRAINER_NODE,
-                            labels[constants.JOB_INDEX_KEY],
+                            pod.metadata.labels[constants.JOB_INDEX_KEY],
                         )
                     elif (
                         c.name == constants.CONTAINER_DATASET_INITIALIZER
@@ -545,9 +590,9 @@ class TrainerClient:
 
                 component = types.Component(
                     name=component_name,
-                    status=pod.status.phase if pod.status else None,  # type: ignore
+                    status=pod.status.phase if pod.status else None,
                     device=device,
-                    device_count=device_count,
+                    device_count=str(device_count),
                     pod_name=pod.metadata.name,
                 )
 
@@ -560,17 +605,5 @@ class TrainerClient:
             raise RuntimeError(
                 f"Failed to list {constants.TRAINJOB_KIND}'s components: {namespace}/{name}"
             )
-
-        # Add the TrainJob status.
-        # TODO (andreyvelich): Discuss how we should show TrainJob status to SDK users.
-        if trainjob_crd.status and trainjob_crd.status.conditions:
-            for c in trainjob_crd.status.conditions:
-                if c.type == "Created" and c.status == "True":
-                    status = "Created"
-                elif c.type == "Complete" and c.status == "True":
-                    status = "Succeeded"
-                elif c.type == "Failed" and c.status == "True":
-                    status = "Failed"
-            train_job.status = status
 
         return train_job

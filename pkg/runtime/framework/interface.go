@@ -51,6 +51,11 @@ type EnforceMLPolicyPlugin interface {
 	EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error
 }
 
+type PodNetworkPlugin interface {
+	Plugin
+	IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) error
+}
+
 type ComponentBuilderPlugin interface {
 	Plugin
 	Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error)

@@ -21,11 +21,18 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/kubeflow/trainer/pkg/apply"
+	"github.com/kubeflow/trainer/pkg/constants"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	resourcehelpers "k8s.io/component-helpers/resource"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/runtime"
@@ -98,29 +105,84 @@ func (r *TrainingRuntime) buildObjects(
 		// The JobSetTemplateSpec annotations are overridden by the TrainJob Annotations (.spec.annotations).
 		propagationAnnotations[k] = v
 	}
+	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: jobsetv1alpha2.GroupVersion.String(),
+			Kind:       "JobSet",
+		},
+		Spec: jobSetTemplateSpec.Spec,
+	}, "spec")
+	if err != nil {
+		return nil, err
+	}
+
 	opts := []runtime.InfoOption{
 		runtime.WithLabels(propagationLabels),
 		runtime.WithAnnotations(propagationAnnotations),
 		runtime.WithMLPolicy(mlPolicy),
 		runtime.WithPodGroupPolicy(podGroupPolicy),
+		runtime.WithTemplateSpec(jobSetSpecApply),
+		runtime.WithPodSetSyncer(syncPodSets),
 	}
 
-	for _, rJob := range jobSetTemplateSpec.Spec.ReplicatedJobs {
-		// By default every ReplicatedJob has only 1 replica.
-		opts = append(opts, runtime.WithPodSpecReplicas(rJob.Name, 1, rJob.Template.Spec.Template.Spec))
+	for i, rJob := range jobSetSpecApply.ReplicatedJobs {
+		// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
+		// REF: https://github.com/kubeflow/trainer/issues/2318
+		count := ptr.Deref(rJob.Template.Spec.Parallelism, 1)
+		if *rJob.Name == constants.JobTrainerNode {
+			count = ptr.Deref(mlPolicy.NumNodes, 1)
+		}
+		opts = append(opts, runtime.WithPodSpecReplicas(
+			*rJob.Name,
+			count,
+			resourcehelpers.PodRequests(&corev1.Pod{Spec: *jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.DeepCopy()}, resourcehelpers.PodResourcesOptions{}),
+			rJob.Template.Spec.Template.Spec),
+		)
 	}
 
 	info := runtime.NewInfo(opts...)
 
-	if err := r.framework.RunEnforceMLPolicyPlugins(info, trainJob); err != nil {
+	if err = r.framework.RunEnforceMLPolicyPlugins(info, trainJob); err != nil {
 		return nil, err
 	}
 
-	if err := r.framework.RunEnforcePodGroupPolicyPlugins(info, trainJob); err != nil {
+	if err = r.framework.RunEnforcePodGroupPolicyPlugins(info, trainJob); err != nil {
+		return nil, err
+	}
+
+	if err = r.framework.RunPodNetworkPlugins(info, trainJob); err != nil {
 		return nil, err
 	}
 
 	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
+}
+
+func syncPodSets(info *runtime.Info) {
+	jsSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+	if !ok {
+		return
+	}
+	for psIdx, ps := range info.TemplateSpec.PodSets {
+		if ps.CountForNonTrainer != nil {
+			jsSpec.ReplicatedJobs[psIdx].Template.Spec.Parallelism = ps.CountForNonTrainer
+			jsSpec.ReplicatedJobs[psIdx].Template.Spec.Completions = ps.CountForNonTrainer
+		}
+		apply.UpsertVolumes(&jsSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Volumes, ps.Volumes...)
+		for containerIdx, container := range ps.Containers {
+			apply.UpsertEnvVar(
+				&jsSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Env,
+				container.Env...,
+			)
+			apply.UpsertPort(
+				&jsSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Ports,
+				container.Ports...,
+			)
+			apply.UpsertVolumeMounts(
+				&jsSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].VolumeMounts,
+				container.VolumeMounts...,
+			)
+		}
+	}
 }
 
 func (r *TrainingRuntime) TerminalCondition(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error) {

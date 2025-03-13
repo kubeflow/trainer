@@ -24,12 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
-	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
-	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	"slices"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
-	jobsetplugin "github.com/kubeflow/trainer/pkg/runtime/framework/plugins/jobset"
+	jobsetplgconsts "github.com/kubeflow/trainer/pkg/runtime/framework/plugins/jobset/constants"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
+	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 )
 
 type JobSetWrapper struct {
@@ -58,20 +59,27 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 										Containers: []corev1.Container{
 											{
 												Name: constants.ContainerDatasetInitializer,
-												VolumeMounts: []corev1.VolumeMount{
-													jobsetplugin.VolumeMountDatasetInitializer,
-												},
+												VolumeMounts: []corev1.VolumeMount{{
+													Name:      jobsetplgconsts.VolumeNameInitializer,
+													MountPath: constants.DatasetMountPath,
+												}},
 											},
 											{
 												Name: constants.ContainerModelInitializer,
-												VolumeMounts: []corev1.VolumeMount{
-													jobsetplugin.VolumeMountModelInitializer,
-												},
+												VolumeMounts: []corev1.VolumeMount{{
+													Name:      jobsetplgconsts.VolumeNameInitializer,
+													MountPath: constants.ModelMountPath,
+												}},
 											},
 										},
-										Volumes: []corev1.Volume{
-											jobsetplugin.VolumeInitializer,
-										},
+										Volumes: []corev1.Volume{{
+											Name: jobsetplgconsts.VolumeNameInitializer,
+											VolumeSource: corev1.VolumeSource{
+												PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+													ClaimName: jobsetplgconsts.VolumeNameInitializer,
+												},
+											},
+										}},
 									},
 								},
 							},
@@ -79,12 +87,6 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 					},
 					{
 						Name: constants.JobTrainerNode,
-						DependsOn: []jobsetv1alpha2.DependsOn{
-							{
-								Name:   constants.JobInitializer,
-								Status: jobsetv1alpha2.DependencyComplete,
-							},
-						},
 						Template: batchv1.JobTemplateSpec{
 							Spec: batchv1.JobSpec{
 								Template: corev1.PodTemplateSpec{
@@ -93,14 +95,25 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 											{
 												Name: constants.ContainerTrainer,
 												VolumeMounts: []corev1.VolumeMount{
-													jobsetplugin.VolumeMountDatasetInitializer,
-													jobsetplugin.VolumeMountModelInitializer,
+													{
+														Name:      jobsetplgconsts.VolumeNameInitializer,
+														MountPath: constants.DatasetMountPath,
+													},
+													{
+														Name:      jobsetplgconsts.VolumeNameInitializer,
+														MountPath: constants.ModelMountPath,
+													},
 												},
 											},
 										},
-										Volumes: []corev1.Volume{
-											jobsetplugin.VolumeInitializer,
-										},
+										Volumes: []corev1.Volume{{
+											Name: jobsetplgconsts.VolumeNameInitializer,
+											VolumeSource: corev1.VolumeSource{
+												PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+													ClaimName: jobsetplgconsts.VolumeNameInitializer,
+												},
+											},
+										}},
 									},
 								},
 							},
@@ -112,9 +125,11 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 	}
 }
 
-func (j *JobSetWrapper) Replicas(replicas int32) *JobSetWrapper {
-	for idx := range j.Spec.ReplicatedJobs {
-		j.Spec.ReplicatedJobs[idx].Replicas = replicas
+func (j *JobSetWrapper) Replicas(replicas int32, rJobNames ...string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if slices.Contains(rJobNames, rJob.Name) {
+			j.Spec.ReplicatedJobs[i].Replicas = replicas
+		}
 	}
 	return j
 }
@@ -124,6 +139,50 @@ func (j *JobSetWrapper) NumNodes(numNodes int32) *JobSetWrapper {
 		if rJob.Name == constants.JobTrainerNode {
 			j.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = &numNodes
 			j.Spec.ReplicatedJobs[i].Template.Spec.Completions = &numNodes
+		}
+	}
+	return j
+}
+
+func (j *JobSetWrapper) Parallelism(rName string, p int32) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = &p
+		}
+	}
+	return j
+}
+
+func (j *JobSetWrapper) Completions(rName string, c int32) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Completions = &c
+		}
+	}
+	return j
+}
+
+func (j *JobSetWrapper) LauncherReplica() *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == constants.JobTrainerNode {
+			j.Spec.ReplicatedJobs = append(j.Spec.ReplicatedJobs, jobsetv1alpha2.ReplicatedJob{})
+			copy(j.Spec.ReplicatedJobs[i+1:], j.Spec.ReplicatedJobs[i:])
+			j.Spec.ReplicatedJobs[i] = jobsetv1alpha2.ReplicatedJob{
+				Name: constants.JobLauncher,
+				Template: batchv1.JobTemplateSpec{
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{{
+									Name:    constants.ContainerLauncher,
+									Command: []string{"mpirun"},
+									Args:    []string{"echo.sh"},
+								}},
+							},
+						},
+					},
+				},
+			}
 		}
 	}
 	return j
@@ -158,12 +217,58 @@ func (j *JobSetWrapper) ContainerTrainerPorts(ports []corev1.ContainerPort) *Job
 	return j
 }
 
+// TODO: ContainerTrainerEnv should be migrated to generic wrapper, Env(rJobName, containerName string, envs ...corev1.EnvVar).
+
 func (j *JobSetWrapper) ContainerTrainerEnv(env []corev1.EnvVar) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == constants.JobTrainerNode {
 			for k, container := range rJob.Template.Spec.Template.Spec.Containers {
 				if container.Name == constants.ContainerTrainer {
 					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Env = env
+				}
+			}
+		}
+	}
+	return j
+}
+
+func (j *JobSetWrapper) Volumes(rJobName string, v ...corev1.Volume) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes = append(
+				j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes,
+				v...,
+			)
+		}
+	}
+	return j
+}
+
+func (j *JobSetWrapper) VolumeMounts(rJobName, containerName string, vms ...corev1.VolumeMount) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			for k, container := range j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
+				if container.Name == containerName {
+					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].VolumeMounts = append(
+						j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].VolumeMounts,
+						vms...,
+					)
+				}
+			}
+		}
+	}
+	return j
+}
+
+func (j *JobSetWrapper) Env(rJobName, containerName string, envs ...corev1.EnvVar) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			for k, container := range j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
+				if container.Name == containerName {
+					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Env = append(
+						j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Env,
+						envs...,
+					)
 				}
 			}
 		}
@@ -187,13 +292,14 @@ func (j *JobSetWrapper) ContainerDatasetModelInitializer(image string, command [
 	return j
 }
 
+// TODO: ContainerDatasetInitializerEnv should be migrated to generic wrapper, Env(rJobName, containerName string, envs ...corev1.EnvVar).
+
 func (j *JobSetWrapper) ContainerDatasetInitializerEnv(env []corev1.EnvVar) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == constants.JobInitializer {
 			for k, container := range rJob.Template.Spec.Template.Spec.Containers {
 				if container.Name == constants.ContainerDatasetInitializer {
 					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Env = env
-
 				}
 			}
 		}
@@ -213,6 +319,8 @@ func (j *JobSetWrapper) ContainerDatasetInitializerEnvFrom(envFrom []corev1.EnvF
 	}
 	return j
 }
+
+// TODO: ContainerModelInitializerEnv should be migrated to generic wrapper, Env(rJobName, containerName string, envs ...corev1.EnvVar).
 
 func (j *JobSetWrapper) ContainerModelInitializerEnv(env []corev1.EnvVar) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
@@ -286,6 +394,18 @@ func (j *JobSetWrapper) Annotation(key, value string) *JobSetWrapper {
 func (j *JobSetWrapper) Conditions(conditions ...metav1.Condition) *JobSetWrapper {
 	if len(conditions) != 0 {
 		j.Status.Conditions = append(j.Status.Conditions, conditions...)
+	}
+	return j
+}
+
+func (j *JobSetWrapper) DependsOn(depName string, depStatus jobsetv1alpha2.DependsOnStatus, rJobName string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].DependsOn = append(j.Spec.ReplicatedJobs[i].DependsOn, jobsetv1alpha2.DependsOn{
+				Name:   depName,
+				Status: depStatus,
+			})
+		}
 	}
 	return j
 }
@@ -506,20 +626,27 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 												Containers: []corev1.Container{
 													{
 														Name: constants.ContainerDatasetInitializer,
-														VolumeMounts: []corev1.VolumeMount{
-															jobsetplugin.VolumeMountDatasetInitializer,
-														},
+														VolumeMounts: []corev1.VolumeMount{{
+															Name:      jobsetplgconsts.VolumeNameInitializer,
+															MountPath: constants.DatasetMountPath,
+														}},
 													},
 													{
 														Name: constants.ContainerModelInitializer,
-														VolumeMounts: []corev1.VolumeMount{
-															jobsetplugin.VolumeMountModelInitializer,
-														},
+														VolumeMounts: []corev1.VolumeMount{{
+															Name:      jobsetplgconsts.VolumeNameInitializer,
+															MountPath: constants.ModelMountPath,
+														}},
 													},
 												},
-												Volumes: []corev1.Volume{
-													jobsetplugin.VolumeInitializer,
-												},
+												Volumes: []corev1.Volume{{
+													Name: jobsetplgconsts.VolumeNameInitializer,
+													VolumeSource: corev1.VolumeSource{
+														PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+															ClaimName: jobsetplgconsts.VolumeNameInitializer,
+														},
+													},
+												}},
 											},
 										},
 									},
@@ -527,12 +654,6 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 							},
 							{
 								Name: constants.JobTrainerNode,
-								DependsOn: []jobsetv1alpha2.DependsOn{
-									{
-										Name:   constants.JobInitializer,
-										Status: jobsetv1alpha2.DependencyComplete,
-									},
-								},
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
 										Template: corev1.PodTemplateSpec{
@@ -541,14 +662,25 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 													{
 														Name: constants.ContainerTrainer,
 														VolumeMounts: []corev1.VolumeMount{
-															jobsetplugin.VolumeMountDatasetInitializer,
-															jobsetplugin.VolumeMountModelInitializer,
+															{
+																Name:      jobsetplgconsts.VolumeNameInitializer,
+																MountPath: constants.DatasetMountPath,
+															},
+															{
+																Name:      jobsetplgconsts.VolumeNameInitializer,
+																MountPath: constants.ModelMountPath,
+															},
 														},
 													},
 												},
-												Volumes: []corev1.Volume{
-													jobsetplugin.VolumeInitializer,
-												},
+												Volumes: []corev1.Volume{{
+													Name: jobsetplgconsts.VolumeNameInitializer,
+													VolumeSource: corev1.VolumeSource{
+														PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+															ClaimName: jobsetplgconsts.VolumeNameInitializer,
+														},
+													},
+												}},
 											},
 										},
 									},
@@ -614,20 +746,27 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 												Containers: []corev1.Container{
 													{
 														Name: constants.ContainerDatasetInitializer,
-														VolumeMounts: []corev1.VolumeMount{
-															jobsetplugin.VolumeMountDatasetInitializer,
-														},
+														VolumeMounts: []corev1.VolumeMount{{
+															Name:      jobsetplgconsts.VolumeNameInitializer,
+															MountPath: constants.DatasetMountPath,
+														}},
 													},
 													{
 														Name: constants.ContainerModelInitializer,
-														VolumeMounts: []corev1.VolumeMount{
-															jobsetplugin.VolumeMountModelInitializer,
-														},
+														VolumeMounts: []corev1.VolumeMount{{
+															Name:      jobsetplgconsts.VolumeNameInitializer,
+															MountPath: constants.ModelMountPath,
+														}},
 													},
 												},
-												Volumes: []corev1.Volume{
-													jobsetplugin.VolumeInitializer,
-												},
+												Volumes: []corev1.Volume{{
+													Name: jobsetplgconsts.VolumeNameInitializer,
+													VolumeSource: corev1.VolumeSource{
+														PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+															ClaimName: jobsetplgconsts.VolumeNameInitializer,
+														},
+													},
+												}},
 											},
 										},
 									},
@@ -635,12 +774,6 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 							},
 							{
 								Name: constants.JobTrainerNode,
-								DependsOn: []jobsetv1alpha2.DependsOn{
-									{
-										Name:   constants.JobInitializer,
-										Status: jobsetv1alpha2.DependencyComplete,
-									},
-								},
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
 										Template: corev1.PodTemplateSpec{
@@ -649,14 +782,25 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 													{
 														Name: constants.ContainerTrainer,
 														VolumeMounts: []corev1.VolumeMount{
-															jobsetplugin.VolumeMountDatasetInitializer,
-															jobsetplugin.VolumeMountModelInitializer,
+															{
+																Name:      jobsetplgconsts.VolumeNameInitializer,
+																MountPath: constants.DatasetMountPath,
+															},
+															{
+																Name:      jobsetplgconsts.VolumeNameInitializer,
+																MountPath: constants.ModelMountPath,
+															},
 														},
 													},
 												},
-												Volumes: []corev1.Volume{
-													jobsetplugin.VolumeInitializer,
-												},
+												Volumes: []corev1.Volume{{
+													Name: jobsetplgconsts.VolumeNameInitializer,
+													VolumeSource: corev1.VolumeSource{
+														PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+															ClaimName: jobsetplgconsts.VolumeNameInitializer,
+														},
+													},
+												}},
 											},
 										},
 									},
@@ -696,6 +840,32 @@ func (s *TrainingRuntimeSpecWrapper) JobSetSpec(spec jobsetv1alpha2.JobSetSpec) 
 
 func (s *TrainingRuntimeSpecWrapper) WithMLPolicy(mlPolicy *trainer.MLPolicy) *TrainingRuntimeSpecWrapper {
 	s.MLPolicy = mlPolicy
+	return s
+}
+
+func (s *TrainingRuntimeSpecWrapper) LauncherReplica() *TrainingRuntimeSpecWrapper {
+	for i, rJob := range s.Template.Spec.ReplicatedJobs {
+		if rJob.Name == constants.JobTrainerNode {
+			s.Template.Spec.ReplicatedJobs = append(s.Template.Spec.ReplicatedJobs, jobsetv1alpha2.ReplicatedJob{})
+			copy(s.Template.Spec.ReplicatedJobs[i+1:], s.Template.Spec.ReplicatedJobs[i:])
+			s.Template.Spec.ReplicatedJobs[i] = jobsetv1alpha2.ReplicatedJob{
+				Name: constants.JobLauncher,
+				Template: batchv1.JobTemplateSpec{
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{{
+									Name:    constants.ContainerLauncher,
+									Command: []string{"mpirun"},
+									Args:    []string{"echo.sh"},
+								}},
+							},
+						},
+					},
+				},
+			}
+		}
+	}
 	return s
 }
 
@@ -763,6 +933,24 @@ func (s *TrainingRuntimeSpecWrapper) PodGroupPolicyCoschedulingSchedulingTimeout
 	return s
 }
 
+func (s *TrainingRuntimeSpecWrapper) Parallelism(rJobName string, parallelism int32) *TrainingRuntimeSpecWrapper {
+	for i, rJob := range s.Template.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			s.Template.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = &parallelism
+		}
+	}
+	return s
+}
+
+func (s *TrainingRuntimeSpecWrapper) Completions(rJobName string, completions int32) *TrainingRuntimeSpecWrapper {
+	for i, rJob := range s.Template.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			s.Template.Spec.ReplicatedJobs[i].Template.Spec.Completions = &completions
+		}
+	}
+	return s
+}
+
 func (s *TrainingRuntimeSpecWrapper) Obj() trainer.TrainingRuntimeSpec {
 	return s.TrainingRuntimeSpec
 }
@@ -793,14 +981,14 @@ func (m *MLPolicyWrapper) TorchPolicy(numProcPerNode string, elasticPolicy *trai
 	return m
 }
 
-func (m *MLPolicyWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation *trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsWorker *bool) *MLPolicyWrapper {
+func (m *MLPolicyWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation *trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsNode *bool) *MLPolicyWrapper {
 	if m.MLPolicySource.MPI == nil {
 		m.MLPolicySource.MPI = &trainer.MPIMLPolicySource{}
 	}
 	m.MLPolicySource.MPI.NumProcPerNode = numProcPerNode
 	m.MLPolicySource.MPI.MPIImplementation = MPImplementation
 	m.MLPolicySource.MPI.SSHAuthMountPath = sshAuthMountPath
-	m.MLPolicySource.MPI.RunLauncherAsNode = runLauncherAsWorker
+	m.MLPolicySource.MPI.RunLauncherAsNode = runLauncherAsNode
 	return m
 }
 
@@ -887,7 +1075,7 @@ func (c *ConfigMapWrapper) WithData(data map[string]string) *ConfigMapWrapper {
 	return c
 }
 
-func (c *ConfigMapWrapper) OwnerReference(gvk schema.GroupVersionKind, name, uid string) *ConfigMapWrapper {
+func (c *ConfigMapWrapper) ControllerReference(gvk schema.GroupVersionKind, name, uid string) *ConfigMapWrapper {
 	c.OwnerReferences = append(c.OwnerReferences, metav1.OwnerReference{
 		APIVersion:         gvk.GroupVersion().String(),
 		Kind:               gvk.Kind,
@@ -937,7 +1125,12 @@ func (s *SecretWrapper) WithData(data map[string][]byte) *SecretWrapper {
 	return s
 }
 
-func (s *SecretWrapper) OwnerReference(gvk schema.GroupVersionKind, name, uid string) *SecretWrapper {
+func (s *SecretWrapper) WithImmutable(immutable bool) *SecretWrapper {
+	s.Immutable = &immutable
+	return s
+}
+
+func (s *SecretWrapper) ControllerReference(gvk schema.GroupVersionKind, name, uid string) *SecretWrapper {
 	s.OwnerReferences = append(s.OwnerReferences, metav1.OwnerReference{
 		APIVersion:         gvk.GroupVersion().String(),
 		Kind:               gvk.Kind,

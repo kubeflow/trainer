@@ -11,35 +11,47 @@ spec:
     mpi:
       numProcPerNode: 1
       mpiImplementation: OpenMPI
-      sshAuthMountPath: /root/.ssh
+      sshAuthMountPath: /home/mpiuser/.ssh
   template:
     spec:
+      network:
+        publishNotReadyAddresses: false
+      successPolicy:
+        operator: All
+        targetReplicatedJobs:
+          - launcher
       replicatedJobs:
         - name: launcher
           template:
             spec:
               template:
                 spec:
-                  # TODO (andreyvelich): Change the command with mpirun.
                   containers:
                     - name: launcher
-                      image: busybox
+                      image: mpioperator/mpi-pi:openmpi
+                      securityContext:
+                        runAsUser: 1000
                       command:
-                        - /bin/sh
-                        - -c
-                        - "echo 'launcher runs for 15 seconds' && sleep 15"
+                        - mpirun
+                      args:
+                        - /home/mpiuser/pi
         - name: trainer-node
-          dependsOn:
-            - name: launcher
-              status: Ready
           template:
             spec:
               template:
                 spec:
                   containers:
-                    - name: trainer
-                      image: busybox
+                    - name: trainer-node
+                      image: mpioperator/mpi-pi:openmpi
+                      securityContext:
+                        runAsUser: 1000
                       command:
-                        - /bin/sh
-                        - -c
-                        - "echo 'trainer node runs for 15 seconds' && sleep 15"
+                        - /usr/sbin/sshd
+                      args:
+                        - -De
+                        - -f
+                        - /home/mpiuser/.sshd_config
+                      readinessProbe:
+                        tcpSocket:
+                          port: 2222
+                        initialDelaySeconds: 5

@@ -25,9 +25,7 @@ from kubeflow.trainer.constants.constants import DATASET_PATH, MODEL_PATH
 
 # Import the Kubeflow Trainer types.
 from kubeflow.trainer.types.types import (
-    FineTuningConfig,
+    CustomTrainer,
     HuggingFaceDatasetConfig,
     HuggingFaceModelInputConfig,
-    LoraConfig,
-    Trainer,
 )

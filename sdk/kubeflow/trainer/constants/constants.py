@@ -129,6 +129,3 @@ CONTAINER_TRAINER = "trainer"
 
 # The Torch env name for the number of procs per node (e.g. number of GPUs per Pod).
 TORCH_ENV_NUM_PROC_PER_NODE = "PET_NPROC_PER_NODE"
-
-# Env variable for the Lora config
-ENV_LORA_CONFIG = "LORA_CONFIG"

@@ -17,38 +17,50 @@ limitations under the License.
 package apply
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func UpsertEnvVar(envVars *[]corev1ac.EnvVarApplyConfiguration, envVar ...*corev1ac.EnvVarApplyConfiguration) {
+var (
+	errorRequestedFieldPathNotFound = errors.New("requested field path not found")
+)
+
+func UpsertEnvVar(envVars *[]corev1ac.EnvVarApplyConfiguration, envVar ...corev1ac.EnvVarApplyConfiguration) {
 	for _, e := range envVar {
-		upsert(envVars, *e, byEnvVarName)
+		upsert(envVars, e, byEnvVarName)
 	}
 }
 
-func UpsertEnvVars(envVars *[]corev1ac.EnvVarApplyConfiguration, upEnvVars []corev1ac.EnvVarApplyConfiguration) {
+func UpsertEnvVars(envVars *[]corev1ac.EnvVarApplyConfiguration, upEnvVars ...corev1ac.EnvVarApplyConfiguration) {
 	for _, e := range upEnvVars {
 		upsert(envVars, e, byEnvVarName)
 	}
 }
 
-func UpsertPort(ports *[]corev1ac.ContainerPortApplyConfiguration, port ...*corev1ac.ContainerPortApplyConfiguration) {
+func UpsertPort(ports *[]corev1ac.ContainerPortApplyConfiguration, port ...corev1ac.ContainerPortApplyConfiguration) {
 	for _, p := range port {
-		upsert(ports, *p, byContainerPortOrName)
+		upsert(ports, p, byContainerPortOrName)
 	}
 }
 
-func UpsertVolumes(volumes *[]corev1ac.VolumeApplyConfiguration, upVolumes []corev1ac.VolumeApplyConfiguration) {
+func UpsertVolumes(volumes *[]corev1ac.VolumeApplyConfiguration, upVolumes ...corev1ac.VolumeApplyConfiguration) {
 	for _, v := range upVolumes {
 		upsert(volumes, v, byVolumeName)
 	}
 }
 
-func UpsertVolumeMounts(mounts *[]corev1ac.VolumeMountApplyConfiguration, upMounts []corev1ac.VolumeMountApplyConfiguration) {
+func UpsertVolumeMounts(mounts *[]corev1ac.VolumeMountApplyConfiguration, upMounts ...corev1ac.VolumeMountApplyConfiguration) {
 	for _, m := range upMounts {
-		upsert(mounts, m, byVolumeMountName)
+		upsert(mounts, m, byVolumeMountPath)
 	}
 }
 
@@ -64,8 +76,8 @@ func byVolumeName(a, b corev1ac.VolumeApplyConfiguration) bool {
 	return ptr.Equal(a.Name, b.Name)
 }
 
-func byVolumeMountName(a, b corev1ac.VolumeMountApplyConfiguration) bool {
-	return ptr.Equal(a.Name, b.Name)
+func byVolumeMountPath(a, b corev1ac.VolumeMountApplyConfiguration) bool {
+	return ptr.Equal(a.MountPath, b.MountPath)
 }
 
 type compare[T any] func(T, T) bool
@@ -120,4 +132,27 @@ func EnvVars(e ...corev1.EnvVar) []corev1ac.EnvVarApplyConfiguration {
 		envs = append(envs, *EnvVar(env))
 	}
 	return envs
+}
+
+func FromTypedObjWithFields[A any](typed client.Object, fields ...string) (*A, error) {
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(typed)
+	if err != nil {
+		return nil, err
+	}
+	uObj, ok, err := unstructured.NestedFieldCopy(u, fields...)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("%w: '.%s'", errorRequestedFieldPathNotFound, strings.Join(fields, "."))
+	}
+	raw, err := json.Marshal(uObj)
+	if err != nil {
+		return nil, err
+	}
+	var objApply *A
+	if err = json.Unmarshal(raw, &objApply); err != nil {
+		return nil, err
+	}
+	return objApply, nil
 }
