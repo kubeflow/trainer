@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import inspect
-import math
 import os
 import queue
 import textwrap

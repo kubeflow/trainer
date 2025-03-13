@@ -221,14 +221,6 @@ class TrainerClient:
                 trainer.resources_per_node
             )
 
-        # Set numProcPerNode to the Trainer.
-        if trainer and trainer.resources_per_node:
-            trainer_crd.num_proc_per_node = (
-                models.IoK8sApimachineryPkgUtilIntstrIntOrString(
-                    utils.get_num_proc_per_node(trainer.resources_per_node)
-                )
-            )
-
         # Add command and args to the Trainer if training function is set.
         if trainer and trainer.func:
             trainer_crd.command = constants.DEFAULT_COMMAND
