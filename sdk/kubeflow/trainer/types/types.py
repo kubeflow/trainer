@@ -21,7 +21,7 @@ from typing import Callable, Dict, List, Optional, Union
 from kubeflow.trainer.constants import constants
 
 
-# Configuration for the custom trainer.
+# Configuration for the Custom Trainer.
 @dataclass
 class CustomTrainer:
     """Custom Trainer configuration. Configure the self-contained function
@@ -100,6 +100,34 @@ class TrainJob:
     runtime: Runtime
     steps: List[Step]
     status: Optional[str] = constants.UNKNOWN
+
+
+# Configuration for the TorchTune LLM Trainer.
+@dataclass
+class TorchTuneConfig:
+    """TorchTune LLM Trainer configuration. Configure the parameters in
+        the TorchTune LLM Trainer that already includes the fine-tuning logic.
+
+    Args:
+        dtype (`Optional[str]`):
+            The underlying data type used to represent the model and optimizer parameters.
+            Currently, we only support `bf16` and `fp32`.
+        batch_size (`Optional[int]`):
+            The number of samples processed before updating model weights.
+        epochs (`Optional[int]`):
+            The number of samples processed before updating model weights.
+        loss (`Optional[str]`): The loss algorithm we use to fine-tune the LLM,
+            e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss`.
+        num_nodes (`Optional[int]`): The number of nodes to use for training.
+        resources_per_node (`Optional[Dict]`): The computing resources to allocate per node.
+    """
+
+    dtype: Optional[str] = None
+    batch_size: Optional[int] = None
+    epochs: Optional[int] = None
+    loss: Optional[str] = None
+    num_nodes: Optional[int] = None
+    resources_per_node: Optional[Dict] = None
 
 
 # Configuration for the HuggingFace dataset initializer.
