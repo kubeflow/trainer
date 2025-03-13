@@ -7,5 +7,3 @@ COPY cmd/trainers/torchtune/requirements.txt .
 
 # Install the needed packages
 RUN pip install -r requirements.txt
-
-ENTRYPOINT [ "tune", "run" ]
