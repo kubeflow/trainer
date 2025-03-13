@@ -5,7 +5,7 @@ This guide explains how to contribute to the Kubeflow Trainer V2 project.
 ## Requirements
 
 - [Go](https://golang.org/) (1.23 or later)
-- [Docker](https://www.docker.com/) (20.10.0 or later)
+- [Docker](https://docs.docker.com/) (23 or later)
 - [Python](https://www.python.org/) (3.11 or later)
 - [kustomize](https://kustomize.io/) (4.0.5 or later)
 - [Kind](https://kind.sigs.k8s.io/) (0.27.0 or later)
