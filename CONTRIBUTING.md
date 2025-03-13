@@ -28,7 +28,6 @@ The Kubeflow Trainer project includes a Makefile with several helpful commands t
 make generate
 
 # Download required tools for development
-make ginkgo envtest controller-gen kind
 
 # Format and verify code
 make fmt vet golangci-lint
