@@ -111,29 +111,6 @@ def get_resources_per_node(
     return resources
 
 
-def get_num_proc_per_node(resources_per_node: dict) -> str:
-    """
-    Get the Trainer numProcPerNode from the given resources.
-    """
-
-    resources = {k.lower(): v for k, v in resources_per_node.items()}
-    # NumProcPerNode is equal to number of GPUs or CPUs, otherwise set it to `auto`
-    for key, value in resources.items():
-        if "gpu" in key:
-            return str(value)
-
-    for key, value in resources.items():
-        if "cpu" in key:
-            # For now, we can't convert milliCPUs to the numProcPerNode.
-            try:
-                value = math.ceil(int(value))
-                return str(value)
-            except Exception:
-                pass
-
-    return "auto"
-
-
 def get_args_using_train_func(
     train_func: Callable,
     train_func_parameters: Optional[Dict[str, Any]] = None,

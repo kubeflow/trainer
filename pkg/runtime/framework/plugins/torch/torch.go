@@ -168,5 +168,5 @@ func calculateNumProcPerNode(
 		}
 		return fallbackNumProcPerNode, false
 	}
-	return intstr.FromInt32(int32(defaultCPU)), false
+	return intstr.FromInt32(defaultCPU), false
 }
