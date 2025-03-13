@@ -34,4 +34,5 @@ from kubeflow.trainer.types.types import (
     Runtime,
     Trainer,
     TrainerType,
+    TorchTuneConfig,
 )
