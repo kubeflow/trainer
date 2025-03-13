@@ -164,7 +164,7 @@ func calculateNumProcPerNode(
 	if resources != nil {
 		if shouldUseCPU(resources) {
 			cpuQ := resources[corev1.ResourceCPU]
-			return intstr.FromInt32(max(int32(defaultCPU), int32(cpuQ.Value()))), true
+			return intstr.FromInt32(max(defaultCPU, int32(cpuQ.Value()))), true
 		}
 		return fallbackNumProcPerNode, false
 	}
