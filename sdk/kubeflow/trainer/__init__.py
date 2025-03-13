@@ -28,4 +28,5 @@ from kubeflow.trainer.types.types import (
     CustomTrainer,
     HuggingFaceDatasetConfig,
     HuggingFaceModelInputConfig,
+    TorchTuneConfig,
 )

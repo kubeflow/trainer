@@ -190,6 +190,7 @@ class TrainerClient:
         self,
         runtime_ref: str,
         trainer: Optional[types.CustomTrainer] = None,
+        fine_tuning_config: Optional[types.TorchTuneConfig] = None,
         dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
         model_config: Optional[types.HuggingFaceModelInputConfig] = None,
     ) -> str:
