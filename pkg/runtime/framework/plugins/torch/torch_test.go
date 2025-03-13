@@ -999,15 +999,11 @@ func TestTorch(t *testing.T) {
 			}
 
 			// Validate the entire info object
-			if tc.wantInfo != nil {
-				if diff := cmp.Diff(tc.wantInfo, tc.info,
-					cmpopts.SortSlices(func(a, b string) bool { return a < b }),
-					cmpopts.SortMaps(func(a, b string) bool { return a < b }),
-				); len(diff) != 0 {
-					t.Errorf("Unexpected RuntimeInfo (-want,+got):\n%s", diff)
-				}
-			} else if tc.info != nil {
-				t.Errorf("Expected info to be nil, but got: %v", tc.info)
+			if diff := cmp.Diff(tc.wantInfo, tc.info,
+				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
+			); len(diff) != 0 {
+				t.Errorf("Unexpected RuntimeInfo (-want,+got):\n%s", diff)
 			}
 		})
 	}
