@@ -7,12 +7,11 @@ For the Kubeflow Trainer documentation, please check [the official Kubeflow docu
 
 - [Go](https://golang.org/) (1.23 or later)
 - [Docker](https://docs.docker.com/) (23 or later)
+- [Lima](https://github.com/lima-vm/lima?tab=readme-ov-file#adopters) (an alternative to DockerDesktop) (0.21.0 or later)
+- [Colima](https://github.com/abiosoft/colima) (Lima specifically for MacOS) (0.6.8 or later)
 - [Python](https://www.python.org/) (3.11 or later)
 - [kustomize](https://kustomize.io/) (4.0.5 or later)
 - [Kind](https://kind.sigs.k8s.io/) (0.27.0 or later)
-- [Docker]....
-- [Lima](https://github.com/lima-vm/lima?tab=readme-ov-file#adopters) (an alternative to DockerDesktop) (0.21.0 or later)
-  - [Colima](https://github.com/abiosoft/colima) (Lima specifically for MacOS) (0.6.8 or later)
 - [pre-commit](https://pre-commit.com/)
 
 Note for Lima the link is to the Adopters, which supports several different container environments.
