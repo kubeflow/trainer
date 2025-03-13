@@ -40,11 +40,10 @@ import (
 
 func TestTorch(t *testing.T) {
 	cases := map[string]struct {
-		info               *runtime.Info
-		trainJob           *trainer.TrainJob
-		wantInfo           *runtime.Info
-		wantMLPolicyError  error
-		wantNumProcPerNode string // For validating numProcPerNode value
+		info              *runtime.Info
+		trainJob          *trainer.TrainJob
+		wantInfo          *runtime.Info
+		wantMLPolicyError error
 	}{
 		"no action when info is nil": {},
 		"no action when mlPolicy is nil": {
@@ -125,7 +124,7 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// Issue #2407 test case - nproc_per_node=auto with CPU limit
+		// nproc_per_node=auto with CPU limit
 		"nproc_per_node=auto with CPU limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -145,9 +144,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "4", // Should be capped to CPU limit
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("4"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// Issue #2407 test case - nproc_per_node=auto with no CPU resources
+		// nproc_per_node=auto with no CPU resources
 		"nproc_per_node=auto with no CPU resources": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -165,9 +207,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "1", // Default to 1 when no CPU resources specified
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("1"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// Issue #2407 test case - nproc_per_node=auto with low CPU limit
+		// nproc_per_node=auto with low CPU limit
 		"nproc_per_node=auto with low CPU limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -187,9 +272,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "2", // Should be capped to CPU limit (2) even if actual CPU count is higher
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("2"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// Issue #2407 test case - nproc_per_node=auto with CPU request but no limit
+		// nproc_per_node=auto with CPU request but no limit
 		"nproc_per_node=auto with CPU request but no limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -209,9 +337,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "3", // Should use CPU request when no limit is set
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("3"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// Issue #2407 test case - nproc_per_node=auto with millicore CPU limit
+		// nproc_per_node=auto with millicore CPU limit
 		"nproc_per_node=auto with millicore CPU limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -231,9 +402,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "3", // Should round up to 3 for 2.5 cores
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("3"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// Issue #2407 test case - nproc_per_node=auto with fractional CPU limit
+		// nproc_per_node=auto with fractional CPU limit
 		"nproc_per_node=auto with fractional CPU limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -253,9 +467,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "1", // Should round up to 1 for 0.7 cores
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("1"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// Issue #2407 test case - nproc_per_node=auto with GPU request should remain auto
+		// nproc_per_node=auto with GPU request should remain auto
 		"nproc_per_node=auto with GPU request should remain auto": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -275,9 +532,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "auto", // Keep auto when GPU is requested
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("auto"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// Issue #2407 test case - explicitly set nproc_per_node should be preserved
+		// explicitly set nproc_per_node should be preserved
 		"explicitly set nproc_per_node should be preserved": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -297,9 +597,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "3", // Explicit value should be preserved
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("3"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// Issue #2407 test case - nproc_per_node=auto with millicore CPU limit in m format
+		// nproc_per_node=auto with millicore CPU limit in m format
 		"nproc_per_node=auto with millicore CPU limit in m format": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -319,9 +662,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "3", // Should round up to 3 for 2500m (2.5) cores
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("3"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// Test case - nproc_per_node=cpu with CPU limit
+		// nproc_per_node=cpu with CPU limit
 		"nproc_per_node=cpu with CPU limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "cpu-job").
 				Trainer(
@@ -341,9 +727,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "4", // Should use CPU limit (4)
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("4"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("cpu-job-trainer-node-0-0.cpu-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// Test case - nproc_per_node=cpu with GPU resources (should still use CPU resources)
+		// nproc_per_node=cpu with GPU resources
 		"nproc_per_node=cpu with GPU resources": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "cpu-gpu-job").
 				Trainer(
@@ -364,9 +793,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "6", // Should use CPU limit (6) even with GPU resources
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("6"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("cpu-gpu-job-trainer-node-0-0.cpu-gpu-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// Test case - nproc_per_node=cpu with fractional CPU
+		// nproc_per_node=cpu with fractional CPU
 		"nproc_per_node=cpu with fractional CPU": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "cpu-frac-job").
 				Trainer(
@@ -386,9 +858,52 @@ func TestTorch(t *testing.T) {
 						Obj(),
 				),
 			),
-			wantNumProcPerNode: "4", // Should round up to 4 for 3.7 cores
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						TorchPolicy("auto", nil).
+						Obj(),
+				},
+				Trainer: runtime.Trainer{
+					NumNodes:       ptr.To[int32](1),
+					NumProcPerNode: "",
+					Env: []corev1ac.EnvVarApplyConfiguration{
+						{
+							Name:  ptr.To(constants.TorchEnvNumNodes),
+							Value: ptr.To("1"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+							Value: ptr.To("4"),
+						},
+						{
+							Name: ptr.To(constants.TorchEnvNodeRank),
+							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+								},
+							},
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterAddr),
+							Value: ptr.To("cpu-frac-job-trainer-node-0-0.cpu-frac-job"),
+						},
+						{
+							Name:  ptr.To(constants.TorchEnvMasterPort),
+							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+						},
+					},
+					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
+						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+					},
+				},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+			},
 		},
-		// New test case - Complete test with multiple GPU resources
+		// multi-node multi-GPU training with complete info
 		"multi-node multi-GPU training with complete info": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "gpu-job").
 				Trainer(
@@ -462,7 +977,6 @@ func TestTorch(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
-			wantNumProcPerNode: "auto", // Should keep auto when GPU is present
 		},
 	}
 
@@ -482,24 +996,6 @@ func TestTorch(t *testing.T) {
 			err = p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(tc.info, tc.trainJob)
 			if diff := cmp.Diff(tc.wantMLPolicyError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from EnforceMLPolicy (-want,+got):\n%s", diff)
-			}
-
-			// If need to validate numProcPerNode
-			if tc.wantNumProcPerNode != "" && tc.info != nil {
-				// Find PET_NPROC_PER_NODE environment variable
-				var numProcPerNodeValue string
-				for _, env := range tc.info.Trainer.Env {
-					if env.Name != nil && *env.Name == constants.TorchEnvNumProcPerNode {
-						if env.Value != nil {
-							numProcPerNodeValue = *env.Value
-						}
-						break
-					}
-				}
-
-				if diff := cmp.Diff(tc.wantNumProcPerNode, numProcPerNodeValue); diff != "" {
-					t.Errorf("Torch.EnforceMLPolicy() numProcPerNode mismatch (-want +got):\n%s", diff)
-				}
 			}
 
 			// Validate the entire info object (if wantInfo is provided)
