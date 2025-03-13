@@ -217,6 +217,8 @@ func (j *JobSetWrapper) ContainerTrainerPorts(ports []corev1.ContainerPort) *Job
 	return j
 }
 
+// TODO: ContainerTrainerEnv should be migrated to generic wrapper, Env(rJobName, containerName string, envs ...corev1.EnvVar).
+
 func (j *JobSetWrapper) ContainerTrainerEnv(env []corev1.EnvVar) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == constants.JobTrainerNode {
@@ -290,6 +292,8 @@ func (j *JobSetWrapper) ContainerDatasetModelInitializer(image string, command [
 	return j
 }
 
+// TODO: ContainerDatasetInitializerEnv should be migrated to generic wrapper, Env(rJobName, containerName string, envs ...corev1.EnvVar).
+
 func (j *JobSetWrapper) ContainerDatasetInitializerEnv(env []corev1.EnvVar) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == constants.JobInitializer {
@@ -315,6 +319,8 @@ func (j *JobSetWrapper) ContainerDatasetInitializerEnvFrom(envFrom []corev1.EnvF
 	}
 	return j
 }
+
+// TODO: ContainerModelInitializerEnv should be migrated to generic wrapper, Env(rJobName, containerName string, envs ...corev1.EnvVar).
 
 func (j *JobSetWrapper) ContainerModelInitializerEnv(env []corev1.EnvVar) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
