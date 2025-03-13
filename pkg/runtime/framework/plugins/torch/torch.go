@@ -160,7 +160,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 func calculateNumProcPerNode(
 	fallbackNumProcPerNode intstr.IntOrString, resources corev1.ResourceList, shouldUseCPU func(resources corev1.ResourceList) bool,
 ) (intstr.IntOrString, bool) {
-	var defaultCPU int = 1
+	var defaultCPU int32 = 1
 	if resources != nil {
 		if shouldUseCPU(resources) {
 			cpuQ := resources[corev1.ResourceCPU]
