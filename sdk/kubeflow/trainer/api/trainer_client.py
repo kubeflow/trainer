@@ -154,6 +154,23 @@ class TrainerClient:
     ) -> str:
         """Create the TrainJob. TODO (andreyvelich): Add description
 
+        Args:
+            runtime_ref (`str`): Reference to the name of existing (Cluster)TrainingRuntime.
+            trainer (`Optional[types.CustomTrainer]`):
+                The configuration of trainer which trains a model from scratch.
+                Currently, we support these types of trainer:
+                - `types.CustomTrainer`: Training with a self-contained function that
+                    encapsulates the entire model training process.
+            fine_tuning_config (`Optional[types.TorchTuneConfig`]):
+                The configuration of trainer which fine-tunes existing pre-trained models.
+                Currently, we support these types of trainer:
+                - `types.TorchTuneConfig`: Training with the `torchtune` trainer that already
+                    includes the fine-tuning logic, requiring only parameter adjustments.
+            dataset_config (`Optional[types.HuggingFaceDatasetConfig]`):
+                Configuration for the dataset provider.
+            model_config (`Optional[types.HuggingFaceModelInputConfig]`):
+                Configuration for the model provider.
+
         Returns:
             str: The unique name of the TrainJob that has been generated.
 
