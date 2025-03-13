@@ -171,19 +171,22 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 	}{
 		"plainml MLPolicy is applied to runtime.Info, TrainJob doesn't have numNodes": {
 			registry: fwkplugins.NewRegistry(),
-			runtimeInfo: &runtime.Info{
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: &trainer.MLPolicy{
-						NumNodes: ptr.To[int32](100),
-					},
-				},
-				Scheduler: &runtime.Scheduler{
-					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {Replicas: 1},
-						constants.JobTrainerNode: {Replicas: 10},
-					},
-				},
-			},
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicy(
+					testingutil.MakeMLPolicyWrapper().
+						WithNumNodes(100).
+						Obj(),
+				),
+				runtime.WithPodSpecReplicas(constants.JobInitializer, 1, nil, corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().WithName(constants.ContainerDatasetInitializer),
+						corev1ac.Container().WithName(constants.ContainerModelInitializer),
+					),
+				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 10, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
+			),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{},
 			},
@@ -193,8 +196,27 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 						NumNodes: ptr.To[int32](100),
 					},
 				},
-				Trainer: runtime.Trainer{
-					NumNodes: ptr.To[int32](100),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:               constants.JobInitializer,
+							CountForNonTrainer: ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									Name: constants.ContainerDatasetInitializer,
+								},
+								{
+									Name: constants.ContainerModelInitializer,
+								},
+							},
+						},
+						{
+							Name: constants.JobTrainerNode,
+							Containers: []runtime.Container{{
+								Name: constants.ContainerTrainer,
+							}},
+						},
+					},
 				},
 				Scheduler: &runtime.Scheduler{
 					TotalRequests: map[string]runtime.TotalResourceRequest{
@@ -206,19 +228,22 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 		},
 		"plainml MLPolicy is applied to runtime.Info, TrainJob has numNodes": {
 			registry: fwkplugins.NewRegistry(),
-			runtimeInfo: &runtime.Info{
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: &trainer.MLPolicy{
-						NumNodes: ptr.To[int32](100),
-					},
-				},
-				Scheduler: &runtime.Scheduler{
-					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {Replicas: 1},
-						constants.JobTrainerNode: {Replicas: 10},
-					},
-				},
-			},
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicy(
+					testingutil.MakeMLPolicyWrapper().
+						WithNumNodes(100).
+						Obj(),
+				),
+				runtime.WithPodSpecReplicas(constants.JobInitializer, 1, nil, corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().WithName(constants.ContainerDatasetInitializer),
+						corev1ac.Container().WithName(constants.ContainerModelInitializer),
+					),
+				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 10, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
+			),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
 					Trainer: &trainer.Trainer{
@@ -229,11 +254,30 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 			wantRuntimeInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicy: &trainer.MLPolicy{
-						NumNodes: ptr.To[int32](100),
+						NumNodes: ptr.To[int32](30),
 					},
 				},
-				Trainer: runtime.Trainer{
-					NumNodes: ptr.To[int32](30),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:               constants.JobInitializer,
+							CountForNonTrainer: ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									Name: constants.ContainerDatasetInitializer,
+								},
+								{
+									Name: constants.ContainerModelInitializer,
+								},
+							},
+						},
+						{
+							Name: constants.JobTrainerNode,
+							Containers: []runtime.Container{{
+								Name: constants.ContainerTrainer,
+							}},
+						},
+					},
 				},
 				Scheduler: &runtime.Scheduler{
 					TotalRequests: map[string]runtime.TotalResourceRequest{
@@ -421,9 +465,6 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 						},
 					},
 				},
-				Trainer: runtime.Trainer{
-					NumNodes: ptr.To[int32](10),
-				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
@@ -556,7 +597,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 			wantRuntimeInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicy: &trainer.MLPolicy{
-						NumNodes: ptr.To[int32](10),
+						NumNodes: ptr.To[int32](100),
 					},
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -565,9 +606,6 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							},
 						},
 					},
-				},
-				Trainer: runtime.Trainer{
-					NumNodes: ptr.To[int32](100),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					ObjApply: jobsetv1alpha2ac.JobSetSpec().

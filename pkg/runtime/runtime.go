@@ -38,8 +38,6 @@ type Info struct {
 	Annotations map[string]string
 	// Original policy values from the runtime.
 	RuntimePolicy RuntimePolicy
-	// Trainer parameters to add to the RuntimeJobTemplate.
-	Trainer
 	// Scheduler parameters to add to the RuntimeJobTemplate.
 	*Scheduler
 	// TemplateSpec is TrainingRuntime Template object.
@@ -74,17 +72,6 @@ type Container struct {
 	Env          []corev1ac.EnvVarApplyConfiguration
 	Ports        []corev1ac.ContainerPortApplyConfiguration
 	VolumeMounts []corev1ac.VolumeMountApplyConfiguration
-}
-
-// DEPRECATED: Replace all Trainer usage with RuntimePolicy and PodSet.
-
-type Trainer struct {
-	NumNodes       *int32
-	NumProcPerNode string
-	Env            []corev1ac.EnvVarApplyConfiguration
-	ContainerPort  *corev1ac.ContainerPortApplyConfiguration
-	Volumes        []corev1ac.VolumeApplyConfiguration
-	VolumeMounts   []corev1ac.VolumeMountApplyConfiguration
 }
 
 // TODO (andreyvelich): Potentially, we can add ScheduleTimeoutSeconds to the Scheduler for consistency.
@@ -228,4 +215,17 @@ func (i *Info) SyncPodSetsToTemplateSpec() {
 func TemplateSpecApply[A any](info *Info) (*A, bool) {
 	spec, ok := info.TemplateSpec.ObjApply.(*A)
 	return spec, ok
+}
+
+func (i *Info) FindContainerByPodSetContainerName(psName, containerName string) *Container {
+	for psIdx, ps := range i.TemplateSpec.PodSets {
+		if ps.Name == psName {
+			for containerIdx, container := range ps.Containers {
+				if container.Name == containerName {
+					return &i.TemplateSpec.PodSets[psIdx].Containers[containerIdx]
+				}
+			}
+		}
+	}
+	return nil
 }

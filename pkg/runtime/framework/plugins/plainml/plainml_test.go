@@ -22,15 +22,15 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/kubeflow/trainer/pkg/apply"
-	"github.com/kubeflow/trainer/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
 	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
@@ -98,58 +98,84 @@ func TestPlainML(t *testing.T) {
 					utiltesting.MakeTrainJobTrainerWrapper().NumNodes(200).Obj(),
 				).
 				Obj(),
-			info: &runtime.Info{
-				Labels:      make(map[string]string),
-				Annotations: make(map[string]string),
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().WithNumNodes(100).Obj(),
-				},
-				Scheduler: &runtime.Scheduler{
-					TotalRequests: make(map[string]runtime.TotalResourceRequest),
-				},
-			},
+			info: runtime.NewInfo(
+				runtime.WithMLPolicy(
+					utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(100).
+						Obj(),
+				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 100, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
+			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().WithNumNodes(100).Obj(),
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().WithNumNodes(200).Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes: ptr.To[int32](200),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: make(map[string]runtime.TotalResourceRequest)},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 200},
+				}},
 			},
 		},
 		"trainJob trainer env are respected rather than runtimeInfo": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(
-					utiltesting.MakeTrainJobTrainerWrapper().ContainerEnv(corev1.EnvVar{
-						Name:  "CONFLICT",
-						Value: "FROM_TRAINER",
-					}).Obj(),
+					utiltesting.MakeTrainJobTrainerWrapper().
+						ContainerEnv(corev1.EnvVar{
+							Name:  "CONFLICT",
+							Value: "FROM_TRAINER",
+						},
+						).
+						NumNodes(1).
+						Obj(),
 				).
 				Obj(),
-			info: &runtime.Info{
-				Labels:      make(map[string]string),
-				Annotations: make(map[string]string),
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().Obj(),
-				},
-				Trainer: runtime.Trainer{
-					Env: apply.EnvVars(corev1.EnvVar{Name: "CONFLICT", Value: "FROM_RUNTIME"}),
-				},
-				Scheduler: &runtime.Scheduler{TotalRequests: make(map[string]runtime.TotalResourceRequest)},
-			},
+			info: runtime.NewInfo(
+				runtime.WithMLPolicy(
+					utiltesting.MakeMLPolicyWrapper().Obj(),
+				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 100, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().
+						WithName(constants.ContainerTrainer).
+						WithEnv(corev1ac.EnvVar().
+							WithName("CONFLICT").
+							WithValue("FROM_TRAINER"),
+						),
+					),
+				),
+			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().Obj(),
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					Env: apply.EnvVars(corev1.EnvVar{Name: "CONFLICT", Value: "FROM_TRAINER"}),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								*corev1ac.EnvVar().WithName("CONFLICT").WithValue("FROM_TRAINER"),
+							},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: make(map[string]runtime.TotalResourceRequest)},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"override trainer numNodes to runtimeInfo scheduler totalRequests": {
@@ -158,27 +184,33 @@ func TestPlainML(t *testing.T) {
 					utiltesting.MakeTrainJobTrainerWrapper().NumNodes(200).Obj(),
 				).
 				Obj(),
-			info: &runtime.Info{
-				Labels:      make(map[string]string),
-				Annotations: make(map[string]string),
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().WithNumNodes(100).Obj(),
-				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {
-						Replicas:    100,
-						PodRequests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("200m")},
-					},
-				}},
-			},
+			info: runtime.NewInfo(
+				runtime.WithMLPolicy(
+					utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(100).
+						Obj(),
+				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 100, corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("200m"),
+				}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
+			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().WithNumNodes(100).Obj(),
+					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+						WithNumNodes(200).
+						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes: ptr.To[int32](200),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+						}},
+					}},
 				},
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
 					constants.JobTrainerNode: {

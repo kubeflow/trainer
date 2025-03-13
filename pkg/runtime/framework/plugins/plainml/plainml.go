@@ -54,11 +54,14 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
 		numNodes = trainJob.Spec.Trainer.NumNodes
 	}
-	info.Trainer.NumNodes = numNodes
+	info.RuntimePolicy.MLPolicy.NumNodes = numNodes
 
 	// Add envs from the TrainJob.
+	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
-		apply.UpsertEnvVars(&info.Trainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
+		if trainerContainer = info.FindContainerByPodSetContainerName(constants.JobTrainerNode, constants.ContainerTrainer); trainerContainer != nil {
+			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
+		}
 	}
 
 	// Update total Pod requests for the PodGroupPolicy plugin.
@@ -73,5 +76,6 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 		}
 	}
 
+	info.SyncPodSetsToTemplateSpec()
 	return nil
 }

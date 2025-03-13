@@ -343,3 +343,75 @@ func TestNewInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestFindContainerByPodSetContainerName(t *testing.T) {
+	cases := map[string]struct {
+		info          *Info
+		psName        string
+		containerName string
+		wantContainer *Container
+	}{
+		"podSet and container exist": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{
+						{
+							Name: "alpha",
+							Containers: []Container{
+								{
+									Name: "one",
+								},
+								{
+									Name: "two",
+								},
+							},
+						},
+						{
+							Name:       "beta",
+							Containers: []Container{{Name: "one"}},
+						},
+					},
+				},
+			},
+			psName:        "alpha",
+			containerName: "one",
+			wantContainer: &Container{
+				Name: "one",
+			},
+		},
+		"podSet exists, but container does not exist": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{{
+						Name:       "alpha",
+						Containers: []Container{{Name: "one"}},
+					}},
+				},
+			},
+			psName:        "alpha",
+			containerName: "two",
+			wantContainer: nil,
+		},
+		"podSet does not exist": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{{
+						Name:       "alpha",
+						Containers: []Container{{Name: "one"}},
+					}},
+				},
+			},
+			psName:        "beta",
+			containerName: "one",
+			wantContainer: nil,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := tc.info.FindContainerByPodSetContainerName(tc.psName, tc.containerName)
+			if diff := cmp.Diff(tc.wantContainer, got); len(diff) != 0 {
+				t.Errorf("Unexpected Container (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}

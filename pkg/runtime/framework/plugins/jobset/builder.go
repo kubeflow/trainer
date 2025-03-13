@@ -153,67 +153,6 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 	return b
 }
 
-// DeprecatedTrainer updates JobSet values for the trainer Job.
-func (b *Builder) DeprecatedTrainer(info *runtime.Info, trainJob *trainer.TrainJob) *Builder {
-	for i, rJob := range b.Spec.ReplicatedJobs {
-		if *rJob.Name == constants.JobTrainerNode {
-			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
-			// REF: https://github.com/kubeflow/trainer/issues/2318
-			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
-			// Update the Parallelism and Completions values for the Trainer Job.
-			b.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = info.Trainer.NumNodes
-			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.Trainer.NumNodes
-
-			// Update the volumes for the Trainer Job.
-			apply.UpsertVolumes(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Volumes, info.Trainer.Volumes...)
-
-			// Update values for the Trainer container.
-			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
-				if *container.Name == constants.ContainerTrainer {
-					// Update values from the TrainJob trainer.
-					if trainJob.Spec.Trainer != nil {
-						if image := trainJob.Spec.Trainer.Image; image != nil {
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Image = image
-						}
-						if command := trainJob.Spec.Trainer.Command; command != nil {
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Command = command
-						}
-						if args := trainJob.Spec.Trainer.Args; args != nil {
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = args
-						}
-						if resourcesPerNode := trainJob.Spec.Trainer.ResourcesPerNode; resourcesPerNode != nil &&
-							(resourcesPerNode.Limits != nil || resourcesPerNode.Requests != nil) {
-							requirements := corev1ac.ResourceRequirements()
-							if limits := resourcesPerNode.Limits; limits != nil {
-								requirements.WithLimits(limits)
-							}
-							if requests := resourcesPerNode.Requests; requests != nil {
-								requirements.WithRequests(requests)
-							}
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
-								WithResources(requirements)
-						}
-					}
-					// Update values from the Info object.
-					if env := info.Trainer.Env; env != nil {
-						// Update JobSet envs from the Info.
-						apply.UpsertEnvVars(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env, env...)
-					}
-					// Update the Trainer container port.
-					if port := info.Trainer.ContainerPort; port != nil {
-						apply.UpsertPort(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Ports, *port)
-					}
-					// Update the Trainer container volume mounts.
-					if mounts := info.Trainer.VolumeMounts; len(mounts) != 0 {
-						apply.UpsertVolumeMounts(&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].VolumeMounts, mounts...)
-					}
-				}
-			}
-		}
-	}
-	return b
-}
-
 // TODO: Supporting merge labels would be great.
 
 func (b *Builder) PodLabels(labels map[string]string) *Builder {

@@ -67,7 +67,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
 		numNodes = trainJob.Spec.Trainer.NumNodes
 	}
-	info.Trainer.NumNodes = numNodes
+	info.RuntimePolicy.MLPolicy.NumNodes = numNodes
 
 	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicy.Torch.NumProcPerNode, intstr.FromString("auto"))
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
@@ -95,7 +95,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 				_, ok := resources[corev1.ResourceCPU]
 				return ok
 			}
-			fallbackNumProcPerNode = intstr.FromInt(1)
+			fallbackNumProcPerNode = intstr.FromInt32(1)
 		default:
 			shouldUseCPU = func(resources corev1.ResourceList) bool { return false }
 			fallbackNumProcPerNode = numProcPerNode
@@ -112,33 +112,35 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	// TODO (andreyvelich): Add validation to check that TrainJob doesn't have "PET_" envs.
 	// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
+	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
-		info.Trainer.Env = apply.EnvVars(trainJob.Spec.Trainer.Env...)
+		if trainerContainer = info.FindContainerByPodSetContainerName(constants.JobTrainerNode, constants.ContainerTrainer); trainerContainer != nil {
+			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
+		}
 	}
-
-	apply.UpsertEnvVar(&info.Trainer.Env,
-		*corev1ac.EnvVar().
-			WithName(constants.TorchEnvNumNodes).
-			WithValue(fmt.Sprintf("%d", ptr.Deref(numNodes, 1))),
-		*corev1ac.EnvVar().
-			WithName(constants.TorchEnvNumProcPerNode).
-			WithValue(numProcPerNode.String()),
-		*corev1ac.EnvVar().
-			WithName(constants.TorchEnvNodeRank).
-			WithValueFrom(corev1ac.EnvVarSource().
-				WithFieldRef(corev1ac.ObjectFieldSelector().
-					WithFieldPath(constants.JobCompletionIndexFieldPath))),
-		*corev1ac.EnvVar().
-			WithName(constants.TorchEnvMasterAddr).
-			WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.JobTrainerNode, trainJob.Name)),
-		*corev1ac.EnvVar().
-			WithName(constants.TorchEnvMasterPort).
-			WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-	)
-
-	// Add container port for the headless service.
-	info.Trainer.ContainerPort = corev1ac.ContainerPort().
-		WithContainerPort(constants.ContainerTrainerPort)
+	if trainerContainer != nil {
+		apply.UpsertEnvVar(&trainerContainer.Env,
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvNumNodes).
+				WithValue(fmt.Sprintf("%d", ptr.Deref(numNodes, 1))),
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvNumProcPerNode).
+				WithValue(numProcPerNode.String()),
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvNodeRank).
+				WithValueFrom(corev1ac.EnvVarSource().
+					WithFieldRef(corev1ac.ObjectFieldSelector().
+						WithFieldPath(constants.JobCompletionIndexFieldPath))),
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvMasterAddr).
+				WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.JobTrainerNode, trainJob.Name)),
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvMasterPort).
+				WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+		)
+		// Add container port for the headless service.
+		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
+	}
 
 	// Update total Pod requests for the PodGroupPolicy plugin.
 	for rName := range info.TotalRequests {
@@ -152,6 +154,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		}
 	}
 
+	info.SyncPodSetsToTemplateSpec()
 	return nil
 }
 

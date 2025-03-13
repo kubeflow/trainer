@@ -151,32 +151,20 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 	// TODO (andreyvelich): Add support for the PodSpecOverride.
 	// TODO (andreyvelich): Refactor the builder with wrappers for PodSpec.
 	// TODO: Once we remove deprecated runtime.Info.Trainer, we should remove JobSet Builder with DeprecatedTrainer().
-	var jobSet *jobsetv1alpha2ac.JobSetApplyConfiguration
-	if info.RuntimePolicy.MLPolicy != nil && info.RuntimePolicy.MLPolicy.MPI != nil {
-		jobSet = jobSetBuilder.
-			Initializer(trainJob).
-			Launcher().
-			Trainer(info, trainJob).
-			PodLabels(info.PodLabels).
-			Suspend(trainJob.Spec.Suspend).
-			Build()
-	} else {
-		jobSet = jobSetBuilder.
-			Initializer(trainJob).
-			DeprecatedTrainer(info, trainJob).
-			PodLabels(info.PodLabels).
-			Suspend(trainJob.Spec.Suspend).
-			Build()
-	}
-
-	// Set the TrainJob as owner
-	jobSet.WithOwnerReferences(metav1ac.OwnerReference().
-		WithAPIVersion(trainer.GroupVersion.String()).
-		WithKind(trainer.TrainJobKind).
-		WithName(trainJob.Name).
-		WithUID(trainJob.UID).
-		WithController(true).
-		WithBlockOwnerDeletion(true))
+	jobSet := jobSetBuilder.
+		Initializer(trainJob).
+		Launcher().
+		Trainer(info, trainJob).
+		PodLabels(info.PodLabels).
+		Suspend(trainJob.Spec.Suspend).
+		Build().
+		WithOwnerReferences(metav1ac.OwnerReference().
+			WithAPIVersion(trainer.GroupVersion.String()).
+			WithKind(trainer.TrainJobKind).
+			WithName(trainJob.Name).
+			WithUID(trainJob.UID).
+			WithController(true).
+			WithBlockOwnerDeletion(true))
 
 	return []any{jobSet}, nil
 }

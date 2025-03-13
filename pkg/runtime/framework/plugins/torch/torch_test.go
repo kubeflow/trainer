@@ -72,6 +72,11 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().WithName(constants.ContainerTrainer),
+					),
+				),
 			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
 				Trainer(
@@ -84,44 +89,50 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+						WithNumNodes(2).
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](2),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("2"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("auto"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("2"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("auto"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("trainJob-trainer-node-0-0.trainJob"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("trainJob-trainer-node-0-0.trainJob"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 2},
+				}},
 			},
 		},
 		"nproc_per_node=auto with CPU limit": {
@@ -142,6 +153,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -152,40 +166,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("4"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("4"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"nproc_per_node=auto with no CPU resources": {
@@ -204,6 +224,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -214,40 +237,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("1"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("1"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"nproc_per_node=auto with low CPU limit": {
@@ -268,6 +297,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -278,40 +310,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("2"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("2"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"nproc_per_node=auto with CPU request but no limit": {
@@ -332,6 +370,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -342,40 +383,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("3"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("3"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"nproc_per_node=auto with millicore CPU limit": {
@@ -396,6 +443,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -406,40 +456,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("3"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("3"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"nproc_per_node=auto with fractional CPU limit": {
@@ -460,6 +516,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -470,40 +529,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("1"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("1"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"nproc_per_node=auto with GPU request should remain auto": {
@@ -524,6 +589,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -534,40 +602,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("auto"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("auto"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"explicitly set nproc_per_node should be preserved": {
@@ -588,6 +662,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -598,40 +675,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("3"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("3"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"nproc_per_node=auto with millicore CPU limit in m format": {
@@ -652,6 +735,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -662,40 +748,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("3"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("3"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("test-job-trainer-node-0-0.test-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"nproc_per_node=cpu with CPU limit": {
@@ -716,6 +808,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -726,40 +821,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("4"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("4"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("cpu-job-trainer-node-0-0.cpu-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("cpu-job-trainer-node-0-0.cpu-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"nproc_per_node=cpu with GPU resources": {
@@ -781,6 +882,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -791,40 +895,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("6"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("6"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("cpu-gpu-job-trainer-node-0-0.cpu-gpu-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("cpu-gpu-job-trainer-node-0-0.cpu-gpu-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"nproc_per_node=cpu with fractional CPU": {
@@ -845,6 +955,9 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels:      make(map[string]string),
@@ -855,40 +968,46 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](1),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("1"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("4"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("4"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("cpu-frac-job-trainer-node-0-0.cpu-frac-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("cpu-frac-job-trainer-node-0-0.cpu-frac-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 1},
+				}},
 			},
 		},
 		"multi-node multi-GPU training with complete info": {
@@ -916,6 +1035,9 @@ func TestTorch(t *testing.T) {
 					"app": "pytorch-training",
 					"env": "production",
 				}),
+				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 2, nil, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				),
 			),
 			wantInfo: &runtime.Info{
 				Labels: map[string]string{
@@ -925,44 +1047,50 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(2).
+						WithNumNodes(4).
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
-				Trainer: runtime.Trainer{
-					NumNodes:       ptr.To[int32](4),
-					NumProcPerNode: "",
-					Env: []corev1ac.EnvVarApplyConfiguration{
-						{
-							Name:  ptr.To(constants.TorchEnvNumNodes),
-							Value: ptr.To("4"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-							Value: ptr.To("auto"),
-						},
-						{
-							Name: ptr.To(constants.TorchEnvNodeRank),
-							ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-								FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-									FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name: constants.JobTrainerNode,
+						Containers: []runtime.Container{{
+							Name: constants.ContainerTrainer,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("4"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("auto"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("gpu-job-trainer-node-0-0.gpu-job"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterAddr),
-							Value: ptr.To("gpu-job-trainer-node-0-0.gpu-job"),
-						},
-						{
-							Name:  ptr.To(constants.TorchEnvMasterPort),
-							Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-						},
-					},
-					ContainerPort: &corev1ac.ContainerPortApplyConfiguration{
-						ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
-					},
+						}},
+					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
+				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
+					constants.JobTrainerNode: {Replicas: 4},
+				}},
 			},
 		},
 	}
