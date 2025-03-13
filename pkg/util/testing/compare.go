@@ -30,7 +30,7 @@ var (
 	PodSetEndpointsCmpOpts = cmp.Transformer("Seq", func(a iter.Seq[string]) []string { return slices.Collect(a) })
 )
 
-func SecretDataComparer(a, b map[string][]byte) bool {
+func MPISecretDataComparer(a, b map[string][]byte) bool {
 	isKeysEqual := true
 	if (a != nil && b != nil) &&
 		((len(a[constants.MPISSHPublicKey]) > 0) != (len(b[constants.MPISSHPublicKey]) > 0) ||

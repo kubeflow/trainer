@@ -48,7 +48,7 @@ func TestMPI(t *testing.T) {
 		cmpopts.SortSlices(func(a, b apiruntime.Object) int {
 			return cmp.Compare(a.GetObjectKind().GroupVersionKind().String(), b.GetObjectKind().GroupVersionKind().String())
 		}),
-		gocmp.Comparer(utiltesting.SecretDataComparer),
+		gocmp.Comparer(utiltesting.MPISecretDataComparer),
 	}
 	errorGetSSHAuthSecretFromAPI := errors.New("failed to get SSH Auth Secret from API during Build")
 

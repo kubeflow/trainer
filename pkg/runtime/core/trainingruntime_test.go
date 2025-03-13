@@ -48,6 +48,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 	cases := map[string]struct {
 		trainingRuntime *trainer.TrainingRuntime
 		trainJob        *trainer.TrainJob
+		ObjCmpOpts      []cmp.Option
 		wantObjs        []runtime.Object
 		wantError       error
 	}{
@@ -450,6 +451,9 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			},
 		},
 		"succeeded to build JobSet with OpenMPI values from the TrainJob": {
+			ObjCmpOpts: cmp.Options{
+				cmp.Comparer(testingutil.MPISecretDataComparer),
+			},
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
 					WithMLPolicy(
@@ -609,7 +613,6 @@ test-job-trainer-node-0-1.test-job slots=8
 		cmpopts.SortSlices(func(a, b corev1.EnvVar) bool {
 			return a.Name < b.Name
 		}),
-		cmp.Comparer(testingutil.SecretDataComparer),
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -638,7 +641,7 @@ test-job-trainer-node-0-1.test-job slots=8
 				t.Errorf("Pipeline built unrecognizable objects: %v", err)
 			}
 
-			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantObjs, resultObjs, append(cmpOpts, tc.ObjCmpOpts...)...); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
 			}
 		})

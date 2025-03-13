@@ -690,7 +690,7 @@ alpha-trainer-node-0-1.alpha slots=8
 							}).
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
 							Obj(),
-						util.IgnoreObjectMetadata, cmp.Comparer(testingutil.SecretDataComparer)))
+						util.IgnoreObjectMetadata, cmp.Comparer(testingutil.MPISecretDataComparer)))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
 				ginkgo.By("Checking if the appropriate Secret is created")
@@ -707,7 +707,7 @@ alpha-trainer-node-0-1.alpha slots=8
 							WithType(corev1.SecretTypeSSHAuth).
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
 							Obj(),
-						util.IgnoreObjectMetadata, cmp.Comparer(testingutil.SecretDataComparer)))
+						util.IgnoreObjectMetadata, cmp.Comparer(testingutil.MPISecretDataComparer)))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 
