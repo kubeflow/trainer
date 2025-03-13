@@ -124,7 +124,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// nproc_per_node=auto with CPU limit
 		"nproc_per_node=auto with CPU limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -189,7 +188,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// nproc_per_node=auto with no CPU resources
 		"nproc_per_node=auto with no CPU resources": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -252,7 +250,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// nproc_per_node=auto with low CPU limit
 		"nproc_per_node=auto with low CPU limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -317,7 +314,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// nproc_per_node=auto with CPU request but no limit
 		"nproc_per_node=auto with CPU request but no limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -382,7 +378,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// nproc_per_node=auto with millicore CPU limit
 		"nproc_per_node=auto with millicore CPU limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -447,7 +442,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// nproc_per_node=auto with fractional CPU limit
 		"nproc_per_node=auto with fractional CPU limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -512,7 +506,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// nproc_per_node=auto with GPU request should remain auto
 		"nproc_per_node=auto with GPU request should remain auto": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -577,7 +570,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// explicitly set nproc_per_node should be preserved
 		"explicitly set nproc_per_node should be preserved": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -642,7 +634,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// nproc_per_node=auto with millicore CPU limit in m format
 		"nproc_per_node=auto with millicore CPU limit in m format": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
@@ -707,7 +698,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// nproc_per_node=cpu with CPU limit
 		"nproc_per_node=cpu with CPU limit": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "cpu-job").
 				Trainer(
@@ -772,7 +762,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// nproc_per_node=cpu with GPU resources
 		"nproc_per_node=cpu with GPU resources": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "cpu-gpu-job").
 				Trainer(
@@ -838,7 +827,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// nproc_per_node=cpu with fractional CPU
 		"nproc_per_node=cpu with fractional CPU": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "cpu-frac-job").
 				Trainer(
@@ -903,7 +891,6 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{}},
 			},
 		},
-		// multi-node multi-GPU training with complete info
 		"multi-node multi-GPU training with complete info": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "gpu-job").
 				Trainer(
