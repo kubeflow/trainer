@@ -27,15 +27,10 @@ The Kubeflow Trainer project includes a Makefile with several helpful commands t
 make generate
 
 # Download required tools for development
+make ginkgo envtest controller-gen kind
 
 # Format and verify code
 make fmt vet golangci-lint
-
-# Run tests (see Testing section below)
-make test test-integration test-e2e
-
-# Setup a cluster for e2e testing
-make test-e2e-setup-cluster
 ```
 
 You can see all available commands by running:
@@ -45,19 +40,7 @@ make help
 
 ### Setting Up Your Environment
 
-#### Quick Setup
-
-The simplest way to set up a local development environment is to use the provided Makefile command:
-
-```sh
-make test-e2e-setup-cluster
-```
-
-This command will:
-1. Build the necessary Docker images
-2. Create a Kind cluster if it doesn't exist
-3. Load your images into the cluster
-4. Deploy the operator
+# TODO: The following setup instructions need to be updated for Kubeflow Trainer V2.
 
 #### Manual Setup
 
@@ -162,6 +145,19 @@ kubectl logs -n kubeflow -l training.kubeflow.org/job-name=pytorch-simple --foll
 ## Testing
 
 The Kubeflow Trainer project includes several types of tests to ensure code quality and functionality.
+
+# Run tests (see Testing section below)
+make test test-integration test-e2e
+
+# Setup a cluster for e2e testing
+make test-e2e-setup-cluster
+
+
+This command will:
+1. Build the necessary Docker images
+2. Create a Kind cluster if it doesn't exist
+3. Load your images into the cluster
+4. Deploy the operator
 
 ### Unit Tests
 
