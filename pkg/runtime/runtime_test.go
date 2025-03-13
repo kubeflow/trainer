@@ -152,7 +152,7 @@ func TestNewInfo(t *testing.T) {
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("constants.ModelMountPath"),
+																WithMountPath(constants.ModelMountPath),
 														).
 														WithResources(corev1ac.ResourceRequirements()),
 												).
@@ -183,7 +183,7 @@ func TestNewInfo(t *testing.T) {
 																WithMountPath(constants.DatasetMountPath),
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("constants.ModelMountPath"),
+																WithMountPath(constants.ModelMountPath),
 														).
 														WithResources(corev1ac.ResourceRequirements()),
 												).
@@ -277,7 +277,7 @@ func TestNewInfo(t *testing.T) {
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("constants.ModelMountPath"),
+																WithMountPath(constants.ModelMountPath),
 														).
 														WithResources(corev1ac.ResourceRequirements()),
 												).
@@ -308,7 +308,7 @@ func TestNewInfo(t *testing.T) {
 																WithMountPath(constants.DatasetMountPath),
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("constants.ModelMountPath"),
+																WithMountPath(constants.ModelMountPath),
 														).
 														WithResources(corev1ac.ResourceRequirements()),
 												).

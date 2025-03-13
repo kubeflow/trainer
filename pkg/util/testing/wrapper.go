@@ -68,7 +68,7 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 												Name: constants.ContainerModelInitializer,
 												VolumeMounts: []corev1.VolumeMount{{
 													Name:      jobsetplgconsts.VolumeNameInitializer,
-													MountPath: "constants.ModelMountPath",
+													MountPath: constants.ModelMountPath,
 												}},
 											},
 										},
@@ -101,7 +101,7 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 													},
 													{
 														Name:      jobsetplgconsts.VolumeNameInitializer,
-														MountPath: "constants.ModelMountPath",
+														MountPath: constants.ModelMountPath,
 													},
 												},
 											},
@@ -629,7 +629,7 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 														Name: constants.ContainerModelInitializer,
 														VolumeMounts: []corev1.VolumeMount{{
 															Name:      jobsetplgconsts.VolumeNameInitializer,
-															MountPath: "constants.ModelMountPath",
+															MountPath: constants.ModelMountPath,
 														}},
 													},
 												},
@@ -662,7 +662,7 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 															},
 															{
 																Name:      jobsetplgconsts.VolumeNameInitializer,
-																MountPath: "constants.ModelMountPath",
+																MountPath: constants.ModelMountPath,
 															},
 														},
 													},
@@ -749,7 +749,7 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 														Name: constants.ContainerModelInitializer,
 														VolumeMounts: []corev1.VolumeMount{{
 															Name:      jobsetplgconsts.VolumeNameInitializer,
-															MountPath: "constants.ModelMountPath",
+															MountPath: constants.ModelMountPath,
 														}},
 													},
 												},
@@ -782,7 +782,7 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 															},
 															{
 																Name:      jobsetplgconsts.VolumeNameInitializer,
-																MountPath: "constants.ModelMountPath",
+																MountPath: constants.ModelMountPath,
 															},
 														},
 													},

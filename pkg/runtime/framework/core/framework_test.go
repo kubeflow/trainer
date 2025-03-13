@@ -440,7 +440,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 										*corev1ac.VolumeMount().
 											WithName(jobsetplgconsts.VolumeNameInitializer).
-											WithMountPath("constants.ModelMountPath"),
+											WithMountPath(constants.ModelMountPath),
 									},
 								},
 							},
@@ -461,7 +461,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithMountPath(constants.DatasetMountPath),
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
-										WithMountPath("constants.ModelMountPath"),
+										WithMountPath(constants.ModelMountPath),
 								},
 							}},
 						},
@@ -487,7 +487,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("constants.ModelMountPath"),
+																WithMountPath(constants.ModelMountPath),
 														),
 												).
 												WithVolumes(
@@ -515,7 +515,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 																WithMountPath(constants.DatasetMountPath),
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("constants.ModelMountPath"),
+																WithMountPath(constants.ModelMountPath),
 														),
 												).
 												WithVolumes(
@@ -595,7 +595,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("constants.ModelMountPath"),
+																WithMountPath(constants.ModelMountPath),
 														),
 												).
 												WithVolumes(
@@ -634,7 +634,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 																WithMountPath(constants.DatasetMountPath),
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
-																WithMountPath("constants.ModelMountPath"),
+																WithMountPath(constants.ModelMountPath),
 														),
 												).
 												WithVolumes(
@@ -663,7 +663,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 										*corev1ac.VolumeMount().
 											WithName(jobsetplgconsts.VolumeNameInitializer).
-											WithMountPath("constants.ModelMountPath"),
+											WithMountPath(constants.ModelMountPath),
 									},
 								},
 							},
@@ -684,7 +684,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithMountPath(constants.DatasetMountPath),
 									*corev1ac.VolumeMount().
 										WithName(jobsetplgconsts.VolumeNameInitializer).
-										WithMountPath("constants.ModelMountPath"),
+										WithMountPath(constants.ModelMountPath),
 								},
 							}},
 						},
