@@ -22,14 +22,25 @@ Note for Lima the link is to the Adopters, which supports several different cont
 The Kubeflow Trainer project includes a Makefile with several helpful commands to streamline your development workflow:
 
 ```sh
-# Generate code assets
+# Generate manifests, APIs and SDK
 make generate
 
-# Build the controller manager
-make build
+# Download required tools for development
+make ginkgo envtest controller-gen kind
 
-# Build docker images
-make docker-build
+# Format and verify code
+make fmt vet golangci-lint
+
+# Run tests (see Testing section below)
+make test test-integration test-e2e
+
+# Setup a cluster for e2e testing
+make test-e2e-setup-cluster
+```
+
+You can see all available commands by running:
+```sh
+make help
 ```
 
 ### Setting Up Your Environment
@@ -154,18 +165,30 @@ The Kubeflow Trainer project includes several types of tests to ensure code qual
 
 ### Unit Tests
 
-Run the unit tests with:
+Run the Go unit tests with:
 
 ```sh
 make test
 ```
 
+You can also run Python unit tests:
+
+```sh
+make test-python
+```
+
 ### Integration Tests
 
-Run the integration tests with:
+Run the Go integration tests with:
 
 ```sh
 make test-integration
+```
+
+For Python integration tests:
+
+```sh
+make test-python-integration
 ```
 
 ### E2E Tests
@@ -174,6 +197,18 @@ Run the end-to-end tests with:
 
 ```sh
 make test-e2e
+```
+
+To set up a Kind cluster for e2e testing:
+
+```sh
+make test-e2e-setup-cluster
+```
+
+You can also run Jupyter notebook tests with Papermill:
+
+```sh
+make test-e2e-notebook
 ```
 
 ### Testing Local Changes
