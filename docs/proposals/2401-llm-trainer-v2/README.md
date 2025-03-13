@@ -271,10 +271,10 @@ TrainingClient().list_runtimes()
 They are expected to get:
 
 ```
-Runtime                             Method                Framework   Model         Phase           Accelerator       Count
+Runtime                             Method                Framework   Pretrained Model    Phase           Accelerator       Count
 
-pytorch-distributed                 custom-trainer        pytorch     <undefined>   any             nvidia.com/GPU    2
-torchtune-llama3.1-8B-finetuning    predefined-trainer    torchtune   Llama3.1-8B   post-training   nvidia.com/GPU    4
+pytorch-distributed                 custom-trainer        pytorch     <undefined>         any             nvidia.com/GPU    2
+torchtune-llama3.1-8B-finetuning    predefined-trainer    torchtune   Llama3.1-8B         post-training   nvidia.com/GPU    4
 ```
 
 In that case, we plan to design `Runtime` dataclass as the following:
@@ -284,7 +284,7 @@ In that case, we plan to design `Runtime` dataclass as the following:
 | name | str | The name of TrainingRuntime/ClusterTrainingRuntime. |
 | method | str | The training method of this runtime, chosen from `custom-trainer`, `predefined-trainer`. |
 | framework | str | The ML framework used for training, e.g. `pytorch`, `torchtune`. |
-| model | Optional[str] | The model specified for this runtime, e.g. `llama3.1-8B`. |
+| pretrained_model | Optional[str] | The pretrained model specified for this runtime, e.g. `llama3.1-8B`. |
 | phase | str | The training phase of this runtime, chosen from `any`, `post-training`. |
 | accelerator | str | The type of devices, e.g. `nvidia.com/gpu`. |
 | accelerator_count | str | The number of devices. |
@@ -296,7 +296,7 @@ class Runtime:
     name: str
     method: str
     framework: str
-    model: Optional[str] = None
+    pretrained_model: Optional[str] = None
     phase: str
     accelerator: str
     accelerator_count: str,
