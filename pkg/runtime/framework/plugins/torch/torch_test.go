@@ -998,7 +998,7 @@ func TestTorch(t *testing.T) {
 				t.Errorf("Unexpected error from EnforceMLPolicy (-want,+got):\n%s", diff)
 			}
 
-			// Validate the entire info object (if wantInfo is provided)
+			// Validate the entire info object
 			if tc.wantInfo != nil {
 				if diff := cmp.Diff(tc.wantInfo, tc.info,
 					cmpopts.SortSlices(func(a, b string) bool { return a < b }),
@@ -1006,6 +1006,8 @@ func TestTorch(t *testing.T) {
 				); len(diff) != 0 {
 					t.Errorf("Unexpected RuntimeInfo (-want,+got):\n%s", diff)
 				}
+			} else if tc.info != nil {
+				t.Errorf("Expected info to be nil, but got: %v", tc.info)
 			}
 		})
 	}

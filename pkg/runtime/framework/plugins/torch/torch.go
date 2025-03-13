@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -75,76 +74,37 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		numProcPerNode = ptr.Deref(trainJob.Spec.Trainer.NumProcPerNode, intstr.FromString("auto"))
 	}
 
-	// Cap nproc_per_node based on CPU resources when set to "auto" and no GPU is requested
-	if numProcPerNode.String() == "auto" && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
-		// Check if GPU is requested
-		hasGPU := false
-		for resourceName := range trainJob.Spec.Trainer.ResourcesPerNode.Limits {
-			if strings.Contains(strings.ToLower(string(resourceName)), "gpu") {
-				hasGPU = true
-				break
-			}
-		}
-		if !hasGPU {
-			for resourceName := range trainJob.Spec.Trainer.ResourcesPerNode.Requests {
-				if strings.Contains(strings.ToLower(string(resourceName)), "gpu") {
-					hasGPU = true
-					break
+	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
+		var (
+			shouldUseCPU           func(resources corev1.ResourceList) bool
+			fallbackNumProcPerNode intstr.IntOrString
+		)
+		switch numProcPerNode.String() {
+		case "auto":
+			shouldUseCPU = func(resources corev1.ResourceList) bool {
+				for resName := range resources {
+					if strings.Contains(strings.ToLower(resName.String()), "gpu") {
+						return false
+					}
 				}
+				return true
 			}
-		}
-
-		// If no GPU is requested, use CPU limit or default to 1
-		if !hasGPU {
-			// Default to 1 core
-			cpuQuantity := resource.MustParse("1")
-
-			// First check limits, then requests
-			if limitQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Limits[corev1.ResourceCPU]; ok {
-				cpuQuantity = limitQuantity
-			} else if requestQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Requests[corev1.ResourceCPU]; ok {
-				cpuQuantity = requestQuantity
+			fallbackNumProcPerNode = intstr.FromString("auto")
+		case "cpu":
+			shouldUseCPU = func(resources corev1.ResourceList) bool {
+				_, ok := resources[corev1.ResourceCPU]
+				return ok
 			}
-
-			// Ensure at least 1 process
-			if cpuQuantity.Cmp(resource.MustParse("1")) < 0 {
-				cpuQuantity = resource.MustParse("1")
-			}
-
-			// Round up to whole cores
-			cpuQuantity.RoundUp(0) // Scale 0 means whole units (cores)
-
-			// Get the value as an integer
-			cpuValue := cpuQuantity.Value()
-
-			numProcPerNode = intstr.FromInt(int(cpuValue))
+			fallbackNumProcPerNode = intstr.FromInt(1)
+		default:
+			shouldUseCPU = func(resources corev1.ResourceList) bool { return false }
+			fallbackNumProcPerNode = numProcPerNode
 		}
-	}
-
-	// Handle "cpu" value - always use CPU resources regardless of GPU presence
-	if numProcPerNode.String() == "cpu" && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
-		// Default to 1 core
-		cpuQuantity := resource.MustParse("1")
-
-		// First check limits, then requests
-		if limitQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Limits[corev1.ResourceCPU]; ok {
-			cpuQuantity = limitQuantity
-		} else if requestQuantity, ok := trainJob.Spec.Trainer.ResourcesPerNode.Requests[corev1.ResourceCPU]; ok {
-			cpuQuantity = requestQuantity
+		nppNode, usedCPU := calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Limits, shouldUseCPU)
+		if !usedCPU {
+			nppNode, usedCPU = calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Requests, shouldUseCPU)
 		}
-
-		// Ensure at least 1 process
-		if cpuQuantity.Cmp(resource.MustParse("1")) < 0 {
-			cpuQuantity = resource.MustParse("1")
-		}
-
-		// Round up to whole cores
-		cpuQuantity.RoundUp(0) // Scale 0 means whole units (cores)
-
-		// Get the value as an integer
-		cpuValue := cpuQuantity.Value()
-
-		numProcPerNode = intstr.FromInt(int(cpuValue))
+		numProcPerNode = nppNode
 	}
 
 	// Update envs for Info object.
@@ -193,4 +153,31 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 
 	return nil
+}
+
+// calculateNumProcPerNode calculates the number of processes per node based on the provided resources.
+// It returns the calculated number of processes per node and a boolean indicating whether CPU resources were used.
+func calculateNumProcPerNode(
+	fallbackNumProcPerNode intstr.IntOrString, resources corev1.ResourceList, shouldUseCPU func(resources corev1.ResourceList) bool,
+) (intstr.IntOrString, bool) {
+	var defaultCPU int = 1
+	if resources != nil {
+		if shouldUseCPU(resources) {
+			cpuQ := resources[corev1.ResourceCPU]
+			if !cpuQ.IsZero() {
+				// Round up to whole cores
+				cpuQ.RoundUp(0) // Scale 0 means whole units (cores)
+
+				// Ensure at least 1 process
+				cpuValue := cpuQ.Value()
+				if cpuValue < int64(defaultCPU) {
+					cpuValue = int64(defaultCPU)
+				}
+
+				return intstr.FromInt(int(cpuValue)), true
+			}
+		}
+		return fallbackNumProcPerNode, false
+	}
+	return intstr.FromInt(defaultCPU), false
 }
