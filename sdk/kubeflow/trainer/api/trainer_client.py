@@ -194,7 +194,13 @@ class TrainerClient:
         dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
         model_config: Optional[types.HuggingFaceModelInputConfig] = None,
     ) -> str:
-        """Create the TrainJob. TODO (andreyvelich): Add description
+        """
+        Create the TrainJob. You can configure these types of training task:
+
+        - Task with custom function: Training with a self-contained function that encapsulates
+            the entire model training process.
+        - Config-driven task with existing trainer: Training with a Trainer that already includes
+            the fine-tuning logic, requiring only parameter adjustments.
 
         Args:
             runtime_ref (`str`): Reference to the name of existing (Cluster)TrainingRuntime.
