@@ -157,15 +157,16 @@ class TrainerClient:
 
         - Custom Training Task: Training with a self-contained function that encapsulates
             the entire model training process.
-        - Fine-tuning Pre-Trained Models: Fine-tuning existing pre-trained models.
+        - Fine-tuning Pre-Trained Models: Fine-tuning existing pre-trained models with trainers
+            that already include the fine-tuning logic, requiring only parameter adjustments.
 
         Args:
             runtime_ref (`str`): Reference to the name of existing (Cluster)TrainingRuntime.
             trainer (`Optional[types.CustomTrainer]`):
-                The configuration of trainer which trains a model with a self-contained function
+                Configuration of the trainer which trains a model with a self-contained function
                     that encapsulates the entire model training process.
             fine_tuning_config (`Optional[types.TorchTuneConfig`]):
-                The configuration of trainer which fine-tunes existing pre-trained models.
+                Configuration of the trainer which fine-tunes existing pre-trained models.
                 Currently, we support these types of trainer:
                 - `types.TorchTuneConfig`: Training with the `torchtune` trainer that already
                     includes the fine-tuning logic, requiring only parameter adjustments.
