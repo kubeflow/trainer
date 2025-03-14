@@ -238,6 +238,12 @@ class TrainerClient:
                     )
                 )
 
+            # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
+            # the torchtune config in the runtime plugin.
+            # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
+            trainer_crd.command = constants.DEFAULT_TORCHTUNE_COMMAND
+            trainer_crd.args = utils.get_args_using_torchtune_config(fine_tuning_config)
+
         # If neither trainer nor fine_tuning_config is set, raise an value error.
         else:
             raise ValueError("Either trainer or fine_tuning_config must be set.")

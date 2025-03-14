@@ -98,8 +98,16 @@ POD_PENDING = "Pending"
 # The default PIP index URL to download Python packages.
 DEFAULT_PIP_INDEX_URL = os.getenv("DEFAULT_PIP_INDEX_URL", "https://pypi.org/simple")
 
+<<<<<<< HEAD
 # The default command for the Trainer container.
 DEFAULT_COMMAND = ["bash", "-c"]
+=======
+# The default command for the Custom Trainer.
+DEFAULT_CUSTOM_COMMAND = ["bash", "-c"]
+
+# The default command for the TorchTune Trainer.
+DEFAULT_TORCHTUNE_COMMAND = ["tune", "run"]
+>>>>>>> 4f486e35 (chore(sdk): update the launching command and args.)
 
 # The Torch env name for the number of procs per node (e.g. number of GPUs per Pod).
 TORCH_ENV_NUM_PROC_PER_NODE = "PET_NPROC_PER_NODE"
