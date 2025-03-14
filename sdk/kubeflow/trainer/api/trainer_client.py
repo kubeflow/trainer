@@ -242,15 +242,10 @@ class TrainerClient:
             if trainer.num_nodes:
                 trainer_crd.num_nodes = trainer.num_nodes
 
-            # Add resources per node and numProcPerNode to the Trainer.
+            # Add resources per node to the Trainer.
             if trainer.resources_per_node:
                 trainer_crd.resources_per_node = utils.get_resources_per_node(
                     trainer.resources_per_node
-                )
-                trainer_crd.num_proc_per_node = (
-                    models.IoK8sApimachineryPkgUtilIntstrIntOrString(
-                        utils.get_num_proc_per_node(trainer.resources_per_node)
-                    )
                 )
 
             # Add command and args to the Trainer.
@@ -274,17 +269,10 @@ class TrainerClient:
             if fine_tuning_config.num_nodes:
                 trainer_crd.num_nodes = fine_tuning_config.num_nodes
 
-            # Add resources per node and numProcPerNode to the Trainer.
+            # Add resources per node to the Trainer.
             if fine_tuning_config.resources_per_node:
                 trainer_crd.resources_per_node = utils.get_resources_per_node(
                     fine_tuning_config.resources_per_node
-                )
-                trainer_crd.num_proc_per_node = (
-                    models.IoK8sApimachineryPkgUtilIntstrIntOrString(
-                        utils.get_num_proc_per_node(
-                            fine_tuning_config.resources_per_node
-                        )
-                    )
                 )
 
             # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
