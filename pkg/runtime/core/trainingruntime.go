@@ -21,8 +21,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/kubeflow/trainer/pkg/apply"
-	"github.com/kubeflow/trainer/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,6 +33,8 @@ import (
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/apply"
+	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	fwkcore "github.com/kubeflow/trainer/pkg/runtime/framework/core"
 	fwkplugins "github.com/kubeflow/trainer/pkg/runtime/framework/plugins"
@@ -89,6 +89,29 @@ func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.Trai
 func (r *TrainingRuntime) buildObjects(
 	ctx context.Context, trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
 ) ([]any, error) {
+
+	info, err := r.runtimeInfo(ctx, trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy)
+	if err != nil {
+		return nil, err
+	}
+	if err = r.framework.RunEnforceMLPolicyPlugins(info, trainJob); err != nil {
+		return nil, err
+	}
+
+	if err = r.framework.RunEnforcePodGroupPolicyPlugins(info, trainJob); err != nil {
+		return nil, err
+	}
+
+	if err = r.framework.RunPodNetworkPlugins(info, trainJob); err != nil {
+		return nil, err
+	}
+
+	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
+}
+
+func (r *TrainingRuntime) runtimeInfo(
+	ctx context.Context, trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy) (*runtime.Info, error) {
+
 	propagationLabels := jobSetTemplateSpec.Labels
 	if propagationLabels == nil && trainJob.Spec.Labels != nil {
 		propagationLabels = make(map[string]string, len(trainJob.Spec.Labels))
@@ -129,7 +152,7 @@ func (r *TrainingRuntime) buildObjects(
 		// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 		// REF: https://github.com/kubeflow/trainer/issues/2318
 		count := ptr.Deref(rJob.Template.Spec.Parallelism, 1)
-		if *rJob.Name == constants.JobTrainerNode {
+		if *rJob.Name == constants.JobTrainerNode && mlPolicy != nil {
 			count = ptr.Deref(mlPolicy.NumNodes, 1)
 		}
 		opts = append(opts, runtime.WithPodSpecReplicas(
@@ -140,21 +163,7 @@ func (r *TrainingRuntime) buildObjects(
 		)
 	}
 
-	info := runtime.NewInfo(opts...)
-
-	if err = r.framework.RunEnforceMLPolicyPlugins(info, trainJob); err != nil {
-		return nil, err
-	}
-
-	if err = r.framework.RunEnforcePodGroupPolicyPlugins(info, trainJob); err != nil {
-		return nil, err
-	}
-
-	if err = r.framework.RunPodNetworkPlugins(info, trainJob); err != nil {
-		return nil, err
-	}
-
-	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
+	return runtime.NewInfo(opts...), nil
 }
 
 func syncPodSets(info *runtime.Info) {
@@ -198,14 +207,20 @@ func (r *TrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 }
 
 func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	trainingRuntime := &trainer.TrainingRuntime{}
 	if err := r.client.Get(ctx, client.ObjectKey{
-		Namespace: old.Namespace,
-		Name:      old.Spec.RuntimeRef.Name,
-	}, &trainer.TrainingRuntime{}); err != nil {
+		Namespace: new.Namespace,
+		Name:      new.Spec.RuntimeRef.Name,
+	}, trainingRuntime); err != nil {
 		return nil, field.ErrorList{
-			field.Invalid(field.NewPath("spec", "runtimeRef"), old.Spec.RuntimeRef,
+			field.Invalid(field.NewPath("spec", "runtimeRef"), new.Spec.RuntimeRef,
 				fmt.Sprintf("%v: specified trainingRuntime must be created before the TrainJob is created", err)),
 		}
 	}
-	return r.framework.RunCustomValidationPlugins(old, new)
+	info, _ := r.runtimeInfo(ctx, new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
+
+	jobSetTemplate := jobsetv1alpha2.JobSet{
+		Spec: trainingRuntime.Spec.Template.Spec,
+	}
+	return r.framework.RunCustomValidationPlugins(jobSetTemplate.DeepCopy(), info, old, new)
 }

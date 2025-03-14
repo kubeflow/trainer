@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 	ginkgo.BeforeAll(func() {
 		fwk = &framework.Framework{}
 		cfg = fwk.Init()
-		ctx, k8sClient = fwk.RunManager(cfg)
+		ctx, k8sClient = fwk.RunManager(cfg, false)
 	})
 	ginkgo.AfterAll(func() {
 		fwk.Teardown()

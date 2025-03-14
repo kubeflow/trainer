@@ -21,7 +21,9 @@ import (
 	"maps"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/utils/ptr"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
@@ -228,4 +230,11 @@ func (i *Info) SyncPodSetsToTemplateSpec() {
 func TemplateSpecApply[A any](info *Info) (*A, bool) {
 	spec, ok := info.TemplateSpec.ObjApply.(*A)
 	return spec, ok
+}
+
+func RuntimeRefToRuntimeRegistryKey(runtimeRef trainer.RuntimeRef) string {
+	return schema.GroupKind{
+		Group: ptr.Deref(runtimeRef.APIGroup, ""),
+		Kind:  ptr.Deref(runtimeRef.Kind, ""),
+	}.String()
 }
