@@ -157,8 +157,7 @@ class TrainerClient:
 
         - Custom Training Task: Training with a self-contained function that encapsulates
             the entire model training process.
-        - Fine-tuning Pre-Trained Models: Training with a Trainer that already includes
-            the fine-tuning logic, requiring only parameter adjustments.
+        - Fine-tuning Pre-Trained Models: Fine-tuning existing pre-trained models.
 
         Args:
             runtime_ref (`str`): Reference to the name of existing (Cluster)TrainingRuntime.
