@@ -155,18 +155,16 @@ class TrainerClient:
         """
         Create the TrainJob. You can configure these types of training task:
 
-        - Task with custom function: Training with a self-contained function that encapsulates
+        - Custom Training Task: Training with a self-contained function that encapsulates
             the entire model training process.
-        - Config-driven task with existing trainer: Training with a Trainer that already includes
+        - Fine-tuning Pre-Trained Models: Training with a Trainer that already includes
             the fine-tuning logic, requiring only parameter adjustments.
 
         Args:
             runtime_ref (`str`): Reference to the name of existing (Cluster)TrainingRuntime.
             trainer (`Optional[types.CustomTrainer]`):
-                The configuration of trainer which trains a model from scratch.
-                Currently, we support these types of trainer:
-                - `types.CustomTrainer`: Training with a self-contained function that
-                    encapsulates the entire model training process.
+                The configuration of trainer which trains a model with a self-contained function
+                    that encapsulates the entire model training process.
             fine_tuning_config (`Optional[types.TorchTuneConfig`]):
                 The configuration of trainer which fine-tunes existing pre-trained models.
                 Currently, we support these types of trainer:
@@ -193,15 +191,14 @@ class TrainerClient:
         # Build the Trainer.
         trainer_crd = models.TrainerV1alpha1Trainer()
 
-        # Add number of nodes to the Trainer.
-        if trainer and trainer.num_nodes:
-            trainer_crd.num_nodes = trainer.num_nodes
+        # If users choose to use a custom training function.
+        if trainer:
+            if not isinstance(trainer, types.CustomTrainer):
+                raise ValueError("The trainer must be an instance of CustomTrainer.")
 
-        # Add resources per node to the Trainer.
-        if trainer and trainer.resources_per_node:
-            trainer_crd.resources_per_node = utils.get_resources_per_node(
-                trainer.resources_per_node
-            )
+            # Add number of nodes to the Trainer.
+            if trainer.num_nodes:
+                trainer_crd.num_nodes = trainer.num_nodes
 
         # Add command and args to the Trainer if training function is set.
         if trainer and trainer.func:
@@ -216,6 +213,34 @@ class TrainerClient:
                     trainer.packages_to_install,
                 )
             )
+
+        # If users choose to use a pre-trained model for fine-tuning.
+        elif fine_tuning_config:
+            if not isinstance(fine_tuning_config, types.TorchTuneConfig):
+                raise ValueError(
+                    "The fine_tuning_config must be an instance of TorchTuneConfig."
+                )
+
+            # Add number of nodes to the Trainer.
+            if fine_tuning_config.num_nodes:
+                trainer_crd.num_nodes = fine_tuning_config.num_nodes
+
+            # Add resources per node and numProcPerNode to the Trainer.
+            if fine_tuning_config.resources_per_node:
+                trainer_crd.resources_per_node = utils.get_resources_per_node(
+                    fine_tuning_config.resources_per_node
+                )
+                trainer_crd.num_proc_per_node = (
+                    models.IoK8sApimachineryPkgUtilIntstrIntOrString(
+                        utils.get_num_proc_per_node(
+                            fine_tuning_config.resources_per_node
+                        )
+                    )
+                )
+
+        # If neither trainer nor fine_tuning_config is set, raise an value error.
+        else:
+            raise ValueError("Either trainer or fine_tuning_config must be set.")
 
         train_job = models.TrainerV1alpha1TrainJob(
             apiVersion=constants.API_VERSION,
