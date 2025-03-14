@@ -97,7 +97,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			}
 			fallbackNumProcPerNode = intstr.FromInt(1)
 		default:
-			shouldUseCPU = func(resources corev1.ResourceList) bool { return false }
+			shouldUseCPU = func(corev1.ResourceList) bool { return false }
 			fallbackNumProcPerNode = numProcPerNode
 		}
 		nppNode, usedCPU := calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Limits, shouldUseCPU)
