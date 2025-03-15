@@ -45,7 +45,7 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 			continue
 		}
 		// Update values for the Dataset Initializer Job.
-		if trainJobAncestor, ok := rJob.Template.Spec.Template.Labels[constants.LabelDatasetInitializer]; ok && trainJobAncestor == constants.DatasetInitializer {
+		if ancestor, ok := rJob.Template.Spec.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestor == constants.DatasetInitializer {
 			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 			// REF: https://github.com/kubeflow/trainer/issues/2318
 			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
@@ -71,7 +71,7 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 			}
 		}
 		// Update values for the Model Initializer Job.
-		if trainJobAncestor, ok := rJob.Template.Spec.Template.Labels[constants.LabelModelInitializer]; ok && trainJobAncestor == constants.ModelInitializer {
+		if ancestor, ok := rJob.Template.Spec.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestor == constants.ModelInitializer {
 			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 			// REF: https://github.com/kubeflow/trainer/issues/2318
 			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)

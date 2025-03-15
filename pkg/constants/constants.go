@@ -14,20 +14,21 @@ const (
 	// JobSetKind is the Kind name for the JobSet.
 	JobSetKind string = "JobSet"
 
+	// LabelTrainJobAncestor is the label to identify relationship between
+	// TrainJob and Pod template in the Runtime. The following labels are supported:
+	// trainer.kubeflow.org/trainjob-ancestor: dataset-initializer  - trainJob.spec.initializer.dataset
+	// trainer.kubeflow.org/trainjob-ancestor: model-initializer    - trainJob.spec.initializer.model
+	// trainer.kubeflow.org/trainjob-ancestor: trainer              - trainJob.spec.trainer
+	LabelTrainJobAncestor string = "trainer.kubeflow.org/trainjob-ancestor"
+
 	// DatasetInitializer is the name of the Job, volume mount, container, and label value for the dataset initializer.
 	DatasetInitializer string = "dataset-initializer"
-
-	// LabelDatasetInitializer is the label of runtime Pod template for the dataset initializer.
-	LabelDatasetInitializer string = "trainer.kubeflow.org/ancestor"
 
 	// DatasetMountPath is the volumeMount path for dataset.
 	DatasetMountPath string = "/workspace/dataset"
 
 	// ModelInitializer is the name of the Job, volume mount, container, and label value for the model initializer.
 	ModelInitializer string = "model-initializer"
-
-	// LabelModelInitializer label which identifies runtime Pod template for the model initializer.
-	LabelModelInitializer string = "trainer.kubeflow.org/ancestor"
 
 	// ModelMountPath is the volumeMount path for model.
 	ModelMountPath string = "/workspace/model"

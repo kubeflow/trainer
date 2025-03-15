@@ -550,7 +550,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
-											WithLabels(map[string]string{constants.LabelDatasetInitializer: constants.DatasetInitializer}).
+											WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.DatasetInitializer}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
@@ -576,7 +576,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
-											WithLabels(map[string]string{constants.LabelModelInitializer: constants.ModelInitializer}).
+											WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.ModelInitializer}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
@@ -677,7 +677,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
-												constants.LabelDatasetInitializer:      constants.DatasetInitializer,
+												constants.LabelTrainJobAncestor:        constants.DatasetInitializer,
 												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().
@@ -707,7 +707,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
-												constants.LabelModelInitializer:        constants.ModelInitializer,
+												constants.LabelTrainJobAncestor:        constants.ModelInitializer,
 												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().

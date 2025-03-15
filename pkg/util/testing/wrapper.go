@@ -58,7 +58,7 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 								Template: corev1.PodTemplateSpec{
 									ObjectMeta: metav1.ObjectMeta{
 										Labels: map[string]string{
-											constants.LabelDatasetInitializer: constants.DatasetInitializer,
+											constants.LabelTrainJobAncestor: constants.DatasetInitializer,
 										},
 									},
 									Spec: corev1.PodSpec{
@@ -91,7 +91,7 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 								Template: corev1.PodTemplateSpec{
 									ObjectMeta: metav1.ObjectMeta{
 										Labels: map[string]string{
-											constants.LabelModelInitializer: constants.ModelInitializer,
+											constants.LabelTrainJobAncestor: constants.ModelInitializer,
 										},
 									},
 									Spec: corev1.PodSpec{
@@ -598,7 +598,7 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 										Template: corev1.PodTemplateSpec{
 											ObjectMeta: metav1.ObjectMeta{
 												Labels: map[string]string{
-													constants.LabelDatasetInitializer: constants.DatasetInitializer,
+													constants.LabelTrainJobAncestor: constants.DatasetInitializer,
 												},
 											},
 											Spec: corev1.PodSpec{
@@ -631,7 +631,7 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 										Template: corev1.PodTemplateSpec{
 											ObjectMeta: metav1.ObjectMeta{
 												Labels: map[string]string{
-													constants.LabelModelInitializer: constants.ModelInitializer,
+													constants.LabelTrainJobAncestor: constants.ModelInitializer,
 												},
 											},
 											Spec: corev1.PodSpec{
