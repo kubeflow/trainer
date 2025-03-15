@@ -1,4 +1,4 @@
-# KEP-2170: Kubeflow Training V2 API
+# KEP-2170: Kubeflow Trainer V2 API
 
 ## Authors
 
@@ -443,7 +443,7 @@ This table explains the rationale for each `TrainJob` parameter:
    </td>
   </tr>
   <tr>
-   <td>Labels and Annotations
+   <td><code>Labels and Annotations</code>
    </td>
    <td>Custom metadata that needs to be applied to the <code>TrainJob</code> resources: JobSet, Job, and Pods.
    </td>
@@ -458,7 +458,7 @@ This table explains the rationale for each `TrainJob` parameter:
    </td>
   </tr>
   <tr>
-   <td>Suspend and ManagedBy
+   <td><code>Suspend and ManagedBy</code>
    </td>
    <td>Scheduling directives for Kueue and MultiKueue
    </td>
@@ -537,11 +537,6 @@ spec:
   initializer:
     dataset:
       storageUri: s3://dataset/custom-dataset/yelp-review
-      env:
-        - name: SPLIT
-          value: train[:5000]
-    model:
-      storageUri: hf://meta-llama/Llama-2-7b
 ```
 
 ### The Trainer API
@@ -549,9 +544,9 @@ spec:
 The `Trainer` represents the APIs that data scientists can use to configure the trainer settings.
 This trainer is executed on every distributed training Node.
 
-User can override the default env variables for the `trainer` container
-of the `node` Job. The Runtime Pod template must contain the
-following label to identify relationship between PodSpec <-> TrainJob:
+User can override the default parameters for the `trainer` container
+of the `node` Job. The runtime Pod template must contain the
+following label to identify relationship between PodSpec <-> `.trainJob.spec.trainer`:
 
 ```
 trainer.kubeflow.org/trainjob-ancestor: trainer
@@ -585,37 +580,13 @@ type Trainer struct {
 }
 ```
 
-The following table explains how `TrainingRuntime` parameters will be overridden with `Trainer`.
+The following tables show how `TrainingRuntime` fields will be overridden with `Trainer`.
 
 <table>
   <tr>
-   <td><strong><code>Trainer</code> Parameter</strong>
+   <td><strong>Parameter of <code>Trainer</code></strong>
    </td>
-   <td><strong> <code>TrainingRuntime</code> Parameter</strong>
-   </td>
-  </tr>
-  <tr>
-   <td><code>.image</code>
-   </td>
-   <td><code>.spec.replicatedJobs[label=’trainer.kubeflow.org/trainjob-ancestor: trainer’].template.spec.template.spec.containers[name=’trainer’].image</code>
-   </td>
-  </tr>
-  <tr>
-   <td><code>.command</code>
-   </td>
-   <td><code>.spec.replicatedJobs[label='trainer.kubeflow.org/trainjob-ancestor: trainer'].template.spec.template.spec.containers[name=’trainer’].command</code>
-   </td>
-  </tr>
-  <tr>
-   <td><code>.args</code>
-   </td>
-   <td><code>.spec.replicatedJobs[label='trainer.kubeflow.org/trainjob-ancestor: trainer'].template.spec.template.spec.containers[name=’trainer’].args</code>
-   </td>
-  </tr>
-  <tr>
-   <td><code>.env</code>
-   </td>
-   <td><code>.spec.replicatedJobs[label='trainer.kubeflow.org/trainjob-ancestor: trainer'].template.spec.template.spec.containers[name=’trainer’].env</code>
+   <td><strong>Parameter of <code>TrainingRuntime</code></strong>
    </td>
   </tr>
   <tr>
@@ -624,17 +595,57 @@ The following table explains how `TrainingRuntime` parameters will be overridden
    <td><code>.spec.numNodes</code>
    </td>
   </tr>
+</table>
+
+The next table shows parameters used to override the Trainer container. These parameters are
+derived from the PodSpec of the ReplicatedJob, which includes the corresponding label:
+
+```
+.spec.replicatedJobs[...].template.spec.template.labels[trainer.kubeflow.org/trainjob-ancestor: trainer’]
+```
+
+<table>
   <tr>
+   <td><strong>Parameter of <code>Trainer</code></strong>
+   </td>
+   <td><strong>Parameter of <code>TrainingRuntime.Spec.ReplicatedJob[...].template.spec.template</code></strong>
+   </td>
+  </tr>
+  <tr>
+   <td><code>.image</code>
+   </td>
+   <td><code>.spec.containers[name=’trainer’].image</code>
+   </td>
+  </tr>
+  <tr>
+   <td><code>.command</code>
+   </td>
+   <td><code>.spec.containers[name=’trainer’].command</code>
+   </td>
+  </tr>
+  <tr>
+   <td><code>.args</code>
+   </td>
+   <td><code>.spec.containers[name=’trainer’].args</code>
+   </td>
+  </tr>
+  <tr>
+   <td><code>.env</code>
+   </td>
+   <td><code>.spec.containers[name=’trainer’].env</code>
+   </td>
+  </tr>
    <td><code>.resourcesPerNode</code>
    </td>
-   <td><code>.spec.replicatedJobs[label='trainer.kubeflow.org/trainjob-ancestor: trainer'].template.spec.template.spec.containers[name=’trainer’].resources</code>
+   <td><code>.spec.containers[name=’trainer’].resources</code>
    </td>
   </tr>
 </table>
 
 ### The Dataset Initializer API
 
-The `DatasetInitializer` represents the APIs that data scientists can use to configure the dataset location and pre-process data on CPUs.
+The `DatasetInitializer` represents the APIs that data scientists can use to configure the dataset
+location and pre-process data on CPUs.
 
 ```golang
 type DatasetInitializer struct {
