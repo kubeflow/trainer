@@ -190,8 +190,7 @@ class TrainerClient:
         self,
         runtime_ref: str,
         trainer: Optional[types.CustomTrainer] = None,
-        dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
-        model_config: Optional[types.HuggingFaceModelInputConfig] = None,
+        initializer: Optional[types.Initializer] = None,
     ) -> str:
         """Create the TrainJob. TODO (andreyvelich): Add description
 
@@ -245,8 +244,8 @@ class TrainerClient:
                     if trainer_crd != models.TrainerV1alpha1Trainer()
                     else None
                 ),
-                datasetConfig=utils.get_dataset_config(dataset_config),
-                modelConfig=utils.get_model_config(model_config),
+                # datasetConfig=utils.get_dataset_config(dataset_config),
+                # modelConfig=utils.get_model_config(model_config),
             ),
         )
 

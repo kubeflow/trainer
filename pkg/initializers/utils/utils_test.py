@@ -1,6 +1,6 @@
 import pytest
-from kubeflow.trainer import HuggingFaceDatasetConfig, HuggingFaceModelInputConfig
 
+import pkg.initializers.types.types as types
 import pkg.initializers.utils.utils as utils
 
 
@@ -8,22 +8,22 @@ import pkg.initializers.utils.utils as utils
     "config_class,env_vars,expected",
     [
         (
-            HuggingFaceModelInputConfig,
+            types.HuggingFaceModelInitializer,
             {"STORAGE_URI": "hf://test", "ACCESS_TOKEN": "token"},
             {"storage_uri": "hf://test", "access_token": "token"},
         ),
         (
-            HuggingFaceModelInputConfig,
+            types.HuggingFaceModelInitializer,
             {"STORAGE_URI": "hf://test"},
             {"storage_uri": "hf://test", "access_token": None},
         ),
         (
-            HuggingFaceDatasetConfig,
+            types.HuggingFaceDatasetInitializer,
             {"STORAGE_URI": "hf://test", "ACCESS_TOKEN": "token"},
             {"storage_uri": "hf://test", "access_token": "token"},
         ),
         (
-            HuggingFaceDatasetConfig,
+            types.HuggingFaceDatasetInitializer,
             {"STORAGE_URI": "hf://test"},
             {"storage_uri": "hf://test", "access_token": None},
         ),

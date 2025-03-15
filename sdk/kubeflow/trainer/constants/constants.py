@@ -100,6 +100,7 @@ CONTAINER_DATASET_INITIALIZER = "dataset-initializer"
 CONTAINER_MODEL_INITIALIZER = "model-initializer"
 
 # The default path to the users' workspace.
+# TODO (andreyvelich): Discuss how to keep this path is sync with pkg.initializers.constants
 WORKSPACE_PATH = "/workspace"
 
 # The path where initializer downloads dataset.
