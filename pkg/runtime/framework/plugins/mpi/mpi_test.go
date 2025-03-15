@@ -27,7 +27,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/kubeflow/trainer/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -115,7 +114,7 @@ func TestMPI(t *testing.T) {
 						Obj(),
 				},
 				Scheduler: &runtime.Scheduler{
-					TotalRequests: make(map[string]runtime.TotalResourceRequest),
+					PodLabels: make(map[string]string),
 				},
 			},
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
@@ -221,7 +220,7 @@ func TestMPI(t *testing.T) {
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
 						Obj(),
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: make(map[string]runtime.TotalResourceRequest)},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 			wantObjs: []apiruntime.Object{
 				utiltesting.MakeSecretWrapper(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
@@ -269,7 +268,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 						Obj(),
 				},
 				Scheduler: &runtime.Scheduler{
-					TotalRequests: make(map[string]runtime.TotalResourceRequest),
+					PodLabels: make(map[string]string),
 				},
 			},
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
@@ -352,7 +351,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 						MPIPolicy(ptr.To[int32](2), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
 						Obj(),
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: make(map[string]runtime.TotalResourceRequest)},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 			wantObjs: []apiruntime.Object{
 				utiltesting.MakeSecretWrapper(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
@@ -368,115 +367,6 @@ trainJob-trainer-node-1-1.trainJob slots=1
 					WithData(map[string]string{
 						constants.MPIHostfileName: `trainJob-trainer-node-1-0.trainJob slots=2
 `,
-					}).
-					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
-					Obj(),
-			},
-		},
-		"calculated numNodes are propagated to info totalRequests": {
-			info: &runtime.Info{
-				Labels:      make(map[string]string),
-				Annotations: make(map[string]string),
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
-						Obj(),
-				},
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{{
-						Name: constants.JobLauncher,
-						Endpoints: func(yield func(string) bool) {
-							yield("trainJob-launcher-0-0.trainJob")
-						},
-					}},
-				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {
-						Replicas: 1,
-						PodRequests: corev1.ResourceList{
-							corev1.ResourceCPU: resource.MustParse("10"),
-						},
-					},
-					constants.JobInitializer: {},
-				}},
-			},
-			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
-				UID("trainJob").
-				Trainer(
-					utiltesting.MakeTrainJobTrainerWrapper().
-						NumNodes(2).
-						Obj()).
-				Obj(),
-			wantInfo: &runtime.Info{
-				Labels:      make(map[string]string),
-				Annotations: make(map[string]string),
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(2).
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
-						Obj(),
-				},
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{{
-						Name: constants.JobLauncher,
-						Volumes: []corev1ac.VolumeApplyConfiguration{
-							*corev1ac.Volume().
-								WithName(constants.MPISSHAuthVolumeName).
-								WithSecret(corev1ac.SecretVolumeSource().
-									WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
-									WithItems(
-										corev1ac.KeyToPath().
-											WithKey(corev1.SSHAuthPrivateKey).
-											WithPath(constants.MPISSHPrivateKeyFile),
-										corev1ac.KeyToPath().
-											WithKey(constants.MPISSHPublicKey).
-											WithPath(constants.MPISSHPublicKeyFile),
-										corev1ac.KeyToPath().
-											WithKey(constants.MPISSHPublicKey).
-											WithPath(constants.MPISSHAuthorizedKeys),
-									),
-								),
-							*corev1ac.Volume().
-								WithName(constants.MPIHostfileVolumeName).
-								WithConfigMap(corev1ac.ConfigMapVolumeSource().
-									WithName(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix)).
-									WithItems(
-										corev1ac.KeyToPath().
-											WithKey(constants.MPIHostfileName).
-											WithPath(constants.MPIHostfileName).
-											WithMode(0444),
-									),
-								),
-						},
-						Endpoints: func(yield func(string) bool) {
-							yield("trainJob-launcher-0-0.trainJob")
-						},
-					}},
-				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {
-						Replicas: 2,
-						PodRequests: corev1.ResourceList{
-							corev1.ResourceCPU: resource.MustParse("10"),
-						},
-					},
-					constants.JobInitializer: {},
-				}},
-			},
-			wantObjs: []apiruntime.Object{
-				utiltesting.MakeSecretWrapper(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
-					WithImmutable(true).
-					WithType(corev1.SecretTypeSSHAuth).
-					WithData(map[string][]byte{
-						constants.MPISSHPublicKey: []byte("EXIST"),
-						corev1.SSHAuthPrivateKey:  []byte("EXIST"),
-					}).
-					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
-					Obj(),
-				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
-					WithData(map[string]string{
-						constants.MPIHostfileName: "",
 					}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
 					Obj(),
@@ -508,9 +398,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 						},
 					},
 				},
-				Scheduler: &runtime.Scheduler{
-					TotalRequests: make(map[string]runtime.TotalResourceRequest),
-				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
 				UID("trainJob").
@@ -591,7 +479,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 						},
 					},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: make(map[string]runtime.TotalResourceRequest)},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 			wantObjs: []apiruntime.Object{
 				utiltesting.MakeSecretWrapper(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
@@ -639,9 +527,7 @@ trainJob-trainer-node-1-0.trainJob slots=1
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
-				Scheduler: &runtime.Scheduler{
-					TotalRequests: make(map[string]runtime.TotalResourceRequest),
-				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
 				UID("trainJob").
@@ -694,7 +580,7 @@ trainJob-trainer-node-1-0.trainJob slots=1
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: make(map[string]runtime.TotalResourceRequest)},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 			wantObjs: []apiruntime.Object{
 				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
@@ -726,9 +612,7 @@ trainJob-trainer-node-1-0.trainJob slots=1
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
-				Scheduler: &runtime.Scheduler{
-					TotalRequests: make(map[string]runtime.TotalResourceRequest),
-				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
 				UID("trainJob").
@@ -781,7 +665,7 @@ trainJob-trainer-node-1-0.trainJob slots=1
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: make(map[string]runtime.TotalResourceRequest)},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 			wantBuildError: errorGetSSHAuthSecretFromAPI,
 		},

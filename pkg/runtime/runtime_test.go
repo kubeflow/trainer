@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
-	resourcehelpers "k8s.io/component-helpers/resource"
 	"k8s.io/utils/ptr"
 
 	"github.com/kubeflow/trainer/pkg/constants"
@@ -46,22 +45,25 @@ func TestNewInfo(t *testing.T) {
 				WithAnnotations(map[string]string{
 					"annotationKey": "annotationValue",
 				}),
-				WithPodSpecReplicas(constants.JobInitializer, 1, resourcehelpers.PodRequests(&corev1.Pod{
-					Spec: corev1.PodSpec{Containers: []corev1.Container{{
+				WithPodSet(constants.JobInitializer, 1, corev1.PodSpec{
+					Containers: []corev1.Container{{
 						Name: constants.ContainerModelInitializer,
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceCPU: resource.MustParse("10"),
 							},
-						}}}, InitContainers: []corev1.Container{{
+						},
+					}},
+					InitContainers: []corev1.Container{{
+						Name:          "setup-initializer",
 						RestartPolicy: ptr.To(corev1.ContainerRestartPolicyAlways),
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceCPU: resource.MustParse("5"),
 							},
-						}}},
-					},
-				}, resourcehelpers.PodResourcesOptions{}), corev1ac.PodSpec().
+						},
+					}},
+				}, corev1ac.PodSpec().
 					WithContainers(
 						corev1ac.Container().
 							WithName(constants.ContainerModelInitializer).
@@ -72,6 +74,7 @@ func TestNewInfo(t *testing.T) {
 					).
 					WithInitContainers(
 						corev1ac.Container().
+							WithName("setup-initializer").
 							WithRestartPolicy(corev1.ContainerRestartPolicyAlways).
 							WithResources(corev1ac.ResourceRequirements().
 								WithRequests(corev1.ResourceList{
@@ -79,15 +82,16 @@ func TestNewInfo(t *testing.T) {
 								})),
 					),
 				),
-				WithPodSpecReplicas(constants.JobTrainerNode, 10, resourcehelpers.PodRequests(&corev1.Pod{
-					Spec: corev1.PodSpec{Containers: []corev1.Container{{
+				WithPodSet(constants.JobTrainerNode, 10, corev1.PodSpec{
+					Containers: []corev1.Container{{
 						Name: constants.ContainerTrainer,
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceCPU: resource.MustParse("15"),
 							},
 						},
-					}}, InitContainers: []corev1.Container{{
+					}},
+					InitContainers: []corev1.Container{{
 						Name:          "preparation",
 						RestartPolicy: ptr.To(corev1.ContainerRestartPolicyAlways),
 						Resources: corev1.ResourceRequirements{
@@ -95,8 +99,8 @@ func TestNewInfo(t *testing.T) {
 								corev1.ResourceCPU: resource.MustParse("25"),
 							},
 						},
-					}}},
-				}, resourcehelpers.PodResourcesOptions{}), corev1ac.PodSpec().
+					}},
+				}, corev1ac.PodSpec().
 					WithContainers(
 						corev1ac.Container().
 							WithName(constants.ContainerTrainer).
@@ -127,7 +131,7 @@ func TestNewInfo(t *testing.T) {
 							})).
 						WithRestartPolicy(corev1.ContainerRestartPolicyAlways),
 					)),
-				WithTemplateSpec(
+				WithTemplateSpecObjApply(
 					jobsetv1alpha2ac.JobSetSpec().
 						WithReplicatedJobs(
 							jobsetv1alpha2ac.ReplicatedJob().
@@ -207,30 +211,21 @@ func TestNewInfo(t *testing.T) {
 				Annotations: map[string]string{
 					"annotationKey": "annotationValue",
 				},
-				Scheduler: &Scheduler{
-					TotalRequests: map[string]TotalResourceRequest{
-						constants.JobInitializer: {
-							Replicas: 1,
-							PodRequests: corev1.ResourceList{
-								corev1.ResourceCPU: resource.MustParse("15"),
-							},
-						},
-						constants.JobTrainerNode: {
-							Replicas: 10,
-							PodRequests: corev1.ResourceList{
-								corev1.ResourceCPU: resource.MustParse("40"),
-							},
-						},
-					},
-				},
+				Scheduler: &Scheduler{PodLabels: make(map[string]string)},
 				TemplateSpec: TemplateSpec{
 					PodSets: []PodSet{
 						{
 							Name:               constants.JobInitializer,
 							CountForNonTrainer: ptr.To[int32](1),
+							InitContainers: []Container{{
+								Name: "setup-initializer",
+							}},
 							Containers: []Container{{
 								Name: constants.ContainerModelInitializer,
 							}},
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU: resource.MustParse("15"),
+							},
 						},
 						{
 							Name: constants.JobTrainerNode,
@@ -251,6 +246,12 @@ func TestNewInfo(t *testing.T) {
 									MountPath: ptr.To("/var"),
 								}},
 							}},
+							InitContainers: []Container{{
+								Name: "preparation",
+							}},
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU: resource.MustParse("40"),
+							},
 						},
 					},
 					ObjApply: jobsetv1alpha2ac.JobSetSpec().
@@ -327,12 +328,15 @@ func TestNewInfo(t *testing.T) {
 			},
 		},
 		"all arguments are not specified": {
-			wantInfo: &Info{Scheduler: &Scheduler{TotalRequests: map[string]TotalResourceRequest{}}},
+			wantInfo: &Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				Scheduler:   &Scheduler{PodLabels: make(map[string]string)},
+			},
 		},
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortMaps(func(a, b string) bool { return a < b }),
-		cmpopts.EquateEmpty(),
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
