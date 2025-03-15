@@ -210,10 +210,10 @@ def train(
 
 @dataclass
 class CustomTrainer:
-    func: Optional[Callable] = None
+    func: Callable = None
     func_args: Optional[Dict] = None
     packages_to_install: Optional[List[str]] = None
-    pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
+    pip_index_url: Optional[str] = constants.DEFAULT_PIP_INDEX_URL
     num_nodes: Optional[int] = None
     resources_per_node: Optional[Dict] = None
 
@@ -252,6 +252,49 @@ class TorchTuneConfig:
     ] = None
     num_nodes: Optional[int] = None,
     resources_per_node: Optional[Dict] = None,
+
+```
+
+#### `list_runtimes()` API
+
+We should allow users to easily get the available TrainingRuntimes/ClusterTrainingRuntimes with the SDK, followed with information related to the training method, framework, model, phase and device. When users execute:
+
+```python
+TrainingClient().list_runtimes()
+```
+
+They are expected to get:
+
+```
+Runtime                             Method                Framework   Pretrained Model    Phase           Accelerator       Count
+
+pytorch-distributed                 custom-trainer        pytorch     <undefined>         any             nvidia.com/GPU    2
+torchtune-llama3.1-8B-finetuning    predefined-trainer    torchtune   Llama3.1-8B         post-training   nvidia.com/GPU    4
+```
+
+In that case, we plan to design `Runtime` dataclass as the following:
+
+| Fields | Type | What is it? |
+| - | - | - |
+| name | str | The name of TrainingRuntime/ClusterTrainingRuntime. |
+| method | str | The training method of this runtime, chosen from `custom-trainer`, `predefined-trainer`. |
+| framework | str | The ML framework used for training, e.g. `pytorch`, `torchtune`. |
+| pretrained_model | Optional[str] | The pretrained model specified for this runtime, e.g. `llama3.1-8B`. |
+| phase | str | The training phase of this runtime, chosen from `any`, `post-training`. |
+| accelerator | str | The type of devices, e.g. `nvidia.com/gpu`. |
+| accelerator_count | str | The number of devices. |
+
+```python
+# Runtime DataClass
+@dataclass
+class Runtime:
+    name: str
+    method: str
+    framework: str
+    pretrained_model: Optional[str] = None
+    phase: str
+    accelerator: str
+    accelerator_count: str,
 
 ```
 
@@ -487,7 +530,8 @@ We will use [papermill](https://github.com/nteract/papermill) to execute these n
 ## Implementation History
 
 - 2025-01-31: Create KEP-2401 doc
-- 2025-03-07: KEP-2401 1st version & Start implementation
+- 2025-03-11: KEP-2401 1st version & Start implementation
+- 2025-03-12: Add new `Runtime` dataclass design
 
 ## Alternatives
 
