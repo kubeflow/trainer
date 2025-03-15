@@ -1,10 +1,9 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from kubeflow.trainer import DATASET_PATH
 
-import pkg.initializer.utils.utils as utils
-from pkg.initializer.dataset.huggingface import HuggingFace
+import pkg.initializers.utils.utils as utils
+from pkg.initializers.dataset.huggingface import HuggingFace
 
 
 # Test cases for config loading
@@ -89,7 +88,7 @@ def test_download_dataset(test_name, test_case):
         # Verify download parameters
         mock_download.assert_called_once_with(
             repo_id=test_case["expected_repo_id"],
-            local_dir=DATASET_PATH,
+            local_dir=utils.DATASET_PATH,
             repo_type="dataset",
         )
     print("Test execution completed")

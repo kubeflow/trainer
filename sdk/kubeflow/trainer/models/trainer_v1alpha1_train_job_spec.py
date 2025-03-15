@@ -19,8 +19,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow.trainer.models.trainer_v1alpha1_dataset_config import TrainerV1alpha1DatasetConfig
-from kubeflow.trainer.models.trainer_v1alpha1_model_config import TrainerV1alpha1ModelConfig
+from kubeflow.trainer.models.trainer_v1alpha1_initializer import TrainerV1alpha1Initializer
 from kubeflow.trainer.models.trainer_v1alpha1_pod_spec_override import TrainerV1alpha1PodSpecOverride
 from kubeflow.trainer.models.trainer_v1alpha1_runtime_ref import TrainerV1alpha1RuntimeRef
 from kubeflow.trainer.models.trainer_v1alpha1_trainer import TrainerV1alpha1Trainer
@@ -32,15 +31,14 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
     TrainJobSpec represents specification of the desired TrainJob.
     """ # noqa: E501
     annotations: Optional[Dict[str, StrictStr]] = Field(default=None, description="Annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
-    dataset_config: Optional[TrainerV1alpha1DatasetConfig] = Field(default=None, description="Configuration of the training dataset.", alias="datasetConfig")
+    initializer: Optional[TrainerV1alpha1Initializer] = Field(default=None, description="Configuration of the initializer.")
     labels: Optional[Dict[str, StrictStr]] = Field(default=None, description="Labels to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
     managed_by: Optional[StrictStr] = Field(default=None, description="ManagedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`", alias="managedBy")
-    model_config_crd: Optional[TrainerV1alpha1ModelConfig] = Field(default=None, description="Configuration of the pre-trained and trained model.", alias="modelConfig")
     pod_spec_overrides: Optional[List[TrainerV1alpha1PodSpecOverride]] = Field(default=None, description="Custom overrides for the training runtime.", alias="podSpecOverrides")
     runtime_ref: TrainerV1alpha1RuntimeRef = Field(description="Reference to the training runtime. The field is immutable.", alias="runtimeRef")
     suspend: Optional[StrictBool] = Field(default=None, description="Whether the controller should suspend the running TrainJob. Defaults to false.")
-    trainer: Optional[TrainerV1alpha1Trainer] = Field(default=None, description="Configuration of the desired trainer.")
-    __properties: ClassVar[List[str]] = ["annotations", "datasetConfig", "labels", "managedBy", "modelConfig", "podSpecOverrides", "runtimeRef", "suspend", "trainer"]
+    trainer: Optional[TrainerV1alpha1Trainer] = Field(default=None, description="Configuration of the trainer.")
+    __properties: ClassVar[List[str]] = ["annotations", "initializer", "labels", "managedBy", "podSpecOverrides", "runtimeRef", "suspend", "trainer"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -81,12 +79,9 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of dataset_config
-        if self.dataset_config:
-            _dict['datasetConfig'] = self.dataset_config.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of model_config_crd
-        if self.model_config_crd:
-            _dict['modelConfig'] = self.model_config_crd.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of initializer
+        if self.initializer:
+            _dict['initializer'] = self.initializer.to_dict()
         # override the default output from pydantic by calling `to_dict()` of each item in pod_spec_overrides (list)
         _items = []
         if self.pod_spec_overrides:
@@ -113,10 +108,9 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
 
         _obj = cls.model_validate({
             "annotations": obj.get("annotations"),
-            "datasetConfig": TrainerV1alpha1DatasetConfig.from_dict(obj["datasetConfig"]) if obj.get("datasetConfig") is not None else None,
+            "initializer": TrainerV1alpha1Initializer.from_dict(obj["initializer"]) if obj.get("initializer") is not None else None,
             "labels": obj.get("labels"),
             "managedBy": obj.get("managedBy"),
-            "modelConfig": TrainerV1alpha1ModelConfig.from_dict(obj["modelConfig"]) if obj.get("modelConfig") is not None else None,
             "podSpecOverrides": [TrainerV1alpha1PodSpecOverride.from_dict(_item) for _item in obj["podSpecOverrides"]] if obj.get("podSpecOverrides") is not None else None,
             "runtimeRef": TrainerV1alpha1RuntimeRef.from_dict(obj["runtimeRef"]) if obj.get("runtimeRef") is not None else None,
             "suspend": obj.get("suspend"),

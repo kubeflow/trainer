@@ -14,6 +14,25 @@ const (
 	// JobSetKind is the Kind name for the JobSet.
 	JobSetKind string = "JobSet"
 
+	// LabelTrainJobAncestor is the label to identify relationship between
+	// TrainJob and Pod template in the Runtime. The following labels are supported:
+	// trainer.kubeflow.org/trainjob-ancestor: dataset-initializer  - trainJob.spec.initializer.dataset
+	// trainer.kubeflow.org/trainjob-ancestor: model-initializer    - trainJob.spec.initializer.model
+	// trainer.kubeflow.org/trainjob-ancestor: trainer              - trainJob.spec.trainer
+	LabelTrainJobAncestor string = "trainer.kubeflow.org/trainjob-ancestor"
+
+	// DatasetInitializer is the name of the Job, volume mount, container, and label value for the dataset initializer.
+	DatasetInitializer string = "dataset-initializer"
+
+	// DatasetMountPath is the volumeMount path for dataset.
+	DatasetMountPath string = "/workspace/dataset"
+
+	// ModelInitializer is the name of the Job, volume mount, container, and label value for the model initializer.
+	ModelInitializer string = "model-initializer"
+
+	// ModelMountPath is the volumeMount path for model.
+	ModelMountPath string = "/workspace/model"
+
 	// JobTrainerNode is the Job name for the trainer node.
 	JobTrainerNode string = "trainer-node"
 
@@ -22,21 +41,6 @@ const (
 
 	// ContainerTrainerPort is the default port for the trainer nodes communication.
 	ContainerTrainerPort int32 = 29500
-
-	// JobInitializer is the Job name for the initializer.
-	JobInitializer string = "initializer"
-
-	// ContainerModelInitializer is the container name for the model initializer.
-	ContainerModelInitializer string = "model-initializer"
-
-	// ContainerDatasetInitializer is the container name for the dataset initializer.
-	ContainerDatasetInitializer string = "dataset-initializer"
-
-	// DatasetMountPath is the volumeMount path for dataset.
-	DatasetMountPath string = "/workspace/dataset"
-
-	// ModelMountPath is the volumeMount path for model.
-	ModelMountPath string = "/workspace/model"
 
 	// PodGroupKind is the Kind name for the PodGroup.
 	PodGroupKind string = "PodGroup"

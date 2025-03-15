@@ -177,10 +177,14 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 						WithNumNodes(100).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobInitializer, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSpecReplicas(constants.DatasetInitializer, 1, nil, corev1ac.PodSpec().
 					WithContainers(
-						corev1ac.Container().WithName(constants.ContainerDatasetInitializer),
-						corev1ac.Container().WithName(constants.ContainerModelInitializer),
+						corev1ac.Container().WithName(constants.DatasetInitializer),
+					),
+				),
+				runtime.WithPodSpecReplicas(constants.ModelInitializer, 1, nil, corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().WithName(constants.ModelInitializer),
 					),
 				),
 				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 10, nil, corev1ac.PodSpec().
@@ -199,14 +203,20 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:               constants.JobInitializer,
+							Name:               constants.DatasetInitializer,
 							CountForNonTrainer: ptr.To[int32](1),
 							Containers: []runtime.Container{
 								{
-									Name: constants.ContainerDatasetInitializer,
+									Name: constants.DatasetInitializer,
 								},
+							},
+						},
+						{
+							Name:               constants.ModelInitializer,
+							CountForNonTrainer: ptr.To[int32](1),
+							Containers: []runtime.Container{
 								{
-									Name: constants.ContainerModelInitializer,
+									Name: constants.ModelInitializer,
 								},
 							},
 						},
@@ -220,8 +230,9 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{
 					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {Replicas: 1},
-						constants.JobTrainerNode: {Replicas: 100},
+						constants.DatasetInitializer: {Replicas: 1},
+						constants.ModelInitializer:   {Replicas: 1},
+						constants.JobTrainerNode:     {Replicas: 100},
 					},
 				},
 			},
@@ -234,10 +245,14 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 						WithNumNodes(100).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobInitializer, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSpecReplicas(constants.DatasetInitializer, 1, nil, corev1ac.PodSpec().
 					WithContainers(
-						corev1ac.Container().WithName(constants.ContainerDatasetInitializer),
-						corev1ac.Container().WithName(constants.ContainerModelInitializer),
+						corev1ac.Container().WithName(constants.DatasetInitializer),
+					),
+				),
+				runtime.WithPodSpecReplicas(constants.ModelInitializer, 1, nil, corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().WithName(constants.ModelInitializer),
 					),
 				),
 				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 10, nil, corev1ac.PodSpec().
@@ -260,14 +275,20 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:               constants.JobInitializer,
+							Name:               constants.DatasetInitializer,
 							CountForNonTrainer: ptr.To[int32](1),
 							Containers: []runtime.Container{
 								{
-									Name: constants.ContainerDatasetInitializer,
+									Name: constants.DatasetInitializer,
 								},
+							},
+						},
+						{
+							Name:               constants.ModelInitializer,
+							CountForNonTrainer: ptr.To[int32](1),
+							Containers: []runtime.Container{
 								{
-									Name: constants.ContainerModelInitializer,
+									Name: constants.ModelInitializer,
 								},
 							},
 						},
@@ -281,8 +302,9 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{
 					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {Replicas: 1},
-						constants.JobTrainerNode: {Replicas: 30},
+						constants.DatasetInitializer: {Replicas: 1},
+						constants.ModelInitializer:   {Replicas: 1},
+						constants.JobTrainerNode:     {Replicas: 30},
 					},
 				},
 			},
@@ -291,16 +313,18 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 			runtimeInfo: &runtime.Info{
 				Scheduler: &runtime.Scheduler{
 					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {Replicas: 1},
-						constants.JobTrainerNode: {Replicas: 10},
+						constants.DatasetInitializer: {Replicas: 1},
+						constants.ModelInitializer:   {Replicas: 1},
+						constants.JobTrainerNode:     {Replicas: 10},
 					},
 				},
 			},
 			wantRuntimeInfo: &runtime.Info{
 				Scheduler: &runtime.Scheduler{
 					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {Replicas: 1},
-						constants.JobTrainerNode: {Replicas: 10},
+						constants.DatasetInitializer: {Replicas: 1},
+						constants.ModelInitializer:   {Replicas: 1},
+						constants.JobTrainerNode:     {Replicas: 10},
 					},
 				},
 			},
@@ -468,7 +492,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobInitializer,
+							Name: constants.DatasetInitializer,
 							Containers: []runtime.Container{
 								{
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
@@ -477,6 +501,18 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 											WithMountPath(constants.DatasetMountPath),
 									},
 								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+						{
+							Name: constants.ModelInitializer,
+							Containers: []runtime.Container{
 								{
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 										*corev1ac.VolumeMount().
@@ -510,21 +546,41 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 					ObjApply: jobsetv1alpha2ac.JobSetSpec().
 						WithReplicatedJobs(
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobInitializer).
+								WithName(constants.DatasetInitializer).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.DatasetInitializer}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
-														WithName(constants.ContainerDatasetInitializer).
+														WithName(constants.DatasetInitializer).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
 																WithMountPath(constants.DatasetMountPath),
 														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.ModelInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{constants.LabelTrainJobAncestor: constants.ModelInitializer}).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
 													corev1ac.Container().
-														WithName(constants.ContainerModelInitializer).
+														WithName(constants.ModelInitializer).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -573,7 +629,11 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{
 					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {
+						constants.DatasetInitializer: {
+							Replicas:    1,
+							PodRequests: resRequests,
+						},
+						constants.ModelInitializer: {
 							Replicas:    1,
 							PodRequests: resRequests,
 						},
@@ -612,24 +672,48 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 						WithReplicatedJobs(
 							jobsetv1alpha2ac.ReplicatedJob().
 								WithReplicas(1).
-								WithName(constants.JobInitializer).
+								WithName(constants.DatasetInitializer).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor:        constants.DatasetInitializer,
 												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
-														WithName(constants.ContainerDatasetInitializer).
+														WithName(constants.DatasetInitializer).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
 																WithMountPath(constants.DatasetMountPath),
 														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithReplicas(1).
+								WithName(constants.ModelInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor:        constants.ModelInitializer,
+												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
+											}).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
 													corev1ac.Container().
-														WithName(constants.ContainerModelInitializer).
+														WithName(constants.ModelInitializer).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -688,7 +772,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 						),
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobInitializer,
+							Name: constants.DatasetInitializer,
 							Containers: []runtime.Container{
 								{
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
@@ -697,6 +781,18 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 											WithMountPath(constants.DatasetMountPath),
 									},
 								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+						{
+							Name: constants.ModelInitializer,
+							Containers: []runtime.Container{
 								{
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 										*corev1ac.VolumeMount().
@@ -731,7 +827,11 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				Scheduler: &runtime.Scheduler{
 					PodLabels: map[string]string{schedulerpluginsv1alpha1.PodGroupLabel: "test-job"},
 					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {
+						constants.DatasetInitializer: {
+							Replicas:    1,
+							PodRequests: resRequests,
+						},
+						constants.ModelInitializer: {
 							Replicas:    1,
 							PodRequests: resRequests,
 						},
@@ -745,19 +845,19 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 			wantObjs: []apiruntime.Object{
 				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
 					SchedulingTimeout(300).
-					MinMember(101). // 101 replicas = 100 Trainer nodes + 1 Initializer.
+					MinMember(102). // 102 replicas = 100 Trainer nodes + 2 Initializer.
 					MinResources(corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("101"), // 1 CPU and 4Gi per replica.
-						corev1.ResourceMemory: resource.MustParse("404Gi"),
+						corev1.ResourceCPU:    resource.MustParse("102"), // 1 CPU and 4Gi per replica.
+						corev1.ResourceMemory: resource.MustParse("408Gi"),
 					}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-job", "uid").
 					Obj(),
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
-					Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-job", "uid").
-					NumNodes(100).
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
-					ContainerTrainer("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+					NumNodes(100).
+					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 					Obj(),
 			},
 		},

@@ -41,49 +41,57 @@ func NewBuilder(jobSet *jobsetv1alpha2ac.JobSetApplyConfiguration) *Builder {
 // Initializer updates JobSet values for the initializer Job.
 func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
-		if *rJob.Name == constants.JobInitializer {
+		if rJob.Template.Spec.Template.ObjectMetaApplyConfiguration == nil {
+			continue
+		}
+		// Update values for the Dataset Initializer Job.
+		if ancestor, ok := rJob.Template.Spec.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestor == constants.DatasetInitializer {
 			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 			// REF: https://github.com/kubeflow/trainer/issues/2318
 			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
-
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
 				// Update values for the dataset initializer container.
-				if *container.Name == constants.ContainerDatasetInitializer && trainJob.Spec.DatasetConfig != nil {
+				if *container.Name == constants.DatasetInitializer && trainJob.Spec.Initializer != nil && trainJob.Spec.Initializer.Dataset != nil {
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
 					// Update the dataset initializer envs.
-					if storageUri := trainJob.Spec.DatasetConfig.StorageUri; storageUri != nil {
+					if storageUri := trainJob.Spec.Initializer.Dataset.StorageUri; storageUri != nil {
 						apply.UpsertEnvVar(env, *corev1ac.EnvVar().
 							WithName(jobsetplgconsts.InitializerEnvStorageUri).
 							WithValue(*storageUri))
 					}
-					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.DatasetConfig.Env...)...)
+					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.Initializer.Dataset.Env...)...)
 					// Update the dataset initializer secret reference.
-					if trainJob.Spec.DatasetConfig.SecretRef != nil {
+					if trainJob.Spec.Initializer.Dataset.SecretRef != nil {
 						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
 							WithEnvFrom(corev1ac.EnvFromSource().
 								WithSecretRef(corev1ac.SecretEnvSource().
-									WithName(trainJob.Spec.DatasetConfig.SecretRef.Name)))
+									WithName(trainJob.Spec.Initializer.Dataset.SecretRef.Name)))
 					}
 				}
-				// TODO (andreyvelich): Add the model exporter when we support it.
+			}
+		}
+		// Update values for the Model Initializer Job.
+		if ancestor, ok := rJob.Template.Spec.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestor == constants.ModelInitializer {
+			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
+			// REF: https://github.com/kubeflow/trainer/issues/2318
+			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
+			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
 				// Update values for the model initializer container.
-				if *container.Name == constants.ContainerModelInitializer &&
-					trainJob.Spec.ModelConfig != nil &&
-					trainJob.Spec.ModelConfig.Input != nil {
-					// Update the model initializer envs.
+				if *container.Name == constants.ModelInitializer && trainJob.Spec.Initializer != nil && trainJob.Spec.Initializer.Model != nil {
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
-					if storageUri := trainJob.Spec.ModelConfig.Input.StorageUri; storageUri != nil {
+					// Update the model initializer envs.
+					if storageUri := trainJob.Spec.Initializer.Model.StorageUri; storageUri != nil {
 						apply.UpsertEnvVar(env, *corev1ac.EnvVar().
 							WithName(jobsetplgconsts.InitializerEnvStorageUri).
 							WithValue(*storageUri))
 					}
-					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.ModelConfig.Input.Env...)...)
+					apply.UpsertEnvVars(env, apply.EnvVars(trainJob.Spec.Initializer.Model.Env...)...)
 					// Update the model initializer secret reference.
-					if trainJob.Spec.ModelConfig.Input.SecretRef != nil {
+					if trainJob.Spec.Initializer.Model.SecretRef != nil {
 						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
 							WithEnvFrom(corev1ac.EnvFromSource().
 								WithSecretRef(corev1ac.SecretEnvSource().
-									WithName(trainJob.Spec.ModelConfig.Input.SecretRef.Name)))
+									WithName(trainJob.Spec.Initializer.Model.SecretRef.Name)))
 					}
 				}
 			}

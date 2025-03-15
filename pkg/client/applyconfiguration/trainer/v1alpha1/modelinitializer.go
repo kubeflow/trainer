@@ -21,24 +21,24 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
-// OutputModelApplyConfiguration represents a declarative configuration of the OutputModel type for use
+// ModelInitializerApplyConfiguration represents a declarative configuration of the ModelInitializer type for use
 // with apply.
-type OutputModelApplyConfiguration struct {
+type ModelInitializerApplyConfiguration struct {
 	StorageUri *string                       `json:"storageUri,omitempty"`
 	Env        []v1.EnvVarApplyConfiguration `json:"env,omitempty"`
 	SecretRef  *corev1.LocalObjectReference  `json:"secretRef,omitempty"`
 }
 
-// OutputModelApplyConfiguration constructs a declarative configuration of the OutputModel type for use with
+// ModelInitializerApplyConfiguration constructs a declarative configuration of the ModelInitializer type for use with
 // apply.
-func OutputModel() *OutputModelApplyConfiguration {
-	return &OutputModelApplyConfiguration{}
+func ModelInitializer() *ModelInitializerApplyConfiguration {
+	return &ModelInitializerApplyConfiguration{}
 }
 
 // WithStorageUri sets the StorageUri field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the StorageUri field is set to the value of the last call.
-func (b *OutputModelApplyConfiguration) WithStorageUri(value string) *OutputModelApplyConfiguration {
+func (b *ModelInitializerApplyConfiguration) WithStorageUri(value string) *ModelInitializerApplyConfiguration {
 	b.StorageUri = &value
 	return b
 }
@@ -46,7 +46,7 @@ func (b *OutputModelApplyConfiguration) WithStorageUri(value string) *OutputMode
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
-func (b *OutputModelApplyConfiguration) WithEnv(values ...*v1.EnvVarApplyConfiguration) *OutputModelApplyConfiguration {
+func (b *ModelInitializerApplyConfiguration) WithEnv(values ...*v1.EnvVarApplyConfiguration) *ModelInitializerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithEnv")
@@ -59,7 +59,7 @@ func (b *OutputModelApplyConfiguration) WithEnv(values ...*v1.EnvVarApplyConfigu
 // WithSecretRef sets the SecretRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SecretRef field is set to the value of the last call.
-func (b *OutputModelApplyConfiguration) WithSecretRef(value corev1.LocalObjectReference) *OutputModelApplyConfiguration {
+func (b *ModelInitializerApplyConfiguration) WithSecretRef(value corev1.LocalObjectReference) *ModelInitializerApplyConfiguration {
 	b.SecretRef = &value
 	return b
 }

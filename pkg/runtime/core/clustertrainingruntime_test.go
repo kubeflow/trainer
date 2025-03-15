@@ -51,17 +51,29 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Spec).
 					JobSetSpec(
 						testingutil.MakeJobSetWrapper("", "").
-							DependsOn(constants.JobInitializer, jobsetv1alpha2.DependencyComplete, constants.JobTrainerNode).
+							DependsOn(constants.JobTrainerNode,
+								[]jobsetv1alpha2.DependsOn{
+									{
+										Name:   constants.DatasetInitializer,
+										Status: jobsetv1alpha2.DependencyComplete,
+									},
+									{
+										Name:   constants.ModelInitializer,
+										Status: jobsetv1alpha2.DependencyComplete,
+									},
+								}...,
+							).
 							Obj().
 							Spec,
 					).
-					ContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					WithMLPolicy(
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
 							Obj(),
 					).
-					ContainerTrainer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					PodGroupPolicyCoschedulingSchedulingTimeout(120).
 					Obj(),
 			).Obj(),
@@ -77,20 +89,32 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 				Obj(),
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
-					ContainerDatasetModelInitializer("test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					DependsOn(constants.JobInitializer, jobsetv1alpha2.DependencyComplete, constants.JobTrainerNode).
-					Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
-					Parallelism(constants.JobInitializer, 1).
-					Completions(constants.JobInitializer, 1).
-					NumNodes(100).
-					ContainerTrainer("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					Suspend(true).
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
-					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode, constants.JobLauncher).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+					NumNodes(100).
+					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					DependsOn(constants.JobTrainerNode,
+						[]jobsetv1alpha2.DependsOn{
+							{
+								Name:   constants.DatasetInitializer,
+								Status: jobsetv1alpha2.DependencyComplete,
+							},
+							{
+								Name:   constants.ModelInitializer,
+								Status: jobsetv1alpha2.DependencyComplete,
+							},
+						}...,
+					).
 					Obj(),
 				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					MinMember(101). // 101 replicas = 100 Trainer nodes + 1 Initializers.
+					MinMember(102). // 102 replicas = 100 Trainer nodes + 2 Initializers.
 					MinResources(corev1.ResourceList{
 						corev1.ResourceCPU: resource.MustParse("102"), // Trainer node has 100 CPUs + 2 CPUs from 2 initializer containers.
 					}).

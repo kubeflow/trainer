@@ -74,15 +74,31 @@ class CustomTrainer:
     resources_per_node: Optional[Dict] = None
 
 
-# Configuration for the HuggingFace dataset provider.
+# Configuration for the HuggingFace dataset initializer.
+# TODO (andreyvelich): Discuss how to keep these configurations is sync with pkg.initializers.types
 @dataclass
-class HuggingFaceDatasetConfig:
+class HuggingFaceDatasetInitializer:
+    storage_uri: str
+    access_token: Optional[str] = None
+
+
+# Configuration for the HuggingFace model initializer.
+@dataclass
+class HuggingFaceModelInitializer:
     storage_uri: str
     access_token: Optional[str] = None
 
 
 @dataclass
-# Configuration for the HuggingFace model provider.
-class HuggingFaceModelInputConfig:
-    storage_uri: str
-    access_token: Optional[str] = None
+class Initializer:
+    """Initializer defines configurations for dataset and pre-trained model initialization
+
+    Args:
+        dataset (`Optional[HuggingFaceDatasetInitializer]`): The configuration for one of the
+            supported dataset initializers.
+        model (`Optional[HuggingFaceModelInitializer]`): The configuration for one of the
+            supported model initializers.
+    """
+
+    dataset: Optional[HuggingFaceDatasetInitializer] = None
+    model: Optional[HuggingFaceModelInitializer] = None

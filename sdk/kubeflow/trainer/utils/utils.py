@@ -104,7 +104,7 @@ def get_args_using_train_func(
     train_func: Callable,
     train_func_parameters: Optional[Dict[str, Any]] = None,
     packages_to_install: Optional[List[str]] = None,
-    pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL,
+    pip_index_url: Optional[str] = constants.DEFAULT_PIP_INDEX_URL,
 ) -> List[str]:
     """
     Get the Trainer args from the given training function and parameters.
@@ -157,7 +157,7 @@ def get_args_using_train_func(
     )
 
     # Install Python packages if that is required.
-    if packages_to_install is not None:
+    if packages_to_install is not None and pip_index_url is not None:
         exec_script = (
             get_script_for_python_packages(packages_to_install, pip_index_url)
             + exec_script
@@ -189,42 +189,46 @@ def get_script_for_python_packages(
     return script_for_python_packages
 
 
-def get_dataset_config(
-    dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
-) -> Optional[models.TrainerV1alpha1DatasetConfig]:
+def get_dataset_initializer(
+    dataset: Optional[types.HuggingFaceDatasetInitializer] = None,
+) -> Optional[models.TrainerV1alpha1DatasetInitializer]:
     """
-    Get the TrainJob DatasetConfig from the given config.
+    Get the TrainJob dataset initializer from the given config.
     """
-    if dataset_config is None:
+    if not isinstance(dataset, types.HuggingFaceDatasetInitializer):
         return None
 
     # TODO (andreyvelich): Support more parameters.
-    ds_config = models.TrainerV1alpha1DatasetConfig(
+    dataset_initializer = models.TrainerV1alpha1DatasetInitializer(
         storageUri=(
-            dataset_config.storage_uri
-            if dataset_config.storage_uri.startswith("hf://")
-            else "hf://" + dataset_config.storage_uri
+            dataset.storage_uri
+            if dataset.storage_uri.startswith("hf://")
+            else "hf://" + dataset.storage_uri
         )
     )
 
-    return ds_config
+    return dataset_initializer
 
 
-def get_model_config(
-    model_config: Optional[types.HuggingFaceModelInputConfig] = None,
-) -> Optional[models.TrainerV1alpha1ModelConfig]:
+def get_model_initializer(
+    model: Optional[types.HuggingFaceModelInitializer] = None,
+) -> Optional[models.TrainerV1alpha1ModelInitializer]:
     """
-    Get the TrainJob ModelConfig from the given config.
+    Get the TrainJob model initializer from the given config.
     """
-    if model_config is None:
+    if not isinstance(model, types.HuggingFaceModelInitializer):
         return None
 
     # TODO (andreyvelich): Support more parameters.
-    m_config = models.TrainerV1alpha1ModelConfig(
-        input=models.TrainerV1alpha1InputModel(storageUri=model_config.storage_uri)
+    model_initializer = models.TrainerV1alpha1ModelInitializer(
+        storageUri=(
+            model.storage_uri
+            if model.storage_uri.startswith("hf://")
+            else "hf://" + model.storage_uri
+        )
     )
 
-    return m_config
+    return model_initializer
 
 
 def wrap_log_stream(q: queue.Queue, log_stream: Any):
