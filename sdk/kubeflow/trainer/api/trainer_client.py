@@ -190,10 +190,32 @@ class TrainerClient:
         self,
         runtime_ref: str,
         trainer: Optional[types.CustomTrainer] = None,
+        fine_tuning_config: Optional[types.TorchTuneConfig] = None,
         dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
         model_config: Optional[types.HuggingFaceModelInputConfig] = None,
     ) -> str:
-        """Create the TrainJob. TODO (andreyvelich): Add description
+        """
+        Create the TrainJob. You can configure these types of training task:
+
+        - Custom Training Task: Training with a self-contained function that encapsulates
+            the entire model training process.
+        - Fine-tuning Pre-Trained Models: Fine-tuning existing pre-trained models with trainers
+            that already include the fine-tuning logic, requiring only parameter adjustments.
+
+        Args:
+            runtime_ref (`str`): Reference to the name of existing (Cluster)TrainingRuntime.
+            trainer (`Optional[types.CustomTrainer]`):
+                Configuration of the trainer which trains a model with a self-contained function
+                    that encapsulates the entire model training process.
+            fine_tuning_config (`Optional[types.TorchTuneConfig`]):
+                Configuration of the trainer which fine-tunes existing pre-trained models.
+                Currently, we support these types of trainer:
+                - `types.TorchTuneConfig`: Training with the `torchtune` trainer that already
+                    includes the fine-tuning logic, requiring only parameter adjustments.
+            dataset_config (`Optional[types.HuggingFaceDatasetConfig]`):
+                Configuration for the dataset provider.
+            model_config (`Optional[types.HuggingFaceModelInputConfig]`):
+                Configuration for the model provider.
 
         Returns:
             str: The unique name of the TrainJob that has been generated.
@@ -211,19 +233,23 @@ class TrainerClient:
         # Build the Trainer.
         trainer_crd = models.TrainerV1alpha1Trainer()
 
-        # Add number of nodes to the Trainer.
-        if trainer and trainer.num_nodes:
-            trainer_crd.num_nodes = trainer.num_nodes
+        # If users choose to use a custom training function.
+        if trainer:
+            if not isinstance(trainer, types.CustomTrainer):
+                raise ValueError("The trainer must be an instance of CustomTrainer.")
 
-        # Add resources per node to the Trainer.
-        if trainer and trainer.resources_per_node:
-            trainer_crd.resources_per_node = utils.get_resources_per_node(
-                trainer.resources_per_node
-            )
+            # Add number of nodes to the Trainer.
+            if trainer.num_nodes:
+                trainer_crd.num_nodes = trainer.num_nodes
 
-        # Add command and args to the Trainer if training function is set.
-        if trainer and trainer.func:
-            trainer_crd.command = constants.DEFAULT_COMMAND
+            # Add resources per node to the Trainer.
+            if trainer.resources_per_node:
+                trainer_crd.resources_per_node = utils.get_resources_per_node(
+                    trainer.resources_per_node
+                )
+
+            # Add command and args to the Trainer.
+            trainer_crd.command = constants.DEFAULT_CUSTOM_COMMAND
             # TODO: Support train function parameters.
             trainer_crd.args = utils.get_args_using_train_func(
                 trainer.func,
@@ -231,6 +257,33 @@ class TrainerClient:
                 trainer.packages_to_install,
                 trainer.pip_index_url,
             )
+
+        # If users choose to use a pre-trained model for fine-tuning.
+        elif fine_tuning_config:
+            if not isinstance(fine_tuning_config, types.TorchTuneConfig):
+                raise ValueError(
+                    "The fine_tuning_config must be an instance of TorchTuneConfig."
+                )
+
+            # Add number of nodes to the Trainer.
+            if fine_tuning_config.num_nodes:
+                trainer_crd.num_nodes = fine_tuning_config.num_nodes
+
+            # Add resources per node to the Trainer.
+            if fine_tuning_config.resources_per_node:
+                trainer_crd.resources_per_node = utils.get_resources_per_node(
+                    fine_tuning_config.resources_per_node
+                )
+
+            # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
+            # the torchtune config in the runtime plugin.
+            # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
+            trainer_crd.command = constants.DEFAULT_TORCHTUNE_COMMAND
+            trainer_crd.args = utils.get_args_using_torchtune_config(fine_tuning_config)
+
+        # If neither trainer nor fine_tuning_config is set, raise an value error.
+        else:
+            raise ValueError("Either trainer or fine_tuning_config must be set.")
 
         train_job = models.TrainerV1alpha1TrainJob(
             apiVersion=constants.API_VERSION,
