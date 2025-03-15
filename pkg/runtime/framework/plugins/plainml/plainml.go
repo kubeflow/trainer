@@ -19,7 +19,6 @@ package plainml
 import (
 	"context"
 
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
@@ -63,19 +62,6 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 		}
 	}
-
-	// Update total Pod requests for the PodGroupPolicy plugin.
-	for rName := range info.TotalRequests {
-		// For other Jobs like the Initializer, replica is always equal to 1.
-		// TODO (andreyvelich): Add support for total requests from the TrainJob's ResourcesPerNode.
-		if rName == constants.JobTrainerNode {
-			info.Scheduler.TotalRequests[rName] = runtime.TotalResourceRequest{
-				Replicas:    ptr.Deref(numNodes, constants.DefaultJobReplicas),
-				PodRequests: info.TotalRequests[rName].PodRequests,
-			}
-		}
-	}
-
 	info.SyncPodSetsToTemplateSpec()
 	return nil
 }
