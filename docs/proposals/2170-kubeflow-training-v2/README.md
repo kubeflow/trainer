@@ -549,8 +549,8 @@ spec:
 The `Trainer` represents the APIs that data scientists can use to configure the trainer settings.
 This trainer is executed on every distributed training Node.
 
-User can override the default env variables for the `model-initializer` container
-of the `model-initializer` Job. The Runtime Pod template must contain the
+User can override the default env variables for the `trainer` container
+of the `node` Job. The Runtime Pod template must contain the
 following label to identify relationship between PodSpec <-> TrainJob:
 
 ```
