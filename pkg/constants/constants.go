@@ -23,17 +23,20 @@ const (
 	// ContainerTrainerPort is the default port for the trainer nodes communication.
 	ContainerTrainerPort int32 = 29500
 
-	// JobInitializer is the Job name for the initializer.
-	JobInitializer string = "initializer"
-
-	// ContainerModelInitializer is the container name for the model initializer.
-	ContainerModelInitializer string = "model-initializer"
+	// JobDatasetInitializer is the Job name for the dataset initializer.
+	JobDatasetInitializer string = "dataset-initializer"
 
 	// ContainerDatasetInitializer is the container name for the dataset initializer.
 	ContainerDatasetInitializer string = "dataset-initializer"
 
 	// DatasetMountPath is the volumeMount path for dataset.
 	DatasetMountPath string = "/workspace/dataset"
+
+	// JobModelInitializer is the Job name for the model initializer.
+	JobModelInitializer string = "model-initializer"
+
+	// ContainerModelInitializer is the container name for the model initializer.
+	ContainerModelInitializer string = "model-initializer"
 
 	// ModelMountPath is the volumeMount path for model.
 	ModelMountPath string = "/workspace/model"

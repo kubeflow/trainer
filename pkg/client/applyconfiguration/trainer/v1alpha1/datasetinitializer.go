@@ -21,24 +21,24 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
-// DatasetConfigApplyConfiguration represents a declarative configuration of the DatasetConfig type for use
+// DatasetInitializerApplyConfiguration represents a declarative configuration of the DatasetInitializer type for use
 // with apply.
-type DatasetConfigApplyConfiguration struct {
+type DatasetInitializerApplyConfiguration struct {
 	StorageUri *string                       `json:"storageUri,omitempty"`
 	Env        []v1.EnvVarApplyConfiguration `json:"env,omitempty"`
 	SecretRef  *corev1.LocalObjectReference  `json:"secretRef,omitempty"`
 }
 
-// DatasetConfigApplyConfiguration constructs a declarative configuration of the DatasetConfig type for use with
+// DatasetInitializerApplyConfiguration constructs a declarative configuration of the DatasetInitializer type for use with
 // apply.
-func DatasetConfig() *DatasetConfigApplyConfiguration {
-	return &DatasetConfigApplyConfiguration{}
+func DatasetInitializer() *DatasetInitializerApplyConfiguration {
+	return &DatasetInitializerApplyConfiguration{}
 }
 
 // WithStorageUri sets the StorageUri field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the StorageUri field is set to the value of the last call.
-func (b *DatasetConfigApplyConfiguration) WithStorageUri(value string) *DatasetConfigApplyConfiguration {
+func (b *DatasetInitializerApplyConfiguration) WithStorageUri(value string) *DatasetInitializerApplyConfiguration {
 	b.StorageUri = &value
 	return b
 }
@@ -46,7 +46,7 @@ func (b *DatasetConfigApplyConfiguration) WithStorageUri(value string) *DatasetC
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
-func (b *DatasetConfigApplyConfiguration) WithEnv(values ...*v1.EnvVarApplyConfiguration) *DatasetConfigApplyConfiguration {
+func (b *DatasetInitializerApplyConfiguration) WithEnv(values ...*v1.EnvVarApplyConfiguration) *DatasetInitializerApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithEnv")
@@ -59,7 +59,7 @@ func (b *DatasetConfigApplyConfiguration) WithEnv(values ...*v1.EnvVarApplyConfi
 // WithSecretRef sets the SecretRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SecretRef field is set to the value of the last call.
-func (b *DatasetConfigApplyConfiguration) WithSecretRef(value corev1.LocalObjectReference) *DatasetConfigApplyConfiguration {
+func (b *DatasetInitializerApplyConfiguration) WithSecretRef(value corev1.LocalObjectReference) *DatasetInitializerApplyConfiguration {
 	b.SecretRef = &value
 	return b
 }
