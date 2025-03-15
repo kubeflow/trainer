@@ -366,14 +366,13 @@ class TrainerClient:
     ) -> Dict[str, str]:
         """Get the logs from TrainJob
         TODO (andreyvelich): Should we change node_index to node_rank ?
-        TODO (andreyvelich): For the initializer, we can add the unit argument.
         """
 
         pod_name = None
         # Get Initializer or Trainer Pod name.
         for c in self.get_job(name).components:
             if c.status != constants.POD_PENDING:
-                if c.name == component and component == constants.JOB_INITIALIZER:
+                if c.name == component and component == constants.DATASET_INITIALIZER:
                     pod_name = c.pod_name
                 elif c.name == component + "-" + str(node_index):
                     pod_name = c.pod_name
@@ -429,19 +428,19 @@ class TrainerClient:
                     return logs_dict
 
         try:
-            if component == constants.JOB_INITIALIZER:
-                logs_dict[constants.CONTAINER_DATASET_INITIALIZER] = (
+            if component == constants.DATASET_INITIALIZER:
+                logs_dict[constants.DATASET_INITIALIZER] = (
                     self.core_api.read_namespaced_pod_log(
                         name=pod_name,
                         namespace=self.namespace,
-                        container=constants.CONTAINER_DATASET_INITIALIZER,
+                        container=constants.DATASET_INITIALIZER,
                     )
                 )
-                logs_dict[constants.CONTAINER_MODEL_INITIALIZER] = (
+                logs_dict[constants.MODEL_INITIALIZER] = (
                     self.core_api.read_namespaced_pod_log(
                         name=pod_name,
                         namespace=self.namespace,
-                        container=constants.CONTAINER_MODEL_INITIALIZER,
+                        container=constants.MODEL_INITIALIZER,
                     )
                 )
             else:
@@ -529,11 +528,13 @@ class TrainerClient:
             train_job.status = status
 
         # Select Pods created by appropriate JobSet, and Initializer, Launcher, or Trainer Job.
-        label_selector = "{}={},{} in ({}, {}, {})".format(
+        # TODO (andreyvelich): Refactor it to check trainer.kubeflow.org/trainjob-ancestor label.
+        label_selector = "{}={},{} in ({}, {}, {}, {})".format(
             constants.JOBSET_NAME_KEY,
             name,
             constants.REPLICATED_JOB_KEY,
-            constants.JOB_INITIALIZER,
+            constants.DATASET_INITIALIZER,
+            constants.MODEL_INITIALIZER,
             constants.JOB_LAUNCHER,
             constants.JOB_TRAINER_NODE,
         )
@@ -578,11 +579,12 @@ class TrainerClient:
                             pod.metadata.labels[constants.JOB_INDEX_KEY],
                         )
                     elif (
-                        c.name == constants.CONTAINER_DATASET_INITIALIZER
-                        or c.name == constants.CONTAINER_MODEL_INITIALIZER
+                        c.name == constants.DATASET_INITIALIZER
+                        or c.name == constants.MODEL_INITIALIZER
                         or c.name == constants.CONTAINER_LAUNCHER
                     ):
-                        # For Initializer or Launcher Job, component is equal to container name.
+                        # For dataset, model initializers, or launcher ReplicatedJob,
+                        # the component is equal to the container name.
                         component_name = c.name
 
                 component = types.Component(
