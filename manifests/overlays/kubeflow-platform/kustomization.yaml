@@ -4,12 +4,12 @@ namespace: kubeflow
 sortOptions:
   order: fifo
 resources:
+  - ../../third-party/jobset # Comment this line if JobSet is installed on the Kubernetes cluster.
   - ../../base/crds
   - ../../base/manager
   - ../../base/rbac
   - ../../base/runtimes/pretraining
   - ../../base/webhook
-  - ../../third-party/jobset # Comment this line if JobSet is installed on the Kubernetes cluster.
   - kubeflow-trainer-roles.yaml
 
 # Update the Kubeflow Trainer controller manager image tag.
