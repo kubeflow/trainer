@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from kubeflow.trainer import MODEL_PATH
 
-import pkg.initializer.utils.utils as utils
-from pkg.initializer.model.huggingface import HuggingFace
+import pkg.initializers.utils.utils as utils
+from pkg.initializers.model.huggingface import HuggingFace
 
 
 # Test cases for config loading

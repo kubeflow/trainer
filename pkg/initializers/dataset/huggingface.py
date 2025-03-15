@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 import huggingface_hub
 from kubeflow.trainer import DATASET_PATH, HuggingFaceDatasetConfig
 
-import pkg.initializer.utils.utils as utils
+import pkg.initializers.utils.utils as utils
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",

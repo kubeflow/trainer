@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from kubeflow.trainer import DATASET_PATH
 
-import pkg.initializer.utils.utils as utils
-from pkg.initializer.dataset.huggingface import HuggingFace
+import pkg.initializers.utils.utils as utils
+from pkg.initializers.dataset.huggingface import HuggingFace
 
 
 # Test cases for config loading

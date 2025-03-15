@@ -1,7 +1,7 @@
 import pytest
 from kubeflow.trainer import HuggingFaceDatasetConfig, HuggingFaceModelInputConfig
 
-import pkg.initializer.utils.utils as utils
+import pkg.initializers.utils.utils as utils
 
 
 @pytest.mark.parametrize(

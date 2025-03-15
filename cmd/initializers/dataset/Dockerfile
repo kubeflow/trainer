@@ -3,8 +3,8 @@ FROM python:3.11-alpine
 WORKDIR /workspace
 
 # Copy the required Python modules.
-COPY cmd/initializer/model/requirements.txt .
-COPY pkg/initializer pkg/initializer
+COPY cmd/initializers/dataset/requirements.txt .
+COPY pkg/initializers pkg/initializers
 
 # Install the needed packages.
 RUN pip install -r requirements.txt
@@ -18,4 +18,4 @@ COPY LICENSE LICENSE
 COPY README.md README.md
 RUN pip install ./sdk
 
-ENTRYPOINT ["python", "-m", "pkg.initializer.model"]
+ENTRYPOINT ["python", "-m", "pkg.initializers.dataset"]

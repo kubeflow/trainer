@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pkg.initializer.dataset.__main__ import main
+from pkg.initializers.model.__main__ import main
 
 
 @pytest.mark.parametrize(
@@ -11,7 +11,7 @@ from pkg.initializer.dataset.__main__ import main
         (
             "Successful download with HuggingFace provider",
             {
-                "storage_uri": "hf://dataset/path",
+                "storage_uri": "hf://model/path",
                 "access_token": "test_token",
                 "expected_error": None,
             },
@@ -27,14 +27,14 @@ from pkg.initializer.dataset.__main__ import main
         (
             "Invalid storage URI scheme",
             {
-                "storage_uri": "invalid://dataset/path",
+                "storage_uri": "invalid://model/path",
                 "access_token": None,
                 "expected_error": Exception,
             },
         ),
     ],
 )
-def test_dataset_main(test_name, test_case, mock_env_vars):
+def test_model_main(test_name, test_case, mock_env_vars):
     """Test main script with different scenarios"""
     print(f"Running test: {test_name}")
 
@@ -49,7 +49,7 @@ def test_dataset_main(test_name, test_case, mock_env_vars):
     mock_hf_instance = MagicMock()
 
     with patch(
-        "pkg.initializer.dataset.__main__.HuggingFace",
+        "pkg.initializers.model.__main__.HuggingFace",
         return_value=mock_hf_instance,
     ) as mock_hf:
 
@@ -62,7 +62,7 @@ def test_dataset_main(test_name, test_case, mock_env_vars):
 
             # Verify HuggingFace instance methods were called
             mock_hf_instance.load_config.assert_called_once()
-            mock_hf_instance.download_dataset.assert_called_once()
+            mock_hf_instance.download_model.assert_called_once()
 
         # Verify HuggingFace class instantiation
         if test_case["storage_uri"] and test_case["storage_uri"].startswith("hf://"):
