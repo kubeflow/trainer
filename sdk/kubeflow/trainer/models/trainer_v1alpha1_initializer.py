@@ -28,9 +28,9 @@ class TrainerV1alpha1Initializer(BaseModel):
     """
     Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.
     """ # noqa: E501
-    dataset_initializer: Optional[TrainerV1alpha1DatasetInitializer] = Field(default=None, description="Configuration of the dataset initialization and pre-processing.", alias="datasetInitializer")
-    model_initializer: Optional[TrainerV1alpha1ModelInitializer] = Field(default=None, description="Configuration of the pre-trained model initialization", alias="modelInitializer")
-    __properties: ClassVar[List[str]] = ["datasetInitializer", "modelInitializer"]
+    dataset: Optional[TrainerV1alpha1DatasetInitializer] = Field(default=None, description="Configuration of the dataset initialization and pre-processing.")
+    model: Optional[TrainerV1alpha1ModelInitializer] = Field(default=None, description="Configuration of the pre-trained model initialization")
+    __properties: ClassVar[List[str]] = ["dataset", "model"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -71,12 +71,12 @@ class TrainerV1alpha1Initializer(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of dataset_initializer
-        if self.dataset_initializer:
-            _dict['datasetInitializer'] = self.dataset_initializer.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of model_initializer
-        if self.model_initializer:
-            _dict['modelInitializer'] = self.model_initializer.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of dataset
+        if self.dataset:
+            _dict['dataset'] = self.dataset.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of model
+        if self.model:
+            _dict['model'] = self.model.to_dict()
         return _dict
 
     @classmethod
@@ -89,8 +89,8 @@ class TrainerV1alpha1Initializer(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "datasetInitializer": TrainerV1alpha1DatasetInitializer.from_dict(obj["datasetInitializer"]) if obj.get("datasetInitializer") is not None else None,
-            "modelInitializer": TrainerV1alpha1ModelInitializer.from_dict(obj["modelInitializer"]) if obj.get("modelInitializer") is not None else None
+            "dataset": TrainerV1alpha1DatasetInitializer.from_dict(obj["dataset"]) if obj.get("dataset") is not None else None,
+            "model": TrainerV1alpha1ModelInitializer.from_dict(obj["model"]) if obj.get("model") is not None else None
         })
         return _obj
 

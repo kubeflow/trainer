@@ -56,7 +56,7 @@ spec:
               initializer:
                 description: Configuration of the initializer.
                 properties:
-                  datasetInitializer:
+                  dataset:
                     description: Configuration of the dataset initialization and pre-processing.
                     properties:
                       env:
@@ -204,7 +204,7 @@ spec:
                         description: Storage uri for the dataset provider.
                         type: string
                     type: object
-                  modelInitializer:
+                  model:
                     description: Configuration of the pre-trained model initialization
                     properties:
                       env:

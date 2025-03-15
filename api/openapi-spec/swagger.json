@@ -13280,7 +13280,7 @@
         "description": "Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.",
         "type": "object",
         "properties": {
-          "datasetInitializer": {
+          "dataset": {
             "description": "Configuration of the dataset initialization and pre-processing.",
             "allOf": [
               {
@@ -13288,7 +13288,7 @@
               }
             ]
           },
-          "modelInitializer": {
+          "model": {
             "description": "Configuration of the pre-trained model initialization",
             "allOf": [
               {

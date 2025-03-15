@@ -696,13 +696,13 @@ func schema_pkg_apis_trainer_v1alpha1_Initializer(ref common.ReferenceCallback) 
 				Description: "Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"datasetInitializer": {
+					"dataset": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Configuration of the dataset initialization and pre-processing.",
 							Ref:         ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.DatasetInitializer"),
 						},
 					},
-					"modelInitializer": {
+					"model": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Configuration of the pre-trained model initialization",
 							Ref:         ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ModelInitializer"),

@@ -19,8 +19,8 @@ package v1alpha1
 // InitializerApplyConfiguration represents a declarative configuration of the Initializer type for use
 // with apply.
 type InitializerApplyConfiguration struct {
-	Dataset *DatasetInitializerApplyConfiguration `json:"datasetInitializer,omitempty"`
-	Model   *ModelInitializerApplyConfiguration   `json:"modelInitializer,omitempty"`
+	Dataset *DatasetInitializerApplyConfiguration `json:"dataset,omitempty"`
+	Model   *ModelInitializerApplyConfiguration   `json:"model,omitempty"`
 }
 
 // InitializerApplyConfiguration constructs a declarative configuration of the Initializer type for use with
