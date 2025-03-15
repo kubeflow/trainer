@@ -189,8 +189,8 @@ class TrainerClient:
     def train(
         self,
         runtime_ref: str,
-        trainer: Optional[types.CustomTrainer] = None,
         initializer: Optional[types.Initializer] = None,
+        trainer: Optional[types.CustomTrainer] = None,
     ) -> str:
         """Create the TrainJob. TODO (andreyvelich): Add description
 
@@ -244,8 +244,14 @@ class TrainerClient:
                     if trainer_crd != models.TrainerV1alpha1Trainer()
                     else None
                 ),
-                # datasetConfig=utils.get_dataset_config(dataset_config),
-                # modelConfig=utils.get_model_config(model_config),
+                initializer=(
+                    models.TrainerV1alpha1Initializer(
+                        dataset=utils.get_dataset_initializer(initializer.dataset),
+                        model=utils.get_model_initializer(initializer.model),
+                    )
+                    if isinstance(initializer, types.Initializer)
+                    else None
+                ),
             ),
         )
 
