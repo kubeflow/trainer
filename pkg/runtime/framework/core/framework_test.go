@@ -178,13 +178,13 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 						WithNumNodes(100).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobInitializer, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobInitializer, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(
 						corev1ac.Container().WithName(constants.ContainerDatasetInitializer),
 						corev1ac.Container().WithName(constants.ContainerModelInitializer),
 					),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 10, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 10, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -219,12 +219,7 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 						},
 					},
 				},
-				Scheduler: &runtime.Scheduler{
-					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {Replicas: 1},
-						constants.JobTrainerNode: {Replicas: 100},
-					},
-				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"plainml MLPolicy is applied to runtime.Info, TrainJob has numNodes": {
@@ -235,13 +230,13 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 						WithNumNodes(100).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobInitializer, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobInitializer, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(
 						corev1ac.Container().WithName(constants.ContainerDatasetInitializer),
 						corev1ac.Container().WithName(constants.ContainerModelInitializer),
 					),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 10, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 10, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -280,30 +275,15 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 						},
 					},
 				},
-				Scheduler: &runtime.Scheduler{
-					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {Replicas: 1},
-						constants.JobTrainerNode: {Replicas: 30},
-					},
-				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"registry is empty": {
 			runtimeInfo: &runtime.Info{
-				Scheduler: &runtime.Scheduler{
-					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {Replicas: 1},
-						constants.JobTrainerNode: {Replicas: 10},
-					},
-				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 			wantRuntimeInfo: &runtime.Info{
-				Scheduler: &runtime.Scheduler{
-					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {Replicas: 1},
-						constants.JobTrainerNode: {Replicas: 10},
-					},
-				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 	}
@@ -438,11 +418,6 @@ func TestRunCustomValidationPlugins(t *testing.T) {
 }
 
 func TestRunComponentBuilderPlugins(t *testing.T) {
-	resRequests := corev1.ResourceList{
-		corev1.ResourceCPU:    resource.MustParse("1"),
-		corev1.ResourceMemory: resource.MustParse("4Gi"),
-	}
-
 	cases := map[string]struct {
 		registry        fwkplugins.Registry
 		runtimeInfo     *runtime.Info
@@ -471,7 +446,12 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobInitializer,
+							Name:               constants.JobInitializer,
+							CountForNonTrainer: ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
 							Containers: []runtime.Container{
 								{
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
@@ -498,6 +478,10 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 						},
 						{
 							Name: constants.JobTrainerNode,
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
 							Containers: []runtime.Container{{
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
@@ -574,18 +558,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 								),
 						),
 				},
-				Scheduler: &runtime.Scheduler{
-					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {
-							Replicas:    1,
-							PodRequests: resRequests,
-						},
-						constants.JobTrainerNode: {
-							Replicas:    1,
-							PodRequests: resRequests,
-						},
-					},
-				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				UID("uid").
@@ -593,7 +566,10 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				Trainer(
 					testingutil.MakeTrainJobTrainerWrapper().
 						NumNodes(100).
-						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("4Gi"),
+						}).
 						Obj(),
 				).
 				Obj(),
@@ -668,7 +644,10 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithCommand("trainjob").
 														WithArgs("trainjob").
 														WithResources(corev1ac.ResourceRequirements().
-															WithRequests(resRequests)).
+															WithRequests(corev1.ResourceList{
+																corev1.ResourceCPU:    resource.MustParse("1"),
+																corev1.ResourceMemory: resource.MustParse("4Gi"),
+															})).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -691,7 +670,12 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 						),
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobInitializer,
+							Name:               constants.JobInitializer,
+							CountForNonTrainer: ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
 							Containers: []runtime.Container{
 								{
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
@@ -718,6 +702,10 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 						},
 						{
 							Name: constants.JobTrainerNode,
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
 							Containers: []runtime.Container{{
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
@@ -733,16 +721,6 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{
 					PodLabels: map[string]string{schedulerpluginsv1alpha1.PodGroupLabel: "test-job"},
-					TotalRequests: map[string]runtime.TotalResourceRequest{
-						constants.JobInitializer: {
-							Replicas:    1,
-							PodRequests: resRequests,
-						},
-						constants.JobTrainerNode: {
-							Replicas:    100,         // Replicas is taken from TrainJob NumNodes.
-							PodRequests: resRequests, // TODO (andreyvelich): Add support for TrainJob ResourcesPerNode in TotalRequests.
-						},
-					},
 				},
 			},
 			wantObjs: []apiruntime.Object{
@@ -760,7 +738,10 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-job", "uid").
 					NumNodes(100).
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
-					ContainerTrainer("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					ContainerTrainer("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					}).
 					Obj(),
 			},
 		},

@@ -21,11 +21,9 @@ import (
 	"errors"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	resourcehelpers "k8s.io/component-helpers/resource"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -144,7 +142,7 @@ func (r *TrainingRuntime) runtimeInfo(
 		runtime.WithAnnotations(propagationAnnotations),
 		runtime.WithMLPolicy(mlPolicy),
 		runtime.WithPodGroupPolicy(podGroupPolicy),
-		runtime.WithTemplateSpec(jobSetSpecApply),
+		runtime.WithTemplateSpecObjApply(jobSetSpecApply),
 		runtime.WithPodSetSyncer(syncPodSets),
 	}
 
@@ -155,10 +153,10 @@ func (r *TrainingRuntime) runtimeInfo(
 		if *rJob.Name == constants.JobTrainerNode && mlPolicy != nil {
 			count = ptr.Deref(mlPolicy.NumNodes, 1)
 		}
-		opts = append(opts, runtime.WithPodSpecReplicas(
+		opts = append(opts, runtime.WithPodSet(
 			*rJob.Name,
 			count,
-			resourcehelpers.PodRequests(&corev1.Pod{Spec: *jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.DeepCopy()}, resourcehelpers.PodResourcesOptions{}),
+			*jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.DeepCopy(),
 			rJob.Template.Spec.Template.Spec),
 		)
 	}

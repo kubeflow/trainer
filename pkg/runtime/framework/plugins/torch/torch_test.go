@@ -72,7 +72,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(
 						corev1ac.Container().WithName(constants.ContainerTrainer),
 					),
@@ -95,7 +95,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -130,9 +131,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 2},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"nproc_per_node=auto with CPU limit": {
@@ -153,7 +152,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -168,7 +167,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -203,9 +203,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"nproc_per_node=auto with no CPU resources": {
@@ -224,7 +222,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -239,7 +237,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -274,9 +273,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"nproc_per_node=auto with low CPU limit": {
@@ -297,7 +294,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -312,7 +309,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -347,9 +345,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"nproc_per_node=auto with CPU request but no limit": {
@@ -370,7 +366,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -385,7 +381,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -420,9 +417,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"nproc_per_node=auto with millicore CPU limit": {
@@ -443,7 +438,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -458,7 +453,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -493,9 +489,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"nproc_per_node=auto with fractional CPU limit": {
@@ -516,7 +510,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -531,7 +525,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -566,9 +561,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"nproc_per_node=auto with GPU request should remain auto": {
@@ -589,7 +582,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -604,7 +597,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -639,16 +633,14 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"explicitly set nproc_per_node should be preserved": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromInt(3)).
+						NumProcPerNode(intstr.FromInt32(3)).
 						Container("test:image", []string{}, []string{}, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("8"),
 						}).
@@ -662,7 +654,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -677,7 +669,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -712,9 +705,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"nproc_per_node=auto with millicore CPU limit in m format": {
@@ -735,7 +726,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -750,7 +741,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -785,9 +777,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"nproc_per_node=cpu with CPU limit": {
@@ -808,7 +798,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -823,7 +813,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -858,9 +849,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"nproc_per_node=cpu with GPU resources": {
@@ -882,7 +871,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -897,7 +886,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -932,9 +922,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"nproc_per_node=cpu with fractional CPU": {
@@ -955,7 +943,7 @@ func TestTorch(t *testing.T) {
 						TorchPolicy("auto", nil).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 1, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -970,7 +958,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -1005,9 +994,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"multi-node multi-GPU training with complete info": {
@@ -1035,7 +1022,7 @@ func TestTorch(t *testing.T) {
 					"app": "pytorch-training",
 					"env": "production",
 				}),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 2, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 2, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -1053,7 +1040,8 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -1088,9 +1076,7 @@ func TestTorch(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 4},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 	}

@@ -23,7 +23,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -104,7 +103,7 @@ func TestPlainML(t *testing.T) {
 						WithNumNodes(100).
 						Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 100, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 100, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
 				),
 			),
@@ -116,15 +115,14 @@ func TestPlainML(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 200},
-				}},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 		"trainJob trainer env are respected rather than runtimeInfo": {
@@ -144,7 +142,7 @@ func TestPlainML(t *testing.T) {
 				runtime.WithMLPolicy(
 					utiltesting.MakeMLPolicyWrapper().Obj(),
 				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 100, nil, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.JobTrainerNode, 100, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().
 						WithName(constants.ContainerTrainer).
 						WithEnv(corev1ac.EnvVar().
@@ -164,7 +162,8 @@ func TestPlainML(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
+						Name:              constants.JobTrainerNode,
+						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
 							Env: []corev1ac.EnvVarApplyConfiguration{
@@ -173,51 +172,7 @@ func TestPlainML(t *testing.T) {
 						}},
 					}},
 				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {Replicas: 1},
-				}},
-			},
-		},
-		"override trainer numNodes to runtimeInfo scheduler totalRequests": {
-			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Trainer(
-					utiltesting.MakeTrainJobTrainerWrapper().NumNodes(200).Obj(),
-				).
-				Obj(),
-			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
-					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(100).
-						Obj(),
-				),
-				runtime.WithPodSpecReplicas(constants.JobTrainerNode, 100, corev1.ResourceList{
-					corev1.ResourceCPU: resource.MustParse("200m"),
-				}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
-				),
-			),
-			wantInfo: &runtime.Info{
-				Labels:      make(map[string]string),
-				Annotations: make(map[string]string),
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(200).
-						Obj(),
-				},
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{{
-						Name: constants.JobTrainerNode,
-						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
-						}},
-					}},
-				},
-				Scheduler: &runtime.Scheduler{TotalRequests: map[string]runtime.TotalResourceRequest{
-					constants.JobTrainerNode: {
-						Replicas:    200,
-						PodRequests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("200m")},
-					}},
-				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
 	}

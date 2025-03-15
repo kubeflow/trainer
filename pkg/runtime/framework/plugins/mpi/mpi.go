@@ -197,18 +197,6 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 			}
 		}
 	}
-
-	// Update total Pod requests for the PodGroupPolicy plugin.
-	for rName := range info.TotalRequests {
-		// For other Jobs like the Initializer, replica is always equal to 1.
-		// TODO (andreyvelich): Add support for total requests from the TrainJob's ResourcesPerNode.
-		if rName == constants.JobTrainerNode {
-			info.TotalRequests[rName] = runtime.TotalResourceRequest{
-				Replicas:    ptr.Deref(info.RuntimePolicy.MLPolicy.NumNodes, constants.DefaultJobReplicas),
-				PodRequests: info.TotalRequests[rName].PodRequests,
-			}
-		}
-	}
 	info.SyncPodSetsToTemplateSpec()
 	return nil
 }

@@ -170,19 +170,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
 	}
-
-	// Update total Pod requests for the PodGroupPolicy plugin.
-	for rName := range info.TotalRequests {
-		// For other Jobs like the Initializer, replica is always equal to 1.
-		// TODO (andreyvelich): Add support for total requests from the TrainJob's ResourcesPerNode.
-		if rName == constants.JobTrainerNode {
-			info.TotalRequests[rName] = runtime.TotalResourceRequest{
-				Replicas:    ptr.Deref(numNodes, constants.DefaultJobReplicas),
-				PodRequests: info.TotalRequests[rName].PodRequests,
-			}
-		}
-	}
-
 	info.SyncPodSetsToTemplateSpec()
 	return nil
 }
