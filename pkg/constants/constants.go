@@ -18,7 +18,7 @@ const (
 	DatasetInitializer string = "dataset-initializer"
 
 	// LabelDatasetInitializer is the label of runtime Pod template for the dataset initializer.
-	LabelDatasetInitializer string = "trainer.kubeflow.org/dataset-initializer"
+	LabelDatasetInitializer string = "trainer.kubeflow.org/ancestor"
 
 	// DatasetMountPath is the volumeMount path for dataset.
 	DatasetMountPath string = "/workspace/dataset"
@@ -27,7 +27,7 @@ const (
 	ModelInitializer string = "model-initializer"
 
 	// LabelModelInitializer label which identifies runtime Pod template for the model initializer.
-	LabelModelInitializer string = "trainer.kubeflow.org/model-initializer"
+	LabelModelInitializer string = "trainer.kubeflow.org/ancestor"
 
 	// ModelMountPath is the volumeMount path for model.
 	ModelMountPath string = "/workspace/model"

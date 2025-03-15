@@ -41,6 +41,9 @@ func NewBuilder(jobSet *jobsetv1alpha2ac.JobSetApplyConfiguration) *Builder {
 // Initializer updates JobSet values for the initializer Job.
 func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
+		if rJob.Template.Spec.Template.ObjectMetaApplyConfiguration == nil {
+			continue
+		}
 		// Update values for the Dataset Initializer Job.
 		if trainJobAncestor, ok := rJob.Template.Spec.Template.Labels[constants.LabelDatasetInitializer]; ok && trainJobAncestor == constants.DatasetInitializer {
 			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
@@ -48,7 +51,7 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
 				// Update values for the dataset initializer container.
-				if *container.Name == constants.DatasetInitializer && trainJob.Spec.Initializer.Dataset != nil {
+				if *container.Name == constants.DatasetInitializer && trainJob.Spec.Initializer != nil && trainJob.Spec.Initializer.Dataset != nil {
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
 					// Update the dataset initializer envs.
 					if storageUri := trainJob.Spec.Initializer.Dataset.StorageUri; storageUri != nil {
@@ -74,7 +77,7 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
 				// Update values for the model initializer container.
-				if *container.Name == constants.ModelInitializer && trainJob.Spec.Initializer.Model != nil {
+				if *container.Name == constants.ModelInitializer && trainJob.Spec.Initializer != nil && trainJob.Spec.Initializer.Model != nil {
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
 					// Update the model initializer envs.
 					if storageUri := trainJob.Spec.Initializer.Model.StorageUri; storageUri != nil {

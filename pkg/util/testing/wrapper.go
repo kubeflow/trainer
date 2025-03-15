@@ -596,6 +596,11 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
 										Template: corev1.PodTemplateSpec{
+											ObjectMeta: metav1.ObjectMeta{
+												Labels: map[string]string{
+													constants.LabelDatasetInitializer: constants.DatasetInitializer,
+												},
+											},
 											Spec: corev1.PodSpec{
 												Containers: []corev1.Container{
 													{
@@ -624,6 +629,11 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
 										Template: corev1.PodTemplateSpec{
+											ObjectMeta: metav1.ObjectMeta{
+												Labels: map[string]string{
+													constants.LabelModelInitializer: constants.ModelInitializer,
+												},
+											},
 											Spec: corev1.PodSpec{
 												Containers: []corev1.Container{
 													{

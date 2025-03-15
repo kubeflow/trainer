@@ -93,9 +93,10 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 					Suspend(true).
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode, constants.JobLauncher).
-					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode, constants.JobLauncher).
-					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode, constants.JobLauncher).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 					NumNodes(100).
+					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 					DependsOn(constants.JobTrainerNode,
