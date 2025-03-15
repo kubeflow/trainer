@@ -398,7 +398,6 @@ trainJob-trainer-node-1-1.trainJob slots=1
 							corev1.ResourceCPU: resource.MustParse("10"),
 						},
 					},
-					constants.JobInitializer: {},
 				}},
 			},
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
@@ -461,7 +460,6 @@ trainJob-trainer-node-1-1.trainJob slots=1
 							corev1.ResourceCPU: resource.MustParse("10"),
 						},
 					},
-					constants.JobInitializer: {},
 				}},
 			},
 			wantObjs: []apiruntime.Object{

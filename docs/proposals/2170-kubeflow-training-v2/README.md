@@ -1386,11 +1386,11 @@ spec:
                           value: hf://tatsu-lab/alpaca
                       volumeMounts:
                         - mountPath: /workspace/dataset
-                          name: dataset-initializer
+                          name: initializer
                   volumes:
-                    - name: dataset-initializer
+                    - name: initializer
                       persistentVolumeClaim:
-                        claimName: dataset-initializer
+                        claimName: initializer
         - name: model-initializer
           template:
             spec:
@@ -1409,11 +1409,11 @@ spec:
                           value: AutoModelForCausalLM
                       volumeMounts:
                         - mountPath: /workspace/model
-                          name: model-initializer
+                          name: initializer
                   volumes:
-                    - name: model-initializer
+                    - name: initializer
                       persistentVolumeClaim:
-                        claimName: model-initializer
+                        claimName: initializer
         - name: node
           dependsOn:
             - name: dataset-initializer
@@ -1446,17 +1446,15 @@ spec:
                         limits:
                           nvidia.com/gpu: 2
                       volumeMounts:
-                        - mountPath: /workspace/dataset
-                          name: dataset-initializer
                         - mountPath: /workspace/model
-                          name: model-initializer
+                          name: initializer
+                      volumeMounts:
+                        - mountPath: /workspace/dataset
+                          name: initializer
                   volumes:
-                    - name: dataset-initializer
+                    - name: initializer
                       persistentVolumeClaim:
-                        claimName: dataset-initializer
-                    - name: model-initializer
-                      persistentVolumeClaim:
-                        claimName: model-initializer
+                        claimName: initializer
 ```
 
 ##### Gemma 7b
@@ -1490,11 +1488,11 @@ spec:
                           value: hf://tatsu-lab/alpaca
                       volumeMounts:
                         - mountPath: /workspace/dataset
-                          name: dataset-initializer
+                          name: initializer
                   volumes:
-                    - name: dataset-initializer
+                    - name: initializer
                       persistentVolumeClaim:
-                        claimName: dataset-initializer
+                        claimName: initializer
         - name: model-initializer
           template:
             spec:
@@ -1513,11 +1511,11 @@ spec:
                           value: AutoModelForCausalLM
                       volumeMounts:
                         - mountPath: /workspace/model
-                          name: model-initializer
+                          name: initializer
                   volumes:
-                    - name: model-initializer
+                    - name: initializer
                       persistentVolumeClaim:
-                        claimName: model-initializer
+                        claimName: initializer
         - name: node
           dependsOn:
             - name: dataset-initializer
@@ -1548,16 +1546,13 @@ spec:
                           nvidia.com/gpu: 2
                       volumeMounts:
                         - mountPath: /workspace/dataset
-                          name: dataset-initializer
+                          name: initializer
                         - mountPath: /workspace/model
-                          name: model-initializer
+                          name: initializer
                   volumes:
-                    - name: dataset-initializer
+                    - name: initializer
                       persistentVolumeClaim:
-                        claimName: dataset-initializer
-                    - name: model-initializer
-                      persistentVolumeClaim:
-                        claimName: model-initializer
+                        claimName: initializer
 ```
 
 #### MPI Runtime
