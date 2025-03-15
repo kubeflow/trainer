@@ -700,8 +700,8 @@ replicatedJobs:
 
 ### The Model Initializer API
 
-The `DatasetInitializer` represents the APIs that data scientists can
-use to configure the pre-trained model input and output location.
+The `ModelInitializer` represents the APIs that data scientists can
+use to configure the pre-trained model input location.
 
 ```golang
 type ModelInitializer struct {
