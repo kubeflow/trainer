@@ -490,7 +490,12 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							},
 						},
 						{
-							Name: constants.ModelInitializer,
+							Name:               constants.ModelInitializer,
+							CountForNonTrainer: ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
 							Containers: []runtime.Container{
 								{
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
@@ -770,7 +775,12 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							},
 						},
 						{
-							Name: constants.ModelInitializer,
+							Name:               constants.ModelInitializer,
+							CountForNonTrainer: ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
 							Containers: []runtime.Container{
 								{
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
@@ -824,6 +834,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-job", "uid").
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode).
+					NumNodes(100).
 					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),
 						corev1.ResourceMemory: resource.MustParse("4Gi"),

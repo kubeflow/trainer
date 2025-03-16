@@ -82,6 +82,43 @@ func TestNewInfo(t *testing.T) {
 								})),
 					),
 				),
+				WithPodSet(constants.ModelInitializer, 1, corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name: constants.ModelInitializer,
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU: resource.MustParse("10"),
+							},
+						},
+					}},
+					InitContainers: []corev1.Container{{
+						Name:          "setup-initializer",
+						RestartPolicy: ptr.To(corev1.ContainerRestartPolicyAlways),
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU: resource.MustParse("5"),
+							},
+						},
+					}},
+				}, corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().
+							WithName(constants.ModelInitializer).
+							WithResources(corev1ac.ResourceRequirements().
+								WithRequests(corev1.ResourceList{
+									corev1.ResourceCPU: resource.MustParse("10"),
+								})),
+					).
+					WithInitContainers(
+						corev1ac.Container().
+							WithName("setup-initializer").
+							WithRestartPolicy(corev1.ContainerRestartPolicyAlways).
+							WithResources(corev1ac.ResourceRequirements().
+								WithRequests(corev1.ResourceList{
+									corev1.ResourceCPU: resource.MustParse("5"),
+								})),
+					),
+				),
 				WithPodSet(constants.JobTrainerNode, 10, corev1.PodSpec{
 					Containers: []corev1.Container{{
 						Name: constants.ContainerTrainer,
@@ -243,10 +280,16 @@ func TestNewInfo(t *testing.T) {
 							Containers: []Container{{
 								Name: constants.DatasetInitializer,
 							}},
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU: resource.MustParse("15"),
+							},
 						},
 						{
 							Name:               constants.ModelInitializer,
 							CountForNonTrainer: ptr.To[int32](1),
+							InitContainers: []Container{{
+								Name: "setup-initializer",
+							}},
 							Containers: []Container{{
 								Name: constants.ModelInitializer,
 							}},
