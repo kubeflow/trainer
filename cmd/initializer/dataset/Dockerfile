@@ -10,7 +10,8 @@ COPY pkg/initializer pkg/initializer
 RUN pip install -r requirements.txt
 
 # Git is needed for the Kubeflow SDK to download JobSet Python models.
-RUN apt update && apt install -y git
+RUN apt-get update && apt-get install -y git
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy and install the Kubeflow SDK for the configs.
 COPY sdk sdk
