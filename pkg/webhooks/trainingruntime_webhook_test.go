@@ -35,17 +35,19 @@ func TestValidateReplicatedJobs(t *testing.T) {
 	}{
 		"valid replicatedJobs": {
 			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
-				Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+				Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer).
 				Obj().Spec.ReplicatedJobs,
 		},
 		"invalid replicas": {
 			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
-				Replicas(2, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+				Replicas(2, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer).
 				Obj().Spec.ReplicatedJobs,
 			wantError: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("replicas"),
 					"2", ""),
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"),
+					"2", ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("replicas"),
 					"2", ""),
 			},
 		},

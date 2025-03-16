@@ -2,9 +2,9 @@ import logging
 from urllib.parse import urlparse
 
 import huggingface_hub
-from kubeflow.trainer import MODEL_PATH, HuggingFaceModelInputConfig
 
-import pkg.initializer.utils.utils as utils
+import pkg.initializers.types.types as types
+import pkg.initializers.utils.utils as utils
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
@@ -16,8 +16,8 @@ logging.basicConfig(
 class HuggingFace(utils.ModelProvider):
 
     def load_config(self):
-        config_dict = utils.get_config_from_env(HuggingFaceModelInputConfig)
-        self.config = HuggingFaceModelInputConfig(**config_dict)
+        config_dict = utils.get_config_from_env(types.HuggingFaceModelInitializer)
+        self.config = types.HuggingFaceModelInitializer(**config_dict)
 
     def download_model(self):
         storage_uri_parsed = urlparse(self.config.storage_uri)
@@ -35,7 +35,7 @@ class HuggingFace(utils.ModelProvider):
         # Ref: https://github.com/kubeflow/trainer/pull/2303#discussion_r1815914270
         huggingface_hub.snapshot_download(
             repo_id=model_uri,
-            local_dir=MODEL_PATH,
+            local_dir=utils.MODEL_PATH,
             allow_patterns=["*.json", "*.safetensors", "*.model"],
             ignore_patterns=["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
         )

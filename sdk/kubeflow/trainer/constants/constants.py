@@ -90,20 +90,18 @@ REPLICATED_JOB_KEY = "jobset.sigs.k8s.io/replicatedjob-name"
 # The label key to identify the Job completion index of the Pod.
 JOB_INDEX_KEY = "batch.kubernetes.io/job-completion-index"
 
-# The Job name for the initializer.
-JOB_INITIALIZER = "initializer"
-
-# The container name for the dataset initializer.
-CONTAINER_DATASET_INITIALIZER = "dataset-initializer"
-
-# The container name for the model initializer.
-CONTAINER_MODEL_INITIALIZER = "model-initializer"
-
 # The default path to the users' workspace.
+# TODO (andreyvelich): Discuss how to keep this path is sync with pkg.initializers.constants
 WORKSPACE_PATH = "/workspace"
+
+# The name of the ReplicatedJob and container of the dataset initializer
+DATASET_INITIALIZER = "dataset-initializer"
 
 # The path where initializer downloads dataset.
 DATASET_PATH = os.path.join(WORKSPACE_PATH, "dataset")
+
+# The name of the ReplicatedJob and container of the model initializer
+MODEL_INITIALIZER = "model-initializer"
 
 # The path where initializer downloads model.
 MODEL_PATH = os.path.join(WORKSPACE_PATH, "model")

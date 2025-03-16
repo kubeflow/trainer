@@ -10,7 +10,7 @@ Google doc: http://bit.ly/4gp8JGd
 
 ## Overview
 
-This document discusses the design of LLM Trainer for [Kubeflow Trainer v2](../2170-kubeflow-training-v2/README.md), tracked by [this issue](https://github.com/kubeflow/training-operator/issues/2401).
+This document discusses the design of LLM Trainer for [Kubeflow Trainer v2](../2170-kubeflow-trainer-v2/README.md), tracked by [this issue](https://github.com/kubeflow/training-operator/issues/2401).
 
 **We decided to implement a custom Trainer to fine-tune LLMs, which will be supported officially via TrainingRuntimes in Kubeflow upstream**. This will greatly ease the workload of writing fine-tuning scripts, and provide an in-box toolkit to fine-tune the LLMs with custom datasets and models for Data Scientists.
 

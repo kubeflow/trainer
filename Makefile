@@ -122,22 +122,20 @@ test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd ## Ru
 
 .PHONY: test-python
 test-python: ## Run Python unit test.
-	export PYTHONPATH=$(PROJECT_DIR)
 	pip install pytest
-	pip install -r ./cmd/initializer/dataset/requirements.txt
+	pip install -r ./cmd/initializers/dataset/requirements.txt
 	pip install ./sdk
 
-	pytest ./pkg/initializer/dataset
-	pytest ./pkg/initializer/model
-	pytest ./pkg/initializer/utils
+	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/dataset
+	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/model
+	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/utils
 
 .PHONY: test-python-integration
 test-python-integration: ## Run Python integration test.
-	export PYTHONPATH=$(PROJECT_DIR)
 	pip install pytest
-	pip install -r ./cmd/initializer/dataset/requirements.txt
+	pip install -r ./cmd/initializers/dataset/requirements.txt
 
-	pytest ./test/integration/initializer
+	PYTHONPATH=$(PROJECT_DIR) pytest ./test/integration/initializers
 
 .PHONY: test-e2e-setup-cluster
 test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.

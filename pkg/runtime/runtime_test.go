@@ -45,9 +45,9 @@ func TestNewInfo(t *testing.T) {
 				WithAnnotations(map[string]string{
 					"annotationKey": "annotationValue",
 				}),
-				WithPodSet(constants.JobInitializer, 1, corev1.PodSpec{
+				WithPodSet(constants.DatasetInitializer, 1, corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Name: constants.ContainerModelInitializer,
+						Name: constants.DatasetInitializer,
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceCPU: resource.MustParse("10"),
@@ -66,7 +66,7 @@ func TestNewInfo(t *testing.T) {
 				}, corev1ac.PodSpec().
 					WithContainers(
 						corev1ac.Container().
-							WithName(constants.ContainerModelInitializer).
+							WithName(constants.DatasetInitializer).
 							WithResources(corev1ac.ResourceRequirements().
 								WithRequests(corev1.ResourceList{
 									corev1.ResourceCPU: resource.MustParse("10"),
@@ -135,7 +135,7 @@ func TestNewInfo(t *testing.T) {
 					jobsetv1alpha2ac.JobSetSpec().
 						WithReplicatedJobs(
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobInitializer).
+								WithName(constants.DatasetInitializer).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithLabels(nil).
 									WithSpec(batchv1ac.JobSpec().
@@ -144,15 +144,35 @@ func TestNewInfo(t *testing.T) {
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
-														WithName(constants.ContainerDatasetInitializer).
+														WithName(constants.DatasetInitializer).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
 																WithMountPath(constants.DatasetMountPath),
 														).
 														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.ModelInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
 													corev1ac.Container().
-														WithName(constants.ContainerModelInitializer).
+														WithName(constants.ModelInitializer).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -215,13 +235,20 @@ func TestNewInfo(t *testing.T) {
 				TemplateSpec: TemplateSpec{
 					PodSets: []PodSet{
 						{
-							Name:               constants.JobInitializer,
+							Name:               constants.DatasetInitializer,
 							CountForNonTrainer: ptr.To[int32](1),
 							InitContainers: []Container{{
 								Name: "setup-initializer",
 							}},
 							Containers: []Container{{
-								Name: constants.ContainerModelInitializer,
+								Name: constants.DatasetInitializer,
+							}},
+						},
+						{
+							Name:               constants.ModelInitializer,
+							CountForNonTrainer: ptr.To[int32](1),
+							Containers: []Container{{
+								Name: constants.ModelInitializer,
 							}},
 							SinglePodRequests: corev1.ResourceList{
 								corev1.ResourceCPU: resource.MustParse("15"),
@@ -257,7 +284,7 @@ func TestNewInfo(t *testing.T) {
 					ObjApply: jobsetv1alpha2ac.JobSetSpec().
 						WithReplicatedJobs(
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobInitializer).
+								WithName(constants.DatasetInitializer).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithLabels(nil).
 									WithSpec(batchv1ac.JobSpec().
@@ -266,15 +293,35 @@ func TestNewInfo(t *testing.T) {
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
-														WithName(constants.ContainerDatasetInitializer).
+														WithName(constants.DatasetInitializer).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
 																WithMountPath(constants.DatasetMountPath),
 														).
 														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.ModelInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
 													corev1ac.Container().
-														WithName(constants.ContainerModelInitializer).
+														WithName(constants.ModelInitializer).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).

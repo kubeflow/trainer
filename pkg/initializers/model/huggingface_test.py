@@ -1,10 +1,9 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from kubeflow.trainer import MODEL_PATH
 
-import pkg.initializer.utils.utils as utils
-from pkg.initializer.model.huggingface import HuggingFace
+import pkg.initializers.utils.utils as utils
+from pkg.initializers.model.huggingface import HuggingFace
 
 
 # Test cases for config loading
@@ -86,7 +85,7 @@ def test_download_model(test_name, test_case):
         # Verify download parameters
         mock_download.assert_called_once_with(
             repo_id=test_case["expected_repo_id"],
-            local_dir=MODEL_PATH,
+            local_dir=utils.MODEL_PATH,
             allow_patterns=["*.json", "*.safetensors", "*.model"],
             ignore_patterns=["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
         )

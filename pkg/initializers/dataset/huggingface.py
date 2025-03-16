@@ -2,9 +2,9 @@ import logging
 from urllib.parse import urlparse
 
 import huggingface_hub
-from kubeflow.trainer import DATASET_PATH, HuggingFaceDatasetConfig
 
-import pkg.initializer.utils.utils as utils
+import pkg.initializers.types.types as types
+import pkg.initializers.utils.utils as utils
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
@@ -16,8 +16,8 @@ logging.basicConfig(
 class HuggingFace(utils.DatasetProvider):
 
     def load_config(self):
-        config_dict = utils.get_config_from_env(HuggingFaceDatasetConfig)
-        self.config = HuggingFaceDatasetConfig(**config_dict)
+        config_dict = utils.get_config_from_env(types.HuggingFaceDatasetInitializer)
+        self.config = types.HuggingFaceDatasetInitializer(**config_dict)
 
     def download_dataset(self):
         storage_uri_parsed = urlparse(self.config.storage_uri)
@@ -32,7 +32,7 @@ class HuggingFace(utils.DatasetProvider):
         huggingface_hub.snapshot_download(
             repo_id=dataset_uri,
             repo_type="dataset",
-            local_dir=DATASET_PATH,
+            local_dir=utils.DATASET_PATH,
         )
 
         logging.info("Dataset has been downloaded")

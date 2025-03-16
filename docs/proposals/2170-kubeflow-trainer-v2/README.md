@@ -1,11 +1,9 @@
-# KEP-2170: Kubeflow Training V2 API
+# KEP-2170: Kubeflow Trainer V2 API
 
 ## Authors
 
 - Andrey Velichkevich - [@andreyvelich](https://github.com/andreyvelich)
 - Yuki Iwai - [@tenzen-y](https://github.com/tenzen-y)
-
-Creation date: 2024-07-16
 
 Google doc: https://bit.ly/3WzjTlw
 
@@ -316,20 +314,19 @@ const (
 	TrainJobJobsCreationFailedReason string = "JobsCreationFailed"
 )
 
+
+// TrainJobSpec represents specification of the desired TrainJob.
 type TrainJobSpec struct {
 	// Reference to the training runtime.
 	// The field is immutable.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="runtimeRef is immutable"
 	RuntimeRef RuntimeRef `json:"runtimeRef"`
 
-	// Configuration of the desired trainer.
+	// Configuration of the initializer.
+	Initializer *Initializer `json:"initializer,omitempty"`
+
+	// Configuration of the trainer.
 	Trainer *Trainer `json:"trainer,omitempty"`
-
-	// Configuration of the training dataset.
-	DatasetConfig *DatasetConfig `json:"datasetConfig,omitempty"`
-
-	// Configuration of the pre-trained and trained model.
-	ModelConfig *ModelConfig `json:"modelConfig,omitempty"`
 
 	// Labels to apply for the derivative JobSet and Jobs.
 	// They will be merged with the TrainingRuntime values.
@@ -340,19 +337,24 @@ type TrainJobSpec struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Custom overrides for the training runtime.
+	// +listType=atomic
 	PodSpecOverrides []PodSpecOverride `json:"podSpecOverrides,omitempty"`
 
 	// Whether the controller should suspend the running TrainJob.
 	// Defaults to false.
+	// +kubebuilder:default=false
 	Suspend *bool `json:"suspend,omitempty"`
 
 	// ManagedBy is used to indicate the controller or entity that manages a TrainJob.
-	// The value must be either an empty, `kubeflow.org/trainjob-controller` or
+	// The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or
 	// `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which
 	// don't have this field at all or the field value is the reserved string
-	// `kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs
+	// `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs
 	// with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.
-	// Defaults to `kubeflow.org/trainjob-controller`
+	// Defaults to `trainer.kubeflow.org/trainjob-controller`
+	// +kubebuilder:default="trainer.kubeflow.org/trainjob-controller"
+	// +kubebuilder:validation:XValidation:rule="self in ['trainer.kubeflow.org/trainjob-controller', 'kueue.x-k8s.io/multikueue']", message="ManagedBy must be trainer.kubeflow.org/trainjob-controller or kueue.x-k8s.io/multikueue if set"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="ManagedBy value is immutable"
 	ManagedBy *string `json:"managedBy,omitempty"`
 }
 
@@ -370,6 +372,16 @@ type RuntimeRef struct {
 	// It must be one of TrainingRuntime or ClusterTrainingRuntime.
 	// Defaults to ClusterTrainingRuntime.
 	Kind *string `json:"kind,omitempty"`
+}
+
+// Initializer represents the desired configuration for the dataset and model initialization.
+// It is used to initialize the assets (dataset and pre-trained model) and pre-process data.
+type Initializer struct {
+	// Configuration of the dataset initialization and pre-processing.
+	Dataset *DatasetInitializer `json:"dataset,omitempty"`
+
+	// Configuration of the pre-trained model initialization
+	Model *ModelInitializer `json:"model,omitempty"`
 }
 
 type TrainJobStatus struct {
@@ -419,25 +431,19 @@ This table explains the rationale for each `TrainJob` parameter:
    </td>
   </tr>
   <tr>
+   <td><code>Initializer</code>
+   </td>
+   <td>Configuration for the dataset and model initialization.
+   </td>
+  </tr>
+  <tr>
    <td><code>Trainer</code>
    </td>
    <td>Configuration for the <code>Trainer</code> such as image, number of nodes, accelerators.
    </td>
   </tr>
   <tr>
-   <td><code>ModelConfig</code>
-   </td>
-   <td>Configuration of the pre-trained model and the location of the model output
-   </td>
-  </tr>
-  <tr>
-   <td><code>DatasetConfig</code>
-   </td>
-   <td>Configuration for the dataset that will be used to train or fine-tune model
-   </td>
-  </tr>
-  <tr>
-   <td>Labels and Annotations
+   <td><code>Labels and Annotations</code>
    </td>
    <td>Custom metadata that needs to be applied to the <code>TrainJob</code> resources: JobSet, Job, and Pods.
    </td>
@@ -452,7 +458,7 @@ This table explains the rationale for each `TrainJob` parameter:
    </td>
   </tr>
   <tr>
-   <td>Suspend and ManagedBy
+   <td><code>Suspend and ManagedBy</code>
    </td>
    <td>Scheduling directives for Kueue and MultiKueue
    </td>
@@ -528,22 +534,23 @@ metadata:
 spec:
   runtimeRef:
     name: torch-tune-llama-7b
-  datasetConfig:
-    storageUri: s3://dataset/custom-dataset/yelp-review
-    env:
-      - name: SPLIT
-        value: train[:5000]
-  modelConfig:
-    input:
-      storageUri: hf://meta-llama/Llama-2-7b
-    output:
-      storageUri: s3://trained-model
+  initializer:
+    dataset:
+      storageUri: s3://dataset/custom-dataset/yelp-review
 ```
 
 ### The Trainer API
 
 The `Trainer` represents the APIs that data scientists can use to configure the trainer settings.
 This trainer is executed on every distributed training Node.
+
+User can override the default parameters for the `trainer` container
+of the `node` Job. The runtime Pod template must contain the
+following label to identify relationship between PodSpec <-> `.trainJob.spec.trainer`:
+
+```
+trainer.kubeflow.org/trainjob-ancestor-step: trainer
+```
 
 ```golang
 type Trainer struct {
@@ -573,37 +580,13 @@ type Trainer struct {
 }
 ```
 
-The following table explains how `TrainingRuntime` parameters will be overridden with `Trainer`.
+The following tables show how `TrainingRuntime` fields will be overridden with `Trainer`.
 
 <table>
   <tr>
-   <td><strong><code>Trainer</code> Parameter</strong>
+   <td><strong>Parameter of <code>Trainer</code></strong>
    </td>
-   <td><strong> <code>TrainingRuntime</code> Parameter</strong>
-   </td>
-  </tr>
-  <tr>
-   <td><code>.image</code>
-   </td>
-   <td><code>.spec.replicatedJobs[name=’Node’].template.spec.template.spec.containers[name=’trainer’].image</code>
-   </td>
-  </tr>
-  <tr>
-   <td><code>.command</code>
-   </td>
-   <td><code>.spec.replicatedJobs[name=’Node’].template.spec.template.spec.containers[name=’trainer’].command</code>
-   </td>
-  </tr>
-  <tr>
-   <td><code>.args</code>
-   </td>
-   <td><code>.spec.replicatedJobs[name=’Node’].template.spec.template.spec.containers[name=’trainer’].args</code>
-   </td>
-  </tr>
-  <tr>
-   <td><code>.env</code>
-   </td>
-   <td><code>.spec.replicatedJobs[name=’Node’].template.spec.template.spec.containers[name=’trainer’].env</code>
+   <td><strong>Parameter of <code>TrainingRuntime</code></strong>
    </td>
   </tr>
   <tr>
@@ -612,28 +595,71 @@ The following table explains how `TrainingRuntime` parameters will be overridden
    <td><code>.spec.numNodes</code>
    </td>
   </tr>
+</table>
+
+The next table shows parameters used to override the Trainer container. These parameters are
+derived from the PodSpec of the ReplicatedJob, which includes the corresponding label:
+
+```
+.spec.replicatedJobs[...].template.spec.template.labels[trainer.kubeflow.org/trainjob-ancestor-step: trainer’]
+```
+
+<table>
   <tr>
+   <td><strong>Parameter of <code>Trainer</code></strong>
+   </td>
+   <td><strong>Parameter of <code>TrainingRuntime.Spec.ReplicatedJob[...].template.spec.template</code></strong>
+   </td>
+  </tr>
+  <tr>
+   <td><code>.image</code>
+   </td>
+   <td><code>.spec.containers[name=’trainer’].image</code>
+   </td>
+  </tr>
+  <tr>
+   <td><code>.command</code>
+   </td>
+   <td><code>.spec.containers[name=’trainer’].command</code>
+   </td>
+  </tr>
+  <tr>
+   <td><code>.args</code>
+   </td>
+   <td><code>.spec.containers[name=’trainer’].args</code>
+   </td>
+  </tr>
+  <tr>
+   <td><code>.env</code>
+   </td>
+   <td><code>.spec.containers[name=’trainer’].env</code>
+   </td>
+  </tr>
    <td><code>.resourcesPerNode</code>
    </td>
-   <td><code>.spec.replicatedJobs[name=’Node’].template.spec.template.spec.containers[name=’trainer’].resources</code>
+   <td><code>.spec.containers[name=’trainer’].resources</code>
    </td>
   </tr>
 </table>
 
-### The Dataset Config API
+### The Dataset Initializer API
 
-The `DatasetConfig` represents the APIs that data scientists can use to configure the dataset location.
+The `DatasetInitializer` represents the APIs that data scientists can use to configure the dataset
+location and pre-process data on CPUs.
 
 ```golang
-type DatasetConfig struct {
+type DatasetInitializer struct {
 	// Storage uri for the dataset provider.
 	StorageUri *string `json:"storageUri,omitempty"`
 
 	// List of environment variables to set in the dataset initializer container.
 	// These values will be merged with the TrainingRuntime's dataset initializer environments.
+	// +listType=map
+	// +listMapKey=name
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
-	// Reference to the TrainJob's secrets to download dataset.
+	// Reference to the secret with credentials to download dataset.
+	// Secret must be created in the TrainJob's namespace.
 	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
 }
 ```
@@ -643,107 +669,102 @@ Initially we will support the following dataset providers:
 - **S3:** `storageUri: s3://bucket-name/path/dataset`
 - **HuggingFace:** `storageUri: hf://repo-id`
 
-User can override the default env variables in the `dataset-initializer` container
-of the `Initializer` Job.
+User can override the default env variables for the `dataset-initializer` container
+of the `dataset-initializer` Job. The Runtime Pod template must contain the
+following label to identify relationship between PodSpec <-> TrainJob:
+
+```
+trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
+```
 
 For example:
 
 ```yaml
-datasetConfig:
-  storageUri: s3://datasets/yelp-review
-  env:
-    - name: ENDPOINT_URL
-      value: s3.custom.com
+initializer:
+  dataset:
+    storageUri: s3://datasets/yelp-review
+    env:
+      - name: ENDPOINT_URL
+        value: s3.custom.com
 ```
 
 Will be converted to:
 
 ```yaml
 replicatedJobs:
-  - name: Initializer
-    template:
-      spec:
-        template:
-          spec:
-            containers:
-              - name: dataset-initializer
-                image: docker.io/kubeflow/dataset-initializer
-                env:
-                  - name: STORAGE_URI
-                    value: s3://dataset/yelp-review
-                  - name: ENDPOINT_URL
-                    value: s3.custom.com
+  - name: dataset-initializer
+    spec:
+      template:
+        metadata:
+          labels:
+            trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
+        spec:
+          containers:
+            - name: dataset-initializer
+              image: docker.io/kubeflow/dataset-initializer
+              env:
+                - name: STORAGE_URI
+                  value: s3://dataset/yelp-review
+                - name: ENDPOINT_URL
+                  value: s3.custom.com
 ```
 
-### The Model Config API
+### The Model Initializer API
 
-The `ModelConfig` represents the APIs that data scientists can use to configure the pre-trained model
-input and output location.
+The `ModelInitializer` represents the APIs that data scientists can
+use to configure the pre-trained model input location.
 
 ```golang
-type ModelConfig struct {
-	// Configuration of the pre-trained model.
-	// When this API is used, the training runtime must have
-	// the `model-initializer` container in the `Initializer` Job.
-	Input *InputModel `json:"input,omitempty"`
-
-	// Configuration of the trained model.
-	// When this API is used, the training runtime must have
-	// the `model-exporter` container in the `Finalizer` Job.
-	Output *OutputModel `json:"output,omitempty"`
-}
-
-type InputModel struct {
+type ModelInitializer struct {
 	// Storage uri for the model provider.
 	StorageUri *string `json:"storageUri,omitempty"`
 
 	// List of environment variables to set in the model initializer container.
 	// These values will be merged with the TrainingRuntime's model initializer environments.
+	// +listType=map
+	// +listMapKey=name
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
-	// Reference to the TrainJob's secrets to download model.
-	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
-}
-
-type OutputModel struct {
-	// Storage uri for the model exporter.
-	StorageUri *string `json:"storageUri,omitempty"`
-
-	// List of environment variables to set in the model exporter container.
-	// These values will be merged with the TrainingRuntime's model exporter environments.
-	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// Reference to the TrainJob's secrets to export model.
+	// Reference to the secret with credentials to download model.
+	// Secret must be created in the TrainJob's namespace.
 	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
 }
 ```
-
-#### The Input Model API
 
 Initially we will support the following model providers:
 
 - **HuggingFace:** `storageUri: hf://model-path`
 
-User can override the default env variables in the `model-initializer` container
-of the `Initializer` Job.
+User can override the default env variables for the `model-initializer` container
+of the `model-initializer` Job. The Runtime Pod template must contain the
+following label to identify relationship between PodSpec <-> TrainJob:
+
+```
+trainer.kubeflow.org/trainjob-ancestor-step: model-initializer
+```
+
 For example:
 
 ```yaml
-modelConfig:
-  storageUri: hf://bert-based-cased
-  env:
-    - name: TRANSFORMER_TYPE
-      value: AutoModelForCausalLM
+initializer:
+  model:
+    storageUri: hf://bert-based-cased
+    env:
+      - name: TRANSFORMER_TYPE
+        value: AutoModelForCausalLM
 ```
 
 Will be converted to:
 
 ```yaml
 replicatedJobs:
-  - name: Initializer
+  - name: model-initializer
     template:
       spec:
         template:
+          metadata:
+            labels:
+              trainer.kubeflow.org/trainjob-ancestor-step: model-initializer
           spec:
             containers:
               - name: model-initializer
@@ -753,109 +774,6 @@ replicatedJobs:
                     value: hf://bert-based-cased
                   - name: TRANSFORMER_TYPE
                     value: AutoModelForCausalLM
-```
-
-#### The Output Model API
-
-After initial implementation of `TrainJob` and `TrainingRuntime`, we will support the ability to
-export the trained model. The following runtime can be implemented:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v2alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: torch-tune-llama-7b-export
-spec:
-  mlPolicy:
-    numNodes: 1
-  template:
-    spec:
-      replicatedJobs:
-        - name: initializer
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: dataset-initializer
-                      image: docker.io/kubeflow/dataset-initializer
-                      env:
-                        - name: STORAGE_URI
-                          value: hf://tatsu-lab/alpaca
-                      volumeMounts:
-                        - mountPath: /workspace/dataset
-                          name: dataset-initializer
-                    - name: model-initializer
-                      image: docker.io/kubeflow/model-initializer
-                      env:
-                        - name: STORAGE_URI
-                          value: hf://meta-llama/Llama-2-7b
-                      volumeMounts:
-                        - mountPath: /workspace/model
-                          name: model-initializer
-                  volumes:
-                    - name: dataset-initializer
-                      persistentVolumeClaim:
-                        claimName: dataset-initializer
-                    - name: model-initializer
-                      persistentVolumeClaim:
-                        claimName: model-initializer
-        - name: trainer-node
-          dependsOn:
-            - name: initializer
-              status: Complete
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: trainer
-                      image: docker.io/kubeflow/llm-trainer
-                      env:
-                        - name: MASTER_ADDR
-                          value: "pytorch-node-0-0.pytorch"
-                        - name: MASTER_PORT
-                          value: 29400
-                        - name: LORA_CONFIG
-                          value: |
-                            {"peft_type": "LORA", "r": 8, "lora_alpha": 16}
-                      command:
-                        - torchrun hf_llm_training.py
-                      resources:
-                        limits:
-                          nvidia.com/gpu: 2
-                      volumeMounts:
-                        - mountPath: /workspace/dataset
-                          name: dataset-initializer
-                        - mountPath: /workspace/pre-trained-model
-                          name: model-initializer
-                        - mountPath: /workspace/adapters
-                          name: model-exporter
-                  volumes:
-                    - name: dataset-initializer
-                      persistentVolumeClaim:
-                        claimName: dataset-initializer
-                    - name: model-initializer
-                      persistentVolumeClaim:
-                        claimName: model-initializer
-                    - name: model-exporter
-                      persistentVolumeClaim:
-                        claimName: model-exporter
-        - name: Finalizer
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: model-exporter
-                      image: docker.io/kubeflow/model-exporter
-                      volumeMounts:
-                        - mountPath: /workspace/adapters
-                          name: model-exporter
-                  volumes:
-                    - name: model-exporter
-                      persistentVolumeClaim:
-                        claimName: model-exporter
 ```
 
 ### The PodSpecOverride APIs
@@ -1142,10 +1060,13 @@ spec:
   template:
     spec:
       replicatedJobs:
-        - name: Node
+        - name: node
           template:
             spec:
               template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
                 spec:
                   schedulerName: coscheduling
                   containers:
@@ -1292,10 +1213,13 @@ spec:
   template:
     spec:
       replicatedJobs:
-        - name: Node
+        - name: node
           template:
             spec:
               template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
                 spec:
                   containers:
                     - name: trainer
@@ -1353,10 +1277,13 @@ spec:
   template:
     spec:
       replicatedJobs:
-        - name: Node
+        - name: node
           template:
             spec:
               template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
                 spec:
                   containers:
                     - name: trainer
@@ -1385,10 +1312,13 @@ spec:
   template:
     spec:
       replicatedJobs:
-        - name: Node
+        - name: node
           template:
             spec:
               template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
                 spec:
                   containers:
                     - name: trainer
@@ -1411,10 +1341,13 @@ spec:
   template:
     spec:
       replicatedJobs:
-        - name: Node
+        - name: node
           template:
             spec:
               template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
                 spec:
                   containers:
                     - name: trainer
@@ -1448,10 +1381,13 @@ spec:
   template:
     spec:
       replicatedJobs:
-        - name: initializer
+        - name: dataset-initializer
           template:
             spec:
               template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
                 spec:
                   containers:
                     - name: dataset-initializer
@@ -1461,7 +1397,20 @@ spec:
                           value: hf://tatsu-lab/alpaca
                       volumeMounts:
                         - mountPath: /workspace/dataset
-                          name: dataset-initializer
+                          name: initializer
+                  volumes:
+                    - name: initializer
+                      persistentVolumeClaim:
+                        claimName: initializer
+        - name: model-initializer
+          template:
+            spec:
+              template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: model-initializer
+                spec:
+                  containers:
                     - name: model-initializer
                       image: docker.io/kubeflow/model-initializer
                       env:
@@ -1471,21 +1420,23 @@ spec:
                           value: AutoModelForCausalLM
                       volumeMounts:
                         - mountPath: /workspace/model
-                          name: model-initializer
+                          name: initializer
                   volumes:
-                    - name: dataset-initializer
+                    - name: initializer
                       persistentVolumeClaim:
-                        claimName: dataset-initializer
-                    - name: model-initializer
-                      persistentVolumeClaim:
-                        claimName: model-initializer
-        - name: trainer-node
+                        claimName: initializer
+        - name: node
           dependsOn:
-            - name: initializer
+            - name: dataset-initializer
+              status: Complete
+            - name: model-initializer
               status: Complete
           template:
             spec:
               template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
                 spec:
                   containers:
                     - name: trainer
@@ -1506,17 +1457,15 @@ spec:
                         limits:
                           nvidia.com/gpu: 2
                       volumeMounts:
-                        - mountPath: /workspace/dataset
-                          name: dataset-initializer
                         - mountPath: /workspace/model
-                          name: model-initializer
+                          name: initializer
+                      volumeMounts:
+                        - mountPath: /workspace/dataset
+                          name: initializer
                   volumes:
-                    - name: dataset-initializer
+                    - name: initializer
                       persistentVolumeClaim:
-                        claimName: dataset-initializer
-                    - name: model-initializer
-                      persistentVolumeClaim:
-                        claimName: model-initializer
+                        claimName: initializer
 ```
 
 ##### Gemma 7b
@@ -1534,10 +1483,13 @@ spec:
   template:
     spec:
       replicatedJobs:
-        - name: initializer
+        - name: dataset-initializer
           template:
             spec:
               template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
                 spec:
                   containers:
                     - name: dataset-initializer
@@ -1547,7 +1499,20 @@ spec:
                           value: hf://tatsu-lab/alpaca
                       volumeMounts:
                         - mountPath: /workspace/dataset
-                          name: dataset-initializer
+                          name: initializer
+                  volumes:
+                    - name: initializer
+                      persistentVolumeClaim:
+                        claimName: initializer
+        - name: model-initializer
+          template:
+            spec:
+              template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: model-initializer
+                spec:
+                  containers:
                     - name: model-initializer
                       image: docker.io/kubeflow/model-initializer
                       env:
@@ -1557,17 +1522,16 @@ spec:
                           value: AutoModelForCausalLM
                       volumeMounts:
                         - mountPath: /workspace/model
-                          name: model-initializer
+                          name: initializer
                   volumes:
-                    - name: dataset-initializer
+                    - name: initializer
                       persistentVolumeClaim:
-                        claimName: dataset-initializer
-                    - name: model-initializer
-                      persistentVolumeClaim:
-                        claimName: model-initializer
-        - name: trainer-node
+                        claimName: initializer
+        - name: node
           dependsOn:
-            - name: initializer
+            - name: dataset-initializer
+              status: Complete
+            - name: model-initializer
               status: Complete
           template:
             spec:
@@ -1593,16 +1557,13 @@ spec:
                           nvidia.com/gpu: 2
                       volumeMounts:
                         - mountPath: /workspace/dataset
-                          name: dataset-initializer
+                          name: initializer
                         - mountPath: /workspace/model
-                          name: model-initializer
+                          name: initializer
                   volumes:
-                    - name: dataset-initializer
+                    - name: initializer
                       persistentVolumeClaim:
-                        claimName: dataset-initializer
-                    - name: model-initializer
-                      persistentVolumeClaim:
-                        claimName: model-initializer
+                        claimName: initializer
 ```
 
 #### MPI Runtime
@@ -1658,16 +1619,16 @@ spec:
         template:
           spec:
             template:
+              metadata:
+                labels:
+                  trainer.kubeflow.org/trainjob-ancestor-step: trainer
               spec:
                 containers:
                   - name: mpi-launcher
                     image: docker.io/mpi-launch
                     command:
                       - mpirun launch-job
-      - name: trainer-node
-        dependsOn:
-          - name: launcher
-            status: Ready
+      - name: node
         template:
           spec:
             template:
@@ -1810,10 +1771,13 @@ spec:
   template:
     spec:
       replicatedJobs:
-        - name: Node
+        - name: node
           template:
             spec:
               template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
                 spec:
                   containers:
                     - name: trainer
@@ -1826,6 +1790,11 @@ spec:
                       command:
                         - torchrun train.py
 ```
+
+## Implementation History
+
+- 2024-07-16 Creation date
+- 2025-03-15 Updated the initializer APIs
 
 ## Alternatives
 

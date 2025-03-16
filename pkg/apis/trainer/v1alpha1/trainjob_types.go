@@ -108,14 +108,11 @@ type TrainJobSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="runtimeRef is immutable"
 	RuntimeRef RuntimeRef `json:"runtimeRef"`
 
-	// Configuration of the desired trainer.
+	// Configuration of the initializer.
+	Initializer *Initializer `json:"initializer,omitempty"`
+
+	// Configuration of the trainer.
 	Trainer *Trainer `json:"trainer,omitempty"`
-
-	// Configuration of the training dataset.
-	DatasetConfig *DatasetConfig `json:"datasetConfig,omitempty"`
-
-	// Configuration of the pre-trained and trained model.
-	ModelConfig *ModelConfig `json:"modelConfig,omitempty"`
 
 	// Labels to apply for the derivative JobSet and Jobs.
 	// They will be merged with the TrainingRuntime values.
@@ -165,8 +162,55 @@ type RuntimeRef struct {
 	Kind *string `json:"kind,omitempty"`
 }
 
-// Trainer represents the desired trainer configuration.
-// Every training runtime contains `trainer` container which represents Trainer.
+// Initializer represents the desired configuration for the dataset and model initialization.
+// It is used to initialize the assets (dataset and pre-trained model) and pre-process data.
+type Initializer struct {
+	// Configuration of the dataset initialization and pre-processing.
+	Dataset *DatasetInitializer `json:"dataset,omitempty"`
+
+	// Configuration of the pre-trained model initialization
+	Model *ModelInitializer `json:"model,omitempty"`
+}
+
+// DatasetInitializer represents the desired configuration to initialize and pre-process dataset.
+// The DatasetInitializer spec will override the runtime Job template
+// which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
+type DatasetInitializer struct {
+	// Storage uri for the dataset provider.
+	StorageUri *string `json:"storageUri,omitempty"`
+
+	// List of environment variables to set in the dataset initializer container.
+	// These values will be merged with the TrainingRuntime's dataset initializer environments.
+	// +listType=map
+	// +listMapKey=name
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Reference to the secret with credentials to download dataset.
+	// Secret must be created in the TrainJob's namespace.
+	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
+}
+
+// DatasetInitializer represents the desired configuration to initialize pre-trained model.
+// The DatasetInitializer spec will override the runtime Job template
+// which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
+type ModelInitializer struct {
+	// Storage uri for the model provider.
+	StorageUri *string `json:"storageUri,omitempty"`
+
+	// List of environment variables to set in the model initializer container.
+	// These values will be merged with the TrainingRuntime's model initializer environments.
+	// +listType=map
+	// +listMapKey=name
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Reference to the secret with credentials to download model.
+	// Secret must be created in the TrainJob's namespace.
+	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
+}
+
+// Trainer represents the desired configuration for the training job.
+// The Trainer spec will override the runtime template
+// which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: trainer`
 type Trainer struct {
 	// Docker image for the training container.
 	Image *string `json:"image,omitempty"`
@@ -196,69 +240,6 @@ type Trainer struct {
 	// For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set.
 	// For the MPI runtime only int value can be set.
 	NumProcPerNode *intstr.IntOrString `json:"numProcPerNode,omitempty"`
-}
-
-// DatasetConfig represents the desired dataset configuration.
-// When this API is used, the training runtime must have
-// the `dataset-initializer` container in the `Initializer` Job.
-type DatasetConfig struct {
-	// Storage uri for the dataset provider.
-	StorageUri *string `json:"storageUri,omitempty"`
-
-	// List of environment variables to set in the dataset initializer container.
-	// These values will be merged with the TrainingRuntime's dataset initializer environments.
-	// +listType=map
-	// +listMapKey=name
-	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// Reference to the secret with credentials to download dataset.
-	// Secret must be created in the TrainJob's namespace.
-	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
-}
-
-// ModelConfig represents the desired model configuration.
-type ModelConfig struct {
-	// Configuration of the pre-trained model.
-	// When this API is used, the training runtime must have
-	// the `model-initializer` container in the `Initializer` Job.
-	Input *InputModel `json:"input,omitempty"`
-
-	// Configuration of the trained model.
-	// When this API is used, the training runtime must have
-	// the `model-exporter` container in the `Exporter` Job.
-	Output *OutputModel `json:"output,omitempty"`
-}
-
-// InputModel represents the desired pre-trained model configuration.
-type InputModel struct {
-	// Storage uri for the model provider.
-	StorageUri *string `json:"storageUri,omitempty"`
-
-	// List of environment variables to set in the model initializer container.
-	// These values will be merged with the TrainingRuntime's model initializer environments.
-	// +listType=map
-	// +listMapKey=name
-	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// Reference to the secret with credentials to download model.
-	// Secret must be created in the TrainJob's namespace.
-	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
-}
-
-// OutputModel represents the desired trained model configuration.
-type OutputModel struct {
-	// Storage uri for the model exporter.
-	StorageUri *string `json:"storageUri,omitempty"`
-
-	// List of environment variables to set in the model exporter container.
-	// These values will be merged with the TrainingRuntime's model exporter environments.
-	// +listType=map
-	// +listMapKey=name
-	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// Reference to the secret with credentials to export model.
-	// Secret must be created in the TrainJob's namespace.
-	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
 }
 
 // PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.

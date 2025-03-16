@@ -18,10 +18,10 @@ jobs:
             dockerfile: cmd/trainer-controller-manager/Dockerfile
             platforms: linux/amd64,linux/arm64,linux/ppc64le
           - component-name: model-initializer
-            dockerfile: cmd/initializer/model/Dockerfile
+            dockerfile: cmd/initializers/model/Dockerfile
             platforms: linux/amd64,linux/arm64
           - component-name: dataset-initializer
-            dockerfile: cmd/initializer/dataset/Dockerfile
+            dockerfile: cmd/initializers/dataset/Dockerfile
             platforms: linux/amd64,linux/arm64
           - component-name: torchtune-trainer
             dockerfile: cmd/trainers/torchtune/Dockerfile

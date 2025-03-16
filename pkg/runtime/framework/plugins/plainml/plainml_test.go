@@ -129,7 +129,7 @@ func TestPlainML(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						ContainerEnv(corev1.EnvVar{
+						Env(corev1.EnvVar{
 							Name:  "CONFLICT",
 							Value: "FROM_TRAINER",
 						},

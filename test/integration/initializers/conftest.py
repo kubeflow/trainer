@@ -34,9 +34,9 @@ def setup_temp_path(monkeypatch):
 
     def configure_path(path_var: str):
         """Configure path variable in kubeflow.trainer"""
-        import kubeflow.trainer as trainer
+        import pkg.initializers.utils.utils as utils
 
-        monkeypatch.setattr(trainer, path_var, temp_dir)
+        monkeypatch.setattr(utils, path_var, temp_dir)
         return temp_dir
 
     yield configure_path

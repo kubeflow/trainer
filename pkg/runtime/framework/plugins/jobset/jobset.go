@@ -94,22 +94,23 @@ func (j *JobSet) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime
 		}
 	}
 
-	if newObj.Spec.ModelConfig != nil && newObj.Spec.ModelConfig.Input != nil {
-		if containerSet, ok := rJobContainerNames[constants.JobInitializer]; !ok {
-			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input modelConfig", constants.JobInitializer)))
-		} else if !containerSet.Has(constants.ContainerModelInitializer) {
-			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ContainerModelInitializer, constants.JobInitializer)))
-		}
-	}
-
-	if newObj.Spec.DatasetConfig != nil {
-		if containerSet, ok := rJobContainerNames[constants.JobInitializer]; !ok {
-			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.JobInitializer)))
-		} else if !containerSet.Has(constants.ContainerDatasetInitializer) {
-			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ContainerDatasetInitializer, constants.JobInitializer)))
+	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Dataset != nil {
+		if containerSet, ok := rJobContainerNames[constants.DatasetInitializer]; !ok {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.DatasetInitializer)))
+		} else if !containerSet.Has(constants.DatasetInitializer) {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.DatasetInitializer, constants.DatasetInitializer)))
 		}
 
 	}
+
+	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Model != nil {
+		if containerSet, ok := rJobContainerNames[constants.ModelInitializer]; !ok {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input modelConfig", constants.ModelInitializer)))
+		} else if !containerSet.Has(constants.ModelInitializer) {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)))
+		}
+	}
+
 	return nil, allErrs
 }
 
