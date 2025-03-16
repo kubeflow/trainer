@@ -113,7 +113,8 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 			ginkgo.Entry("Should fail in creating trainJob with pre-trained model config when referencing a trainingRuntime without an initializer",
 				func() *trainer.TrainJob {
 					newContainers := []corev1.Container{}
-					job := &trainingRuntime.Spec.Template.Spec.ReplicatedJobs[0]
+					// TODO (andreyvelich): Refactor this test to check ancestor label.
+					job := &trainingRuntime.Spec.Template.Spec.ReplicatedJobs[1]
 					for _, container := range job.Template.Spec.Template.Spec.Containers {
 						if container.Name != constants.ModelInitializer {
 							newContainers = append(newContainers, container)
