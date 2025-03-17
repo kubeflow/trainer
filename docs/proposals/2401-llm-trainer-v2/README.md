@@ -204,9 +204,9 @@ So we plan to modify the `train` API to:
 
 ```python
 def train(
+    runtime_ref: str,
     trainer: Optional[Union[CustomTrainer, BuiltinTrainer]] = None,
     initializer: Optional[Initializer] = None,
-    runtime_ref: Optional[str] = None,
 ) -> str:
     pass
 
