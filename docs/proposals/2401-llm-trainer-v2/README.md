@@ -77,10 +77,7 @@ To hide users from complex Kubernetes configuations, we will provide a simple ye
 
 ```python
 job_id = TrainingClient().train(
-    dataset_config=HuggingFaceDatasetConfig(
-        storage_uri="tatsu-lab/alpaca",
-    ),
-    fine_tuning_config=TorchTuneConfig(
+    trainer=TorchTuneConfig(
         dtype="bf16",
         batch_size=1,
         epochs=1,
@@ -89,6 +86,11 @@ job_id = TrainingClient().train(
             lora_alpha=128,
         ),
         num_nodes=5,
+    ),
+    initializer=Initializer(
+        dataset=HuggingFaceDatasetInitializer(
+            storage_uri="tatsu-lab/alpaca",
+        )
     ),
     runtime_ref="torchtune-llama3.1-8B-finetuning",
 )
