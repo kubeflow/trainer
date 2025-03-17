@@ -3,14 +3,16 @@ kind: Kustomization
 
 # Namespace where all resources are deployed.
 namespace: kubeflow-system
+sortOptions:
+  order: fifo
 
 resources:
   - namespace.yaml
   - ../../third-party/jobset  # Comment this line if JobSet is installed on the Kubernetes cluster.
   - ../../base/crds
+  - ../../base/runtimes/pretraining
   - ../../base/manager
   - ../../base/rbac
-  - ../../base/runtimes/pretraining
   - ../../base/webhook
 
 # Update the Kubeflow Trainer controller manager image tag.
