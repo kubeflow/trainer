@@ -114,7 +114,7 @@ endif
 # Instructions to run tests.
 .PHONY: test
 test: ## Run Go unit test.
-	go test $(shell go list ./... | grep -v '/test/') -coverprofile cover.out
+	go test $(shell go list ./... | grep -v '/test/' | grep -v '/cmd/' | grep -v '/hack/' | grep -v '/pkg/apis' | grep -v '/pkg/client') -coverprofile cover.out
 
 .PHONY: test-integration
 test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd ## Run Go integration test.

@@ -1,8 +1,8 @@
 # Kubeflow Trainer
 
-[![Build Status](https://github.com/kubeflow/training-operator/actions/workflows/test-go.yaml/badge.svg?branch=master)](https://github.com/kubeflow/training-operator/actions/workflows/test-go.yaml?branch=master)
-[![Coverage Status](https://coveralls.io/repos/github/kubeflow/training-operator/badge.svg?branch=master)](https://coveralls.io/github/kubeflow/training-operator?branch=master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/kubeflow/training-operator)](https://goreportcard.com/report/github.com/kubeflow/training-operator)
+[![Build Status](https://github.com/kubeflow/trainer/actions/workflows/test-go.yaml/badge.svg?branch=master)](https://github.com/kubeflow/trainer/actions/workflows/test-go.yaml?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/kubeflow/trainer/badge.svg?branch=master)](https://coveralls.io/github/kubeflow/trainer?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kubeflow/trainer)](https://goreportcard.com/report/github.com/kubeflow/trainer)
 
 <h1 align="center">
     <img src="./docs/images/trainer-logo.svg" alt="logo" width="200">
@@ -60,7 +60,7 @@ Kubeflow Trainer project is currently in <strong>alpha</strong> status, and APIs
 If you are using Kubeflow Training Operator V1, please refer [to this migration document](https://www.kubeflow.org/docs/components/trainer/operator-guides/migration/).
 
 Kubeflow Community will maintain the Training Operator V1 source code at
-[the `release-1.9` branch](https://github.com/kubeflow/training-operator/tree/release-1.9).
+[the `release-1.9` branch](https://github.com/kubeflow/trainer/tree/release-1.9).
 
 You can find the documentation for Kubeflow Training Operator V1 in [these guides](https://www.kubeflow.org/docs/components/trainer/legacy-v1).
 
