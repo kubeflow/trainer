@@ -200,10 +200,8 @@ So we plan to modify the `train` API to:
 
 ```python
 def train(
-    trainer: Optional[CustomTrainer] = None,
-    fine_tuning_config: Optional[Union[TorchTuneConfig]] = None,
-    dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
-    model_config: Optional[types.HuggingFaceModelInputConfig] = None,
+    trainer: Optional[Union[CustomTrainer, BuiltinTrainer]] = None,
+    initializer: Optional[Initializer] = None,
     runtime_ref: Optional[str] = None,
 ) -> str:
     pass
@@ -217,11 +215,15 @@ class CustomTrainer:
     num_nodes: Optional[int] = None
     resources_per_node: Optional[Dict] = None
 
+@dataclass
+class BuiltinTrainer:
+    config: Optional[TorchTuneConfig] = None
+
 ```
 
-`trainer` defines the parameters for Type 1 tasks, and will add support for custom function in the initial stage.
+`CustomTrainer` defines the parameters for Type 1 tasks, and will add support for custom function in the initial stage.
 
-`fine_tuning_config` defines the parameters for LLM fine-tuning task in Type 2, and will add support for fine-tuning with `torchtune` in the early stage.
+`BuiltinTrainer` defines the parameters for Type 2 tasks, and will add support for post-training with `torchtune` in the early stage.
 
 We natively support all `recipe` and `config` supported by `torchtune`, since `torchtune` has already provided us with default `config`. We just cannot mutate them if we do not support the corresponding mutation config.
 
