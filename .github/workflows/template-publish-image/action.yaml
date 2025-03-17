@@ -49,23 +49,24 @@ runs:
         docker system df
         df -hT
 
-    - name: Move docker data directory
-      shell: bash
-      run: |
-        echo "Stopping docker service ..."
-        sudo systemctl stop docker
-        DOCKER_DEFAULT_ROOT_DIR=/var/lib/docker
-        DOCKER_ROOT_DIR=/mnt/docker
-        echo "Moving ${DOCKER_DEFAULT_ROOT_DIR} -> ${DOCKER_ROOT_DIR}"
-        sudo mv ${DOCKER_DEFAULT_ROOT_DIR} ${DOCKER_ROOT_DIR}
-        echo "Creating symlink ${DOCKER_DEFAULT_ROOT_DIR} -> ${DOCKER_ROOT_DIR}"
-        sudo ln -s ${DOCKER_ROOT_DIR} ${DOCKER_DEFAULT_ROOT_DIR}
-        echo "$(sudo ls -l ${DOCKER_DEFAULT_ROOT_DIR})"
-        echo "Starting docker service ..."
-        sudo systemctl daemon-reload
-        sudo systemctl start docker
-        echo "Docker service status:"
-        sudo systemctl --no-pager -l -o short status docker
+# Tombstoning this step as it isn't needed on CNCF Runners
+#    - name: Move docker data directory
+#      shell: bash
+#      run: |
+#        echo "Stopping docker service ..."
+#        sudo systemctl stop docker
+#        DOCKER_DEFAULT_ROOT_DIR=/var/lib/docker
+#        DOCKER_ROOT_DIR=/mnt/docker
+#        echo "Moving ${DOCKER_DEFAULT_ROOT_DIR} -> ${DOCKER_ROOT_DIR}"
+#        sudo mv ${DOCKER_DEFAULT_ROOT_DIR} ${DOCKER_ROOT_DIR}
+#        echo "Creating symlink ${DOCKER_DEFAULT_ROOT_DIR} -> ${DOCKER_ROOT_DIR}"
+#        sudo ln -s ${DOCKER_ROOT_DIR} ${DOCKER_DEFAULT_ROOT_DIR}
+#        echo "$(sudo ls -l ${DOCKER_DEFAULT_ROOT_DIR})"
+#        echo "Starting docker service ..."
+#        sudo systemctl daemon-reload
+#        sudo systemctl start docker
+#        echo "Docker service status:"
+#        sudo systemctl --no-pager -l -o short status docker
 
     - name: Setup QEMU
       uses: docker/setup-qemu-action@v3
