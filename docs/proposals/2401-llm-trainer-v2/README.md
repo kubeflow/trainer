@@ -77,15 +77,17 @@ To hide users from complex Kubernetes configuations, we will provide a simple ye
 
 ```python
 job_id = TrainingClient().train(
-    trainer=TorchTuneConfig(
-        dtype="bf16",
-        batch_size=1,
-        epochs=1,
-        peft_config=LoraConfig(
-            lora_rank=64,
-            lora_alpha=128,
+    trainer=BuiltinTrainer(
+        config=TorchTuneConfig(
+            dtype="bf16",
+            batch_size=1,
+            epochs=1,
+            peft_config=LoraConfig(
+                lora_rank=64,
+                lora_alpha=128,
+            ),
+            num_nodes=5,
         ),
-        num_nodes=5,
     ),
     initializer=Initializer(
         dataset=HuggingFaceDatasetInitializer(
