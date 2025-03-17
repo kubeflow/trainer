@@ -331,6 +331,20 @@ func (j *JobSetWrapper) ControllerReference(gvk schema.GroupVersionKind, name, u
 	return j
 }
 
+func (j *JobSetWrapper) ReplicatedJobLabel(key, value string, rJobNames ...string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if !slices.Contains(rJobNames, rJob.Name) {
+			continue
+		}
+
+		if rJob.Template.Labels == nil {
+			j.Spec.ReplicatedJobs[i].Template.Labels = make(map[string]string, 1)
+		}
+		j.Spec.ReplicatedJobs[i].Template.Labels[key] = value
+	}
+	return j
+}
+
 func (j *JobSetWrapper) PodLabel(key, value string) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Template.Spec.Template.Labels == nil {

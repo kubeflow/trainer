@@ -35,12 +35,20 @@ func TestValidateReplicatedJobs(t *testing.T) {
 	}{
 		"valid replicatedJobs": {
 			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
-				Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+				LauncherReplica().
+				Replicas(1, constants.Launcher, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+				Obj().Spec.ReplicatedJobs,
+		},
+		"valid replicatedJobs with unknown user-specified ancestor": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				ReplicatedJobLabel(constants.LabelTrainJobAncestor, "user-specified", constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+				Replicas(2, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 				Obj().Spec.ReplicatedJobs,
 		},
 		"invalid replicas": {
 			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
-				Replicas(2, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+				LauncherReplica().
+				Replicas(2, constants.Launcher, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 				Obj().Spec.ReplicatedJobs,
 			wantError: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("replicas"),
@@ -48,6 +56,8 @@ func TestValidateReplicatedJobs(t *testing.T) {
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"),
 					"2", ""),
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("replicas"),
+					"2", ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(3).Child("replicas"),
 					"2", ""),
 			},
 		},
