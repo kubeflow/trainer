@@ -212,7 +212,7 @@ def train(
 
 @dataclass
 class CustomTrainer:
-    func: Optional[Callable] = None
+    func: Callable
     func_args: Optional[Dict] = None
     packages_to_install: Optional[List[str]] = None
     pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
