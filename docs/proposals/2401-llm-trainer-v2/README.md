@@ -197,8 +197,8 @@ TrainerClient().train(
 
 As we discussed in [Github](https://github.com/kubeflow/trainer/pull/2410#discussion_r1963832826), the `train()` API mainly executes two types of training tasks:
 
-1. **Type 1: Training with custom function/image**: A self-contained function/image that encapsulates the entire model training process.
-2. **Type 2: Config-driven approach with existing Trainer**: A trainer that already includes fine-tuning logic, requiring only parameter adjustments.
+1. **Type 1: Training with custom function/image**: A self-contained function/image that encapsulates the entire model training process (e.g. `CustomTrainer`).
+2. **Type 2: Config-driven approach with existing Trainer**: A trainer that already includes fine-tuning logic, requiring only parameter adjustments (e.g. `BuiltinTrainer`).
 
 So we plan to modify the `train()` API to:
 
