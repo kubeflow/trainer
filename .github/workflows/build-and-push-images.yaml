@@ -8,7 +8,7 @@ jobs:
   build-and-publish-to-ghcr:
     name: Build and Publish Images to Github Container Registry
     runs-on:
-      labels: ubuntu-latest-16-cores
+      labels: oracle-16cpu-64gb-x86-64
 
     strategy:
       fail-fast: false
@@ -69,7 +69,7 @@ jobs:
   build-and-publish-to-dockerhub:
     name: Build and Publish Images to DockerHub
     runs-on:
-      labels: ubuntu-latest-16-cores
+      labels: oracle-16cpu-64gb-x86-64
 
     strategy:
       fail-fast: false
