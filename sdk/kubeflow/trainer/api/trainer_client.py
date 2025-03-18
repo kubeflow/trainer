@@ -162,18 +162,7 @@ class TrainerClient:
 
         Args:
             runtime_ref (`str`): Reference to the name of existing (Cluster)TrainingRuntime.
-            trainer (`Optional[types.CustomTrainer]`):
-                Configuration of the trainer which trains a model with a self-contained function
-                    that encapsulates the entire model training process.
-            fine_tuning_config (`Optional[types.TorchTuneConfig`]):
-                Configuration of the trainer which fine-tunes existing pre-trained models.
-                Currently, we support these types of trainer:
-                - `types.TorchTuneConfig`: Training with the `torchtune` trainer that already
-                    includes the fine-tuning logic, requiring only parameter adjustments.
-            dataset_config (`Optional[types.HuggingFaceDatasetConfig]`):
-                Configuration for the dataset provider.
-            model_config (`Optional[types.HuggingFaceModelInputConfig]`):
-                Configuration for the model provider.
+            trainer (`Optional[types.CustomTrainer, types.TorchTuneConfig]`)
 
         Returns:
             str: The unique name of the TrainJob that has been generated.
@@ -191,7 +180,6 @@ class TrainerClient:
         # Build the Trainer.
         trainer_crd = models.TrainerV1alpha1Trainer()
 
-        # If users choose to use a custom training function.
         if trainer and isinstance(trainer, types.CustomTrainer):
             # Add number of nodes to the Trainer.
             if trainer.num_nodes:
@@ -205,43 +193,26 @@ class TrainerClient:
                     trainer.resources_per_node
                 )
 
-            # TODO: Support train function parameters.
-            trainer_crd.command, trainer_crd.args = (
-                utils.get_entrypoint_using_train_func(
-                    runtime,
-                    trainer.func,
-                    trainer.func_args,
-                    trainer.pip_index_url,
-                    trainer.packages_to_install,
+            # If users choose to use a custom training function.
+            if isinstance(trainer, types.CustomTrainer):
+                # TODO: Support train function parameters.
+                trainer_crd.command, trainer_crd.args = (
+                    utils.get_entrypoint_using_train_func(
+                        runtime,
+                        trainer.func,
+                        trainer.func_args,
+                        trainer.pip_index_url,
+                        trainer.packages_to_install,
+                    )
                 )
-            )
 
             # If users choose to use a pre-trained model for fine-tuning.
-            # elif fine_tuning_config:
-            #     if not isinstance(fine_tuning_config, types.TorchTuneConfig):
-            #         raise ValueError(
-            #             "The fine_tuning_config must be an instance of TorchTuneConfig."
-            #         )
-
-            #     # Add number of nodes to the Trainer.
-            #     if fine_tuning_config.num_nodes:
-            #         trainer_crd.num_nodes = fine_tuning_config.num_nodes
-
-            #     # Add resources per node to the Trainer.
-            #     if fine_tuning_config.resources_per_node:
-            #         trainer_crd.resources_per_node = utils.get_resources_per_node(
-            #             fine_tuning_config.resources_per_node
-            #         )
-
             # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
             # the torchtune config in the runtime plugin.
             # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
-            trainer_crd.command = constants.DEFAULT_TORCHTUNE_COMMAND
-            # trainer_crd.args = utils.get_args_using_torchtune_config(fine_tuning_config)
-
-        # If neither trainer nor fine_tuning_config is set, raise an value error.
-        else:
-            raise ValueError("Either trainer or fine_tuning_config must be set.")
+            elif isinstance(trainer, types.TorchTuneConfig):
+                trainer_crd.command = constants.DEFAULT_TORCHTUNE_COMMAND
+                trainer_crd.args = utils.get_args_using_torchtune_config(trainer)
 
         train_job = models.TrainerV1alpha1TrainJob(
             apiVersion=constants.API_VERSION,
