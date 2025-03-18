@@ -18,7 +18,7 @@ import queue
 import random
 import string
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
@@ -150,7 +150,7 @@ class TrainerClient:
         self,
         runtime: types.Runtime = types.DEFAULT_RUNTIME,
         initializer: Optional[types.Initializer] = None,
-        trainer: Optional[types.CustomTrainer] = None,
+        trainer: Optional[Union[types.CustomTrainer, types.TorchTuneConfig]] = None,
     ) -> str:
         """
         Create the TrainJob. You can configure these types of training task:
@@ -192,10 +192,7 @@ class TrainerClient:
         trainer_crd = models.TrainerV1alpha1Trainer()
 
         # If users choose to use a custom training function.
-        if trainer:
-            if not isinstance(trainer, types.CustomTrainer):
-                raise ValueError("The trainer must be an instance of CustomTrainer.")
-
+        if trainer and isinstance(trainer, types.CustomTrainer):
             # Add number of nodes to the Trainer.
             if trainer.num_nodes:
                 trainer_crd.num_nodes = trainer.num_nodes
@@ -219,28 +216,28 @@ class TrainerClient:
                 )
             )
 
-        # If users choose to use a pre-trained model for fine-tuning.
-        elif fine_tuning_config:
-            if not isinstance(fine_tuning_config, types.TorchTuneConfig):
-                raise ValueError(
-                    "The fine_tuning_config must be an instance of TorchTuneConfig."
-                )
+            # If users choose to use a pre-trained model for fine-tuning.
+            # elif fine_tuning_config:
+            #     if not isinstance(fine_tuning_config, types.TorchTuneConfig):
+            #         raise ValueError(
+            #             "The fine_tuning_config must be an instance of TorchTuneConfig."
+            #         )
 
-            # Add number of nodes to the Trainer.
-            if fine_tuning_config.num_nodes:
-                trainer_crd.num_nodes = fine_tuning_config.num_nodes
+            #     # Add number of nodes to the Trainer.
+            #     if fine_tuning_config.num_nodes:
+            #         trainer_crd.num_nodes = fine_tuning_config.num_nodes
 
-            # Add resources per node to the Trainer.
-            if fine_tuning_config.resources_per_node:
-                trainer_crd.resources_per_node = utils.get_resources_per_node(
-                    fine_tuning_config.resources_per_node
-                )
+            #     # Add resources per node to the Trainer.
+            #     if fine_tuning_config.resources_per_node:
+            #         trainer_crd.resources_per_node = utils.get_resources_per_node(
+            #             fine_tuning_config.resources_per_node
+            #         )
 
             # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
             # the torchtune config in the runtime plugin.
             # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
             trainer_crd.command = constants.DEFAULT_TORCHTUNE_COMMAND
-            trainer_crd.args = utils.get_args_using_torchtune_config(fine_tuning_config)
+            # trainer_crd.args = utils.get_args_using_torchtune_config(fine_tuning_config)
 
         # If neither trainer nor fine_tuning_config is set, raise an value error.
         else:
