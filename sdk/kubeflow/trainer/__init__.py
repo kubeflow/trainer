@@ -28,4 +28,5 @@ from kubeflow.trainer.types.types import (
     CustomTrainer,
     HuggingFaceDatasetInitializer,
     HuggingFaceModelInitializer,
+    Initializer,
 )
