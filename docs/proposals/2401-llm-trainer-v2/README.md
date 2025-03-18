@@ -76,7 +76,7 @@ By adopting `torchtune` as the low-level runtime for LLM fine-tuning, we can eas
 To hide users from complex Kubernetes configuations, we will provide a simple yet flexible Python SDK wrapping all specifications of models, datasets, training runtime and fine-tuning configs. Like this:
 
 ```python
-job_id = TrainingClient().train(
+job_id = TrainerClient().train(
     trainer=BuiltinTrainer(
         config=TorchTuneConfig(
             dtype="bf16",
