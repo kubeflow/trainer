@@ -221,7 +221,7 @@ class CustomTrainer:
 
 @dataclass
 class BuiltinTrainer:
-    config: Optional[TorchTuneConfig] = None
+    config: TorchTuneConfig
 
 ```
 
