@@ -964,30 +964,47 @@ func (m *MLPolicyWrapper) WithNumNodes(numNodes int32) *MLPolicyWrapper {
 	return m
 }
 
-func (m *MLPolicyWrapper) TorchPolicy(numProcPerNode string, elasticPolicy *trainer.TorchElasticPolicy) *MLPolicyWrapper {
-	if m.MLPolicySource.Torch == nil {
-		m.MLPolicySource.Torch = &trainer.TorchMLPolicySource{}
+func (m *MLPolicyWrapper) WithMLPolicySource(source trainer.MLPolicySource) *MLPolicyWrapper {
+	m.MLPolicySource = source
+	return m
+}
+
+func (m *MLPolicyWrapper) Obj() *trainer.MLPolicy {
+	return &m.MLPolicy
+}
+
+type MLPolicySourceWrapper struct {
+	trainer.MLPolicySource
+}
+
+func MakeMLPolicySourceWrapper() *MLPolicySourceWrapper {
+	return &MLPolicySourceWrapper{}
+}
+
+func (m *MLPolicySourceWrapper) TorchPolicy(numProcPerNode string, elasticPolicy *trainer.TorchElasticPolicy) *MLPolicySourceWrapper {
+	if m.Torch == nil {
+		m.Torch = &trainer.TorchMLPolicySource{}
 	}
-	m.MLPolicySource.Torch = &trainer.TorchMLPolicySource{
+	m.Torch = &trainer.TorchMLPolicySource{
 		NumProcPerNode: ptr.To(intstr.FromString(numProcPerNode)),
 		ElasticPolicy:  elasticPolicy,
 	}
 	return m
 }
 
-func (m *MLPolicyWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation *trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsNode *bool) *MLPolicyWrapper {
-	if m.MLPolicySource.MPI == nil {
-		m.MLPolicySource.MPI = &trainer.MPIMLPolicySource{}
+func (m *MLPolicySourceWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation *trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsNode *bool) *MLPolicySourceWrapper {
+	if m.MPI == nil {
+		m.MPI = &trainer.MPIMLPolicySource{}
 	}
-	m.MLPolicySource.MPI.NumProcPerNode = numProcPerNode
-	m.MLPolicySource.MPI.MPIImplementation = MPImplementation
-	m.MLPolicySource.MPI.SSHAuthMountPath = sshAuthMountPath
-	m.MLPolicySource.MPI.RunLauncherAsNode = runLauncherAsNode
+	m.MPI.NumProcPerNode = numProcPerNode
+	m.MPI.MPIImplementation = MPImplementation
+	m.MPI.SSHAuthMountPath = sshAuthMountPath
+	m.MPI.RunLauncherAsNode = runLauncherAsNode
 	return m
 }
 
-func (m *MLPolicyWrapper) Obj() *trainer.MLPolicy {
-	return &m.MLPolicy
+func (m *MLPolicySourceWrapper) Obj() *trainer.MLPolicySource {
+	return &m.MLPolicySource
 }
 
 type SchedulerPluginsPodGroupWrapper struct {

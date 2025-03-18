@@ -82,7 +82,7 @@ func (m *MPI) Name() string {
 
 func (m *MPI) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.Info, oldJobObj, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
-	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicy == nil || runtimeInfo.RuntimePolicy.MLPolicy.MPI == nil {
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil, allErrs
 	}
 
@@ -98,17 +98,17 @@ func (m *MPI) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.In
 }
 
 func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
-	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.MPI == nil {
+	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil
 	}
 
 	// TrainJob contains the actual information for the Trainer.
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		info.RuntimePolicy.MLPolicy.NumNodes = trainJob.Spec.Trainer.NumNodes
+		info.FindPodSetByName(constants.JobTrainerNode).Count = trainJob.Spec.Trainer.NumNodes
 	}
 
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
-		info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode = ptr.To(int32(trainJob.Spec.Trainer.NumProcPerNode.IntValue()))
+		info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode = ptr.To(int32(trainJob.Spec.Trainer.NumProcPerNode.IntValue()))
 	}
 
 	// Add Secret and ConfigMap volumes to the Info object
@@ -164,7 +164,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 				[]corev1ac.VolumeMountApplyConfiguration{
 					*corev1ac.VolumeMount().
 						WithName(constants.MPISSHAuthVolumeName).
-						WithMountPath(*info.RuntimePolicy.MLPolicy.MPI.SSHAuthMountPath),
+						WithMountPath(*info.RuntimePolicy.MLPolicySource.MPI.SSHAuthMountPath),
 				}...,
 			)
 			if ps.Name == constants.JobLauncher && container.Name == constants.ContainerLauncher {
@@ -174,7 +174,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 						WithName(constants.MPIHostfileVolumeName).
 						WithMountPath(constants.MPIHostfileDir),
 				)
-				switch *info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
+				switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
 				case trainer.MPIImplementationOpenMPI:
 					apply.UpsertEnvVars(
 						&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Env,
@@ -186,13 +186,13 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 							WithValue("true"),
 						*corev1ac.EnvVar().
 							WithName(constants.OpenMPIEnvDefaultSlots).
-							WithValue(strconv.Itoa(int(*info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode))),
+							WithValue(strconv.Itoa(int(*info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode))),
 						*corev1ac.EnvVar().
 							WithName(constants.OpenMPIEnvKeyRSHArgs).
 							WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 					)
 				default:
-					return fmt.Errorf("MPI implementation for %v doesn't supported", info.RuntimePolicy.MLPolicy.MPI.MPIImplementation)
+					return fmt.Errorf("MPI implementation for %v doesn't supported", info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation)
 				}
 			}
 		}
@@ -213,7 +213,7 @@ func (m *MPI) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 }
 
 func (m *MPI) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
-	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.MPI == nil {
+	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil, nil
 	}
 
@@ -272,13 +272,13 @@ func sshAuthSecretName(trainJobName string) string {
 
 func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.TrainJob) *corev1ac.ConfigMapApplyConfiguration {
 	var hostFile bytes.Buffer
-	runLauncherAsNode := ptr.Deref(info.RuntimePolicy.MLPolicy.MPI.RunLauncherAsNode, false)
-	slots := ptr.Deref(info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode, 1)
+	runLauncherAsNode := ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false)
+	slots := ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode, 1)
 	for _, ps := range info.TemplateSpec.PodSets {
 		if !isTrainerNode(runLauncherAsNode, ps) {
 			continue
 		}
-		switch *info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
+		switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
 		case trainer.MPIImplementationOpenMPI:
 			for e := range ps.Endpoints {
 				hostFile.WriteString(fmt.Sprintf("%s slots=%d\n", e, slots))

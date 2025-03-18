@@ -54,7 +54,7 @@ func (t *Torch) Name() string {
 
 func (t *Torch) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
-	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicy == nil || runtimeInfo.RuntimePolicy.MLPolicy.Torch == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
 		return nil, allErrs
 	}
 
@@ -88,18 +88,17 @@ func (t *Torch) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.
 
 // TODO (andreyvelich): Add support for PyTorch elastic when JobSet supports Elastic Jobs.
 func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
-	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.Torch == nil {
+	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Torch == nil {
 		return nil
 	}
 
 	// TrainJob contains the actual information for the Trainer.
-	numNodes := info.RuntimePolicy.MLPolicy.NumNodes
+	numNodes := info.FindPodSetByName(constants.JobTrainerNode).Count
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		numNodes = trainJob.Spec.Trainer.NumNodes
+		*numNodes = *trainJob.Spec.Trainer.NumNodes
 	}
-	info.RuntimePolicy.MLPolicy.NumNodes = numNodes
 
-	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicy.Torch.NumProcPerNode, intstr.FromString("auto"))
+	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicySource.Torch.NumProcPerNode, intstr.FromString("auto"))
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
 		numProcPerNode = ptr.Deref(trainJob.Spec.Trainer.NumProcPerNode, intstr.FromString("auto"))
 	}

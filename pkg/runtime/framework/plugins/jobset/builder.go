@@ -120,8 +120,8 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 			// REF: https://github.com/kubeflow/trainer/issues/2318
 			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
 			// Update the Parallelism and Completions values for the Trainer Job.
-			b.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = info.RuntimePolicy.MLPolicy.NumNodes
-			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.RuntimePolicy.MLPolicy.NumNodes
+			b.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = info.TemplateSpec.PodSets[i].Count
+			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.TemplateSpec.PodSets[i].Count
 
 			// Update values for the Trainer container.
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {

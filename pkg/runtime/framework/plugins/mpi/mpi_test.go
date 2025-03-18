@@ -61,7 +61,7 @@ func TestMPI(t *testing.T) {
 		wantBuildError    error
 	}{
 		"no action when info is nil": {},
-		"no action when mlPolicy is nil": {
+		"no action when mlPolicySource is nil": {
 			info: &runtime.Info{
 				Labels: map[string]string{"key": "value"},
 			},
@@ -69,15 +69,15 @@ func TestMPI(t *testing.T) {
 				Labels: map[string]string{"key": "value"},
 			},
 		},
-		"no action when mlPolicy mpi is null": {
+		"no action when mlPolicySource mpi is null": {
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().Obj(),
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().Obj(),
 				},
 			},
 			wantInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().Obj(),
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().Obj(),
 				},
 			},
 		},
@@ -97,19 +97,13 @@ func TestMPI(t *testing.T) {
 							Name: constants.JobTrainerNode,
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-trainer-node-1-0.trainJob")
-							},
-						},
-						{
-							Name: constants.JobTrainerNode,
-							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-trainer-node-1-1.trainJob")
 							},
 						},
 					},
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
 						Obj(),
 				},
@@ -165,7 +159,8 @@ func TestMPI(t *testing.T) {
 							},
 						},
 						{
-							Name: constants.JobTrainerNode,
+							Name:  constants.JobTrainerNode,
+							Count: ptr.To[int32](2),
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
 									WithName(constants.MPISSHAuthVolumeName).
@@ -186,37 +181,13 @@ func TestMPI(t *testing.T) {
 							},
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-trainer-node-1-0.trainJob")
-							},
-						},
-						{
-							Name: constants.JobTrainerNode,
-							Volumes: []corev1ac.VolumeApplyConfiguration{
-								*corev1ac.Volume().
-									WithName(constants.MPISSHAuthVolumeName).
-									WithSecret(corev1ac.SecretVolumeSource().
-										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
-										WithItems(
-											corev1ac.KeyToPath().
-												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
-											corev1ac.KeyToPath().
-												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
-											corev1ac.KeyToPath().
-												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
-										),
-									),
-							},
-							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-trainer-node-1-1.trainJob")
 							},
 						},
 					},
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(2).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
 						Obj(),
 				},
@@ -263,7 +234,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 					},
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
 						Obj(),
 				},
@@ -320,7 +291,8 @@ trainJob-trainer-node-1-1.trainJob slots=1
 							},
 						},
 						{
-							Name: constants.JobTrainerNode,
+							Name:  constants.JobTrainerNode,
+							Count: ptr.To[int32](1),
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
 									WithName(constants.MPISSHAuthVolumeName).
@@ -346,8 +318,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 					},
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](2), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
 						Obj(),
 				},
@@ -377,8 +348,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
@@ -411,8 +381,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
@@ -454,7 +423,8 @@ trainJob-trainer-node-1-1.trainJob slots=1
 							},
 						},
 						{
-							Name: constants.JobTrainerNode,
+							Name:  constants.JobTrainerNode,
+							Count: ptr.To[int32](1),
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
 									WithName(constants.MPISSHAuthVolumeName).
@@ -522,8 +492,7 @@ trainJob-trainer-node-1-0.trainJob slots=1
 					},
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
@@ -575,8 +544,7 @@ trainJob-trainer-node-1-0.trainJob slots=1
 					},
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
@@ -607,8 +575,7 @@ trainJob-trainer-node-1-0.trainJob slots=1
 					},
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
@@ -660,8 +627,7 @@ trainJob-trainer-node-1-0.trainJob slots=1
 					},
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},

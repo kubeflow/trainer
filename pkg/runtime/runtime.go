@@ -28,7 +28,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
 )
 
 var (
@@ -50,7 +49,7 @@ type Info struct {
 }
 
 type RuntimePolicy struct {
-	MLPolicy       *trainer.MLPolicy
+	MLPolicySource *trainer.MLPolicySource
 	PodGroupPolicy *trainer.PodGroupPolicy
 }
 
@@ -65,16 +64,14 @@ type TemplateSpec struct {
 type PodSet struct {
 	// PodSet name is the name to identify PodSpec.
 	// This typically has the name stored in each PodSpec.
-	Name string
-	// If Name is trainer-node, CountForNonTrainer is null.
-	// For Trainer, PodSet Count should be stored in Info.RuntimePolicy.MLPolicy.NumNodes.
-	CountForNonTrainer *int32
-	InitContainers     []Container
-	Containers         []Container
-	Volumes            []corev1ac.VolumeApplyConfiguration
-	Endpoints          iter.Seq[string]
+	Name           string
+	Count          *int32
+	InitContainers []Container
+	Containers     []Container
+	Volumes        []corev1ac.VolumeApplyConfiguration
+	Endpoints      iter.Seq[string]
 	// The total PodSet requests can be calculated with
-	// SinglePodRequests x [CountForNonTrainer|RuntimePolicy.MLPolicy.NumNodes].
+	// SinglePodRequests x Count.
 	SinglePodRequests corev1.ResourceList
 }
 
@@ -113,9 +110,11 @@ func WithAnnotations(annotations map[string]string) InfoOption {
 	}
 }
 
-func WithMLPolicy(mlPolicy *trainer.MLPolicy) InfoOption {
+func WithMLPolicySource(mlPolicy *trainer.MLPolicy) InfoOption {
 	return func(o *InfoOptions) {
-		o.runtimePolicy.MLPolicy = mlPolicy
+		if mlPolicy != nil {
+			o.runtimePolicy.MLPolicySource = &mlPolicy.MLPolicySource
+		}
 	}
 }
 
@@ -139,13 +138,11 @@ func WithPodSet(
 	return func(o *InfoOptions) {
 		ps := PodSet{
 			Name:              psName,
+			Count:             ptr.To(max(count, 1)),
 			Volumes:           podSpecApply.Volumes,
 			SinglePodRequests: resourcehelpers.PodRequests(&corev1.Pod{Spec: typedPodSpec}, resourcehelpers.PodResourcesOptions{}),
 			InitContainers:    slices.Collect(toPodSetContainer(podSpecApply.InitContainers...)),
 			Containers:        slices.Collect(toPodSetContainer(podSpecApply.Containers...)),
-		}
-		if psName != constants.JobTrainerNode {
-			ps.CountForNonTrainer = ptr.To(max(count, 1))
 		}
 		o.templateSpec.PodSets = append(o.templateSpec.PodSets, ps)
 	}
@@ -208,13 +205,22 @@ func TemplateSpecApply[A any](info *Info) (*A, bool) {
 
 // FindContainerByPodSetContainerName finds runtime.Container from Info.TemplateSpec.PodSet by PodSet and Container name.
 func (i *Info) FindContainerByPodSetContainerName(psName, containerName string) *Container {
+	ps := i.FindPodSetByName(psName)
+	if ps == nil {
+		return nil
+	}
+	for containerIdx, container := range ps.Containers {
+		if container.Name == containerName {
+			return &ps.Containers[containerIdx]
+		}
+	}
+	return nil
+}
+
+func (i *Info) FindPodSetByName(psName string) *PodSet {
 	for psIdx, ps := range i.TemplateSpec.PodSets {
 		if ps.Name == psName {
-			for containerIdx, container := range ps.Containers {
-				if container.Name == containerName {
-					return &i.TemplateSpec.PodSets[psIdx].Containers[containerIdx]
-				}
-			}
+			return &i.TemplateSpec.PodSets[psIdx]
 		}
 	}
 	return nil

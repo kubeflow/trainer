@@ -79,8 +79,7 @@ func TestJobSet(t *testing.T) {
 				Obj(),
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(2).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), nil, nil).
 						Obj(),
 				},
@@ -88,10 +87,11 @@ func TestJobSet(t *testing.T) {
 					PodSets: []runtime.PodSet{
 						{
 							Name:       constants.JobLauncher,
-							Containers: make([]runtime.Container, 2),
+							Containers: make([]runtime.Container, 1),
 						},
 						{
 							Name:       constants.JobTrainerNode,
+							Count:      ptr.To[int32](2),
 							Containers: make([]runtime.Container, 1),
 						},
 					},
@@ -116,7 +116,7 @@ func TestJobSet(t *testing.T) {
 								WithName(constants.JobTrainerNode).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(1).
+										WithParallelism(2).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -131,8 +131,7 @@ func TestJobSet(t *testing.T) {
 			},
 			wantInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(2).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), nil, nil).
 						Obj(),
 				},
@@ -140,13 +139,14 @@ func TestJobSet(t *testing.T) {
 					PodSets: []runtime.PodSet{
 						{
 							Name:       constants.JobLauncher,
-							Containers: make([]runtime.Container, 2),
+							Containers: make([]runtime.Container, 1),
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-launcher-0-0.trainJob")
 							},
 						},
 						{
 							Name:       constants.JobTrainerNode,
+							Count:      ptr.To[int32](2),
 							Containers: make([]runtime.Container, 1),
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-trainer-node-0-0.trainJob")
@@ -175,7 +175,7 @@ func TestJobSet(t *testing.T) {
 								WithName(constants.JobTrainerNode).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(1).
+										WithParallelism(2).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -194,9 +194,7 @@ func TestJobSet(t *testing.T) {
 				Obj(),
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						Obj(),
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
@@ -246,9 +244,7 @@ func TestJobSet(t *testing.T) {
 			},
 			wantInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						Obj(),
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{

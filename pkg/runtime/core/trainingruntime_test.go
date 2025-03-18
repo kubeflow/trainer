@@ -298,7 +298,10 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					WithMLPolicy(
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
-							TorchPolicy("auto", nil).
+							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+								TorchPolicy("auto", nil).
+								Obj(),
+							).
 							Obj(),
 					).
 					JobSetSpec(
@@ -389,7 +392,10 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					WithMLPolicy(
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
-							TorchPolicy("auto", nil).
+							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+								TorchPolicy("auto", nil).
+								Obj(),
+							).
 							Obj(),
 					).
 					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
@@ -489,7 +495,10 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					WithMLPolicy(
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(1).
-							MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+								MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+								Obj(),
+							).
 							Obj(),
 					).
 					LauncherReplica().

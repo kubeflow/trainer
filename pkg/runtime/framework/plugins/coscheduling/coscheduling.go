@@ -45,7 +45,6 @@ import (
 	schedulerpluginsv1alpha1ac "sigs.k8s.io/scheduler-plugins/pkg/generated/applyconfiguration/scheduling/v1alpha1"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
 	runtimeindexer "github.com/kubeflow/trainer/pkg/runtime/indexer"
@@ -123,13 +122,7 @@ func (c *CoScheduling) Build(ctx context.Context, info *runtime.Info, trainJob *
 	var totalMembers int32
 	totalResources := make(corev1.ResourceList)
 	for _, ps := range info.TemplateSpec.PodSets {
-		var count int32
-		switch ps.Name {
-		case constants.JobTrainerNode:
-			count = *info.RuntimePolicy.MLPolicy.NumNodes
-		default:
-			count = *ps.CountForNonTrainer
-		}
+		count := *ps.Count
 		totalMembers += count
 		for resName, quantity := range ps.SinglePodRequests {
 			quantity.Mul(int64(count))

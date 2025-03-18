@@ -43,17 +43,15 @@ func (p *PlainML) Name() string {
 }
 
 func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
-	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.Torch != nil || info.RuntimePolicy.MLPolicy.MPI != nil {
+	if info == nil ||
+		(info.RuntimePolicy.MLPolicySource != nil && (info.RuntimePolicy.MLPolicySource.Torch != nil || info.RuntimePolicy.MLPolicySource.MPI != nil)) {
 		return nil
 	}
 
 	// TrainJob contains the actual information for the number of nodes.
-	numNodes := info.RuntimePolicy.MLPolicy.NumNodes
-
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		numNodes = trainJob.Spec.Trainer.NumNodes
+		info.FindPodSetByName(constants.JobTrainerNode).Count = trainJob.Spec.Trainer.NumNodes
 	}
-	info.RuntimePolicy.MLPolicy.NumNodes = numNodes
 
 	// Add envs from the TrainJob.
 	var trainerContainer *runtime.Container

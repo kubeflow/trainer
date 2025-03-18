@@ -46,7 +46,7 @@ func TestTorch(t *testing.T) {
 		wantMLPolicyError error
 	}{
 		"no action when info is nil": {},
-		"no action when mlPolicy is nil": {
+		"no action when mlPolicySource is nil": {
 			info: runtime.NewInfo(
 				runtime.WithLabels(map[string]string{"key": "value"}),
 			),
@@ -54,22 +54,26 @@ func TestTorch(t *testing.T) {
 				runtime.WithLabels(map[string]string{"key": "value"}),
 			),
 		},
-		"no action when mlPolicy torch is null": {
+		"no action when mlPolicySource torch is null": {
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(utiltesting.MakeMLPolicyWrapper().
-					Obj()),
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().Obj(),
+				),
 			),
 			wantInfo: runtime.NewInfo(
-				runtime.WithMLPolicy(utiltesting.MakeMLPolicyWrapper().
-					Obj()),
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().Obj(),
+				),
 			),
 		},
 		"trainJob numNodes is respected rather than mlPolicy one": {
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -88,14 +92,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(2).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](2),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -139,17 +143,19 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("auto")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("4"),
 						}).
 						Obj(),
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -160,14 +166,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -211,15 +217,17 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("auto")).
-						Container("test:image", []string{}, []string{}, nil).
+						Container("test:image", nil, nil, nil).
 						Obj(),
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -230,14 +238,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -281,17 +289,19 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("auto")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("2"), // Low CPU limit
 						}).
 						Obj(),
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -302,14 +312,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -353,17 +363,19 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("auto")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("3"),
 						}).
 						Obj(),
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -374,14 +386,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -425,17 +437,19 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("auto")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("2.5"), // 2.5 CPU cores
 						}).
 						Obj(),
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -446,14 +460,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -497,17 +511,19 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("auto")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("0.7"), // 0.7 CPU cores
 						}).
 						Obj(),
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -518,14 +534,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -569,17 +585,19 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("auto")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+						Container("test:image", nil, nil, corev1.ResourceList{
 							"nvidia.com/gpu": resource.MustParse("2"),
 						}).
 						Obj(),
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -590,14 +608,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -641,17 +659,19 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromInt32(3)).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("8"),
 						}).
 						Obj(),
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -662,14 +682,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -713,17 +733,19 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("auto")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("2500m"), // 2.5 CPU cores in millicore format
 						}).
 						Obj(),
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -734,14 +756,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -785,17 +807,19 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("cpu")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("4"),
 						}).
 						Obj(),
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -806,14 +830,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -857,7 +881,7 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("cpu")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("6"),
 							"nvidia.com/gpu":   resource.MustParse("2"),
 						}).
@@ -865,10 +889,12 @@ func TestTorch(t *testing.T) {
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -879,14 +905,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -930,17 +956,19 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("cpu")).
-						Container("test:image", []string{}, []string{}, corev1.ResourceList{
+						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("3.7"),
 						}).
 						Obj(),
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -951,14 +979,14 @@ func TestTorch(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -1003,7 +1031,7 @@ func TestTorch(t *testing.T) {
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumNodes(4).
 						NumProcPerNode(intstr.FromString("auto")).
-						Container("pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime", []string{}, []string{}, corev1.ResourceList{
+						Container("pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("8"),
 							corev1.ResourceMemory: resource.MustParse("16Gi"),
 							"nvidia.com/gpu":      resource.MustParse("4"), // 4 GPUs per node
@@ -1012,10 +1040,12 @@ func TestTorch(t *testing.T) {
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(2). // This value should be overridden by the value in trainJob
-						TorchPolicy("auto", nil).
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy("auto", nil).
+							Obj(),
+						).
 						Obj(),
 				),
 				runtime.WithLabels(map[string]string{
@@ -1033,14 +1063,14 @@ func TestTorch(t *testing.T) {
 				},
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(4).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](4),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,

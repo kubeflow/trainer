@@ -173,11 +173,7 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 		"plainml MLPolicy is applied to runtime.Info, TrainJob doesn't have numNodes": {
 			registry: fwkplugins.NewRegistry(),
 			runtimeInfo: runtime.NewInfo(
-				runtime.WithMLPolicy(
-					testingutil.MakeMLPolicyWrapper().
-						WithNumNodes(100).
-						Obj(),
-				),
+				runtime.WithMLPolicySource(testingutil.MakeMLPolicyWrapper().Obj()),
 				runtime.WithPodSet(constants.DatasetInitializer, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(
 						corev1ac.Container().WithName(constants.DatasetInitializer),
@@ -197,15 +193,13 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 			},
 			wantRuntimeInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: &trainer.MLPolicy{
-						NumNodes: ptr.To[int32](100),
-					},
+					MLPolicySource: testingutil.MakeMLPolicySourceWrapper().Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:               constants.DatasetInitializer,
-							CountForNonTrainer: ptr.To[int32](1),
+							Name:  constants.DatasetInitializer,
+							Count: ptr.To[int32](1),
 							Containers: []runtime.Container{
 								{
 									Name: constants.DatasetInitializer,
@@ -213,8 +207,8 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 							},
 						},
 						{
-							Name:               constants.ModelInitializer,
-							CountForNonTrainer: ptr.To[int32](1),
+							Name:  constants.ModelInitializer,
+							Count: ptr.To[int32](1),
 							Containers: []runtime.Container{
 								{
 									Name: constants.ModelInitializer,
@@ -222,7 +216,8 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 							},
 						},
 						{
-							Name: constants.JobTrainerNode,
+							Name:  constants.JobTrainerNode,
+							Count: ptr.To[int32](10),
 							Containers: []runtime.Container{{
 								Name: constants.ContainerTrainer,
 							}},
@@ -235,10 +230,8 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 		"plainml MLPolicy is applied to runtime.Info, TrainJob has numNodes": {
 			registry: fwkplugins.NewRegistry(),
 			runtimeInfo: runtime.NewInfo(
-				runtime.WithMLPolicy(
-					testingutil.MakeMLPolicyWrapper().
-						WithNumNodes(100).
-						Obj(),
+				runtime.WithMLPolicySource(
+					testingutil.MakeMLPolicyWrapper().Obj(),
 				),
 				runtime.WithPodSet(constants.DatasetInitializer, 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(
@@ -263,15 +256,13 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 			},
 			wantRuntimeInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: &trainer.MLPolicy{
-						NumNodes: ptr.To[int32](30),
-					},
+					MLPolicySource: testingutil.MakeMLPolicySourceWrapper().Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:               constants.DatasetInitializer,
-							CountForNonTrainer: ptr.To[int32](1),
+							Name:  constants.DatasetInitializer,
+							Count: ptr.To[int32](1),
 							Containers: []runtime.Container{
 								{
 									Name: constants.DatasetInitializer,
@@ -279,8 +270,8 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 							},
 						},
 						{
-							Name:               constants.ModelInitializer,
-							CountForNonTrainer: ptr.To[int32](1),
+							Name:  constants.ModelInitializer,
+							Count: ptr.To[int32](1),
 							Containers: []runtime.Container{
 								{
 									Name: constants.ModelInitializer,
@@ -288,7 +279,8 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 							},
 						},
 						{
-							Name: constants.JobTrainerNode,
+							Name:  constants.JobTrainerNode,
+							Count: ptr.To[int32](30),
 							Containers: []runtime.Container{{
 								Name: constants.ContainerTrainer,
 							}},
@@ -452,9 +444,6 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").DeepCopy(),
 			runtimeInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: &trainer.MLPolicy{
-						NumNodes: ptr.To[int32](10),
-					},
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
 							Coscheduling: &trainer.CoschedulingPodGroupPolicySource{
@@ -466,8 +455,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:               constants.DatasetInitializer,
-							CountForNonTrainer: ptr.To[int32](1),
+							Name:  constants.DatasetInitializer,
+							Count: ptr.To[int32](1),
 							SinglePodRequests: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
@@ -490,8 +479,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							},
 						},
 						{
-							Name:               constants.ModelInitializer,
-							CountForNonTrainer: ptr.To[int32](1),
+							Name:  constants.ModelInitializer,
+							Count: ptr.To[int32](1),
 							SinglePodRequests: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
@@ -632,9 +621,6 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				Obj(),
 			wantRuntimeInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: &trainer.MLPolicy{
-						NumNodes: ptr.To[int32](100),
-					},
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
 							Coscheduling: &trainer.CoschedulingPodGroupPolicySource{
@@ -751,8 +737,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 						),
 					PodSets: []runtime.PodSet{
 						{
-							Name:               constants.DatasetInitializer,
-							CountForNonTrainer: ptr.To[int32](1),
+							Name:  constants.DatasetInitializer,
+							Count: ptr.To[int32](1),
 							SinglePodRequests: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
@@ -775,8 +761,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							},
 						},
 						{
-							Name:               constants.ModelInitializer,
-							CountForNonTrainer: ptr.To[int32](1),
+							Name:  constants.ModelInitializer,
+							Count: ptr.To[int32](1),
 							SinglePodRequests: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
@@ -799,7 +785,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							},
 						},
 						{
-							Name: constants.JobTrainerNode,
+							Name:  constants.JobTrainerNode,
+							Count: ptr.To[int32](100),
 							SinglePodRequests: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
@@ -1054,14 +1041,13 @@ func TestPodNetworkPlugins(t *testing.T) {
 			registry: fwkplugins.NewRegistry(),
 			runtimeInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: testingutil.MakeMLPolicyWrapper().
-						WithNumNodes(2).
-						Obj(),
+					MLPolicySource: testingutil.MakeMLPolicySourceWrapper().Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
 							Name:       constants.JobTrainerNode,
+							Count:      ptr.To[int32](2),
 							Containers: make([]runtime.Container, 1),
 						},
 					},
@@ -1071,6 +1057,8 @@ func TestPodNetworkPlugins(t *testing.T) {
 								WithName(constants.JobTrainerNode).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -1086,15 +1074,14 @@ func TestPodNetworkPlugins(t *testing.T) {
 			},
 			wantRuntimeInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: testingutil.MakeMLPolicyWrapper().
-						WithNumNodes(2).
-						Obj(),
+					MLPolicySource: testingutil.MakeMLPolicySourceWrapper().Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
 							Name:       constants.JobTrainerNode,
 							Containers: make([]runtime.Container, 1),
+							Count:      ptr.To[int32](2),
 							Endpoints: func(yield func(string) bool) {
 								yield("test-job-trainer-node-0-0.test-job")
 								yield("test-job-trainer-node-0-1.test-job")
@@ -1107,6 +1094,8 @@ func TestPodNetworkPlugins(t *testing.T) {
 								WithName(constants.JobTrainerNode).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(

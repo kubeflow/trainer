@@ -43,20 +43,11 @@ func TestPlainML(t *testing.T) {
 		wantInfo  *runtime.Info
 	}{
 		"no action when info is null": {},
-		"no action when mlPolicy is null": {
-			info: &runtime.Info{
-				Labels: map[string]string{"key": "value"},
-			},
-			wantInfo: &runtime.Info{
-				Labels: map[string]string{"key": "value"},
-			},
-		},
-		"no action when mlPolicy torch is not null": {
+		"no action when mlPolicySource torch is not null": {
 			info: &runtime.Info{
 				Labels: map[string]string{"key": "value"},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(100).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
@@ -64,19 +55,17 @@ func TestPlainML(t *testing.T) {
 			wantInfo: &runtime.Info{
 				Labels: map[string]string{"key": "value"},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(100).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						TorchPolicy("auto", nil).
 						Obj(),
 				},
 			},
 		},
-		"no action when mlPolicy mpi is not null": {
+		"no action when mlPolicySource mpi is not null": {
 			info: &runtime.Info{
 				Labels: map[string]string{"key": "value"},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(100).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(false)).
 						Obj(),
 				},
@@ -84,8 +73,7 @@ func TestPlainML(t *testing.T) {
 			wantInfo: &runtime.Info{
 				Labels: map[string]string{"key": "value"},
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(100).
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
 						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(false)).
 						Obj(),
 				},
@@ -98,10 +86,8 @@ func TestPlainML(t *testing.T) {
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
-					utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(100).
-						Obj(),
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 100, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
@@ -111,11 +97,12 @@ func TestPlainML(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().WithNumNodes(200).Obj(),
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](200),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,
@@ -139,7 +126,7 @@ func TestPlainML(t *testing.T) {
 				).
 				Obj(),
 			info: runtime.NewInfo(
-				runtime.WithMLPolicy(
+				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().Obj(),
 				),
 				runtime.WithPodSet(constants.JobTrainerNode, 100, corev1.PodSpec{}, corev1ac.PodSpec().
@@ -156,13 +143,12 @@ func TestPlainML(t *testing.T) {
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicy: utiltesting.MakeMLPolicyWrapper().
-						WithNumNodes(1).
-						Obj(),
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:              constants.JobTrainerNode,
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.ContainerTrainer,

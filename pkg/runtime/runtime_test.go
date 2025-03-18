@@ -272,8 +272,8 @@ func TestNewInfo(t *testing.T) {
 				TemplateSpec: TemplateSpec{
 					PodSets: []PodSet{
 						{
-							Name:               constants.DatasetInitializer,
-							CountForNonTrainer: ptr.To[int32](1),
+							Name:  constants.DatasetInitializer,
+							Count: ptr.To[int32](1),
 							InitContainers: []Container{{
 								Name: "setup-initializer",
 							}},
@@ -285,8 +285,8 @@ func TestNewInfo(t *testing.T) {
 							},
 						},
 						{
-							Name:               constants.ModelInitializer,
-							CountForNonTrainer: ptr.To[int32](1),
+							Name:  constants.ModelInitializer,
+							Count: ptr.To[int32](1),
 							InitContainers: []Container{{
 								Name: "setup-initializer",
 							}},
@@ -298,7 +298,8 @@ func TestNewInfo(t *testing.T) {
 							},
 						},
 						{
-							Name: constants.JobTrainerNode,
+							Name:  constants.JobTrainerNode,
+							Count: ptr.To[int32](10),
 							Containers: []Container{{
 								Name: constants.ContainerTrainer,
 								Env: []corev1ac.EnvVarApplyConfiguration{{
@@ -505,6 +506,52 @@ func TestFindContainerByPodSetContainerName(t *testing.T) {
 			got := tc.info.FindContainerByPodSetContainerName(tc.psName, tc.containerName)
 			if diff := cmp.Diff(tc.wantContainer, got); len(diff) != 0 {
 				t.Errorf("Unexpected Container (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFindContainerByName(t *testing.T) {
+	cases := map[string]struct {
+		info   *Info
+		psName string
+		want   *PodSet
+	}{
+		"PodSet exists": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{
+						{
+							Name: "alpha",
+						},
+						{
+							Name: "beta",
+						},
+					},
+				},
+			},
+			psName: "alpha",
+			want: &PodSet{
+				Name: "alpha",
+			},
+		},
+		"PodSet does not exist": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{{
+						Name: "alpha",
+					}},
+				},
+			},
+			psName: "beta",
+			want:   nil,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := tc.info.FindPodSetByName(tc.psName)
+			if diff := cmp.Diff(tc.want, got); len(diff) != 0 {
+				t.Errorf("Unexpected PodSet (-want,+got):\n%s", diff)
 			}
 		})
 	}

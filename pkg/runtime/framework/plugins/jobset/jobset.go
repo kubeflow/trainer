@@ -145,10 +145,7 @@ func (j *JobSet) IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJ
 	for rJobIdx, rJob := range spec.ReplicatedJobs {
 		// TODO: Support multiple replicas for replicated Jobs.
 		// REF: https://github.com/kubeflow/trainer/issues/2318
-		podCount := info.TemplateSpec.PodSets[rJobIdx].CountForNonTrainer
-		if *rJob.Name == constants.JobTrainerNode {
-			podCount = info.RuntimePolicy.MLPolicy.NumNodes
-		}
+		podCount := info.TemplateSpec.PodSets[rJobIdx].Count
 		rJobReplicas := 1
 		info.TemplateSpec.PodSets[rJobIdx].Endpoints = func(yield func(string) bool) {
 			for podIdx := range ptr.Deref(podCount, 1) {

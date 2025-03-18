@@ -88,7 +88,7 @@ func (r *TrainingRuntime) buildObjects(
 	ctx context.Context, trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
 ) ([]any, error) {
 
-	info, err := r.runtimeInfo(ctx, trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy)
+	info, err := r.newRuntimeInfo(trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy)
 	if err != nil {
 		return nil, err
 	}
@@ -107,9 +107,9 @@ func (r *TrainingRuntime) buildObjects(
 	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
 }
 
-func (r *TrainingRuntime) runtimeInfo(
-	ctx context.Context, trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy) (*runtime.Info, error) {
-
+func (r *TrainingRuntime) newRuntimeInfo(
+	trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
+) (*runtime.Info, error) {
 	propagationLabels := jobSetTemplateSpec.Labels
 	if propagationLabels == nil && trainJob.Spec.Labels != nil {
 		propagationLabels = make(map[string]string, len(trainJob.Spec.Labels))
@@ -140,7 +140,7 @@ func (r *TrainingRuntime) runtimeInfo(
 	opts := []runtime.InfoOption{
 		runtime.WithLabels(propagationLabels),
 		runtime.WithAnnotations(propagationAnnotations),
-		runtime.WithMLPolicy(mlPolicy),
+		runtime.WithMLPolicySource(mlPolicy),
 		runtime.WithPodGroupPolicy(podGroupPolicy),
 		runtime.WithTemplateSpecObjApply(jobSetSpecApply),
 		runtime.WithPodSetSyncer(syncPodSets),
@@ -170,9 +170,9 @@ func syncPodSets(info *runtime.Info) {
 		return
 	}
 	for psIdx, ps := range info.TemplateSpec.PodSets {
-		if ps.CountForNonTrainer != nil {
-			jsSpec.ReplicatedJobs[psIdx].Template.Spec.Parallelism = ps.CountForNonTrainer
-			jsSpec.ReplicatedJobs[psIdx].Template.Spec.Completions = ps.CountForNonTrainer
+		if ps.Count != nil {
+			jsSpec.ReplicatedJobs[psIdx].Template.Spec.Parallelism = ps.Count
+			jsSpec.ReplicatedJobs[psIdx].Template.Spec.Completions = ps.Count
 		}
 		apply.UpsertVolumes(&jsSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Volumes, ps.Volumes...)
 		for containerIdx, container := range ps.Containers {
@@ -215,7 +215,7 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 				fmt.Sprintf("%v: specified trainingRuntime must be created before the TrainJob is created", err)),
 		}
 	}
-	info, _ := r.runtimeInfo(ctx, new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
+	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
 
 	jobSetTemplate := jobsetv1alpha2.JobSet{
 		Spec: trainingRuntime.Spec.Template.Spec,

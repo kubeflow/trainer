@@ -331,7 +331,10 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
 									WithNumNodes(100).
-									TorchPolicy("auto", nil).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										TorchPolicy("auto", nil).
+										Obj(),
+									).
 									Obj(),
 							).
 							Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
@@ -607,7 +610,10 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
 									WithNumNodes(1).
-									MPIPolicy(ptr.To[int32](8), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(ptr.To[int32](8), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+										Obj(),
+									).
 									Obj(),
 							).
 							Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).

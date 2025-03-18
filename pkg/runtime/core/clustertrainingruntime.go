@@ -79,7 +79,7 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 				fmt.Sprintf("%v: specified clusterTrainingRuntime must be created before the TrainJob is created", err)),
 		}
 	}
-	info, _ := r.runtimeInfo(ctx, new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy)
+	info, _ := r.newRuntimeInfo(new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy)
 	jobSetTemplate := jobsetv1alpha2.JobSet{
 		Spec: clusterTrainingRuntime.Spec.Template.Spec,
 	}
