@@ -346,7 +346,8 @@ class TrainerClient:
                     self.core_api.read_namespaced_pod_log,
                     name=pod_name,
                     namespace=self.namespace,
-                    container=constants.NODE,
+                    # TODO (andreyvelich): Container name must be "node"
+                    container=constants.TRAINER,
                 )
             )
             finished = [False] * len(log_streams)
@@ -369,8 +370,12 @@ class TrainerClient:
                                 finished[index] = True
                                 break
                             # Print logs to the StdOut and update results dict.
-                            print(f"[{step}]: {logline}")
-                            logs_dict[step] = logs_dict.get(step, "") + logline + "\n"
+                            print(f"[{step}-{node_rank}]: {logline}")
+                            logs_dict[f"{step}-{node_rank}"] = (
+                                logs_dict.get(f"{step}-{node_rank}", "")
+                                + logline
+                                + "\n"
+                            )
                         except queue.Empty:
                             break
                 if all(finished):
@@ -398,7 +403,8 @@ class TrainerClient:
                     self.core_api.read_namespaced_pod_log(
                         name=pod_name,
                         namespace=self.namespace,
-                        container=constants.NODE,
+                        # TODO (andreyvelich): Container name must be "node"
+                        container=constants.TRAINER,
                     )
                 )
 

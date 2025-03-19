@@ -93,7 +93,8 @@ def get_runtime_accelerators(
                 raise Exception(f"ReplicatedJob template is invalid: {rjob}")
 
             for container in rjob.template.spec.template.spec.containers:
-                if container.name == constants.NODE:
+                # TODO (andreyvelich): Container name must be "node"
+                if container.name == constants.TRAINER:
                     _, container_devices = get_container_devices(container.resources)
                     if isinstance(container_devices, float):
                         accelerator_count = container_devices
@@ -153,8 +154,8 @@ def get_trainjob_node_step(
     step_name = f"{constants.NODE}-{job_index}"
 
     for c in pod_spec.containers:
-        # TODO (andreyvelich): Container name must be "Node"
-        if c.name in {constants.MPI_LAUNCHER, constants.NODE}:
+        # TODO (andreyvelich): Container name must be "node"
+        if c.name in {constants.MPI_LAUNCHER, constants.TRAINER}:
             device, device_count = get_container_devices(c.resources)
             if c.env:
                 for env in c.env:
