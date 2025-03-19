@@ -130,6 +130,20 @@ class TorchTuneConfig:
     resources_per_node: Optional[Dict] = None
 
 
+# Configuration for the Builtin Trainer.
+@dataclass
+class BuiltinTrainer:
+    """
+    Builtin Trainer configuration. Configure the builtin trainer that already includes
+        the fine-tuning logic, requiring only parameter adjustments.
+
+    Args:
+        config (`TorchTuneConfig`): The configuration for the builtin trainer.
+    """
+
+    config: TorchTuneConfig
+
+
 # Configuration for the HuggingFace dataset initializer.
 # TODO (andreyvelich): Discuss how to keep these configurations is sync with pkg.initializers.types
 @dataclass
