@@ -96,10 +96,10 @@ class Step:
 @dataclass
 class TrainJob:
     name: str
-    runtime_ref: str
     creation_timestamp: datetime
+    runtime: Runtime
     steps: List[Step]
-    status: Optional[str] = "Unknown"
+    status: Optional[str] = constants.UNKNOWN
 
 
 # Configuration for the HuggingFace dataset initializer.

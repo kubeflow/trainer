@@ -73,9 +73,8 @@ class TrainerClient:
 
         self.namespace = namespace
 
-    # TODO (andreyvelich): Currently, only Cluster Training Runtime is supported.
     def list_runtimes(self) -> List[types.Runtime]:
-        """List of the available runtimes.
+        """List of the available Runtimes.
 
         Returns:
             List[Runtime]: List of available training runtimes.
@@ -95,33 +94,15 @@ class TrainerClient:
                 async_req=True,
             )
 
-            response = thread.get(constants.DEFAULT_TIMEOUT)
-            for item in response["items"]:
+            runtime_list = models.TrainerV1alpha1ClusterTrainingRuntimeList.from_dict(
+                thread.get(constants.DEFAULT_TIMEOUT)
+            )
 
-                runtime = models.TrainerV1alpha1ClusterTrainingRuntime.from_dict(item)
+            if not runtime_list:
+                return result
 
-                # TODO (andreyvelich): Currently, the labels must be presented.
-                if not (
-                    runtime
-                    and runtime.metadata
-                    and runtime.metadata.name
-                    and runtime.spec
-                    and runtime.spec.ml_policy
-                    and runtime.spec.template.spec
-                    and runtime.spec.template.spec.replicated_jobs
-                ):
-                    raise Exception(f"Runtime object is invalid: {runtime}")
-
-                result.append(
-                    types.Runtime(
-                        name=runtime.metadata.name,
-                        trainer=utils.get_runtime_trainer(
-                            runtime.spec.template.spec.replicated_jobs,
-                            runtime.spec.ml_policy,
-                            runtime.metadata,
-                        ),
-                    )
-                )
+            for runtime in runtime_list.items:
+                result.append(self.__get_runtime_from_crd(runtime))
 
         except multiprocessing.TimeoutError:
             raise TimeoutError(
@@ -135,6 +116,34 @@ class TrainerClient:
             )
 
         return result
+
+    def get_runtime(self, name: str) -> types.Runtime:
+        """Get the the Runtime object"""
+
+        try:
+            thread = self.custom_api.get_namespaced_custom_object(
+                constants.GROUP,
+                constants.VERSION,
+                self.namespace,
+                constants.CLUSTER_TRAINING_RUNTIME_PLURAL,
+                name,
+                async_req=True,
+            )
+
+            runtime = models.TrainerV1alpha1ClusterTrainingRuntime.from_dict(
+                thread.get(constants.DEFAULT_TIMEOUT)  # type: ignore
+            )
+
+        except multiprocessing.TimeoutError:
+            raise TimeoutError(
+                f"Timeout to get {constants.TRAINJOB_KIND}: {self.namespace}/{name}"
+            )
+        except Exception:
+            raise RuntimeError(
+                f"Failed to get {constants.TRAINJOB_KIND}: {self.namespace}/{name}"
+            )
+
+        return self.__get_runtime_from_crd(runtime)  # type: ignore
 
     def train(
         self,
@@ -230,7 +239,9 @@ class TrainerClient:
 
         return train_job_name
 
-    def list_jobs(self, runtime_ref: Optional[str] = None) -> List[types.TrainJob]:
+    def list_jobs(
+        self, runtime: Optional[types.Runtime] = None
+    ) -> List[types.TrainJob]:
         """List of all TrainJobs.
 
         Returns:
@@ -251,19 +262,21 @@ class TrainerClient:
                 constants.TRAINJOB_PLURAL,
                 async_req=True,
             )
-            response = thread.get(constants.DEFAULT_TIMEOUT)
 
-            trainjob_list = models.TrainerV1alpha1TrainJobList.from_dict(response)
+            trainjob_list = models.TrainerV1alpha1TrainJobList.from_dict(
+                thread.get(constants.DEFAULT_TIMEOUT)
+            )
+
             if not trainjob_list:
                 return result
 
             for trainjob in trainjob_list.items:
-                # If runtime ref is set, we check the TrainJob's runtime.
+                # If runtime object is set, we check the TrainJob's runtime reference.
                 if (
-                    runtime_ref is not None
+                    runtime is not None
                     and trainjob.spec
                     and trainjob.spec.runtime_ref
-                    and trainjob.spec.runtime_ref.name != runtime_ref
+                    and trainjob.spec.runtime_ref.name != runtime.name
                 ):
                     continue
 
@@ -281,7 +294,7 @@ class TrainerClient:
         return result
 
     def get_job(self, name: str) -> types.TrainJob:
-        """Get the TrainJob information"""
+        """Get the TrainJob object"""
 
         try:
             thread = self.custom_api.get_namespaced_custom_object(
@@ -440,6 +453,30 @@ class TrainerClient:
             f"{constants.TRAINJOB_KIND} {self.namespace}/{name} has been deleted"
         )
 
+    def __get_runtime_from_crd(
+        self,
+        runtime_crd: models.TrainerV1alpha1ClusterTrainingRuntime,
+    ) -> types.Runtime:
+
+        if not (
+            runtime_crd.metadata
+            and runtime_crd.metadata.name
+            and runtime_crd.spec
+            and runtime_crd.spec.ml_policy
+            and runtime_crd.spec.template.spec
+            and runtime_crd.spec.template.spec.replicated_jobs
+        ):
+            raise Exception(f"ClusterTrainingRuntime CRD is invalid: {runtime_crd}")
+
+        return types.Runtime(
+            name=runtime_crd.metadata.name,
+            trainer=utils.get_runtime_trainer(
+                runtime_crd.spec.template.spec.replicated_jobs,
+                runtime_crd.spec.ml_policy,
+                runtime_crd.metadata,
+            ),
+        )
+
     def __get_trainjob_from_crd(
         self,
         trainjob_crd: models.TrainerV1alpha1TrainJob,
@@ -460,8 +497,8 @@ class TrainerClient:
         # Construct the TrainJob from the CRD.
         train_job = types.TrainJob(
             name=name,
-            runtime_ref=trainjob_crd.spec.runtime_ref.name,
             creation_timestamp=trainjob_crd.metadata.creation_timestamp,
+            runtime=self.get_runtime(trainjob_crd.spec.runtime_ref.name),
             steps=[],
         )
 
