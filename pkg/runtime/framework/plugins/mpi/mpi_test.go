@@ -47,6 +47,7 @@ func TestMPI(t *testing.T) {
 		cmpopts.SortSlices(func(a, b apiruntime.Object) int {
 			return cmp.Compare(a.GetObjectKind().GroupVersionKind().String(), b.GetObjectKind().GroupVersionKind().String())
 		}),
+		cmpopts.SortSlices(func(a, b corev1.EnvVar) int { return cmp.Compare(a.Name, b.Name) }),
 		gocmp.Comparer(utiltesting.MPISecretDataComparer),
 	}
 	errorGetSSHAuthSecretFromAPI := errors.New("failed to get SSH Auth Secret from API during Build")
@@ -88,16 +89,19 @@ func TestMPI(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobLauncher,
+							Name:  constants.JobLauncher,
+							Count: ptr.To[int32](1),
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-launcher-0-0.trainJob")
 							},
 						},
 						{
-							Name: constants.JobTrainerNode,
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
 							Endpoints: func(yield func(string) bool) {
-								yield("trainJob-trainer-node-1-0.trainJob")
-								yield("trainJob-trainer-node-1-1.trainJob")
+								yield("trainJob-node-1-0.trainJob")
+								yield("trainJob-node-1-1.trainJob")
 							},
 						},
 					},
@@ -124,7 +128,8 @@ func TestMPI(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobLauncher,
+							Name:  constants.JobLauncher,
+							Count: ptr.To[int32](1),
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
 									WithName(constants.MPISSHAuthVolumeName).
@@ -159,8 +164,9 @@ func TestMPI(t *testing.T) {
 							},
 						},
 						{
-							Name:  constants.JobTrainerNode,
-							Count: ptr.To[int32](2),
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](2),
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
 									WithName(constants.MPISSHAuthVolumeName).
@@ -180,8 +186,8 @@ func TestMPI(t *testing.T) {
 									),
 							},
 							Endpoints: func(yield func(string) bool) {
-								yield("trainJob-trainer-node-1-0.trainJob")
-								yield("trainJob-trainer-node-1-1.trainJob")
+								yield("trainJob-node-1-0.trainJob")
+								yield("trainJob-node-1-1.trainJob")
 							},
 						},
 					},
@@ -205,8 +211,8 @@ func TestMPI(t *testing.T) {
 					Obj(),
 				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
 					WithData(map[string]string{
-						constants.MPIHostfileName: `trainJob-trainer-node-1-0.trainJob slots=1
-trainJob-trainer-node-1-1.trainJob slots=1
+						constants.MPIHostfileName: `trainJob-node-1-0.trainJob slots=1
+trainJob-node-1-1.trainJob slots=1
 `,
 					}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
@@ -220,15 +226,18 @@ trainJob-trainer-node-1-1.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobLauncher,
+							Name:  constants.JobLauncher,
+							Count: ptr.To[int32](1),
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-launcher-0-0.trainJob")
 							},
 						},
 						{
-							Name: constants.JobTrainerNode,
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
 							Endpoints: func(yield func(string) bool) {
-								yield("trainJob-trainer-node-1-0.trainJob")
+								yield("trainJob-node-1-0.trainJob")
 							},
 						},
 					},
@@ -256,7 +265,8 @@ trainJob-trainer-node-1-1.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobLauncher,
+							Name:  constants.JobLauncher,
+							Count: ptr.To[int32](1),
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
 									WithName(constants.MPISSHAuthVolumeName).
@@ -291,8 +301,9 @@ trainJob-trainer-node-1-1.trainJob slots=1
 							},
 						},
 						{
-							Name:  constants.JobTrainerNode,
-							Count: ptr.To[int32](1),
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
 									WithName(constants.MPISSHAuthVolumeName).
@@ -312,7 +323,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 									),
 							},
 							Endpoints: func(yield func(string) bool) {
-								yield("trainJob-trainer-node-1-0.trainJob")
+								yield("trainJob-node-1-0.trainJob")
 							},
 						},
 					},
@@ -336,7 +347,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 					Obj(),
 				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
 					WithData(map[string]string{
-						constants.MPIHostfileName: `trainJob-trainer-node-1-0.trainJob slots=2
+						constants.MPIHostfileName: `trainJob-node-1-0.trainJob slots=2
 `,
 					}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
@@ -355,16 +366,25 @@ trainJob-trainer-node-1-1.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobLauncher,
+							Name:  constants.JobLauncher,
+							Count: ptr.To[int32](1),
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-launcher-0-0.trainJob")
 							},
+							Containers: []runtime.Container{{
+								Name: constants.ContainerLauncher,
+							}},
 						},
 						{
-							Name: constants.JobTrainerNode,
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
 							Endpoints: func(yield func(string) bool) {
-								yield("trainJob-trainer-node-1-0.trainJob")
+								yield("trainJob-node-1-0.trainJob")
 							},
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+							}},
 						},
 					},
 				},
@@ -374,7 +394,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 				UID("trainJob").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumNodes(1).
+						NumNodes(10).
 						Obj()).
 				Obj(),
 			wantInfo: &runtime.Info{
@@ -388,7 +408,33 @@ trainJob-trainer-node-1-1.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobLauncher,
+							Name:  constants.JobLauncher,
+							Count: ptr.To[int32](1),
+							Containers: []runtime.Container{{
+								Name: constants.ContainerLauncher,
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().
+										WithName(constants.MPISSHAuthVolumeName).
+										WithMountPath("/root/.ssh"),
+									*corev1ac.VolumeMount().
+										WithName(constants.MPIHostfileVolumeName).
+										WithMountPath("/etc/mpi"),
+								},
+								Env: []corev1ac.EnvVarApplyConfiguration{
+									*corev1ac.EnvVar().
+										WithName(constants.OpenMPIEnvHostFileLocation).
+										WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+									*corev1ac.EnvVar().
+										WithName(constants.OpenMPIEnvKeepFQDNHostNames).
+										WithValue("true"),
+									*corev1ac.EnvVar().
+										WithName(constants.OpenMPIEnvDefaultSlots).
+										WithValue("1"),
+									*corev1ac.EnvVar().
+										WithName(constants.OpenMPIEnvKeyRSHArgs).
+										WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
+								},
+							}},
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
 									WithName(constants.MPISSHAuthVolumeName).
@@ -423,8 +469,17 @@ trainJob-trainer-node-1-1.trainJob slots=1
 							},
 						},
 						{
-							Name:  constants.JobTrainerNode,
-							Count: ptr.To[int32](1),
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](9),
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().
+										WithName(constants.MPISSHAuthVolumeName).
+										WithMountPath("/root/.ssh"),
+								},
+							}},
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
 									WithName(constants.MPISSHAuthVolumeName).
@@ -444,7 +499,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 									),
 							},
 							Endpoints: func(yield func(string) bool) {
-								yield("trainJob-trainer-node-1-0.trainJob")
+								yield("trainJob-node-1-0.trainJob")
 							},
 						},
 					},
@@ -464,7 +519,7 @@ trainJob-trainer-node-1-1.trainJob slots=1
 				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
 					WithData(map[string]string{
 						constants.MPIHostfileName: `trainJob-launcher-0-0.trainJob slots=1
-trainJob-trainer-node-1-0.trainJob slots=1
+trainJob-node-1-0.trainJob slots=1
 `,
 					}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").

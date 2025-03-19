@@ -76,9 +76,9 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(
-						corev1ac.Container().WithName(constants.ContainerTrainer),
+						corev1ac.Container().WithName(constants.Node),
 					),
 				),
 			),
@@ -98,11 +98,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](2),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -125,7 +126,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("trainJob-trainer-node-0-0.trainJob"),
+									Value: ptr.To("trainJob-node-0-0.trainJob"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -158,8 +159,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -172,11 +173,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -199,7 +201,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+									Value: ptr.To("test-job-node-0-0.test-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -230,8 +232,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -244,11 +246,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -271,7 +274,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+									Value: ptr.To("test-job-node-0-0.test-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -304,8 +307,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -318,11 +321,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -345,7 +349,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+									Value: ptr.To("test-job-node-0-0.test-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -378,8 +382,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -392,11 +396,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -419,7 +424,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+									Value: ptr.To("test-job-node-0-0.test-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -452,8 +457,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -466,11 +471,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -493,7 +499,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+									Value: ptr.To("test-job-node-0-0.test-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -526,8 +532,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -540,11 +546,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -567,7 +574,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+									Value: ptr.To("test-job-node-0-0.test-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -600,8 +607,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -614,11 +621,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -641,7 +649,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+									Value: ptr.To("test-job-node-0-0.test-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -674,8 +682,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -688,11 +696,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -715,7 +724,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+									Value: ptr.To("test-job-node-0-0.test-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -748,8 +757,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -762,11 +771,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -789,7 +799,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("test-job-trainer-node-0-0.test-job"),
+									Value: ptr.To("test-job-node-0-0.test-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -822,8 +832,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -836,11 +846,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -863,7 +874,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("cpu-job-trainer-node-0-0.cpu-job"),
+									Value: ptr.To("cpu-job-node-0-0.cpu-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -897,8 +908,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -911,11 +922,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -938,7 +950,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("cpu-gpu-job-trainer-node-0-0.cpu-gpu-job"),
+									Value: ptr.To("cpu-gpu-job-node-0-0.cpu-gpu-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -971,8 +983,8 @@ func TestTorch(t *testing.T) {
 						).
 						Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -985,11 +997,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -1012,7 +1025,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("cpu-frac-job-trainer-node-0-0.cpu-frac-job"),
+									Value: ptr.To("cpu-frac-job-node-0-0.cpu-frac-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
@@ -1052,8 +1065,8 @@ func TestTorch(t *testing.T) {
 					"app": "pytorch-training",
 					"env": "production",
 				}),
-				runtime.WithPodSet(constants.JobTrainerNode, 2, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 2, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -1069,11 +1082,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](4),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
@@ -1096,7 +1110,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterAddr),
-									Value: ptr.To("gpu-job-trainer-node-0-0.gpu-job"),
+									Value: ptr.To("gpu-job-node-0-0.gpu-job"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),

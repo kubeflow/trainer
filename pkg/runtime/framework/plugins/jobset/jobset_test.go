@@ -74,7 +74,7 @@ func TestJobSet(t *testing.T) {
 				},
 			},
 		},
-		"trainer numNodes is respected rather than parallelism when replicatedJob name is trainer-node": {
+		"trainer numNodes is respected rather than parallelism when replicatedJob name is node": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
 				Obj(),
 			info: &runtime.Info{
@@ -90,7 +90,7 @@ func TestJobSet(t *testing.T) {
 							Containers: make([]runtime.Container, 1),
 						},
 						{
-							Name:       constants.JobTrainerNode,
+							Name:       constants.Node,
 							Count:      ptr.To[int32](2),
 							Containers: make([]runtime.Container, 1),
 						},
@@ -113,14 +113,14 @@ func TestJobSet(t *testing.T) {
 									),
 								),
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobTrainerNode).
+								WithName(constants.Node).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithParallelism(2).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
-													corev1ac.Container().WithName(constants.ContainerTrainer),
+													corev1ac.Container().WithName(constants.Node),
 												),
 											),
 										),
@@ -145,12 +145,12 @@ func TestJobSet(t *testing.T) {
 							},
 						},
 						{
-							Name:       constants.JobTrainerNode,
+							Name:       constants.Node,
 							Count:      ptr.To[int32](2),
 							Containers: make([]runtime.Container, 1),
 							Endpoints: func(yield func(string) bool) {
-								yield("trainJob-trainer-node-0-0.trainJob")
-								yield("trainJob-trainer-node-0-1.trainJob")
+								yield("trainJob-node-0-0.trainJob")
+								yield("trainJob-node-0-1.trainJob")
 							},
 						},
 					},
@@ -172,14 +172,14 @@ func TestJobSet(t *testing.T) {
 									),
 								),
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobTrainerNode).
+								WithName(constants.Node).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithParallelism(2).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
-													corev1ac.Container().WithName(constants.ContainerTrainer),
+													corev1ac.Container().WithName(constants.Node),
 												),
 											),
 										),
@@ -203,7 +203,7 @@ func TestJobSet(t *testing.T) {
 							Containers: make([]runtime.Container, 1),
 						},
 						{
-							Name:       constants.JobTrainerNode,
+							Name:       constants.Node,
 							Containers: make([]runtime.Container, 1),
 						},
 					},
@@ -226,14 +226,14 @@ func TestJobSet(t *testing.T) {
 									),
 								),
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobTrainerNode).
+								WithName(constants.Node).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithParallelism(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
-													corev1ac.Container().WithName(constants.ContainerTrainer),
+													corev1ac.Container().WithName(constants.Node),
 												),
 											),
 										),
@@ -256,10 +256,10 @@ func TestJobSet(t *testing.T) {
 							},
 						},
 						{
-							Name:       constants.JobTrainerNode,
+							Name:       constants.Node,
 							Containers: make([]runtime.Container, 1),
 							Endpoints: func(yield func(string) bool) {
-								yield("trainJob-trainer-node-0-0.kubeflow.org")
+								yield("trainJob-node-0-0.kubeflow.org")
 							},
 						},
 					},
@@ -282,14 +282,14 @@ func TestJobSet(t *testing.T) {
 									),
 								),
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobTrainerNode).
+								WithName(constants.Node).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithParallelism(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
-													corev1ac.Container().WithName(constants.ContainerTrainer),
+													corev1ac.Container().WithName(constants.Node),
 												),
 											),
 										),

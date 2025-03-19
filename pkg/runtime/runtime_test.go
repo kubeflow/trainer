@@ -45,7 +45,7 @@ func TestNewInfo(t *testing.T) {
 				WithAnnotations(map[string]string{
 					"annotationKey": "annotationValue",
 				}),
-				WithPodSet(constants.DatasetInitializer, 1, corev1.PodSpec{
+				WithPodSet(constants.DatasetInitializer, ptr.To(constants.DatasetInitializer), 1, corev1.PodSpec{
 					Containers: []corev1.Container{{
 						Name: constants.DatasetInitializer,
 						Resources: corev1.ResourceRequirements{
@@ -82,7 +82,7 @@ func TestNewInfo(t *testing.T) {
 								})),
 					),
 				),
-				WithPodSet(constants.ModelInitializer, 1, corev1.PodSpec{
+				WithPodSet(constants.ModelInitializer, ptr.To(constants.ModelInitializer), 1, corev1.PodSpec{
 					Containers: []corev1.Container{{
 						Name: constants.ModelInitializer,
 						Resources: corev1.ResourceRequirements{
@@ -119,9 +119,9 @@ func TestNewInfo(t *testing.T) {
 								})),
 					),
 				),
-				WithPodSet(constants.JobTrainerNode, 10, corev1.PodSpec{
+				WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 10, corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Name: constants.ContainerTrainer,
+						Name: constants.Node,
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceCPU: resource.MustParse("15"),
@@ -140,7 +140,7 @@ func TestNewInfo(t *testing.T) {
 				}, corev1ac.PodSpec().
 					WithContainers(
 						corev1ac.Container().
-							WithName(constants.ContainerTrainer).
+							WithName(constants.Node).
 							WithResources(corev1ac.ResourceRequirements().
 								WithRequests(corev1.ResourceList{
 									corev1.ResourceCPU: resource.MustParse("25"),
@@ -228,7 +228,7 @@ func TestNewInfo(t *testing.T) {
 									),
 								),
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobTrainerNode).
+								WithName(constants.Node).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithLabels(nil).
 									WithSpec(batchv1ac.JobSpec().
@@ -237,7 +237,7 @@ func TestNewInfo(t *testing.T) {
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
-														WithName(constants.ContainerTrainer).
+														WithName(constants.Node).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -272,8 +272,9 @@ func TestNewInfo(t *testing.T) {
 				TemplateSpec: TemplateSpec{
 					PodSets: []PodSet{
 						{
-							Name:  constants.DatasetInitializer,
-							Count: ptr.To[int32](1),
+							Name:     constants.DatasetInitializer,
+							Ancestor: ptr.To(constants.DatasetInitializer),
+							Count:    ptr.To[int32](1),
 							InitContainers: []Container{{
 								Name: "setup-initializer",
 							}},
@@ -285,8 +286,9 @@ func TestNewInfo(t *testing.T) {
 							},
 						},
 						{
-							Name:  constants.ModelInitializer,
-							Count: ptr.To[int32](1),
+							Name:     constants.ModelInitializer,
+							Ancestor: ptr.To(constants.ModelInitializer),
+							Count:    ptr.To[int32](1),
 							InitContainers: []Container{{
 								Name: "setup-initializer",
 							}},
@@ -298,10 +300,11 @@ func TestNewInfo(t *testing.T) {
 							},
 						},
 						{
-							Name:  constants.JobTrainerNode,
-							Count: ptr.To[int32](10),
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](10),
 							Containers: []Container{{
-								Name: constants.ContainerTrainer,
+								Name: constants.Node,
 								Env: []corev1ac.EnvVarApplyConfiguration{{
 									Name:  ptr.To("TEST"),
 									Value: ptr.To("TEST"),
@@ -384,7 +387,7 @@ func TestNewInfo(t *testing.T) {
 									),
 								),
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobTrainerNode).
+								WithName(constants.Node).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithLabels(nil).
 									WithSpec(batchv1ac.JobSpec().
@@ -393,7 +396,7 @@ func TestNewInfo(t *testing.T) {
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
-														WithName(constants.ContainerTrainer).
+														WithName(constants.Node).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -439,10 +442,10 @@ func TestNewInfo(t *testing.T) {
 	}
 }
 
-func TestFindContainerByPodSetContainerName(t *testing.T) {
+func TestFindContainerByPodSetAncestorContainerName(t *testing.T) {
 	cases := map[string]struct {
 		info          *Info
-		psName        string
+		psAncestor    string
 		containerName string
 		wantContainer *Container
 	}{
@@ -451,7 +454,7 @@ func TestFindContainerByPodSetContainerName(t *testing.T) {
 				TemplateSpec: TemplateSpec{
 					PodSets: []PodSet{
 						{
-							Name: "alpha",
+							Ancestor: ptr.To("alpha"),
 							Containers: []Container{
 								{
 									Name: "one",
@@ -462,13 +465,13 @@ func TestFindContainerByPodSetContainerName(t *testing.T) {
 							},
 						},
 						{
-							Name:       "beta",
+							Ancestor:   ptr.To("beta"),
 							Containers: []Container{{Name: "one"}},
 						},
 					},
 				},
 			},
-			psName:        "alpha",
+			psAncestor:    "alpha",
 			containerName: "one",
 			wantContainer: &Container{
 				Name: "one",
@@ -478,12 +481,12 @@ func TestFindContainerByPodSetContainerName(t *testing.T) {
 			info: &Info{
 				TemplateSpec: TemplateSpec{
 					PodSets: []PodSet{{
-						Name:       "alpha",
+						Ancestor:   ptr.To("alpha"),
 						Containers: []Container{{Name: "one"}},
 					}},
 				},
 			},
-			psName:        "alpha",
+			psAncestor:    "alpha",
 			containerName: "two",
 			wantContainer: nil,
 		},
@@ -491,19 +494,19 @@ func TestFindContainerByPodSetContainerName(t *testing.T) {
 			info: &Info{
 				TemplateSpec: TemplateSpec{
 					PodSets: []PodSet{{
-						Name:       "alpha",
+						Ancestor:   ptr.To("alpha"),
 						Containers: []Container{{Name: "one"}},
 					}},
 				},
 			},
-			psName:        "beta",
+			psAncestor:    "beta",
 			containerName: "one",
 			wantContainer: nil,
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := tc.info.FindContainerByPodSetContainerName(tc.psName, tc.containerName)
+			got := tc.info.FindContainerByPodSetAncestorContainerName(tc.psAncestor, tc.containerName)
 			if diff := cmp.Diff(tc.wantContainer, got); len(diff) != 0 {
 				t.Errorf("Unexpected Container (-want,+got):\n%s", diff)
 			}
@@ -511,11 +514,11 @@ func TestFindContainerByPodSetContainerName(t *testing.T) {
 	}
 }
 
-func TestFindContainerByName(t *testing.T) {
+func TestFindPodSetByName(t *testing.T) {
 	cases := map[string]struct {
-		info   *Info
-		psName string
-		want   *PodSet
+		info       *Info
+		psName     string
+		wantPodSet *PodSet
 	}{
 		"PodSet exists": {
 			info: &Info{
@@ -531,8 +534,56 @@ func TestFindContainerByName(t *testing.T) {
 				},
 			},
 			psName: "alpha",
-			want: &PodSet{
+			wantPodSet: &PodSet{
 				Name: "alpha",
+			},
+		},
+		"PodSet does not exist": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{
+						{
+							Name: "alpha",
+						},
+					},
+				},
+			},
+			psName:     "beta",
+			wantPodSet: nil,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := tc.info.FindPodSetByName(tc.psName)
+			if diff := cmp.Diff(tc.wantPodSet, got); len(diff) != 0 {
+				t.Errorf("Unexpected PodSet (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFindContainerByName(t *testing.T) {
+	cases := map[string]struct {
+		info       *Info
+		psAncestor string
+		want       *PodSet
+	}{
+		"PodSet exists": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{
+						{
+							Ancestor: ptr.To("alpha"),
+						},
+						{
+							Ancestor: ptr.To("beta"),
+						},
+					},
+				},
+			},
+			psAncestor: "alpha",
+			want: &PodSet{
+				Ancestor: ptr.To("alpha"),
 			},
 		},
 		"PodSet does not exist": {
@@ -543,13 +594,13 @@ func TestFindContainerByName(t *testing.T) {
 					}},
 				},
 			},
-			psName: "beta",
-			want:   nil,
+			psAncestor: "beta",
+			want:       nil,
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := tc.info.FindPodSetByName(tc.psName)
+			got := tc.info.FindPodSetByAncestor(tc.psAncestor)
 			if diff := cmp.Diff(tc.want, got); len(diff) != 0 {
 				t.Errorf("Unexpected PodSet (-want,+got):\n%s", diff)
 			}

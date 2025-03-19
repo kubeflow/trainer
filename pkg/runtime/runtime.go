@@ -64,7 +64,10 @@ type TemplateSpec struct {
 type PodSet struct {
 	// PodSet name is the name to identify PodSpec.
 	// This typically has the name stored in each PodSpec.
-	Name           string
+	Name string
+	// Ancestor is built by `trainer.kubeflow.org/trainjob-ancestor-step` label value
+	// in Runtime CRDs.
+	Ancestor       *string
 	Count          *int32
 	InitContainers []Container
 	Containers     []Container
@@ -133,11 +136,12 @@ func WithTemplateSpecObjApply(objApply any) InfoOption {
 // WithPodSet construct Info.TemplateSpec.PodSet from PodSpec.
 // The third argument, 'typedPodSpec' is used only to calculate requested resources.
 func WithPodSet(
-	psName string, count int32, typedPodSpec corev1.PodSpec, podSpecApply *corev1ac.PodSpecApplyConfiguration,
+	psName string, ancestor *string, count int32, typedPodSpec corev1.PodSpec, podSpecApply *corev1ac.PodSpecApplyConfiguration,
 ) InfoOption {
 	return func(o *InfoOptions) {
 		ps := PodSet{
 			Name:              psName,
+			Ancestor:          ancestor,
 			Count:             ptr.To(max(count, 1)),
 			Volumes:           podSpecApply.Volumes,
 			SinglePodRequests: resourcehelpers.PodRequests(&corev1.Pod{Spec: typedPodSpec}, resourcehelpers.PodResourcesOptions{}),
@@ -203,25 +207,28 @@ func TemplateSpecApply[A any](info *Info) (*A, bool) {
 	return spec, ok
 }
 
-// FindContainerByPodSetContainerName finds runtime.Container from Info.TemplateSpec.PodSet by PodSet and Container name.
-func (i *Info) FindContainerByPodSetContainerName(psName, containerName string) *Container {
-	ps := i.FindPodSetByName(psName)
+// FindContainerByPodSetAncestorContainerName finds runtime.Container from Info.TemplateSpec.PodSet by PodSet Ancestor and Container name.
+func (i *Info) FindContainerByPodSetAncestorContainerName(psAncestor, containerName string) *Container {
+	ps := i.FindPodSetByAncestor(psAncestor)
 	if ps == nil {
 		return nil
 	}
-	for containerIdx, container := range ps.Containers {
-		if container.Name == containerName {
-			return &ps.Containers[containerIdx]
-		}
+	if idx := slices.IndexFunc(ps.Containers, func(c Container) bool { return c.Name == containerName }); idx != -1 {
+		return &ps.Containers[idx]
+	}
+	return nil
+}
+
+func (i *Info) FindPodSetByAncestor(ancestor string) *PodSet {
+	if idx := slices.IndexFunc(i.TemplateSpec.PodSets, func(ps PodSet) bool { return ptr.Equal(ps.Ancestor, &ancestor) }); idx != -1 {
+		return &i.TemplateSpec.PodSets[idx]
 	}
 	return nil
 }
 
 func (i *Info) FindPodSetByName(psName string) *PodSet {
-	for psIdx, ps := range i.TemplateSpec.PodSets {
-		if ps.Name == psName {
-			return &i.TemplateSpec.PodSets[psIdx]
-		}
+	if idx := slices.IndexFunc(i.TemplateSpec.PodSets, func(ps PodSet) bool { return ps.Name == psName }); idx != -1 {
+		return &i.TemplateSpec.PodSets[idx]
 	}
 	return nil
 }

@@ -54,13 +54,13 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 					{
 						Name: constants.DatasetInitializer,
 						Template: batchv1.JobTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+								},
+							},
 							Spec: batchv1.JobSpec{
 								Template: corev1.PodTemplateSpec{
-									ObjectMeta: metav1.ObjectMeta{
-										Labels: map[string]string{
-											constants.LabelTrainJobAncestor: constants.DatasetInitializer,
-										},
-									},
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
 											{
@@ -87,13 +87,13 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 					{
 						Name: constants.ModelInitializer,
 						Template: batchv1.JobTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									constants.LabelTrainJobAncestor: constants.ModelInitializer,
+								},
+							},
 							Spec: batchv1.JobSpec{
 								Template: corev1.PodTemplateSpec{
-									ObjectMeta: metav1.ObjectMeta{
-										Labels: map[string]string{
-											constants.LabelTrainJobAncestor: constants.ModelInitializer,
-										},
-									},
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
 											{
@@ -118,14 +118,19 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 						},
 					},
 					{
-						Name: constants.JobTrainerNode,
+						Name: constants.Node,
 						Template: batchv1.JobTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+								},
+							},
 							Spec: batchv1.JobSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
 											{
-												Name: constants.ContainerTrainer,
+												Name: constants.Node,
 												VolumeMounts: []corev1.VolumeMount{
 													{
 														Name:      jobsetplgconsts.VolumeNameInitializer,
@@ -168,7 +173,7 @@ func (j *JobSetWrapper) Replicas(replicas int32, rJobNames ...string) *JobSetWra
 
 func (j *JobSetWrapper) NumNodes(numNodes int32) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
-		if rJob.Name == constants.JobTrainerNode {
+		if rJob.Name == constants.Node {
 			j.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = &numNodes
 			j.Spec.ReplicatedJobs[i].Template.Spec.Completions = &numNodes
 		}
@@ -196,7 +201,7 @@ func (j *JobSetWrapper) Completions(c int32, rJobNames ...string) *JobSetWrapper
 
 func (j *JobSetWrapper) LauncherReplica() *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
-		if rJob.Name == constants.JobTrainerNode {
+		if rJob.Name == constants.Node {
 			j.Spec.ReplicatedJobs = append(j.Spec.ReplicatedJobs, jobsetv1alpha2.ReplicatedJob{})
 			copy(j.Spec.ReplicatedJobs[i+1:], j.Spec.ReplicatedJobs[i:])
 			j.Spec.ReplicatedJobs[i] = jobsetv1alpha2.ReplicatedJob{
@@ -238,9 +243,9 @@ func (j *JobSetWrapper) Container(rJobName, containerName, image string, command
 
 func (j *JobSetWrapper) ContainerTrainerPorts(ports []corev1.ContainerPort) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
-		if rJob.Name == constants.JobTrainerNode {
+		if rJob.Name == constants.Node {
 			for k, container := range rJob.Template.Spec.Template.Spec.Containers {
-				if container.Name == constants.ContainerTrainer {
+				if container.Name == constants.Node {
 					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Ports = ports
 				}
 			}
@@ -594,13 +599,13 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 							{
 								Name: constants.DatasetInitializer,
 								Template: batchv1.JobTemplateSpec{
+									ObjectMeta: metav1.ObjectMeta{
+										Labels: map[string]string{
+											constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+										},
+									},
 									Spec: batchv1.JobSpec{
 										Template: corev1.PodTemplateSpec{
-											ObjectMeta: metav1.ObjectMeta{
-												Labels: map[string]string{
-													constants.LabelTrainJobAncestor: constants.DatasetInitializer,
-												},
-											},
 											Spec: corev1.PodSpec{
 												Containers: []corev1.Container{
 													{
@@ -627,13 +632,13 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 							{
 								Name: constants.ModelInitializer,
 								Template: batchv1.JobTemplateSpec{
+									ObjectMeta: metav1.ObjectMeta{
+										Labels: map[string]string{
+											constants.LabelTrainJobAncestor: constants.ModelInitializer,
+										},
+									},
 									Spec: batchv1.JobSpec{
 										Template: corev1.PodTemplateSpec{
-											ObjectMeta: metav1.ObjectMeta{
-												Labels: map[string]string{
-													constants.LabelTrainJobAncestor: constants.ModelInitializer,
-												},
-											},
 											Spec: corev1.PodSpec{
 												Containers: []corev1.Container{
 													{
@@ -658,14 +663,19 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 								},
 							},
 							{
-								Name: constants.JobTrainerNode,
+								Name: constants.Node,
 								Template: batchv1.JobTemplateSpec{
+									ObjectMeta: metav1.ObjectMeta{
+										Labels: map[string]string{
+											constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+										},
+									},
 									Spec: batchv1.JobSpec{
 										Template: corev1.PodTemplateSpec{
 											Spec: corev1.PodSpec{
 												Containers: []corev1.Container{
 													{
-														Name: constants.ContainerTrainer,
+														Name: constants.Node,
 														VolumeMounts: []corev1.VolumeMount{
 															{
 																Name:      jobsetplgconsts.VolumeNameInitializer,
@@ -799,14 +809,14 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 								},
 							},
 							{
-								Name: constants.JobTrainerNode,
+								Name: constants.Node,
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
 										Template: corev1.PodTemplateSpec{
 											Spec: corev1.PodSpec{
 												Containers: []corev1.Container{
 													{
-														Name: constants.ContainerTrainer,
+														Name: constants.Node,
 														VolumeMounts: []corev1.VolumeMount{
 															{
 																Name:      jobsetplgconsts.VolumeNameInitializer,
@@ -871,7 +881,7 @@ func (s *TrainingRuntimeSpecWrapper) WithMLPolicy(mlPolicy *trainer.MLPolicy) *T
 
 func (s *TrainingRuntimeSpecWrapper) LauncherReplica() *TrainingRuntimeSpecWrapper {
 	for i, rJob := range s.Template.Spec.ReplicatedJobs {
-		if rJob.Name == constants.JobTrainerNode {
+		if rJob.Name == constants.Node {
 			s.Template.Spec.ReplicatedJobs = append(s.Template.Spec.ReplicatedJobs, jobsetv1alpha2.ReplicatedJob{})
 			copy(s.Template.Spec.ReplicatedJobs[i+1:], s.Template.Spec.ReplicatedJobs[i:])
 			s.Template.Spec.ReplicatedJobs[i] = jobsetv1alpha2.ReplicatedJob{

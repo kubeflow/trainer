@@ -150,11 +150,18 @@ func (r *TrainingRuntime) newRuntimeInfo(
 		// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 		// REF: https://github.com/kubeflow/trainer/issues/2318
 		count := ptr.Deref(rJob.Template.Spec.Parallelism, 1)
-		if *rJob.Name == constants.JobTrainerNode && mlPolicy != nil {
-			count = ptr.Deref(mlPolicy.NumNodes, 1)
+		var ancestor *string
+		if metadata := rJob.Template.ObjectMetaApplyConfiguration; metadata != nil && metadata.Labels != nil {
+			if labelAncestor, ok := metadata.Labels[constants.LabelTrainJobAncestor]; ok {
+				if labelAncestor == constants.AncestorTrainer && mlPolicy != nil {
+					count = ptr.Deref(mlPolicy.NumNodes, 1)
+				}
+				ancestor = &labelAncestor
+			}
 		}
 		opts = append(opts, runtime.WithPodSet(
 			*rJob.Name,
+			ancestor,
 			count,
 			*jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.DeepCopy(),
 			rJob.Template.Spec.Template.Spec),

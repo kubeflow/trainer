@@ -34,11 +34,12 @@ const (
 	// ModelMountPath is the volumeMount path for model.
 	ModelMountPath string = "/workspace/model"
 
-	// JobTrainerNode is the Job name for the trainer node.
-	JobTrainerNode string = "trainer-node"
+	// AncestorTrainer is the ancestor name for Trainer, which is mostly used for the value of
+	// 'trainer.kubeflow.org/trainjob-ancestor-step'.
+	AncestorTrainer string = "trainer"
 
-	// ContainerTrainer is the container name for the trainer.
-	ContainerTrainer string = "trainer"
+	// Node is the name of the Job and container for the trainer node
+	Node string = "node"
 
 	// ContainerTrainerPort is the default port for the trainer nodes communication.
 	ContainerTrainerPort int32 = 29500

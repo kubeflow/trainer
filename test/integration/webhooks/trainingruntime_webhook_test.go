@@ -189,7 +189,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 						},
 					}
 					runtime.Spec.Template.Spec = testingutil.MakeJobSetWrapper(ns.Name, "runtime").
-						Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer).
+						Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 						Obj().
 						Spec
 					return runtime
@@ -209,7 +209,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -231,7 +231,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -254,7 +254,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -276,7 +276,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -299,7 +299,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -321,7 +321,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -344,7 +344,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).
@@ -366,7 +366,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 									Obj().
 									Spec,
 							).

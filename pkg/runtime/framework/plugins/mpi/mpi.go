@@ -79,7 +79,7 @@ func (m *MPI) Name() string {
 // TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 // Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 
-func (m *MPI) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.Info, oldJobObj, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (m *MPI) Validate(_ client.Object, runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil, allErrs
@@ -103,7 +103,16 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 
 	// TrainJob contains the actual information for the Trainer.
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		info.FindPodSetByName(constants.JobTrainerNode).Count = trainJob.Spec.Trainer.NumNodes
+		if node := info.FindPodSetByName(constants.Node); node != nil && node.Count != nil {
+			if ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
+				// TODO: We should implement more strong validations for the MPIRuntime with runLauncherAsNode.
+				// REF: https://github.com/kubeflow/trainer/issues/2550
+				// When runLauncherAsNode is enabled, 1 nodes should be allocated to launcher.
+				*node.Count = max(*trainJob.Spec.Trainer.NumNodes-1, 1)
+			} else {
+				*node.Count = *trainJob.Spec.Trainer.NumNodes
+			}
+		}
 	}
 
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
@@ -112,7 +121,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 
 	// Add Secret and ConfigMap volumes to the Info object
 	for psIdx, ps := range info.TemplateSpec.PodSets {
-		if ps.Name != constants.JobTrainerNode && ps.Name != constants.JobLauncher {
+		if ps.Name != constants.Node && ps.Name != constants.JobLauncher {
 			continue
 		}
 		apply.UpsertVolumes(
@@ -155,7 +164,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 			)
 		}
 		for cIdx, container := range ps.Containers {
-			if container.Name != constants.JobLauncher && container.Name != constants.JobTrainerNode {
+			if container.Name != constants.JobLauncher && container.Name != constants.Node {
 				continue
 			}
 			apply.UpsertVolumeMounts(
@@ -274,7 +283,7 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 	runLauncherAsNode := ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false)
 	slots := ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode, 1)
 	for _, ps := range info.TemplateSpec.PodSets {
-		if !isTrainerNode(runLauncherAsNode, ps) {
+		if !isNode(runLauncherAsNode, ps) {
 			continue
 		}
 		switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
@@ -297,6 +306,6 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 			WithBlockOwnerDeletion(true))
 }
 
-func isTrainerNode(runLauncherAsNode bool, ps runtime.PodSet) bool {
-	return (runLauncherAsNode && ps.Name == constants.JobLauncher) || ps.Name == constants.JobTrainerNode
+func isNode(runLauncherAsNode bool, ps runtime.PodSet) bool {
+	return (runLauncherAsNode && ps.Name == constants.JobLauncher) || ps.Name == constants.Node
 }

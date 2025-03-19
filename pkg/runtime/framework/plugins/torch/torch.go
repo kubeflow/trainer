@@ -52,7 +52,7 @@ func (t *Torch) Name() string {
 	return Name
 }
 
-func (t *Torch) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (t *Torch) Validate(_ client.Object, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
 		return nil, allErrs
@@ -93,9 +93,9 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 
 	// TrainJob contains the actual information for the Trainer.
-	numNodes := info.FindPodSetByName(constants.JobTrainerNode).Count
-	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		*numNodes = *trainJob.Spec.Trainer.NumNodes
+	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	if trainerPS != nil && trainerPS.Count != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
 	}
 
 	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicySource.Torch.NumProcPerNode, intstr.FromString("auto"))
@@ -142,7 +142,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
-		if trainerContainer = info.FindContainerByPodSetContainerName(constants.JobTrainerNode, constants.ContainerTrainer); trainerContainer != nil {
+		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
 			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 		}
 	}
@@ -150,7 +150,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		apply.UpsertEnvVar(&trainerContainer.Env,
 			*corev1ac.EnvVar().
 				WithName(constants.TorchEnvNumNodes).
-				WithValue(fmt.Sprintf("%d", ptr.Deref(numNodes, 1))),
+				WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
 			*corev1ac.EnvVar().
 				WithName(constants.TorchEnvNumProcPerNode).
 				WithValue(numProcPerNode.String()),
@@ -161,7 +161,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 						WithFieldPath(constants.JobCompletionIndexFieldPath))),
 			*corev1ac.EnvVar().
 				WithName(constants.TorchEnvMasterAddr).
-				WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.JobTrainerNode, trainJob.Name)),
+				WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
 			*corev1ac.EnvVar().
 				WithName(constants.TorchEnvMasterPort).
 				WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),

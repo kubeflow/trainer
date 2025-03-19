@@ -12,10 +12,11 @@ spec:
       numProcPerNode: 1
       mpiImplementation: OpenMPI
       sshAuthMountPath: /home/mpiuser/.ssh
+      runLauncherAsNode: true
   template:
     spec:
       network:
-        publishNotReadyAddresses: false
+        publishNotReadyAddresses: true
       successPolicy:
         operator: All
         targetReplicatedJobs:
@@ -23,25 +24,28 @@ spec:
       replicatedJobs:
         - name: launcher
           template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
             spec:
               template:
                 spec:
                   containers:
-                    - name: launcher
-                      image: mpioperator/mpi-pi:openmpi
-                      securityContext:
-                        runAsUser: 1000
-                      command:
-                        - mpirun
-                      args:
-                        - /home/mpiuser/pi
-        - name: trainer-node
+                  - name: node
+                    image: mpioperator/mpi-pi:openmpi
+                    securityContext:
+                      runAsUser: 1000
+                    command:
+                      - mpirun
+                    args:
+                      - /home/mpiuser/pi
+        - name: node
           template:
             spec:
               template:
                 spec:
                   containers:
-                    - name: trainer-node
+                    - name: node
                       image: mpioperator/mpi-pi:openmpi
                       securityContext:
                         runAsUser: 1000

@@ -119,7 +119,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 						PodGroupPolicyCoscheduling(&trainer.CoschedulingPodGroupPolicySource{ScheduleTimeoutSeconds: ptr.To[int32](100)}).
 						Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 						Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-						Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 						Obj()).
 				Obj()
 		})
@@ -144,7 +144,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Label("testingKey", "testingVal").
 							Annotation("testingKey", "testingVal").
 							PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, trainJobKey.Name).
-							Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer).
+							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 							Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 							NumNodes(100).
@@ -166,7 +166,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									},
 								}...,
 							).
-							Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 							Obj(),
 						util.IgnoreObjectMetadata))
 					pg := &schedulerpluginsv1alpha1.PodGroup{}
@@ -219,7 +219,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Label("testingKey", "testingVal").
 							Annotation("testingKey", "testingVal").
 							PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, trainJobKey.Name).
-							Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer).
+							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 							Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 							NumNodes(100).
@@ -241,7 +241,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									},
 								}...,
 							).
-							Container(constants.JobTrainerNode, constants.ContainerTrainer, updatedImageName, []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Container(constants.Node, constants.Node, updatedImageName, []string{"trainjob"}, []string{"trainjob"}, resRequests).
 							Obj(),
 						util.IgnoreObjectMetadata))
 					pg := &schedulerpluginsv1alpha1.PodGroup{}
@@ -283,7 +283,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					jobSet := &jobsetv1alpha2.JobSet{}
 					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
 					for _, rJob := range jobSet.Spec.ReplicatedJobs {
-						if rJob.Name == constants.JobTrainerNode {
+						if rJob.Name == constants.Node {
 							g.Expect(rJob.Template.Spec.Template.Spec.Containers[0].Image).Should(gomega.Equal(updatedImageName))
 						}
 					}
@@ -304,7 +304,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					g.Expect(jobSet.Spec.Suspend).ShouldNot(gomega.BeNil())
 					g.Expect(*jobSet.Spec.Suspend).Should(gomega.BeTrue())
 					for _, rJob := range jobSet.Spec.ReplicatedJobs {
-						if rJob.Name == constants.JobTrainerNode {
+						if rJob.Name == constants.Node {
 							g.Expect(rJob.Template.Spec.Template.Spec.Containers[0].Image).Should(gomega.Equal(originImageName))
 						}
 					}
@@ -337,7 +337,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									).
 									Obj(),
 							).
-							Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+							Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 							Obj()).
 					Obj()
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
@@ -354,13 +354,13 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 						testingutil.MakeJobSetWrapper(ns.Name, trainJobKey.Name).
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
 							Suspend(false).
-							Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer).
+							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 							Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 							NumNodes(100).
-							Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 							ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort, Protocol: "TCP"}}).
-							Env(constants.JobTrainerNode, constants.ContainerTrainer,
+							Env(constants.Node, constants.Node,
 								[]corev1.EnvVar{
 									{
 										Name:  "TRAIN_JOB",
@@ -384,7 +384,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									},
 									{
 										Name:  constants.TorchEnvMasterAddr,
-										Value: fmt.Sprintf("alpha-%s-0-0.alpha", constants.JobTrainerNode),
+										Value: fmt.Sprintf("alpha-%s-0-0.alpha", constants.Node),
 									},
 									{
 										Name:  constants.TorchEnvMasterPort,
@@ -616,7 +616,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									).
 									Obj(),
 							).
-							Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 							Obj()).
 					Obj()
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
@@ -634,11 +634,11 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
 							Suspend(false).
 							LauncherReplica().
-							Replicas(1, constants.JobTrainerNode, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 							Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 							NumNodes(2).
-							Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 							Volumes(constants.JobLauncher,
 								corev1.Volume{
 									Name: constants.MPISSHAuthVolumeName,
@@ -678,7 +678,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									},
 								},
 							).
-							Volumes(constants.JobTrainerNode,
+							Volumes(constants.Node,
 								corev1.Volume{
 									Name: constants.MPISSHAuthVolumeName,
 									VolumeSource: corev1.VolumeSource{
@@ -706,6 +706,9 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 								corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
 								corev1.VolumeMount{Name: constants.MPIHostfileVolumeName, MountPath: constants.MPIHostfileDir},
 							).
+							VolumeMounts(constants.Node, constants.Node,
+								corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
+							).
 							Env(constants.JobLauncher, constants.ContainerLauncher,
 								corev1.EnvVar{
 									Name:  constants.OpenMPIEnvHostFileLocation,
@@ -724,7 +727,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									Value: constants.OpenMPIEnvDefaultValueRSHArgs,
 								},
 							).
-							Env(constants.JobTrainerNode, constants.ContainerTrainer,
+							Env(constants.Node, constants.Node,
 								corev1.EnvVar{
 									Name:  "TRAIN_JOB",
 									Value: "value",
@@ -741,8 +744,8 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					g.Expect(cm).Should(gomega.BeComparableTo(
 						testingutil.MakeConfigMapWrapper(cmKey.Name, cmKey.Namespace).
 							WithData(map[string]string{
-								constants.MPIHostfileName: `alpha-trainer-node-0-0.alpha slots=8
-alpha-trainer-node-0-1.alpha slots=8
+								constants.MPIHostfileName: `alpha-node-0-0.alpha slots=8
+alpha-node-0-1.alpha slots=8
 `,
 							}).
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).

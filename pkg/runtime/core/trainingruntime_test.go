@@ -67,7 +67,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						PodGroupPolicyCoschedulingSchedulingTimeout(120).
 						Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 						Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-						Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 						Obj(),
 				).Obj(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
@@ -89,13 +89,13 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Label("conflictLabel", "override").
 					Annotation("conflictAnnotation", "override").
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode, constants.JobLauncher).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.JobLauncher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 					NumNodes(30).
 					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Obj(),
 				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
@@ -116,8 +116,8 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							WithNumNodes(100).
 							Obj(),
 					).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Env(constants.JobTrainerNode, constants.ContainerTrainer,
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Env(constants.Node, constants.Node,
 						[]corev1.EnvVar{
 							{
 								Name:  "TRAIN_JOB",
@@ -155,12 +155,12 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 					NumNodes(100).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-					Env(constants.JobTrainerNode, constants.ContainerTrainer,
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Env(constants.Node, constants.Node,
 						[]corev1.EnvVar{
 							{
 								Name:  "TRAIN_JOB",
@@ -189,7 +189,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					).
 					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Container(constants.ModelInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Obj(),
 			).Obj(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
@@ -235,13 +235,13 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 					NumNodes(100).
 					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Container(constants.ModelInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Env(constants.DatasetInitializer, constants.DatasetInitializer,
 						[]corev1.EnvVar{
 							{
@@ -306,7 +306,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					).
 					JobSetSpec(
 						testingutil.MakeJobSetWrapper("", "").
-							DependsOn(constants.JobTrainerNode,
+							DependsOn(constants.Node,
 								[]jobsetv1alpha2.DependsOn{
 									{
 										Name:   constants.DatasetInitializer,
@@ -321,7 +321,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							Obj().
 							Spec,
 					).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Obj(),
 			).Obj(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
@@ -337,13 +337,13 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode, constants.JobLauncher).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.JobLauncher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 					NumNodes(30).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
-					Env(constants.JobTrainerNode, constants.ContainerTrainer,
+					Env(constants.Node, constants.Node,
 						[]corev1.EnvVar{
 							{
 								Name:  constants.TorchEnvNumNodes,
@@ -363,7 +363,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							},
 							{
 								Name:  constants.TorchEnvMasterAddr,
-								Value: fmt.Sprintf("test-job-%s-0-0.test-job", constants.JobTrainerNode),
+								Value: fmt.Sprintf("test-job-%s-0-0.test-job", constants.Node),
 							},
 							{
 								Name:  constants.TorchEnvMasterPort,
@@ -371,7 +371,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							},
 						}...,
 					).
-					DependsOn(constants.JobTrainerNode,
+					DependsOn(constants.Node,
 						[]jobsetv1alpha2.DependsOn{
 							{
 								Name:   constants.DatasetInitializer,
@@ -398,8 +398,8 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							).
 							Obj(),
 					).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Env(constants.JobTrainerNode, constants.ContainerTrainer,
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Env(constants.Node, constants.Node,
 						[]corev1.EnvVar{
 							{
 								Name:  "TRAIN_JOB",
@@ -437,13 +437,13 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode, constants.JobLauncher).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.JobLauncher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 					NumNodes(100).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
-					Env(constants.JobTrainerNode, constants.ContainerTrainer,
+					Env(constants.Node, constants.Node,
 						[]corev1.EnvVar{
 							{
 								Name:  "TRAIN_JOB",
@@ -471,7 +471,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							},
 							{
 								Name:  constants.TorchEnvMasterAddr,
-								Value: fmt.Sprintf("test-job-%s-0-0.test-job", constants.JobTrainerNode),
+								Value: fmt.Sprintf("test-job-%s-0-0.test-job", constants.Node),
 							},
 							{
 								Name:  constants.TorchEnvMasterPort,
@@ -490,21 +490,22 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			ObjCmpOpts: cmp.Options{
 				cmp.Comparer(testingutil.MPISecretDataComparer),
 			},
-			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
-				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-					WithMLPolicy(
-						testingutil.MakeMLPolicyWrapper().
-							WithNumNodes(1).
-							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+				RuntimeSpec(
+					testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+						WithMLPolicy(
+							testingutil.MakeMLPolicyWrapper().
+								WithNumNodes(1).
+								WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+									Obj(),
+								).
 								Obj(),
-							).
-							Obj(),
-					).
-					LauncherReplica().
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Obj(),
-			).
+						).
+						LauncherReplica().
+						Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Obj(),
+				).
 				Obj(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				UID("uid").
@@ -520,8 +521,8 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				testingutil.MakeConfigMapWrapper(fmt.Sprintf("test-job%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					WithData(map[string]string{
-						constants.MPIHostfileName: `test-job-trainer-node-0-0.test-job slots=8
-test-job-trainer-node-0-1.test-job slots=8
+						constants.MPIHostfileName: `test-job-node-0-0.test-job slots=8
+test-job-node-0-1.test-job slots=8
 `,
 					}).
 					Obj(),
@@ -537,7 +538,7 @@ test-job-trainer-node-0-1.test-job slots=8
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					LauncherReplica().
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode, constants.JobLauncher).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.JobLauncher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 					NumNodes(2).
@@ -580,7 +581,7 @@ test-job-trainer-node-0-1.test-job slots=8
 							},
 						},
 					).
-					Volumes(constants.JobTrainerNode,
+					Volumes(constants.Node,
 						corev1.Volume{
 							Name: constants.MPISSHAuthVolumeName,
 							VolumeSource: corev1.VolumeSource{
@@ -608,6 +609,9 @@ test-job-trainer-node-0-1.test-job slots=8
 						corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
 						corev1.VolumeMount{Name: constants.MPIHostfileVolumeName, MountPath: constants.MPIHostfileDir},
 					).
+					VolumeMounts(constants.Node, constants.Node,
+						corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
+					).
 					Env(constants.JobLauncher, constants.ContainerLauncher,
 						corev1.EnvVar{
 							Name:  constants.OpenMPIEnvHostFileLocation,
@@ -626,7 +630,7 @@ test-job-trainer-node-0-1.test-job slots=8
 							Value: constants.OpenMPIEnvDefaultValueRSHArgs,
 						},
 					).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Obj(),
 			},
 		},

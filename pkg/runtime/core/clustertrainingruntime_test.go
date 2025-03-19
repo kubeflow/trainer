@@ -51,7 +51,7 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Spec).
 					JobSetSpec(
 						testingutil.MakeJobSetWrapper("", "").
-							DependsOn(constants.JobTrainerNode,
+							DependsOn(constants.Node,
 								[]jobsetv1alpha2.DependsOn{
 									{
 										Name:   constants.DatasetInitializer,
@@ -73,7 +73,7 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 							WithNumNodes(100).
 							Obj(),
 					).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					PodGroupPolicyCoschedulingSchedulingTimeout(120).
 					Obj(),
 			).Obj(),
@@ -92,14 +92,14 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					Suspend(true).
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobTrainerNode, constants.JobLauncher).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.JobLauncher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
 					NumNodes(100).
 					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Container(constants.JobTrainerNode, constants.ContainerTrainer, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-					DependsOn(constants.JobTrainerNode,
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					DependsOn(constants.Node,
 						[]jobsetv1alpha2.DependsOn{
 							{
 								Name:   constants.DatasetInitializer,

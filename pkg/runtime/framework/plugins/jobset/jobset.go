@@ -146,7 +146,7 @@ func (j *JobSet) IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJ
 		// TODO: Support multiple replicas for replicated Jobs.
 		// REF: https://github.com/kubeflow/trainer/issues/2318
 		podCount := info.TemplateSpec.PodSets[rJobIdx].Count
-		rJobReplicas := 1
+		rJobReplicas := constants.DefaultJobReplicas
 		info.TemplateSpec.PodSets[rJobIdx].Endpoints = func(yield func(string) bool) {
 			for podIdx := range ptr.Deref(podCount, 1) {
 				endpoint := fmt.Sprintf("%s-%s-%d-%d.%s", trainJob.Name, *rJob.Name, rJobReplicas-1, podIdx, subDomain)
@@ -194,7 +194,7 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 	// TODO: Once we remove deprecated runtime.Info.Trainer, we should remove JobSet Builder with DeprecatedTrainer().
 	jobSet := jobSetBuilder.
 		Initializer(trainJob).
-		Launcher().
+		Launcher(info, trainJob).
 		Trainer(info, trainJob).
 		PodLabels(info.Scheduler.PodLabels).
 		Suspend(trainJob.Spec.Suspend).

@@ -12,13 +12,16 @@ spec:
   template:
     spec:
       replicatedJobs:
-        - name: trainer-node
+        - name: node
           template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
             spec:
               template:
                 spec:
                   containers:
-                    - name: trainer
+                    - name: node
                       image: pytorch/pytorch:2.5.0-cuda12.4-cudnn9-runtime
                       command:
                         - /bin/bash

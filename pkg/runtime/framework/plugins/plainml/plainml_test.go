@@ -89,8 +89,8 @@ func TestPlainML(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 100, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.ContainerTrainer)),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 100, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			wantInfo: &runtime.Info{
@@ -101,11 +101,12 @@ func TestPlainML(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](200),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 						}},
 					}},
 				},
@@ -129,9 +130,9 @@ func TestPlainML(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().Obj(),
 				),
-				runtime.WithPodSet(constants.JobTrainerNode, 100, corev1.PodSpec{}, corev1ac.PodSpec().
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 100, corev1.PodSpec{}, corev1ac.PodSpec().
 					WithContainers(corev1ac.Container().
-						WithName(constants.ContainerTrainer).
+						WithName(constants.Node).
 						WithEnv(corev1ac.EnvVar().
 							WithName("CONFLICT").
 							WithValue("FROM_TRAINER"),
@@ -147,11 +148,12 @@ func TestPlainML(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.JobTrainerNode,
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
 						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
-							Name: constants.ContainerTrainer,
+							Name: constants.Node,
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								*corev1ac.EnvVar().WithName("CONFLICT").WithValue("FROM_TRAINER"),
 							},

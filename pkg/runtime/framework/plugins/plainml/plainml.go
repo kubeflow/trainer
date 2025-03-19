@@ -50,13 +50,15 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 
 	// TrainJob contains the actual information for the number of nodes.
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		info.FindPodSetByName(constants.JobTrainerNode).Count = trainJob.Spec.Trainer.NumNodes
+		if trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer); trainerPS != nil && trainerPS.Count != nil {
+			*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
+		}
 	}
 
 	// Add envs from the TrainJob.
 	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
-		if trainerContainer = info.FindContainerByPodSetContainerName(constants.JobTrainerNode, constants.ContainerTrainer); trainerContainer != nil {
+		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
 			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 		}
 	}

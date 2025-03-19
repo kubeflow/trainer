@@ -41,11 +41,12 @@ func NewBuilder(jobSet *jobsetv1alpha2ac.JobSetApplyConfiguration) *Builder {
 // Initializer updates JobSet values for the initializer Job.
 func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
-		if rJob.Template.Spec.Template.ObjectMetaApplyConfiguration == nil {
+		jobMetadata := rJob.Template.ObjectMetaApplyConfiguration
+		if jobMetadata == nil || jobMetadata.Labels == nil {
 			continue
 		}
 		// Update values for the Dataset Initializer Job.
-		if ancestor, ok := rJob.Template.Spec.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestor == constants.DatasetInitializer {
+		if ancestor, ok := jobMetadata.Labels[constants.LabelTrainJobAncestor]; ok && ancestor == constants.DatasetInitializer {
 			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 			// REF: https://github.com/kubeflow/trainer/issues/2318
 			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
@@ -71,7 +72,7 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 			}
 		}
 		// Update values for the Model Initializer Job.
-		if ancestor, ok := rJob.Template.Spec.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestor == constants.ModelInitializer {
+		if ancestor, ok := jobMetadata.Labels[constants.LabelTrainJobAncestor]; ok && ancestor == constants.ModelInitializer {
 			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 			// REF: https://github.com/kubeflow/trainer/issues/2318
 			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
@@ -101,7 +102,7 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 }
 
 // Launcher updates JobSet values for the launcher Job.
-func (b *Builder) Launcher() *Builder {
+func (b *Builder) Launcher(info *runtime.Info, trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
 		if *rJob.Name == constants.JobLauncher {
 			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
@@ -115,17 +116,21 @@ func (b *Builder) Launcher() *Builder {
 // Trainer updates JobSet values for the trainer Job.
 func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
-		if *rJob.Name == constants.JobTrainerNode {
+		jobMetadata := rJob.Template.ObjectMetaApplyConfiguration
+		if jobMetadata == nil || jobMetadata.Labels == nil {
+			continue
+		}
+		if ancestor, ok := jobMetadata.Labels[constants.LabelTrainJobAncestor]; ok && ancestor == constants.AncestorTrainer {
 			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 			// REF: https://github.com/kubeflow/trainer/issues/2318
 			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
 			// Update the Parallelism and Completions values for the Trainer Job.
-			b.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = info.TemplateSpec.PodSets[i].Count
-			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.TemplateSpec.PodSets[i].Count
+			b.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = info.FindPodSetByAncestor(constants.AncestorTrainer).Count
+			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.FindPodSetByAncestor(constants.AncestorTrainer).Count
 
 			// Update values for the Trainer container.
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
-				if *container.Name == constants.ContainerTrainer {
+				if *container.Name == constants.Node {
 					// Update values from the TrainJob trainer.
 					if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
 						if image := jobTrainer.Image; image != nil {
