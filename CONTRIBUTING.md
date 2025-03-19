@@ -42,19 +42,6 @@ make help
 
 The Kubeflow Trainer project includes several types of tests to ensure code quality and functionality.
 
-# Run tests 
-make test test-integration test-e2e
-
-# Setup a cluster for e2e testing
-make test-e2e-setup-cluster
-
-
-This command will:
-1. Build the necessary Docker images
-2. Create a Kind cluster if it doesn't exist
-3. Load your images into the cluster
-4. Deploy the operator
-
 ### Unit Tests
 
 Run the Go unit tests with:
@@ -102,43 +89,6 @@ You can also run Jupyter notebook tests with Papermill:
 ```sh
 make test-e2e-notebook
 ```
-
-### Testing Local Changes
-
-To test your local changes to the operator:
-
-1. Build a custom operator image:
-   ```sh
-   make docker-build IMG=my-username/training-operator:my-pr-01
-   ```
-
-2. Load the image into your kind cluster:
-   ```sh
-   kind load docker-image my-username/training-operator:my-pr-01
-   ```
-
-3. Update the operator deployment to use your image:
-   ```sh
-   cd ./manifests/overlays/standalone
-   kustomize edit set image my-username/training-operator=my-username/training-operator:my-pr-01
-   ```
-
-4. Deploy the updated operator:
-   ```sh
-   kubectl apply -k ./manifests/overlays/standalone
-   ```
-
-5. Submit a job to test:
-   ```sh
-   kubectl patch -n kubeflow deployments training-operator --type json -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "my-username/training-operator:my-pr-01"}]'
-   kubectl apply -f https://raw.githubusercontent.com/kubeflow/training-operator/master/examples/pytorch/simple.yaml
-   ```
-
-6. Check the job logs:
-   ```sh
-   kubectl logs -n kubeflow -l training.kubeflow.org/job-name=pytorch-simple
-   ```
-
 ## Best Practices
 
 ### Go Version
