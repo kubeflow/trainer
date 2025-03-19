@@ -127,7 +127,6 @@ kind: ClusterTrainingRuntime
 metadata:
   name: torchtune-llama3.1-8B-finetuning
   labels:
-    trainer.kubeflow.org/phase: post-training
 spec:
   mlPolicy:
     numNodes: 1

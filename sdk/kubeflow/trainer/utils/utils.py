@@ -64,9 +64,9 @@ def get_container_devices(
     elif constants.TPU_LABEL in resources.limits:
         device = constants.TPU_DEVICE_TYPE
         device_count = resources.limits[constants.TPU_LABEL].actual_instance
-    elif constants.CPU_LABEL in resources.limits:
+    elif constants.CPU_DEVICE_TYPE in resources.limits:
         device = constants.CPU_DEVICE_TYPE
-        device_count = resources.limits[constants.CPU_LABEL].actual_instance
+        device_count = resources.limits[constants.CPU_DEVICE_TYPE].actual_instance
     else:
         raise Exception(
             f"Unknown device type in the container resources: {resources.limits}"
@@ -75,6 +75,69 @@ def get_container_devices(
         raise Exception(f"Failed to get device count for resources: {resources.limits}")
 
     return device, device_count
+
+
+def get_trainjob_initializer_step(
+    pod_name: str,
+    pod_spec: models.IoK8sApiCoreV1PodSpec,
+    pod_status: Optional[models.IoK8sApiCoreV1PodStatus],
+) -> types.Step:
+    """
+    Get the TrainJob initializer step from the given Pod name, spec, and status.
+    """
+
+    # Dataset and model initializer runs in a ReplicatedJob and Pod.
+    for c in pod_spec.containers:
+        if c.name in {constants.DATASET_INITIALIZER, constants.MODEL_INITIALIZER}:
+            device, device_count = get_container_devices(c.resources)
+            step = types.Step(
+                name=c.name,
+                status=pod_status.phase if pod_status else None,
+                device=device,
+                device_count=str(device_count),
+                pod_name=pod_name,
+            )
+            break
+
+    return step
+
+
+def get_trainjob_node_step(
+    replicated_job_name: str,
+    job_index: int,
+    pod_name: str,
+    pod_spec: models.IoK8sApiCoreV1PodSpec,
+    pod_status: Optional[models.IoK8sApiCoreV1PodStatus],
+) -> types.Step:
+    """
+    Get the TrainJob trainer node step from the given Pod name, spec, and status.
+    """
+
+    step_name = f"{constants.NODE}-{job_index}"
+
+    for c in pod_spec.containers:
+        # TODO (andreyvelich): Container name must be "Node"
+        if c.name in {constants.MPI_LAUNCHER, constants.NODE}:
+            device, device_count = get_container_devices(c.resources)
+            if c.env:
+                for env in c.env:
+                    if env.value and env.value.isdigit():
+                        if env.name == constants.TORCH_ENV_NUM_PROC_PER_NODE:
+                            device_count = env.value
+                        elif env.name == constants.MPI_ENV_NUM_SLOTS_PER_NODE:
+                            device_count = env.value
+                            # For the MPI use-cases, the launcher container is always node-0
+                            # Thus, we should increase the Job index for other nodes.
+                            if replicated_job_name != constants.MPI_LAUNCHER:
+                                step_name = f"{constants.NODE}-{job_index+1}"
+
+    return types.Step(
+        name=step_name,
+        status=pod_status.phase if pod_status else None,
+        device=device,
+        device_count=str(device_count),
+        pod_name=pod_name,
+    )
 
 
 # TODO (andreyvelich): Discuss if we want to support V1ResourceRequirements resources as input.
@@ -153,7 +216,7 @@ def get_args_using_train_func(
     exec_script = exec_script.format(
         func_code=func_code,
         func_file=func_file,
-        entrypoint=constants.ENTRYPOINT_TORCH,
+        entrypoint=constants.TORCH_ENTRYPOINT,
     )
 
     # Install Python packages if that is required.

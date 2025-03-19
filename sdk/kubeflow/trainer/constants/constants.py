@@ -31,8 +31,19 @@ CLUSTER_TRAINING_RUNTIME_KIND = "ClusterTrainingRuntime"
 # The plural for the ClusterTrainingRuntime.
 CLUSTER_TRAINING_RUNTIME_PLURAL = "clustertrainingruntimes"
 
+# The Kind name for the TrainJob.
+TRAINJOB_KIND = "TrainJob"
+
+# The plural for the TrainJob.
+TRAINJOB_PLURAL = "trainjobs"
+
+# The label key to identify the relationship between TrainJob and Pod template in the runtime.
+# For example, what PodTemplate must be overridden by TrainJob's .spec.trainer APIs.
+TRAINJOB_ANCESTOR_LABEL = "trainer.kubeflow.org/trainjob-ancestor-step"
+
 # The label key to identify training phase where TrainingRuntime should be used.
 # For example, runtime for the pre-training or post-training.
+# TODO (andreyvelich): Remove it.
 PHASE_KEY = "trainer.kubeflow.org/phase"
 
 # The value indicates that runtime can be used for the model pre-training.
@@ -43,15 +54,12 @@ PHASE_POST_TRAINING = "post-training"
 
 # The label key to identify the accelerator type for model training (e.g. GPU-Tesla-V100-16GB).
 # TODO: Potentially, we should take this from the Node selectors.
-ACCELERATOR_KEY = "trainer.kubeflow.org/accelerator"
+ACCELERATOR_LABEL = "trainer.kubeflow.org/accelerator"
 
 # Unknown indicates that the value can't be identified.
 UNKNOWN = "Unknown"
 
-# The label for CPU in the container resources.
-CPU_LABEL = "cpu"
-
-# The default type for CPU device.
+# The default type for CPU device, and it indicates the label in the container resources.
 CPU_DEVICE_TYPE = "cpu"
 
 # The label for NVIDIA GPU in the container resources.
@@ -66,21 +74,6 @@ TPU_LABEL = "google.com/tpu"
 # The default type for TPU device.
 TPU_DEVICE_TYPE = "tpu"
 
-# The Kind name for the TrainJob.
-TRAINJOB_KIND = "TrainJob"
-
-# The plural for the TrainJob.
-TRAINJOB_PLURAL = "trainjobs"
-
-# The default PIP index URL to download Python packages.
-DEFAULT_PIP_INDEX_URL = os.getenv("DEFAULT_PIP_INDEX_URL", "https://pypi.org/simple")
-
-# The default command for the Trainer.
-DEFAULT_COMMAND = ["bash", "-c"]
-
-# Distributed PyTorch entrypoint.
-ENTRYPOINT_TORCH = "torchrun"
-
 # The label key to identify the JobSet name of the Pod.
 JOBSET_NAME_KEY = "jobset.sigs.k8s.io/jobset-name"
 
@@ -90,40 +83,53 @@ REPLICATED_JOB_KEY = "jobset.sigs.k8s.io/replicatedjob-name"
 # The label key to identify the Job completion index of the Pod.
 JOB_INDEX_KEY = "batch.kubernetes.io/job-completion-index"
 
+# The name of the ReplicatedJob and container of the dataset initializer.
+# Also, it represents the `trainjob-ancestor-step` label value for the dataset initializer step.
+DATASET_INITIALIZER = "dataset-initializer"
+
+# The name of the ReplicatedJob and container of the model initializer.
+# Also, it represents the `trainjob-ancestor-step` label value for the model initializer step.
+MODEL_INITIALIZER = "model-initializer"
+
 # The default path to the users' workspace.
 # TODO (andreyvelich): Discuss how to keep this path is sync with pkg.initializers.constants
 WORKSPACE_PATH = "/workspace"
 
-# The name of the ReplicatedJob and container of the dataset initializer
-DATASET_INITIALIZER = "dataset-initializer"
-
 # The path where initializer downloads dataset.
 DATASET_PATH = os.path.join(WORKSPACE_PATH, "dataset")
-
-# The name of the ReplicatedJob and container of the model initializer
-MODEL_INITIALIZER = "model-initializer"
 
 # The path where initializer downloads model.
 MODEL_PATH = os.path.join(WORKSPACE_PATH, "model")
 
-# The Job name for the launcher (e.g. mpirun launcher).
-JOB_LAUNCHER = "launcher"
+# The name of the ReplicatedJob and container of the node. The node usually represents single
+# VM where distributed training code is executed.
+# TODO: Change it to "node"
+NODE = "trainer-node"
 
-# The container name for the launcher
-CONTAINER_LAUNCHER = "launcher"
-
-# The Job name for the trainer nodes.
-JOB_TRAINER_NODE = "trainer-node"
-
-# The Pod type for the master node.
-MASTER_NODE = f"{JOB_TRAINER_NODE}-0"
+# The `trainjob-ancestor-step` label value for the trainer step.
+TRAINER = "trainer"
 
 # The Pod pending phase indicates that Pod has been accepted by the Kubernetes cluster,
 # but one or more of the containers has not been made ready to run.
 POD_PENDING = "Pending"
 
-# The container name for the Trainer.
-CONTAINER_TRAINER = "trainer"
+# The default PIP index URL to download Python packages.
+DEFAULT_PIP_INDEX_URL = os.getenv("DEFAULT_PIP_INDEX_URL", "https://pypi.org/simple")
+
+# The default command for the Trainer.
+DEFAULT_COMMAND = ["bash", "-c"]
 
 # The Torch env name for the number of procs per node (e.g. number of GPUs per Pod).
 TORCH_ENV_NUM_PROC_PER_NODE = "PET_NPROC_PER_NODE"
+
+# The container entrypoint for distributed PyTorch.
+TORCH_ENTRYPOINT = "torchrun"
+
+# The name of the ReplicatedJob to launch mpirun.
+MPI_LAUNCHER = "launcher"
+
+# The OpenMPI env name for the number of slots per nude (e.g. number of GPUs per Pod).
+MPI_ENV_NUM_SLOTS_PER_NODE = "OMPI_MCA_orte_set_default_slots"
+
+# The container entrypoint for distributed MPI
+MPI_ENTRYPOINT = "mpirun"

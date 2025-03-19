@@ -78,8 +78,8 @@ class TrainerClient:
         """List of the available runtimes.
 
         Returns:
-            List[Runtime]: List of available training runtimes. It returns an empty list if
-                runtimes don't exist.
+            List[Runtime]: List of available training runtimes.
+                If no runtimes exist, an empty list is returned.
 
         Raises:
             TimeoutError: Timeout to list Runtimes.
@@ -112,18 +112,18 @@ class TrainerClient:
                 metadata = runtime.metadata
 
                 # TODO (andreyvelich): Currently, the labels must be presented.
-                if metadata.name and metadata.labels and ml_policy.num_nodes:
-                    if not (
-                        runtime.spec.template.spec
-                        and runtime.spec.template.spec.replicated_jobs
-                    ):
-                        raise Exception(
-                            f"Runtime Job template is invalid: {runtime.spec.template.spec}"
-                        )
+                if (
+                    metadata.name
+                    and metadata.labels
+                    and ml_policy.num_nodes
+                    and runtime.spec.template.spec
+                    and runtime.spec.template.spec.replicated_jobs
+                ):
+
                     # Get the Trainer container resources.
                     resources = None
                     for job in runtime.spec.template.spec.replicated_jobs:
-                        if job.name == constants.JOB_TRAINER_NODE:
+                        if job.name == constants.NODE:
                             if not (
                                 job.template.spec and job.template.spec.template.spec
                             ):
@@ -131,7 +131,7 @@ class TrainerClient:
                                     f"JobSet template is invalid: {runtime.spec.template.spec}"
                                 )
                             for container in job.template.spec.template.spec.containers:
-                                if container.name == constants.CONTAINER_TRAINER:
+                                if container.name == constants.NODE:
                                     resources = container.resources
 
                     # Get the accelerator for the Trainer nodes.
@@ -154,7 +154,7 @@ class TrainerClient:
                         accelerator_count = ml_policy.mpi.num_proc_per_node
 
                     if isinstance(accelerator_count, (float, int)):
-                        accelerator_count = accelerator_count * ml_policy.num_nodes
+                        accelerator_count *= ml_policy.num_nodes
 
                     result.append(
                         types.Runtime(
@@ -165,8 +165,8 @@ class TrainerClient:
                                 else constants.UNKNOWN
                             ),
                             accelerator=(
-                                metadata.labels[constants.ACCELERATOR_KEY]
-                                if constants.ACCELERATOR_KEY in metadata.labels
+                                metadata.labels[constants.ACCELERATOR_LABEL]
+                                if constants.ACCELERATOR_LABEL in metadata.labels
                                 else constants.UNKNOWN
                             ),
                             accelerator_count=str(accelerator_count),
@@ -284,7 +284,7 @@ class TrainerClient:
 
         Returns:
             List[TrainerV1alpha1TrainJob]: List of created TrainJobs.
-                It returns an empty list if TrainJobs don't exist.
+                If no TrainJob exist, an empty list is returned.
 
         Raises:
             TimeoutError: Timeout to list TrainJobs.
@@ -360,23 +360,18 @@ class TrainerClient:
     def get_job_logs(
         self,
         name: str,
-        follow: bool = False,
-        component: str = constants.JOB_TRAINER_NODE,
-        node_index: int = 0,
+        follow: Optional[bool] = False,
+        step: str = constants.NODE,
+        node_rank: int = 0,
     ) -> Dict[str, str]:
-        """Get the logs from TrainJob
-        TODO (andreyvelich): Should we change node_index to node_rank ?
-        """
+        """Get the logs from TrainJob"""
 
+        # Get the TrainJob Pod name.
         pod_name = None
-        # Get Initializer or Trainer Pod name.
-        for c in self.get_job(name).components:
+        for c in self.get_job(name).steps:
             if c.status != constants.POD_PENDING:
-                if c.name == component and component == constants.DATASET_INITIALIZER:
+                if c.name == step or c.name == f"{step}-{node_rank}":
                     pod_name = c.pod_name
-                elif c.name == component + "-" + str(node_index):
-                    pod_name = c.pod_name
-
         if pod_name is None:
             return {}
 
@@ -386,17 +381,17 @@ class TrainerClient:
         # TODO (andreyvelich): Potentially, refactor this.
         # Support logging of multiple Pods.
         # TODO (andreyvelich): Currently, follow is supported only for Trainer.
-        if follow and component == constants.JOB_TRAINER_NODE:
+        if follow and step == constants.NODE:
             log_streams = []
             log_streams.append(
                 watch.Watch().stream(
                     self.core_api.read_namespaced_pod_log,
                     name=pod_name,
                     namespace=self.namespace,
-                    container=constants.CONTAINER_TRAINER,
+                    container=constants.NODE,
                 )
             )
-            finished = [False for _ in log_streams]
+            finished = [False] * len(log_streams)
 
             # Create thread and queue per stream, for non-blocking iteration.
             log_queue_pool = utils.get_log_queue_pool(log_streams)
@@ -415,20 +410,16 @@ class TrainerClient:
                             if logline is None:
                                 finished[index] = True
                                 break
-                            # Print logs to the StdOut
-                            print(f"[{component}]: {logline}")
-                            # Add logs to the results dict.
-                            if component not in logs_dict:
-                                logs_dict[component] = logline + "\n"
-                            else:
-                                logs_dict[component] += logline + "\n"
+                            # Print logs to the StdOut and update results dict.
+                            print(f"[{step}]: {logline}")
+                            logs_dict[step] = logs_dict.get(step, "") + logline + "\n"
                         except queue.Empty:
                             break
                 if all(finished):
                     return logs_dict
 
         try:
-            if component == constants.DATASET_INITIALIZER:
+            if step == constants.DATASET_INITIALIZER:
                 logs_dict[constants.DATASET_INITIALIZER] = (
                     self.core_api.read_namespaced_pod_log(
                         name=pod_name,
@@ -436,6 +427,7 @@ class TrainerClient:
                         container=constants.DATASET_INITIALIZER,
                     )
                 )
+            elif step == constants.MODEL_INITIALIZER:
                 logs_dict[constants.MODEL_INITIALIZER] = (
                     self.core_api.read_namespaced_pod_log(
                         name=pod_name,
@@ -444,13 +436,14 @@ class TrainerClient:
                     )
                 )
             else:
-                logs_dict[component + "-" + str(node_index)] = (
+                logs_dict[f"{step}-{node_rank}"] = (
                     self.core_api.read_namespaced_pod_log(
                         name=pod_name,
                         namespace=self.namespace,
-                        container=constants.CONTAINER_TRAINER,
+                        container=constants.NODE,
                     )
                 )
+
         except Exception:
             raise RuntimeError(
                 f"Failed to read logs for the pod {self.namespace}/{pod_name}"
@@ -512,7 +505,7 @@ class TrainerClient:
             name=name,
             runtime_ref=trainjob_crd.spec.runtime_ref.name,
             creation_timestamp=trainjob_crd.metadata.creation_timestamp,
-            components=[],
+            steps=[],
         )
 
         # Add the TrainJob status.
@@ -527,17 +520,18 @@ class TrainerClient:
                     status = "Failed"
             train_job.status = status
 
-        # Select Pods created by appropriate JobSet, and Initializer, Launcher, or Trainer Job.
-        # TODO (andreyvelich): Refactor it to check this label:
-        # `trainer.kubeflow.org/trainjob-ancestor-step`.
+        # Select Pods created by the appropriate JobSet.
+        # It detects pods using the `trainer.kubeflow.org/trainjob-ancestor-step` label.
+        # However, it also checks the ReplicatedJob.name == "Node" value,
+        # since MPI creates two ReplicatedJobs: Launcher + Node.
         label_selector = "{}={},{} in ({}, {}, {}, {})".format(
             constants.JOBSET_NAME_KEY,
             name,
             constants.REPLICATED_JOB_KEY,
             constants.DATASET_INITIALIZER,
             constants.MODEL_INITIALIZER,
-            constants.JOB_LAUNCHER,
-            constants.JOB_TRAINER_NODE,
+            constants.MPI_LAUNCHER,
+            constants.NODE,
         )
 
         # Add the TrainJob components, e.g. trainer nodes and initializer.
@@ -554,56 +548,45 @@ class TrainerClient:
                 return train_job
 
             for pod in pod_list.items:
-                if not (pod.metadata and pod.metadata.name and pod.spec):
+                # Pod must have labels to detect the TrainJob step.
+                # Every Pod always has a single TrainJob step.
+                if not (
+                    pod.metadata
+                    and pod.metadata.name
+                    and pod.metadata.labels
+                    and pod.spec
+                ):
                     raise Exception(f"TrainJob Pod is invalid: {pod}")
-                # The TrainJob Pods might have these containers:
-                # dataset-initializer, model-initializer, launcher, and trainer
-                for c in pod.spec.containers:
-                    device, device_count = utils.get_container_devices(c.resources)
-                    if c.name == constants.CONTAINER_TRAINER:
-                        # For Trainer numProcPerNode overrides container resources.
-                        if c.env:
-                            for env in c.env:
-                                if (
-                                    env.name == constants.TORCH_ENV_NUM_PROC_PER_NODE
-                                    and env.value
-                                    and env.value.isdigit()
-                                ):
-                                    device_count = env.value
-                        # For Trainer node Job, component name is equal to <Job_Name>-<Index>
-                        if not pod.metadata.labels:
-                            raise Exception(
-                                f"TrainJob Pod labels are invalid: {pod.metadata.labels}"
-                            )
-                        component_name = "{}-{}".format(
-                            constants.JOB_TRAINER_NODE,
-                            pod.metadata.labels[constants.JOB_INDEX_KEY],
-                        )
-                    elif (
-                        c.name == constants.DATASET_INITIALIZER
-                        or c.name == constants.MODEL_INITIALIZER
-                        or c.name == constants.CONTAINER_LAUNCHER
-                    ):
-                        # For dataset, model initializers, or launcher ReplicatedJob,
-                        # the component is equal to the container name.
-                        component_name = c.name
 
-                component = types.Component(
-                    name=component_name,
-                    status=pod.status.phase if pod.status else None,
-                    device=device,
-                    device_count=str(device_count),
-                    pod_name=pod.metadata.name,
-                )
+                # Get the Initializer step.
+                if pod.metadata.labels[constants.REPLICATED_JOB_KEY] in {
+                    constants.DATASET_INITIALIZER,
+                    constants.MODEL_INITIALIZER,
+                }:
+                    step = utils.get_trainjob_initializer_step(
+                        pod.metadata.name, pod.spec, pod.status
+                    )
+                # Get the Node step.
+                elif pod.metadata.labels[constants.REPLICATED_JOB_KEY] in {
+                    constants.MPI_LAUNCHER,
+                    constants.NODE,
+                }:
+                    step = utils.get_trainjob_node_step(
+                        pod.metadata.labels[constants.REPLICATED_JOB_KEY],
+                        int(pod.metadata.labels[constants.JOB_INDEX_KEY]),
+                        pod.metadata.name,
+                        pod.spec,
+                        pod.status,
+                    )
 
-                train_job.components.append(component)
+                train_job.steps.append(step)
         except multiprocessing.TimeoutError:
             raise TimeoutError(
-                f"Timeout to list {constants.TRAINJOB_KIND}'s components: {namespace}/{name}"
+                f"Timeout to list {constants.TRAINJOB_KIND}'s steps: {namespace}/{name}"
             )
         except Exception:
             raise RuntimeError(
-                f"Failed to list {constants.TRAINJOB_KIND}'s components: {namespace}/{name}"
+                f"Failed to list {constants.TRAINJOB_KIND}'s steps: {namespace}/{name}"
             )
 
         return train_job

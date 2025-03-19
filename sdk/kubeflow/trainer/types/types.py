@@ -29,9 +29,9 @@ class Runtime:
     accelerator_count: str
 
 
-# Representation for the TrainJob component.
+# Representation for the TrainJob steps.
 @dataclass
-class Component:
+class Step:
     name: str
     status: Optional[str]
     device: str
@@ -46,7 +46,7 @@ class TrainJob:
     name: str
     runtime_ref: str
     creation_timestamp: datetime
-    components: List[Component]
+    steps: List[Step]
     status: Optional[str] = "Unknown"
 
 
@@ -69,7 +69,7 @@ class CustomTrainer:
     func: Callable
     func_args: Optional[Dict] = None
     packages_to_install: Optional[List[str]] = None
-    pip_index_url: Optional[str] = constants.DEFAULT_PIP_INDEX_URL
+    pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
     num_nodes: Optional[int] = None
     resources_per_node: Optional[Dict] = None
 

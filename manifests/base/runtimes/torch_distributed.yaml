@@ -2,8 +2,6 @@ apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: torch-distributed
-  labels:
-    trainer.kubeflow.org/phase: pre-training
 spec:
   mlPolicy:
     numNodes: 1
