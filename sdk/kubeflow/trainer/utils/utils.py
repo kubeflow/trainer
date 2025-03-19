@@ -77,6 +77,43 @@ def get_container_devices(
     return device, device_count
 
 
+def get_runtime_accelerators(
+    ml_policy: models.TrainerV1alpha1MLPolicy,
+    replicated_jobs: List[models.JobsetV1alpha2ReplicatedJob],
+) -> str:
+    """
+    Get the runtime accelerators for the given node jobs and MLPolicy.
+    """
+
+    accelerator_count = constants.UNKNOWN
+    for rjob in replicated_jobs:
+        # ReplicatedJob and container name should be node.
+        if rjob.name == constants.NODE:
+            if not (rjob.template.spec and rjob.template.spec.template.spec):
+                raise Exception(f"ReplicatedJob template is invalid: {rjob}")
+
+            for container in rjob.template.spec.template.spec.containers:
+                if container.name == constants.NODE:
+                    _, container_devices = get_container_devices(container.resources)
+                    if isinstance(container_devices, float):
+                        accelerator_count = container_devices
+                        break
+
+    # Torch and MPI plugins override accelerator count.
+    if ml_policy.torch and ml_policy.torch.num_proc_per_node:
+        num_proc = ml_policy.torch.num_proc_per_node.actual_instance
+        if isinstance(num_proc, int):
+            accelerator_count = num_proc
+    elif ml_policy.mpi and ml_policy.mpi.num_proc_per_node:
+        accelerator_count = ml_policy.mpi.num_proc_per_node
+
+    # Multiply accelerator_count by number of nodes.
+    if accelerator_count != constants.UNKNOWN and ml_policy.num_nodes:
+        accelerator_count *= ml_policy.num_nodes
+
+    return str(accelerator_count)
+
+
 def get_trainjob_initializer_step(
     pod_name: str,
     pod_spec: models.IoK8sApiCoreV1PodSpec,

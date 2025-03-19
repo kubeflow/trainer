@@ -100,78 +100,36 @@ class TrainerClient:
 
                 runtime = models.TrainerV1alpha1ClusterTrainingRuntime.from_dict(item)
 
+                # TODO (andreyvelich): Currently, the labels must be presented.
                 if not (
                     runtime
                     and runtime.metadata
+                    and runtime.metadata.name
                     and runtime.spec
                     and runtime.spec.ml_policy
-                ):
-                    raise Exception(f"Runtime object is invalid: {runtime}")
-
-                ml_policy = runtime.spec.ml_policy
-                metadata = runtime.metadata
-
-                # TODO (andreyvelich): Currently, the labels must be presented.
-                if (
-                    metadata.name
-                    and metadata.labels
-                    and ml_policy.num_nodes
                     and runtime.spec.template.spec
                     and runtime.spec.template.spec.replicated_jobs
                 ):
+                    raise Exception(f"Runtime object is invalid: {runtime}")
 
-                    # Get the Trainer container resources.
-                    resources = None
-                    for job in runtime.spec.template.spec.replicated_jobs:
-                        if job.name == constants.NODE:
-                            if not (
-                                job.template.spec and job.template.spec.template.spec
-                            ):
-                                raise Exception(
-                                    f"JobSet template is invalid: {runtime.spec.template.spec}"
-                                )
-                            for container in job.template.spec.template.spec.containers:
-                                if container.name == constants.NODE:
-                                    resources = container.resources
-
-                    # Get the accelerator for the Trainer nodes.
-                    # TODO (andreyvelich): Currently, we get the accelerator type from
-                    # the runtime labels.
-                    _, accelerator_count = utils.get_container_devices(resources)
-
-                    # NumProcPerNode from Torch or MPI overrides accelerator count.
-                    if (
-                        ml_policy.torch
-                        and ml_policy.torch.num_proc_per_node
-                        and isinstance(
-                            ml_policy.torch.num_proc_per_node.actual_instance, int
-                        )
-                    ):
-                        accelerator_count = (
-                            ml_policy.torch.num_proc_per_node.actual_instance
-                        )
-                    elif ml_policy.mpi and ml_policy.mpi.num_proc_per_node:
-                        accelerator_count = ml_policy.mpi.num_proc_per_node
-
-                    if isinstance(accelerator_count, (float, int)):
-                        accelerator_count *= ml_policy.num_nodes
-
-                    result.append(
-                        types.Runtime(
-                            name=metadata.name,
-                            phase=(
-                                metadata.labels[constants.PHASE_KEY]
-                                if constants.PHASE_KEY in metadata.labels
-                                else constants.UNKNOWN
-                            ),
-                            accelerator=(
-                                metadata.labels[constants.ACCELERATOR_LABEL]
-                                if constants.ACCELERATOR_LABEL in metadata.labels
-                                else constants.UNKNOWN
-                            ),
-                            accelerator_count=str(accelerator_count),
-                        )
+                result.append(
+                    types.Runtime(
+                        name=runtime.metadata.name,
+                        # TODO (andreyvelich): Hardcoded for testing.
+                        trainer_type=types.TrainerType.CUSTOM_TRAINER,
+                        framework=types.Framework.MLX,
+                        accelerator_count=utils.get_runtime_accelerators(
+                            runtime.spec.ml_policy,
+                            runtime.spec.template.spec.replicated_jobs,
+                        ),
+                        accelerator=(
+                            runtime.metadata.labels[constants.ACCELERATOR_LABEL]
+                            if runtime.metadata.labels
+                            and constants.ACCELERATOR_LABEL in runtime.metadata.labels
+                            else constants.UNKNOWN
+                        ),
                     )
+                )
 
         except multiprocessing.TimeoutError:
             raise TimeoutError(

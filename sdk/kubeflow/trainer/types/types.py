@@ -15,39 +15,10 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from typing import Callable, Dict, List, Optional
 
 from kubeflow.trainer.constants import constants
-
-
-# Representation for the Training Runtime.
-@dataclass
-class Runtime:
-    name: str
-    phase: str
-    accelerator: str
-    accelerator_count: str
-
-
-# Representation for the TrainJob steps.
-@dataclass
-class Step:
-    name: str
-    status: Optional[str]
-    device: str
-    device_count: str
-    pod_name: str
-
-
-# Representation for the TrainJob.
-# TODO (andreyvelich): Discuss what fields users want to get.
-@dataclass
-class TrainJob:
-    name: str
-    runtime_ref: str
-    creation_timestamp: datetime
-    steps: List[Step]
-    status: Optional[str] = "Unknown"
 
 
 # Configuration for the custom trainer.
@@ -72,6 +43,48 @@ class CustomTrainer:
     pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
     num_nodes: Optional[int] = None
     resources_per_node: Optional[Dict] = None
+
+
+class TrainerType(Enum):
+    CUSTOM_TRAINER = CustomTrainer.__name__
+
+
+class Framework(Enum):
+    TORCH = "torch"
+    DEEPSPEED = "deepspeed"
+    MLX = "mlx"
+
+
+# Representation for the Training Runtime.
+@dataclass
+class Runtime:
+    name: str
+    trainer_type: TrainerType
+    framework: Framework
+    pretrained_model: Optional[str] = None
+    accelerator: str = constants.UNKNOWN
+    accelerator_count: str = constants.UNKNOWN
+
+
+# Representation for the TrainJob steps.
+@dataclass
+class Step:
+    name: str
+    status: Optional[str]
+    device: str
+    device_count: str
+    pod_name: str
+
+
+# Representation for the TrainJob.
+# TODO (andreyvelich): Discuss what fields users want to get.
+@dataclass
+class TrainJob:
+    name: str
+    runtime_ref: str
+    creation_timestamp: datetime
+    steps: List[Step]
+    status: Optional[str] = "Unknown"
 
 
 # Configuration for the HuggingFace dataset initializer.
