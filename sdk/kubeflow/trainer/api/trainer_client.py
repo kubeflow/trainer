@@ -150,19 +150,20 @@ class TrainerClient:
         self,
         runtime: types.Runtime = types.DEFAULT_RUNTIME,
         initializer: Optional[types.Initializer] = None,
-        trainer: Optional[Union[types.CustomTrainer, types.TorchTuneConfig]] = None,
+        trainer: Optional[Union[types.CustomTrainer, types.BuiltinTrainer]] = None,
     ) -> str:
         """
         Create the TrainJob. You can configure these types of training task:
 
         - Custom Training Task: Training with a self-contained function that encapsulates
-            the entire model training process.
-        - Fine-tuning Pre-Trained Models: Fine-tuning existing pre-trained models with trainers
-            that already include the fine-tuning logic, requiring only parameter adjustments.
+            the entire model training process, e.g. `CustomTrainer`.
+        - Config-driven Task with Existing Trainer: Training with a trainer that already includes
+            the post-training logic, requiring only parameter adjustments, e.g. `BuiltinTrainer`.
 
         Args:
             runtime_ref (`str`): Reference to the name of existing (Cluster)TrainingRuntime.
-            trainer (`Optional[types.CustomTrainer, types.TorchTuneConfig]`)
+            trainer (`Optional[types.CustomTrainer, types.BuiltinTrainer]`):
+                Configuration for Custom Training Task or Config-driven Task with Existing Trainer.
 
         Returns:
             str: The unique name of the TrainJob that has been generated.
@@ -180,21 +181,21 @@ class TrainerClient:
         # Build the Trainer.
         trainer_crd = models.TrainerV1alpha1Trainer()
 
-        if trainer and isinstance(trainer, types.CustomTrainer):
-            # Add number of nodes to the Trainer.
-            if trainer.num_nodes:
-                trainer_crd.num_nodes = trainer.num_nodes
-
-        # Add command and args to the Trainer if training function is set.
-        if trainer and trainer.func:
-            # Add resources per node to the Trainer.
-            if trainer.resources_per_node:
-                trainer_crd.resources_per_node = utils.get_resources_per_node(
-                    trainer.resources_per_node
-                )
-
+        if trainer:
             # If users choose to use a custom training function.
             if isinstance(trainer, types.CustomTrainer):
+                # Add number of nodes to the Trainer.
+                if trainer.num_nodes:
+                    trainer_crd.num_nodes = trainer.num_nodes
+
+                # Add resources per node to the Trainer.
+                if trainer.resources_per_node:
+                    trainer_crd.resources_per_node = utils.get_resources_per_node(
+                        trainer.resources_per_node
+                    )
+
+                # Add command and args to the Trainer.
+                trainer_crd.command = constants.DEFAULT_CUSTOM_COMMAND
                 # TODO: Support train function parameters.
                 trainer_crd.command, trainer_crd.args = (
                     utils.get_entrypoint_using_train_func(
@@ -206,13 +207,37 @@ class TrainerClient:
                     )
                 )
 
-            # If users choose to use a pre-trained model for fine-tuning.
-            # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
-            # the torchtune config in the runtime plugin.
-            # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
-            elif isinstance(trainer, types.TorchTuneConfig):
+            # If users choose to use a builtin trainer for post-training.
+            elif isinstance(trainer, types.BuiltinTrainer):
+                if trainer.config is None or not isinstance(
+                    trainer.config, types.TorchTuneConfig
+                ):
+                    raise ValueError(
+                        "The config is missing or not supported for the BuiltinTrainer. "
+                        "Currently, we only support `TorchTuneConfig` as parameter."
+                    )
+
+                # Add number of nodes to the Trainer.
+                if trainer.config.num_nodes:
+                    trainer_crd.num_nodes = trainer.config.num_nodes
+
+                # Add resources per node to the Trainer.
+                if trainer.config.resources_per_node:
+                    trainer_crd.resources_per_node = utils.get_resources_per_node(
+                        trainer.config.resources_per_node
+                    )
+
+                # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
+                # the torchtune config in the runtime plugin.
+                # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
                 trainer_crd.command = constants.DEFAULT_TORCHTUNE_COMMAND
                 trainer_crd.args = utils.get_args_using_torchtune_config(trainer)
+
+            else:
+                raise ValueError(
+                    f"The trainer type {type(trainer)} is not supported. "
+                    "Please use CustomTrainer or BuiltinTrainer."
+                )
 
         train_job = models.TrainerV1alpha1TrainJob(
             apiVersion=constants.API_VERSION,
