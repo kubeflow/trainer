@@ -13,6 +13,9 @@
 # limitations under the License.
 
 import os
+from typing import Dict
+
+from kubeflow.trainer.types import types
 
 # How long to wait in seconds for requests to the Kubernetes API Server.
 DEFAULT_TIMEOUT = 120
@@ -133,3 +136,39 @@ MPI_ENV_NUM_SLOTS_PER_NODE = "OMPI_MCA_orte_set_default_slots"
 
 # The container entrypoint for distributed MPI
 MPI_ENTRYPOINT = "mpirun"
+
+
+# The dict where key is the container image and value its representation.
+# Each Trainer representation defines trainer parameters (e.g. type, framework, entrypoint).
+# TODO (andreyvelich): We should allow user to overrides the default image names.
+ALL_TRAINERS: Dict[str, types.Trainer] = {
+    # Custom Trainers.
+    "pytorch/pytorch": types.Trainer(
+        trainer_type=types.TrainerType.CUSTOM_TRAINER,
+        framework=types.Framework.TORCH,
+        entrypoint="torchrun",
+    ),
+    "ghcr.io/kubeflow/trainer/mlx-runtime": types.Trainer(
+        trainer_type=types.TrainerType.CUSTOM_TRAINER,
+        framework=types.Framework.MLX,
+        entrypoint="mpirun",
+    ),
+    "ghcr.io/kubeflow/trainer/deepspeed-runtime": types.Trainer(
+        trainer_type=types.TrainerType.CUSTOM_TRAINER,
+        framework=types.Framework.DEEPSPEED,
+        entrypoint="mpirun",
+    ),
+    # Builtin Trainers.
+    "ghcr.io/kubeflow/trainer/torchtune-trainer": types.Trainer(
+        trainer_type=types.TrainerType.BUILTIN_TRAINER,
+        framework=types.Framework.TORCHTUNE,
+        entrypoint="tune run",
+    ),
+}
+
+# When trainer can't be detected this default value is used.
+DEFAULT_TRAINER = types.Trainer(
+    trainer_type=types.TrainerType.CUSTOM_TRAINER,
+    framework=types.Framework.TORCH,
+    entrypoint="torchrun",
+)

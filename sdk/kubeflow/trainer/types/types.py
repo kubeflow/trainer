@@ -45,25 +45,40 @@ class CustomTrainer:
     resources_per_node: Optional[Dict] = None
 
 
+# Configuration for the Builtin Trainer.
+@dataclass
+class BuiltinTrainer:
+    pass
+
+
 class TrainerType(Enum):
     CUSTOM_TRAINER = CustomTrainer.__name__
+    BUILTIN_TRAINER = BuiltinTrainer.__name__
 
 
 class Framework(Enum):
     TORCH = "torch"
     DEEPSPEED = "deepspeed"
     MLX = "mlx"
+    TORCHTUNE = "torchtune"
+
+
+# Representation for the Trainer of the runtime.
+@dataclass
+class Trainer:
+    trainer_type: TrainerType
+    framework: Framework
+    entrypoint: str
+    accelerator: str = constants.UNKNOWN
+    accelerator_count: str = constants.UNKNOWN
 
 
 # Representation for the Training Runtime.
 @dataclass
 class Runtime:
     name: str
-    trainer_type: TrainerType
-    framework: Framework
+    trainer: Trainer
     pretrained_model: Optional[str] = None
-    accelerator: str = constants.UNKNOWN
-    accelerator_count: str = constants.UNKNOWN
 
 
 # Representation for the TrainJob steps.

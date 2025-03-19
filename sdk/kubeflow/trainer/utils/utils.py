@@ -17,7 +17,7 @@ import os
 import queue
 import textwrap
 import threading
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
@@ -42,7 +42,7 @@ def get_default_target_namespace() -> str:
 
 def get_container_devices(
     resources: Optional[models.IoK8sApiCoreV1ResourceRequirements],
-) -> Tuple[str, Union[str, float]]:
+) -> Tuple[str, str]:
     """
     Get the device type and device count for the given container.
     """
@@ -74,31 +74,48 @@ def get_container_devices(
     if device_count is None:
         raise Exception(f"Failed to get device count for resources: {resources.limits}")
 
-    return device, device_count
+    return device, str(device_count)
 
 
-def get_runtime_accelerators(
-    ml_policy: models.TrainerV1alpha1MLPolicy,
+def get_runtime_trainer_container(
     replicated_jobs: List[models.JobsetV1alpha2ReplicatedJob],
-) -> str:
+) -> Optional[models.IoK8sApiCoreV1Container]:
     """
-    Get the runtime accelerators for the given node jobs and MLPolicy.
+    Get the runtime node container from the given replicated jobs.
     """
 
-    accelerator_count = constants.UNKNOWN
     for rjob in replicated_jobs:
-        # ReplicatedJob and container name should be node.
-        if rjob.name == constants.NODE:
-            if not (rjob.template.spec and rjob.template.spec.template.spec):
-                raise Exception(f"ReplicatedJob template is invalid: {rjob}")
-
+        if not (
+            rjob.template.metadata
+            and rjob.template.spec
+            and rjob.template.spec.template.spec
+        ):
+            raise Exception(f"ReplicatedJob template is invalid: {rjob}")
+        # The ancestor labels define Trainer container in the ReplicatedJobs.
+        if (
+            rjob.template.metadata.labels
+            and constants.TRAINJOB_ANCESTOR_LABEL in rjob.template.metadata.labels
+        ):
             for container in rjob.template.spec.template.spec.containers:
                 # TODO (andreyvelich): Container name must be "node"
                 if container.name == constants.TRAINER:
-                    _, container_devices = get_container_devices(container.resources)
-                    if isinstance(container_devices, float):
-                        accelerator_count = container_devices
-                        break
+                    return container
+
+
+def get_runtime_trainer(
+    runtime_metadata: models.IoK8sApimachineryPkgApisMetaV1ObjectMeta,
+    ml_policy: models.TrainerV1alpha1MLPolicy,
+    trainer_container: models.IoK8sApiCoreV1Container,
+) -> types.Trainer:
+    """
+    Get the runtime trainer object.
+    """
+
+    # Extract image name from the container image
+    image_name = trainer_container.image.split(":")[0]
+    trainer = constants.ALL_TRAINERS.get(image_name, constants.DEFAULT_TRAINER)
+
+    _, trainer.accelerator_count = get_container_devices(trainer_container.resources)
 
     # Torch and MPI plugins override accelerator count.
     if ml_policy.torch and ml_policy.torch.num_proc_per_node:
@@ -109,10 +126,20 @@ def get_runtime_accelerators(
         accelerator_count = ml_policy.mpi.num_proc_per_node
 
     # Multiply accelerator_count by number of nodes.
+    # TODO: Change it
     if accelerator_count != constants.UNKNOWN and ml_policy.num_nodes:
         accelerator_count *= ml_policy.num_nodes
 
-    return str(accelerator_count)
+    trainer.accelerator_count = str(accelerator_count)
+
+    trainer.accelerator = (
+        runtime_metadata.labels[constants.ACCELERATOR_LABEL]
+        if runtime_metadata.labels
+        and constants.ACCELERATOR_LABEL in runtime_metadata.labels
+        else constants.UNKNOWN
+    )
+
+    return trainer
 
 
 def get_trainjob_initializer_step(
