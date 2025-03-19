@@ -162,6 +162,8 @@ class TrainerClient:
 
         Args:
             runtime_ref (`str`): Reference to the name of existing (Cluster)TrainingRuntime.
+            initializer (`Optional[types.Initializer]`):
+                Configuration for Dataset and Model Initializers.
             trainer (`Optional[types.CustomTrainer, types.BuiltinTrainer]`):
                 Configuration for Custom Training Task or Config-driven Task with Existing Trainer.
 
