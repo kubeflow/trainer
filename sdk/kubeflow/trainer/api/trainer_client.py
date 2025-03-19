@@ -520,9 +520,9 @@ class TrainerClient:
         # However, it also checks the ReplicatedJob.name == "Node" value,
         # since MPI creates two ReplicatedJobs: Launcher + Node.
         label_selector = "{}={},{} in ({}, {}, {}, {})".format(
-            constants.JOBSET_NAME_KEY,
+            constants.JOBSET_NAME_LABEL,
             name,
-            constants.REPLICATED_JOB_KEY,
+            constants.JOBSET_RJOB_NAME_LABEL,
             constants.DATASET_INITIALIZER,
             constants.MODEL_INITIALIZER,
             constants.MPI_LAUNCHER,
@@ -554,7 +554,7 @@ class TrainerClient:
                     raise Exception(f"TrainJob Pod is invalid: {pod}")
 
                 # Get the Initializer step.
-                if pod.metadata.labels[constants.REPLICATED_JOB_KEY] in {
+                if pod.metadata.labels[constants.JOBSET_RJOB_NAME_LABEL] in {
                     constants.DATASET_INITIALIZER,
                     constants.MODEL_INITIALIZER,
                 }:
@@ -562,13 +562,13 @@ class TrainerClient:
                         pod.metadata.name, pod.spec, pod.status
                     )
                 # Get the Node step.
-                elif pod.metadata.labels[constants.REPLICATED_JOB_KEY] in {
+                elif pod.metadata.labels[constants.JOBSET_RJOB_NAME_LABEL] in {
                     constants.MPI_LAUNCHER,
                     constants.NODE,
                 }:
                     step = utils.get_trainjob_node_step(
-                        pod.metadata.labels[constants.REPLICATED_JOB_KEY],
-                        int(pod.metadata.labels[constants.JOB_INDEX_KEY]),
+                        pod.metadata.labels[constants.JOBSET_RJOB_NAME_LABEL],
+                        int(pod.metadata.labels[constants.JOB_INDEX_LABEL]),
                         pod.metadata.name,
                         pod.spec,
                         pod.status,

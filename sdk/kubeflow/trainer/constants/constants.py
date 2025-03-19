@@ -41,48 +41,6 @@ TRAINJOB_PLURAL = "trainjobs"
 # For example, what PodTemplate must be overridden by TrainJob's .spec.trainer APIs.
 TRAINJOB_ANCESTOR_LABEL = "trainer.kubeflow.org/trainjob-ancestor-step"
 
-# The label key to identify training phase where TrainingRuntime should be used.
-# For example, runtime for the pre-training or post-training.
-# TODO (andreyvelich): Remove it.
-PHASE_KEY = "trainer.kubeflow.org/phase"
-
-# The value indicates that runtime can be used for the model pre-training.
-PHASE_PRE_TRAINING = "pre-training"
-
-# The value indicates that runtime can be used for the model post-training.
-PHASE_POST_TRAINING = "post-training"
-
-# The label key to identify the accelerator type for model training (e.g. GPU-Tesla-V100-16GB).
-# TODO: Potentially, we should take this from the Node selectors.
-ACCELERATOR_LABEL = "trainer.kubeflow.org/accelerator"
-
-# Unknown indicates that the value can't be identified.
-UNKNOWN = "Unknown"
-
-# The default type for CPU device, and it indicates the label in the container resources.
-CPU_DEVICE_TYPE = "cpu"
-
-# The label for NVIDIA GPU in the container resources.
-NVIDIA_GPU_LABEL = "nvidia.com/gpu"
-
-# The default type for GPU device.
-GPU_DEVICE_TYPE = "gpu"
-
-# The label for TPU in the container resources.
-TPU_LABEL = "google.com/tpu"
-
-# The default type for TPU device.
-TPU_DEVICE_TYPE = "tpu"
-
-# The label key to identify the JobSet name of the Pod.
-JOBSET_NAME_KEY = "jobset.sigs.k8s.io/jobset-name"
-
-# The label key to identify the JobSet's ReplicatedJob of the Pod.
-REPLICATED_JOB_KEY = "jobset.sigs.k8s.io/replicatedjob-name"
-
-# The label key to identify the Job completion index of the Pod.
-JOB_INDEX_KEY = "batch.kubernetes.io/job-completion-index"
-
 # The name of the ReplicatedJob and container of the dataset initializer.
 # Also, it represents the `trainjob-ancestor-step` label value for the dataset initializer step.
 DATASET_INITIALIZER = "dataset-initializer"
@@ -108,6 +66,31 @@ NODE = "trainer-node"
 
 # The `trainjob-ancestor-step` label value for the trainer step.
 TRAINER = "trainer"
+
+# The label key to identify the accelerator type for model training (e.g. GPU-Tesla-V100-16GB).
+# TODO: Potentially, we should take this from the Node selectors.
+ACCELERATOR_LABEL = "trainer.kubeflow.org/accelerator"
+
+# Unknown indicates that the value can't be identified.
+UNKNOWN = "Unknown"
+
+# The label for cpu in the container resources.
+CPU_LABEL = "cpu"
+
+# The label for NVIDIA GPU in the container resources.
+GPU_LABEL = "nvidia.com/gpu"
+
+# The label for TPU in the container resources.
+TPU_LABEL = "google.com/tpu"
+
+# The label key to identify the JobSet name of the Pod.
+JOBSET_NAME_LABEL = "jobset.sigs.k8s.io/jobset-name"
+
+# The label key to identify the JobSet's ReplicatedJob of the Pod.
+JOBSET_RJOB_NAME_LABEL = "jobset.sigs.k8s.io/replicatedjob-name"
+
+# The label key to identify the Job completion index of the Pod.
+JOB_INDEX_LABEL = "batch.kubernetes.io/job-completion-index"
 
 # The Pod pending phase indicates that Pod has been accepted by the Kubernetes cluster,
 # but one or more of the containers has not been made ready to run.
