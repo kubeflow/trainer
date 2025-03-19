@@ -177,11 +177,11 @@ def get_trainjob_initializer_step(
 
 
 def get_trainjob_node_step(
-    replicated_job_name: str,
-    job_index: int,
     pod_name: str,
     pod_spec: models.IoK8sApiCoreV1PodSpec,
     pod_status: Optional[models.IoK8sApiCoreV1PodStatus],
+    replicated_job_name: str,
+    job_index: int,
 ) -> types.Step:
     """
     Get the TrainJob trainer node step from the given Pod name, spec, and status.

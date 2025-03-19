@@ -559,7 +559,9 @@ class TrainerClient:
                     constants.MODEL_INITIALIZER,
                 }:
                     step = utils.get_trainjob_initializer_step(
-                        pod.metadata.name, pod.spec, pod.status
+                        pod.metadata.name,
+                        pod.spec,
+                        pod.status,
                     )
                 # Get the Node step.
                 elif pod.metadata.labels[constants.JOBSET_RJOB_NAME_LABEL] in {
@@ -567,11 +569,11 @@ class TrainerClient:
                     constants.NODE,
                 }:
                     step = utils.get_trainjob_node_step(
-                        pod.metadata.labels[constants.JOBSET_RJOB_NAME_LABEL],
-                        int(pod.metadata.labels[constants.JOB_INDEX_LABEL]),
                         pod.metadata.name,
                         pod.spec,
                         pod.status,
+                        pod.metadata.labels[constants.JOBSET_RJOB_NAME_LABEL],
+                        int(pod.metadata.labels[constants.JOB_INDEX_LABEL]),
                     )
 
                 train_job.steps.append(step)
