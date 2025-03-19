@@ -16,7 +16,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Union
 
 from kubeflow.trainer.constants import constants
 
@@ -70,7 +70,7 @@ class Trainer:
     framework: Framework
     entrypoint: str
     accelerator: str = constants.UNKNOWN
-    accelerator_count: str = constants.UNKNOWN
+    accelerator_count: Union[str, float, int] = constants.UNKNOWN
 
 
 # Representation for the Training Runtime.
@@ -86,9 +86,9 @@ class Runtime:
 class Step:
     name: str
     status: Optional[str]
-    device: str
-    device_count: str
     pod_name: str
+    device: str = constants.UNKNOWN
+    device_count: Union[str, int] = constants.UNKNOWN
 
 
 # Representation for the TrainJob.

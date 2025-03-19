@@ -151,12 +151,12 @@ ALL_TRAINERS: Dict[str, types.Trainer] = {
     "ghcr.io/kubeflow/trainer/mlx-runtime": types.Trainer(
         trainer_type=types.TrainerType.CUSTOM_TRAINER,
         framework=types.Framework.MLX,
-        entrypoint="mpirun",
+        entrypoint="mpirun --hostfile /etc/mpi/hostfile -x LD_LIBRARY_PATH=/usr/local/lib/ python3",
     ),
     "ghcr.io/kubeflow/trainer/deepspeed-runtime": types.Trainer(
         trainer_type=types.TrainerType.CUSTOM_TRAINER,
         framework=types.Framework.DEEPSPEED,
-        entrypoint="mpirun",
+        entrypoint="mpirun --hostfile /etc/mpi/hostfile python3",
     ),
     # Builtin Trainers.
     "ghcr.io/kubeflow/trainer/torchtune-trainer": types.Trainer(
@@ -166,9 +166,15 @@ ALL_TRAINERS: Dict[str, types.Trainer] = {
     ),
 }
 
-# When trainer can't be detected this default value is used.
+# The default trainer configuration when runtime detection fails
 DEFAULT_TRAINER = types.Trainer(
     trainer_type=types.TrainerType.CUSTOM_TRAINER,
     framework=types.Framework.TORCH,
     entrypoint="torchrun",
+)
+
+# The default runtime configuration for the train() API
+DEFAULT_RUNTIME = types.Runtime(
+    name="torch-distributed",
+    trainer=DEFAULT_TRAINER,
 )

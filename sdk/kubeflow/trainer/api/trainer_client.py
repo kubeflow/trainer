@@ -73,8 +73,6 @@ class TrainerClient:
 
         self.namespace = namespace
 
-        # self.default_runtime = types
-
     # TODO (andreyvelich): Currently, only Cluster Training Runtime is supported.
     def list_runtimes(self) -> List[types.Runtime]:
         """List of the available runtimes.
@@ -114,24 +112,16 @@ class TrainerClient:
                 ):
                     raise Exception(f"Runtime object is invalid: {runtime}")
 
-                # result.append(
-                #     types.Runtime(
-                #         name=runtime.metadata.name,
-                #         trainer=utils.get_runtime_trainer,
-                #         trainer_type=utils.get_runtime_trainer_type(contane),
-                #         framework=utils.get_runtime_trainer(),
-                #         accelerator_count=utils.get_runtime_accelerators(
-                #             runtime.spec.ml_policy,
-                #             runtime.spec.template.spec.replicated_jobs,
-                #         ),
-                #         accelerator=(
-                #             runtime.metadata.labels[constants.ACCELERATOR_LABEL]
-                #             if runtime.metadata.labels
-                #             and constants.ACCELERATOR_LABEL in runtime.metadata.labels
-                #             else constants.UNKNOWN
-                #         ),
-                #     )
-                # )
+                result.append(
+                    types.Runtime(
+                        name=runtime.metadata.name,
+                        trainer=utils.get_runtime_trainer(
+                            runtime.spec.template.spec.replicated_jobs,
+                            runtime.spec.ml_policy,
+                            runtime.metadata,
+                        ),
+                    )
+                )
 
         except multiprocessing.TimeoutError:
             raise TimeoutError(
@@ -148,7 +138,7 @@ class TrainerClient:
 
     def train(
         self,
-        runtime: types.Runtime = None,
+        runtime: types.Runtime = constants.DEFAULT_RUNTIME,
         initializer: Optional[types.Initializer] = None,
         trainer: Optional[types.CustomTrainer] = None,
     ) -> str:
@@ -185,6 +175,7 @@ class TrainerClient:
             trainer_crd.command = constants.DEFAULT_COMMAND
             # TODO: Support train function parameters.
             trainer_crd.args = utils.get_args_using_train_func(
+                runtime,
                 trainer.func,
                 trainer.func_args,
                 trainer.packages_to_install,
@@ -197,22 +188,22 @@ class TrainerClient:
             metadata=models.IoK8sApimachineryPkgApisMetaV1ObjectMeta(
                 name=train_job_name
             ),
-            # spec=models.TrainerV1alpha1TrainJobSpec(
-            #     runtimeRef=models.TrainerV1alpha1RuntimeRef(name=runtime_ref),
-            #     trainer=(
-            #         trainer_crd
-            #         if trainer_crd != models.TrainerV1alpha1Trainer()
-            #         else None
-            #     ),
-            #     initializer=(
-            #         models.TrainerV1alpha1Initializer(
-            #             dataset=utils.get_dataset_initializer(initializer.dataset),
-            #             model=utils.get_model_initializer(initializer.model),
-            #         )
-            #         if isinstance(initializer, types.Initializer)
-            #         else None
-            #     ),
-            # ),
+            spec=models.TrainerV1alpha1TrainJobSpec(
+                runtimeRef=models.TrainerV1alpha1RuntimeRef(name=runtime.name),
+                trainer=(
+                    trainer_crd
+                    if trainer_crd != models.TrainerV1alpha1Trainer()
+                    else None
+                ),
+                initializer=(
+                    models.TrainerV1alpha1Initializer(
+                        dataset=utils.get_dataset_initializer(initializer.dataset),
+                        model=utils.get_model_initializer(initializer.model),
+                    )
+                    if isinstance(initializer, types.Initializer)
+                    else None
+                ),
+            ),
         )
 
         # Create the TrainJob.
