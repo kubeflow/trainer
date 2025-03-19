@@ -75,7 +75,7 @@ jobs:
         with:
           image: |
             docker.io/kubeflow/${{ inputs.component-name }}
-            ghcr.io/kubeflow/training/${{ inputs.component-name }}
+            ghcr.io/kubeflow/trainer/${{ inputs.component-name }}
           dockerfile: ${{ inputs.dockerfile }}
           platforms: ${{ inputs.platforms }}
           context: ${{ inputs.context }}
@@ -88,7 +88,7 @@ jobs:
         with:
           image: |
             docker.io/kubeflow/${{ inputs.component-name }}
-            ghcr.io/kubeflow/training/${{ inputs.component-name }}
+            ghcr.io/kubeflow/trainer/${{ inputs.component-name }}
           dockerfile: ${{ inputs.dockerfile }}
           platforms: ${{ inputs.platforms }}
           context: ${{ inputs.context }}
