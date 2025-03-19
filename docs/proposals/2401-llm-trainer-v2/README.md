@@ -262,7 +262,7 @@ class TorchTuneConfig:
 
 #### `list_runtimes()` API
 
-We should allow users to easily get the available TrainingRuntimes/ClusterTrainingRuntimes with the SDK, followed with information related to the training method, framework, model, phase and device. When users execute:
+We should allow users to easily get the available TrainingRuntimes/ClusterTrainingRuntimes with the SDK, followed with information related to the trainer type, framework, model, and device. When users execute:
 
 ```python
 TrainingClient().list_runtimes()
@@ -271,10 +271,10 @@ TrainingClient().list_runtimes()
 They are expected to get:
 
 ```
-Runtime                             Method                Framework   Pretrained Model    Phase           Accelerator       Count
+Runtime                             Trainer Type          Framework   Pretrained Model    Accelerator       Count
 
-pytorch-distributed                 custom-trainer        pytorch     <undefined>         any             nvidia.com/GPU    2
-torchtune-llama3.1-8B-finetuning    predefined-trainer    torchtune   Llama3.1-8B         post-training   nvidia.com/GPU    4
+pytorch-distributed                 custom-trainer        pytorch     <undefined>         nvidia.com/GPU    2
+torchtune-llama3.1-8B-finetuning    builtin-trainer       torchtune   Llama3.1-8B         nvidia.com/GPU    4
 ```
 
 In that case, we plan to design `Runtime` dataclass as the following:
@@ -282,10 +282,9 @@ In that case, we plan to design `Runtime` dataclass as the following:
 | Fields | Type | What is it? |
 | - | - | - |
 | name | str | The name of TrainingRuntime/ClusterTrainingRuntime. |
-| method | str | The training method of this runtime, chosen from `custom-trainer`, `predefined-trainer`. |
+| trainer_type | str | The training method of this runtime, chosen from `custom-trainer`, `builtin-trainer`. |
 | framework | str | The ML framework used for training, e.g. `pytorch`, `torchtune`. |
 | pretrained_model | Optional[str] | The pretrained model specified for this runtime, e.g. `llama3.1-8B`. |
-| phase | str | The training phase of this runtime, chosen from `any`, `post-training`. |
 | accelerator | str | The type of devices, e.g. `nvidia.com/gpu`. |
 | accelerator_count | str | The number of devices. |
 
@@ -294,10 +293,9 @@ In that case, we plan to design `Runtime` dataclass as the following:
 @dataclass
 class Runtime:
     name: str
-    method: str
+    trainer_type: str
     framework: str
     pretrained_model: Optional[str] = None
-    phase: str
     accelerator: str
     accelerator_count: str,
 
