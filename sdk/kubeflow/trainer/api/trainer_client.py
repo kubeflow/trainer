@@ -121,10 +121,9 @@ class TrainerClient:
         """Get the the Runtime object"""
 
         try:
-            thread = self.custom_api.get_namespaced_custom_object(
+            thread = self.custom_api.get_cluster_custom_object(
                 constants.GROUP,
                 constants.VERSION,
-                self.namespace,
                 constants.CLUSTER_TRAINING_RUNTIME_PLURAL,
                 name,
                 async_req=True,
@@ -136,18 +135,20 @@ class TrainerClient:
 
         except multiprocessing.TimeoutError:
             raise TimeoutError(
-                f"Timeout to get {constants.TRAINJOB_KIND}: {self.namespace}/{name}"
+                f"Timeout to get {constants.CLUSTER_TRAINING_RUNTIME_PLURAL}: "
+                f"{self.namespace}/{name}"
             )
         except Exception:
             raise RuntimeError(
-                f"Failed to get {constants.TRAINJOB_KIND}: {self.namespace}/{name}"
+                f"Failed to get {constants.CLUSTER_TRAINING_RUNTIME_PLURAL}: "
+                f"{self.namespace}/{name}"
             )
 
         return self.__get_runtime_from_crd(runtime)  # type: ignore
 
     def train(
         self,
-        runtime: types.Runtime = constants.DEFAULT_RUNTIME,
+        runtime: types.Runtime = types.DEFAULT_RUNTIME,
         initializer: Optional[types.Initializer] = None,
         trainer: Optional[types.CustomTrainer] = None,
     ) -> str:
@@ -187,8 +188,8 @@ class TrainerClient:
                 runtime,
                 trainer.func,
                 trainer.func_args,
-                trainer.packages_to_install,
                 trainer.pip_index_url,
+                trainer.packages_to_install,
             )
 
         train_job = models.TrainerV1alpha1TrainJob(

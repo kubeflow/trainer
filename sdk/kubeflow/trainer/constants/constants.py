@@ -13,9 +13,6 @@
 # limitations under the License.
 
 import os
-from typing import Dict
-
-from kubeflow.trainer.types import types
 
 # How long to wait in seconds for requests to the Kubernetes API Server.
 DEFAULT_TIMEOUT = 120
@@ -125,56 +122,8 @@ DEFAULT_COMMAND = ["bash", "-c"]
 # The Torch env name for the number of procs per node (e.g. number of GPUs per Pod).
 TORCH_ENV_NUM_PROC_PER_NODE = "PET_NPROC_PER_NODE"
 
-# The container entrypoint for distributed PyTorch.
-TORCH_ENTRYPOINT = "torchrun"
-
 # The name of the ReplicatedJob to launch mpirun.
 MPI_LAUNCHER = "launcher"
 
 # The OpenMPI env name for the number of slots per nude (e.g. number of GPUs per Pod).
 MPI_ENV_NUM_SLOTS_PER_NODE = "OMPI_MCA_orte_set_default_slots"
-
-# The container entrypoint for distributed MPI
-MPI_ENTRYPOINT = "mpirun"
-
-
-# The dict where key is the container image and value its representation.
-# Each Trainer representation defines trainer parameters (e.g. type, framework, entrypoint).
-# TODO (andreyvelich): We should allow user to overrides the default image names.
-ALL_TRAINERS: Dict[str, types.Trainer] = {
-    # Custom Trainers.
-    "pytorch/pytorch": types.Trainer(
-        trainer_type=types.TrainerType.CUSTOM_TRAINER,
-        framework=types.Framework.TORCH,
-        entrypoint="torchrun",
-    ),
-    "ghcr.io/kubeflow/trainer/mlx-runtime": types.Trainer(
-        trainer_type=types.TrainerType.CUSTOM_TRAINER,
-        framework=types.Framework.MLX,
-        entrypoint="mpirun --hostfile /etc/mpi/hostfile -x LD_LIBRARY_PATH=/usr/local/lib/ python3",
-    ),
-    "ghcr.io/kubeflow/trainer/deepspeed-runtime": types.Trainer(
-        trainer_type=types.TrainerType.CUSTOM_TRAINER,
-        framework=types.Framework.DEEPSPEED,
-        entrypoint="mpirun --hostfile /etc/mpi/hostfile python3",
-    ),
-    # Builtin Trainers.
-    "ghcr.io/kubeflow/trainer/torchtune-trainer": types.Trainer(
-        trainer_type=types.TrainerType.BUILTIN_TRAINER,
-        framework=types.Framework.TORCHTUNE,
-        entrypoint="tune run",
-    ),
-}
-
-# The default trainer configuration when runtime detection fails
-DEFAULT_TRAINER = types.Trainer(
-    trainer_type=types.TrainerType.CUSTOM_TRAINER,
-    framework=types.Framework.TORCH,
-    entrypoint="torchrun",
-)
-
-# The default runtime configuration for the train() API
-DEFAULT_RUNTIME = types.Runtime(
-    name="torch-distributed",
-    trainer=DEFAULT_TRAINER,
-)

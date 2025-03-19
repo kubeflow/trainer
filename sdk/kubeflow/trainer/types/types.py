@@ -130,3 +130,45 @@ class Initializer:
 
     dataset: Optional[HuggingFaceDatasetInitializer] = None
     model: Optional[HuggingFaceModelInitializer] = None
+
+
+# The dict where key is the container image and value its representation.
+# Each Trainer representation defines trainer parameters (e.g. type, framework, entrypoint).
+# TODO (andreyvelich): We should allow user to overrides the default image names.
+ALL_TRAINERS: Dict[str, Trainer] = {
+    # Custom Trainers.
+    "pytorch/pytorch": Trainer(
+        trainer_type=TrainerType.CUSTOM_TRAINER,
+        framework=Framework.TORCH,
+        entrypoint="torchrun",
+    ),
+    "ghcr.io/kubeflow/trainer/mlx-runtime": Trainer(
+        trainer_type=TrainerType.CUSTOM_TRAINER,
+        framework=Framework.MLX,
+        entrypoint="mpirun --hostfile /etc/mpi/hostfile -x LD_LIBRARY_PATH=/usr/local/lib/ python3",
+    ),
+    "ghcr.io/kubeflow/trainer/deepspeed-runtime": Trainer(
+        trainer_type=TrainerType.CUSTOM_TRAINER,
+        framework=Framework.DEEPSPEED,
+        entrypoint="mpirun --hostfile /etc/mpi/hostfile python3",
+    ),
+    # Builtin Trainers.
+    "ghcr.io/kubeflow/trainer/torchtune-trainer": Trainer(
+        trainer_type=TrainerType.BUILTIN_TRAINER,
+        framework=Framework.TORCHTUNE,
+        entrypoint="tune run",
+    ),
+}
+
+# The default trainer configuration when runtime detection fails
+DEFAULT_TRAINER = Trainer(
+    trainer_type=TrainerType.CUSTOM_TRAINER,
+    framework=Framework.TORCH,
+    entrypoint="torchrun",
+)
+
+# The default runtime configuration for the train() API
+DEFAULT_RUNTIME = Runtime(
+    name="torch-distributed",
+    trainer=DEFAULT_TRAINER,
+)
