@@ -345,7 +345,7 @@ class TrainerClient:
 
         # TODO (andreyvelich): Potentially, refactor this.
         # Support logging of multiple Pods.
-        # TODO (andreyvelich): Currently, follow is supported only for Trainer.
+        # TODO (andreyvelich): Currently, follow is supported only for node container.
         if follow and step == constants.NODE:
             log_streams = []
             log_streams.append(
@@ -353,8 +353,7 @@ class TrainerClient:
                     self.core_api.read_namespaced_pod_log,
                     name=pod_name,
                     namespace=self.namespace,
-                    # TODO (andreyvelich): Container name must be "node"
-                    container=constants.TRAINER,
+                    container=constants.NODE,
                 )
             )
             finished = [False] * len(log_streams)
@@ -410,8 +409,7 @@ class TrainerClient:
                     self.core_api.read_namespaced_pod_log(
                         name=pod_name,
                         namespace=self.namespace,
-                        # TODO (andreyvelich): Container name must be "node"
-                        container=constants.TRAINER,
+                        container=constants.NODE,
                     )
                 )
 
@@ -515,17 +513,15 @@ class TrainerClient:
                     status = "Failed"
             train_job.status = status
 
-        # Select Pods created by the appropriate JobSet.
-        # It detects pods using the `trainer.kubeflow.org/trainjob-ancestor-step` label.
-        # However, it also checks the ReplicatedJob.name == "Node" value,
-        # since MPI creates two ReplicatedJobs: Launcher + Node.
+        # Select Pods created by the appropriate JobSet. It checks the following ReplicatedJob.name:
+        # dataset-initializer, model-initializer, launcher, node.
         label_selector = "{}={},{} in ({}, {}, {}, {})".format(
             constants.JOBSET_NAME_LABEL,
             name,
             constants.JOBSET_RJOB_NAME_LABEL,
             constants.DATASET_INITIALIZER,
             constants.MODEL_INITIALIZER,
-            constants.MPI_LAUNCHER,
+            constants.LAUNCHER,
             constants.NODE,
         )
 
@@ -565,7 +561,7 @@ class TrainerClient:
                     )
                 # Get the Node step.
                 elif pod.metadata.labels[constants.JOBSET_RJOB_NAME_LABEL] in {
-                    constants.MPI_LAUNCHER,
+                    constants.LAUNCHER,
                     constants.NODE,
                 }:
                     step = utils.get_trainjob_node_step(

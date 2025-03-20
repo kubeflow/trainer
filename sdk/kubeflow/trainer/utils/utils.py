@@ -47,14 +47,13 @@ def get_container_devices(
     Get the device type and device count for the given container.
     """
 
-    # TODO (andreyvelich): We should discuss how to get container device type.
-    # Potentially, we can use the trainer.kubeflow.org/device label from the runtime or
-    # node types.
-
     # If containers resource limits are empty, return Unknown.
     if resources is None or resources.limits is None:
         return None
 
+    # TODO (andreyvelich): We should discuss how to get container device type.
+    # Potentially, we can use the trainer.kubeflow.org/device label from the runtime or
+    # node types.
     # TODO (andreyvelich): Support other resource labels (e.g. NPUs).
     if constants.GPU_LABEL in resources.limits:
         device = constants.GPU_LABEL.split("/")[1]
@@ -94,11 +93,7 @@ def get_runtime_trainer_container(
             continue
 
         for container in rjob.template.spec.template.spec.containers:
-            # TODO (andreyvelich): Container name must be always "node"
-            if (
-                container.name == constants.TRAINER
-                or container.name == constants.MPI_LAUNCHER
-            ):
+            if container.name == constants.NODE:
                 return container
 
     return None
@@ -187,12 +182,7 @@ def get_trainjob_node_step(
     Get the TrainJob trainer node step from the given Pod name, spec, and status.
     """
 
-    container = next(
-        c
-        for c in pod_spec.containers
-        # TODO (andreyvelich): Container name must be "node"
-        if c.name in {constants.MPI_LAUNCHER, constants.TRAINER}
-    )
+    container = next(c for c in pod_spec.containers if c.name == constants.NODE)
 
     step = types.Step(
         name=f"{constants.NODE}-{job_index}",
@@ -210,9 +200,9 @@ def get_trainjob_node_step(
                     step.device_count = env.value
                 elif env.name == constants.MPI_ENV_NUM_SLOTS_PER_NODE:
                     # For the MPI use-cases, the launcher container is always node-0
-                    # Thus, we should increase the Job index for other nodes.
+                    # Thus, we should increase the index for other nodes.
                     step.device_count = env.value
-                    if replicated_job_name != constants.MPI_LAUNCHER:
+                    if replicated_job_name != constants.LAUNCHER:
                         step.name = f"{constants.NODE}-{job_index+1}"
 
     return step
@@ -291,7 +281,6 @@ def get_args_using_train_func(
     )
 
     # Add function code to the execute script.
-    # TODO (andreyvelich): Add support for other entrypoints.
     exec_script = exec_script.format(
         func_code=func_code,
         func_file=func_file,

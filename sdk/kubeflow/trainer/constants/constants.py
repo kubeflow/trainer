@@ -59,13 +59,12 @@ DATASET_PATH = os.path.join(WORKSPACE_PATH, "dataset")
 # The path where initializer downloads model.
 MODEL_PATH = os.path.join(WORKSPACE_PATH, "model")
 
-# The name of the ReplicatedJob and container of the node. The node usually represents single
-# VM where distributed training code is executed.
-# TODO: Change it to "node"
-NODE = "trainer-node"
+# The name of the ReplicatedJob to launch mpirun.
+LAUNCHER = "launcher"
 
-# The `trainjob-ancestor-step` label value for the trainer step.
-TRAINER = "trainer"
+# The name of the ReplicatedJob and container of the node. The node usually represents
+# single VM where distributed training code is executed.
+NODE = "node"
 
 # The label key to identify the accelerator type for model training (e.g. GPU-Tesla-V100-16GB).
 # TODO: Potentially, we should take this from the Node selectors.
@@ -104,9 +103,6 @@ DEFAULT_COMMAND = ["bash", "-c"]
 
 # The Torch env name for the number of procs per node (e.g. number of GPUs per Pod).
 TORCH_ENV_NUM_PROC_PER_NODE = "PET_NPROC_PER_NODE"
-
-# The name of the ReplicatedJob to launch mpirun.
-MPI_LAUNCHER = "launcher"
 
 # The OpenMPI env name for the number of slots per nude (e.g. number of GPUs per Pod).
 MPI_ENV_NUM_SLOTS_PER_NODE = "OMPI_MCA_orte_set_default_slots"
