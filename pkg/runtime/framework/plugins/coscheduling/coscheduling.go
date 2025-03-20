@@ -45,6 +45,7 @@ import (
 	schedulerpluginsv1alpha1ac "sigs.k8s.io/scheduler-plugins/pkg/generated/applyconfiguration/scheduling/v1alpha1"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
 	runtimeindexer "github.com/kubeflow/trainer/pkg/runtime/indexer"
@@ -120,16 +121,32 @@ func (c *CoScheduling) Build(ctx context.Context, info *runtime.Info, trainJob *
 	}
 
 	var totalMembers int32
+	resourcesPerNode := trainJob.Spec.Trainer.ResourcesPerNode
 	totalResources := make(corev1.ResourceList)
 	for _, ps := range info.TemplateSpec.PodSets {
 		count := *ps.Count
-		totalMembers += count
-		for resName, quantity := range ps.SinglePodRequests {
-			quantity.Mul(int64(count))
-			current := totalResources[resName]
-			current.Add(quantity)
-			totalResources[resName] = current
+
+		// If ps is a trainer-node then get resources from trainjob spec
+		switch ps.Name {
+		case constants.JobTrainerNode:
+			if resourcesPerNode != nil {
+				for resName, quantity := range resourcesPerNode.Requests {
+					quantity.Mul(int64(count))
+					current := totalResources[resName]
+					current.Add(quantity)
+					totalResources[resName] = current
+				}
+			}
+		default:
+			for resName, quantity := range ps.SinglePodRequests {
+				quantity.Mul(int64(count))
+				current := totalResources[resName]
+				current.Add(quantity)
+				totalResources[resName] = current
+			}
 		}
+
+		totalMembers += count
 	}
 
 	podGroup := schedulerpluginsv1alpha1ac.PodGroup(trainJob.Name, trainJob.Namespace)
