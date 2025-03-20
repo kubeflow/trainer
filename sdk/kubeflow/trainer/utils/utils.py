@@ -281,7 +281,7 @@ def get_entrypoint_using_train_func(
         func_file = os.path.join("/home", "mpiuser", func_file)
     else:
         container_command = constants.DEFAULT_COMMAND
-        python_entrypoint = runtime.trainer.entrypoint
+        python_entrypoint = " ".join(runtime.trainer.entrypoint)
 
     exec_script = textwrap.dedent(
         """
