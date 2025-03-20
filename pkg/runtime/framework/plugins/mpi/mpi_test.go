@@ -372,7 +372,7 @@ trainJob-node-1-1.trainJob slots=1
 								yield("trainJob-launcher-0-0.trainJob")
 							},
 							Containers: []runtime.Container{{
-								Name: constants.ContainerLauncher,
+								Name: constants.Node,
 							}},
 						},
 						{
@@ -411,7 +411,7 @@ trainJob-node-1-1.trainJob slots=1
 							Name:  constants.JobLauncher,
 							Count: ptr.To[int32](1),
 							Containers: []runtime.Container{{
-								Name: constants.ContainerLauncher,
+								Name: constants.Node,
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 									*corev1ac.VolumeMount().
 										WithName(constants.MPISSHAuthVolumeName).

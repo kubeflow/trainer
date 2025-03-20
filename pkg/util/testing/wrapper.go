@@ -211,7 +211,7 @@ func (j *JobSetWrapper) LauncherReplica() *JobSetWrapper {
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{{
-									Name:    constants.ContainerLauncher,
+									Name:    constants.Node,
 									Command: []string{"mpirun"},
 									Args:    []string{"echo.sh"},
 								}},
@@ -891,7 +891,7 @@ func (s *TrainingRuntimeSpecWrapper) LauncherReplica() *TrainingRuntimeSpecWrapp
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{{
-									Name:    constants.ContainerLauncher,
+									Name:    constants.Node,
 									Command: []string{"mpirun"},
 									Args:    []string{"echo.sh"},
 								}},

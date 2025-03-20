@@ -106,7 +106,7 @@ func TestJobSet(t *testing.T) {
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().WithName("sidecar"),
-													corev1ac.Container().WithName(constants.ContainerLauncher),
+													corev1ac.Container().WithName(constants.Node),
 												),
 											),
 										),
@@ -165,7 +165,7 @@ func TestJobSet(t *testing.T) {
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().WithName("sidecar"),
-													corev1ac.Container().WithName(constants.ContainerLauncher),
+													corev1ac.Container().WithName(constants.Node),
 												),
 											),
 										),
@@ -219,7 +219,7 @@ func TestJobSet(t *testing.T) {
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
-													corev1ac.Container().WithName(constants.ContainerLauncher),
+													corev1ac.Container().WithName(constants.Node),
 												),
 											),
 										),
@@ -275,7 +275,7 @@ func TestJobSet(t *testing.T) {
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
-													corev1ac.Container().WithName(constants.ContainerLauncher),
+													corev1ac.Container().WithName(constants.Node),
 												),
 											),
 										),

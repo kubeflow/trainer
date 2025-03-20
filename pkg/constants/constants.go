@@ -70,9 +70,6 @@ const (
 	// JobLauncher is the Job name for the launcher.
 	JobLauncher string = "launcher"
 
-	// ContainerLauncher is the container name for the launcher.
-	ContainerLauncher string = "launcher"
-
 	// MPISSHAuthSecretSuffix is the name suffix for Secret with MPI SSH keys.
 	MPISSHAuthSecretSuffix string = "-mpi-ssh-auth"
 

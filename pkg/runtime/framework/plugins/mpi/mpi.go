@@ -164,7 +164,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 			)
 		}
 		for cIdx, container := range ps.Containers {
-			if container.Name != constants.JobLauncher && container.Name != constants.Node {
+			if container.Name != constants.Node {
 				continue
 			}
 			apply.UpsertVolumeMounts(
@@ -175,7 +175,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 						WithMountPath(*info.RuntimePolicy.MLPolicySource.MPI.SSHAuthMountPath),
 				}...,
 			)
-			if ps.Name == constants.JobLauncher && container.Name == constants.ContainerLauncher {
+			if ps.Name == constants.JobLauncher && container.Name == constants.Node {
 				apply.UpsertVolumeMounts(
 					&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].VolumeMounts,
 					*corev1ac.VolumeMount().

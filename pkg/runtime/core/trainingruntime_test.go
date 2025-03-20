@@ -605,14 +605,14 @@ test-job-node-0-1.test-job slots=8
 							},
 						},
 					).
-					VolumeMounts(constants.JobLauncher, constants.ContainerLauncher,
+					VolumeMounts(constants.JobLauncher, constants.Node,
 						corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
 						corev1.VolumeMount{Name: constants.MPIHostfileVolumeName, MountPath: constants.MPIHostfileDir},
 					).
 					VolumeMounts(constants.Node, constants.Node,
 						corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
 					).
-					Env(constants.JobLauncher, constants.ContainerLauncher,
+					Env(constants.JobLauncher, constants.Node,
 						corev1.EnvVar{
 							Name:  constants.OpenMPIEnvHostFileLocation,
 							Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),
