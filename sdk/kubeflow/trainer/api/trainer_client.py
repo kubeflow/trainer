@@ -182,14 +182,16 @@ class TrainerClient:
 
         # Add command and args to the Trainer if training function is set.
         if trainer and trainer.func:
-            trainer_crd.command = constants.DEFAULT_COMMAND
+
             # TODO: Support train function parameters.
-            trainer_crd.args = utils.get_args_using_train_func(
-                runtime,
-                trainer.func,
-                trainer.func_args,
-                trainer.pip_index_url,
-                trainer.packages_to_install,
+            trainer_crd.command, trainer_crd.args = (
+                utils.get_entrypoint_using_train_func(
+                    runtime,
+                    trainer.func,
+                    trainer.func_args,
+                    trainer.pip_index_url,
+                    trainer.packages_to_install,
+                )
             )
 
         train_job = models.TrainerV1alpha1TrainJob(

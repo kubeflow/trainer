@@ -231,15 +231,15 @@ def get_resources_per_node(
     return resources
 
 
-def get_args_using_train_func(
+def get_entrypoint_using_train_func(
     runtime: types.Runtime,
     train_func: Callable,
     train_func_parameters: Optional[Dict[str, Any]],
     pip_index_url: str,
     packages_to_install: Optional[List[str]] = None,
-) -> List[str]:
+) -> Tuple[List[str], List[str]]:
     """
-    Get the Trainer args from the given training function and parameters.
+    Get the Trainer command and args from the given training function and parameters.
     """
     # Check if training function is callable.
     if not callable(train_func):
@@ -270,21 +270,33 @@ def get_args_using_train_func(
     # Prepare the template to execute script.
     # Currently, we override the file where the training function is defined.
     # That allows to execute the training script with the entrypoint.
+    if runtime.trainer.entrypoint is None:
+        raise Exception(f"Runtime trainer must have an entrypoint: {runtime.trainer}")
+
+    # We don't allow to override python entrypoint for `mpirun`
+    if runtime.trainer.entrypoint[0] == "mpirun":
+        container_command = runtime.trainer.entrypoint
+        python_entrypoint = "python"
+        # mpirun uses file from this location: /home/mpiuser/<FILE_NAME>.py
+        func_file = os.path.join("/home", "mpiuser", func_file)
+    else:
+        container_command = constants.DEFAULT_COMMAND
+        python_entrypoint = runtime.trainer.entrypoint
+
     exec_script = textwrap.dedent(
         """
-                program_path=$(mktemp -d)
                 read -r -d '' SCRIPT << EOM\n
                 {func_code}
                 EOM
                 printf "%s" \"$SCRIPT\" > \"{func_file}\"
-                {entrypoint} \"{func_file}\""""
+                {python_entrypoint} \"{func_file}\""""
     )
 
     # Add function code to the execute script.
     exec_script = exec_script.format(
         func_code=func_code,
         func_file=func_file,
-        entrypoint=runtime.trainer.entrypoint,
+        python_entrypoint=python_entrypoint,
     )
 
     # Install Python packages if that is required.
@@ -295,7 +307,7 @@ def get_args_using_train_func(
         )
 
     # Return container command and args to execute training function.
-    return [exec_script]
+    return container_command, [exec_script]
 
 
 def get_script_for_python_packages(
