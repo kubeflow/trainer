@@ -85,13 +85,43 @@ func (m *MPI) Name() string {
 
 func (m *MPI) Validate(runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
-	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil, allErrs
 	}
 
 	if trainJobTrainer := newJobObj.Spec.Trainer; trainJobTrainer != nil && trainJobTrainer.NumProcPerNode != nil {
 		if trainJobTrainer.NumProcPerNode.Type != intstr.Int {
 			allErrs = append(allErrs, field.Invalid(numProcPerNodePath, *trainJobTrainer.NumProcPerNode, "must have an int value for MPI TrainJob"))
+	specPath := field.NewPath("spec")
+	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumProcPerNode != nil {
+		numProcPerNodePath := specPath.Child("trainer").Child("numProcPerNode")
+		numProcPerNode := *newJobObj.Spec.Trainer.NumProcPerNode
+		if numProcPerNode.Type != intstr.Int {
+			allErrs = append(allErrs, field.Invalid(numProcPerNodePath, newJobObj.Spec.Trainer.NumProcPerNode, "must have an int value"))
+		}
+	}
+
+	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumNodes != nil {
+		numNodes := *newJobObj.Spec.Trainer.NumNodes
+		isRunLauncherAsNode := *runtimeInfo.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode
+		if numNodes >= 2 && isRunLauncherAsNode {
+			var hasLauncher, hasNode bool
+			for _, podSet := range runtimeInfo.TemplateSpec.PodSets {
+				if podSet.Name == "launcher" {
+					hasLauncher = true
+				}
+				if podSet.Name == "node" {
+					hasNode = true
+				}
+				if hasLauncher && hasNode {
+					break
+				}
+			}
+
+			if !hasLauncher || !hasNode {
+				numNodesPath := specPath.Child("trainer").Child("numNodes")
+				allErrs = append(allErrs, field.Invalid(numNodesPath, newJobObj.Spec.Trainer.NumNodes, "TrainJob creation rejected: numNodes>=2 with RunLauncherAsNode enabled requires both launcher and node PodSet configurations in the TrainingRuntime"))
+			}
 		}
 	}
 	return nil, allErrs
