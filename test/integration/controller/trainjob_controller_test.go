@@ -634,12 +634,12 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
 							Suspend(false).
 							LauncherReplica().
-							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
-							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
-							Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+							Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 							NumNodes(2).
 							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-							Volumes(constants.JobLauncher,
+							Volumes(constants.Launcher,
 								corev1.Volume{
 									Name: constants.MPISSHAuthVolumeName,
 									VolumeSource: corev1.VolumeSource{
@@ -702,14 +702,14 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									},
 								},
 							).
-							VolumeMounts(constants.JobLauncher, constants.Node,
+							VolumeMounts(constants.Launcher, constants.Node,
 								corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
 								corev1.VolumeMount{Name: constants.MPIHostfileVolumeName, MountPath: constants.MPIHostfileDir},
 							).
 							VolumeMounts(constants.Node, constants.Node,
 								corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
 							).
-							Env(constants.JobLauncher, constants.Node,
+							Env(constants.Launcher, constants.Node,
 								corev1.EnvVar{
 									Name:  constants.OpenMPIEnvHostFileLocation,
 									Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),

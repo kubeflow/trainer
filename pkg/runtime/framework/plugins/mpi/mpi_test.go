@@ -89,7 +89,7 @@ func TestMPI(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:  constants.JobLauncher,
+							Name:  constants.Launcher,
 							Count: ptr.To[int32](1),
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-launcher-0-0.trainJob")
@@ -128,7 +128,7 @@ func TestMPI(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:  constants.JobLauncher,
+							Name:  constants.Launcher,
 							Count: ptr.To[int32](1),
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
@@ -226,7 +226,7 @@ trainJob-node-1-1.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:  constants.JobLauncher,
+							Name:  constants.Launcher,
 							Count: ptr.To[int32](1),
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-launcher-0-0.trainJob")
@@ -265,7 +265,7 @@ trainJob-node-1-1.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:  constants.JobLauncher,
+							Name:  constants.Launcher,
 							Count: ptr.To[int32](1),
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
@@ -366,7 +366,7 @@ trainJob-node-1-1.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:  constants.JobLauncher,
+							Name:  constants.Launcher,
 							Count: ptr.To[int32](1),
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-launcher-0-0.trainJob")
@@ -408,7 +408,7 @@ trainJob-node-1-1.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:  constants.JobLauncher,
+							Name:  constants.Launcher,
 							Count: ptr.To[int32](1),
 							Containers: []runtime.Container{{
 								Name: constants.Node,
@@ -539,7 +539,7 @@ trainJob-node-1-0.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobLauncher,
+							Name: constants.Launcher,
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-launcher-0-0.trainJob")
 							},
@@ -562,7 +562,7 @@ trainJob-node-1-0.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobLauncher,
+							Name: constants.Launcher,
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
 									WithName(constants.MPISSHAuthVolumeName).
@@ -622,7 +622,7 @@ trainJob-node-1-0.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobLauncher,
+							Name: constants.Launcher,
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-launcher-0-0.trainJob")
 							},
@@ -645,7 +645,7 @@ trainJob-node-1-0.trainJob slots=1
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.JobLauncher,
+							Name: constants.Launcher,
 							Volumes: []corev1ac.VolumeApplyConfiguration{
 								*corev1ac.Volume().
 									WithName(constants.MPISSHAuthVolumeName).

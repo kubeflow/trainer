@@ -89,9 +89,9 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Label("conflictLabel", "override").
 					Annotation("conflictAnnotation", "override").
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.JobLauncher).
-					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
-					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 					NumNodes(30).
 					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
@@ -337,7 +337,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.JobLauncher).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 					NumNodes(30).
@@ -437,7 +437,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.JobLauncher).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 					NumNodes(100).
@@ -538,11 +538,11 @@ test-job-node-0-1.test-job slots=8
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					LauncherReplica().
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.JobLauncher).
-					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
-					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 					NumNodes(2).
-					Volumes(constants.JobLauncher,
+					Volumes(constants.Launcher,
 						corev1.Volume{
 							Name: constants.MPISSHAuthVolumeName,
 							VolumeSource: corev1.VolumeSource{
@@ -605,14 +605,14 @@ test-job-node-0-1.test-job slots=8
 							},
 						},
 					).
-					VolumeMounts(constants.JobLauncher, constants.Node,
+					VolumeMounts(constants.Launcher, constants.Node,
 						corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
 						corev1.VolumeMount{Name: constants.MPIHostfileVolumeName, MountPath: constants.MPIHostfileDir},
 					).
 					VolumeMounts(constants.Node, constants.Node,
 						corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
 					).
-					Env(constants.JobLauncher, constants.Node,
+					Env(constants.Launcher, constants.Node,
 						corev1.EnvVar{
 							Name:  constants.OpenMPIEnvHostFileLocation,
 							Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),

@@ -121,7 +121,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 
 	// Add Secret and ConfigMap volumes to the Info object
 	for psIdx, ps := range info.TemplateSpec.PodSets {
-		if ps.Name != constants.Node && ps.Name != constants.JobLauncher {
+		if ps.Name != constants.Node && ps.Name != constants.Launcher {
 			continue
 		}
 		apply.UpsertVolumes(
@@ -145,7 +145,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 					),
 			}...,
 		)
-		if ps.Name == constants.JobLauncher {
+		if ps.Name == constants.Launcher {
 			apply.UpsertVolumes(
 				&info.TemplateSpec.PodSets[psIdx].Volumes,
 				[]corev1ac.VolumeApplyConfiguration{
@@ -175,7 +175,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 						WithMountPath(*info.RuntimePolicy.MLPolicySource.MPI.SSHAuthMountPath),
 				}...,
 			)
-			if ps.Name == constants.JobLauncher && container.Name == constants.Node {
+			if ps.Name == constants.Launcher && (container.Name == constants.Node || container.Name == constants.Launcher) {
 				apply.UpsertVolumeMounts(
 					&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].VolumeMounts,
 					*corev1ac.VolumeMount().
@@ -307,5 +307,5 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 }
 
 func isNode(runLauncherAsNode bool, ps runtime.PodSet) bool {
-	return (runLauncherAsNode && ps.Name == constants.JobLauncher) || ps.Name == constants.Node
+	return (runLauncherAsNode && ps.Name == constants.Launcher) || ps.Name == constants.Node
 }

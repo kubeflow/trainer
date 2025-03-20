@@ -67,8 +67,9 @@ const (
 	// {"type": "Suspended", "status": "True", "reason": "Resumed"} condition.
 	TrainJobResumedMessage = "TrainJob is resumed"
 
-	// JobLauncher is the Job name for the launcher.
-	JobLauncher string = "launcher"
+	// Node is the name of the Job and container for the MPI launcher.
+	// When RunLauncherAsNode: true, for the launcher Job the container name is node.
+	Launcher string = "launcher"
 
 	// MPISSHAuthSecretSuffix is the name suffix for Secret with MPI SSH keys.
 	MPISSHAuthSecretSuffix string = "-mpi-ssh-auth"

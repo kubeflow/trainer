@@ -86,7 +86,7 @@ func TestJobSet(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:       constants.JobLauncher,
+							Name:       constants.Launcher,
 							Containers: make([]runtime.Container, 1),
 						},
 						{
@@ -98,7 +98,7 @@ func TestJobSet(t *testing.T) {
 					ObjApply: jobsetv1alpha2ac.JobSetSpec().
 						WithReplicatedJobs(
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobLauncher).
+								WithName(constants.Launcher).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithParallelism(1).
@@ -138,7 +138,7 @@ func TestJobSet(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:       constants.JobLauncher,
+							Name:       constants.Launcher,
 							Containers: make([]runtime.Container, 1),
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-launcher-0-0.trainJob")
@@ -157,7 +157,7 @@ func TestJobSet(t *testing.T) {
 					ObjApply: jobsetv1alpha2ac.JobSetSpec().
 						WithReplicatedJobs(
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobLauncher).
+								WithName(constants.Launcher).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithParallelism(1).
@@ -199,7 +199,7 @@ func TestJobSet(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:       constants.JobLauncher,
+							Name:       constants.Launcher,
 							Containers: make([]runtime.Container, 1),
 						},
 						{
@@ -212,7 +212,7 @@ func TestJobSet(t *testing.T) {
 							WithSubdomain("kubeflow.org")).
 						WithReplicatedJobs(
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobLauncher).
+								WithName(constants.Launcher).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithParallelism(1).
@@ -249,7 +249,7 @@ func TestJobSet(t *testing.T) {
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
-							Name:       constants.JobLauncher,
+							Name:       constants.Launcher,
 							Containers: make([]runtime.Container, 1),
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-launcher-0-0.kubeflow.org")
@@ -268,7 +268,7 @@ func TestJobSet(t *testing.T) {
 							WithSubdomain("kubeflow.org")).
 						WithReplicatedJobs(
 							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.JobLauncher).
+								WithName(constants.Launcher).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithParallelism(1).

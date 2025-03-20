@@ -92,9 +92,9 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					Suspend(true).
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.JobLauncher).
-					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
-					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.JobLauncher).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 					NumNodes(100).
 					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
