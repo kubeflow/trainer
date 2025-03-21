@@ -85,6 +85,8 @@ func (m *MPI) Name() string {
 
 func (m *MPI) Validate(runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
+
+	// check for basic nil values.
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil, allErrs
 	}
@@ -92,38 +94,55 @@ func (m *MPI) Validate(runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob
 	if trainJobTrainer := newJobObj.Spec.Trainer; trainJobTrainer != nil && trainJobTrainer.NumProcPerNode != nil {
 		if trainJobTrainer.NumProcPerNode.Type != intstr.Int {
 			allErrs = append(allErrs, field.Invalid(numProcPerNodePath, *trainJobTrainer.NumProcPerNode, "must have an int value for MPI TrainJob"))
+	if runtimeInfo.TemplateSpec.PodSets == nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("TemplateSpec", "PodSets"), runtimeInfo.TemplateSpec.PodSets, "PodSets must be defined"))
+		return nil, allErrs
+	}
+	if runtimeInfo.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode == nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("runtimePolicy", "MLPolicySource", "MPI", "RunLauncherAsNode"), nil, "RunLauncherAsNode must be defined"))
+		return nil, allErrs
+	}
+	if newJobObj.Spec.Trainer == nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("newJobObj", "Spec", "Trainer"), nil, "Trainer not defined"))
+		return nil, allErrs
+	}
+	if newJobObj.Spec.Trainer.NumNodes == nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("newJobObj", "Spec", "Trainer", "NumNodes"), nil, "NumNodes not defined"))
+		return nil, allErrs
+	}
+
 	specPath := field.NewPath("spec")
-	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumProcPerNode != nil {
-		numProcPerNodePath := specPath.Child("trainer").Child("numProcPerNode")
+	if newJobObj.Spec.Trainer.NumProcPerNode != nil {
+		numProcPerNodePath := specPath.Child("trainer", "numProcPerNode")
 		numProcPerNode := *newJobObj.Spec.Trainer.NumProcPerNode
 		if numProcPerNode.Type != intstr.Int {
 			allErrs = append(allErrs, field.Invalid(numProcPerNodePath, newJobObj.Spec.Trainer.NumProcPerNode, "must have an int value"))
 		}
 	}
 
-	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumNodes != nil {
-		numNodes := *newJobObj.Spec.Trainer.NumNodes
-		isRunLauncherAsNode := *runtimeInfo.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode
-		if numNodes >= 2 && isRunLauncherAsNode {
-			var hasLauncher, hasNode bool
-			for _, podSet := range runtimeInfo.TemplateSpec.PodSets {
-				if podSet.Name == "launcher" {
-					hasLauncher = true
-				}
-				if podSet.Name == "node" {
-					hasNode = true
-				}
-				if hasLauncher && hasNode {
-					break
-				}
+	// validate PodSet configurations based on NumNodes and RunLauncherAsNode.
+	numNodes := *newJobObj.Spec.Trainer.NumNodes
+	isRunLauncherAsNode := *runtimeInfo.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode
+	if numNodes >= 2 && isRunLauncherAsNode {
+		var hasLauncher, hasNode bool
+		for _, podSet := range runtimeInfo.TemplateSpec.PodSets {
+			if podSet.Name == "launcher" {
+				hasLauncher = true
 			}
-
-			if !hasLauncher || !hasNode {
-				numNodesPath := specPath.Child("trainer").Child("numNodes")
-				allErrs = append(allErrs, field.Invalid(numNodesPath, newJobObj.Spec.Trainer.NumNodes, "TrainJob creation rejected: numNodes>=2 with RunLauncherAsNode enabled requires both launcher and node PodSet configurations in the TrainingRuntime"))
+			if podSet.Name == "node" {
+				hasNode = true
+			}
+			if hasLauncher && hasNode {
+				break
 			}
 		}
+		if !hasLauncher || !hasNode {
+			numNodesPath := specPath.Child("trainer", "numNodes")
+			allErrs = append(allErrs, field.Invalid(numNodesPath, newJobObj.Spec.Trainer.NumNodes,
+				"TrainJob creation rejected: numNodes>=2 with RunLauncherAsNode enabled requires both launcher and node PodSet configurations in the TrainingRuntime"))
+		}
 	}
+
 	return nil, allErrs
 }
 
