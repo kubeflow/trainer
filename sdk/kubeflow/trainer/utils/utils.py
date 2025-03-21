@@ -277,8 +277,8 @@ def get_entrypoint_using_train_func(
     if runtime.trainer.entrypoint[0] == "mpirun":
         container_command = runtime.trainer.entrypoint
         python_entrypoint = "python"
-        # mpirun uses file from this location: /home/mpiuser/<FILE_NAME>.py
-        func_file = os.path.join("/home", "mpiuser", func_file)
+        # The default file location is: /home/mpiuser/<FILE_NAME>.py
+        func_file = os.path.join(constants.DEFAULT_MPI_USER_HOME, func_file)
     else:
         container_command = constants.DEFAULT_COMMAND
         python_entrypoint = " ".join(runtime.trainer.entrypoint)
