@@ -260,6 +260,47 @@ class TorchTuneConfig:
 
 ```
 
+#### `list_runtimes()` API
+
+We should allow users to easily get the available TrainingRuntimes/ClusterTrainingRuntimes with the SDK, followed with information related to the trainer type, framework, model, and device. When users execute:
+
+```python
+TrainingClient().list_runtimes()
+```
+
+They are expected to get:
+
+```
+Runtime                             Trainer Type          Framework   Pretrained Model    Accelerator       Count
+
+pytorch-distributed                 custom-trainer        pytorch     <undefined>         nvidia.com/GPU    2
+torchtune-llama3.1-8B-finetuning    builtin-trainer       torchtune   Llama3.1-8B         nvidia.com/GPU    4
+```
+
+In that case, we plan to design `Runtime` dataclass as the following:
+
+| Fields | Type | What is it? |
+| - | - | - |
+| name | str | The name of TrainingRuntime/ClusterTrainingRuntime. |
+| trainer_type | str | The training method of this runtime, chosen from `custom-trainer`, `builtin-trainer`. |
+| framework | str | The ML framework used for training, e.g. `pytorch`, `torchtune`. |
+| pretrained_model | Optional[str] | The pretrained model specified for this runtime, e.g. `llama3.1-8B`. |
+| accelerator | str | The type of devices, e.g. `nvidia.com/gpu`. |
+| accelerator_count | str | The number of devices. |
+
+```python
+# Runtime DataClass
+@dataclass
+class Runtime:
+    name: str
+    trainer_type: str
+    framework: str
+    pretrained_model: Optional[str] = None
+    accelerator: str
+    accelerator_count: str,
+
+```
+
 ### Complement `torch` Plugin
 
 #### Perform Mutation in `torch` Plugin
@@ -492,7 +533,8 @@ We will use [papermill](https://github.com/nteract/papermill) to execute these n
 ## Implementation History
 
 - 2025-01-31: Create KEP-2401 doc
-- 2025-03-07: KEP-2401 1st version & Start implementation
+- 2025-03-11: KEP-2401 1st version & Start implementation
+- 2025-03-12: Add new `Runtime` dataclass design
 
 ## Alternatives
 
