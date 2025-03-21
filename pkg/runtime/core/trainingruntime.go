@@ -223,9 +223,5 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 		}
 	}
 	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
-
-	jobSetTemplate := jobsetv1alpha2.JobSet{
-		Spec: trainingRuntime.Spec.Template.Spec,
-	}
-	return r.framework.RunCustomValidationPlugins(jobSetTemplate.DeepCopy(), info, old, new)
+	return r.framework.RunCustomValidationPlugins(info, old, new)
 }

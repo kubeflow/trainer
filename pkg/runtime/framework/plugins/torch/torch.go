@@ -52,7 +52,7 @@ func (t *Torch) Name() string {
 	return Name
 }
 
-func (t *Torch) Validate(_ client.Object, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
 		return nil, allErrs

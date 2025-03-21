@@ -79,7 +79,7 @@ func (m *MPI) Name() string {
 // TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 // Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 
-func (m *MPI) Validate(_ client.Object, runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (m *MPI) Validate(runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil, allErrs
