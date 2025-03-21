@@ -99,10 +99,10 @@ func (m *MPI) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.In
 		if numNodes >= 2 && isRunLauncherAsNode {
 			var hasLauncher, hasNode bool
 			for _, podSet := range runtimeInfo.TemplateSpec.PodSets {
-				if podSet.Name == constants.JobLauncher {
+				if podSet.Name == "launcher" {
 					hasLauncher = true
 				}
-				if podSet.Name == constants.Node {
+				if podSet.Name == "node" {
 					hasNode = true
 				}
 				if hasLauncher && hasNode {
