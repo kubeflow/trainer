@@ -287,7 +287,7 @@ def get_entrypoint_using_train_func(
         # The default file location is: /home/mpiuser/<FILE_NAME>.py
         func_file = os.path.join(constants.DEFAULT_MPI_USER_HOME, func_file)
     else:
-        container_command = constants.DEFAULT_COMMAND
+        container_command = constants.DEFAULT_CUSTOM_COMMAND
         python_entrypoint = " ".join(runtime.trainer.entrypoint)
 
     exec_script = textwrap.dedent(
