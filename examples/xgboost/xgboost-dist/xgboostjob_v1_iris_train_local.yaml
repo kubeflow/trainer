@@ -15,7 +15,7 @@ spec:
               claimName: xgboostlocal
           containers:
           - name: xgboost
-            image: docker.io/kubeflow/xgboost-dist-iris:latest
+            image: ghcr.io/kubeflow/training-v1/xgboost-dist-iris:latest
             volumeMounts:
               - name: task-pv-storage
                 mountPath: /tmp/xgboost_model
@@ -41,7 +41,7 @@ spec:
               claimName: xgboostlocal
           containers:
           - name: xgboost
-            image: docker.io/kubeflow/xgboost-dist-iris:latest
+            image: ghcr.io/kubeflow/training-v1/xgboost-dist-iris:latest
             volumeMounts:
               - name: task-pv-storage
                 mountPath: /tmp/xgboost_model

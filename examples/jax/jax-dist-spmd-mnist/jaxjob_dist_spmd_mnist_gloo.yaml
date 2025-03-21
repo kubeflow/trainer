@@ -12,5 +12,5 @@ spec:
         spec:
           containers:
             - name: jax
-              image: docker.io/kubeflow/jaxjob-dist-spmd-mnist:latest
+              image: ghcr.io/kubeflow/training-v1/jaxjob-dist-spmd-mnist:latest
               imagePullPolicy: Always

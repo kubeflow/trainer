@@ -12,7 +12,7 @@ spec:
         spec:
           containers:
             - name: jax
-              image: docker.io/kubeflow/jaxjob-simple:latest
+              image: ghcr.io/kubeflow/training-v1/jaxjob-simple:latest
               command:
                 - "python3"
                 - "train.py"

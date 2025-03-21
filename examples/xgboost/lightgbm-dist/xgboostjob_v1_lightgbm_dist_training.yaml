@@ -11,7 +11,7 @@ spec:
         spec:
           containers:
           - name: xgboost
-            image: kubeflow/lightgbm-dist-py-test:1.0
+            image: ghcr.io/kubeflow/training-v1/lightgbm-dist-py-test:latest
             ports:
             - containerPort: 9991
               name: xgboostjob-port
@@ -45,7 +45,7 @@ spec:
         spec:
           containers:
           - name: xgboost
-            image: kubeflow/lightgbm-dist-py-test:1.0
+            image: ghcr.io/kubeflow/training-v1/lightgbm-dist-py-test:latest
             ports:
             - containerPort: 9991
               name: xgboostjob-port

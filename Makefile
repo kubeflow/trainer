@@ -1,5 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG ?= kubeflow/training-operator:latest
+IMG ?= ghcr.io/kubeflow/training-v1/training-operator:latest
 # CRD generation options
 CRD_OPTIONS ?= "crd:generateEmbeddedObjectMeta=true,maxDescLen=400"
 

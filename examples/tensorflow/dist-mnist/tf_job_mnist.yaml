@@ -11,7 +11,7 @@ spec:
         spec:
           containers:
             - name: tensorflow
-              image: kubeflow/tf-dist-mnist-test:latest
+              image: ghcr.io/kubeflow/training-v1/tf-dist-mnist-test:latest
 
     PS:
       replicas: 1
@@ -20,7 +20,7 @@ spec:
         spec:
           containers:
             - name: tensorflow
-              image: kubeflow/tf-dist-mnist-test:latest
+              image: ghcr.io/kubeflow/training-v1/tf-dist-mnist-test:latest
 
     Worker:
       replicas: 2
@@ -29,4 +29,4 @@ spec:
         spec:
           containers:
             - name: tensorflow
-              image: kubeflow/tf-dist-mnist-test:latest
+              image: ghcr.io/kubeflow/training-v1/tf-dist-mnist-test:latest

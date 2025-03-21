@@ -11,7 +11,7 @@ spec:
         spec:
           containers:
             - name: pytorch
-              image: kubeflow/pytorch-dist-mnist:latest
+              image: ghcr.io/kubeflow/training-v1/pytorch-dist-mnist:latest
               args: ["--backend", "nccl"]
               resources:
                 limits:
@@ -23,7 +23,7 @@ spec:
         spec:
           containers:
             - name: pytorch
-              image: kubeflow/pytorch-dist-mnist:latest
+              image: ghcr.io/kubeflow/training-v1/pytorch-dist-mnist:latest
               args: ["--backend", "nccl"]
               resources:
                 limits:

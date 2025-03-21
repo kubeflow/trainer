@@ -11,7 +11,7 @@ spec:
         spec:
           containers:
             - name: pytorch
-              image: kubeflow/pytorch-deepspeed-demo:latest
+              image: ghcr.io/kubeflow/training-v1/pytorch-deepspeed-demo:latest
               command:
                 - torchrun
                 - /train_bert_ds.py
@@ -27,7 +27,7 @@ spec:
         spec:
           containers:
             - name: pytorch
-              image: kubeflow/pytorch-deepspeed-demo:latest
+              image: ghcr.io/kubeflow/training-v1/pytorch-deepspeed-demo:latest
               command:
                 - torchrun
                 - /train_bert_ds.py

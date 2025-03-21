@@ -13,7 +13,7 @@ spec:
         spec:
           containers:
             - name: tensorflow
-              image: kubeflow/tf-multi-worker-strategy:latest
+              image: ghcr.io/kubeflow/training-v1/tf-multi-worker-strategy:latest
               volumeMounts:
                 - mountPath: /train
                   name: training

@@ -32,5 +32,5 @@ const (
 	// PyTorchInitContainerMaxTriesDefault is the default number of tries for the pytorch init container.
 	PyTorchInitContainerMaxTriesDefault = 100
 	// MPIKubectlDeliveryImageDefault is the default image for launcher pod in MPIJob init container.
-	MPIKubectlDeliveryImageDefault = "kubeflow/kubectl-delivery:latest"
+	MPIKubectlDeliveryImageDefault = "ghcr.io/kubeflow/training-v1/kubectl-delivery:latest"
 )

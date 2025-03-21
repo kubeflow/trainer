@@ -11,7 +11,7 @@ spec:
         spec:
           containers:
           - name: xgboost
-            image: docker.io/kubeflow/xgboost-dist-iris:latest
+            image: ghcr.io/kubeflow/training-v1/xgboost-dist-iris:latest
             ports:
             - containerPort: 9991
               name: xgboostjob-port
@@ -28,7 +28,7 @@ spec:
         spec:
           containers:
           - name: xgboost
-            image: docker.io/kubeflow/xgboost-dist-iris:latest
+            image: ghcr.io/kubeflow/training-v1/xgboost-dist-iris:latest
             ports:
             - containerPort: 9991
               name: xgboostjob-port
