@@ -280,7 +280,7 @@ def get_entrypoint_using_train_func(
         # The default file location is: /home/mpiuser/<FILE_NAME>.py
         func_file = os.path.join(constants.DEFAULT_MPI_USER_HOME, func_file)
     else:
-        container_command = constants.DEFAULT_COMMAND
+        container_command = constants.DEFAULT_CUSTOM_COMMAND
         python_entrypoint = " ".join(runtime.trainer.entrypoint)
 
     exec_script = textwrap.dedent(
@@ -308,6 +308,39 @@ def get_entrypoint_using_train_func(
 
     # Return container command and args to execute training function.
     return container_command, [exec_script]
+
+
+def get_args_using_torchtune_config(
+    fine_tuning_config: types.TorchTuneConfig,
+) -> List[str]:
+    """
+    Get the Trainer args from the TorchTuneConfig.
+    """
+    args = []
+
+    # Override the dtype if it is provided.
+    if fine_tuning_config.dtype:
+        if fine_tuning_config.dtype not in constants.TORCHTUNE_DTYPES:
+            raise ValueError(
+                f"Unsupported dtype: {fine_tuning_config.dtype}. "
+                f"Supported dtypes are: {constants.TORCHTUNE_DTYPES}"
+            )
+
+        args.append(f"dtype={fine_tuning_config.dtype}")
+
+    # Override the batch size if it is provided.
+    if fine_tuning_config.batch_size:
+        args.append(f"batch_size={fine_tuning_config.batch_size}")
+
+    # Override the epochs if it is provided.
+    if fine_tuning_config.epochs:
+        args.append(f"epochs={fine_tuning_config.epochs}")
+
+    # Override the loss if it is provided.
+    if fine_tuning_config.loss:
+        args.append(f"loss={fine_tuning_config.loss}")
+
+    return args
 
 
 def get_script_for_python_packages(
