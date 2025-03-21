@@ -83,7 +83,7 @@ func (m *MPI) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.In
 	var allErrs field.ErrorList
 
 	// check for basic nil values.
-	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
+	if newJobObj == nil || runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil, allErrs
 	}
 	if runtimeInfo.TemplateSpec.PodSets == nil {
