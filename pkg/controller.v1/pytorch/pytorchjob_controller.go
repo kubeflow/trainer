@@ -386,8 +386,13 @@ func (r *PyTorchJobReconciler) UpdateJobStatus(job interface{},
 					msg := fmt.Sprintf("PyTorchJob %s is running.", pytorchjob.Name)
 					commonutil.UpdateJobConditions(jobStatus, kubeflowv1.JobRunning, corev1.ConditionTrue, commonutil.NewReason(kubeflowv1.PyTorchJobKind, commonutil.JobRunningReason), msg)
 				}
+				created, _, successful, _, _, err := trainingoperatorcommon.GetMetricsValues(pytorchjob.Namespace, r.GetFrameworkName())
+				if err != nil {
+					logger.Errorf("Failed to get metrics values: %v", err)
+					return err
+				}
 				// when master is succeed, the job is finished.
-				if expected == 0 {
+				if expected == 0 && (created>successful) {
 					msg := fmt.Sprintf("PyTorchJob %s is successfully completed.", pytorchjob.Name)
 					logrus.Info(msg)
 					r.Recorder.Event(pytorchjob, corev1.EventTypeNormal, commonutil.NewReason(kubeflowv1.PyTorchJobKind, commonutil.JobSucceededReason), msg)

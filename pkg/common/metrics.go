@@ -17,6 +17,7 @@ package common
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	dto "github.com/prometheus/client_model/go"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
@@ -86,4 +87,39 @@ func FailedJobsCounterInc(job_namespace, framework string) {
 
 func RestartedJobsCounterInc(job_namespace, framework string) {
 	jobsRestartedCount.WithLabelValues(job_namespace, framework).Inc()
+}
+
+// getCounterValueFromCounterVec retrieves the counter value for a specific label combination from a CounterVec.
+func getCounterValueFromCounterVec(cv *prometheus.CounterVec, jobNamespace, framework string) (float64, error) {
+    counter, err := cv.GetMetricWithLabelValues(jobNamespace, framework)
+    if err != nil {
+        return 0, err
+    }
+    m := &dto.Metric{}
+    if err := counter.Write(m); err != nil {
+        return 0, err
+    }
+    return m.GetCounter().GetValue(), nil
+}
+
+// Get all job-related metric values
+func GetMetricsValues(jobNamespace, framework string) (float64, float64, float64, float64, float64, error) {
+	metricsMap := map[string]*prometheus.CounterVec{
+		"created":   jobsCreatedCount,
+		"deleted":   jobsDeletedCount,
+		"successful": jobsSuccessfulCount,
+		"failed":     jobsFailedCount,
+		"restarted":  jobsRestartedCount,
+	}
+
+	var metricsValues [5]float64
+	for i, metricName := range []string{"created", "deleted", "successful", "failed", "restarted"} {
+		value, err := getCounterValueFromCounterVec(metricsMap[metricName], jobNamespace, framework)
+		if err != nil {
+			return 0, 0, 0, 0, 0, err
+		}
+		metricsValues[i] = value
+	}
+
+	return metricsValues[0], metricsValues[1], metricsValues[2], metricsValues[3], metricsValues[4], nil
 }
