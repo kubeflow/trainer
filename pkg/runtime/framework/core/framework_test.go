@@ -40,6 +40,7 @@ import (
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/apply"
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
@@ -422,9 +423,17 @@ func TestRunCustomValidationPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			runtimeInfo := runtime.NewInfo()
-			jobSetTemplate := testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test")
-			warnings, errs := fwk.RunCustomValidationPlugins(jobSetTemplate, runtimeInfo, tc.oldObj, tc.newObj)
+			jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test").Obj(),
+				"spec",
+			)
+			if err != nil {
+				t.Fatalf("Failed to convert typed JobSet to ApplyConfigurations: %v", err)
+			}
+			runtimeInfo := runtime.NewInfo(
+				runtime.WithTemplateSpecObjApply(jobSetSpecApply),
+			)
+			warnings, errs := fwk.RunCustomValidationPlugins(runtimeInfo, tc.oldObj, tc.newObj)
 			if diff := cmp.Diff(tc.wantWarnings, warnings, cmpopts.SortSlices(func(a, b string) bool { return a < b })); len(diff) != 0 {
 				t.Errorf("Unexpected warninigs (-want,+got):\n%s", diff)
 			}
