@@ -47,6 +47,10 @@ import (
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
 )
 
+var (
+	numProcPerNodePath = field.NewPath("spec").Child("trainer").Child("numProcPerNode")
+)
+
 // TODO : Support MPICH and IntelMPI implementations.
 
 type MPI struct {
@@ -85,12 +89,9 @@ func (m *MPI) Validate(_ client.Object, runtimeInfo *runtime.Info, _, newJobObj 
 		return nil, allErrs
 	}
 
-	specPath := field.NewPath("spec")
-	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumProcPerNode != nil {
-		numProcPerNodePath := specPath.Child("trainer").Child("numProcPerNode")
-		numProcPerNode := *newJobObj.Spec.Trainer.NumProcPerNode
-		if numProcPerNode.Type != intstr.Int {
-			allErrs = append(allErrs, field.Invalid(numProcPerNodePath, newJobObj.Spec.Trainer.NumProcPerNode, "must have an int value"))
+	if trainJobTrainer := newJobObj.Spec.Trainer; trainJobTrainer != nil && trainJobTrainer.NumProcPerNode != nil {
+		if trainJobTrainer.NumProcPerNode.Type != intstr.Int {
+			allErrs = append(allErrs, field.Invalid(numProcPerNodePath, *trainJobTrainer.NumProcPerNode, "must have an int value for MPI TrainJob"))
 		}
 	}
 	return nil, allErrs
