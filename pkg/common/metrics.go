@@ -91,22 +91,22 @@ func RestartedJobsCounterInc(job_namespace, framework string) {
 
 // getCounterValueFromCounterVec retrieves the counter value for a specific label combination from a CounterVec.
 func getCounterValueFromCounterVec(cv *prometheus.CounterVec, jobNamespace, framework string) (float64, error) {
-    counter, err := cv.GetMetricWithLabelValues(jobNamespace, framework)
-    if err != nil {
-        return 0, err
-    }
-    m := &dto.Metric{}
-    if err := counter.Write(m); err != nil {
-        return 0, err
-    }
-    return m.GetCounter().GetValue(), nil
+	counter, err := cv.GetMetricWithLabelValues(jobNamespace, framework)
+	if err != nil {
+		return 0, err
+	}
+	m := &dto.Metric{}
+	if err := counter.Write(m); err != nil {
+		return 0, err
+	}
+	return m.GetCounter().GetValue(), nil
 }
 
 // Get all job-related metric values
 func GetMetricsValues(jobNamespace, framework string) (float64, float64, float64, float64, float64, error) {
 	metricsMap := map[string]*prometheus.CounterVec{
-		"created":   jobsCreatedCount,
-		"deleted":   jobsDeletedCount,
+		"created":    jobsCreatedCount,
+		"deleted":    jobsDeletedCount,
 		"successful": jobsSuccessfulCount,
 		"failed":     jobsFailedCount,
 		"restarted":  jobsRestartedCount,

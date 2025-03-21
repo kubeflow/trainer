@@ -392,7 +392,7 @@ func (r *PyTorchJobReconciler) UpdateJobStatus(job interface{},
 					return err
 				}
 				// when master is succeed, the job is finished.
-				if expected == 0 && (created>successful) {
+				if expected == 0 && (created > successful) {
 					msg := fmt.Sprintf("PyTorchJob %s is successfully completed.", pytorchjob.Name)
 					logrus.Info(msg)
 					r.Recorder.Event(pytorchjob, corev1.EventTypeNormal, commonutil.NewReason(kubeflowv1.PyTorchJobKind, commonutil.JobSucceededReason), msg)
