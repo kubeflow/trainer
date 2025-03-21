@@ -161,7 +161,7 @@ class TrainerClient:
             the post-training logic, requiring only parameter adjustments, e.g. `BuiltinTrainer`.
 
         Args:
-            runtime_ref (`str`): Reference to the name of existing (Cluster)TrainingRuntime.
+            runtime (`types.Runtime`): Reference to the existing (Cluster)TrainingRuntime.
             initializer (`Optional[types.Initializer]`):
                 Configuration for Dataset and Model Initializers.
             trainer (`Optional[types.CustomTrainer, types.BuiltinTrainer]`):
