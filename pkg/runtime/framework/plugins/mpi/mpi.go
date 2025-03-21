@@ -87,7 +87,7 @@ func (m *MPI) Validate(runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob
 	var allErrs field.ErrorList
 
 	// check for basic nil values.
-	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
+	if newJobObj == nil || runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil, allErrs
 	}
 
