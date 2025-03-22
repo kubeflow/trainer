@@ -503,6 +503,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								Obj(),
 						).
 						LauncherReplica().
+						Replicas(1, constants.Launcher).
 						Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 						Obj(),
 				).

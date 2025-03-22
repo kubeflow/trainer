@@ -101,18 +101,6 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 	return b
 }
 
-// Launcher updates JobSet values for the launcher Job.
-func (b *Builder) Launcher(info *runtime.Info, trainJob *trainer.TrainJob) *Builder {
-	for i, rJob := range b.Spec.ReplicatedJobs {
-		if *rJob.Name == constants.Launcher {
-			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
-			// REF: https://github.com/kubeflow/trainer/issues/2318
-			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
-		}
-	}
-	return b
-}
-
 // Trainer updates JobSet values for the trainer Job.
 func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {

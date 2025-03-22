@@ -919,6 +919,15 @@ func (s *TrainingRuntimeSpecWrapper) LauncherReplica() *TrainingRuntimeSpecWrapp
 	return s
 }
 
+func (s *TrainingRuntimeSpecWrapper) Replicas(replicas int32, rJobNames ...string) *TrainingRuntimeSpecWrapper {
+	for i, rJob := range s.Template.Spec.ReplicatedJobs {
+		if slices.Contains(rJobNames, rJob.Name) {
+			s.Template.Spec.ReplicatedJobs[i].Replicas = replicas
+		}
+	}
+	return s
+}
+
 func (s *TrainingRuntimeSpecWrapper) Container(rJobName, containerName, image string, command []string, args []string, res corev1.ResourceList) *TrainingRuntimeSpecWrapper {
 	for i, rJob := range s.Template.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {
