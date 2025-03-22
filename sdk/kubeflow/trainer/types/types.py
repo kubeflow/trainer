@@ -140,15 +140,15 @@ ALL_TRAINERS: Dict[str, Trainer] = {
     "pytorch/pytorch": Trainer(
         trainer_type=TrainerType.CUSTOM_TRAINER,
         framework=Framework.TORCH,
-        entrypoint=["torchrun"],
+        entrypoint=[constants.TORCH_ENTRYPOINT],
     ),
     "ghcr.io/kubeflow/trainer/mlx-runtime": Trainer(
         trainer_type=TrainerType.CUSTOM_TRAINER,
         framework=Framework.MLX,
         entrypoint=[
-            "mpirun",
+            constants.MPI_ENTRYPOINT,
             "--hostfile",
-            "/etc/mpi/hostfile",
+            constants.MPI_HOSTFILE,
             "-x",
             "LD_LIBRARY_PATH=/usr/local/lib/",
             "bash",
@@ -158,8 +158,13 @@ ALL_TRAINERS: Dict[str, Trainer] = {
     "ghcr.io/kubeflow/trainer/deepspeed-runtime": Trainer(
         trainer_type=TrainerType.CUSTOM_TRAINER,
         framework=Framework.DEEPSPEED,
-        # TODO (andreyvelich): Change it once we support DeepSpeed runtime.
-        entrypoint=["mpirun"],
+        entrypoint=[
+            constants.MPI_ENTRYPOINT,
+            "--hostfile",
+            constants.MPI_HOSTFILE,
+            "bash",
+            "-c",
+        ],
     ),
     # Builtin Trainers.
     "ghcr.io/kubeflow/trainer/torchtune-trainer": Trainer(
@@ -172,7 +177,7 @@ ALL_TRAINERS: Dict[str, Trainer] = {
 DEFAULT_TRAINER = Trainer(
     trainer_type=TrainerType.CUSTOM_TRAINER,
     framework=Framework.TORCH,
-    entrypoint=["torchrun"],
+    entrypoint=[constants.TORCH_ENTRYPOINT],
 )
 
 # The default runtime configuration for the train() API

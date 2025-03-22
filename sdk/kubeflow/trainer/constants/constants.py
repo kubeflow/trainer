@@ -101,11 +101,18 @@ DEFAULT_PIP_INDEX_URL = os.getenv("DEFAULT_PIP_INDEX_URL", "https://pypi.org/sim
 # The default command for the Trainer container.
 DEFAULT_COMMAND = ["bash", "-c"]
 
+# The default entrypoint for torchrun.
+TORCH_ENTRYPOINT = "torchrun"
+
 # The Torch env name for the number of procs per node (e.g. number of GPUs per Pod).
 TORCH_ENV_NUM_PROC_PER_NODE = "PET_NPROC_PER_NODE"
 
 # The default home directory for the MPI user.
 DEFAULT_MPI_USER_HOME = os.getenv("DEFAULT_MPI_USER_HOME", "/home/mpiuser")
 
-# The OpenMPI env name for the number of slots per nude (e.g. number of GPUs per Pod).
-MPI_ENV_NUM_SLOTS_PER_NODE = "OMPI_MCA_orte_set_default_slots"
+# The default location for MPI hostfile.
+# TODO (andreyvelich): We should get this info from Runtime CRD.
+MPI_HOSTFILE = "/etc/mpi/hostfile"
+
+# The default entrypoint for mpirun.
+MPI_ENTRYPOINT = "mpirun"
