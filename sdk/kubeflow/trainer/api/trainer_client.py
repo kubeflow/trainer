@@ -496,7 +496,7 @@ class TrainerClient:
         namespace = trainjob_crd.metadata.namespace
 
         # Construct the TrainJob from the CRD.
-        train_job = types.TrainJob(
+        trainjob = types.TrainJob(
             name=name,
             creation_timestamp=trainjob_crd.metadata.creation_timestamp,
             runtime=self.get_runtime(trainjob_crd.spec.runtime_ref.name),
@@ -513,7 +513,7 @@ class TrainerClient:
                     status = "Succeeded"
                 elif c.type == "Failed" and c.status == "True":
                     status = "Failed"
-            train_job.status = status
+            trainjob.status = status
 
         # Select Pods created by the appropriate JobSet. It checks the following ReplicatedJob.name:
         # dataset-initializer, model-initializer, launcher, node.
@@ -538,7 +538,7 @@ class TrainerClient:
             # Convert Pod to the correct format.
             pod_list = models.IoK8sApiCoreV1PodList.from_dict(response.to_dict())
             if not pod_list:
-                return train_job
+                return trainjob
 
             for pod in pod_list.items:
                 # Pod must have labels to detect the TrainJob step.
@@ -570,11 +570,12 @@ class TrainerClient:
                         pod.metadata.name,
                         pod.spec,
                         pod.status,
+                        trainjob.runtime,
                         pod.metadata.labels[constants.JOBSET_RJOB_NAME_LABEL],
                         int(pod.metadata.labels[constants.JOB_INDEX_LABEL]),
                     )
 
-                train_job.steps.append(step)
+                trainjob.steps.append(step)
         except multiprocessing.TimeoutError:
             raise TimeoutError(
                 f"Timeout to list {constants.TRAINJOB_KIND}'s steps: {namespace}/{name}"
@@ -584,4 +585,4 @@ class TrainerClient:
                 f"Failed to list {constants.TRAINJOB_KIND}'s steps: {namespace}/{name}"
             )
 
-        return train_job
+        return trainjob

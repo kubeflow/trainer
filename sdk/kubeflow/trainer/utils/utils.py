@@ -84,7 +84,7 @@ def get_runtime_trainer_container(
     for rjob in replicated_jobs:
         if not (rjob.template.spec and rjob.template.spec.template.spec):
             raise Exception(f"Invalid ReplicatedJob template: {rjob}")
-        # The ancestor labels define Trainer container in the ReplicatedJobs.
+        # The ancestor label defines Trainer container in the ReplicatedJobs.
         if not (
             rjob.template.metadata
             and rjob.template.metadata.labels
@@ -175,6 +175,7 @@ def get_trainjob_node_step(
     pod_name: str,
     pod_spec: models.IoK8sApiCoreV1PodSpec,
     pod_status: Optional[models.IoK8sApiCoreV1PodStatus],
+    trainjob_runtime: types.Runtime,
     replicated_job_name: str,
     job_index: int,
 ) -> types.Step:
@@ -193,17 +194,23 @@ def get_trainjob_node_step(
     if devices := get_container_devices(container.resources):
         step.device, step.device_count = devices
 
+    # For the MPI use-cases, the launcher container is always node-0
+    # Thus, we should increase the index for other nodes.
+    if (
+        trainjob_runtime.trainer.entrypoint
+        and trainjob_runtime.trainer.entrypoint[0] == constants.MPI_ENTRYPOINT
+        and replicated_job_name != constants.LAUNCHER
+    ):
+        # TODO (andreyvelich): We should also override the device_count
+        # based on OMPI_MCA_orte_set_default_slots value. Right now, it is hard to do
+        # since we inject this env only to the Launcher Pod.
+        step.name = f"{constants.NODE}-{job_index+1}"
+
     if container.env:
         for env in container.env:
             if env.value and env.value.isdigit():
                 if env.name == constants.TORCH_ENV_NUM_PROC_PER_NODE:
                     step.device_count = env.value
-                elif env.name == constants.MPI_ENV_NUM_SLOTS_PER_NODE:
-                    # For the MPI use-cases, the launcher container is always node-0
-                    # Thus, we should increase the index for other nodes.
-                    step.device_count = env.value
-                    if replicated_job_name != constants.LAUNCHER:
-                        step.name = f"{constants.NODE}-{job_index+1}"
 
     return step
 
@@ -274,7 +281,7 @@ def get_entrypoint_using_train_func(
         raise Exception(f"Runtime trainer must have an entrypoint: {runtime.trainer}")
 
     # We don't allow to override python entrypoint for `mpirun`
-    if runtime.trainer.entrypoint[0] == "mpirun":
+    if runtime.trainer.entrypoint[0] == constants.MPI_ENTRYPOINT:
         container_command = runtime.trainer.entrypoint
         python_entrypoint = "python"
         # The default file location is: /home/mpiuser/<FILE_NAME>.py
