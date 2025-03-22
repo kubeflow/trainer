@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - torch_distributed.yaml
   - mpi_distributed.yaml
+  - deepspeed_distributed.yaml

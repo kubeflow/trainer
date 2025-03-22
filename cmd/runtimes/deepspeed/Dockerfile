@@ -7,10 +7,9 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt install -y --no-install-recommends \
     cmake g++ gcc \
     wget vim \
-    openssh-client openssh-server libcap2-bin
+    openssh-client openssh-server libcap2-bin \
+    libopenmpi-dev openmpi-bin
 
-# Add privilege separation directory to run sshd as root.
-# RUN mkdir -p /var/run/sshd
 # Add capability to run sshd as non-root.
 RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/sbin/sshd
 RUN apt remove libcap2-bin -y
@@ -34,14 +33,6 @@ WORKDIR /home/mpiuser
 # Configurations for running sshd as non-root.
 COPY --chown=mpiuser cmd/runtimes/deepspeed/sshd_config .sshd_config
 RUN echo "Port ${PORT}" >>/home/mpiuser/.sshd_config
-
-# Install OpenMPI.
-ARG MPI_VERSION=5.0.7
-RUN wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-${MPI_VERSION}.tar.gz
-RUN tar -xvf openmpi-${MPI_VERSION}.tar.gz && rm -rf openmpi-${MPI_VERSION}.tar.gz
-RUN cd openmpi-${MPI_VERSION} && ./configure --prefix=/usr/local && make -j"$(nproc)" install
-
-RUN rm -rf openmpi-${MPI_VERSION}
 
 ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/mpi/lib:/usr/local/mpi/lib64:${LD_LIBRARY_PATH}
 
