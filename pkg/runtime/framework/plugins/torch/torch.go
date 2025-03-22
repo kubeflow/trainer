@@ -66,7 +66,7 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 		if numProcPerNode.Type == intstr.String {
 			allowed := sets.New("auto", "cpu", "gpu")
 			if !allowed.Has(numProcPerNode.StrVal) {
-				allErrs = append(allErrs, field.Invalid(numProcPerNodePath, newObj.Spec.Trainer.NumProcPerNode, fmt.Sprintf("must have an int value or %v", allowed.UnsortedList())))
+				allErrs = append(allErrs, field.Invalid(numProcPerNodePath, numProcPerNode, fmt.Sprintf("must have an int value or %v", sets.List(allowed))))
 			}
 		}
 
@@ -79,7 +79,7 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 
 		if torchEnvs.Len() > 0 {
 			trainerEnvsPath := specPath.Child("trainer").Child("env")
-			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %s", strings.Join(torchEnvs.UnsortedList(), ", "))))
+			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(torchEnvs))))
 		}
 	}
 

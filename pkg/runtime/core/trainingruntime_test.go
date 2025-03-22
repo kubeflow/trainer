@@ -299,7 +299,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy("auto", nil).
+								TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
 								Obj(),
 							).
 							Obj(),
@@ -393,7 +393,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy("auto", nil).
+								TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
 								Obj(),
 							).
 							Obj(),

@@ -1014,12 +1014,12 @@ func MakeMLPolicySourceWrapper() *MLPolicySourceWrapper {
 	return &MLPolicySourceWrapper{}
 }
 
-func (m *MLPolicySourceWrapper) TorchPolicy(numProcPerNode string, elasticPolicy *trainer.TorchElasticPolicy) *MLPolicySourceWrapper {
+func (m *MLPolicySourceWrapper) TorchPolicy(numProcPerNode *intstr.IntOrString, elasticPolicy *trainer.TorchElasticPolicy) *MLPolicySourceWrapper {
 	if m.Torch == nil {
 		m.Torch = &trainer.TorchMLPolicySource{}
 	}
 	m.Torch = &trainer.TorchMLPolicySource{
-		NumProcPerNode: ptr.To(intstr.FromString(numProcPerNode)),
+		NumProcPerNode: numProcPerNode,
 		ElasticPolicy:  elasticPolicy,
 	}
 	return m

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
@@ -332,7 +333,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 								testingutil.MakeMLPolicyWrapper().
 									WithNumNodes(100).
 									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-										TorchPolicy("auto", nil).
+										TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
 										Obj(),
 									).
 									Obj(),
