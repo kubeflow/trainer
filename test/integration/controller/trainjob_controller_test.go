@@ -607,6 +607,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					RuntimeSpec(
 						testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").Spec).
 							LauncherReplica().
+							Replicas(1, constants.Launcher).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
 									WithNumNodes(1).

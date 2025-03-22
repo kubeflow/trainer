@@ -194,7 +194,6 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 	// TODO: Once we remove deprecated runtime.Info.Trainer, we should remove JobSet Builder with DeprecatedTrainer().
 	jobSet := jobSetBuilder.
 		Initializer(trainJob).
-		Launcher(info, trainJob).
 		Trainer(info, trainJob).
 		PodLabels(info.Scheduler.PodLabels).
 		Suspend(trainJob.Spec.Suspend).
