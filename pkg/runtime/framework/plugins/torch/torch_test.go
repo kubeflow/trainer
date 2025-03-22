@@ -27,9 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
@@ -1149,6 +1151,173 @@ func TestTorch(t *testing.T) {
 				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected RuntimeInfo (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidate(t *testing.T) {
+	cases := map[string]struct {
+		info         *runtime.Info
+		oldObj       *trainer.TrainJob
+		newObj       *trainer.TrainJob
+		wantError    field.ErrorList
+		wantWarnings admission.Warnings
+	}{
+		"no action when info is nil": {
+			info: nil,
+			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+		},
+		"no action when info does not have MLPolicySource": {
+			info: runtime.NewInfo(),
+			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+		},
+		"info has MLPolicySource but no Torch policy": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().Obj()),
+			),
+			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+		},
+		"numProcPerNode is string and invalid": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy("npu", nil).
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(intstr.FromString("npu")).
+					Obj(),
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("numProcPerNode"),
+					intstr.FromString("npu"),
+					fmt.Sprintf("must have an int value or %v", []string{"auto", "cpu", "gpu"}),
+				),
+			},
+		},
+		"numProcPerNode is valid string": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy("auto", nil).
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(intstr.FromString("auto")).
+					Obj(),
+				).
+				Obj(),
+		},
+		"valid environment variable present": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy("auto", nil).
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					Env(
+						[]corev1.EnvVar{
+							{
+								Name:  "test",
+								Value: "value",
+							},
+							{
+								Name:  "test2",
+								Value: "value",
+							},
+						}...,
+					).
+					Obj(),
+				).
+				Obj(),
+		},
+		"reserved environment variable present": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy("auto", nil).
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(intstr.FromString("auto")).
+					Env(
+						[]corev1.EnvVar{
+							{
+								Name:  "test",
+								Value: "value",
+							},
+							{
+								Name:  constants.TorchEnvNumProcPerNode,
+								Value: "value",
+							},
+						}...,
+					).
+					Obj(),
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("env"),
+					[]corev1.EnvVar{
+						{
+							Name:  "test",
+							Value: "value",
+						},
+						{
+							Name:  constants.TorchEnvNumProcPerNode,
+							Value: "value",
+						},
+					},
+					fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", constants.TorchEnvNumProcPerNode),
+				),
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+			p, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize Torch plugin: %v", err)
+			}
+			warnings, errs := p.(framework.CustomValidationPlugin).Validate(nil, tc.info, tc.oldObj, tc.newObj)
+			if diff := cmp.Diff(tc.wantError, errs); len(diff) != 0 {
+				t.Errorf("Unexpected error from Validate (-want, +got): %s", diff)
+			}
+			if diff := cmp.Diff(tc.wantWarnings, warnings); len(diff) != 0 {
+				t.Errorf("Unexpected warnings from Validate (-want, +got): %s", diff)
 			}
 		})
 	}
