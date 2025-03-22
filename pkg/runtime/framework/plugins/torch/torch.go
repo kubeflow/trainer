@@ -19,6 +19,7 @@ package torch
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -66,7 +67,10 @@ func (t *Torch) Validate(_ client.Object, runtimeInfo *runtime.Info, _, newObj *
 		if numProcPerNode.Type == intstr.String {
 			allowed := sets.New("auto", "cpu", "gpu")
 			if !allowed.Has(numProcPerNode.StrVal) {
-				allErrs = append(allErrs, field.Invalid(numProcPerNodePath, newObj.Spec.Trainer.NumProcPerNode, fmt.Sprintf("must have an int value or %v", allowed.UnsortedList())))
+				allowedList := sets.New("auto", "cpu", "gpu").UnsortedList()
+				// Make sure the order is decided for UT
+				sort.Strings(allowedList)
+				allErrs = append(allErrs, field.Invalid(numProcPerNodePath, numProcPerNode, fmt.Sprintf("must have an int value or %v", allowedList)))
 			}
 		}
 
@@ -79,7 +83,9 @@ func (t *Torch) Validate(_ client.Object, runtimeInfo *runtime.Info, _, newObj *
 
 		if torchEnvs.Len() > 0 {
 			trainerEnvsPath := specPath.Child("trainer").Child("env")
-			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %s", strings.Join(torchEnvs.UnsortedList(), ", "))))
+			torchEnvList := torchEnvs.UnsortedList()
+			sort.Strings(torchEnvList)
+			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %s", strings.Join(torchEnvList, ", "))))
 		}
 	}
 
