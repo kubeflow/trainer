@@ -73,7 +73,7 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 	clusterTrainingRuntime := &trainer.ClusterTrainingRuntime{}
 	if err := r.client.Get(ctx, client.ObjectKey{
 		Name: new.Spec.RuntimeRef.Name,
-	}, &trainer.ClusterTrainingRuntime{}); err != nil {
+	}, clusterTrainingRuntime); err != nil {
 		return nil, field.ErrorList{
 			field.Invalid(field.NewPath("spec", "RuntimeRef"), new.Spec.RuntimeRef,
 				fmt.Sprintf("%v: specified clusterTrainingRuntime must be created before the TrainJob is created", err)),

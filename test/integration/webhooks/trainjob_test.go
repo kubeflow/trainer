@@ -136,7 +136,7 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				testingutil.BeForbiddenError()),
-			ginkgo.Entry("Should fail in creating trainJob with dataset config when referencing a trainingRuntime without an initializer",
+			ginkgo.Entry("Should fail in creating trainJob with dataset initializer when referencing a trainingRuntime without an initializer",
 				func() *trainer.TrainJob {
 					newContainers := []corev1.Container{}
 					job := &trainingRuntime.Spec.Template.Spec.ReplicatedJobs[0]
@@ -161,6 +161,22 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				testingutil.BeForbiddenError()),
+			ginkgo.Entry("Should succeed in creating trainJob with dataset initializer when referencing a ClusterTrainingRuntime with an initializer",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
+						Initializer(
+							testingutil.MakeTrainJobInitializerWrapper().
+								DatasetInitializer(
+									testingutil.MakeTrainJobDatasetInitializerWrapper().
+										StorageUri("hf://trainjob-model").
+										Obj(),
+								).
+								Obj(),
+						).
+						Obj()
+				},
+				gomega.Succeed()),
 			ginkgo.Entry("Should fail in creating trainJob with invalid trainer config for mpi runtime",
 				func() *trainer.TrainJob {
 					trainingRuntime.Spec.MLPolicy = &trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{MPI: &trainer.MPIMLPolicySource{}}}
