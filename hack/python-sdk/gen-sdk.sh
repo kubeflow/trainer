@@ -24,7 +24,7 @@ SWAGGER_JAR_URL="https://repo1.maven.org/maven2/org/openapitools/openapi-generat
 SWAGGER_CODEGEN_JAR="${repo_root}/hack/python-sdk/openapi-generator-cli.jar"
 SWAGGER_CODEGEN_CONF="${repo_root}/hack/python-sdk/swagger_config.json"
 SDK_OUTPUT_PATH="${repo_root}/sdk/python"
-VERSION=1.9.0
+VERSION=1.9.1
 SWAGGER_CODEGEN_FILE="${repo_root}/hack/python-sdk/swagger.json"
 
 if [ -z "${GOPATH:-}" ]; then
