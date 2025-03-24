@@ -96,7 +96,9 @@ make test-e2e-notebook
 
 On ubuntu the default go package appears to be gccgo-go which has problems. It's recommended to install Go from official tarballs.
 
-### Code Style
+## Code Style
+
+### pre-commit
 
 Make sure to install [pre-commit](https://pre-commit.com/) (`pip install pre-commit`) and run `pre-commit install` from the root of the repository at least once before creating git commits.
 
