@@ -16,7 +16,7 @@ For the Kubeflow Trainer documentation, please check [the official Kubeflow docu
 
 Note for Lima the link is to the Adopters, which supports several different container environments.
 
-### Development
+## Development
 
 The Kubeflow Trainer project includes a Makefile with several helpful commands to streamline your development workflow:
 
