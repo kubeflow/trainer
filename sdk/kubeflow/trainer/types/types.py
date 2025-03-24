@@ -201,8 +201,6 @@ ALL_TRAINERS: Dict[str, Trainer] = {
             constants.MPI_ENTRYPOINT,
             "--hostfile",
             constants.MPI_HOSTFILE,
-            "-x",
-            "LD_LIBRARY_PATH=/usr/local/lib/",
             "bash",
             "-c",
         ],
