@@ -1,18 +1,21 @@
 # Developer Guide
 
-# TODO (andreyvelich): This doc needs to be updated for Kubeflow Trainer V2
-
 Kubeflow Training Operator is currently at v1.
 
 ## Requirements
 
 - [Go](https://golang.org/) (1.23 or later)
-- [Docker](https://docs.docker.com/) (23 or later)
+- Docker:
+    - Windows and Linux:
+      - [Docker](https://docs.docker.com/) (23 or later)
+      - [Lima](https://github.com/lima-vm/lima?tab=readme-ov-file#adopters) (an alternative to DockerDesktop) (0.21.0 or later)
+    - MacOS:
+      - [Lima](https://github.com/lima-vm/lima?tab=readme-ov-file#adopters) (0.21.0 or later)
+      - [Colima](https://github.com/abiosoft/colima) (Lima specifically for MacOS) (0.6.8 or later)
+
 - [Python](https://www.python.org/) (3.11 or later)
 - [kustomize](https://kustomize.io/) (4.0.5 or later)
 - [Kind](https://kind.sigs.k8s.io/) (0.22.0 or later)
-- [Lima](https://github.com/lima-vm/lima?tab=readme-ov-file#adopters) (an alternative to DockerDesktop) (0.21.0 or later)
-  - [Colima](https://github.com/abiosoft/colima) (Lima specifically for MacOS) (0.6.8 or later)
 - [pre-commit](https://pre-commit.com/)
 
 Note for Lima the link is to the Adopters, which supports several different container environments.
@@ -22,22 +25,28 @@ Note for Lima the link is to the Adopters, which supports several different cont
 Create a symbolic link inside your GOPATH to the location you checked out the code
 
 ```sh
-mkdir -p $(go env GOPATH)/src/github.com/kubeflow
-ln -sf ${GIT_TRAINING} $(go env GOPATH)/src/github.com/kubeflow/training-operator
+$ mkdir -p $(go env GOPATH)/src/github.com/kubeflow
+$ ln -sf ${GIT_TRAINING} $(go env GOPATH)/src/github.com/kubeflow/training-operator
 ```
 
 - GIT_TRAINING should be the location where you checked out https://github.com/kubeflow/training-operator
 
 Install dependencies
 
+Change directory to project root and then:
 ```sh
-go mod tidy
+$ go mod tidy
 ```
 
 Build the library
 
 ```sh
-go install github.com/kubeflow/training-operator/cmd/training-operator.v1
+$ go install github.com/kubeflow/trainer/cmd/trainer-controller-manager
+```
+
+after installing check by using which
+```sh
+$ which trainer-controller-manager
 ```
 
 ## Running the Operator Locally
@@ -51,7 +60,7 @@ First, you need to run a Kubernetes cluster locally. We recommend [Kind](https:/
 You can create a `kind` cluster by running
 
 ```sh
-kind create cluster
+$ kind create cluster
 ```
 
 This will load your kubernetes config file with the new cluster.
@@ -59,7 +68,7 @@ This will load your kubernetes config file with the new cluster.
 After creating the cluster, you can check the nodes with the code below which should show you the kind-control-plane.
 
 ```sh
-kubectl get nodes
+$ kubectl get nodes
 ```
 
 The output should look something like below:
@@ -70,51 +79,87 @@ NAME                 STATUS   ROLES           AGE   VERSION
 kind-control-plane   Ready    control-plane   32s   v1.27.3
 ```
 
-Note, that for the example job below, the PyTorchJob uses the `kubeflow` namespace.
+Note, that for the example job below, the TrainJob uses the `kubeflow-system` namespace.
 
 From here we can apply the manifests to the cluster.
 
 ```sh
-kubectl apply --server-side -k "github.com/kubeflow/training-operator/manifests/overlays/standalone"
+$ kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/manager?ref=master"
 ```
+```sh
+$ kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/runtimes?ref=master"
+```
+
+Ensure that the JobSet and Trainer controller manager pods are running:
+```
+$ kubectl get pods -n kubeflow-system
+
+NAME                                                   READY   STATUS    RESTARTS   AGE
+jobset-controller-manager-694f54749-tx9t8              1/1     Running   0          2m19s
+kubeflow-trainer-controller-manager-74c685f689-td8ms   1/1     Running   0          2m19s
+
+```
+
+
 
 Then we can patch it with the latest operator image.
 
+
 ```sh
-kubectl patch -n kubeflow deployments training-operator --type json -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "kubeflow/training-operator:latest"}]'
+$ kubectl patch -n kubeflow-system deployments kubeflow-trainer-controller-manager --type json -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "kubeflow/training-operator:latest"}]'
+
+deployment.apps/kubeflow-trainer-controller-manager patched
 ```
 
 Then we can run the job with the following command.
 
+
+`trainjob.yaml file:`
+```yaml
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: pytorch-mnist-example
+spec:
+  runtimeRef:
+    name: torch-distributed
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+
+```
+
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/kubeflow/training-operator/master/examples/pytorch/simple.yaml
+$ kubectl apply -f trainjob.yaml
 ```
 
-And we can see the output of the job from the logs, which may take some time to produce but should look something like below.
-
+We can see the output of the job from the logs like below. But before checking logs, first check if our trainjob has completed.
+```sh
+$ kubectl get trainjobs --all-namespaces
+NAMESPACE   NAME                    STATE      AGE
+default     pytorch-mnist-example   Complete   15m
 ```
-$ kubectl logs -n kubeflow -l training.kubeflow.org/job-name=pytorch-simple --follow
-Defaulted container "pytorch" out of: pytorch, init-pytorch (init)
-2024-04-19T19:00:29Z INFO     Train Epoch: 1 [4480/60000 (7%)]	loss=2.2295
-2024-04-19T19:00:32Z INFO     Train Epoch: 1 [5120/60000 (9%)]	loss=2.1790
-2024-04-19T19:00:35Z INFO     Train Epoch: 1 [5760/60000 (10%)]	loss=2.1150
-2024-04-19T19:00:38Z INFO     Train Epoch: 1 [6400/60000 (11%)]	loss=2.0294
-2024-04-19T19:00:41Z INFO     Train Epoch: 1 [7040/60000 (12%)]	loss=1.9156
-2024-04-19T19:00:44Z INFO     Train Epoch: 1 [7680/60000 (13%)]	loss=1.7949
-2024-04-19T19:00:47Z INFO     Train Epoch: 1 [8320/60000 (14%)]	loss=1.5567
-2024-04-19T19:00:50Z INFO     Train Epoch: 1 [8960/60000 (15%)]	loss=1.3715
-2024-04-19T19:00:54Z INFO     Train Epoch: 1 [9600/60000 (16%)]	loss=1.3385
-2024-04-19T19:00:57Z INFO     Train Epoch: 1 [10240/60000 (17%)]	loss=1.1650
-2024-04-19T19:00:29Z INFO     Train Epoch: 1 [4480/60000 (7%)]	loss=2.2295
-2024-04-19T19:00:32Z INFO     Train Epoch: 1 [5120/60000 (9%)]	loss=2.1790
-2024-04-19T19:00:35Z INFO     Train Epoch: 1 [5760/60000 (10%)]	loss=2.1150
-2024-04-19T19:00:38Z INFO     Train Epoch: 1 [6400/60000 (11%)]	loss=2.0294
-2024-04-19T19:00:41Z INFO     Train Epoch: 1 [7040/60000 (12%)]	loss=1.9156
-2024-04-19T19:00:44Z INFO     Train Epoch: 1 [7680/60000 (13%)]	loss=1.7949
-2024-04-19T19:00:47Z INFO     Train Epoch: 1 [8320/60000 (14%)]	loss=1.5567
-2024-04-19T19:00:50Z INFO     Train Epoch: 1 [8960/60000 (15%)]	loss=1.3715
-2024-04-19T19:00:53Z INFO     Train Epoch: 1 [9600/60000 (16%)]	loss=1.3385
-2024-04-19T19:00:57Z INFO     Train Epoch: 1 [10240/60000 (17%)]	loss=1.1650
+
+to check which node executed the job:
+```sh
+$ kubectl get pods -n default
+NAME                                           READY   STATUS      RESTARTS   AGE
+pytorch-mnist-example-trainer-node-0-0-2t9bl   0/1     Completed   0          16m
+```
+
+check the logs (you should see a list of python packages)
+```sh
+$ kubectl logs -f pytorch-mnist-example-trainer-node-0-0-2t9bl -n default -c trainer
+Torch Distributed Runtime
+--------------------------------------
+Torch Default Runtime Env
+Package                   Version
+------------------------- ------------
+archspec                  0.2.3
+asttokens                 2.4.1
+astunparse                1.6.3
+attrs                     24.2.0
+beautifulsoup4            4.12.3
+{--truncated for readability--}
 ```
 
 ## Testing changes locally
@@ -125,43 +170,50 @@ You do this by building a new operator image and loading it into your kind clust
 ### Build Operator Image
 
 ```sh
-make docker-build IMG=my-username/training-operator:my-pr-01
+$ export IMG=my-username/training-operator:my-pr-01
 ```
-
+```sh
+$ docker build -t ${IMG} -f cmd/trainer-controller-manager/Dockerfile .
+```
 You can swap `my-username/training-operator:my-pr-01` with whatever you would like.
 
 ## Load docker image
 
 ```sh
-kind load docker-image my-username/training-operator:my-pr-01
+$ kind load docker-image ${IMG}
 ```
 
 ## Modify operator image with new one
 
 ```sh
-cd ./manifests/overlays/standalone
-kustomize edit set image my-username/training-operator=my-username/training-operator:my-pr-01
+$ cd ./manifests/overlays/manager
+
+$ kustomize edit set image my-username/training-operator=my-username/training-operator:my-pr-01
+
 ```
 
 Update the `newTag` key in `./manifests/overlayes/standalone/kustimization.yaml` with the new image.
 
-Deploy the operator with:
+Deploy the operator with (after changing directory back to project root):
 
 ```sh
-kubectl apply -k ./manifests/overlays/standalone
+$ kubectl apply --server-side -k ./manifests/overlays/manager
 ```
 
 And now we can submit jobs to the operator.
 
 ```sh
-kubectl patch -n kubeflow deployments training-operator --type json -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "my-username/training-operator:my-pr-01"}]'
-kubectl apply -f https://raw.githubusercontent.com/kubeflow/training-operator/master/examples/pytorch/simple.yaml
+$ kubectl patch -n kubeflow-system deployments kubeflow-trainer-controller-manager --type json -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "my-username/training-operator:my-pr-01"}]'
+
+deployment.apps/kubeflow-trainer-controller-manager patched
 ```
 
-You should be able to see a pod for your training operator running in your namespace using
+Again apply the trainjob using the steps similar as done in "Running Your Operator Locally" section. You may need to delete the trainjob if it exists and recreate it. After the trainjob has been created, you can verify that your operator image was used
 
 ```
-kubectl logs -n kubeflow -l training.kubeflow.org/job-name=pytorch-simple
+$ kubectl get deployment -n kubeflow-system kubeflow-trainer-controller-manager -o=jsonpath='{.spec.template.spec.containers[0].image}'
+
+my-username/training-operator:my-pr-01
 ```
 
 ## Go version
@@ -173,23 +225,21 @@ On ubuntu the default go package appears to be gccgo-go which has problems see [
 To generate Python SDK for the operator, run:
 
 ```
-./hack/python-sdk/gen-sdk.sh
+make generate
 ```
 
 This command will re-generate the api and model files together with the documentation and model tests.
-The following files/folders in `sdk/python` are auto-generated and should not be modified directly:
+The following files/folders in `sdk/` are auto-generated and should not be modified directly:
 
 ```
-sdk/python/docs
-sdk/python/kubeflow/training/models
-sdk/python/kubeflow/training/*.py
-sdk/python/test/*.py
+sdk/kubeflow/trainer/models
+sdk/kubeflow/trainer/*.py
 ```
 
 The Training Operator client and public APIs are located here:
 
 ```
-sdk/python/kubeflow/training/api
+sdk/kubeflow/trainer/api
 ```
 
 ## Code Style
