@@ -6,7 +6,7 @@ resources:
   - namespace.yaml
 images:
   - name: ghcr.io/kubeflow/training-v1/training-operator
-    newTag: v1-f654b1e
+    newTag: v1-5c0e763
 secretGenerator:
   - name: training-operator-webhook-cert
     options:
