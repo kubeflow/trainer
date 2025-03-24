@@ -94,7 +94,7 @@ job_id = TrainerClient().train(
             storage_uri="tatsu-lab/alpaca",
         )
     ),
-    runtime_ref=Runtime(
+    runtime=Runtime(
       name="torchtune-llama3.1-8B-finetuning",
     ),
 )
@@ -348,7 +348,7 @@ Related changes:
 
 #### Create Map from `TorchTuneConfig` to Specific Recipes and Configs
 
-We will create a map from (`TorchTuneConfig`, `num_nodes`, `nproc_per_node`, `runtime_ref`) to dedicated `recipe` and `config` in the server side. This will allow users to fine-tune their LLMs without knowing about `torchtune`'s recipes and configs and prevent SDK from changing frequently.
+We will create a map from (`TorchTuneConfig`, `num_nodes`, `nproc_per_node`, `runtime`) to dedicated `recipe` and `config` in the server side. This will allow users to fine-tune their LLMs without knowing about `torchtune`'s recipes and configs and prevent SDK from changing frequently.
 
 - How to Select `recipe`
 
@@ -359,13 +359,13 @@ We will create a map from (`TorchTuneConfig`, `num_nodes`, `nproc_per_node`, `ru
 
 - How to Select `config`
 
-We will create one `ClusterTrainingRuntime` for one model. In this way, we can extract the model info in `runtime_ref`, and select corresponding config file according to the `recipe`.
+We will create one `ClusterTrainingRuntime` for one model. In this way, we can extract the model info in `runtime`, and select corresponding config file according to the `recipe`.
 
 #### Validate Fine-Tuning Configurations
 
 In order to ensure the validity of the configurations propagated by SDK, we plan to add some validating requirements to the TrainJob Webhook. We'll implement validations in torch plugin [`CustomValidationPlugin`](https://github.com/kubeflow/trainer/blob/1f443729ebdb3e792d4b9cd2b242f33b0e86fe14/pkg/runtime/framework/interface.go#L34-L37):
 
-1. The ClusterTrainingRuntime referenced by `runtime_ref` exists in the control plane.
+1. The ClusterTrainingRuntime referenced by `runtime` exists in the control plane.
 
 #### Determine Default Resources
 
