@@ -107,7 +107,7 @@ Specific programmatically generated files listed in the `exclude` field in [.pre
 
 ## Legacy Setup Instructions
 
-# TODO: The following setup instructions need to be updated for Kubeflow Trainer V2.
+> TODO: The following setup instructions need to be updated for Kubeflow Trainer V2.
 
 #### Manual Setup
 
