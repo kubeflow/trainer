@@ -92,11 +92,21 @@ make test-e2e-notebook
 ```
 ## Best Practices
 
-### Go Version
+### Go Development
+When coding:
+
+Follow [effective go](https://go.dev/doc/effective_go) guidelines.
+Run locally [make check](https://github.com/kubeflow/katib/blob/46173463027e4fd2e604e25d7075b2b31a702049/Makefile#L31) to verify if changes follow best practices before submitting PRs.
+
+When writing tests:
+
+Use [cmp.Diff](https://pkg.go.dev/github.com/google/go-cmp/cmp#Diff) instead of reflect.Equal, to provide useful comparisons.
+Define test cases as maps instead of slices to avoid dependencies on the running order. Map key should be equal to the test case name.
 
 On ubuntu the default go package appears to be gccgo-go which has problems. It's recommended to install Go from official tarballs.
 
 ## Code Style
+
 
 ### pre-commit
 
