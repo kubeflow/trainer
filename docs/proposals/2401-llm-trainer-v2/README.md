@@ -94,7 +94,9 @@ job_id = TrainerClient().train(
             storage_uri="tatsu-lab/alpaca",
         )
     ),
-    runtime_ref="torchtune-llama3.1-8B-finetuning",
+    runtime_ref=Runtime(
+      name="torchtune-llama3.1-8B-finetuning",
+    ),
 )
 ```
 
@@ -188,7 +190,7 @@ To provide a better user experience, we need to offer a simple SDK that allows u
 ```python
 # By default we can fine-tune models without any additional configurations from users
 TrainerClient().train(
-    runtime_ref="torchtune-llama-3.3-70b"
+    runtime=Runtime(name="torchtune-llama-3.3-70b"),
 )
 ```
 
@@ -203,7 +205,8 @@ So we plan to modify the `train()` API to:
 
 ```python
 def train(
-    runtime_ref: str,
+    self,
+    runtime: types.Runtime = types.DEFAULT_RUNTIME,
     trainer: Optional[Union[CustomTrainer, BuiltinTrainer]] = None,
     initializer: Optional[Initializer] = None,
 ) -> str:
