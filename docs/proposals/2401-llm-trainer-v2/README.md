@@ -283,21 +283,49 @@ In that case, we plan to design `Runtime` dataclass as the following:
 | - | - | - |
 | name | str | The name of TrainingRuntime/ClusterTrainingRuntime. |
 | trainer_type | str | The training method of this runtime, chosen from `custom-trainer`, `builtin-trainer`. |
-| framework | str | The ML framework used for training, e.g. `pytorch`, `torchtune`. |
 | pretrained_model | Optional[str] | The pretrained model specified for this runtime, e.g. `llama3.1-8B`. |
-| accelerator | str | The type of devices, e.g. `nvidia.com/gpu`. |
-| accelerator_count | str | The number of devices. |
+
 
 ```python
 # Runtime DataClass
 @dataclass
 class Runtime:
     name: str
-    trainer_type: str
-    framework: str
+    trainer: Trainer
     pretrained_model: Optional[str] = None
-    accelerator: str
-    accelerator_count: str,
+
+```
+
+`Trainer` dataclass:
+
+| Fields | Type | What is it? |
+| trainer_type | TrainerType | Selected from CustomTrainer and BuiltinTrainer. |
+| framework | Framework | The ML framework used for training, e.g. `torch`, `torchtune`. |
+| entrypoint | Optional[List[str]] | Entrypoint for the trainer node. |
+| accelerator | str | The type of devices, e.g. `nvidia.com/gpu`. |
+| accelerator_count | Union[str, float, int] | The number of devices. |
+
+```python
+class TrainerType(Enum):
+    CUSTOM_TRAINER = CustomTrainer.__name__
+    BUILTIN_TRAINER = BuiltinTrainer.__name__
+
+
+class Framework(Enum):
+    TORCH = "torch"
+    DEEPSPEED = "deepspeed"
+    MLX = "mlx"
+    TORCHTUNE = "torchtune"
+
+
+# Representation for the Trainer of the runtime.
+@dataclass
+class Trainer:
+    trainer_type: TrainerType
+    framework: Framework
+    entrypoint: Optional[List[str]] = None
+    accelerator: str = constants.UNKNOWN
+    accelerator_count: Union[str, float, int] = constants.UNKNOWN
 
 ```
 
@@ -534,7 +562,7 @@ We will use [papermill](https://github.com/nteract/papermill) to execute these n
 
 - 2025-01-31: Create KEP-2401 doc
 - 2025-03-11: KEP-2401 1st version & Start implementation
-- 2025-03-12: Add new `Runtime` dataclass design
+- 2025-03-24: Add new `Runtime` dataclass design
 
 ## Alternatives
 
