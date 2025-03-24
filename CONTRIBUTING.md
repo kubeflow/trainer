@@ -72,17 +72,18 @@ make test-python-integration
 
 ### E2E Tests
 
+To set up a Kind cluster for e2e testing:
+
+```sh
+make test-e2e-setup-cluster
+```
+
 Run the end-to-end tests with:
 
 ```sh
 make test-e2e
 ```
 
-To set up a Kind cluster for e2e testing:
-
-```sh
-make test-e2e-setup-cluster
-```
 
 You can also run Jupyter notebook tests with Papermill:
 
