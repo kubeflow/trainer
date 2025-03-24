@@ -16,112 +16,7 @@ For the Kubeflow Trainer documentation, please check [the official Kubeflow docu
 
 Note for Lima the link is to the Adopters, which supports several different container environments.
 
-## Contributing Workflow
-For contributions to the Kubeflow Trainer project, please follow this workflow:
-
-1. Fork the repository on GitHub
-2. Clone your fork locally
-3. Add the upstream remote to keep your fork in sync:
-   ```sh
-   git remote add upstream https://github.com/kubeflow/trainer.git
-   ```
-4. Create a new branch for your changes:
-   ```sh
-   git checkout -b feature/your-feature-name
-   ```
-5. Fetch the latest changes from the upstream repository and rebase your branch:
-   ```sh
-   git fetch upstream
-   git rebase upstream/main
-   ```
-6. Make your changes and commit them:
-   - Install pre-commit hooks before creating commits:
-     ```sh
-     pip install pre-commit
-     pre-commit install
-     ```
-     ```sh
-     git commit -m -s "your commit message"
-     ```
-   - The pre-commit hooks will automatically check your code for style issues
-   - If the hooks fail, fix the issues (if they weren't fixed automatically) and stage your changes again
-   - For more details, see the [Code Style](#code-style) section
-7. Push your changes to your fork and create a pull request (PR)
-
-
-# Building the Operator
-Install dependencies:
-
-```sh
-go mod tidy
-```
-
-Build the library:
-
-```sh
-go install github.com/kubeflow/trainer/cmd/trainer-controller-manager
-```
-
-## Running the Operator Locally
-
-Running the operator locally in a docker container (as opposed to deploying it on a K8s cluster) is convenient for debugging/development.
-
-### Run a Kubernetes cluster
-
-First, you need to run a Kubernetes cluster locally. We recommend [KinD](https://kind.sigs.k8s.io).
-
-You can create a `kind` cluster by running
-
-```sh
-kind create cluster
-```
-
-This will load your kubernetes config file with the new cluster.
-
-After creating the cluster, you can check the nodes with the code below which should show you the kind-control-plane.
-
-```sh
-kubectl get nodes
-```
-
-The output should look something like below:
-
-```
-$ kubectl get nodes
-NAME                 STATUS   ROLES           AGE   VERSION
-kind-control-plane   Ready    control-plane   32s   v1.32.2
-```
-
-### Install Kubeflow Trainer Components
-
-From here we need to install two components:
-
-1. First, deploy the Kubeflow Trainer controller manager:
-   ```sh
-   kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/manager?ref=master"
-   ```
-
-Ensure that the JobSet and Trainer controller manager pods are running:
-
-```sh
-kubectl get pods -n kubeflow-system
-```
-
-You should see something like:
-
-```
-NAME                                                   READY   STATUS    RESTARTS   AGE
-jobset-controller-manager-694f54749-6tgft              1/1     Running   0          96s
-kubeflow-trainer-controller-manager-678d4bfc86-hqgbv   1/1     Running   0          96s
-```
-
-2. Next, deploy the Kubeflow Training Runtimes:
-   ```sh
-   kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/runtimes?ref=master"
-   ```
-
-
-### Development Workflow
+### Development
 
 The Kubeflow Trainer project includes a Makefile with several helpful commands to streamline your development workflow:
 
@@ -198,8 +93,8 @@ make test-e2e-notebook
 ### Go Development
 When coding:
 
-Follow [effective go](https://go.dev/doc/effective_go) guidelines.
-Run locally [make check](https://github.com/kubeflow/katib/blob/46173463027e4fd2e604e25d7075b2b31a702049/Makefile#L31) to verify if changes follow best practices before submitting PRs.
+Follow the [effective go](https://go.dev/doc/effective_go) guidelines.
+Run [`make check`](https://github.com/kubeflow/katib/blob/46173463027e4fd2e604e25d7075b2b31a702049/Makefile#L31) locally to verify if changes follow best practices before submitting PRs.
 
 When writing tests:
 
