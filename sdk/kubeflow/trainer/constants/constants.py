@@ -107,53 +107,6 @@ DEFAULT_TORCHTUNE_COMMAND = ["tune", "run"]
 # The supported dtypes for the TorchTune Trainer.
 TORCHTUNE_DTYPES = ["bf16", "fp32"]
 
-# Distributed PyTorch entrypoint.
-ENTRYPOINT_TORCH = "torchrun"
-
-# The label key to identify the JobSet name of the Pod.
-JOBSET_NAME_KEY = "jobset.sigs.k8s.io/jobset-name"
-
-# The label key to identify the JobSet's ReplicatedJob of the Pod.
-REPLICATED_JOB_KEY = "jobset.sigs.k8s.io/replicatedjob-name"
-
-# The label key to identify the Job completion index of the Pod.
-JOB_INDEX_KEY = "batch.kubernetes.io/job-completion-index"
-
-# The default path to the users' workspace.
-# TODO (andreyvelich): Discuss how to keep this path is sync with pkg.initializers.constants
-WORKSPACE_PATH = "/workspace"
-
-# The name of the ReplicatedJob and container of the dataset initializer
-DATASET_INITIALIZER = "dataset-initializer"
-
-# The path where initializer downloads dataset.
-DATASET_PATH = os.path.join(WORKSPACE_PATH, "dataset")
-
-# The name of the ReplicatedJob and container of the model initializer
-MODEL_INITIALIZER = "model-initializer"
-
-# The path where initializer downloads model.
-MODEL_PATH = os.path.join(WORKSPACE_PATH, "model")
-
-# The Job name for the launcher (e.g. mpirun launcher).
-JOB_LAUNCHER = "launcher"
-
-# The container name for the launcher
-CONTAINER_LAUNCHER = "launcher"
-
-# The Job name for the trainer nodes.
-JOB_TRAINER_NODE = "trainer-node"
-
-# The Pod type for the master node.
-MASTER_NODE = f"{JOB_TRAINER_NODE}-0"
-
-# The Pod pending phase indicates that Pod has been accepted by the Kubernetes cluster,
-# but one or more of the containers has not been made ready to run.
-POD_PENDING = "Pending"
-
-# The container name for the Trainer.
-CONTAINER_TRAINER = "trainer"
-
 # The Torch env name for the number of procs per node (e.g. number of GPUs per Pod).
 TORCH_ENV_NUM_PROC_PER_NODE = "PET_NPROC_PER_NODE"
 
