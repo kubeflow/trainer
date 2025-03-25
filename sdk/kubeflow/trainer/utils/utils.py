@@ -350,6 +350,44 @@ def get_args_using_torchtune_config(
     return args
 
 
+def get_trainer_crd_from_custom_trainer(
+    trainer: types.CustomTrainer,
+    runtime: types.Runtime,
+) -> models.TrainerV1alpha1Trainer:
+    """
+    Get the Trainer CRD from the custom trainer.
+    """
+    if not isinstance(trainer, types.CustomTrainer):
+        raise ValueError(
+            f"Trainer must be of type {types.CustomTrainer.__name__}, got {type(trainer)}"
+        )
+
+    trainer_crd = models.TrainerV1alpha1Trainer()
+
+    # Add number of nodes to the Trainer.
+    if trainer.num_nodes:
+        trainer_crd.num_nodes = trainer.num_nodes
+
+    # Add resources per node to the Trainer.
+    if trainer.resources_per_node:
+        trainer_crd.resources_per_node = get_resources_per_node(
+            trainer.resources_per_node
+        )
+
+    # Add command and args to the Trainer.
+    trainer_crd.command = constants.DEFAULT_CUSTOM_COMMAND
+    # TODO: Support train function parameters.
+    trainer_crd.command, trainer_crd.args = get_entrypoint_using_train_func(
+        runtime,
+        trainer.func,
+        trainer.func_args,
+        trainer.pip_index_url,
+        trainer.packages_to_install,
+    )
+
+    return trainer_crd
+
+
 def get_script_for_python_packages(
     packages_to_install: List[str], pip_index_url: str
 ) -> str:
