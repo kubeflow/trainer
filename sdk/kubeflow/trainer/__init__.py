@@ -31,6 +31,7 @@ from kubeflow.trainer.types.types import (
     HuggingFaceDatasetInitializer,
     HuggingFaceModelInitializer,
     Initializer,
+    Loss,
     Runtime,
     Trainer,
     TrainerType,

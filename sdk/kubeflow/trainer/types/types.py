@@ -45,6 +45,14 @@ class CustomTrainer:
     resources_per_node: Optional[Dict] = None
 
 
+# TODO(Electronic-Waste): Add more loss functions.
+# Loss function for the TorchTune LLM Trainer.
+class Loss(Enum):
+    """Loss function for the TorchTune LLM Trainer."""
+
+    CEWithChunkedOutputLoss = "torchtune.modules.loss.CEWithChunkedOutputLoss"
+
+
 # Configuration for the TorchTune LLM Trainer.
 @dataclass
 class TorchTuneConfig:
@@ -68,7 +76,7 @@ class TorchTuneConfig:
     dtype: Optional[str] = None
     batch_size: Optional[int] = None
     epochs: Optional[int] = None
-    loss: Optional[str] = None
+    loss: Optional[Loss] = None
     num_nodes: Optional[int] = None
     resources_per_node: Optional[Dict] = None
 

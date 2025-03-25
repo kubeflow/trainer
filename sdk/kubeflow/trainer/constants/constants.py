@@ -107,6 +107,9 @@ DEFAULT_TORCHTUNE_COMMAND = ["tune", "run"]
 # The supported dtypes for the TorchTune Trainer.
 TORCHTUNE_DTYPES = ["bf16", "fp32"]
 
+# The default entrypoint for torchrun.
+TORCH_ENTRYPOINT = "torchrun"
+
 # The Torch env name for the number of procs per node (e.g. number of GPUs per Pod).
 TORCH_ENV_NUM_PROC_PER_NODE = "PET_NPROC_PER_NODE"
 
