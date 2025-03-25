@@ -2,8 +2,6 @@ apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: mlx-distributed
-  labels:
-    trainer.kubeflow.org/accelerator: cpu
 spec:
   mlPolicy:
     numNodes: 1

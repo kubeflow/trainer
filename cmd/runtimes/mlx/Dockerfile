@@ -24,7 +24,7 @@ RUN echo "Port ${PORT}" >>/home/mpiuser/.sshd_config
 ARG MPI_VERSION=5.0.7
 RUN wget https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-${MPI_VERSION}.tar.gz
 RUN tar -xvf openmpi-${MPI_VERSION}.tar.gz && rm -rf openmpi-${MPI_VERSION}.tar.gz
-RUN cd openmpi-${MPI_VERSION} && ./configure --prefix=/usr/local && make -j"$(nproc)" install
+RUN cd openmpi-${MPI_VERSION} && ./configure --prefix=/usr/local && make install
 RUN rm -rf openmpi-${MPI_VERSION}
 
 ENV LD_LIBRARY_PATH=/usr/local/lib
