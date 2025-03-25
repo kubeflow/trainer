@@ -240,7 +240,7 @@ We natively support all `recipe` and `config` supported by `torchtune`, since `t
 | dtype | Optional[str] | The underlying data type used to represent the model and optimizer parameters. Currently, we only support `bf16` and `fp32`. |
 | batch_size | Optional[int] | The number of samples processed before updating model weights. |
 | epochs | Optional[int] | The number of samples processed before updating model weights. |
-| loss | Optional[str] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
+| loss | Optional[Loss] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
 | peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
 | dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, MultimodalDataset]] | Configuration for dataset preprocessing. |
 | num_nodes | Optional[int] | The number of PyTorch Nodes in training |
@@ -253,7 +253,7 @@ class TorchTuneConfig:
     dtype: Optional[str] = None
     batch_size: Optional[int] = None
     epochs: Optional[int] = None
-    loss: Optional[str] = None
+    loss: Optional[Loss] = None
     peft_config: Optional[Union[LoraConfig]] = None
     dataset_preprocess_config: Optional[
         Union[InstructDataset, ChatDataset, MultimodalDataset],
