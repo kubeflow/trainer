@@ -18,7 +18,7 @@ import queue
 import random
 import string
 import uuid
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
@@ -150,7 +150,7 @@ class TrainerClient:
         self,
         runtime: types.Runtime = types.DEFAULT_RUNTIME,
         initializer: Optional[types.Initializer] = None,
-        trainer: Optional[Union[types.CustomTrainer, types.BuiltinTrainer]] = None,
+        trainer: Optional[types.CustomTrainer] = None,
     ) -> str:
         """
         Create the TrainJob. You can configure these types of training task:
@@ -162,7 +162,7 @@ class TrainerClient:
             runtime (`types.Runtime`): Reference to one of existing Runtimes.
             initializer (`Optional[types.Initializer]`):
                 Configuration for the dataset and model initializers.
-            trainer (`Optional[types.CustomTrainer, types.BuiltinTrainer]`):
+            trainer (`Optional[types.CustomTrainer]`):
                 Configuration for Custom Training Task.
 
         Returns:
