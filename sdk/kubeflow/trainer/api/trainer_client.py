@@ -157,15 +157,13 @@ class TrainerClient:
 
         - Custom Training Task: Training with a self-contained function that encapsulates
             the entire model training process, e.g. `CustomTrainer`.
-        - Config-driven Task with Existing Trainer: Training with a trainer that already includes
-            the post-training logic, requiring only parameter adjustments, e.g. `BuiltinTrainer`.
 
         Args:
-            runtime (`types.Runtime`): Reference to the existing (Cluster)TrainingRuntime.
+            runtime (`types.Runtime`): Reference to one of existing Runtimes.
             initializer (`Optional[types.Initializer]`):
-                Configuration for Dataset and Model Initializers.
+                Configuration for the dataset and model initializers.
             trainer (`Optional[types.CustomTrainer, types.BuiltinTrainer]`):
-                Configuration for Custom Training Task or Config-driven Task with Existing Trainer.
+                Configuration for Custom Training Task.
 
         Returns:
             str: The unique name of the TrainJob that has been generated.
@@ -211,12 +209,9 @@ class TrainerClient:
 
             # If users choose to use a builtin trainer for post-training.
             elif isinstance(trainer, types.BuiltinTrainer):
-                if trainer.config is None or not isinstance(
-                    trainer.config, types.TorchTuneConfig
-                ):
+                if not isinstance(trainer.config, types.TorchTuneConfig):
                     raise ValueError(
-                        "The config is missing or not supported for the BuiltinTrainer. "
-                        "Currently, we only support `TorchTuneConfig` as parameter."
+                        f"The BuiltinTrainer config is invalid: {trainer.config}"
                     )
 
                 # Add number of nodes to the Trainer.
