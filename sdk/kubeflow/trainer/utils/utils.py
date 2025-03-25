@@ -319,7 +319,7 @@ def get_entrypoint_using_train_func(
 
 def get_args_using_torchtune_config(
     fine_tuning_config: types.TorchTuneConfig,
-) -> List[str]:
+) -> Tuple[List[str], List[str]]:
     """
     Get the Trainer args from the TorchTuneConfig.
     """
@@ -347,7 +347,7 @@ def get_args_using_torchtune_config(
     if fine_tuning_config.loss:
         args.append(f"loss={fine_tuning_config.loss}")
 
-    return args
+    return constants.DEFAULT_TORCHTUNE_COMMAND, args
 
 
 def get_trainer_crd_from_custom_trainer(
@@ -357,11 +357,6 @@ def get_trainer_crd_from_custom_trainer(
     """
     Get the Trainer CRD from the custom trainer.
     """
-    if not isinstance(trainer, types.CustomTrainer):
-        raise ValueError(
-            f"Trainer must be of type {types.CustomTrainer.__name__}, got {type(trainer)}"
-        )
-
     trainer_crd = models.TrainerV1alpha1Trainer()
 
     # Add number of nodes to the Trainer.
@@ -384,6 +379,35 @@ def get_trainer_crd_from_custom_trainer(
         trainer.pip_index_url,
         trainer.packages_to_install,
     )
+
+    return trainer_crd
+
+
+def get_trainer_crd_from_builtin_trainer(
+    trainer: types.BuiltinTrainer,
+) -> models.TrainerV1alpha1Trainer:
+    """
+    Get the Trainer CRD from the builtin trainer.
+    """
+    if not isinstance(trainer.config, types.TorchTuneConfig):
+        raise ValueError(f"The BuiltinTrainer config is invalid: {trainer.config}")
+
+    trainer_crd = models.TrainerV1alpha1Trainer()
+
+    # Add number of nodes to the Trainer.
+    if trainer.config.num_nodes:
+        trainer_crd.num_nodes = trainer.config.num_nodes
+
+    # Add resources per node to the Trainer.
+    if trainer.config.resources_per_node:
+        trainer_crd.resources_per_node = get_resources_per_node(
+            trainer.config.resources_per_node
+        )
+
+    # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
+    # the torchtune config in the runtime plugin.
+    # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
+    trainer_crd.command, trainer_crd.args = get_args_using_torchtune_config(trainer)
 
     return trainer_crd
 

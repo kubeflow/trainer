@@ -184,51 +184,13 @@ class TrainerClient:
         if trainer:
             # If users choose to use a custom training function.
             if isinstance(trainer, types.CustomTrainer):
-                # Add number of nodes to the Trainer.
-                if trainer.num_nodes:
-                    trainer_crd.num_nodes = trainer.num_nodes
-
-                # Add resources per node to the Trainer.
-                if trainer.resources_per_node:
-                    trainer_crd.resources_per_node = utils.get_resources_per_node(
-                        trainer.resources_per_node
-                    )
-
-                # Add command and args to the Trainer.
-                trainer_crd.command = constants.DEFAULT_CUSTOM_COMMAND
-                # TODO: Support train function parameters.
-                trainer_crd.command, trainer_crd.args = (
-                    utils.get_entrypoint_using_train_func(
-                        runtime,
-                        trainer.func,
-                        trainer.func_args,
-                        trainer.pip_index_url,
-                        trainer.packages_to_install,
-                    )
+                trainer_crd = utils.get_trainer_crd_from_custom_trainer(
+                    trainer, runtime
                 )
 
             # If users choose to use a builtin trainer for post-training.
             elif isinstance(trainer, types.BuiltinTrainer):
-                if not isinstance(trainer.config, types.TorchTuneConfig):
-                    raise ValueError(
-                        f"The BuiltinTrainer config is invalid: {trainer.config}"
-                    )
-
-                # Add number of nodes to the Trainer.
-                if trainer.config.num_nodes:
-                    trainer_crd.num_nodes = trainer.config.num_nodes
-
-                # Add resources per node to the Trainer.
-                if trainer.config.resources_per_node:
-                    trainer_crd.resources_per_node = utils.get_resources_per_node(
-                        trainer.config.resources_per_node
-                    )
-
-                # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
-                # the torchtune config in the runtime plugin.
-                # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
-                trainer_crd.command = constants.DEFAULT_TORCHTUNE_COMMAND
-                trainer_crd.args = utils.get_args_using_torchtune_config(trainer)
+                trainer_crd = utils.get_trainer_crd_from_builtin_trainer(trainer)
 
             else:
                 raise ValueError(
