@@ -42,7 +42,7 @@ to install and get started with Kubeflow Trainer.
 
 The following links provide information on how to get involved in the community:
 
-- Join our [`#kubeflow-training` Slack channel](https://www.kubeflow.org/docs/about/community/#kubeflow-slack).
+- Join our [`#kubeflow-trainer` Slack channel](https://www.kubeflow.org/docs/about/community/#kubeflow-slack).
 - Attend [the bi-weekly AutoML and Training Working Group](https://bit.ly/2PWVCkV) community meeting.
 - Check out [who is using Kubeflow Trainer](ADOPTERS.md).
 
