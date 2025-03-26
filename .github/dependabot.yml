@@ -1,0 +1,40 @@
+version: 2
+updates:
+  # Dependencies listed in go.mod
+  - package-ecosystem: "gomod"
+    directory: "/" 
+    schedule:
+      interval: "weekly"
+    labels:
+    - go
+    - dependencie
+
+  # Dependencies listed in .github/workflows/*.yml
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+    - github-actions
+    - dependencies
+
+  # Dependencies listed in Dockerfile
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+    - docker
+    - dependencies
+
+  # Dependencies listed in requirements.txt
+  - package-ecosystem: "pip"
+    directories:
+      - "/"
+      - "/sdk/python/kubeflow/storage_initializer/"
+      - "/sdk/python/kubeflow/trainer/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - python
+      - dependencies
