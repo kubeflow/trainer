@@ -327,11 +327,8 @@ def get_args_using_torchtune_config(
 
     # Override the dtype if it is provided.
     if fine_tuning_config.dtype:
-        if fine_tuning_config.dtype not in [dtype.value for dtype in types.DataType]:
-            raise ValueError(
-                f"Unsupported dtype: {fine_tuning_config.dtype}. "
-                f"Supported dtypes are: {[dtype.value for dtype in types.DataType]}"
-            )
+        if not isinstance(fine_tuning_config.dtype, types.DataType):
+            raise ValueError(f"Invalid dtype: {fine_tuning_config.dtype}.")
 
         args.append(f"dtype={fine_tuning_config.dtype}")
 
