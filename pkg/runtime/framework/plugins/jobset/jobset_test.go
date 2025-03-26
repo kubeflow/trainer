@@ -337,20 +337,16 @@ func TestJobSetValidate(t *testing.T) {
 		wantError    field.ErrorList
 		wantWarnings admission.Warnings
 	}{
-		"runtime info is nil": {
-			info:   nil,
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
-		},
 		"no initializer job": {
 			info: &runtime.Info{TemplateSpec: runtime.TemplateSpec{
-				ObjApply: jobsetv1alpha2ac.JobSetSpecApplyConfiguration{},
+				ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{},
 			}},
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Initializer(nil).
 				Obj(),
 		},
 		"no dataset initializer job": {
 			info: &runtime.Info{TemplateSpec: runtime.TemplateSpec{
-				ObjApply: jobsetv1alpha2ac.JobSetSpecApplyConfiguration{},
+				ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{},
 			}},
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Initializer(&trainer.Initializer{Dataset: nil}).
@@ -359,10 +355,23 @@ func TestJobSetValidate(t *testing.T) {
 		"must have dataset initializer  job when trainJob is configured with input datasetConfig": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
 						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
 							{
 								Name: ptr.To("random"),
+								Template: &v1.JobTemplateSpecApplyConfiguration{
+									Spec: &v1.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To("random"),
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -373,7 +382,7 @@ func TestJobSetValidate(t *testing.T) {
 					Dataset: &trainer.DatasetInitializer{},
 				}).Obj(),
 			wantError: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("runtimeRef"),
+				field.Invalid(runtimeRefPath,
 					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
 					fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.DatasetInitializer)),
 			},
@@ -381,7 +390,7 @@ func TestJobSetValidate(t *testing.T) {
 		"must have container with name - dataset initializer in the dataset initializer job": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
 						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
 							{
 								Name: ptr.To(constants.DatasetInitializer),
@@ -412,7 +421,7 @@ func TestJobSetValidate(t *testing.T) {
 		"no model initializer job": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
 						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
 							{
 								Name: ptr.To(constants.DatasetInitializer),
@@ -441,10 +450,23 @@ func TestJobSetValidate(t *testing.T) {
 		"must have model initializer job when trainJob is configured with input modelConfig": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
 						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
 							{
 								Name: ptr.To("random"),
+								Template: &v1.JobTemplateSpecApplyConfiguration{
+									Spec: &v1.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To("random"),
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -463,7 +485,7 @@ func TestJobSetValidate(t *testing.T) {
 		"must have container with name - model initializer in the model initializer job": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
 						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
 							{
 								Name: ptr.To(constants.ModelInitializer),
