@@ -35,5 +35,6 @@ COPY cmd/runtimes/deepspeed/requirements.txt .
 RUN pip install --user -r requirements.txt
 
 # Give mpiuser permission to download packages and HF models.
+# .cache directory is used by ML frameworks to download models.
 RUN chown -R mpiuser:mpiuser /home/mpiuser/.local
-RUN chown -R mpiuser:mpiuser /home/mpiuser/.cache
+RUN mkdir -p /home/mpiuser/.cache && chown -R mpiuser:mpiuser /home/mpiuser/.cache
