@@ -309,7 +309,9 @@ def get_entrypoint_using_train_func(
     # Install Python packages if that is required.
     if packages_to_install is not None:
         exec_script = (
-            get_script_for_python_packages(packages_to_install, pip_index_url)
+            get_script_for_python_packages(
+                packages_to_install, pip_index_url, runtime.trainer.entrypoint
+            )
             + exec_script
         )
 
@@ -410,7 +412,9 @@ def get_trainer_crd_from_builtin_trainer(
 
 
 def get_script_for_python_packages(
-    packages_to_install: List[str], pip_index_url: str
+    packages_to_install: List[str],
+    pip_index_url: str,
+    runtime_entrypoint: List[str],
 ) -> str:
     """
     Get init script to install Python packages from the given pip index URL.
@@ -418,14 +422,19 @@ def get_script_for_python_packages(
     packages_str = " ".join([str(package) for package in packages_to_install])
 
     script_for_python_packages = textwrap.dedent(
-        f"""
+        """
         if ! [ -x "$(command -v pip)" ]; then
             python -m ensurepip || python -m ensurepip --user || apt-get install python-pip
         fi
 
         PIP_DISABLE_PIP_VERSION_CHECK=1 python -m pip install --quiet \
-        --no-warn-script-location --index-url {pip_index_url} {packages_str}
-        """
+        --no-warn-script-location --index-url {} {} {}
+        """.format(
+            pip_index_url,
+            packages_str,
+            # For the OpenMPI, the packages must be installed for the mpiuser.
+            "--user" if runtime_entrypoint[0] == constants.MPI_ENTRYPOINT else "",
+        )
     )
 
     return script_for_python_packages
