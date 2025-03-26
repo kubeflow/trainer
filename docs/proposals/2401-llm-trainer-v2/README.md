@@ -247,10 +247,21 @@ We natively support all `recipe` and `config` supported by `torchtune`, since `t
 | resource_per_node | Optional[Dict] | The resource for each PyTorch Node |
 
 ```python
+# Loss function for the TorchTune LLM Trainer.
+class Loss(Enum):
+    CEWithChunkedOutputLoss = "torchtune.modules.loss.CEWithChunkedOutputLoss"
+
+
+# Data type for the TorchTune LLM Trainer.
+class DataType(Enum):
+    BF16 = "bf16"
+    FP32 = "fp32"
+
+
 # TorchTuneConfig DataClass
 @dataclass
 class TorchTuneConfig:
-    dtype: Optional[str] = None
+    dtype: Optional[DataType] = None
     batch_size: Optional[int] = None
     epochs: Optional[int] = None
     loss: Optional[Loss] = None
