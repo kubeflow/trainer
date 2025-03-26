@@ -15,15 +15,14 @@ RUN apt-get update && apt install -y --no-install-recommends \
 RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/sbin/sshd
 RUN apt remove libcap2-bin -y
 
-ARG PORT=2222
-
 # Configure mpiuser and home directory.
 RUN useradd -m mpiuser
 WORKDIR /home/mpiuser
 
-# Configurations for running sshd as non-root.
+# Copy SSH configurations from the MPI image.
+COPY --from=mpi /etc/ssh/ssh_config /etc/ssh/ssh_config
+COPY --from=mpi /etc/ssh/sshd_config /etc/ssh/sshd_config
 COPY --from=mpi /home/mpiuser/.sshd_config /home/mpiuser/.sshd_config
-RUN echo "Port ${PORT}" >>/home/mpiuser/.sshd_config
 
 ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/mpi/lib:/usr/local/mpi/lib64:${LD_LIBRARY_PATH}
 
