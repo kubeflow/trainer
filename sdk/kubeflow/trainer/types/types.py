@@ -53,6 +53,14 @@ class Loss(Enum):
     CEWithChunkedOutputLoss = "torchtune.modules.loss.CEWithChunkedOutputLoss"
 
 
+# Data type for the TorchTune LLM Trainer.
+class DataType(Enum):
+    """Data type for the TorchTune LLM Trainer."""
+
+    BF16 = "bf16"
+    FP32 = "fp32"
+
+
 # Configuration for the TorchTune LLM Trainer.
 @dataclass
 class TorchTuneConfig:
@@ -60,20 +68,20 @@ class TorchTuneConfig:
         the TorchTune LLM Trainer that already includes the fine-tuning logic.
 
     Args:
-        dtype (`Optional[str]`):
+        dtype (`Optional[Dtype]`):
             The underlying data type used to represent the model and optimizer parameters.
             Currently, we only support `bf16` and `fp32`.
         batch_size (`Optional[int]`):
             The number of samples processed before updating model weights.
         epochs (`Optional[int]`):
             The number of samples processed before updating model weights.
-        loss (`Optional[str]`): The loss algorithm we use to fine-tune the LLM,
+        loss (`Optional[Loss]`): The loss algorithm we use to fine-tune the LLM,
             e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss`.
         num_nodes (`Optional[int]`): The number of nodes to use for training.
         resources_per_node (`Optional[Dict]`): The computing resources to allocate per node.
     """
 
-    dtype: Optional[str] = None
+    dtype: Optional[DataType] = None
     batch_size: Optional[int] = None
     epochs: Optional[int] = None
     loss: Optional[Loss] = None
