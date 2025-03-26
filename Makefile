@@ -111,10 +111,6 @@ ifeq ($(GOLANGCI_LINT),)
 endif
 	golangci-lint run --timeout 5m --go 1.23 ./...
 
-.PHONY: check
-check: go-mod-download fmt vet golangci-lint ## Run checks for code quality and best practices
-	@echo "All code quality checks passed!"
-
 # Instructions to run tests.
 .PHONY: test
 test: ## Run Go unit test.

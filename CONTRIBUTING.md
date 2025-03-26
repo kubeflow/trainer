@@ -94,7 +94,7 @@ make test-e2e-notebook
 When coding:
 
 Follow the [effective go](https://go.dev/doc/effective_go) guidelines.
-Run `make check` locally to verify if changes follow best practices before submitting PRs.
+Run [`make generate`](https://github.com/kubeflow/trainer/blob/4e6199c9486d861655a712d7017b8f23f9f2e48e/Makefile#L87) locally to verify if changes follow best practices before submitting PRs.
 
 When writing tests:
 
