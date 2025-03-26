@@ -104,9 +104,6 @@ DEFAULT_CUSTOM_COMMAND = ["bash", "-c"]
 # The default command for the TorchTune Trainer.
 DEFAULT_TORCHTUNE_COMMAND = ["tune", "run"]
 
-# The supported dtypes for the TorchTune Trainer.
-TORCHTUNE_DTYPES = ["bf16", "fp32"]
-
 # The default entrypoint for torchrun.
 TORCH_ENTRYPOINT = "torchrun"
 
