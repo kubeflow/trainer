@@ -89,7 +89,7 @@ func (m *MPI) Validate(runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob
 		return nil, allErrs
 	}
 	specPath := field.NewPath("spec")
-	if newJobObj.Spec.Trainer.NumProcPerNode != nil {
+	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumProcPerNode != nil {
 		numProcPerNodePath := specPath.Child("trainer", "numProcPerNode")
 		numProcPerNode := *newJobObj.Spec.Trainer.NumProcPerNode
 		if numProcPerNode.Type != intstr.Int {
