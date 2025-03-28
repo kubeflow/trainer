@@ -88,10 +88,9 @@ func (m *MPI) Validate(runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob
 		return nil, allErrs
 	}
 	specPath := field.NewPath("spec")
-	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumProcPerNode != nil {
-		numProcPerNode := *newJobObj.Spec.Trainer.NumProcPerNode
-		if numProcPerNode.Type != intstr.Int {
-			allErrs = append(allErrs, field.Invalid(numProcPerNodePath, numProcPerNode, "must have an int value for MPI TrainJob"))
+	if trainJobTrainer := newJobObj.Spec.Trainer; trainJobTrainer != nil && trainJobTrainer.NumProcPerNode != nil {
+		if trainJobTrainer.NumProcPerNode.Type != intstr.Int {
+			allErrs = append(allErrs, field.Invalid(numProcPerNodePath, *trainJobTrainer.NumProcPerNode, "must have an int value for MPI TrainJob"))
 		}
 	}
 	// validate PodSet configurations based on NumNodes and RunLauncherAsNode.

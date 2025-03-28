@@ -783,7 +783,11 @@ func TestValidate(t *testing.T) {
 				).
 				Obj(),
 			wantError: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("trainer", "numProcPerNode"), intstr.IntOrString{Type: 1, StrVal: "invalid"}, "must have an int value for MPI TrainJob"),
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("numProcPerNode"),
+					intstr.FromString("invalid"),
+					"must have an int value for MPI TrainJob",
+				),
 			},
 		},
 		"numProcPerNode typed is int": {
@@ -812,6 +816,9 @@ func TestValidate(t *testing.T) {
 					).
 					Obj(),
 				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
 			),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Trainer(&trainer.Trainer{NumNodes: ptr.To(int32(1))}).Obj(),
 		},
@@ -823,6 +830,9 @@ func TestValidate(t *testing.T) {
 						Obj(),
 					).
 					Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Trainer(&trainer.Trainer{NumNodes: ptr.To(int32(2))}).Obj(),
@@ -838,6 +848,9 @@ func TestValidate(t *testing.T) {
 						Obj(),
 					).
 					Obj(),
+				),
+				runtime.WithPodSet(constants.Launcher, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
 				),
 			),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Trainer(&trainer.Trainer{NumNodes: ptr.To(int32(2))}).Obj(),
