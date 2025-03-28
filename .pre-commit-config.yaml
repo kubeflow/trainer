@@ -3,6 +3,7 @@ repos:
     rev: v2.3.0
     hooks:
       - id: check-yaml
+        exclude: '^charts/kubeflow-trainer/.*\.yaml$'
         args: [--allow-multiple-documents]
       - id: check-json
       - id: end-of-file-fixer
