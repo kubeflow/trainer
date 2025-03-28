@@ -1,5 +1,26 @@
 # Changelog
 
+# [v1.9.1](https://github.com/kubeflow/training-operator/tree/v1.9.1) (2025-03-24)
+
+## Breaking Changes
+
+- Update Manifest Images to GHCR ([#2544](https://github.com/kubeflow/trainer/pull/2544) by [@saileshd1402](https://github.com/saileshd1402))
+- Push images to GHCR for release-1.9 ([#2491](https://github.com/kubeflow/trainer/pull/2491) by [@saileshd1402](https://github.com/saileshd1402))
+
+## New Features
+
+- Add volume and volume mounts arguments to TrainingClient.create_job API ([#2449](https://github.com/kubeflow/trainer/pull/2449) by [@astefanutti](https://github.com/astefanutti))
+- Add configurable QPS and burst settings for kube API client ([#2411](https://github.com/kubeflow/trainer/pull/2411) by [@ronk21runai](https://github.com/ronk21runai))
+
+## Bug Fixes
+
+- fix(ci): Change publish dir from `training` to `trainer` ([#2546](https://github.com/kubeflow/trainer/pull/2546) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- fix: fix typos in script comments. ([#2465](https://github.com/kubeflow/trainer/pull/2465) by [@IRONICBo](https://github.com/IRONICBo))
+- fix: adds jaxjobs to the kubeflow-training-roles.yaml ClusterRole ([#2417](https://github.com/kubeflow/trainer/pull/2417) by [@DnPlas](https://github.com/DnPlas))
+- [release-1.9] Rename paddlepaddle_defaults.go file name ([#2400](https://github.com/kubeflow/trainer/pull/2400) by [@ChristianZaccaria](https://github.com/ChristianZaccaria))
+
+[Full Changelog](https://github.com/kubeflow/trainer/compare/v1.9.0...v1.9.1)
+
 # [v1.9.0](https://github.com/kubeflow/training-operator/tree/v1.9.0) (2025-01-21)
 
 ## Breaking Changes
