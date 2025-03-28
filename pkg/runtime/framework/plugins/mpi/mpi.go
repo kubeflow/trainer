@@ -82,7 +82,6 @@ func (m *MPI) Name() string {
 // TODO (andreyvelich): Add validation to check that TrainJob doesn't have MPI envs.
 // TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 // Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
-
 func (m *MPI) Validate(runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
@@ -90,7 +89,6 @@ func (m *MPI) Validate(runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob
 	}
 	specPath := field.NewPath("spec")
 	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumProcPerNode != nil {
-		numProcPerNodePath := specPath.Child("trainer", "numProcPerNode")
 		numProcPerNode := *newJobObj.Spec.Trainer.NumProcPerNode
 		if numProcPerNode.Type != intstr.Int {
 			allErrs = append(allErrs, field.Invalid(numProcPerNodePath, newJobObj.Spec.Trainer.NumProcPerNode, "must have an int value"))
