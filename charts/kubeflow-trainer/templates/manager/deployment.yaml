@@ -1,0 +1,109 @@
+{{/*
+Copyright 2024 The Kubeflow authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "trainer.manager.deployment.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "trainer.manager.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.manager.replicas }}
+  selector:
+    matchLabels:
+      {{- include "trainer.manager.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "trainer.manager.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: manager
+        image: {{ include "trainer.image" . }}
+        {{- with .Values.image.pullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
+        command:
+        - /manager
+        args:
+        {{- if gt (.Values.manager.replicas | int) 1 }}
+        - --leader-elect=true
+        {{- end }}
+        - --webhook-service-name={{ include "trainer.webhook.service.name" . }}
+        - --webhook-secret-name={{ include "trainer.webhook.secret.name" . }}
+        {{- with .Values.manager.env }}
+        env:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.manager.envFrom }}
+        envFrom:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        volumeMounts:
+        - name: webhook-cert
+          mountPath: /tmp/k8s-webhook-server/serving-certs
+          readOnly: true
+        {{- with .Values.manager.volumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.manager.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          timeoutSeconds: 3
+        {{- with .Values.manager.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      volumes:
+      - name: webhook-cert
+        secret:
+          secretName: {{ include "trainer.webhook.secret.name" . }}
+          defaultMode: 420
+      {{- with .Values.manager.volumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.manager.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.manager.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.manager.tolerations }}
+      tolerations:
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      serviceAccountName: {{ include "trainer.manager.serviceAccount.name" . }}
