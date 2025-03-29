@@ -44,14 +44,6 @@ rules:
   - update
   - patch
 - apiGroups:
-  - ""
-  resources:
-  - limitranges
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - node.k8s.io
   resources:
   - runtimeclasses
