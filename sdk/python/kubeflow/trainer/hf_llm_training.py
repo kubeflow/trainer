@@ -13,6 +13,7 @@ from transformers import (
     AutoModelForImageClassification,
     AutoTokenizer,
     DataCollatorForLanguageModeling,
+    DataCollatorWithPadding,
     Trainer,
     TrainingArguments,
 )
@@ -58,6 +59,9 @@ def setup_model_and_tokenizer(model_uri, transformer_type, model_dir, num_labels
     # Freeze model parameters
     for param in model.parameters():
         param.requires_grad = False
+    
+    if not tokenizer.pad_token:
+        tokenizer.pad_token = tokenizer.eos_token
 
     return model, tokenizer
 
@@ -147,6 +151,13 @@ def train_model(model, transformer_type, train_data, eval_data, tokenizer, train
             tokenizer,
             pad_to_multiple_of=8,
             mlm=False,
+        )
+    else:
+        logger.info("Add general data collator with padding")
+        logger.info("-" * 40)
+        trainer.data_collator = DataCollatorWithPadding(
+            tokenizer,
+            pad_to_multiple_of=8,
         )
 
     # Train the model.
