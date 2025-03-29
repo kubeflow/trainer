@@ -34,9 +34,9 @@ commonLabels: {}
 
 image:
   # -- Image registry.
-  registry: docker.io
+  registry: ghcr.io
   # -- Image repository.
-  repository: kubeflow/trainer-controller-manager
+  repository: kubeflow/trainer/trainer-controller-manager
   # -- Image tag.
   # @default -- If not set, the chart version will be used.
   tag: ""
