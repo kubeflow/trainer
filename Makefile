@@ -152,3 +152,9 @@ PAPERMILL_TIMEOUT=900
 .PHONY: test-e2e-notebook
 test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
 	NOTEBOOK_INPUT=$(NOTEBOOK_INPUT) NOTEBOOK_OUTPUT=$(NOTEBOOK_OUTPUT) PAPERMILL_TIMEOUT=$(PAPERMILL_TIMEOUT) ./hack/e2e-run-notebook.sh
+
+.PHONY: helm-commit
+helm-commit: ## Commit the changes to the helm chart.
+	@find charts/ -mindepth 1 -maxdepth 1 -type d -exec helm dependency update {} \;
+	@find charts/ -mindepth 1 -maxdepth 1 -type d -exec helm package {} --destination {} \;
+	helm repo index charts/ --url https://kubeflow.github.io/trainer

@@ -29,3 +29,4 @@ cover.out
 # Helm
 charts/kubeflow-trainer/charts/
 charts/kubeflow-trainer/Chart.lock
+*.tgz

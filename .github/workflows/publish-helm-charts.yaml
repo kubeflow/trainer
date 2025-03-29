@@ -2,11 +2,10 @@ name: publish-helm-chart
 
 on:
   push:
-
   workflow_dispatch:
 
 env:
-  CHARTS_PATH: ./charts
+  CHARTS_PATH: charts
 
 jobs:
   prepare-matrix:
@@ -30,6 +29,7 @@ jobs:
       packages: write
 
     needs: prepare-matrix
+    if: ${{ needs.prepare-matrix.outputs.matrix != '[]'  && needs.prepare-matrix.outputs.matrix != '' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -62,19 +62,13 @@ jobs:
         run: helm package . --destination .
         working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.chart }}-chart
-          path: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}/*.tgz
-
   publish:
-    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: write
 
     needs: [prepare-matrix, build]
+    if: github.ref == 'refs/heads/main' && ${{ needs.prepare-matrix.outputs.matrix != '[]'  && needs.prepare-matrix.outputs.matrix != '' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -104,3 +98,25 @@ jobs:
         run: |
           helm package ${{ env.CHARTS_PATH }}/${{ matrix.chart }} --version ${{ env.VERSION }}
           helm push ./${{ matrix.chart }}-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.actor }}/helm-charts
+
+  release:
+    permissions:
+      contents: write
+    needs: [prepare-matrix, build, publish]
+    if: github.ref == 'refs/heads/main' && ${{ needs.prepare-matrix.outputs.matrix != '[]'  && needs.prepare-matrix.outputs.matrix != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.7.0
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
