@@ -14,16 +14,24 @@
 # limitations under the License.
 #
 
-suite: Test controller deployment
+suite: Test manager deployment
 
 templates:
   - manager/deployment.yaml
 
 release:
-  name: trainer
+  name: kubeflow-trainer
   namespace: kubeflow-system
 
 tests:
+  - it: Should create manager deployment
+    asserts:
+      - containsDocument:
+          apiVersion: apps/v1
+          kind: Deployment
+          name: kubeflow-trainer-controller-manager
+          namespace: kubeflow-system
+
   - it: Should use the specified image repository if `image.registry`, `image.repository` and `image.tag` are set
     set:
       image:
