@@ -14,20 +14,34 @@
 # limitations under the License.
 #
 
-suite: Test manager Service
+suite: Test manager ClusterRoleBinding
 
 templates:
-  - manager/service.yaml
+  - rbac/clusterrole_binding.yaml
 
 release:
   name: kubeflow-trainer
   namespace: kubeflow-system
 
 tests:
-  - it: Should create manager Service
+  - it: Should create manager ClusterRoleBinding
     asserts:
       - containsDocument:
-          apiVersion: v1
-          kind: Service
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
           name: kubeflow-trainer-controller-manager
-          namespace: kubeflow-system
+
+  - it: Should bind manager ClusterRole to manager ServiceAccount
+    asserts:
+      - equal:
+          path: roleRef
+          value:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: kubeflow-trainer-controller-manager
+      - contains:
+          path: subjects
+          content:
+            kind: ServiceAccount
+            name: kubeflow-trainer-controller-manager
+            namespace: kubeflow-system

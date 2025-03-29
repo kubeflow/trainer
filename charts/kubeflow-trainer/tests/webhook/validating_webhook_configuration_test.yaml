@@ -14,20 +14,28 @@
 # limitations under the License.
 #
 
-suite: Test manager Service
+suite: Test ValidatingWebhookConfiguration
 
 templates:
-  - manager/service.yaml
+  - webhook/validating_webhook_configuration.yaml
 
 release:
   name: kubeflow-trainer
   namespace: kubeflow-system
 
 tests:
-  - it: Should create manager Service
+  - it: Should create ValidatingWebhookConfiguration
     asserts:
       - containsDocument:
-          apiVersion: v1
-          kind: Service
-          name: kubeflow-trainer-controller-manager
-          namespace: kubeflow-system
+          apiVersion: admissionregistration.k8s.io/v1
+          kind: ValidatingWebhookConfiguration
+          name: validator.trainer.kubeflow.org
+
+  - it: Should use the specified failurePolicy if `webhook.failurePolicy` is set
+    set:
+      webhook:
+        failurePolicy: Ignore
+    asserts:
+      - equal:
+          path: webhooks[*].failurePolicy
+          value: Ignore

@@ -14,20 +14,19 @@
 # limitations under the License.
 #
 
-suite: Test manager Service
+suite: Test manager ClusterRole
 
 templates:
-  - manager/service.yaml
+  - rbac/clusterrole.yaml
 
 release:
   name: kubeflow-trainer
   namespace: kubeflow-system
 
 tests:
-  - it: Should create manager Service
+  - it: Should create manager ClusterRole
     asserts:
       - containsDocument:
-          apiVersion: v1
-          kind: Service
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
           name: kubeflow-trainer-controller-manager
-          namespace: kubeflow-system

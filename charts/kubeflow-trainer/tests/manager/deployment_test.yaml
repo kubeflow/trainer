@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-suite: Test manager deployment
+suite: Test manager Deployment
 
 templates:
   - manager/deployment.yaml
@@ -24,7 +24,7 @@ release:
   namespace: kubeflow-system
 
 tests:
-  - it: Should create manager deployment
+  - it: Should create manager Deployment
     asserts:
       - containsDocument:
           apiVersion: apps/v1

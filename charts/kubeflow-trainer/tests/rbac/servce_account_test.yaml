@@ -14,20 +14,20 @@
 # limitations under the License.
 #
 
-suite: Test manager Service
+suite: Test manager ServiceAccount
 
 templates:
-  - manager/service.yaml
+  - rbac/service_account.yaml
 
 release:
   name: kubeflow-trainer
   namespace: kubeflow-system
 
 tests:
-  - it: Should create manager Service
+  - it: Should create manager ServiceAccount
     asserts:
       - containsDocument:
           apiVersion: v1
-          kind: Service
+          kind: ServiceAccount
           name: kubeflow-trainer-controller-manager
           namespace: kubeflow-system
