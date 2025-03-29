@@ -15,36 +15,22 @@ limitations under the License.
 */ -}}
 
 {{/*
-Create the name of the controller service account.
+Create the name of the manager service account.
 */}}
 {{- define "trainer.manager.serviceAccount.name" -}}
 {{ include "trainer.manager.name" . }}
 {{- end -}}
 
 {{/*
-Create the name of the controller cluster role.
+Create the name of the manager cluster role.
 */}}
 {{- define "trainer.manager.clusterRole.name" -}}
 {{ include "trainer.manager.name" . }}
 {{- end -}}
 
 {{/*
-Create the name of the controller cluster role binding.
+Create the name of the manager cluster role binding.
 */}}
 {{- define "trainer.manager.clusterRoleBinding.name" -}}
-{{ include "trainer.manager.name" . }}
-{{- end -}}
-
-{{/*
-Create the name of the controller role.
-*/}}
-{{- define "trainer.manager.role.name" -}}
-{{ include "trainer.manager.name" . }}
-{{- end -}}
-
-{{/*
-Create the name of the controller role binding.
-*/}}
-{{- define "trainer.manager.roleBinding.name" -}}
 {{ include "trainer.manager.name" . }}
 {{- end -}}
