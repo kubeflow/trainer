@@ -59,7 +59,7 @@ def setup_model_and_tokenizer(model_uri, transformer_type, model_dir, num_labels
     # Freeze model parameters
     for param in model.parameters():
         param.requires_grad = False
-    
+
     if not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.eos_token
 
