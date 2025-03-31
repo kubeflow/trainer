@@ -1,4 +1,4 @@
-peft==0.3.0
-datasets==2.21.0
-transformers==4.38.0
-boto3==1.33.9
+peft==0.15.1
+datasets==3.5.0
+transformers==4.50.2
+boto3==1.37.22

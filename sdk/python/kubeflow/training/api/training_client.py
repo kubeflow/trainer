@@ -294,7 +294,7 @@ class TrainingClient(object):
                 VOLUME_PATH_DATASET,
                 "--lora_config",
                 json.dumps(
-                    trainer_parameters.lora_config.__dict__, cls=utils.SetEncoder
+                    trainer_parameters.lora_config.to_dict(), cls=utils.SetEncoder
                 ),
                 "--training_parameters",
                 json.dumps(trainer_parameters.training_parameters.to_dict()),
