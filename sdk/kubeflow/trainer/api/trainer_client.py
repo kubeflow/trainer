@@ -20,6 +20,7 @@ import string
 import uuid
 from typing import Dict, List, Optional
 
+from kubeflow.trainer.api.trainer_client_abc import TrainerClientABC
 import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
@@ -29,7 +30,7 @@ from kubernetes import client, config, watch
 logger = logging.getLogger(__name__)
 
 
-class TrainerClient:
+class TrainerClient(TrainerClientABC):
     def __init__(
         self,
         config_file: Optional[str] = None,
