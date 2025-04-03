@@ -11,17 +11,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import os
 from typing import List, Optional, Dict
+import yaml
 
+from kubeflow.trainer import models
 from kubeflow.trainer.api.trainer_client_abc import TrainerClientABC
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
+from kubeflow.trainer.utils import utils
 
 
 class LocalTrainerClient(TrainerClientABC):
+    def __init__(
+        self,
+        local_runtimes_path: str = constants.LOCAL_RUNTIMES_PATH,
+    ):
+        self.local_runtimes_path = local_runtimes_path
+
     def list_runtimes(self) -> List[types.Runtime]:
-        raise NotImplementedError()
+        runtimes = []
+        for filename in os.listdir(self.local_runtimes_path):
+            with open(os.path.join(self.local_runtimes_path, filename), "r") as f:
+                content_str = f.read()
+                content_dict = yaml.safe_load(content_str)
+                runtime_cr = models.TrainerV1alpha1ClusterTrainingRuntime.from_dict(content_dict)
+                runtimes.append(utils.get_runtime_from_crd(runtime_cr))
+        return runtimes
 
     def get_runtime(self, name: str) -> types.Runtime:
         raise NotImplementedError()

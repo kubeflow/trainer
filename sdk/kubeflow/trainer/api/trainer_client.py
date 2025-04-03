@@ -103,7 +103,7 @@ class TrainerClient(TrainerClientABC):
                 return result
 
             for runtime in runtime_list.items:
-                result.append(self.__get_runtime_from_crd(runtime))
+                result.append(utils.get_runtime_from_crd(runtime))
 
         except multiprocessing.TimeoutError:
             raise TimeoutError(
@@ -145,7 +145,7 @@ class TrainerClient(TrainerClientABC):
                 f"{self.namespace}/{name}"
             )
 
-        return self.__get_runtime_from_crd(runtime)  # type: ignore
+        return utils.get_runtime_from_crd(runtime)  # type: ignore
 
     def train(
         self,
@@ -453,30 +453,6 @@ class TrainerClient(TrainerClientABC):
 
         logger.debug(
             f"{constants.TRAINJOB_KIND} {self.namespace}/{name} has been deleted"
-        )
-
-    def __get_runtime_from_crd(
-        self,
-        runtime_crd: models.TrainerV1alpha1ClusterTrainingRuntime,
-    ) -> types.Runtime:
-
-        if not (
-            runtime_crd.metadata
-            and runtime_crd.metadata.name
-            and runtime_crd.spec
-            and runtime_crd.spec.ml_policy
-            and runtime_crd.spec.template.spec
-            and runtime_crd.spec.template.spec.replicated_jobs
-        ):
-            raise Exception(f"ClusterTrainingRuntime CRD is invalid: {runtime_crd}")
-
-        return types.Runtime(
-            name=runtime_crd.metadata.name,
-            trainer=utils.get_runtime_trainer(
-                runtime_crd.spec.template.spec.replicated_jobs,
-                runtime_crd.spec.ml_policy,
-                runtime_crd.metadata,
-            ),
         )
 
     def __get_trainjob_from_crd(

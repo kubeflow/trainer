@@ -73,6 +73,28 @@ def get_container_devices(
 
     return device, str(device_count)
 
+def get_runtime_from_crd(
+    runtime_crd: models.TrainerV1alpha1ClusterTrainingRuntime,
+) -> types.Runtime:
+
+    if not (
+        runtime_crd.metadata
+        and runtime_crd.metadata.name
+        and runtime_crd.spec
+        and runtime_crd.spec.ml_policy
+        and runtime_crd.spec.template.spec
+        and runtime_crd.spec.template.spec.replicated_jobs
+    ):
+        raise Exception(f"ClusterTrainingRuntime CRD is invalid: {runtime_crd}")
+
+    return types.Runtime(
+        name=runtime_crd.metadata.name,
+        trainer=get_runtime_trainer(
+            runtime_crd.spec.template.spec.replicated_jobs,
+            runtime_crd.spec.ml_policy,
+            runtime_crd.metadata,
+        ),
+    )
 
 def get_runtime_trainer_container(
     replicated_jobs: List[models.JobsetV1alpha2ReplicatedJob],

@@ -116,3 +116,6 @@ MPI_HOSTFILE = "/etc/mpi/hostfile"
 
 # The default entrypoint for mpirun.
 MPI_ENTRYPOINT = "mpirun"
+
+# The default path to the directory containing local training runtime configs
+LOCAL_RUNTIMES_PATH = "./kubeflow/trainer/config/local_runtimes"
