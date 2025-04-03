@@ -39,8 +39,11 @@ class LocalTrainerClient(TrainerClientABC):
                 runtimes.append(utils.get_runtime_from_crd(runtime_cr))
         return runtimes
 
-    def get_runtime(self, name: str) -> types.Runtime:
-        raise NotImplementedError()
+    def get_runtime(self, name: str) -> types.Runtime | None:
+        for r in self.list_runtimes():
+            if r.name == name:
+                return r
+        return None
 
     def train(
             self,
