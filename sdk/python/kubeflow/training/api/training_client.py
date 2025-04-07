@@ -567,13 +567,13 @@ class TrainingClient(object):
                 constants.JOB_PARAMETERS[job_kind]["plural"],
                 job,
             )
-        except multiprocessing.TimeoutError:
+        except multiprocessing.TimeoutError as e:
             raise TimeoutError(
-                f"Timeout to create {job_kind}: {namespace}/{job.metadata.name}"
+                f"Timeout to create {job_kind}: {namespace}/{job.metadata.name} due to {str(e)}"
             )
-        except Exception:
+        except Exception as e:
             raise RuntimeError(
-                f"Failed to create {job_kind}: {namespace}/{job.metadata.name}"
+                f"Failed to create {job_kind}: {namespace}/{job.metadata.name} due to {str(e)}"
             )
 
         logger.debug(f"{job_kind} {namespace}/{job.metadata.name} has been created")
@@ -625,10 +625,14 @@ class TrainingClient(object):
                 response, constants.JOB_PARAMETERS[job_kind]["model"]
             )
 
-        except multiprocessing.TimeoutError:
-            raise TimeoutError(f"Timeout to get {job_kind}: {namespace}/{name}")
-        except Exception:
-            raise RuntimeError(f"Failed to get {job_kind}: {namespace}/{name}")
+        except multiprocessing.TimeoutError as e:
+            raise TimeoutError(
+                f"Timeout to get {job_kind}: {namespace}/{name} due to {str(e)}"
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to get {job_kind}: {namespace}/{name} due to {str(e)}"
+            )
 
         return job
 
@@ -682,10 +686,14 @@ class TrainingClient(object):
                 )
                 for item in response.get("items")
             ]
-        except multiprocessing.TimeoutError:
-            raise TimeoutError(f"Timeout to list {job_kind}s in namespace: {namespace}")
-        except Exception:
-            raise RuntimeError(f"Failed to list {job_kind}s in namespace: {namespace}")
+        except multiprocessing.TimeoutError as e:
+            raise TimeoutError(
+                f"Timeout to list {job_kind}s in namespace: {namespace} due to {str(e)}"
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to list {job_kind}s in namespace: {namespace} due to {str(e)}"
+            )
 
         return result
 
@@ -1110,10 +1118,14 @@ class TrainingClient(object):
                 async_req=True,
             )
             return thread.get(timeout).items
-        except multiprocessing.TimeoutError:
-            raise TimeoutError(f"Timeout to list pods for Job: {namespace}/{name}")
-        except Exception:
-            raise RuntimeError(f"Failed to list pods for Job: {namespace}/{name}")
+        except multiprocessing.TimeoutError as e:
+            raise TimeoutError(
+                f"Timeout to list pods for Job: {namespace}/{name} due to {str(e)}"
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to list pods for Job: {namespace}/{name} due to {str(e)}"
+            )
 
     def get_job_pod_names(
         self,
@@ -1311,9 +1323,10 @@ class TrainingClient(object):
                             container=constants.JOB_PARAMETERS[job_kind]["container"],
                         )
                         logs_dict[pod.metadata.name] = pod_logs
-                    except Exception:
+                    except Exception as e:
                         raise RuntimeError(
                             f"Failed to read logs for pod {namespace}/{pod.metadata.name}"
+                            f"due to {str(e)}"
                         )
         # If verbose is set, return Kubernetes events for Job and pods.
         if verbose:
@@ -1380,10 +1393,14 @@ class TrainingClient(object):
                 name,
                 job,
             )
-        except multiprocessing.TimeoutError:
-            raise TimeoutError(f"Timeout to update {job_kind}: {namespace}/{name}")
-        except Exception:
-            raise RuntimeError(f"Failed to update {job_kind}: {namespace}/{name}")
+        except multiprocessing.TimeoutError as e:
+            raise TimeoutError(
+                f"Timeout to update {job_kind}: {namespace}/{name} due to {str(e)}"
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to update {job_kind}: {namespace}/{name} due to {str(e)}"
+            )
 
         logger.debug(f"{job_kind} {namespace}/{name} has been updated")
 
@@ -1422,9 +1439,13 @@ class TrainingClient(object):
                 name=name,
                 body=delete_options,
             )
-        except multiprocessing.TimeoutError:
-            raise TimeoutError(f"Timeout to delete {job_kind}: {namespace}/{name}")
-        except Exception:
-            raise RuntimeError(f"Failed to delete {job_kind}: {namespace}/{name}")
+        except multiprocessing.TimeoutError as e:
+            raise TimeoutError(
+                f"Timeout to delete {job_kind}: {namespace}/{name} due to {str(e)}"
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to delete {job_kind}: {namespace}/{name} due to {str(e)}"
+            )
 
         logger.debug(f"{job_kind} {namespace}/{name} has been deleted")
