@@ -29,7 +29,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = ["kubernetes>=27.2.0", "pydantic>=2.10.0"]
+dependencies = ["kubernetes>=27.2.0", "pydantic>=2.10.0", "docker>=7.1.0"]
 
 [project.urls]
 Homepage = "https://github.com/kubeflow/trainer"

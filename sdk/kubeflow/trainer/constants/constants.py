@@ -117,5 +117,14 @@ MPI_HOSTFILE = "/etc/mpi/hostfile"
 # The default entrypoint for mpirun.
 MPI_ENTRYPOINT = "mpirun"
 
-# The default path to the directory containing local training runtime configs
+# The default path to the directory containing local training runtime configs.
 LOCAL_RUNTIMES_PATH = "./kubeflow/trainer/config/local_runtimes"
+
+# The label key used to associate docker resources with a train job name.
+LOCAL_TRAIN_JOB_NAME_LABEL = "trainer.kubeflow.org/train-job-name"
+
+# The prefix given to names used for local train jobs.
+LOCAL_TRAIN_JOB_NAME_PREFIX = "kubeflow-trainer-"
+
+# The key for the label used to indicate the rank of a local container node.
+LOCAL_NODE_RANK_LABEL = "trainer.kubeflow.org/node-rank"

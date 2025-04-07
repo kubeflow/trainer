@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import os
 from typing import List, Optional, Dict
 import yaml
@@ -18,6 +19,7 @@ import yaml
 from kubeflow.trainer import models
 from kubeflow.trainer.api.trainer_client_abc import TrainerClientABC
 from kubeflow.trainer.constants import constants
+from kubeflow.trainer.local_job_client import LocalJobClient
 from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils
 
@@ -26,24 +28,22 @@ class LocalTrainerClient(TrainerClientABC):
     def __init__(
         self,
         local_runtimes_path: str = constants.LOCAL_RUNTIMES_PATH,
+        local_job_client: LocalJobClient = LocalJobClient(),
     ):
         self.local_runtimes_path = local_runtimes_path
+        self.local_job_client = local_job_client
 
     def list_runtimes(self) -> List[types.Runtime]:
         runtimes = []
-        for filename in os.listdir(self.local_runtimes_path):
-            with open(os.path.join(self.local_runtimes_path, filename), "r") as f:
-                content_str = f.read()
-                content_dict = yaml.safe_load(content_str)
-                runtime_cr = models.TrainerV1alpha1ClusterTrainingRuntime.from_dict(content_dict)
-                runtimes.append(utils.get_runtime_from_crd(runtime_cr))
+        for cr in self.__list_runtime_crs():
+            runtimes.append(utils.get_runtime_from_crd(cr))
         return runtimes
 
-    def get_runtime(self, name: str) -> types.Runtime | None:
+    def get_runtime(self, name: str) -> types.Runtime:
         for r in self.list_runtimes():
             if r.name == name:
                 return r
-        return None
+        raise RuntimeError(f"No runtime found with name '{name}'")
 
     def train(
             self,
@@ -51,7 +51,20 @@ class LocalTrainerClient(TrainerClientABC):
             initializer: Optional[types.Initializer] = None,
             trainer: Optional[types.CustomTrainer] = None,
     ) -> str:
-        raise NotImplementedError()
+        runtime_cr = self.__get_runtime_cr(runtime.name)
+        if runtime_cr is None:
+            raise RuntimeError(f"No runtime found with name '{runtime.name}'")
+
+        if trainer and trainer.num_nodes:
+            num_nodes = trainer.num_nodes
+        else:
+            num_nodes = 1
+
+        train_job_name = self.local_job_client.create_job(
+            runtime_cr=runtime_cr,
+            num_nodes=num_nodes,
+        )
+        return train_job_name
 
     def list_jobs(
             self, runtime: Optional[types.Runtime] = None
@@ -68,7 +81,40 @@ class LocalTrainerClient(TrainerClientABC):
             step: str = constants.NODE,
             node_rank: int = 0,
     ) -> Dict[str, str]:
-        raise NotImplementedError()
+        """Gets logs for the specified training job
+            Args:
+                name (str): The name of the training job
+                follow (bool): If true, follows the job logs and prints them to standard out (default False)
+                step (int): The training job step to target (default "node")
+                node_rank (int): The node rank to retrieve logs from (default 0)
+
+            Returns:
+                Dict[str, str]: The logs of the training job, where the key is the
+                step and node rank, and the value is the logs for that node.
+         """
+        return self.local_job_client.get_job_logs(
+            job_name=name,
+            follow=follow,
+            step=step,
+            node_rank=node_rank
+        )
 
     def delete_job(self, name: str):
-        raise NotImplementedError()
+        self.local_job_client.delete_job(job_name=name)
+
+    def __list_runtime_crs(self) -> List[models.TrainerV1alpha1ClusterTrainingRuntime]:
+        runtime_crs = []
+        for filename in os.listdir(self.local_runtimes_path):
+            with open(os.path.join(self.local_runtimes_path, filename), "r") as f:
+                cr_str = f.read()
+                cr_dict = yaml.safe_load(cr_str)
+                cr = models.TrainerV1alpha1ClusterTrainingRuntime.from_dict(cr_dict)
+                if cr is not None:
+                    runtime_crs.append(cr)
+        return runtime_crs
+
+    def __get_runtime_cr(self, name: str) -> models.TrainerV1alpha1ClusterTrainingRuntime | None:
+        for cr in self.__list_runtime_crs():
+            if cr.metadata.name == name:
+                return cr
+        return None

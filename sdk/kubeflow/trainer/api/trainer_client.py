@@ -15,9 +15,6 @@
 import logging
 import multiprocessing
 import queue
-import random
-import string
-import uuid
 from typing import Dict, List, Optional
 
 from kubeflow.trainer.api.trainer_client_abc import TrainerClientABC
@@ -166,7 +163,7 @@ class TrainerClient(TrainerClientABC):
 
         # Generate unique name for the TrainJob.
         # TODO (andreyvelich): Discuss this TrainJob name generation.
-        train_job_name = random.choice(string.ascii_lowercase) + uuid.uuid4().hex[:11]
+        train_job_name = utils.generate_train_job_name()
 
         # Build the Trainer.
         trainer_crd = models.TrainerV1alpha1Trainer()
