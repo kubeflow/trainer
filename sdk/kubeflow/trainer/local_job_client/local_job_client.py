@@ -16,7 +16,6 @@ from typing import List, Dict
 
 import docker
 
-from kubeflow.trainer import models
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.utils import utils
 
@@ -29,9 +28,11 @@ class LocalJobClient:
             self.docker_client = docker_client
 
     def create_job(
-        self,
-        runtime_cr: models.TrainerV1alpha1ClusterTrainingRuntime,
-        num_nodes: int,
+            self,
+            image: str,
+            entrypoint: List[str],
+            command: List[str],
+            num_nodes: int,
     ) -> str:
         train_job_name = f"{constants.LOCAL_TRAIN_JOB_NAME_PREFIX}{utils.generate_train_job_name()}"
 
@@ -43,16 +44,13 @@ class LocalJobClient:
             },
         )
 
-        runtime_container = utils.get_runtime_trainer_container(
-            runtime_cr.spec.template.spec.replicated_jobs
-        )
-
         for i in range(num_nodes):
             c = self.docker_client.containers.run(
                 name=f"{train_job_name}-{i}",
-                image=runtime_container.image,
                 network=docker_network.id,
-                command=runtime_container.command,
+                image=image,
+                entrypoint=entrypoint,
+                command=command,
                 labels={
                     constants.LOCAL_TRAIN_JOB_NAME_LABEL: train_job_name,
                     constants.LOCAL_NODE_RANK_LABEL: str(i),

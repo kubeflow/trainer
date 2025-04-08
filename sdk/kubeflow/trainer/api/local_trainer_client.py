@@ -55,13 +55,39 @@ class LocalTrainerClient(TrainerClientABC):
         if runtime_cr is None:
             raise RuntimeError(f"No runtime found with name '{runtime.name}'")
 
+        runtime_container = utils.get_runtime_trainer_container(
+            runtime_cr.spec.template.spec.replicated_jobs
+        )
+        if runtime_container is None:
+            raise RuntimeError(f"No runtime container found")
+
+        image = runtime_container.image
+        if image is None:
+            raise RuntimeError(f"No runtime container image specified")
+
+        if trainer and trainer.func:
+            entrypoint, command = (
+                utils.get_entrypoint_using_train_func(
+                    runtime,
+                    trainer.func,
+                    trainer.func_args,
+                    trainer.pip_index_url,
+                    trainer.packages_to_install,
+                )
+            )
+        else:
+            entrypoint = runtime_container.command
+            command = runtime_container.args
+
         if trainer and trainer.num_nodes:
             num_nodes = trainer.num_nodes
         else:
             num_nodes = 1
 
         train_job_name = self.local_job_client.create_job(
-            runtime_cr=runtime_cr,
+            image=image,
+            entrypoint=entrypoint,
+            command=command,
             num_nodes=num_nodes,
         )
         return train_job_name
