@@ -134,6 +134,18 @@ const (
 
 	// TorchEnvMasterPort is the env name for the master node port.
 	TorchEnvMasterPort string = "PET_MASTER_PORT"
+
+	// TochTuneArgNumNodes is the arg anme for the number of training nodes.
+	TorchTuneArgNumNodes string = "--nnodes"
+
+	// TorchTuneArgNumProcPerNode is the arg name for the number of procs per node (e.g. number of GPUs per Pod).
+	TorchTuneArgNumProcPerNode string = "--nproc_per_node"
+
+	// TorchTuneArgRdzvId is the arg name for the rendezvous ID.
+	TorchTuneArgRdzvId string = "--rdzv_id"
+
+	// TorchTuneArgRdzvEndpoint is the arg name for the rendezvous endpoint.
+	TorchTuneArgRdzvEndpoint string = "--rdzv_endpoint"
 )
 
 var (
@@ -142,4 +154,7 @@ var (
 
 	// Torchrun reserved env names
 	TorchRunReservedEnvNames = sets.New(TorchEnvNumNodes, TorchEnvNumProcPerNode, TorchEnvNodeRank, TorchEnvMasterAddr, TorchEnvMasterPort)
+
+	// TorchTuneEntrypoint is the entrypoint for the torchtune.
+	TorchTuneEntrypoint = []string{"tune", "run"}
 )

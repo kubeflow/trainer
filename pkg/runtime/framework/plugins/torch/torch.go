@@ -19,6 +19,7 @@ package torch
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -137,9 +138,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 
 	// Update envs for Info object.
-	// Add PyTorch distributed "PET_" values for torchrun
-	// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
-	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
 		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
@@ -147,25 +145,33 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		}
 	}
 	if trainerContainer != nil {
-		apply.UpsertEnvVar(&trainerContainer.Env,
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvNumNodes).
-				WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvNumProcPerNode).
-				WithValue(numProcPerNode.String()),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvNodeRank).
-				WithValueFrom(corev1ac.EnvVarSource().
-					WithFieldRef(corev1ac.ObjectFieldSelector().
-						WithFieldPath(constants.JobCompletionIndexFieldPath))),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvMasterAddr).
-				WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvMasterPort).
-				WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-		)
+		// Add PyTorch distributed "PET_" values for torchrun.
+		// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
+		// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
+		if !slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
+			apply.UpsertEnvVar(&trainerContainer.Env,
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvNumNodes).
+					WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvNumProcPerNode).
+					WithValue(numProcPerNode.String()),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvNodeRank).
+					WithValueFrom(corev1ac.EnvVarSource().
+						WithFieldRef(corev1ac.ObjectFieldSelector().
+							WithFieldPath(constants.JobCompletionIndexFieldPath))),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvMasterAddr).
+					WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvMasterPort).
+					WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+			)
+		} else {
+			// Add PyTorch distributed command line args for torchtune.
+
+		}
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
 	}
