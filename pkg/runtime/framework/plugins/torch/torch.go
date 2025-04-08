@@ -22,7 +22,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -187,7 +186,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 				),
 				fmt.Sprintf("%s %s",
 					constants.TorchTuneArgRdzvId,
-					uuid.New().String(),
+					trainJob.Name,
 				),
 				fmt.Sprintf("%s %s",
 					constants.TorchTuneArgRdzvEndpoint,

@@ -1126,6 +1126,74 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
+		"pass distributed params to Args when using torchtune": {
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "torchtune-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(4).
+						NumProcPerNode(intstr.FromString("auto")).
+						Container(
+							"ghcr.io/kubeflow/trainer/torchtune-trainer",
+							[]string{"tune", "run"},
+							[]string{
+								"dtype=fp16",
+								"batch_size=32",
+								"epochs=10",
+								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+							},
+							corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("8"),
+								corev1.ResourceMemory: resource.MustParse("16Gi"),
+								"nvidia.com/gpu":      resource.MustParse("4"), // 4 GPUs per node
+							},
+						).
+						Obj(),
+				).
+				Obj(),
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+							Args: []string{
+								fmt.Sprintf("%s %s", constants.TorchTuneArgNumNodes, "4"),
+								fmt.Sprintf("%s %s", constants.TorchTuneArgNumProcPerNode, "auto"),
+								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvId, "torchtune-job"),
+								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
+							},
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -1326,6 +1394,40 @@ func TestValidate(t *testing.T) {
 					}()),
 				),
 			},
+		},
+		"no reserved environment variable for torchtune": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(intstr.FromString("auto")).
+					Container(
+						"ghcr.io/kubeflow/trainer/torchtune-trainer",
+						[]string{"tune", "run"},
+						nil, corev1.ResourceList{},
+					).
+					Env(
+						[]corev1.EnvVar{
+							{
+								Name:  "test",
+								Value: "value",
+							},
+							{
+								Name:  constants.TorchEnvNumProcPerNode,
+								Value: "value",
+							},
+						}...,
+					).
+					Obj(),
+				).
+				Obj(),
 		},
 	}
 	for name, tc := range cases {
