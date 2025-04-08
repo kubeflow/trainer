@@ -1175,7 +1175,7 @@ func TestTorch(t *testing.T) {
 					PodSets: []runtime.PodSet{{
 						Name:              constants.Node,
 						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
+						Count:             ptr.To[int32](4),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.Node,
