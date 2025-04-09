@@ -64,6 +64,6 @@ setuptools.setup(
     tests_require=TESTS_REQUIRES,
     extras_require={
         "test": TESTS_REQUIRES,
-        "huggingface": ["transformers==4.38.0", "peft==0.3.0"],
+        "huggingface": ["transformers==4.50.2", "peft==0.15.1"],
     },
 )
