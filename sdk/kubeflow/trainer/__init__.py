@@ -33,6 +33,7 @@ from kubeflow.trainer.types.types import (
     HuggingFaceModelInitializer,
     Initializer,
     Loss,
+    PretrainedModel,
     Runtime,
     Trainer,
     TrainerType,

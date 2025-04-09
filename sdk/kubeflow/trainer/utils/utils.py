@@ -320,6 +320,7 @@ def get_entrypoint_using_train_func(
 
 
 def get_args_using_torchtune_config(
+    runtime: types.Runtime,
     fine_tuning_config: types.TorchTuneConfig,
 ) -> Tuple[List[str], List[str]]:
     """
@@ -345,6 +346,12 @@ def get_args_using_torchtune_config(
     # Override the loss if it is provided.
     if fine_tuning_config.loss:
         args.append(f"loss={fine_tuning_config.loss}")
+
+    # Provide pre-trained model information.
+    # TODO(Electronic-Waste): Move pre-trained model information to the runtime API fields.
+    # Ref: https://github.com/kubeflow/trainer/pull/2410#pullrequestreview-2672356400
+    if runtime.pretrained_model:
+        args.append(f"model={runtime.pretrained_model}")
 
     return constants.DEFAULT_TORCHTUNE_COMMAND, args
 
@@ -384,6 +391,7 @@ def get_trainer_crd_from_custom_trainer(
 
 def get_trainer_crd_from_builtin_trainer(
     trainer: types.BuiltinTrainer,
+    runtime: types.Runtime,
 ) -> models.TrainerV1alpha1Trainer:
     """
     Get the Trainer CRD from the builtin trainer.
@@ -406,7 +414,9 @@ def get_trainer_crd_from_builtin_trainer(
     # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
     # the torchtune config in the runtime plugin.
     # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
-    trainer_crd.command, trainer_crd.args = get_args_using_torchtune_config(trainer)
+    trainer_crd.command, trainer_crd.args = get_args_using_torchtune_config(
+        runtime, trainer
+    )
 
     return trainer_crd
 

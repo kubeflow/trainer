@@ -115,6 +115,12 @@ class Framework(Enum):
     TORCHTUNE = "torchtune"
 
 
+class PretrainedModel(Enum):
+    LLAMA3_2_1B = "llama3_2/1B"
+    LLAMA3_2_3B = "llama3_2/3B"
+    LLAMA3_3_70B = "llama3_3/70B"
+
+
 # Representation for the Trainer of the runtime.
 @dataclass
 class Trainer:
@@ -130,7 +136,7 @@ class Trainer:
 class Runtime:
     name: str
     trainer: Trainer
-    pretrained_model: Optional[str] = None
+    pretrained_model: Optional[PretrainedModel] = None
 
 
 # Representation for the TrainJob steps.
