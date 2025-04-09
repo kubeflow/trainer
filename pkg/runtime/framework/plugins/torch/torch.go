@@ -71,9 +71,8 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 			}
 		}
 
-		// Check reserved envs for torchrun.
-		// TODO(Electronic-Waste): Add validation for torchtune args.
 		if !slices.Equal(newObj.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
+			// Check reserved envs for torchrun.
 			torchEnvs := sets.New[string]()
 			for _, env := range newObj.Spec.Trainer.Env {
 				if constants.TorchRunReservedEnvNames.Has(env.Name) {
@@ -84,6 +83,17 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 			if torchEnvs.Len() > 0 {
 				trainerEnvsPath := specPath.Child("trainer").Child("env")
 				allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(torchEnvs))))
+			}
+		} else {
+			// Check supported pretrained models for torchtune.
+			// TODO(Electronic-Waste): Add more validation for torchtune when we support more arguments.
+			argPath := specPath.Child("trainer").Child("args")
+			model := getModelFromArgs(newObj.Spec.Trainer.Args)
+
+			if model == nil {
+				allErrs = append(allErrs, field.Invalid(argPath, newObj.Spec.Trainer.Args, "must specify a pretrained model"))
+			} else if !constants.TorchTuneSupportedPretrainedModels.Has(*model) {
+				allErrs = append(allErrs, field.Invalid(argPath, newObj.Spec.Trainer.Args, fmt.Sprintf("must have a supported pretrained model, invalid model configured: %v", *model)))
 			}
 		}
 	}
@@ -246,15 +256,6 @@ func getRecipeFromArgs(numNodes int32, numProcPerNode intstr.IntOrString, _ []st
 
 // getConfigFromArgs extracts the config from distributed parameters, recipe and command line arguments.
 func getConfigFileFromArgs(numNodes int32, recipe string, args []string) string {
-	// Extract model from command line args.
-	model := constants.MODEL_LLAMA3_2_1B
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "model") {
-			model = strings.Split(arg, "=")[1]
-			break
-		}
-	}
-
 	// Determine the config file name based on the recipe and number of nodes.
 	var suffix string
 	switch recipe {
@@ -268,5 +269,16 @@ func getConfigFileFromArgs(numNodes int32, recipe string, args []string) string 
 		suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
 	}
 
-	return fmt.Sprintf("%s%s.yaml", model, suffix)
+	return fmt.Sprintf("%s%s.yaml", *getModelFromArgs(args), suffix)
+}
+
+func getModelFromArgs(args []string) *string {
+	var model *string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "model") {
+			model = &strings.Split(arg, "=")[1]
+			break
+		}
+	}
+	return model
 }

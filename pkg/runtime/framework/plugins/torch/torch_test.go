@@ -1568,7 +1568,8 @@ func TestValidate(t *testing.T) {
 					Container(
 						"ghcr.io/kubeflow/trainer/torchtune-trainer",
 						[]string{"tune", "run"},
-						nil, corev1.ResourceList{},
+						[]string{"model=llama3_2/1B"},
+						corev1.ResourceList{},
 					).
 					Env(
 						[]corev1.EnvVar{
@@ -1585,6 +1586,65 @@ func TestValidate(t *testing.T) {
 					Obj(),
 				).
 				Obj(),
+		},
+		"missing pretrained model": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(intstr.FromString("auto")).
+					Container(
+						"ghcr.io/kubeflow/trainer/torchtune-trainer",
+						[]string{"tune", "run"},
+						nil, corev1.ResourceList{},
+					).
+					Obj(),
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("args"),
+					[]string(nil),
+					"must specify a pretrained model",
+				),
+			},
+		},
+		"unsupported pretrained model": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(intstr.FromString("auto")).
+					Container(
+						"ghcr.io/kubeflow/trainer/torchtune-trainer",
+						[]string{"tune", "run"},
+						[]string{"model=llama3_1/70B"},
+						corev1.ResourceList{},
+					).
+					Obj(),
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("args"),
+					[]string{"model=llama3_1/70B"},
+					fmt.Sprintf("must have a supported pretrained model, invalid model configured: %s", "llama3_1/70B"),
+				),
+			},
 		},
 	}
 	for name, tc := range cases {
