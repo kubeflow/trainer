@@ -25,3 +25,8 @@ hack/python-sdk/openapi-generator-cli.jar
 
 # Coverage
 cover.out
+
+# Helm
+charts/kubeflow-trainer/charts/
+charts/kubeflow-trainer/Chart.lock
+*.tgz
