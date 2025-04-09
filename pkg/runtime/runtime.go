@@ -80,7 +80,7 @@ type PodSet struct {
 
 type Container struct {
 	Name         string
-	Args		 []string
+	Args         []string
 	Env          []corev1ac.EnvVarApplyConfiguration
 	Ports        []corev1ac.ContainerPortApplyConfiguration
 	VolumeMounts []corev1ac.VolumeMountApplyConfiguration
