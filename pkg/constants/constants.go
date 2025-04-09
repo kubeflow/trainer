@@ -150,11 +150,31 @@ const (
 	// TorchTuneFullFinetuneSingleDevice Recipe is the recipe for the single device full finetune.
 	TorchTuneFullFinetuneSingleDevice string = "full_finetune_single_device"
 
+	// TorchTuneFullFinetuneSingleDeviceConfigSuffix is the config suffix for the single device full finetune.
+	TorchTuneFullFinetuneSingleDeviceConfigSuffix string = "_full_single_device"
+
 	// TorchTuneFullFinetuneDistributed Recipe is the recipe for the distributed full finetune.
 	TorchTuneFullFinetuneDistributed string = "full_finetune_distributed"
 
+	// TorchTuneFullFinetuneMultiDevicesConfigSuffix is the config suffix for the single node distributed full finetune.
+	TorchTuneFullFinetuneMultiDevicesConfigSuffix string = "_full"
+
+	// TorchTuneFullFinetuneMultiNodesConfigSuffix is the config suffix for the multi node distributed full finetune.
+	TorchTuneFullFinetuneMultiNodesConfigSuffix string = "_full_multinode"
+
 	// TorchTuneDefaultRecipe is the default recipe for the torchtune.
 	TorchTuneDefaultRecipe string = TorchTuneFullFinetuneDistributed
+)
+
+const (
+	// MODEL_LLAMA3_2_1B is the model name for the Llama3.2 1B Instruct model.
+	MODEL_LLAMA3_2_1B = "llama3_2/1B"
+
+	// MODEL_LLAMA3_2_7B is the model name for the Llama3.2 7B Instruct model.
+	MODEL_LLAMA3_2_7B = "llama3_2/7B"
+
+	// MODEL_LLAMA3_3_70B is the model name for the Llama3.3 70B Instruct model.
+	MODEL_LLAMA3_3_70B = "llama3_3/70B"
 )
 
 var (
@@ -163,6 +183,12 @@ var (
 
 	// Torchrun reserved env names
 	TorchRunReservedEnvNames = sets.New(TorchEnvNumNodes, TorchEnvNumProcPerNode, TorchEnvNodeRank, TorchEnvMasterAddr, TorchEnvMasterPort)
+
+	// Currently supported TorchTune recipes.
+	TorchTuneSupportedRecipes = sets.New(TorchTuneFullFinetuneSingleDevice, TorchTuneFullFinetuneDistributed)
+
+	// Currently supported pretrained models for TorchTuen Trainer.
+	TorchTuneSupportedPretrainedModels = sets.New(MODEL_LLAMA3_2_1B, MODEL_LLAMA3_2_7B, MODEL_LLAMA3_3_70B)
 
 	// TorchTuneEntrypoint is the entrypoint for the torchtune.
 	TorchTuneEntrypoint = []string{"tune", "run"}

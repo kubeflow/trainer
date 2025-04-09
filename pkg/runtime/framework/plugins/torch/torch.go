@@ -200,12 +200,14 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			)
 
 			// 2. Get the recipe and config from old args and append them to new args.
-			newArgs = append(newArgs,
-				getRecipeFromArgs(numNodes, numProcPerNode, oldArgs),
-			)
+			recipe := getRecipeFromArgs(numNodes, numProcPerNode, oldArgs)
+			config := getConfigFileFromArgs(numNodes, recipe, oldArgs)
+			newArgs = append(newArgs, recipe, fmt.Sprintf("--config %s", config))
 
 			// 3. Reserve old arguments to override corresponding items in the config file.
-			newArgs = append(newArgs, oldArgs...)
+			newArgs = append(newArgs, slices.DeleteFunc(oldArgs, func(arg string) bool {
+				return strings.HasPrefix(arg, "model")
+			})...)
 
 			trainerContainer.Args = newArgs
 		}
@@ -240,4 +242,31 @@ func getRecipeFromArgs(numNodes int32, numProcPerNode intstr.IntOrString, _ []st
 		recipe = constants.TorchTuneFullFinetuneSingleDevice
 	}
 	return recipe
+}
+
+// getConfigFromArgs extracts the config from distributed parameters, recipe and command line arguments.
+func getConfigFileFromArgs(numNodes int32, recipe string, args []string) string {
+	// Extract model from command line args.
+	model := constants.MODEL_LLAMA3_2_1B
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "model") {
+			model = strings.Split(arg, "=")[1]
+			break
+		}
+	}
+
+	// Determine the config file name based on the recipe and number of nodes.
+	var suffix string
+	switch recipe {
+	case constants.TorchTuneFullFinetuneDistributed:
+		if numNodes == 1 {
+			suffix = constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
+		} else {
+			suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
+		}
+	case constants.TorchTuneFullFinetuneSingleDevice:
+		suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
+	}
+
+	return fmt.Sprintf("%s%s.yaml", model, suffix)
 }
