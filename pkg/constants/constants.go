@@ -146,6 +146,15 @@ const (
 
 	// TorchTuneArgRdzvEndpoint is the arg name for the rendezvous endpoint.
 	TorchTuneArgRdzvEndpoint string = "--rdzv_endpoint"
+
+	// TorchTuneFullFinetuneSingleDevice Recipe is the recipe for the single device full finetune.
+	TorchTuneFullFinetuneSingleDevice string = "full_finetune_single_device"
+
+	// TorchTuneFullFinetuneDistributed Recipe is the recipe for the distributed full finetune.
+	TorchTuneFullFinetuneDistributed string = "full_finetune_distributed"
+
+	// TorchTuneDefaultRecipe is the default recipe for the torchtune.
+	TorchTuneDefaultRecipe string = TorchTuneFullFinetuneDistributed
 )
 
 var (

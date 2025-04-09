@@ -34,12 +34,6 @@ var (
 	errorRequestedFieldPathNotFound = errors.New("requested field path not found")
 )
 
-func UpsertArgs(args *[]string, upArgs ...string) {
-	for _, a := range upArgs {
-		upsert(args, a, byArgName)
-	}
-}
-
 func UpsertEnvVar(envVars *[]corev1ac.EnvVarApplyConfiguration, envVar ...corev1ac.EnvVarApplyConfiguration) {
 	for _, e := range envVar {
 		upsert(envVars, e, byEnvVarName)
@@ -68,10 +62,6 @@ func UpsertVolumeMounts(mounts *[]corev1ac.VolumeMountApplyConfiguration, upMoun
 	for _, m := range upMounts {
 		upsert(mounts, m, byVolumeMountPath)
 	}
-}
-
-func byArgName(a, b string) bool {
-	return a == b
 }
 
 func byEnvVarName(a, b corev1ac.EnvVarApplyConfiguration) bool {

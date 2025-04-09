@@ -173,12 +173,17 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 					WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 			)
 		} else {
-			// Add PyTorch distributed command line args for torchtune.
+			// Mutate command line args for torchtune.
+			// Ref: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2#complement-torch-plugin
+			oldArgs, newArgs := trainerContainer.Args, []string{}
+
+			// 1. Add PyTorch distributed command line args for torchtune.
 			// TODO(Electronic-Waste): Add more args for torchtune if required.
-			apply.UpsertArgs(&trainerContainer.Args,
-				fmt.Sprintf("%s %s",
+			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
+			newArgs = append(newArgs,
+				fmt.Sprintf("%s %d",
 					constants.TorchTuneArgNumNodes,
-					fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)),
+					numNodes,
 				),
 				fmt.Sprintf("%s %s",
 					constants.TorchTuneArgNumProcPerNode,
@@ -188,11 +193,21 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 					constants.TorchTuneArgRdzvId,
 					trainJob.Name,
 				),
-				fmt.Sprintf("%s %s",
+				fmt.Sprintf("%s %s-%s-0-0.%s:%d",
 					constants.TorchTuneArgRdzvEndpoint,
-					fmt.Sprintf("%s-%s-0-0.%s:%d", trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort),
+					trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort,
 				),
 			)
+
+			// 2. Get the recipe and config from old args and append them to new args.
+			newArgs = append(newArgs,
+				getRecipeFromArgs(numNodes, numProcPerNode, oldArgs),
+			)
+
+			// 3. Reserve old arguments to override corresponding items in the config file.
+			newArgs = append(newArgs, oldArgs...)
+
+			trainerContainer.Args = newArgs
 		}
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
@@ -215,4 +230,14 @@ func calculateNumProcPerNode(
 		return fallbackNumProcPerNode, false
 	}
 	return intstr.FromInt32(defaultCPU), false
+}
+
+// getRecipeFromArgs extracts the recipe from the distributed parameters and command line arguments.
+// TODO(Electronic-Waste): Add support for more recipes.
+func getRecipeFromArgs(numNodes int32, numProcPerNode intstr.IntOrString, _ []string) string {
+	recipe := constants.TorchTuneDefaultRecipe
+	if numNodes == 1 && numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 {
+		recipe = constants.TorchTuneFullFinetuneSingleDevice
+	}
+	return recipe
 }
