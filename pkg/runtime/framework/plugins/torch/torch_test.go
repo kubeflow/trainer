@@ -1126,11 +1126,11 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
-		"pass distributed params to Args when using torchtune": {
+		"multi-devices full fine-tuning with torchtune": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "torchtune-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumNodes(4).
+						NumNodes(1).
 						NumProcPerNode(intstr.FromString("auto")).
 						Container(
 							"ghcr.io/kubeflow/trainer/torchtune-trainer",
@@ -1140,6 +1140,7 @@ func TestTorch(t *testing.T) {
 								"batch_size=32",
 								"epochs=10",
 								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+								"model=llama3_2/1B",
 							},
 							corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("8"),
@@ -1175,15 +1176,96 @@ func TestTorch(t *testing.T) {
 					PodSets: []runtime.PodSet{{
 						Name:              constants.Node,
 						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](4),
+						Count:             ptr.To[int32](1),
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Args: []string{
-								fmt.Sprintf("%s %s", constants.TorchTuneArgNumNodes, "4"),
+								fmt.Sprintf("%s %s", constants.TorchTuneArgNumNodes, "1"),
 								fmt.Sprintf("%s %s", constants.TorchTuneArgNumProcPerNode, "auto"),
 								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvId, "torchtune-job"),
 								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
+								constants.TorchTuneFullFinetuneDistributed,
+								"--config llama3_2/1B_full.yaml",
+								"dtype=fp16",
+								"batch_size=32",
+								"epochs=10",
+								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+							},
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
+		"single-device full fine-tuning with torchtune": {
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "torchtune-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(1).
+						NumProcPerNode(intstr.FromInt(1)).
+						Container(
+							"ghcr.io/kubeflow/trainer/torchtune-trainer",
+							[]string{"tune", "run"},
+							[]string{
+								"dtype=fp16",
+								"batch_size=32",
+								"epochs=10",
+								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+								"model=llama3_2/1B",
+							},
+							corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("8"),
+								corev1.ResourceMemory: resource.MustParse("16Gi"),
+								"nvidia.com/gpu":      resource.MustParse("1"), // 1 GPU per node
+							},
+						).
+						Obj(),
+				).
+				Obj(),
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+							Args: []string{
+								fmt.Sprintf("%s %s", constants.TorchTuneArgNumNodes, "1"),
+								fmt.Sprintf("%s %s", constants.TorchTuneArgNumProcPerNode, "1"),
+								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvId, "torchtune-job"),
+								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
+								constants.TorchTuneFullFinetuneSingleDevice,
+								"--config llama3_2/1B_full_single_device.yaml",
+								"dtype=fp16",
+								"batch_size=32",
+								"epochs=10",
+								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
 							},
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),

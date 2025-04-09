@@ -175,7 +175,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		} else {
 			// Mutate command line args for torchtune.
 			// Ref: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2#complement-torch-plugin
-			oldArgs, newArgs := trainerContainer.Args, []string{}
+			oldArgs, newArgs := trainJob.Spec.Trainer.Args, []string{}
 
 			// 1. Add PyTorch distributed command line args for torchtune.
 			// TODO(Electronic-Waste): Add more args for torchtune if required.
