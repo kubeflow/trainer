@@ -32,6 +32,9 @@ spec:
                       persistentVolumeClaim:
                         claimName: initializer
         - name: model-initializer
+          dependsOn:
+            - name: dataset-initializer
+              status: Complete
           template:
             metadata:
               labels:
@@ -54,8 +57,6 @@ spec:
                         claimName: initializer
         - name: node
           dependsOn:
-            - name: dataset-initializer
-              status: Complete
             - name: model-initializer
               status: Complete
           template:
