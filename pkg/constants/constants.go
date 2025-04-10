@@ -187,7 +187,7 @@ var (
 	// Currently supported TorchTune recipes.
 	TorchTuneSupportedRecipes = sets.New(TorchTuneFullFinetuneSingleDevice, TorchTuneFullFinetuneDistributed)
 
-	// Currently supported pretrained models for TorchTuen Trainer.
+	// Currently supported pretrained models for TorchTune Trainer.
 	TorchTuneSupportedPretrainedModels = sets.New(MODEL_LLAMA3_2_1B, MODEL_LLAMA3_2_7B, MODEL_LLAMA3_3_70B)
 
 	// TorchTuneEntrypoint is the entrypoint for the torchtune.
