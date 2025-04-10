@@ -87,13 +87,11 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 		} else {
 			// Check supported pretrained models for torchtune.
 			// TODO(Electronic-Waste): Add more validation for torchtune when we support more arguments.
-			argPath := specPath.Child("trainer").Child("args")
-			model := getModelFromArgs(newObj.Spec.Trainer.Args)
+			runtimeRefNamePath := specPath.Child("runtimeRef").Child("name")
+			model := getModelFromRuntimeRef(newObj.Spec.RuntimeRef.Name)
 
-			if model == nil {
-				allErrs = append(allErrs, field.Invalid(argPath, newObj.Spec.Trainer.Args, "must specify a pretrained model"))
-			} else if !constants.TorchTuneSupportedPretrainedModels.Has(*model) {
-				allErrs = append(allErrs, field.Invalid(argPath, newObj.Spec.Trainer.Args, fmt.Sprintf("must have a supported pretrained model, invalid model configured: %v", *model)))
+			if !constants.TorchTuneSupportedPretrainedModels.Has(model) {
+				allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("must have a supported pretrained model, invalid model configured: %v", model)))
 			}
 		}
 	}
@@ -211,7 +209,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 
 			// 2. Get the recipe and config from old args and append them to new args.
 			recipe := getRecipeFromArgs(numNodes, numProcPerNode, oldArgs)
-			config := getConfigFileFromArgs(numNodes, recipe, oldArgs)
+			config := getConfigFileFromArgs(numNodes, recipe, trainJob.Spec.RuntimeRef.Name)
 			newArgs = append(newArgs, recipe, fmt.Sprintf("--config %s", config))
 
 			// 3. Reserve old arguments to override corresponding items in the config file.
@@ -254,8 +252,8 @@ func getRecipeFromArgs(numNodes int32, numProcPerNode intstr.IntOrString, _ []st
 	return recipe
 }
 
-// getConfigFromArgs extracts the config from distributed parameters, recipe and command line arguments.
-func getConfigFileFromArgs(numNodes int32, recipe string, args []string) string {
+// getConfigFromArgs extracts the config from distributed parameters, recipe and runtime reference name.
+func getConfigFileFromArgs(numNodes int32, recipe, runtimeRefName string) string {
 	// Determine the config file name based on the recipe and number of nodes.
 	var suffix string
 	switch recipe {
@@ -269,16 +267,14 @@ func getConfigFileFromArgs(numNodes int32, recipe string, args []string) string 
 		suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
 	}
 
-	return fmt.Sprintf("%s%s.yaml", *getModelFromArgs(args), suffix)
+	return fmt.Sprintf("%s%s.yaml", getModelFromRuntimeRef(runtimeRefName), suffix)
 }
 
-func getModelFromArgs(args []string) *string {
-	var model *string
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "model") {
-			model = &strings.Split(arg, "=")[1]
-			break
-		}
+func getModelFromRuntimeRef(runtimeRefName string) string {
+	fields := strings.Split(runtimeRefName, "-")
+	if len(fields) != 3 {
+		return ""
 	}
-	return model
+
+	return fmt.Sprintf("%s/%s", strings.ReplaceAll(fields[1], ".", "_"), strings.ToUpper(fields[2]))
 }

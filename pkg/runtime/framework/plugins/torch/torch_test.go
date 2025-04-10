@@ -1140,7 +1140,6 @@ func TestTorch(t *testing.T) {
 								"batch_size=32",
 								"epochs=10",
 								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
-								"model=llama3_2/1B",
 							},
 							corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("8"),
@@ -1149,6 +1148,10 @@ func TestTorch(t *testing.T) {
 							},
 						).
 						Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.2-1b",
 				).
 				Obj(),
 			info: runtime.NewInfo(
@@ -1215,7 +1218,6 @@ func TestTorch(t *testing.T) {
 								"batch_size=32",
 								"epochs=10",
 								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
-								"model=llama3_2/1B",
 							},
 							corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("8"),
@@ -1224,6 +1226,10 @@ func TestTorch(t *testing.T) {
 							},
 						).
 						Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.2-1b",
 				).
 				Obj(),
 			info: runtime.NewInfo(
@@ -1290,7 +1296,6 @@ func TestTorch(t *testing.T) {
 								"batch_size=32",
 								"epochs=10",
 								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
-								"model=llama3_3/70B",
 							},
 							corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("8"),
@@ -1299,6 +1304,10 @@ func TestTorch(t *testing.T) {
 							},
 						).
 						Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.3-70b",
 				).
 				Obj(),
 			info: runtime.NewInfo(
@@ -1568,8 +1577,7 @@ func TestValidate(t *testing.T) {
 					Container(
 						"ghcr.io/kubeflow/trainer/torchtune-trainer",
 						[]string{"tune", "run"},
-						[]string{"model=llama3_2/1B"},
-						corev1.ResourceList{},
+						nil, corev1.ResourceList{},
 					).
 					Env(
 						[]corev1.EnvVar{
@@ -1585,9 +1593,13 @@ func TestValidate(t *testing.T) {
 					).
 					Obj(),
 				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.2-1b",
+				).
 				Obj(),
 		},
-		"missing pretrained model": {
+		"unsupported pretrained model": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
@@ -1607,41 +1619,15 @@ func TestValidate(t *testing.T) {
 					).
 					Obj(),
 				).
-				Obj(),
-			wantError: field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec").Child("trainer").Child("args"),
-					[]string(nil),
-					"must specify a pretrained model",
-				),
-			},
-		},
-		"unsupported pretrained model": {
-			info: runtime.NewInfo(
-				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
-					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
-						Obj(),
-					).
-					Obj(),
-				),
-			),
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(intstr.FromString("auto")).
-					Container(
-						"ghcr.io/kubeflow/trainer/torchtune-trainer",
-						[]string{"tune", "run"},
-						[]string{"model=llama3_1/70B"},
-						corev1.ResourceList{},
-					).
-					Obj(),
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.1-70b",
 				).
 				Obj(),
 			wantError: field.ErrorList{
 				field.Invalid(
-					field.NewPath("spec").Child("trainer").Child("args"),
-					[]string{"model=llama3_1/70B"},
+					field.NewPath("spec").Child("runtimeRef").Child("name"),
+					"torchtune-llama3.1-70b",
 					fmt.Sprintf("must have a supported pretrained model, invalid model configured: %s", "llama3_1/70B"),
 				),
 			},
