@@ -35,7 +35,7 @@ class TrainerClient:
         config_file: Optional[str] = None,
         context: Optional[str] = None,
         client_configuration: Optional[client.Configuration] = None,
-        namespace: str = utils.get_default_target_namespace(),
+        namespace: Optional[str] = None,
     ):
         """TrainerClient constructor. Configure logging in your application
             as follows to see detailed information from the TrainerClient APIs:
@@ -58,6 +58,9 @@ class TrainerClient:
                 `/var/run/secrets/kubernetes.io/serviceaccount/namespace` file. By default it
                 uses the `default` namespace.
         """
+
+        if namespace is None:
+            namespace = utils.get_default_target_namespace(context)
 
         # If client configuration is not set, use kube-config to access Kubernetes APIs.
         if client_configuration is None:

@@ -29,10 +29,16 @@ def is_running_in_k8s() -> bool:
     return os.path.isdir("/var/run/secrets/kubernetes.io/")
 
 
-def get_default_target_namespace() -> str:
+def get_default_target_namespace(context: Optional[str] = None) -> str:
     if not is_running_in_k8s():
         try:
-            _, current_context = config.list_kube_config_contexts()
+            all_contexts, current_context = config.list_kube_config_contexts()
+            # If context is set, we should get namespace from it.
+            if context:
+                for c in all_contexts:
+                    if isinstance(c, Dict) and c.get("name") == context:
+                        return c["context"]["namespace"]
+            # Otherwise, try to get namespace from the current context.
             return current_context["context"]["namespace"]
         except Exception:
             return constants.DEFAULT_NAMESPACE
