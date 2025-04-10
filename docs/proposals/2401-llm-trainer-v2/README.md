@@ -95,7 +95,7 @@ job_id = TrainerClient().train(
         )
     ),
     runtime=Runtime(
-      name="torchtune-llama3.1-8B-finetuning",
+      name="torchtune-llama3.1-8b",
     ),
 )
 ```
@@ -127,7 +127,7 @@ The CLI-based way allows us to mutate these parameters by overriding the `comman
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
-  name: torchtune-llama3.1-8B-finetuning
+  name: torchtune-llama3.1-8b
   labels:
 spec:
   mlPolicy:
@@ -144,7 +144,7 @@ spec:
                 spec:
                   containers:
                     - name: trainer
-                      image: <pytorch+cuda+torchtune image>
+                      image: ghcr.io/kubeflow/trainer/torchtune-trainer
                       command:
                         - tune run
                       args:
@@ -160,13 +160,13 @@ metadata:
   namespace: tenant-alpha
 spec:
   runtimeRef:
-    name: torchtune-llama3.1-8B-finetuning
+    name: torchtune-llama3.1-8B
   trainer:
     command:
       - tune run
     args:
       - --nnodes=1
-      - --nproc_per_node=4
+      - --nproc_per_node=2
       - lora_finetune_distributed
       - --config
       - llama3_1/8B_full
@@ -190,7 +190,7 @@ To provide a better user experience, we need to offer a simple SDK that allows u
 ```python
 # By default we can fine-tune models without any additional configurations from users
 TrainerClient().train(
-    runtime=Runtime(name="torchtune-llama-3.3-70b"),
+    runtime=Runtime(name="torchtune-llama3.3-70b"),
 )
 ```
 
@@ -199,7 +199,7 @@ TrainerClient().train(
 As we discussed in [Github](https://github.com/kubeflow/trainer/pull/2410#discussion_r1963832826), the `train()` API mainly executes two types of training tasks:
 
 1. **Type 1: Training with custom function/image**: A self-contained function/image that encapsulates the entire model training process (e.g. `CustomTrainer`).
-2. **Type 2: Config-driven approach with existing Trainer**: A trainer that already includes fine-tuning logic, requiring only parameter adjustments (e.g. `BuiltinTrainer`).
+2. **Type 2: Config-driven approach with existing Trainer**: A trainer that already includes training process, requiring only parameter adjustments (e.g. `BuiltinTrainer`).
 
 So we plan to modify the `train()` API to:
 
@@ -353,9 +353,9 @@ We will add CLI-based parameters mutation to `EnforceMLPolicy()` in `pkg/runtime
 
 Related changes:
 
-1. Store container arguments to internal runtime Information (`pkg/runtime/runtime.go`).
+1. Add `Args` fields to internal runtime Information (`pkg/runtime/runtime.go`).
 
-2. Insert container arguments in front of Args of Trainer Node (`pkg/runtime/framework/plugins/jobest/builder.go`)
+2. Insert distributed parameters to Trainer Args (`pkg/runtime/framework/plugins/torch/torch.go`)
 
 #### Create Map from `TorchTuneConfig` to Specific Recipes and Configs
 
@@ -370,17 +370,13 @@ We will create a map from (`TorchTuneConfig`, `num_nodes`, `nproc_per_node`, `ru
 
 - How to Select `config`
 
-We will create one `ClusterTrainingRuntime` for one model. In this way, we can extract the model info in `runtime`, and select corresponding config file according to the `recipe`.
+We will create one `ClusterTrainingRuntime` for one model. In this way, we can extract the model info in the `.spec.runtimeRef.name` field path of Trainjob, and select corresponding config file according to the `recipe`.
 
 #### Validate Fine-Tuning Configurations
 
 In order to ensure the validity of the configurations propagated by SDK, we plan to add some validating requirements to the TrainJob Webhook. We'll implement validations in torch plugin [`CustomValidationPlugin`](https://github.com/kubeflow/trainer/blob/1f443729ebdb3e792d4b9cd2b242f33b0e86fe14/pkg/runtime/framework/interface.go#L34-L37):
 
 1. The ClusterTrainingRuntime referenced by `runtime` exists in the control plane.
-
-#### Determine Default Resources
-
-Currently, `torchtune` has limited support for multi-node training (but support is coming soon). So, we'd better use 1 PyTorch node and 1 GPU by default. Users can specify `num_nodes` and `resource_per_node` in the `Trainer` field to increase PyTorch nodes and GPU number.
 
 ### Maintain ClusterTrainingRuntimes in Manifests
 
@@ -463,17 +459,17 @@ For model and dataset initialization, we'll reuse the existing [Kubeflow Trainer
 # Dataset Initialization
 containers:
   - name: dataset-initializer
-    image: docker.io/kubeflow/dataset-initializer
+    image: ghcr.io/kubeflo/trainer/dataset-initializer
     env:
       - name: STORAGE_URI
         value: hf://tatsu-lab/alpaca
     volumeMounts:
       - mountPath: /workspace/dataset
-        name: dataset-initializer
+        name: initializer
 volumes:
-  - name: dataset-initializer
+  - name: initializer
     persistentVolumeClaim:
-      claimName: dataset-initializer
+      claimName: initializer
 
 ```
 
@@ -481,17 +477,17 @@ volumes:
 # Model Initialization
 containers:
   - name: model-initializer
-    image: docker.io/kubeflow/model-initializer
+    image: ghcr.io/kubeflow/trainer/model-initializer
     env:
       - name: STORAGE_URI
-        value: hf://meta-llama/Llama-2-7b
+        value: hf://meta-llama/Llama-3.2-1B-Instruct
     volumeMounts:
       - mountPath: /workspace/model
-        name: model-initializer
+        name: initializer
 volumes:
-  - name: model-initializer
+  - name: initializer
     persistentVolumeClaim:
-      claimName: model-initializer
+      claimName: initializer
 
 ```
 
@@ -501,7 +497,7 @@ As for the [model exporter](https://github.com/kubeflow/trainer/issues/2245), we
 # Model Exporting
 containers:
   - name: model-exporter
-    image: docker.io/kubeflow/model-exporter
+    image: ghcr.io/kubeflow/trainer/model-exporter
     volumeMounts:
       - mountPath: /workspace/adapters
         name: model-exporter
