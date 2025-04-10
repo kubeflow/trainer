@@ -347,12 +347,6 @@ def get_args_using_torchtune_config(
     if fine_tuning_config.loss:
         args.append(f"loss={fine_tuning_config.loss}")
 
-    # Provide pre-trained model information.
-    # TODO(Electronic-Waste): Move pre-trained model information to the runtime API fields.
-    # Ref: https://github.com/kubeflow/trainer/pull/2410#pullrequestreview-2672356400
-    if runtime.pretrained_model:
-        args.append(f"model={runtime.pretrained_model}")
-
     return constants.DEFAULT_TORCHTUNE_COMMAND, args
 
 
