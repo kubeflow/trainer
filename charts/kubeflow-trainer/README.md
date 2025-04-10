@@ -73,9 +73,9 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | fullnameOverride | string | `""` | String to fully override release name. |
 | jobset.install | bool | `true` | Whether to install jobset as a dependency managed by trainer. This must be set to `false` if jobset controller/webhook has already been installed into the cluster. |
 | commonLabels | object | `{}` | Common labels to add to the resources. |
-| image.registry | string | `"docker.io"` | Image registry. |
-| image.repository | string | `"kubeflow/trainer-controller-manager"` | Image repository. |
-| image.tag | string | If not set, the chart version will be used. | Image tag. |
+| image.registry | string | `"ghcr.io"` | Image registry. |
+| image.repository | string | `"kubeflow/trainer/trainer-controller-manager"` | Image repository. |
+| image.tag | string | `"latest"` | Image tag. |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | image.pullSecrets | list | `[]` | Image pull secrets for private image registry. |
 | manager.replicas | int | `1` | Number of replicas of manager. |
