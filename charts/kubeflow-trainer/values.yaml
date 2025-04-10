@@ -38,8 +38,7 @@ image:
   # -- Image repository.
   repository: kubeflow/trainer/trainer-controller-manager
   # -- Image tag.
-  # @default -- If not set, the chart version will be used.
-  tag: ""
+  tag: latest
   # -- Image pull policy.
   pullPolicy: IfNotPresent
   # -- Image pull secrets for private image registry.
