@@ -20,6 +20,9 @@ __version__ = "0.1.0"
 # Import the Kubeflow Trainer client.
 from kubeflow.trainer.api.trainer_client import TrainerClient
 
+# Import the Kubeflow Local Trainer client.
+from kubeflow.trainer.api.local_trainer_client import LocalTrainerClient
+
 # Import the Kubeflow Trainer constants.
 from kubeflow.trainer.constants.constants import DATASET_PATH, MODEL_PATH
 
