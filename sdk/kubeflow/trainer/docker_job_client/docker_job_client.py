@@ -21,7 +21,7 @@ from kubeflow.trainer.constants import constants
 from kubeflow.trainer.utils import utils
 
 
-class LocalJobClient:
+class DockerJobClient:
     def __init__(self, docker_client: docker.DockerClient | None = None):
         if docker_client is None:
             self.docker_client = docker.from_env()
@@ -45,7 +45,7 @@ class LocalJobClient:
             name=train_job_name,
             driver="bridge",
             labels={
-                constants.LOCAL_TRAIN_JOB_NAME_LABEL: train_job_name,
+                constants.DOCKER_TRAIN_JOB_NAME_LABEL: train_job_name,
             },
         )
 
@@ -57,7 +57,7 @@ class LocalJobClient:
                 entrypoint=entrypoint,
                 command=command,
                 labels={
-                    constants.LOCAL_TRAIN_JOB_NAME_LABEL: train_job_name,
+                    constants.DOCKER_TRAIN_JOB_NAME_LABEL: train_job_name,
                     constants.LOCAL_NODE_RANK_LABEL: str(i),
                 },
                 environment=self.__get_container_environment(
@@ -98,7 +98,7 @@ class LocalJobClient:
             all=True,
             filters={
                 "label": [
-                    f"{constants.LOCAL_TRAIN_JOB_NAME_LABEL}={job_name}",
+                    f"{constants.DOCKER_TRAIN_JOB_NAME_LABEL}={job_name}",
                     f"{constants.LOCAL_NODE_RANK_LABEL}={node_rank}",
                 ]
             },
@@ -121,15 +121,15 @@ class LocalJobClient:
         return logs
 
     def list_jobs(self) -> List[str]:
-        """Lists the names of all local training jobs.
+        """Lists the names of all Docker training jobs.
 
         Returns:
-            List[str]: A list of local training job names.
+            List[str]: A list of Docker training job names.
         """
 
         # Because a network is created for each job, we use network names to list all jobs.
         networks = self.docker_client.networks.list(
-            filters={"label": constants.LOCAL_TRAIN_JOB_NAME_LABEL},
+            filters={"label": constants.DOCKER_TRAIN_JOB_NAME_LABEL},
         )
 
         job_names = []
@@ -138,13 +138,13 @@ class LocalJobClient:
         return job_names
 
     def delete_job(self, job_name: str) -> None:
-        """Deletes all resources associated with a local training job.
+        """Deletes all resources associated with a Docker training job.
         Args:
-            job_name (str): The name of the local training job.
+            job_name (str): The name of the Docker training job.
         """
         containers = self.docker_client.containers.list(
             all=True,
-            filters={"label": f"{constants.LOCAL_TRAIN_JOB_NAME_LABEL}={job_name}"}
+            filters={"label": f"{constants.DOCKER_TRAIN_JOB_NAME_LABEL}={job_name}"}
         )
         for c in containers:
             c.remove(force=True)
