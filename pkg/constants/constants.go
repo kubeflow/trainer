@@ -167,14 +167,14 @@ const (
 )
 
 const (
-	// MODEL_LLAMA3_2_1B is the model name for the Llama3.2 1B Instruct model.
-	MODEL_LLAMA3_2_1B = "llama3_2/1B"
+	// TORCHTUNE_MODEL_LLAMA3_2_1B is the model name for the Llama3.2 1B Instruct model.
+	TORCHTUNE_MODEL_LLAMA3_2_1B = "llama3_2/1B"
 
-	// MODEL_LLAMA3_2_7B is the model name for the Llama3.2 7B Instruct model.
-	MODEL_LLAMA3_2_7B = "llama3_2/7B"
+	// TORCHTUNE_MODEL_LLAMA3_2_7B is the model name for the Llama3.2 7B Instruct model.
+	TORCHTUNE_MODEL_LLAMA3_2_7B = "llama3_2/7B"
 
-	// MODEL_LLAMA3_3_70B is the model name for the Llama3.3 70B Instruct model.
-	MODEL_LLAMA3_3_70B = "llama3_3/70B"
+	// TORCHTUNE_MODEL_LLAMA3_3_70B is the model name for the Llama3.3 70B Instruct model.
+	TORCHTUNE_MODEL_LLAMA3_3_70B = "llama3_3/70B"
 )
 
 var (
@@ -184,11 +184,8 @@ var (
 	// Torchrun reserved env names
 	TorchRunReservedEnvNames = sets.New(TorchEnvNumNodes, TorchEnvNumProcPerNode, TorchEnvNodeRank, TorchEnvMasterAddr, TorchEnvMasterPort)
 
-	// Currently supported TorchTune recipes.
-	TorchTuneSupportedRecipes = sets.New(TorchTuneFullFinetuneSingleDevice, TorchTuneFullFinetuneDistributed)
-
 	// Currently supported pretrained models for TorchTune Trainer.
-	TorchTuneSupportedPretrainedModels = sets.New(MODEL_LLAMA3_2_1B, MODEL_LLAMA3_2_7B, MODEL_LLAMA3_3_70B)
+	TorchTuneSupportedPretrainedModels = sets.New(TORCHTUNE_MODEL_LLAMA3_2_1B, TORCHTUNE_MODEL_LLAMA3_2_7B, TORCHTUNE_MODEL_LLAMA3_3_70B)
 
 	// TorchTuneEntrypoint is the entrypoint for the torchtune.
 	TorchTuneEntrypoint = []string{"tune", "run"}

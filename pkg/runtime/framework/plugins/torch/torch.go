@@ -213,9 +213,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			newArgs = append(newArgs, recipe, fmt.Sprintf("--config %s", config))
 
 			// 3. Reserve old arguments to override corresponding items in the config file.
-			newArgs = append(newArgs, slices.DeleteFunc(oldArgs, func(arg string) bool {
-				return strings.HasPrefix(arg, "model")
-			})...)
+			newArgs = append(newArgs, oldArgs...)
 
 			trainerContainer.Args = newArgs
 		}
