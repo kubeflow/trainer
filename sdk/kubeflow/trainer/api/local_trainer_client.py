@@ -28,10 +28,14 @@ class LocalTrainerClient(TrainerClientABC):
     def __init__(
         self,
         local_runtimes_path: str = constants.LOCAL_RUNTIMES_PATH,
-        local_job_client: LocalJobClient = LocalJobClient(),
+        local_job_client: LocalJobClient | None = None,
     ):
         self.local_runtimes_path = local_runtimes_path
-        self.local_job_client = local_job_client
+
+        if local_job_client is None:
+            self.local_job_client = LocalJobClient()
+        else:
+            self.local_job_client = local_job_client
 
     def list_runtimes(self) -> List[types.Runtime]:
         runtimes = []
