@@ -128,3 +128,6 @@ LOCAL_TRAIN_JOB_NAME_PREFIX = "kubeflow-trainer-"
 
 # The key for the label used to indicate the rank of a local container node.
 LOCAL_NODE_RANK_LABEL = "trainer.kubeflow.org/node-rank"
+
+# The port number exposed by torch master nodes.
+TORCH_MASTER_NODE_PORT = 29500

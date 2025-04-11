@@ -89,6 +89,7 @@ class LocalTrainerClient(TrainerClientABC):
             entrypoint=entrypoint,
             command=command,
             num_nodes=num_nodes,
+            framework=runtime.trainer.framework,
         )
         return train_job_name
 

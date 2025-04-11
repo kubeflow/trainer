@@ -16,6 +16,7 @@ from typing import List, Dict
 
 import docker
 
+from kubeflow.trainer.types import types
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.utils import utils
 
@@ -28,12 +29,16 @@ class LocalJobClient:
             self.docker_client = docker_client
 
     def create_job(
-            self,
-            image: str,
-            entrypoint: List[str],
-            command: List[str],
-            num_nodes: int,
+        self,
+        image: str,
+        entrypoint: List[str],
+        command: List[str],
+        num_nodes: int,
+        framework: types.Framework
     ) -> str:
+        if framework != types.Framework.TORCH:
+            raise RuntimeError(f"Framework '{framework}' is not currently supported.")
+
         train_job_name = f"{constants.LOCAL_TRAIN_JOB_NAME_PREFIX}{utils.generate_train_job_name()}"
 
         docker_network = self.docker_client.networks.create(
@@ -55,6 +60,12 @@ class LocalJobClient:
                     constants.LOCAL_TRAIN_JOB_NAME_LABEL: train_job_name,
                     constants.LOCAL_NODE_RANK_LABEL: str(i),
                 },
+                environment=self.__get_container_environment(
+                    framework=framework,
+                    master_node_address=f"{train_job_name}-0",
+                    num_nodes=num_nodes,
+                    node_rank=i,
+                ),
                 detach=True,
             )
 
@@ -142,3 +153,21 @@ class LocalJobClient:
         network = self.docker_client.networks.get(job_name)
         network.remove()
         print(f"Removed network: {network.name}")
+
+    @staticmethod
+    def __get_container_environment(
+        framework: types.Framework,
+        master_node_address: str,
+        num_nodes: int,
+        node_rank: int,
+    ) -> Dict[str, str]:
+        if framework != types.Framework.TORCH:
+            raise RuntimeError(f"Framework '{framework}' is not currently supported.")
+
+        return {
+            "PET_NNODES": str(num_nodes),
+            "PET_NPROC_PER_NODE": "1",
+            "PET_NODE_RANK": str(node_rank),
+            "PET_MASTER_ADDR": master_node_address,
+            "PET_MASTER_PORT": str(constants.TORCH_MASTER_NODE_PORT),
+        }
