@@ -17,14 +17,14 @@ from typing import List, Optional, Dict
 import yaml
 
 from kubeflow.trainer import models
-from kubeflow.trainer.api.trainer_client_abc import TrainerClientABC
+from kubeflow.trainer.api.abstract_trainer_client import AbstractTrainerClient
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.docker_job_client import DockerJobClient
 from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils
 
 
-class LocalTrainerClient(TrainerClientABC):
+class LocalTrainerClient(AbstractTrainerClient):
     def __init__(
         self,
         local_runtimes_path: str = constants.LOCAL_RUNTIMES_PATH,

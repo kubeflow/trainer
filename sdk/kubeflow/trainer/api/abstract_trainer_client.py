@@ -19,7 +19,7 @@ from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
 
 
-class TrainerClientABC(ABC):
+class AbstractTrainerClient(ABC):
     @abstractmethod
     def delete_job(self, name: str):
         pass

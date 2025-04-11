@@ -17,7 +17,7 @@ import multiprocessing
 import queue
 from typing import Dict, List, Optional
 
-from kubeflow.trainer.api.trainer_client_abc import TrainerClientABC
+from kubeflow.trainer.api.abstract_trainer_client import AbstractTrainerClient
 import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
@@ -27,7 +27,7 @@ from kubernetes import client, config, watch
 logger = logging.getLogger(__name__)
 
 
-class TrainerClient(TrainerClientABC):
+class TrainerClient(AbstractTrainerClient):
     def __init__(
         self,
         config_file: Optional[str] = None,
