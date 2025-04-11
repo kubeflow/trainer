@@ -28,6 +28,8 @@ jobset:
   # -- Whether to install jobset as a dependency managed by trainer.
   # This must be set to `false` if jobset controller/webhook has already been installed into the cluster.
   install: true
+  # -- String to fully override jobset release name.
+  fullnameOverride: jobset
 
 # -- Common labels to add to the resources.
 commonLabels: {}
