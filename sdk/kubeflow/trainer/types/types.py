@@ -220,6 +220,7 @@ ALL_TRAINERS: Dict[str, Trainer] = {
     "ghcr.io/kubeflow/trainer/torchtune-trainer": Trainer(
         trainer_type=TrainerType.BUILTIN_TRAINER,
         framework=Framework.TORCHTUNE,
+        entrypoint=constants.DEFAULT_TORCHTUNE_COMMAND,
     ),
 }
 

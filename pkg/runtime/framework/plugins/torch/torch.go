@@ -19,6 +19,7 @@ package torch
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -70,16 +71,28 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 			}
 		}
 
-		torchEnvs := sets.New[string]()
-		for _, env := range newObj.Spec.Trainer.Env {
-			if constants.TorchRunReservedEnvNames.Has(env.Name) {
-				torchEnvs.Insert(env.Name)
+		if !slices.Equal(newObj.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
+			// Check reserved envs for torchrun.
+			torchEnvs := sets.New[string]()
+			for _, env := range newObj.Spec.Trainer.Env {
+				if constants.TorchRunReservedEnvNames.Has(env.Name) {
+					torchEnvs.Insert(env.Name)
+				}
 			}
-		}
 
-		if torchEnvs.Len() > 0 {
-			trainerEnvsPath := specPath.Child("trainer").Child("env")
-			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(torchEnvs))))
+			if torchEnvs.Len() > 0 {
+				trainerEnvsPath := specPath.Child("trainer").Child("env")
+				allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(torchEnvs))))
+			}
+		} else {
+			// Check supported pretrained models for torchtune.
+			// TODO(Electronic-Waste): Add more validation for torchtune when we support more arguments.
+			runtimeRefNamePath := specPath.Child("runtimeRef").Child("name")
+			model := getModelFromRuntimeRef(newObj.Spec.RuntimeRef.Name)
+
+			if !constants.TorchTuneSupportedPretrainedModels.Has(model) {
+				allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("must have a supported pretrained model, invalid model configured: %v", model)))
+			}
 		}
 	}
 
@@ -137,9 +150,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 
 	// Update envs for Info object.
-	// Add PyTorch distributed "PET_" values for torchrun
-	// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
-	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
 		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
@@ -147,25 +157,66 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		}
 	}
 	if trainerContainer != nil {
-		apply.UpsertEnvVar(&trainerContainer.Env,
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvNumNodes).
-				WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvNumProcPerNode).
-				WithValue(numProcPerNode.String()),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvNodeRank).
-				WithValueFrom(corev1ac.EnvVarSource().
-					WithFieldRef(corev1ac.ObjectFieldSelector().
-						WithFieldPath(constants.JobCompletionIndexFieldPath))),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvMasterAddr).
-				WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvMasterPort).
-				WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-		)
+		if !slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
+			// Add PyTorch distributed "PET_" values for torchrun.
+			// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
+			// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
+			apply.UpsertEnvVar(&trainerContainer.Env,
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvNumNodes).
+					WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvNumProcPerNode).
+					WithValue(numProcPerNode.String()),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvNodeRank).
+					WithValueFrom(corev1ac.EnvVarSource().
+						WithFieldRef(corev1ac.ObjectFieldSelector().
+							WithFieldPath(constants.JobCompletionIndexFieldPath))),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvMasterAddr).
+					WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvMasterPort).
+					WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+			)
+		} else {
+			// Mutate command line args for torchtune.
+			// Ref: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2#complement-torch-plugin
+			oldArgs, newArgs := trainJob.Spec.Trainer.Args, []string{}
+
+			// 1. Add PyTorch distributed command line args for torchtune.
+			// TODO(Electronic-Waste): Add more args for torchtune if required.
+			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
+			newArgs = append(newArgs,
+				fmt.Sprintf("%s %d",
+					constants.TorchTuneArgNumNodes,
+					numNodes,
+				),
+				fmt.Sprintf("%s %s",
+					constants.TorchTuneArgNumProcPerNode,
+					numProcPerNode.String(),
+				),
+				fmt.Sprintf("%s %s",
+					constants.TorchTuneArgRdzvId,
+					trainJob.Name,
+				),
+				fmt.Sprintf("%s %s-%s-0-0.%s:%d",
+					constants.TorchTuneArgRdzvEndpoint,
+					trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort,
+				),
+			)
+
+			// 2. Get the recipe and config from old args and append them to new args.
+			recipe := getRecipeFromArgs(numNodes, numProcPerNode, oldArgs)
+			config := getConfigFileFromArgs(numNodes, recipe, trainJob.Spec.RuntimeRef.Name)
+			newArgs = append(newArgs, recipe, fmt.Sprintf("--config %s", config))
+
+			// 3. Reserve old arguments to override corresponding items in the config file.
+			newArgs = append(newArgs, oldArgs...)
+
+			trainerContainer.Args = newArgs
+		}
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
 	}
@@ -187,4 +238,41 @@ func calculateNumProcPerNode(
 		return fallbackNumProcPerNode, false
 	}
 	return intstr.FromInt32(defaultCPU), false
+}
+
+// getRecipeFromArgs extracts the recipe from the distributed parameters and command line arguments.
+// TODO(Electronic-Waste): Add support for more recipes.
+func getRecipeFromArgs(numNodes int32, numProcPerNode intstr.IntOrString, _ []string) string {
+	recipe := constants.TorchTuneDefaultRecipe
+	if numNodes == 1 && numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 {
+		recipe = constants.TorchTuneFullFinetuneSingleDevice
+	}
+	return recipe
+}
+
+// getConfigFromArgs extracts the config from distributed parameters, recipe and runtime reference name.
+func getConfigFileFromArgs(numNodes int32, recipe, runtimeRefName string) string {
+	// Determine the config file name based on the recipe and number of nodes.
+	var suffix string
+	switch recipe {
+	case constants.TorchTuneFullFinetuneDistributed:
+		if numNodes == 1 {
+			suffix = constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
+		} else {
+			suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
+		}
+	case constants.TorchTuneFullFinetuneSingleDevice:
+		suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
+	}
+
+	return fmt.Sprintf("%s%s.yaml", getModelFromRuntimeRef(runtimeRefName), suffix)
+}
+
+func getModelFromRuntimeRef(runtimeRefName string) string {
+	fields := strings.Split(runtimeRefName, "-")
+	if len(fields) != 3 {
+		return ""
+	}
+
+	return fmt.Sprintf("%s/%s", strings.ReplaceAll(fields[1], ".", "_"), strings.ToUpper(fields[2]))
 }
