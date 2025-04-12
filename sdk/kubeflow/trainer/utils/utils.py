@@ -320,7 +320,6 @@ def get_entrypoint_using_train_func(
 
 
 def get_args_using_torchtune_config(
-    runtime: types.Runtime,
     fine_tuning_config: types.TorchTuneConfig,
 ) -> Tuple[List[str], List[str]]:
     """
@@ -385,7 +384,6 @@ def get_trainer_crd_from_custom_trainer(
 
 def get_trainer_crd_from_builtin_trainer(
     trainer: types.BuiltinTrainer,
-    runtime: types.Runtime,
 ) -> models.TrainerV1alpha1Trainer:
     """
     Get the Trainer CRD from the builtin trainer.
@@ -408,9 +406,7 @@ def get_trainer_crd_from_builtin_trainer(
     # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
     # the torchtune config in the runtime plugin.
     # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
-    trainer_crd.command, trainer_crd.args = get_args_using_torchtune_config(
-        runtime, trainer
-    )
+    trainer_crd.command, trainer_crd.args = get_args_using_torchtune_config(trainer)
 
     return trainer_crd
 
