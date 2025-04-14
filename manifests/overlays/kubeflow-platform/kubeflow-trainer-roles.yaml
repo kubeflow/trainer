@@ -24,6 +24,13 @@ rules:
     resources:
       - clustertrainingruntimes
       - trainingruntimes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - kubeflow.org
+    resources:
       - trainjobs
     verbs:
       - create
