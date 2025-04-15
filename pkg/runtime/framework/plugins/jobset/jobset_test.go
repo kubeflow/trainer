@@ -330,10 +330,9 @@ func TestJobSet(t *testing.T) {
 	}
 }
 
-func TestJobSetValidate(t *testing.T) {
+func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info
-		_            *trainer.TrainJob
 		newObj       *trainer.TrainJob
 		wantError    field.ErrorList
 		wantWarnings admission.Warnings
@@ -353,7 +352,7 @@ func TestJobSetValidate(t *testing.T) {
 				Initializer(&trainer.Initializer{Dataset: nil}).
 				Obj(),
 		},
-		"must have dataset initializer  job when trainJob is configured with input datasetConfig": {
+		"must have dataset initializer job when trainJob is configured with input datasetConfig": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
 					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
@@ -526,7 +525,6 @@ func TestJobSetValidate(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
 			}
-
 			warnings, errs := p.(framework.CustomValidationPlugin).Validate(tc.info, nil, tc.newObj)
 			if diff := cmp.Diff(tc.wantError, errs); len(diff) != 0 {
 				t.Errorf("Unexpected error from Validate (-want, +got): %s", diff)
