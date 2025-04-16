@@ -1606,7 +1606,7 @@ func TestValidate(t *testing.T) {
 				),
 			},
 		},
-		"no reserved environment variable for torchtune": {
+		"reserved environment variable for torchtune": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
@@ -1643,6 +1643,26 @@ func TestValidate(t *testing.T) {
 					"torchtune-llama3.2-1b",
 				).
 				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("env"),
+					[]corev1.EnvVar{
+						{
+							Name:  "test",
+							Value: "value",
+						},
+						{
+							Name:  constants.TorchEnvNumProcPerNode,
+							Value: "value",
+						},
+					},
+					fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", func() []string {
+						torchEnvs := sets.New[string]()
+						torchEnvs.Insert(constants.TorchEnvNumProcPerNode)
+						return sets.List(torchEnvs)
+					}()),
+				),
+			},
 		},
 		"unsupported pretrained model": {
 			info: runtime.NewInfo(

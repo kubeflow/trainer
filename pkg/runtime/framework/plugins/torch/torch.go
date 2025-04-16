@@ -71,22 +71,22 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 			}
 		}
 
-		if !slices.Equal(newObj.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
-			// Check reserved envs for torchrun.
-			torchEnvs := sets.New[string]()
-			for _, env := range newObj.Spec.Trainer.Env {
-				if constants.TorchRunReservedEnvNames.Has(env.Name) {
-					torchEnvs.Insert(env.Name)
-				}
+		// Check reserved envs for torchrun.
+		torchEnvs := sets.New[string]()
+		for _, env := range newObj.Spec.Trainer.Env {
+			if constants.TorchRunReservedEnvNames.Has(env.Name) {
+				torchEnvs.Insert(env.Name)
 			}
+		}
 
-			if torchEnvs.Len() > 0 {
-				trainerEnvsPath := specPath.Child("trainer").Child("env")
-				allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(torchEnvs))))
-			}
-		} else {
-			// Check supported pretrained models for torchtune.
-			// TODO(Electronic-Waste): Add more validation for torchtune when we support more arguments.
+		if torchEnvs.Len() > 0 {
+			trainerEnvsPath := specPath.Child("trainer").Child("env")
+			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(torchEnvs))))
+		}
+
+		// Check supported pretrained models for torchtune.
+		// TODO(Electronic-Waste): Add more validation for torchtune when we support more arguments.
+		if slices.Equal(newObj.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
 			runtimeRefNamePath := specPath.Child("runtimeRef").Child("name")
 			model := getModelFromRuntimeRef(newObj.Spec.RuntimeRef.Name)
 
