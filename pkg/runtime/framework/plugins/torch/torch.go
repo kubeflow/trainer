@@ -71,7 +71,7 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 			}
 		}
 
-		// Check reserved envs for torchrun.
+		// Check reserved envs.
 		torchEnvs := sets.New[string]()
 		for _, env := range newObj.Spec.Trainer.Env {
 			if constants.TorchRunReservedEnvNames.Has(env.Name) {
