@@ -1184,9 +1184,6 @@ func TestTorch(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Args: []string{
-								fmt.Sprintf("%s %s", constants.TorchTuneArgNumNodes, "1"),
-								fmt.Sprintf("%s %s", constants.TorchTuneArgNumProcPerNode, "auto"),
-								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvId, "torchtune-job"),
 								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
 								constants.TorchTuneFullFinetuneDistributed,
 								"--config llama3_2/1B_full.yaml",
@@ -1194,6 +1191,24 @@ func TestTorch(t *testing.T) {
 								"batch_size=32",
 								"epochs=10",
 								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+							},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("auto"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
 							},
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
@@ -1262,9 +1277,6 @@ func TestTorch(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Args: []string{
-								fmt.Sprintf("%s %s", constants.TorchTuneArgNumNodes, "1"),
-								fmt.Sprintf("%s %s", constants.TorchTuneArgNumProcPerNode, "1"),
-								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvId, "torchtune-job"),
 								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
 								constants.TorchTuneFullFinetuneSingleDevice,
 								"--config llama3_2/1B_full_single_device.yaml",
@@ -1272,6 +1284,24 @@ func TestTorch(t *testing.T) {
 								"batch_size=32",
 								"epochs=10",
 								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+							},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("1"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
 							},
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
@@ -1340,9 +1370,6 @@ func TestTorch(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Args: []string{
-								fmt.Sprintf("%s %s", constants.TorchTuneArgNumNodes, "2"),
-								fmt.Sprintf("%s %s", constants.TorchTuneArgNumProcPerNode, "8"),
-								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvId, "torchtune-job"),
 								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
 								constants.TorchTuneFullFinetuneDistributed,
 								"--config llama3_3/70B_full_multinode.yaml",
@@ -1350,6 +1377,24 @@ func TestTorch(t *testing.T) {
 								"batch_size=32",
 								"epochs=10",
 								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+							},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("2"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("8"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
 							},
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
 								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),

@@ -157,22 +157,26 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		}
 	}
 	if trainerContainer != nil {
+		// Add PyTorch distributed "PET_" values for torchrun and torchtune.
+		// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
+		// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
+		apply.UpsertEnvVar(&trainerContainer.Env,
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvNumNodes).
+				WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvNumProcPerNode).
+				WithValue(numProcPerNode.String()),
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvNodeRank).
+				WithValueFrom(corev1ac.EnvVarSource().
+					WithFieldRef(corev1ac.ObjectFieldSelector().
+						WithFieldPath(constants.JobCompletionIndexFieldPath))),
+		)
+
 		if !slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
-			// Add PyTorch distributed "PET_" values for torchrun.
-			// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
-			// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
+			// Add PET_MASTER_ADDR and PET_MASTER_PORT envs for torchrun.
 			apply.UpsertEnvVar(&trainerContainer.Env,
-				*corev1ac.EnvVar().
-					WithName(constants.TorchEnvNumNodes).
-					WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
-				*corev1ac.EnvVar().
-					WithName(constants.TorchEnvNumProcPerNode).
-					WithValue(numProcPerNode.String()),
-				*corev1ac.EnvVar().
-					WithName(constants.TorchEnvNodeRank).
-					WithValueFrom(corev1ac.EnvVarSource().
-						WithFieldRef(corev1ac.ObjectFieldSelector().
-							WithFieldPath(constants.JobCompletionIndexFieldPath))),
 				*corev1ac.EnvVar().
 					WithName(constants.TorchEnvMasterAddr).
 					WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
@@ -185,22 +189,8 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			// Ref: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2#complement-torch-plugin
 			oldArgs, newArgs := trainJob.Spec.Trainer.Args, []string{}
 
-			// 1. Add PyTorch distributed command line args for torchtune.
-			// TODO(Electronic-Waste): Add more args for torchtune if required.
-			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
+			// 1. Add rendezvous backend arg for torchtune.
 			newArgs = append(newArgs,
-				fmt.Sprintf("%s %d",
-					constants.TorchTuneArgNumNodes,
-					numNodes,
-				),
-				fmt.Sprintf("%s %s",
-					constants.TorchTuneArgNumProcPerNode,
-					numProcPerNode.String(),
-				),
-				fmt.Sprintf("%s %s",
-					constants.TorchTuneArgRdzvId,
-					trainJob.Name,
-				),
 				fmt.Sprintf("%s %s-%s-0-0.%s:%d",
 					constants.TorchTuneArgRdzvEndpoint,
 					trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort,
@@ -208,6 +198,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			)
 
 			// 2. Get the recipe and config from old args and append them to new args.
+			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
 			recipe := getRecipeFromArgs(numNodes, numProcPerNode, oldArgs)
 			config := getConfigFileFromArgs(numNodes, recipe, trainJob.Spec.RuntimeRef.Name)
 			newArgs = append(newArgs, recipe, fmt.Sprintf("--config %s", config))
