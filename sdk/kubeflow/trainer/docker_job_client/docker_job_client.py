@@ -62,7 +62,7 @@ class DockerJobClient:
                 },
                 environment=self.__get_container_environment(
                     framework=framework,
-                    master_node_address=f"{train_job_name}-0",
+                    head_node_address=f"{train_job_name}-0",
                     num_nodes=num_nodes,
                     node_rank=i,
                 ),
@@ -157,7 +157,7 @@ class DockerJobClient:
     @staticmethod
     def __get_container_environment(
         framework: types.Framework,
-        master_node_address: str,
+        head_node_address: str,
         num_nodes: int,
         node_rank: int,
     ) -> Dict[str, str]:
@@ -168,6 +168,6 @@ class DockerJobClient:
             "PET_NNODES": str(num_nodes),
             "PET_NPROC_PER_NODE": "1",
             "PET_NODE_RANK": str(node_rank),
-            "PET_MASTER_ADDR": master_node_address,
-            "PET_MASTER_PORT": str(constants.TORCH_MASTER_NODE_PORT),
+            "PET_MASTER_ADDR": head_node_address,
+            "PET_MASTER_PORT": str(constants.TORCH_HEAD_NODE_PORT),
         }
