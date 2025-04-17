@@ -118,7 +118,7 @@ MPI_HOSTFILE = "/etc/mpi/hostfile"
 MPI_ENTRYPOINT = "mpirun"
 
 # The default path to the directory containing local training runtime configs.
-LOCAL_RUNTIMES_PATH = "./kubeflow/trainer/config/local_runtimes"
+LOCAL_RUNTIMES_PATH = "trainer/config/local_runtimes"
 
 # The label key used to associate docker resources with a train job name.
 DOCKER_TRAIN_JOB_NAME_LABEL = "trainer.kubeflow.org/train-job-name"
@@ -131,3 +131,6 @@ LOCAL_NODE_RANK_LABEL = "trainer.kubeflow.org/node-rank"
 
 # The port number exposed by torch master nodes.
 TORCH_MASTER_NODE_PORT = 29500
+
+# The name of the Kubeflow Trainer SDK package.
+PACKAGE_NAME = "kubeflow"

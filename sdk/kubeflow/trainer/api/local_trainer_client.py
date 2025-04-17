@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
+from importlib import resources
+from pathlib import Path
 from typing import List, Optional, Dict
 import yaml
 
@@ -27,10 +28,13 @@ from kubeflow.trainer.utils import utils
 class LocalTrainerClient(AbstractTrainerClient):
     def __init__(
         self,
-        local_runtimes_path: str = constants.LOCAL_RUNTIMES_PATH,
+        local_runtimes_path: Path | None = None,
         docker_job_client: DockerJobClient | None = None,
     ):
-        self.local_runtimes_path = local_runtimes_path
+        if local_runtimes_path is None:
+            self.local_runtimes_path = resources.files(constants.PACKAGE_NAME) / constants.LOCAL_RUNTIMES_PATH
+        else:
+            self.local_runtimes_path = local_runtimes_path
 
         if docker_job_client is None:
             self.docker_job_client = DockerJobClient()
@@ -135,8 +139,8 @@ class LocalTrainerClient(AbstractTrainerClient):
 
     def __list_runtime_crs(self) -> List[models.TrainerV1alpha1ClusterTrainingRuntime]:
         runtime_crs = []
-        for filename in os.listdir(self.local_runtimes_path):
-            with open(os.path.join(self.local_runtimes_path, filename), "r") as f:
+        for filename in self.local_runtimes_path.iterdir():
+            with open(filename, "r") as f:
                 cr_str = f.read()
                 cr_dict = yaml.safe_load(cr_str)
                 cr = models.TrainerV1alpha1ClusterTrainingRuntime.from_dict(cr_dict)
