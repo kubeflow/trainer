@@ -4,12 +4,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
 )
 
 func TestIndexTrainJobTrainingRuntime(t *testing.T) {
