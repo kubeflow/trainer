@@ -24,11 +24,20 @@ import (
 	"github.com/kubeflow/trainer/pkg/runtime"
 )
 
-type Registry map[string]func(ctx context.Context, client client.Client, indexer client.FieldIndexer) (runtime.Runtime, error)
+type Registry map[string]RuntimeRegistrar
+type RuntimeRegistrar struct {
+	factory      func(ctx context.Context, client client.Client, indexer client.FieldIndexer) (runtime.Runtime, error)
+	dependencies []string
+}
 
 func NewRuntimeRegistry() Registry {
 	return Registry{
-		TrainingRuntimeGroupKind:        NewTrainingRuntime,
-		ClusterTrainingRuntimeGroupKind: NewClusterTrainingRuntime,
+		TrainingRuntimeGroupKind: RuntimeRegistrar{
+			factory: NewTrainingRuntime,
+		},
+		ClusterTrainingRuntimeGroupKind: RuntimeRegistrar{
+			factory:      NewClusterTrainingRuntime,
+			dependencies: []string{TrainingRuntimeGroupKind},
+		},
 	}
 }

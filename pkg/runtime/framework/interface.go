@@ -33,7 +33,7 @@ type Plugin interface {
 
 type CustomValidationPlugin interface {
 	Plugin
-	Validate(oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList)
+	Validate(info *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList)
 }
 
 type WatchExtensionPlugin interface {
@@ -49,6 +49,11 @@ type EnforcePodGroupPolicyPlugin interface {
 type EnforceMLPolicyPlugin interface {
 	Plugin
 	EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error
+}
+
+type PodNetworkPlugin interface {
+	Plugin
+	IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) error
 }
 
 type ComponentBuilderPlugin interface {

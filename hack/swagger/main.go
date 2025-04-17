@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/common"
+	builderutil "k8s.io/kube-openapi/pkg/openapiconv"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
@@ -30,12 +31,11 @@ import (
 
 // Generate Kubeflow Training OpenAPI specification.
 func main() {
-
 	var oAPIDefs = map[string]common.OpenAPIDefinition{}
 	defs := spec.Definitions{}
 
 	refCallback := func(name string) spec.Ref {
-		return spec.MustCreateRef("#/definitions/" + common.EscapeJsonPointer(swaggify(name)))
+		return spec.MustCreateRef("#/definitions/" + swaggify(name))
 	}
 
 	for k, v := range trainer.GetOpenAPIDefinitions(refCallback) {
@@ -43,7 +43,19 @@ func main() {
 	}
 
 	for defName, val := range oAPIDefs {
-		defs[swaggify(defName)] = val.Schema
+		// Exclude InternalEvent from the OpenAPI spec since it requires runtime.Object dependency.
+		if defName != "k8s.io/apimachinery/pkg/apis/meta/v1.InternalEvent" {
+			// OpenAPI generator incorrectly creates models if enum doesn't have default value.
+			// Therefore, we remove the default value when it is equal to ""
+			// Kubernetes OpenAPI spec doesn't have enums: https://github.com/kubernetes/kubernetes/issues/109177
+			for property, schema := range val.Schema.Properties {
+				if schema.Enum != nil && schema.Default == "" {
+					schema.Default = nil
+					val.Schema.SetProperty(property, schema)
+				}
+			}
+			defs[swaggify(defName)] = val.Schema
+		}
 	}
 	swagger := spec.Swagger{
 		SwaggerProps: spec.SwaggerProps{
@@ -52,12 +64,15 @@ func main() {
 			Paths:       &spec.Paths{Paths: map[string]spec.PathItem{}},
 			Info: &spec.Info{
 				InfoProps: spec.InfoProps{
-					Title: "Kubeflow Trainer OpenAPI Spec",
+					Title:   "Kubeflow Trainer OpenAPI Spec",
+					Version: "unversioned",
 				},
 			},
 		},
 	}
-	jsonBytes, err := json.MarshalIndent(swagger, "", "  ")
+	swaggerOpenAPIV3 := builderutil.ConvertV2ToV3(&swagger)
+
+	jsonBytes, err := json.MarshalIndent(swaggerOpenAPIV3, "", "  ")
 	if err != nil {
 		klog.Fatal(err.Error())
 	}
@@ -67,8 +82,7 @@ func main() {
 func swaggify(name string) string {
 	name = strings.Replace(name, "github.com/kubeflow/trainer/pkg/apis/", "", -1)
 	name = strings.Replace(name, "sigs.k8s.io/jobset/api/", "", -1)
-	name = strings.Replace(name, "k8s.io/api/core/", "", -1)
-	name = strings.Replace(name, "k8s.io/apimachinery/pkg/apis/meta/", "", -1)
+	name = strings.Replace(name, "k8s.io", "io.k8s", -1)
 	name = strings.Replace(name, "/", ".", -1)
 	return name
 }

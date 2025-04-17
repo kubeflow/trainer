@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This shell is used to auto generate some useful tools for k8s, such as clientset, lister, informer and so on.
-# We don't use this tool to generate deepcopy because kubebuilder (controller-tools) has covered that part.
+# This shell is used to auto generate some useful tools for k8s, such as clientset, lister, informer.
 
 set -o errexit
 set -o nounset
@@ -70,12 +69,27 @@ OPENAPI_PKG=$(go list -m -mod=readonly -f "{{.Dir}}" k8s.io/kube-openapi)
 echo ">> Using ${OPENAPI_PKG}"
 
 echo "Generating OpenAPI specification for Kubeflow Trainer"
+
+# This list needs to cover all of the types used transitively from the Kubeflow Trainer APIs.
+# Update this list if Kubeflow Trainer depends on new external APIs.
+EXTRA_PACKAGES=(
+  k8s.io/apimachinery/pkg/apis/meta/v1
+  k8s.io/apimachinery/pkg/api/resource
+  k8s.io/apimachinery/pkg/runtime
+  k8s.io/apimachinery/pkg/util/intstr
+  k8s.io/api/core/v1
+  k8s.io/api/autoscaling/v2
+  k8s.io/api/batch/v1
+  sigs.k8s.io/jobset/api/jobset/v1alpha2
+)
+
 go run ${OPENAPI_PKG}/cmd/openapi-gen \
   --go-header-file "${TRAINER_ROOT}/hack/boilerplate/boilerplate.go.txt" \
   --output-pkg "${TRAINER_PKG}/pkg/apis/trainer/v1alpha1" \
   --output-dir "${TRAINER_ROOT}/pkg/apis/trainer/v1alpha1" \
   --output-file "zz_generated.openapi.go" \
   --report-filename "${TRAINER_ROOT}/hack/violation_exception_v1alpha1.list" \
+  "${EXTRA_PACKAGES[@]}" \
   "${TRAINER_ROOT}/pkg/apis/trainer/v1alpha1"
 
 # Generating OpenAPI Swagger for Kubeflow Trainer.
