@@ -1,0 +1,47 @@
+name: Build Images
+
+on:
+  - pull_request
+
+jobs:
+  build:
+    name: Build Images
+    runs-on:
+      labels: ubuntu-latest-16-cores
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component-name: trainer-controller-manager
+            dockerfile: cmd/trainer-controller-manager/Dockerfile
+            platforms: linux/amd64,linux/arm64,linux/ppc64le
+          - component-name: model-initializer
+            dockerfile: cmd/initializers/model/Dockerfile
+            platforms: linux/amd64,linux/arm64
+          - component-name: dataset-initializer
+            dockerfile: cmd/initializers/dataset/Dockerfile
+            platforms: linux/amd64,linux/arm64
+          - component-name: deepspeed-runtime
+            dockerfile: cmd/runtimes/deepspeed/Dockerfile
+            platforms: linux/amd64,linux/arm64
+          - component-name: mlx-runtime
+            dockerfile: cmd/runtimes/mlx/Dockerfile
+            platforms: linux/arm64
+          - component-name: torchtune-trainer
+            dockerfile: cmd/trainers/torchtune/Dockerfile
+            platforms: linux/amd64,linux/arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test Build For Component ${{ matrix.component-name }}
+        uses: ./.github/workflows/template-publish-image
+        with:
+          image: |
+            ghcr.io/kubeflow/trainer/${{ matrix.component-name }}
+            docker.io/kubeflow/${{ matrix.component-name }}
+          dockerfile: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platforms }}
+          context: ${{ matrix.context }}
+          push: false
