@@ -5,6 +5,8 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 )
 
 const (
@@ -169,10 +171,13 @@ var (
 	// JobCompletionIndexFieldPath is the field path for the Job completion index annotation.
 	JobCompletionIndexFieldPath string = fmt.Sprintf("metadata.annotations['%s']", batchv1.JobCompletionIndexAnnotation)
 
-	// Torchrun reserved env names
+	// TorchRunReservedEnvNames is torchrun reserved env names
 	TorchRunReservedEnvNames = sets.New(TorchEnvNumNodes, TorchEnvNumProcPerNode, TorchEnvNodeRank, TorchEnvMasterAddr, TorchEnvMasterPort)
 
-	// Currently supported pretrained models for TorchTune Trainer.
+	// ResourceInUseFinalizer is a finalizer for managed resources which is used by other resources.
+	ResourceInUseFinalizer = fmt.Sprintf("%s/resource-in-use", trainer.GroupVersion.Group)
+
+	// TorchTuneSupportedPretrainedModels supported pretrained models for TorchTune Trainer.
 	TorchTuneSupportedPretrainedModels = sets.New(TORCHTUNE_MODEL_LLAMA3_2_1B, TORCHTUNE_MODEL_LLAMA3_2_7B, TORCHTUNE_MODEL_LLAMA3_3_70B)
 
 	// TorchTuneEntrypoint is the entrypoint for the torchtune.

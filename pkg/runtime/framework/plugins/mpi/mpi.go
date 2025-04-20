@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
@@ -219,10 +220,20 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 func (m *MPI) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	return []runtime.ReconcilerBuilder{
 		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
-			return b.Owns(&corev1.ConfigMap{})
+			return b.Watches(
+				&corev1.ConfigMap{},
+				handler.EnqueueRequestForOwner(
+					m.client.Scheme(), m.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
+				),
+			)
 		},
 		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
-			return b.Owns(&corev1.Secret{})
+			return b.Watches(
+				&corev1.Secret{},
+				handler.EnqueueRequestForOwner(
+					m.client.Scheme(), m.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
+				),
+			)
 		},
 	}
 }

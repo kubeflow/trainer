@@ -23,12 +23,21 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/kubeflow/trainer/pkg/constants"
 )
 
 var (
-	PodSetEndpointsCmpOpts = cmp.Transformer("Seq", func(a iter.Seq[string]) []string { return slices.Collect(a) })
+	PodSetEndpointsCmpOpts                = cmp.Transformer("Seq", func(a iter.Seq[string]) []string { return slices.Collect(a) })
+	TrainJobUpdateReconcileRequestCmpOpts = cmp.Transformer("SeqTrainJobUpdateReconcileRequest",
+		func(req iter.Seq[types.NamespacedName]) []types.NamespacedName {
+			if req == nil {
+				return nil
+			}
+			return slices.Collect(req)
+		},
+	)
 )
 
 func MPISecretDataComparer(a, b map[string][]byte) bool {

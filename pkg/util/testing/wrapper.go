@@ -739,6 +739,16 @@ func (r *TrainingRuntimeWrapper) Annotation(key, value string) *TrainingRuntimeW
 	return r
 }
 
+func (r *TrainingRuntimeWrapper) Finalizers(f ...string) *TrainingRuntimeWrapper {
+	r.ObjectMeta.Finalizers = append(r.ObjectMeta.Finalizers, f...)
+	return r
+}
+
+func (r *TrainingRuntimeWrapper) DeletionTimestamp(t metav1.Time) *TrainingRuntimeWrapper {
+	r.ObjectMeta.DeletionTimestamp = &t
+	return r
+}
+
 func (r *TrainingRuntimeWrapper) RuntimeSpec(spec trainer.TrainingRuntimeSpec) *TrainingRuntimeWrapper {
 	r.Spec = spec
 	return r

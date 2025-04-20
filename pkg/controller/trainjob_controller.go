@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
+	"slices"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -32,9 +34,15 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
@@ -50,19 +58,44 @@ const (
 	updateFailed      objsOpState = iota
 )
 
+type TrainJobWatcher interface {
+	NotifyTrainJobUpdate(oldJob, newJob *trainer.TrainJob)
+}
+
 type TrainJobReconciler struct {
 	log      logr.Logger
 	client   client.Client
 	recorder record.EventRecorder
 	runtimes map[string]jobruntimes.Runtime
+	watchers iter.Seq[TrainJobWatcher]
 }
 
-func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, runtimes map[string]jobruntimes.Runtime) *TrainJobReconciler {
+type TrainJobReconcilerOptions struct {
+	Watchers iter.Seq[TrainJobWatcher]
+}
+
+type TrainJobReconcilerOption func(*TrainJobReconcilerOptions)
+
+func WithWatchers(watchers ...TrainJobWatcher) TrainJobReconcilerOption {
+	return func(o *TrainJobReconcilerOptions) {
+		o.Watchers = slices.Values(watchers)
+	}
+}
+
+var _ reconcile.Reconciler = (*TrainJobReconciler)(nil)
+var _ predicate.TypedPredicate[*trainer.TrainJob] = (*TrainJobReconciler)(nil)
+
+func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, runtimes map[string]jobruntimes.Runtime, opts ...TrainJobReconcilerOption) *TrainJobReconciler {
+	options := &TrainJobReconcilerOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
 	return &TrainJobReconciler{
 		log:      ctrl.Log.WithName("trainjob-controller"),
 		client:   client,
 		recorder: recorder,
 		runtimes: runtimes,
+		watchers: options.Watchers,
 	}
 }
 
@@ -143,6 +176,34 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 	return creationSucceeded, nil
 }
 
+func (r *TrainJobReconciler) Create(e event.TypedCreateEvent[*trainer.TrainJob]) bool {
+	r.log.WithValues("trainJob", klog.KObj(e.Object)).Info("TrainJob create event")
+	defer r.notifyWatchers(nil, e.Object)
+	return true
+}
+
+func (r *TrainJobReconciler) Delete(e event.TypedDeleteEvent[*trainer.TrainJob]) bool {
+	r.log.WithValues("trainJob", klog.KObj(e.Object)).Info("TrainJob delete event")
+	defer r.notifyWatchers(e.Object, nil)
+	return true
+}
+
+func (r *TrainJobReconciler) Update(e event.TypedUpdateEvent[*trainer.TrainJob]) bool {
+	r.log.WithValues("trainJob", klog.KObj(e.ObjectNew)).Info("TrainJob update event")
+	return true
+}
+
+func (r *TrainJobReconciler) Generic(e event.TypedGenericEvent[*trainer.TrainJob]) bool {
+	r.log.WithValues("trainJob", klog.KObj(e.Object)).Info("TrainJob generic event")
+	return true
+}
+
+func (r *TrainJobReconciler) notifyWatchers(oldJob, newJob *trainer.TrainJob) {
+	for w := range r.watchers {
+		w.NotifyTrainJobUpdate(oldJob, newJob)
+	}
+}
+
 func setCreatedCondition(trainJob *trainer.TrainJob, opState objsOpState) {
 	var newCond metav1.Condition
 	switch opState {
@@ -214,9 +275,15 @@ func isTrainJobFinished(trainJob *trainer.TrainJob) bool {
 }
 
 func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
-	b := ctrl.NewControllerManagedBy(mgr).
+	b := builder.TypedControllerManagedBy[reconcile.Request](mgr).
+		Named("trainjob_controller").
 		WithOptions(options).
-		For(&trainer.TrainJob{})
+		WatchesRawSource(source.TypedKind(
+			mgr.GetCache(),
+			&trainer.TrainJob{},
+			&handler.TypedEnqueueRequestForObject[*trainer.TrainJob]{},
+			r,
+		))
 	for _, runtime := range r.runtimes {
 		for _, registrar := range runtime.EventHandlerRegistrars() {
 			if registrar != nil {

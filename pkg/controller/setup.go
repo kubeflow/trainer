@@ -24,10 +24,18 @@ import (
 )
 
 func SetupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, options controller.Options) (string, error) {
+	runtimeRec := NewTrainingRuntimeReconciler(
+		mgr.GetClient(),
+		mgr.GetEventRecorderFor("trainer-trainingruntime-controller"),
+	)
+	if err := runtimeRec.SetupWithManager(mgr, options); err != nil {
+		return "TrainingRuntime", err
+	}
 	if err := NewTrainJobReconciler(
 		mgr.GetClient(),
 		mgr.GetEventRecorderFor("trainer-trainjob-controller"),
 		runtimes,
+		WithWatchers(runtimeRec),
 	).SetupWithManager(mgr, options); err != nil {
 		return "TrainJob", err
 	}
