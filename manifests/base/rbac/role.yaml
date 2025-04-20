@@ -59,6 +59,7 @@ rules:
 - apiGroups:
   - trainer.kubeflow.org
   resources:
+  - clustertrainingruntimes/finalizers
   - trainingruntimes/finalizers
   - trainjobs/finalizers
   - trainjobs/status

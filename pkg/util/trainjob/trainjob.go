@@ -26,3 +26,8 @@ func RuntimeRefIsTrainingRuntime(ref trainer.RuntimeRef) bool {
 	return ptr.Equal(ref.APIGroup, &trainer.GroupVersion.Group) &&
 		ptr.Equal(ref.Kind, ptr.To(trainer.TrainingRuntimeKind))
 }
+
+func RuntimeRefIsClusterTrainingRuntime(ref trainer.RuntimeRef) bool {
+	return ptr.Equal(ref.APIGroup, &trainer.GroupVersion.Group) &&
+		ptr.Equal(ref.Kind, ptr.To(trainer.ClusterTrainingRuntimeKind))
+}

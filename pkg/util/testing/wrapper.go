@@ -874,6 +874,16 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 	}
 }
 
+func (r *ClusterTrainingRuntimeWrapper) Finalizers(f ...string) *ClusterTrainingRuntimeWrapper {
+	r.ObjectMeta.Finalizers = append(r.ObjectMeta.Finalizers, f...)
+	return r
+}
+
+func (r *ClusterTrainingRuntimeWrapper) DeletionTimestamp(t metav1.Time) *ClusterTrainingRuntimeWrapper {
+	r.ObjectMeta.DeletionTimestamp = &t
+	return r
+}
+
 func (r *ClusterTrainingRuntimeWrapper) RuntimeSpec(spec trainer.TrainingRuntimeSpec) *ClusterTrainingRuntimeWrapper {
 	r.Spec = spec
 	return r

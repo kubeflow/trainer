@@ -53,3 +53,33 @@ func TestRuntimeRefIsTrainingRuntime(t *testing.T) {
 		})
 	}
 }
+
+func TestRuntimeRefIsClusterTrainingRuntime(t *testing.T) {
+	cases := map[string]struct {
+		ref  trainer.RuntimeRef
+		want bool
+	}{
+		"runtimeRef is ClusterTrainingRuntime": {
+			ref: trainer.RuntimeRef{
+				APIGroup: &trainer.GroupVersion.Group,
+				Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
+			},
+			want: true,
+		},
+		"runtimeRef is not ClusterTrainingRuntime": {
+			ref: trainer.RuntimeRef{
+				APIGroup: &trainer.GroupVersion.Group,
+				Kind:     ptr.To(trainer.TrainingRuntimeKind),
+			},
+			want: false,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := RuntimeRefIsClusterTrainingRuntime(tc.ref)
+			if got != tc.want {
+				t.Errorf("Unexpected RuntimeRefIsClusterTrainingRuntime()\nwant: %v\n, want: %v", got, tc.want)
+			}
+		})
+	}
+}
