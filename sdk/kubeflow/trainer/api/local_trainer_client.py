@@ -31,6 +31,11 @@ class LocalTrainerClient(AbstractTrainerClient):
         local_runtimes_path: Optional[Path] = None,
         docker_job_client: Optional[DockerJobClient] = None,
     ):
+        print(
+            "Warning: LocalTrainerClient is an alpha feature for Kubeflow Trainer. "
+            "Some features may be unstable or unimplemented."
+        )
+
         if local_runtimes_path is None:
             self.local_runtimes_path = resources.files(constants.PACKAGE_NAME) / constants.LOCAL_RUNTIMES_PATH
         else:
