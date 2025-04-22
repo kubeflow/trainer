@@ -1183,14 +1183,12 @@ func TestTorch(t *testing.T) {
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.Node,
-							Args: []string{
+							Command: []string{
+								"tune",
+								"run",
 								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
 								constants.TorchTuneFullFinetuneDistributed,
 								"--config llama3_2/1B_full.yaml",
-								"dtype=fp16",
-								"batch_size=32",
-								"epochs=10",
-								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
 							},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -1276,14 +1274,12 @@ func TestTorch(t *testing.T) {
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.Node,
-							Args: []string{
+							Command: []string{
+								"tune",
+								"run",
 								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
 								constants.TorchTuneFullFinetuneSingleDevice,
 								"--config llama3_2/1B_full_single_device.yaml",
-								"dtype=fp16",
-								"batch_size=32",
-								"epochs=10",
-								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
 							},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -1369,14 +1365,12 @@ func TestTorch(t *testing.T) {
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.Node,
-							Args: []string{
+							Command: []string{
+								"tune",
+								"run",
 								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
 								constants.TorchTuneFullFinetuneDistributed,
 								"--config llama3_3/70B_full_multinode.yaml",
-								"dtype=fp16",
-								"batch_size=32",
-								"epochs=10",
-								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
 							},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -1583,64 +1577,6 @@ func TestValidate(t *testing.T) {
 						}...,
 					).
 					Obj(),
-				).
-				Obj(),
-			wantError: field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec").Child("trainer").Child("env"),
-					[]corev1.EnvVar{
-						{
-							Name:  "test",
-							Value: "value",
-						},
-						{
-							Name:  constants.TorchEnvNumProcPerNode,
-							Value: "value",
-						},
-					},
-					fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", func() []string {
-						torchEnvs := sets.New[string]()
-						torchEnvs.Insert(constants.TorchEnvNumProcPerNode)
-						return sets.List(torchEnvs)
-					}()),
-				),
-			},
-		},
-		"reserved environment variable for torchtune": {
-			info: runtime.NewInfo(
-				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
-					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
-						Obj(),
-					).
-					Obj(),
-				),
-			),
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(intstr.FromString("auto")).
-					Container(
-						"ghcr.io/kubeflow/trainer/torchtune-trainer",
-						[]string{"tune", "run"},
-						nil, corev1.ResourceList{},
-					).
-					Env(
-						[]corev1.EnvVar{
-							{
-								Name:  "test",
-								Value: "value",
-							},
-							{
-								Name:  constants.TorchEnvNumProcPerNode,
-								Value: "value",
-							},
-						}...,
-					).
-					Obj(),
-				).
-				RuntimeRef(
-					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
-					"torchtune-llama3.2-1b",
 				).
 				Obj(),
 			wantError: field.ErrorList{

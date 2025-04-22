@@ -152,9 +152,6 @@ const (
 
 	// TorchTuneFullFinetuneMultiNodesConfigSuffix is the config suffix for the multi node distributed full finetune.
 	TorchTuneFullFinetuneMultiNodesConfigSuffix string = "_full_multinode"
-
-	// TorchTuneDefaultRecipe is the default recipe for the torchtune.
-	TorchTuneDefaultRecipe string = TorchTuneFullFinetuneDistributed
 )
 
 const (

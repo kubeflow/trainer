@@ -185,28 +185,23 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 					WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 			)
 		} else {
-			// Mutate command line args for torchtune.
+			// Mutate trainer command for torchtune.
 			// Ref: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2#complement-torch-plugin
-			oldArgs, newArgs := trainJob.Spec.Trainer.Args, []string{}
-
 			// 1. Add rendezvous backend arg for torchtune.
-			newArgs = append(newArgs,
+			var newCommand []string
+			newCommand = append(newCommand,
 				fmt.Sprintf("%s %s-%s-0-0.%s:%d",
 					constants.TorchTuneArgRdzvEndpoint,
 					trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort,
 				),
 			)
 
-			// 2. Get the recipe and config from old args and append them to new args.
+			// 2. Get the recipe and config from old args and append them to newCommand.
 			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
-			recipe := getRecipeFromArgs(numNodes, numProcPerNode, oldArgs)
-			config := getConfigFileFromArgs(numNodes, recipe, trainJob.Spec.RuntimeRef.Name)
-			newArgs = append(newArgs, recipe, fmt.Sprintf("--config %s", config))
+			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, trainJob.Spec.RuntimeRef.Name, trainJob.Spec.Trainer.Args)
+			newCommand = append(newCommand, recipe, fmt.Sprintf("--config %s", config))
 
-			// 3. Reserve old arguments to override corresponding items in the config file.
-			newArgs = append(newArgs, oldArgs...)
-
-			trainerContainer.Args = newArgs
+			trainerContainer.Command = newCommand
 		}
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
@@ -231,18 +226,14 @@ func calculateNumProcPerNode(
 	return intstr.FromInt32(defaultCPU), false
 }
 
-// getRecipeFromArgs extracts the recipe from the distributed parameters and command line arguments.
-// TODO(Electronic-Waste): Add support for more recipes.
-func getRecipeFromArgs(numNodes int32, numProcPerNode intstr.IntOrString, _ []string) string {
-	recipe := constants.TorchTuneDefaultRecipe
+// getRecipeAndConfig returns the recipe and config file name based on the number of nodes,
+// number of processes per node, runtime reference name, and command line arguments.
+func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, runtimeRefName string, _ []string) (string, string) {
+	recipe := constants.TorchTuneFullFinetuneDistributed
 	if numNodes == 1 && numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 {
 		recipe = constants.TorchTuneFullFinetuneSingleDevice
 	}
-	return recipe
-}
 
-// getConfigFromArgs extracts the config from distributed parameters, recipe and runtime reference name.
-func getConfigFileFromArgs(numNodes int32, recipe, runtimeRefName string) string {
 	// Determine the config file name based on the recipe and number of nodes.
 	var suffix string
 	switch recipe {
@@ -256,7 +247,7 @@ func getConfigFileFromArgs(numNodes int32, recipe, runtimeRefName string) string
 		suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
 	}
 
-	return fmt.Sprintf("%s%s.yaml", getModelFromRuntimeRef(runtimeRefName), suffix)
+	return recipe, fmt.Sprintf("%s%s.yaml", getModelFromRuntimeRef(runtimeRefName), suffix)
 }
 
 func getModelFromRuntimeRef(runtimeRefName string) string {
