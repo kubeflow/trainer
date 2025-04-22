@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import docker
 
@@ -22,7 +22,7 @@ from kubeflow.trainer.utils import utils
 
 
 class DockerJobClient:
-    def __init__(self, docker_client: docker.DockerClient | None = None):
+    def __init__(self, docker_client: Optional[docker.DockerClient] = None):
         if docker_client is None:
             self.docker_client = docker.from_env()
         else:

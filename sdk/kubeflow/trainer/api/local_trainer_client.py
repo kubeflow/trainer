@@ -28,8 +28,8 @@ from kubeflow.trainer.utils import utils
 class LocalTrainerClient(AbstractTrainerClient):
     def __init__(
         self,
-        local_runtimes_path: Path | None = None,
-        docker_job_client: DockerJobClient | None = None,
+        local_runtimes_path: Optional[Path] = None,
+        docker_job_client: Optional[DockerJobClient] = None,
     ):
         if local_runtimes_path is None:
             self.local_runtimes_path = resources.files(constants.PACKAGE_NAME) / constants.LOCAL_RUNTIMES_PATH
@@ -148,7 +148,7 @@ class LocalTrainerClient(AbstractTrainerClient):
                     runtime_crs.append(cr)
         return runtime_crs
 
-    def __get_runtime_cr(self, name: str) -> models.TrainerV1alpha1ClusterTrainingRuntime | None:
+    def __get_runtime_cr(self, name: str) -> Optional[models.TrainerV1alpha1ClusterTrainingRuntime]:
         for cr in self.__list_runtime_crs():
             if cr.metadata.name == name:
                 return cr
