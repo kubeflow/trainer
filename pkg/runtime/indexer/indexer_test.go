@@ -18,39 +18,32 @@ func TestIndexTrainJobTrainingRuntime(t *testing.T) {
 		want []string
 	}{
 		"object is not a TrainJob": {
-			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(schema.GroupVersionKind{}, "test runtime"),
-			want: nil,
+			obj: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test").Obj(),
 		},
 		"TrainJob with matching APIGroup and Kind": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "test runtime").TrainJob,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "test runtime").Obj(),
 			want: []string{"test runtime"},
 		},
 		"TrainJob with non-matching APIGroup": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(schema.GroupVersionKind{Group: "trainer.kubeflow", Version: "v1alpha1", Kind: trainer.TrainingRuntimeKind}, "test runtime").TrainJob,
-			want: nil,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(schema.GroupVersionKind{Group: "trainer.kubeflow", Version: "v1alpha1", Kind: trainer.TrainingRuntimeKind}, "test runtime").Obj(),
 		},
 		"TrainJob with non-matching Kind": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.GroupVersion.WithKind("TrainingRun"), "test runtime").TrainJob,
-			want: nil,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(trainer.GroupVersion.WithKind("TrainingRun"), "test runtime").Obj(),
 		},
 		"TrainJob with nil APIGroup": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(schema.GroupVersionKind{Group: "", Version: "v1alpha1", Kind: trainer.TrainingRuntimeKind}, "test runtime").TrainJob,
-			want: nil,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(schema.GroupVersionKind{Group: "", Version: "v1alpha1", Kind: trainer.TrainingRuntimeKind}, "test runtime").Obj(),
 		},
 		"TrainJob with nil Kind": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.GroupVersion.WithKind(""), "test runtime").TrainJob,
-			want: nil,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(trainer.GroupVersion.WithKind(""), "test runtime").Obj(),
 		},
 		"TrainJob with both APIGroup and Kind nil": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(schema.GroupVersionKind{Group: "", Version: "v1alpha1", Kind: ""}, "test runtime").TrainJob,
-			want: nil,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(schema.GroupVersionKind{Group: "", Version: "v1alpha1", Kind: ""}, "test runtime").Obj(),
 		},
 	}
 
@@ -70,39 +63,32 @@ func TestIndexTrainJobClusterTrainingRuntime(t *testing.T) {
 		want []string
 	}{
 		"object is not a TrainJob": {
-			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(schema.GroupVersionKind{}, "test runtime"),
-			want: nil,
+			obj: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test").Obj(),
 		},
 		"TrainJob with matching APIGroup and Kind": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test runtime").TrainJob,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test runtime").Obj(),
 			want: []string{"test runtime"},
 		},
 		"TrainJob with non-matching APIGroup": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(schema.GroupVersionKind{Group: "trainer.kubeflow", Version: "v1alpha1", Kind: trainer.ClusterTrainingRuntimeKind}, "test runtime").TrainJob,
-			want: nil,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(schema.GroupVersionKind{Group: "trainer.kubeflow", Version: "v1alpha1", Kind: trainer.ClusterTrainingRuntimeKind}, "test runtime").Obj(),
 		},
 		"TrainJob with non-matching Kind": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.GroupVersion.WithKind("ClusterTrainingRun"), "test runtime").TrainJob,
-			want: nil,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(trainer.GroupVersion.WithKind("ClusterTrainingRun"), "test runtime").Obj(),
 		},
 		"TrainJob with nil APIGroup": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(schema.GroupVersionKind{Group: "", Version: "v1alpha1", Kind: trainer.ClusterTrainingRuntimeKind}, "test runtime").TrainJob,
-			want: nil,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(schema.GroupVersionKind{Group: "", Version: "v1alpha1", Kind: trainer.ClusterTrainingRuntimeKind}, "test runtime").Obj(),
 		},
 		"TrainJob with nil Kind": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.GroupVersion.WithKind(""), "test runtime").TrainJob,
-			want: nil,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(trainer.GroupVersion.WithKind(""), "test runtime").Obj(),
 		},
 		"TrainJob with both APIGroup and Kind nil": {
-			obj: &utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(schema.GroupVersionKind{Group: "", Version: "v1alpha1", Kind: ""}, "test runtime").TrainJob,
-			want: nil,
+			obj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(schema.GroupVersionKind{Group: "", Version: "v1alpha1", Kind: ""}, "test runtime").Obj(),
 		},
 	}
 
