@@ -143,6 +143,8 @@ def create_job(
     command=None,
     args=None,
     num_workers=2,
+    labels=None,
+    annotations=None,
     env_vars=None,
     volumes=None,
     volume_mounts=None,
@@ -195,10 +197,16 @@ def create_job(
             ),
         )
 
+    meta_kwargs = {"name": TEST_NAME, "namespace": TEST_NAME}
+    if labels is not None:
+        meta_kwargs["labels"] = labels
+    if annotations is not None:
+        meta_kwargs["annotations"] = annotations
+
     pytorchjob = KubeflowOrgV1PyTorchJob(
         api_version=constants.API_VERSION,
         kind=constants.PYTORCHJOB_KIND,
-        metadata=V1ObjectMeta(name=TEST_NAME, namespace=TEST_NAME),
+        metadata=V1ObjectMeta(**meta_kwargs),
         spec=KubeflowOrgV1PyTorchJobSpec(
             run_policy=KubeflowOrgV1RunPolicy(clean_pod_policy=None),
             pytorch_replica_specs=pytorch_replica_specs,
@@ -569,6 +577,38 @@ test_data_create_job = [
         },
         ValueError,
         None,
+    ),
+    (
+        "valid flow with labels",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "labels": {"upstream": "kubeflow", "component": "training"},
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            labels={"upstream": "kubeflow", "component": "training"},
+            annotations=None,
+        ),
+    ),
+    (
+        "valid flow with annotations",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "annotations": {"purpose": "unit-test", "env": "test"},
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            labels=None,
+            annotations={"purpose": "unit-test", "env": "test"},
+        ),
     ),
 ]
 

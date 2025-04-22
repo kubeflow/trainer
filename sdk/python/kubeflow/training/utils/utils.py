@@ -273,6 +273,8 @@ def get_tfjob_template(
     namespace: str,
     pod_template_spec: models.V1PodTemplateSpec,
     num_workers: int,
+    labels: Optional[Dict[str, str]] = None,
+    annotations: Optional[Dict[str, str]] = None,
     num_chief_replicas: Optional[int] = None,
     num_ps_replicas: Optional[int] = None,
 ):
@@ -296,6 +298,12 @@ def get_tfjob_template(
                 template=pod_template_spec,
             )
         )
+
+    if labels is not None:
+        tfjob.metadata.labels = labels
+
+    if annotations is not None:
+        tfjob.metadata.annotations = annotations
 
     if num_ps_replicas is not None:
         tfjob.spec.tf_replica_specs[constants.REPLICA_TYPE_PS] = (
@@ -321,6 +329,8 @@ def get_pytorchjob_template(
     namespace: str,
     num_workers: int,
     worker_pod_template_spec: Optional[models.V1PodTemplateSpec],
+    labels: Optional[Dict[str, str]] = None,
+    annotations: Optional[Dict[str, str]] = None,
     master_pod_template_spec: Optional[models.V1PodTemplateSpec] = None,
     num_procs_per_worker: Optional[Union[int, str]] = None,
 ):
@@ -336,7 +346,13 @@ def get_pytorchjob_template(
         ),
     )
 
-    if num_procs_per_worker:
+    if labels is not None:
+        pytorchjob.metadata.labels = labels
+
+    if annotations is not None:
+        pytorchjob.metadata.annotations = annotations
+
+    if num_procs_per_worker is not None:
         pytorchjob.spec.nproc_per_node = str(num_procs_per_worker)
 
     # Create Master replica if that is set.

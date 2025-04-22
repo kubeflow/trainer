@@ -96,6 +96,8 @@ class TrainingClient(object):
         self,
         name: str,
         namespace: Optional[str] = None,
+        labels: Optional[Dict[str, str]] = None,
+        annotations: Optional[Dict[str, str]] = None,
         num_workers: int = 1,
         num_procs_per_worker: int = 1,
         resources_per_worker: Union[dict, client.V1ResourceRequirements, None] = None,
@@ -133,6 +135,10 @@ class TrainingClient(object):
             name: Name of the PyTorchJob.
             namespace: Namespace for the PyTorchJob. By default namespace is taken from
                 `TrainingClient` object.
+            labels: Labels for the PyTorchJob. You can specify a dictionary as a mapping object
+                representing the labels.
+            annotations: Annotations for the PyTorchJob. You can specify a dictionary as a
+                mapping object representing the annotations.
             num_workers: Number of PyTorchJob workers.
             num_procs_per_worker: Number of processes per PyTorchJob worker for `torchrun` CLI. You
                 should use this parameter if you want to use more than 1 GPU per PyTorchJob worker.
@@ -327,6 +333,8 @@ class TrainingClient(object):
         job = utils.get_pytorchjob_template(
             name=name,
             namespace=namespace,
+            labels=labels,
+            annotations=annotations,
             master_pod_template_spec=master_pod_template_spec,
             worker_pod_template_spec=worker_pod_template_spec,
             num_workers=num_workers,
@@ -340,6 +348,8 @@ class TrainingClient(object):
         job: Optional[constants.JOB_MODELS_TYPE] = None,
         name: Optional[str] = None,
         namespace: Optional[str] = None,
+        labels: Optional[Dict[str, str]] = None,
+        annotations: Optional[Dict[str, str]] = None,
         job_kind: Optional[str] = None,
         base_image: Optional[str] = None,
         train_func: Optional[Callable] = None,
@@ -370,6 +380,10 @@ class TrainingClient(object):
             name: Name for the Job. It must be set if `job` parameter is omitted.
             namespace: Namespace for the Job. By default namespace is taken from
                 `TrainingClient` object.
+            labels: Labels for the Job. You can specify a dictionary as a mapping
+                object representing the labels.
+            annotations: Annotations for the Job. You can specify a dictionary as
+                a mapping object representing the annotations.
             job_kind: Kind for the Job (e.g. `TFJob` or `PyTorchJob`). It must be set if
                 `job` parameter is omitted. By default Job kind is taken from
                 `TrainingClient` object.
@@ -429,16 +443,25 @@ class TrainingClient(object):
             RuntimeError: Failed to create Job.
         """
 
-        # When Job is set, only namespace arg is allowed.
+        # When Job is set, only namespace, labels, and annotations args are allowed.
         if job is not None:
             for key, value in locals().items():
                 if (
                     key
-                    not in ["self", "job", "namespace", "pip_index_url", "num_workers"]
+                    not in [
+                        "self",
+                        "job",
+                        "namespace",
+                        "pip_index_url",
+                        "num_workers",
+                        "labels",
+                        "annotations",
+                    ]
                     and value is not None
                 ):
                     raise ValueError(
-                        "If `job` is set only `namespace` argument is allowed. "
+                        "If `job` is set only `namespace`, `labels`, and `annotations` "
+                        "arguments are allowed. "
                         f"Argument `{key}` must be None."
                     )
 
@@ -525,6 +548,8 @@ class TrainingClient(object):
                 job = utils.get_tfjob_template(
                     name=name,
                     namespace=namespace,
+                    labels=labels,
+                    annotations=annotations,
                     pod_template_spec=pod_template_spec,
                     num_workers=num_workers,
                     num_chief_replicas=num_chief_replicas,
@@ -539,6 +564,8 @@ class TrainingClient(object):
                 job = utils.get_pytorchjob_template(
                     name=name,
                     namespace=namespace,
+                    labels=labels,
+                    annotations=annotations,
                     worker_pod_template_spec=pod_template_spec,
                     num_workers=num_workers,
                     num_procs_per_worker=num_procs_per_worker,
