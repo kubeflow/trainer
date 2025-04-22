@@ -1184,8 +1184,6 @@ func TestTorch(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Command: []string{
-								"tune",
-								"run",
 								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
 								constants.TorchTuneFullFinetuneDistributed,
 								"--config llama3_2/1B_full.yaml",
@@ -1275,8 +1273,6 @@ func TestTorch(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Command: []string{
-								"tune",
-								"run",
 								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
 								constants.TorchTuneFullFinetuneSingleDevice,
 								"--config llama3_2/1B_full_single_device.yaml",
@@ -1366,8 +1362,6 @@ func TestTorch(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Command: []string{
-								"tune",
-								"run",
 								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
 								constants.TorchTuneFullFinetuneDistributed,
 								"--config llama3_3/70B_full_multinode.yaml",
