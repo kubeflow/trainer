@@ -40,6 +40,9 @@ echo "Create Kind cluster and load Kubeflow Trainer images"
 ${KIND} create cluster --image "${KIND_NODE_VERSION}"
 ${KIND} load docker-image ${CONTROLLER_MANAGER_CI_IMAGE}
 
+echo "Current directory file tree:"
+tree  /home/runner/work/trainer/trainer/go/src/github.com/kubeflow/trainer/manifests
+
 echo "Deploy Kubeflow Trainer"
 E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
 mkdir -p "${E2E_MANIFESTS_DIR}"
