@@ -10,7 +10,7 @@ Google doc: http://bit.ly/4gp8JGd
 
 ## Overview
 
-This document discusses the design of LLM Trainer for [Kubeflow Trainer v2](../2170-kubeflow-training-v2/README.md), tracked by [this issue](https://github.com/kubeflow/training-operator/issues/2401).
+This document discusses the design of LLM Trainer for [Kubeflow Trainer v2](../2170-kubeflow-trainer-v2/README.md), tracked by [this issue](https://github.com/kubeflow/training-operator/issues/2401).
 
 **We decided to implement a custom Trainer to fine-tune LLMs, which will be supported officially via TrainingRuntimes in Kubeflow upstream**. This will greatly ease the workload of writing fine-tuning scripts, and provide an in-box toolkit to fine-tune the LLMs with custom datasets and models for Data Scientists.
 
@@ -76,21 +76,27 @@ By adopting `torchtune` as the low-level runtime for LLM fine-tuning, we can eas
 To hide users from complex Kubernetes configuations, we will provide a simple yet flexible Python SDK wrapping all specifications of models, datasets, training runtime and fine-tuning configs. Like this:
 
 ```python
-job_id = TrainingClient().train(
-    dataset_config=HuggingFaceDatasetConfig(
-        storage_uri="tatsu-lab/alpaca",
-    ),
-    fine_tuning_config=TorchTuneConfig(
-        dtype="bf16",
-        batch_size=1,
-        epochs=1,
-        peft_config=LoraConfig(
-            lora_rank=64,
-            lora_alpha=128,
+job_id = TrainerClient().train(
+    trainer=BuiltinTrainer(
+        config=TorchTuneConfig(
+            dtype="bf16",
+            batch_size=1,
+            epochs=1,
+            peft_config=LoraConfig(
+                lora_rank=64,
+                lora_alpha=128,
+            ),
+            num_nodes=5,
         ),
-        num_nodes=5,
     ),
-    runtime_ref="torchtune-llama3.1-8B-finetuning",
+    initializer=Initializer(
+        dataset=HuggingFaceDatasetInitializer(
+            storage_uri="tatsu-lab/alpaca",
+        )
+    ),
+    runtime=Runtime(
+      name="torchtune-llama3.1-8b",
+    ),
 )
 ```
 
@@ -121,9 +127,8 @@ The CLI-based way allows us to mutate these parameters by overriding the `comman
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
-  name: torchtune-llama3.1-8B-finetuning
+  name: torchtune-llama3.1-8b
   labels:
-    trainer.kubeflow.org/phase: post-training
 spec:
   mlPolicy:
     numNodes: 1
@@ -139,7 +144,7 @@ spec:
                 spec:
                   containers:
                     - name: trainer
-                      image: <pytorch+cuda+torchtune image>
+                      image: ghcr.io/kubeflow/trainer/torchtune-trainer
                       command:
                         - tune run
                       args:
@@ -155,13 +160,13 @@ metadata:
   namespace: tenant-alpha
 spec:
   runtimeRef:
-    name: torchtune-llama3.1-8B-finetuning
+    name: torchtune-llama3.1-8B
   trainer:
     command:
       - tune run
     args:
       - --nnodes=1
-      - --nproc_per_node=4
+      - --nproc_per_node=2
       - lora_finetune_distributed
       - --config
       - llama3_1/8B_full
@@ -185,43 +190,46 @@ To provide a better user experience, we need to offer a simple SDK that allows u
 ```python
 # By default we can fine-tune models without any additional configurations from users
 TrainerClient().train(
-    runtime_ref="torchtune-llama-3.3-70b"
+    runtime=Runtime(name="torchtune-llama3.3-70b"),
 )
 ```
 
-#### Modify the `train` API
+#### Modify the `train()` API
 
-As we discussed in [Github](https://github.com/kubeflow/trainer/pull/2410#discussion_r1963832826), the `train` API mainly executes two types of training tasks:
+As we discussed in [Github](https://github.com/kubeflow/trainer/pull/2410#discussion_r1963832826), the `train()` API mainly executes two types of training tasks:
 
-1. **Type 1: Training with custom function/image**: A self-contained function/image that encapsulates the entire model training process.
-2. **Type 2: Config-driven approach with existing Trainer**: A trainer that already includes fine-tuning logic, requiring only parameter adjustments.
+1. **Type 1: Training with custom function/image**: A self-contained function/image that encapsulates the entire model training process (e.g. `CustomTrainer`).
+2. **Type 2: Config-driven approach with existing Trainer**: A trainer that already includes training process, requiring only parameter adjustments (e.g. `BuiltinTrainer`).
 
-So we plan to modify the `train` API to:
+So we plan to modify the `train()` API to:
 
 ```python
 def train(
-    trainer: Optional[CustomTrainer] = None,
-    fine_tuning_config: Optional[Union[TorchTuneConfig]] = None,
-    dataset_config: Optional[types.HuggingFaceDatasetConfig] = None,
-    model_config: Optional[types.HuggingFaceModelInputConfig] = None,
-    runtime_ref: Optional[str] = None,
+    self,
+    runtime: types.Runtime = types.DEFAULT_RUNTIME,
+    trainer: Optional[Union[CustomTrainer, BuiltinTrainer]] = None,
+    initializer: Optional[Initializer] = None,
 ) -> str:
     pass
 
 @dataclass
 class CustomTrainer:
-    func: Optional[Callable] = None
+    func: Callable
     func_args: Optional[Dict] = None
     packages_to_install: Optional[List[str]] = None
-    pip_index_url: str = constants.DEFAULT_PIP_INDEX_URL
+    pip_index_url: Optional[str] = constants.DEFAULT_PIP_INDEX_URL
     num_nodes: Optional[int] = None
     resources_per_node: Optional[Dict] = None
 
+@dataclass
+class BuiltinTrainer:
+    config: TorchTuneConfig
+
 ```
 
-`trainer` defines the parameters for Type 1 tasks, and will add support for custom function in the initial stage.
+`CustomTrainer` defines the parameters for Type 1 tasks, and will add support for custom function in the initial stage.
 
-`fine_tuning_config` defines the parameters for LLM fine-tuning task in Type 2, and will add support for fine-tuning with `torchtune` in the early stage.
+`BuiltinTrainer` defines the parameters for Type 2 tasks, and will add support for post-training with `torchtune` in the early stage.
 
 We natively support all `recipe` and `config` supported by `torchtune`, since `torchtune` has already provided us with default `config`. We just cannot mutate them if we do not support the corresponding mutation config.
 
@@ -229,29 +237,109 @@ We natively support all `recipe` and `config` supported by `torchtune`, since `t
 
 | Parameters | Type | What is it? |
 | - | - | - |
-| dtype | Optional[str] | The underlying data type used to represent the model and optimizer parameters. Currently, we only support `bf16` and `fp32`. |
+| dtype | Optional[DataType] | The underlying data type used to represent the model and optimizer parameters. Currently, we only support `bf16` and `fp32`. |
 | batch_size | Optional[int] | The number of samples processed before updating model weights. |
 | epochs | Optional[int] | The number of samples processed before updating model weights. |
-| loss | Optional[str] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
+| loss | Optional[Loss] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
 | peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
 | dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, MultimodalDataset]] | Configuration for dataset preprocessing. |
 | num_nodes | Optional[int] | The number of PyTorch Nodes in training |
 | resource_per_node | Optional[Dict] | The resource for each PyTorch Node |
 
 ```python
+# Loss function for the TorchTune LLM Trainer.
+class Loss(Enum):
+    CEWithChunkedOutputLoss = "torchtune.modules.loss.CEWithChunkedOutputLoss"
+
+
+# Data type for the TorchTune LLM Trainer.
+class DataType(Enum):
+    BF16 = "bf16"
+    FP32 = "fp32"
+
+
 # TorchTuneConfig DataClass
 @dataclass
 class TorchTuneConfig:
-    dtype: Optional[str] = None
+    dtype: Optional[DataType] = None
     batch_size: Optional[int] = None
     epochs: Optional[int] = None
-    loss: Optional[str] = None
+    loss: Optional[Loss] = None
     peft_config: Optional[Union[LoraConfig]] = None
     dataset_preprocess_config: Optional[
         Union[InstructDataset, ChatDataset, MultimodalDataset],
     ] = None
     num_nodes: Optional[int] = None,
     resources_per_node: Optional[Dict] = None,
+
+```
+
+#### `list_runtimes()` API
+
+We should allow users to easily get the available TrainingRuntimes/ClusterTrainingRuntimes with the SDK, followed with information related to the trainer type, framework, model, and device. When users execute:
+
+```python
+TrainingClient().list_runtimes()
+```
+
+They are expected to get:
+
+```
+Runtime                             Trainer Type          Framework   Pretrained Model    Accelerator       Count
+
+pytorch-distributed                 custom-trainer        pytorch     <undefined>         nvidia.com/GPU    2
+torchtune-llama3.1-8B-finetuning    builtin-trainer       torchtune   Llama3.1-8B         nvidia.com/GPU    4
+```
+
+In that case, we plan to design `Runtime` dataclass as the following:
+
+| Fields | Type | What is it? |
+| - | - | - |
+| name | str | The name of TrainingRuntime/ClusterTrainingRuntime. |
+| trainer_type | str | The training method of this runtime, chosen from `custom-trainer`, `builtin-trainer`. |
+| pretrained_model | Optional[str] | The pretrained model specified for this runtime, e.g. `llama3.1-8B`. |
+
+
+```python
+# Runtime DataClass
+@dataclass
+class Runtime:
+    name: str
+    trainer: Trainer
+    pretrained_model: Optional[str] = None
+
+```
+
+`Trainer` dataclass:
+
+| Fields | Type | What is it? |
+| trainer_type | TrainerType | Selected from CustomTrainer and BuiltinTrainer. |
+| framework | Framework | The ML framework used for training, e.g. `torch`, `torchtune`. |
+| entrypoint | Optional[List[str]] | Entrypoint for the trainer node. |
+| accelerator | str | The type of devices, e.g. `nvidia.com/gpu`. |
+| accelerator_count | Union[str, float, int] | The number of devices. |
+
+```python
+class TrainerType(Enum):
+    CUSTOM_TRAINER = CustomTrainer.__name__
+    BUILTIN_TRAINER = BuiltinTrainer.__name__
+
+
+class Framework(Enum):
+    TORCH = "torch"
+    DEEPSPEED = "deepspeed"
+    MLX = "mlx"
+    TORCHTUNE = "torchtune"
+
+
+# Representation for the Trainer of the runtime.
+@dataclass
+class Trainer:
+    trainer_type: TrainerType
+    framework: Framework
+    entrypoint: Optional[List[str]] = None
+    accelerator: str = constants.UNKNOWN
+    accelerator_count: Union[str, float, int] = constants.UNKNOWN
 
 ```
 
@@ -265,13 +353,13 @@ We will add CLI-based parameters mutation to `EnforceMLPolicy()` in `pkg/runtime
 
 Related changes:
 
-1. Store container arguments to internal runtime Information (`pkg/runtime/runtime.go`).
+1. Add `Args` fields to internal runtime Information (`pkg/runtime/runtime.go`).
 
-2. Insert container arguments in front of Args of Trainer Node (`pkg/runtime/framework/plugins/jobest/builder.go`)
+2. Insert distributed parameters to Trainer Args (`pkg/runtime/framework/plugins/torch/torch.go`)
 
 #### Create Map from `TorchTuneConfig` to Specific Recipes and Configs
 
-We will create a map from (`TorchTuneConfig`, `num_nodes`, `nproc_per_node`, `runtime_ref`) to dedicated `recipe` and `config` in the server side. This will allow users to fine-tune their LLMs without knowing about `torchtune`'s recipes and configs and prevent SDK from changing frequently.
+We will create a map from (`TorchTuneConfig`, `num_nodes`, `nproc_per_node`, `runtime`) to dedicated `recipe` and `config` in the server side. This will allow users to fine-tune their LLMs without knowing about `torchtune`'s recipes and configs and prevent SDK from changing frequently.
 
 - How to Select `recipe`
 
@@ -282,17 +370,13 @@ We will create a map from (`TorchTuneConfig`, `num_nodes`, `nproc_per_node`, `ru
 
 - How to Select `config`
 
-We will create one `ClusterTrainingRuntime` for one model. In this way, we can extract the model info in `runtime_ref`, and select corresponding config file according to the `recipe`.
+We will create one `ClusterTrainingRuntime` for one model. In this way, we can extract the model info in the `.spec.runtimeRef.name` field path of Trainjob, and select corresponding config file according to the `recipe`.
 
 #### Validate Fine-Tuning Configurations
 
 In order to ensure the validity of the configurations propagated by SDK, we plan to add some validating requirements to the TrainJob Webhook. We'll implement validations in torch plugin [`CustomValidationPlugin`](https://github.com/kubeflow/trainer/blob/1f443729ebdb3e792d4b9cd2b242f33b0e86fe14/pkg/runtime/framework/interface.go#L34-L37):
 
-1. The ClusterTrainingRuntime referenced by `runtime_ref` exists in the control plane.
-
-#### Determine Default Resources
-
-Currently, `torchtune` has limited support for multi-node training (but support is coming soon). So, we'd better use 1 PyTorch node and 1 GPU by default. Users can specify `num_nodes` and `resource_per_node` in the `Trainer` field to increase PyTorch nodes and GPU number.
+1. The ClusterTrainingRuntime referenced by `runtime` exists in the control plane.
 
 ### Maintain ClusterTrainingRuntimes in Manifests
 
@@ -375,17 +459,17 @@ For model and dataset initialization, we'll reuse the existing [Kubeflow Trainer
 # Dataset Initialization
 containers:
   - name: dataset-initializer
-    image: docker.io/kubeflow/dataset-initializer
+    image: ghcr.io/kubeflo/trainer/dataset-initializer
     env:
       - name: STORAGE_URI
         value: hf://tatsu-lab/alpaca
     volumeMounts:
       - mountPath: /workspace/dataset
-        name: dataset-initializer
+        name: initializer
 volumes:
-  - name: dataset-initializer
+  - name: initializer
     persistentVolumeClaim:
-      claimName: dataset-initializer
+      claimName: initializer
 
 ```
 
@@ -393,17 +477,17 @@ volumes:
 # Model Initialization
 containers:
   - name: model-initializer
-    image: docker.io/kubeflow/model-initializer
+    image: ghcr.io/kubeflow/trainer/model-initializer
     env:
       - name: STORAGE_URI
-        value: hf://meta-llama/Llama-2-7b
+        value: hf://meta-llama/Llama-3.2-1B-Instruct
     volumeMounts:
       - mountPath: /workspace/model
-        name: model-initializer
+        name: initializer
 volumes:
-  - name: model-initializer
+  - name: initializer
     persistentVolumeClaim:
-      claimName: model-initializer
+      claimName: initializer
 
 ```
 
@@ -413,7 +497,7 @@ As for the [model exporter](https://github.com/kubeflow/trainer/issues/2245), we
 # Model Exporting
 containers:
   - name: model-exporter
-    image: docker.io/kubeflow/model-exporter
+    image: ghcr.io/kubeflow/trainer/model-exporter
     volumeMounts:
       - mountPath: /workspace/adapters
         name: model-exporter
@@ -487,7 +571,8 @@ We will use [papermill](https://github.com/nteract/papermill) to execute these n
 ## Implementation History
 
 - 2025-01-31: Create KEP-2401 doc
-- 2025-03-07: KEP-2401 1st version & Start implementation
+- 2025-03-11: KEP-2401 1st version & Start implementation
+- 2025-03-24: Add new `Runtime` dataclass design
 
 ## Alternatives
 

@@ -27,7 +27,7 @@ from typing_extensions import Self
 
 class TrainerV1alpha1Trainer(BaseModel):
     """
-    Trainer represents the desired trainer configuration. Every training runtime contains `trainer` container which represents Trainer.
+    Trainer represents the desired configuration for the training job. The Trainer spec will override the runtime template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: trainer`
     """ # noqa: E501
     args: Optional[List[StrictStr]] = Field(default=None, description="Arguments to the entrypoint for the training container.")
     command: Optional[List[StrictStr]] = Field(default=None, description="Entrypoint commands for the training container.")

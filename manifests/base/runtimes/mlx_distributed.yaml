@@ -1,0 +1,68 @@
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: mlx-distributed
+spec:
+  mlPolicy:
+    numNodes: 1
+    mpi:
+      numProcPerNode: 1
+      mpiImplementation: OpenMPI
+      sshAuthMountPath: /home/mpiuser/.ssh
+      runLauncherAsNode: true
+  template:
+    spec:
+      network:
+        publishNotReadyAddresses: true
+      successPolicy:
+        operator: All
+        targetReplicatedJobs:
+          - launcher
+      replicatedJobs:
+        - name: launcher
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: ghcr.io/kubeflow/trainer/mlx-runtime
+                      securityContext:
+                        runAsUser: 1000
+                      command:
+                        - mpirun
+                        - -n
+                        - "1"
+                        - bash
+                        - -c
+                        - |
+                          echo "MLX Distributed Runtime"
+
+                          echo "--------------------------------------"
+                          set -e
+                          mpirun --version
+                          python --version
+                          pip list
+        - name: node
+          template:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: ghcr.io/kubeflow/trainer/mlx-runtime
+                      securityContext:
+                        runAsUser: 1000
+                      command:
+                        - /usr/sbin/sshd
+                      args:
+                        - -De
+                        - -f
+                        - /home/mpiuser/.sshd_config
+                      readinessProbe:
+                        tcpSocket:
+                          port: 2222
+                        initialDelaySeconds: 5

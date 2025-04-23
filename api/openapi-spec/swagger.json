@@ -13242,8 +13242,8 @@
           }
         }
       },
-      "trainer.v1alpha1.DatasetConfig": {
-        "description": "DatasetConfig represents the desired dataset configuration. When this API is used, the training runtime must have the `dataset-initializer` container in the `Initializer` Job.",
+      "trainer.v1alpha1.DatasetInitializer": {
+        "description": "DatasetInitializer represents the desired configuration to initialize and pre-process dataset. The DatasetInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
         "type": "object",
         "properties": {
           "env": {
@@ -13276,37 +13276,25 @@
           }
         }
       },
-      "trainer.v1alpha1.InputModel": {
-        "description": "InputModel represents the desired pre-trained model configuration.",
+      "trainer.v1alpha1.Initializer": {
+        "description": "Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.",
         "type": "object",
         "properties": {
-          "env": {
-            "description": "List of environment variables to set in the model initializer container. These values will be merged with the TrainingRuntime's model initializer environments.",
-            "type": "array",
-            "items": {
-              "default": {},
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.EnvVar"
-                }
-              ]
-            },
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map"
-          },
-          "secretRef": {
-            "description": "Reference to the secret with credentials to download model. Secret must be created in the TrainJob's namespace.",
+          "dataset": {
+            "description": "Configuration of the dataset initialization and pre-processing.",
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.LocalObjectReference"
+                "$ref": "#/components/schemas/trainer.v1alpha1.DatasetInitializer"
               }
             ]
           },
-          "storageUri": {
-            "description": "Storage uri for the model provider.",
-            "type": "string"
+          "model": {
+            "description": "Configuration of the pre-trained model initialization",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.ModelInitializer"
+              }
+            ]
           }
         }
       },
@@ -13454,34 +13442,12 @@
           }
         }
       },
-      "trainer.v1alpha1.ModelConfig": {
-        "description": "ModelConfig represents the desired model configuration.",
-        "type": "object",
-        "properties": {
-          "input": {
-            "description": "Configuration of the pre-trained model. When this API is used, the training runtime must have the `model-initializer` container in the `Initializer` Job.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.InputModel"
-              }
-            ]
-          },
-          "output": {
-            "description": "Configuration of the trained model. When this API is used, the training runtime must have the `model-exporter` container in the `Exporter` Job.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.OutputModel"
-              }
-            ]
-          }
-        }
-      },
-      "trainer.v1alpha1.OutputModel": {
-        "description": "OutputModel represents the desired trained model configuration.",
+      "trainer.v1alpha1.ModelInitializer": {
+        "description": "DatasetInitializer represents the desired configuration to initialize pre-trained model. The DatasetInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
         "type": "object",
         "properties": {
           "env": {
-            "description": "List of environment variables to set in the model exporter container. These values will be merged with the TrainingRuntime's model exporter environments.",
+            "description": "List of environment variables to set in the model initializer container. These values will be merged with the TrainingRuntime's model initializer environments.",
             "type": "array",
             "items": {
               "default": {},
@@ -13497,7 +13463,7 @@
             "x-kubernetes-list-type": "map"
           },
           "secretRef": {
-            "description": "Reference to the secret with credentials to export model. Secret must be created in the TrainJob's namespace.",
+            "description": "Reference to the secret with credentials to download model. Secret must be created in the TrainJob's namespace.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.LocalObjectReference"
@@ -13505,7 +13471,7 @@
             ]
           },
           "storageUri": {
-            "description": "Storage uri for the model exporter.",
+            "description": "Storage uri for the model provider.",
             "type": "string"
           }
         }
@@ -13818,11 +13784,11 @@
               "default": ""
             }
           },
-          "datasetConfig": {
-            "description": "Configuration of the training dataset.",
+          "initializer": {
+            "description": "Configuration of the initializer.",
             "allOf": [
               {
-                "$ref": "#/components/schemas/trainer.v1alpha1.DatasetConfig"
+                "$ref": "#/components/schemas/trainer.v1alpha1.Initializer"
               }
             ]
           },
@@ -13837,14 +13803,6 @@
           "managedBy": {
             "description": "ManagedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`",
             "type": "string"
-          },
-          "modelConfig": {
-            "description": "Configuration of the pre-trained and trained model.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.ModelConfig"
-              }
-            ]
           },
           "podSpecOverrides": {
             "description": "Custom overrides for the training runtime.",
@@ -13873,7 +13831,7 @@
             "type": "boolean"
           },
           "trainer": {
-            "description": "Configuration of the desired trainer.",
+            "description": "Configuration of the trainer.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.Trainer"
@@ -13923,7 +13881,7 @@
         }
       },
       "trainer.v1alpha1.Trainer": {
-        "description": "Trainer represents the desired trainer configuration. Every training runtime contains `trainer` container which represents Trainer.",
+        "description": "Trainer represents the desired configuration for the training job. The Trainer spec will override the runtime template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: trainer`",
         "type": "object",
         "properties": {
           "args": {

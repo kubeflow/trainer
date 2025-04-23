@@ -1,0 +1,96 @@
+{{- /*
+Copyright 2025 The Kubeflow authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/ -}}
+
+{{ template "chart.header" . }}
+
+{{ template "chart.deprecationWarning" . }}
+
+{{ template "chart.badgesSection" . }}
+
+{{ template "chart.description" . }}
+
+{{ template "chart.homepageLine" . }}
+
+## Introduction
+
+This chart bootstraps a [Kubernetes Trainer]({{template "chart.homepage" . }}) deployment using the [Helm](https://helm.sh) package manager.
+
+## Prerequisites
+
+- Helm >= 3
+- Kubernetes >= 1.29
+
+## Usage
+
+### Add Helm Repo
+
+```bash
+helm repo add kubeflow-trainer https://kubeflow.github.io/trainer
+
+helm repo update
+```
+
+See [helm repo](https://helm.sh/docs/helm/helm_repo) for command documentation.
+
+### Install the chart
+
+```bash
+helm install [RELEASE_NAME] kubeflow-trainer/kubeflow-trainer
+```
+
+For example, if you want to create a release with name `kubeflow-trainer` in the `kubeflow-system` namespace:
+
+```shell
+helm upgrade kubeflow-trainer kubeflow-trainer/kubeflow-trainer \
+    --install \
+    --namespace kubeflow-system \
+    --create-namespace
+```
+
+Note that by passing the `--create-namespace` flag to the `helm install` command, `helm` will create the release namespace if it does not exist.
+If you have already installed jobset controller/webhook, you can skip installing it by adding `--set jobset.install=false` to the command arguments.
+
+See [helm install](https://helm.sh/docs/helm/helm_install) for command documentation.
+
+### Upgrade the chart
+
+```shell
+helm upgrade [RELEASE_NAME] kubeflow-trainer/kubeflow-trainer [flags]
+```
+
+See [helm upgrade](https://helm.sh/docs/helm/helm_upgrade) for command documentation.
+
+### Uninstall the chart
+
+```shell
+helm uninstall [RELEASE_NAME]
+```
+
+This removes all the Kubernetes resources associated with the chart and deletes the release, except for the `crds`, those will have to be removed manually.
+
+See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command documentation.
+
+{{ template "chart.valuesSection" . }}
+
+{{- define "chart.maintainersTable" -}}
+| Name | Url |
+| ---- | --- |
+{{- range .Maintainers }}
+| {{ .Name }} | {{ if .Url }}<{{ .Url }}>{{ end }} |
+{{- end }}
+{{- end }}
+
+{{ template "chart.maintainersSection" . }}

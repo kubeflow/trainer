@@ -28,7 +28,6 @@ import (
 	"strconv"
 
 	"golang.org/x/crypto/ssh"
-
 	corev1 "k8s.io/api/core/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -46,6 +45,10 @@ import (
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
+)
+
+var (
+	numProcPerNodePath = field.NewPath("spec").Child("trainer").Child("numProcPerNode")
 )
 
 // TODO : Support MPICH and IntelMPI implementations.
@@ -79,41 +82,53 @@ func (m *MPI) Name() string {
 // TODO (andreyvelich): Add validation to check that TrainJob doesn't have MPI envs.
 // TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 // Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
-
-func (m *MPI) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.Info, oldJobObj, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (m *MPI) Validate(runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
-	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicy == nil || runtimeInfo.RuntimePolicy.MLPolicy.MPI == nil {
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil, allErrs
 	}
-
 	specPath := field.NewPath("spec")
-	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumProcPerNode != nil {
-		numProcPerNodePath := specPath.Child("trainer").Child("numProcPerNode")
-		numProcPerNode := *newJobObj.Spec.Trainer.NumProcPerNode
-		if numProcPerNode.Type != intstr.Int {
-			allErrs = append(allErrs, field.Invalid(numProcPerNodePath, newJobObj.Spec.Trainer.NumProcPerNode, "must have an int value"))
+	if trainJobTrainer := newJobObj.Spec.Trainer; trainJobTrainer != nil && trainJobTrainer.NumProcPerNode != nil {
+		if trainJobTrainer.NumProcPerNode.Type != intstr.Int {
+			allErrs = append(allErrs, field.Invalid(numProcPerNodePath, *trainJobTrainer.NumProcPerNode, "must have an int value for MPI TrainJob"))
+		}
+	}
+	// validate PodSet configurations based on NumNodes and RunLauncherAsNode.
+	if trainJobTrainer := newJobObj.Spec.Trainer; trainJobTrainer != nil && ptr.Deref(trainJobTrainer.NumNodes, 1) >= 2 && ptr.Deref(runtimeInfo.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
+		if runtimeInfo.FindPodSetByName(constants.Launcher) == nil || runtimeInfo.FindPodSetByName(constants.Node) == nil {
+			numNodesPath := specPath.Child("trainer", "numNodes")
+			allErrs = append(allErrs, field.Invalid(numNodesPath, newJobObj.Spec.Trainer.NumNodes, "must have 1 when MPI trainingRuntime with enabled runLauncherAsNode does not have either launcher and node"))
 		}
 	}
 	return nil, allErrs
 }
 
 func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
-	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.MPI == nil {
+	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil
 	}
 
 	// TrainJob contains the actual information for the Trainer.
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		info.RuntimePolicy.MLPolicy.NumNodes = trainJob.Spec.Trainer.NumNodes
+		if node := info.FindPodSetByName(constants.Node); node != nil && node.Count != nil {
+			if ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
+				// TODO: We should implement more strong validations for the MPIRuntime with runLauncherAsNode.
+				// REF: https://github.com/kubeflow/trainer/issues/2550
+				// When runLauncherAsNode is enabled, 1 nodes should be allocated to launcher.
+				*node.Count = max(*trainJob.Spec.Trainer.NumNodes-1, 1)
+			} else {
+				*node.Count = *trainJob.Spec.Trainer.NumNodes
+			}
+		}
 	}
 
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
-		info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode = ptr.To(int32(trainJob.Spec.Trainer.NumProcPerNode.IntValue()))
+		info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode = ptr.To(int32(trainJob.Spec.Trainer.NumProcPerNode.IntValue()))
 	}
 
 	// Add Secret and ConfigMap volumes to the Info object
 	for psIdx, ps := range info.TemplateSpec.PodSets {
-		if ps.Name != constants.JobTrainerNode && ps.Name != constants.JobLauncher {
+		if ps.Name != constants.Node && ps.Name != constants.Launcher {
 			continue
 		}
 		apply.UpsertVolumes(
@@ -137,7 +152,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 					),
 			}...,
 		)
-		if ps.Name == constants.JobLauncher {
+		if ps.Name == constants.Launcher {
 			apply.UpsertVolumes(
 				&info.TemplateSpec.PodSets[psIdx].Volumes,
 				[]corev1ac.VolumeApplyConfiguration{
@@ -156,7 +171,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 			)
 		}
 		for cIdx, container := range ps.Containers {
-			if container.Name != constants.JobLauncher && container.Name != constants.JobTrainerNode {
+			if container.Name != constants.Node {
 				continue
 			}
 			apply.UpsertVolumeMounts(
@@ -164,17 +179,17 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 				[]corev1ac.VolumeMountApplyConfiguration{
 					*corev1ac.VolumeMount().
 						WithName(constants.MPISSHAuthVolumeName).
-						WithMountPath(*info.RuntimePolicy.MLPolicy.MPI.SSHAuthMountPath),
+						WithMountPath(*info.RuntimePolicy.MLPolicySource.MPI.SSHAuthMountPath),
 				}...,
 			)
-			if ps.Name == constants.JobLauncher && container.Name == constants.ContainerLauncher {
+			if ps.Name == constants.Launcher && (container.Name == constants.Node || container.Name == constants.Launcher) {
 				apply.UpsertVolumeMounts(
 					&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].VolumeMounts,
 					*corev1ac.VolumeMount().
 						WithName(constants.MPIHostfileVolumeName).
 						WithMountPath(constants.MPIHostfileDir),
 				)
-				switch *info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
+				switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
 				case trainer.MPIImplementationOpenMPI:
 					apply.UpsertEnvVars(
 						&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Env,
@@ -186,26 +201,14 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 							WithValue("true"),
 						*corev1ac.EnvVar().
 							WithName(constants.OpenMPIEnvDefaultSlots).
-							WithValue(strconv.Itoa(int(*info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode))),
+							WithValue(strconv.Itoa(int(*info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode))),
 						*corev1ac.EnvVar().
 							WithName(constants.OpenMPIEnvKeyRSHArgs).
 							WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 					)
 				default:
-					return fmt.Errorf("MPI implementation for %v doesn't supported", info.RuntimePolicy.MLPolicy.MPI.MPIImplementation)
+					return fmt.Errorf("MPI implementation for %v doesn't supported", info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation)
 				}
-			}
-		}
-	}
-
-	// Update total Pod requests for the PodGroupPolicy plugin.
-	for rName := range info.TotalRequests {
-		// For other Jobs like the Initializer, replica is always equal to 1.
-		// TODO (andreyvelich): Add support for total requests from the TrainJob's ResourcesPerNode.
-		if rName == constants.JobTrainerNode {
-			info.TotalRequests[rName] = runtime.TotalResourceRequest{
-				Replicas:    ptr.Deref(info.RuntimePolicy.MLPolicy.NumNodes, constants.DefaultJobReplicas),
-				PodRequests: info.TotalRequests[rName].PodRequests,
 			}
 		}
 	}
@@ -225,7 +228,7 @@ func (m *MPI) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 }
 
 func (m *MPI) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
-	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.MPI == nil {
+	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil, nil
 	}
 
@@ -284,13 +287,13 @@ func sshAuthSecretName(trainJobName string) string {
 
 func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.TrainJob) *corev1ac.ConfigMapApplyConfiguration {
 	var hostFile bytes.Buffer
-	runLauncherAsNode := ptr.Deref(info.RuntimePolicy.MLPolicy.MPI.RunLauncherAsNode, false)
-	slots := ptr.Deref(info.RuntimePolicy.MLPolicy.MPI.NumProcPerNode, 1)
+	runLauncherAsNode := ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false)
+	slots := ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode, 1)
 	for _, ps := range info.TemplateSpec.PodSets {
-		if !isTrainerNode(runLauncherAsNode, ps) {
+		if !isNode(runLauncherAsNode, ps) {
 			continue
 		}
-		switch *info.RuntimePolicy.MLPolicy.MPI.MPIImplementation {
+		switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
 		case trainer.MPIImplementationOpenMPI:
 			for e := range ps.Endpoints {
 				hostFile.WriteString(fmt.Sprintf("%s slots=%d\n", e, slots))
@@ -310,6 +313,6 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 			WithBlockOwnerDeletion(true))
 }
 
-func isTrainerNode(runLauncherAsNode bool, ps runtime.PodSet) bool {
-	return (runLauncherAsNode && ps.Name == constants.JobLauncher) || ps.Name == constants.JobTrainerNode
+func isNode(runLauncherAsNode bool, ps runtime.PodSet) bool {
+	return (runLauncherAsNode && ps.Name == constants.Launcher) || ps.Name == constants.Node
 }

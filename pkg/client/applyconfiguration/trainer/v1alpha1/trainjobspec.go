@@ -20,9 +20,8 @@ package v1alpha1
 // with apply.
 type TrainJobSpecApplyConfiguration struct {
 	RuntimeRef       *RuntimeRefApplyConfiguration       `json:"runtimeRef,omitempty"`
+	Initializer      *InitializerApplyConfiguration      `json:"initializer,omitempty"`
 	Trainer          *TrainerApplyConfiguration          `json:"trainer,omitempty"`
-	DatasetConfig    *DatasetConfigApplyConfiguration    `json:"datasetConfig,omitempty"`
-	ModelConfig      *ModelConfigApplyConfiguration      `json:"modelConfig,omitempty"`
 	Labels           map[string]string                   `json:"labels,omitempty"`
 	Annotations      map[string]string                   `json:"annotations,omitempty"`
 	PodSpecOverrides []PodSpecOverrideApplyConfiguration `json:"podSpecOverrides,omitempty"`
@@ -44,27 +43,19 @@ func (b *TrainJobSpecApplyConfiguration) WithRuntimeRef(value *RuntimeRefApplyCo
 	return b
 }
 
+// WithInitializer sets the Initializer field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Initializer field is set to the value of the last call.
+func (b *TrainJobSpecApplyConfiguration) WithInitializer(value *InitializerApplyConfiguration) *TrainJobSpecApplyConfiguration {
+	b.Initializer = value
+	return b
+}
+
 // WithTrainer sets the Trainer field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Trainer field is set to the value of the last call.
 func (b *TrainJobSpecApplyConfiguration) WithTrainer(value *TrainerApplyConfiguration) *TrainJobSpecApplyConfiguration {
 	b.Trainer = value
-	return b
-}
-
-// WithDatasetConfig sets the DatasetConfig field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DatasetConfig field is set to the value of the last call.
-func (b *TrainJobSpecApplyConfiguration) WithDatasetConfig(value *DatasetConfigApplyConfiguration) *TrainJobSpecApplyConfiguration {
-	b.DatasetConfig = value
-	return b
-}
-
-// WithModelConfig sets the ModelConfig field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ModelConfig field is set to the value of the last call.
-func (b *TrainJobSpecApplyConfiguration) WithModelConfig(value *ModelConfigApplyConfiguration) *TrainJobSpecApplyConfiguration {
-	b.ModelConfig = value
 	return b
 }
 

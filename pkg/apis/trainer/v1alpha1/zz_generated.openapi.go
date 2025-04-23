@@ -34,15 +34,14 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ClusterTrainingRuntimeList":       schema_pkg_apis_trainer_v1alpha1_ClusterTrainingRuntimeList(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ContainerOverride":                schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource": schema_pkg_apis_trainer_v1alpha1_CoschedulingPodGroupPolicySource(ref),
-		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.DatasetConfig":                    schema_pkg_apis_trainer_v1alpha1_DatasetConfig(ref),
-		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.InputModel":                       schema_pkg_apis_trainer_v1alpha1_InputModel(ref),
+		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.DatasetInitializer":               schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref),
+		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.Initializer":                      schema_pkg_apis_trainer_v1alpha1_Initializer(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec":               schema_pkg_apis_trainer_v1alpha1_JobSetTemplateSpec(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.JobStatus":                        schema_pkg_apis_trainer_v1alpha1_JobStatus(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.MLPolicy":                         schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.MLPolicySource":                   schema_pkg_apis_trainer_v1alpha1_MLPolicySource(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.MPIMLPolicySource":                schema_pkg_apis_trainer_v1alpha1_MPIMLPolicySource(ref),
-		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ModelConfig":                      schema_pkg_apis_trainer_v1alpha1_ModelConfig(ref),
-		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.OutputModel":                      schema_pkg_apis_trainer_v1alpha1_OutputModel(ref),
+		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ModelInitializer":                 schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodGroupPolicy":                   schema_pkg_apis_trainer_v1alpha1_PodGroupPolicy(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodGroupPolicySource":             schema_pkg_apis_trainer_v1alpha1_PodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodSpecOverride":                  schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref),
@@ -640,11 +639,11 @@ func schema_pkg_apis_trainer_v1alpha1_CoschedulingPodGroupPolicySource(ref commo
 	}
 }
 
-func schema_pkg_apis_trainer_v1alpha1_DatasetConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "DatasetConfig represents the desired dataset configuration. When this API is used, the training runtime must have the `dataset-initializer` container in the `Initializer` Job.",
+				Description: "DatasetInitializer represents the desired configuration to initialize and pre-process dataset. The DatasetInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"storageUri": {
@@ -690,53 +689,30 @@ func schema_pkg_apis_trainer_v1alpha1_DatasetConfig(ref common.ReferenceCallback
 	}
 }
 
-func schema_pkg_apis_trainer_v1alpha1_InputModel(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_trainer_v1alpha1_Initializer(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "InputModel represents the desired pre-trained model configuration.",
+				Description: "Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"storageUri": {
+					"dataset": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Storage uri for the model provider.",
-							Type:        []string{"string"},
-							Format:      "",
+							Description: "Configuration of the dataset initialization and pre-processing.",
+							Ref:         ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.DatasetInitializer"),
 						},
 					},
-					"env": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type": "map",
-							},
-						},
+					"model": {
 						SchemaProps: spec.SchemaProps{
-							Description: "List of environment variables to set in the model initializer container. These values will be merged with the TrainingRuntime's model initializer environments.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/core/v1.EnvVar"),
-									},
-								},
-							},
-						},
-					},
-					"secretRef": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Reference to the secret with credentials to download model. Secret must be created in the TrainJob's namespace.",
-							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
+							Description: "Configuration of the pre-trained model initialization",
+							Ref:         ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ModelInitializer"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference"},
+			"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.DatasetInitializer", "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ModelInitializer"},
 	}
 }
 
@@ -932,43 +908,16 @@ func schema_pkg_apis_trainer_v1alpha1_MPIMLPolicySource(ref common.ReferenceCall
 	}
 }
 
-func schema_pkg_apis_trainer_v1alpha1_ModelConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ModelConfig represents the desired model configuration.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"input": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Configuration of the pre-trained model. When this API is used, the training runtime must have the `model-initializer` container in the `Initializer` Job.",
-							Ref:         ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.InputModel"),
-						},
-					},
-					"output": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Configuration of the trained model. When this API is used, the training runtime must have the `model-exporter` container in the `Exporter` Job.",
-							Ref:         ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.OutputModel"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.InputModel", "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.OutputModel"},
-	}
-}
-
-func schema_pkg_apis_trainer_v1alpha1_OutputModel(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "OutputModel represents the desired trained model configuration.",
+				Description: "DatasetInitializer represents the desired configuration to initialize pre-trained model. The DatasetInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"storageUri": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Storage uri for the model exporter.",
+							Description: "Storage uri for the model provider.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -983,7 +932,7 @@ func schema_pkg_apis_trainer_v1alpha1_OutputModel(ref common.ReferenceCallback) 
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of environment variables to set in the model exporter container. These values will be merged with the TrainingRuntime's model exporter environments.",
+							Description: "List of environment variables to set in the model initializer container. These values will be merged with the TrainingRuntime's model initializer environments.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -997,7 +946,7 @@ func schema_pkg_apis_trainer_v1alpha1_OutputModel(ref common.ReferenceCallback) 
 					},
 					"secretRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Reference to the secret with credentials to export model. Secret must be created in the TrainJob's namespace.",
+							Description: "Reference to the secret with credentials to download model. Secret must be created in the TrainJob's namespace.",
 							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
 						},
 					},
@@ -1448,22 +1397,16 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 							Ref:         ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.RuntimeRef"),
 						},
 					},
+					"initializer": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Configuration of the initializer.",
+							Ref:         ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.Initializer"),
+						},
+					},
 					"trainer": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration of the desired trainer.",
+							Description: "Configuration of the trainer.",
 							Ref:         ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.Trainer"),
-						},
-					},
-					"datasetConfig": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Configuration of the training dataset.",
-							Ref:         ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.DatasetConfig"),
-						},
-					},
-					"modelConfig": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Configuration of the pre-trained and trained model.",
-							Ref:         ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ModelConfig"),
 						},
 					},
 					"labels": {
@@ -1536,7 +1479,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.DatasetConfig", "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ModelConfig", "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodSpecOverride", "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.RuntimeRef", "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.Trainer"},
+			"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.Initializer", "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodSpecOverride", "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.RuntimeRef", "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.Trainer"},
 	}
 }
 
@@ -1605,7 +1548,7 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Trainer represents the desired trainer configuration. Every training runtime contains `trainer` container which represents Trainer.",
+				Description: "Trainer represents the desired configuration for the training job. The Trainer spec will override the runtime template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: trainer`",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"image": {

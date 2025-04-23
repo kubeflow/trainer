@@ -53,16 +53,3 @@ if [[ $(uname) == "Darwin" ]]; then
 else
   sed -i -e "s/__version__.*/__version__ = \"${SDK_VERSION}\"/" ${SDK_OUTPUT_PATH}/kubeflow/trainer/__init__.py
 fi
-
-# The `model_config` property conflicts with Pydantic name.
-# Therefore, we rename it to `model_config_crd`
-TRAINJOB_SPEC_MODEL=${SDK_OUTPUT_PATH}/kubeflow/trainer/models/trainer_v1alpha1_train_job_spec.py
-if [[ $(uname) == "Darwin" ]]; then
-  sed -i '' -e "s/model_config/model_config_crd/" ${TRAINJOB_SPEC_MODEL}
-  sed -i '' -e "s/model_config_crd = ConfigDict/model_config = ConfigDict/" ${TRAINJOB_SPEC_MODEL}
-  sed -i '' -e "s/kubeflow.trainer.models.trainer_v1alpha1_model_config_crd/kubeflow.trainer.models.trainer_v1alpha1_model_config/" ${TRAINJOB_SPEC_MODEL}
-else
-  sed -i -e "s/model_config/model_config_crd/" ${TRAINJOB_SPEC_MODEL}
-  sed -i -e "s/model_config_crd = ConfigDict/model_config = ConfigDict/" ${TRAINJOB_SPEC_MODEL}
-  sed -i -e "s/kubeflow.trainer.models.trainer_v1alpha1_model_config_crd/kubeflow.trainer.models.trainer_v1alpha1_model_config/" ${TRAINJOB_SPEC_MODEL}
-fi

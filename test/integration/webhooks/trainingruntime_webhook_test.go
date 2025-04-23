@@ -135,7 +135,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 				func() *trainer.TrainingRuntime {
 					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
 					runtime.Spec.MLPolicy = &trainer.MLPolicy{
-						NumNodes: ptr.To(int32(2)),
+						NumNodes: ptr.To[int32](2),
 						MLPolicySource: trainer.MLPolicySource{
 							Torch: &trainer.TorchMLPolicySource{
 								ElasticPolicy: &trainer.TorchElasticPolicy{},
@@ -152,7 +152,10 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(nil, ptr.To[trainer.MPIImplementation]("invalid"), nil, nil).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(nil, ptr.To[trainer.MPIImplementation]("invalid"), nil, nil).
+										Obj(),
+									).
 									Obj(),
 							).
 							Obj()).
@@ -186,7 +189,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 						},
 					}
 					runtime.Spec.Template.Spec = testingutil.MakeJobSetWrapper(ns.Name, "runtime").
-						Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+						Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 						Obj().
 						Spec
 					return runtime
@@ -198,12 +201,15 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(ptr.To[int32](1), nil, ptr.To("/usr/dir"), ptr.To(false)).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(ptr.To[int32](1), nil, ptr.To("/usr/dir"), ptr.To(false)).
+										Obj(),
+									).
 									Obj(),
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 									Obj().
 									Spec,
 							).
@@ -217,12 +223,15 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+										Obj(),
+									).
 									Obj(),
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 									Obj().
 									Spec,
 							).
@@ -237,12 +246,15 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(false)).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(false)).
+										Obj(),
+									).
 									Obj(),
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 									Obj().
 									Spec,
 							).
@@ -256,12 +268,15 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+										Obj(),
+									).
 									Obj(),
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 									Obj().
 									Spec,
 							).
@@ -276,12 +291,15 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), nil).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), nil).
+										Obj(),
+									).
 									Obj(),
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 									Obj().
 									Spec,
 							).
@@ -295,12 +313,15 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+										Obj(),
+									).
 									Obj(),
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 									Obj().
 									Spec,
 							).
@@ -315,12 +336,15 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+										Obj(),
+									).
 									Obj(),
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 									Obj().
 									Spec,
 							).
@@ -334,12 +358,15 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
-									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/usr/dir"), ptr.To(false)).
+										Obj(),
+									).
 									Obj(),
 							).
 							JobSetSpec(
 								testingutil.MakeJobSetWrapper(ns.Name, "jobset").
-									Replicas(1, constants.JobTrainerNode, constants.JobInitializer, constants.JobLauncher).
+									Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 									Obj().
 									Spec,
 							).

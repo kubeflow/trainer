@@ -36,10 +36,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.ContainerOverrideApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("CoschedulingPodGroupPolicySource"):
 		return &trainerv1alpha1.CoschedulingPodGroupPolicySourceApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("DatasetConfig"):
-		return &trainerv1alpha1.DatasetConfigApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("InputModel"):
-		return &trainerv1alpha1.InputModelApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("DatasetInitializer"):
+		return &trainerv1alpha1.DatasetInitializerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Initializer"):
+		return &trainerv1alpha1.InitializerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobSetTemplateSpec"):
 		return &trainerv1alpha1.JobSetTemplateSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobStatus"):
@@ -48,12 +48,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.MLPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MLPolicySource"):
 		return &trainerv1alpha1.MLPolicySourceApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("ModelConfig"):
-		return &trainerv1alpha1.ModelConfigApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ModelInitializer"):
+		return &trainerv1alpha1.ModelInitializerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MPIMLPolicySource"):
 		return &trainerv1alpha1.MPIMLPolicySourceApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("OutputModel"):
-		return &trainerv1alpha1.OutputModelApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("PodGroupPolicy"):
 		return &trainerv1alpha1.PodGroupPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("PodGroupPolicySource"):

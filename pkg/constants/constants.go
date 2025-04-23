@@ -15,29 +15,34 @@ const (
 	// JobSetKind is the Kind name for the JobSet.
 	JobSetKind string = "JobSet"
 
-	// JobTrainerNode is the Job name for the trainer node.
-	JobTrainerNode string = "trainer-node"
+	// LabelTrainJobAncestor is the label to identify relationship between
+	// TrainJob and Pod template in the Runtime. The following labels are supported:
+	// trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer  - trainJob.spec.initializer.dataset
+	// trainer.kubeflow.org/trainjob-ancestor-step: model-initializer    - trainJob.spec.initializer.model
+	// trainer.kubeflow.org/trainjob-ancestor-step: trainer              - trainJob.spec.trainer
+	LabelTrainJobAncestor string = "trainer.kubeflow.org/trainjob-ancestor-step"
 
-	// ContainerTrainer is the container name for the trainer.
-	ContainerTrainer string = "trainer"
-
-	// ContainerTrainerPort is the default port for the trainer nodes communication.
-	ContainerTrainerPort int32 = 29500
-
-	// JobInitializer is the Job name for the initializer.
-	JobInitializer string = "initializer"
-
-	// ContainerModelInitializer is the container name for the model initializer.
-	ContainerModelInitializer string = "model-initializer"
-
-	// ContainerDatasetInitializer is the container name for the dataset initializer.
-	ContainerDatasetInitializer string = "dataset-initializer"
+	// DatasetInitializer is the name of the Job, volume mount, container, and label value for the dataset initializer.
+	DatasetInitializer string = "dataset-initializer"
 
 	// DatasetMountPath is the volumeMount path for dataset.
 	DatasetMountPath string = "/workspace/dataset"
 
+	// ModelInitializer is the name of the Job, volume mount, container, and label value for the model initializer.
+	ModelInitializer string = "model-initializer"
+
 	// ModelMountPath is the volumeMount path for model.
 	ModelMountPath string = "/workspace/model"
+
+	// AncestorTrainer is the ancestor name for Trainer, which is mostly used for the value of
+	// 'trainer.kubeflow.org/trainjob-ancestor-step'.
+	AncestorTrainer string = "trainer"
+
+	// Node is the name of the Job and container for the trainer node
+	Node string = "node"
+
+	// ContainerTrainerPort is the default port for the trainer nodes communication.
+	ContainerTrainerPort int32 = 29500
 
 	// PodGroupKind is the Kind name for the PodGroup.
 	PodGroupKind string = "PodGroup"
@@ -62,11 +67,9 @@ const (
 	// {"type": "Suspended", "status": "True", "reason": "Resumed"} condition.
 	TrainJobResumedMessage = "TrainJob is resumed"
 
-	// JobLauncher is the Job name for the launcher.
-	JobLauncher string = "launcher"
-
-	// ContainerLauncher is the container name for the launcher.
-	ContainerLauncher string = "launcher"
+	// Node is the name of the Job and container for the MPI launcher.
+	// When RunLauncherAsNode: true, for the launcher Job the container name is node.
+	Launcher string = "launcher"
 
 	// MPISSHAuthSecretSuffix is the name suffix for Secret with MPI SSH keys.
 	MPISSHAuthSecretSuffix string = "-mpi-ssh-auth"

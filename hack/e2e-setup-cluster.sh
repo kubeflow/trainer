@@ -30,7 +30,7 @@ TIMEOUT="5m"
 
 # Kubeflow Trainer images.
 # TODO (andreyvelich): Support initializers images.
-CONTROLLER_MANAGER_CI_IMAGE_NAME="kubeflow/trainer-controller-manager"
+CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-manager"
 CONTROLLER_MANAGER_CI_IMAGE_TAG="test"
 CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
 echo "Build Kubeflow Trainer images"

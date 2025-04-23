@@ -19,7 +19,6 @@ package plainml
 import (
 	"context"
 
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
@@ -44,38 +43,25 @@ func (p *PlainML) Name() string {
 }
 
 func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
-	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.Torch != nil || info.RuntimePolicy.MLPolicy.MPI != nil {
+	if info == nil ||
+		(info.RuntimePolicy.MLPolicySource != nil && (info.RuntimePolicy.MLPolicySource.Torch != nil || info.RuntimePolicy.MLPolicySource.MPI != nil)) {
 		return nil
 	}
 
 	// TrainJob contains the actual information for the number of nodes.
-	numNodes := info.RuntimePolicy.MLPolicy.NumNodes
-
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		numNodes = trainJob.Spec.Trainer.NumNodes
+		if trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer); trainerPS != nil && trainerPS.Count != nil {
+			*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
+		}
 	}
-	info.RuntimePolicy.MLPolicy.NumNodes = numNodes
 
 	// Add envs from the TrainJob.
 	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
-		if trainerContainer = info.FindContainerByPodSetContainerName(constants.JobTrainerNode, constants.ContainerTrainer); trainerContainer != nil {
+		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
 			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 		}
 	}
-
-	// Update total Pod requests for the PodGroupPolicy plugin.
-	for rName := range info.TotalRequests {
-		// For other Jobs like the Initializer, replica is always equal to 1.
-		// TODO (andreyvelich): Add support for total requests from the TrainJob's ResourcesPerNode.
-		if rName == constants.JobTrainerNode {
-			info.Scheduler.TotalRequests[rName] = runtime.TotalResourceRequest{
-				Replicas:    ptr.Deref(numNodes, constants.DefaultJobReplicas),
-				PodRequests: info.TotalRequests[rName].PodRequests,
-			}
-		}
-	}
-
 	info.SyncPodSetsToTemplateSpec()
 	return nil
 }

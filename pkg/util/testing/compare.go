@@ -22,8 +22,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/kubeflow/trainer/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/kubeflow/trainer/pkg/constants"
 )
 
 var (

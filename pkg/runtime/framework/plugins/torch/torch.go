@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -34,7 +35,6 @@ import (
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
-	corev1 "k8s.io/api/core/v1"
 )
 
 type Torch struct{}
@@ -52,9 +52,9 @@ func (t *Torch) Name() string {
 	return Name
 }
 
-func (t *Torch) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
-	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicy == nil || runtimeInfo.RuntimePolicy.MLPolicy.Torch == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
 		return nil, allErrs
 	}
 
@@ -66,7 +66,7 @@ func (t *Torch) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.
 		if numProcPerNode.Type == intstr.String {
 			allowed := sets.New("auto", "cpu", "gpu")
 			if !allowed.Has(numProcPerNode.StrVal) {
-				allErrs = append(allErrs, field.Invalid(numProcPerNodePath, newObj.Spec.Trainer.NumProcPerNode, fmt.Sprintf("must have an int value or %v", allowed.UnsortedList())))
+				allErrs = append(allErrs, field.Invalid(numProcPerNodePath, numProcPerNode, fmt.Sprintf("must have an int value or %v", sets.List(allowed))))
 			}
 		}
 
@@ -79,7 +79,7 @@ func (t *Torch) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.
 
 		if torchEnvs.Len() > 0 {
 			trainerEnvsPath := specPath.Child("trainer").Child("env")
-			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %s", strings.Join(torchEnvs.UnsortedList(), ", "))))
+			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(torchEnvs))))
 		}
 	}
 
@@ -88,18 +88,17 @@ func (t *Torch) Validate(runtimeJobTemplate client.Object, runtimeInfo *runtime.
 
 // TODO (andreyvelich): Add support for PyTorch elastic when JobSet supports Elastic Jobs.
 func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
-	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.Torch == nil {
+	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Torch == nil {
 		return nil
 	}
 
 	// TrainJob contains the actual information for the Trainer.
-	numNodes := info.RuntimePolicy.MLPolicy.NumNodes
-	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		numNodes = trainJob.Spec.Trainer.NumNodes
+	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	if trainerPS != nil && trainerPS.Count != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
 	}
-	info.RuntimePolicy.MLPolicy.NumNodes = numNodes
 
-	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicy.Torch.NumProcPerNode, intstr.FromString("auto"))
+	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicySource.Torch.NumProcPerNode, intstr.FromString("auto"))
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
 		numProcPerNode = ptr.Deref(trainJob.Spec.Trainer.NumProcPerNode, intstr.FromString("auto"))
 	}
@@ -143,7 +142,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
-		if trainerContainer = info.FindContainerByPodSetContainerName(constants.JobTrainerNode, constants.ContainerTrainer); trainerContainer != nil {
+		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
 			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 		}
 	}
@@ -151,7 +150,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		apply.UpsertEnvVar(&trainerContainer.Env,
 			*corev1ac.EnvVar().
 				WithName(constants.TorchEnvNumNodes).
-				WithValue(fmt.Sprintf("%d", ptr.Deref(numNodes, 1))),
+				WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
 			*corev1ac.EnvVar().
 				WithName(constants.TorchEnvNumProcPerNode).
 				WithValue(numProcPerNode.String()),
@@ -162,7 +161,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 						WithFieldPath(constants.JobCompletionIndexFieldPath))),
 			*corev1ac.EnvVar().
 				WithName(constants.TorchEnvMasterAddr).
-				WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.JobTrainerNode, trainJob.Name)),
+				WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
 			*corev1ac.EnvVar().
 				WithName(constants.TorchEnvMasterPort).
 				WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
@@ -170,19 +169,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
 	}
-
-	// Update total Pod requests for the PodGroupPolicy plugin.
-	for rName := range info.TotalRequests {
-		// For other Jobs like the Initializer, replica is always equal to 1.
-		// TODO (andreyvelich): Add support for total requests from the TrainJob's ResourcesPerNode.
-		if rName == constants.JobTrainerNode {
-			info.TotalRequests[rName] = runtime.TotalResourceRequest{
-				Replicas:    ptr.Deref(numNodes, constants.DefaultJobReplicas),
-				PodRequests: info.TotalRequests[rName].PodRequests,
-			}
-		}
-	}
-
 	info.SyncPodSetsToTemplateSpec()
 	return nil
 }
