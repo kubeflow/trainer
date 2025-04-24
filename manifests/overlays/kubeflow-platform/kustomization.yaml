@@ -6,7 +6,7 @@ sortOptions:
 resources:
   - ../../third-party/jobset # Comment this line if JobSet is installed on the Kubernetes cluster.
   - ../../base/crds
-  - ../../base/runtimes/pretraining
+  - ../../base/runtimes
   - ../../base/manager
   - ../../base/rbac
   - ../../base/webhook
