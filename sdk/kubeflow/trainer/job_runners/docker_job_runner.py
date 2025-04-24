@@ -16,11 +16,12 @@ from typing import Dict, List, Optional
 
 import docker
 from kubeflow.trainer.constants import constants
+from kubeflow.trainer.job_runners.job_runner import JobRunner
 from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils
 
 
-class DockerJobClient:
+class DockerJobRunner(JobRunner):
     def __init__(self, docker_client: Optional[docker.DockerClient] = None):
         if docker_client is None:
             self.docker_client = docker.from_env()

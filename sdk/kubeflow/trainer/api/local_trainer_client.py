@@ -20,7 +20,7 @@ import yaml
 from kubeflow.trainer import models
 from kubeflow.trainer.api.abstract_trainer_client import AbstractTrainerClient
 from kubeflow.trainer.constants import constants
-from kubeflow.trainer.docker_job_client import DockerJobClient
+from kubeflow.trainer.job_runners import JobRunner, DockerJobRunner
 from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils
 
@@ -29,7 +29,7 @@ class LocalTrainerClient(AbstractTrainerClient):
     def __init__(
         self,
         local_runtimes_path: Optional[Path] = None,
-        docker_job_client: Optional[DockerJobClient] = None,
+        job_runner: Optional[JobRunner] = None,
     ):
         print(
             "Warning: LocalTrainerClient is an alpha feature for Kubeflow Trainer. "
@@ -43,10 +43,10 @@ class LocalTrainerClient(AbstractTrainerClient):
         else:
             self.local_runtimes_path = local_runtimes_path
 
-        if docker_job_client is None:
-            self.docker_job_client = DockerJobClient()
+        if job_runner is None:
+            self.job_runner = DockerJobRunner()
         else:
-            self.docker_job_client = docker_job_client
+            self.job_runner = job_runner
 
     def list_runtimes(self) -> List[types.Runtime]:
         runtimes = []
@@ -97,7 +97,7 @@ class LocalTrainerClient(AbstractTrainerClient):
         else:
             num_nodes = 1
 
-        train_job_name = self.docker_job_client.create_job(
+        train_job_name = self.job_runner.create_job(
             image=image,
             entrypoint=entrypoint,
             command=command,
@@ -132,12 +132,12 @@ class LocalTrainerClient(AbstractTrainerClient):
             Dict[str, str]: The logs of the training job, where the key is the
             step and node rank, and the value is the logs for that node.
         """
-        return self.docker_job_client.get_job_logs(
+        return self.job_runner.get_job_logs(
             job_name=name, follow=follow, step=step, node_rank=node_rank
         )
 
     def delete_job(self, name: str):
-        self.docker_job_client.delete_job(job_name=name)
+        self.job_runner.delete_job(job_name=name)
 
     def __list_runtime_crs(self) -> List[models.TrainerV1alpha1ClusterTrainingRuntime]:
         runtime_crs = []
