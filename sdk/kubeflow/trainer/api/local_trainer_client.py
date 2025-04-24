@@ -20,7 +20,7 @@ import yaml
 from kubeflow.trainer import models
 from kubeflow.trainer.api.abstract_trainer_client import AbstractTrainerClient
 from kubeflow.trainer.constants import constants
-from kubeflow.trainer.job_runners import JobRunner, DockerJobRunner
+from kubeflow.trainer.job_runners import DockerJobRunner, JobRunner
 from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils
 
@@ -103,6 +103,7 @@ class LocalTrainerClient(AbstractTrainerClient):
             command=command,
             num_nodes=num_nodes,
             framework=runtime.trainer.framework,
+            runtime_name=runtime.name,
         )
         return train_job_name
 
@@ -112,7 +113,15 @@ class LocalTrainerClient(AbstractTrainerClient):
         raise NotImplementedError()
 
     def get_job(self, name: str) -> types.TrainJob:
-        raise NotImplementedError()
+        container_job = self.job_runner.get_job(name)
+
+        return types.TrainJob(
+            name=container_job.name,
+            creation_timestamp=container_job.creation_timestamp,
+            steps=[container.to_step() for container in container_job.containers],
+            runtime=self.get_runtime(container_job.runtime_name),
+            status=container_job.status,
+        )
 
     def get_job_logs(
         self,

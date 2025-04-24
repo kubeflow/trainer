@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datetime import datetime
 from typing import Dict, List, Optional
 
 import docker
@@ -35,6 +36,7 @@ class DockerJobRunner(JobRunner):
         command: List[str],
         num_nodes: int,
         framework: types.Framework,
+        runtime_name: str,
     ) -> str:
         if framework != types.Framework.TORCH:
             raise RuntimeError(f"Framework '{framework}' is not currently supported.")
@@ -47,7 +49,8 @@ class DockerJobRunner(JobRunner):
             name=train_job_name,
             driver="bridge",
             labels={
-                constants.DOCKER_TRAIN_JOB_NAME_LABEL: train_job_name,
+                constants.CONTAINER_TRAIN_JOB_NAME_LABEL: train_job_name,
+                constants.CONTAINER_RUNTIME_LABEL: runtime_name,
             },
         )
 
@@ -59,8 +62,9 @@ class DockerJobRunner(JobRunner):
                 entrypoint=entrypoint,
                 command=command,
                 labels={
-                    constants.DOCKER_TRAIN_JOB_NAME_LABEL: train_job_name,
+                    constants.CONTAINER_TRAIN_JOB_NAME_LABEL: train_job_name,
                     constants.LOCAL_NODE_RANK_LABEL: str(i),
+                    constants.CONTAINER_RUNTIME_LABEL: runtime_name,
                 },
                 environment=self.__get_container_environment(
                     framework=framework,
@@ -73,8 +77,32 @@ class DockerJobRunner(JobRunner):
 
         return train_job_name
 
-    def get_job(self, job_name: str):
-        raise NotImplementedError()
+    def get_job(self, job_name: str) -> types.ContainerJob:
+        network = self.docker_client.networks.get(job_name)
+
+        docker_containers = self.docker_client.containers.list(
+            filters={
+                "label": [f"{constants.CONTAINER_TRAIN_JOB_NAME_LABEL}={job_name}"]
+            },
+            all=True,
+        )
+
+        containers = []
+        for container in docker_containers:
+            containers.append(
+                types.Container(
+                    name=container.name,
+                    status=container.status,
+                ),
+            )
+
+        return types.ContainerJob(
+            name=job_name,
+            creation_timestamp=datetime.fromisoformat(network.attrs["Created"]),
+            runtime_name=network.attrs["Labels"][constants.CONTAINER_RUNTIME_LABEL],
+            containers=containers,
+            status=self.__get_job_status(containers),
+        )
 
     def get_job_logs(
         self,
@@ -100,7 +128,7 @@ class DockerJobRunner(JobRunner):
             all=True,
             filters={
                 "label": [
-                    f"{constants.DOCKER_TRAIN_JOB_NAME_LABEL}={job_name}",
+                    f"{constants.CONTAINER_TRAIN_JOB_NAME_LABEL}={job_name}",
                     f"{constants.LOCAL_NODE_RANK_LABEL}={node_rank}",
                 ]
             },
@@ -129,7 +157,7 @@ class DockerJobRunner(JobRunner):
 
         # Because a network is created for each job, we use network names to list all jobs.
         networks = self.docker_client.networks.list(
-            filters={"label": constants.DOCKER_TRAIN_JOB_NAME_LABEL},
+            filters={"label": constants.CONTAINER_TRAIN_JOB_NAME_LABEL},
         )
 
         job_names = []
@@ -144,7 +172,7 @@ class DockerJobRunner(JobRunner):
         """
         containers = self.docker_client.containers.list(
             all=True,
-            filters={"label": f"{constants.DOCKER_TRAIN_JOB_NAME_LABEL}={job_name}"},
+            filters={"label": f"{constants.CONTAINER_TRAIN_JOB_NAME_LABEL}={job_name}"},
         )
         for c in containers:
             c.remove(force=True)
@@ -171,3 +199,8 @@ class DockerJobRunner(JobRunner):
             "PET_MASTER_ADDR": head_node_address,
             "PET_MASTER_PORT": str(constants.TORCH_HEAD_NODE_PORT),
         }
+
+    @staticmethod
+    def __get_job_status(_: List[types.Container]) -> str:
+        # TODO (eoinfennessy): Discuss how to report status
+        return constants.UNKNOWN

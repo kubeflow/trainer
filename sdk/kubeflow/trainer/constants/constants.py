@@ -120,8 +120,11 @@ MPI_ENTRYPOINT = "mpirun"
 # The default path to the directory containing local training runtime configs.
 LOCAL_RUNTIMES_PATH = "trainer/config/local_runtimes"
 
-# The label key used to associate docker resources with a train job name.
-DOCKER_TRAIN_JOB_NAME_LABEL = "trainer.kubeflow.org/train-job-name"
+# The label key used to associate container resources with a train job name.
+CONTAINER_TRAIN_JOB_NAME_LABEL = "trainer.kubeflow.org/train-job-name"
+
+# The label key used to associate container resources with a runtime.
+CONTAINER_RUNTIME_LABEL = "trainer.kubeflow.org/runtime"
 
 # The prefix given to names used for local train jobs.
 LOCAL_TRAIN_JOB_NAME_PREFIX = "kubeflow-trainer-"

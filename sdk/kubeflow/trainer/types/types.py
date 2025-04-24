@@ -102,6 +102,26 @@ class TrainJob:
     status: Optional[str] = constants.UNKNOWN
 
 
+# Representation for a container used in a local job.
+@dataclass
+class Container:
+    name: str
+    status: str
+
+    def to_step(self) -> Step:
+        return Step(name=self.name, status=self.status, pod_name=self.name)
+
+
+# Representation for a local container job.
+@dataclass
+class ContainerJob:
+    name: str
+    creation_timestamp: datetime
+    runtime_name: str
+    containers: List[Container]
+    status: Optional[str] = constants.UNKNOWN
+
+
 # Configuration for the HuggingFace dataset initializer.
 # TODO (andreyvelich): Discuss how to keep these configurations is sync with pkg.initializers.types
 @dataclass

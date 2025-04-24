@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from typing import Dict, List
 
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
@@ -22,26 +22,27 @@ from kubeflow.trainer.types import types
 class JobRunner(ABC):
     @abstractmethod
     def create_job(
-            self,
-            image: str,
-            entrypoint: List[str],
-            command: List[str],
-            num_nodes: int,
-            framework: types.Framework,
+        self,
+        image: str,
+        entrypoint: List[str],
+        command: List[str],
+        num_nodes: int,
+        framework: types.Framework,
+        runtime_name: str,
     ) -> str:
         pass
 
     @abstractmethod
-    def get_job(self, job_name: str):
+    def get_job(self, job_name: str) -> types.ContainerJob:
         pass
 
     @abstractmethod
     def get_job_logs(
-            self,
-            job_name: str,
-            follow: bool = False,
-            step: str = constants.NODE,
-            node_rank: int = 0,
+        self,
+        job_name: str,
+        follow: bool = False,
+        step: str = constants.NODE,
+        node_rank: int = 0,
     ) -> Dict[str, str]:
         pass
 
