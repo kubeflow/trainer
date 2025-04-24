@@ -42,10 +42,8 @@ ${KIND} load docker-image ${CONTROLLER_MANAGER_CI_IMAGE}
 
 # This avoids a race condition where API server has not yet registered CRDs
 echo "Deploy Kubeflow Trainer CRDs first"
-kubectl apply --server-side -k manifests/base/crds || (
-  kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
-    exit 1
-)
+kubectl apply --server-side -k manifests/base/crds
+
 echo "Deploy Kubeflow Trainer"
 E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
 mkdir -p "${E2E_MANIFESTS_DIR}"
