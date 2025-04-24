@@ -148,22 +148,14 @@ class DockerJobRunner(JobRunner):
             logs[f"{step}-{node_rank}"] = containers[0].logs().decode()
         return logs
 
-    def list_jobs(self) -> List[str]:
-        """Lists the names of all Docker training jobs.
-
-        Returns:
-            List[str]: A list of Docker training job names.
-        """
-
-        # Because a network is created for each job, we use network names to list all jobs.
-        networks = self.docker_client.networks.list(
-            filters={"label": constants.CONTAINER_TRAIN_JOB_NAME_LABEL},
-        )
-
-        job_names = []
-        for n in networks:
-            job_names.append(n.name)
-        return job_names
+    def list_jobs(
+        self,
+        runtime_name: Optional[str] = None,
+    ) -> List[types.ContainerJob]:
+        jobs = []
+        for name in self.__list_job_names(runtime_name):
+            jobs.append(self.get_job(name))
+        return jobs
 
     def delete_job(self, job_name: str) -> None:
         """Deletes all resources associated with a Docker training job.
@@ -181,6 +173,33 @@ class DockerJobRunner(JobRunner):
         network = self.docker_client.networks.get(job_name)
         network.remove()
         print(f"Removed network: {network.name}")
+
+    def __list_job_names(
+        self,
+        runtime_name: Optional[str] = None,
+    ) -> List[str]:
+        """Lists the names of all Docker training jobs.
+
+        Args:
+            runtime_name (Optional[str]): Filter by runtime name (default None)
+
+        Returns:
+            List[str]: A list of Docker training job names.
+        """
+
+        filters = {"label": [constants.CONTAINER_TRAIN_JOB_NAME_LABEL]}
+        if runtime_name is not None:
+            filters["label"].append(
+                f"{constants.CONTAINER_RUNTIME_LABEL}={runtime_name}"
+            )
+
+        # Because a network is created for each job, we use network names to list all jobs.
+        networks = self.docker_client.networks.list(filters=filters)
+
+        job_names = []
+        for n in networks:
+            job_names.append(n.name)
+        return job_names
 
     @staticmethod
     def __get_container_environment(

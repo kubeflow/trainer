@@ -110,18 +110,17 @@ class LocalTrainerClient(AbstractTrainerClient):
     def list_jobs(
         self, runtime: Optional[types.Runtime] = None
     ) -> List[types.TrainJob]:
-        raise NotImplementedError()
+        runtime_name = runtime.name if runtime else None
+        container_jobs = self.job_runner.list_jobs(runtime_name)
+
+        train_jobs = []
+        for container_job in container_jobs:
+            train_jobs.append(self.__container_job_to_train_job(container_job))
+        return train_jobs
 
     def get_job(self, name: str) -> types.TrainJob:
         container_job = self.job_runner.get_job(name)
-
-        return types.TrainJob(
-            name=container_job.name,
-            creation_timestamp=container_job.creation_timestamp,
-            steps=[container.to_step() for container in container_job.containers],
-            runtime=self.get_runtime(container_job.runtime_name),
-            status=container_job.status,
-        )
+        return self.__container_job_to_train_job(container_job)
 
     def get_job_logs(
         self,
@@ -167,3 +166,14 @@ class LocalTrainerClient(AbstractTrainerClient):
             if cr.metadata.name == name:
                 return cr
         return None
+
+    def __container_job_to_train_job(
+        self, container_job: types.ContainerJob
+    ) -> types.TrainJob:
+        return types.TrainJob(
+            name=container_job.name,
+            creation_timestamp=container_job.creation_timestamp,
+            steps=[container.to_step() for container in container_job.containers],
+            runtime=self.get_runtime(container_job.runtime_name),
+            status=container_job.status,
+        )

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
@@ -47,7 +47,10 @@ class JobRunner(ABC):
         pass
 
     @abstractmethod
-    def list_jobs(self) -> List[str]:
+    def list_jobs(
+        self,
+        runtime_name: Optional[str] = None,
+    ) -> List[types.ContainerJob]:
         pass
 
     @abstractmethod
