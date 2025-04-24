@@ -17,8 +17,8 @@ import multiprocessing
 import queue
 from typing import Dict, List, Optional
 
-from kubeflow.trainer.api.abstract_trainer_client import AbstractTrainerClient
 import kubeflow.trainer.models as models
+from kubeflow.trainer.api.abstract_trainer_client import AbstractTrainerClient
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils

@@ -15,11 +15,11 @@
 import inspect
 import os
 import queue
+import random
 import string
 import textwrap
 import threading
 import uuid
-import random
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import kubeflow.trainer.models as models
@@ -76,6 +76,7 @@ def get_container_devices(
 
     return device, str(device_count)
 
+
 def get_runtime_from_crd(
     runtime_crd: models.TrainerV1alpha1ClusterTrainingRuntime,
 ) -> types.Runtime:
@@ -98,6 +99,7 @@ def get_runtime_from_crd(
             runtime_crd.metadata,
         ),
     )
+
 
 def get_runtime_trainer_container(
     replicated_jobs: List[models.JobsetV1alpha2ReplicatedJob],
@@ -423,6 +425,7 @@ def get_log_queue_pool(log_streams: List[Any]) -> List[queue.Queue]:
         pool.append(q)
         threading.Thread(target=wrap_log_stream, args=(q, log_stream)).start()
     return pool
+
 
 def generate_train_job_name() -> str:
     return random.choice(string.ascii_lowercase) + uuid.uuid4().hex[:11]

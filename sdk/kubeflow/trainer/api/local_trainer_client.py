@@ -14,9 +14,9 @@
 
 from importlib import resources
 from pathlib import Path
-from typing import List, Optional, Dict
-import yaml
+from typing import Dict, List, Optional
 
+import yaml
 from kubeflow.trainer import models
 from kubeflow.trainer.api.abstract_trainer_client import AbstractTrainerClient
 from kubeflow.trainer.constants import constants
@@ -37,7 +37,9 @@ class LocalTrainerClient(AbstractTrainerClient):
         )
 
         if local_runtimes_path is None:
-            self.local_runtimes_path = resources.files(constants.PACKAGE_NAME) / constants.LOCAL_RUNTIMES_PATH
+            self.local_runtimes_path = (
+                resources.files(constants.PACKAGE_NAME) / constants.LOCAL_RUNTIMES_PATH
+            )
         else:
             self.local_runtimes_path = local_runtimes_path
 
@@ -59,10 +61,10 @@ class LocalTrainerClient(AbstractTrainerClient):
         raise RuntimeError(f"No runtime found with name '{name}'")
 
     def train(
-            self,
-            runtime: types.Runtime = types.DEFAULT_RUNTIME,
-            initializer: Optional[types.Initializer] = None,
-            trainer: Optional[types.CustomTrainer] = None,
+        self,
+        runtime: types.Runtime = types.DEFAULT_RUNTIME,
+        initializer: Optional[types.Initializer] = None,
+        trainer: Optional[types.CustomTrainer] = None,
     ) -> str:
         runtime_cr = self.__get_runtime_cr(runtime.name)
         if runtime_cr is None:
@@ -72,21 +74,19 @@ class LocalTrainerClient(AbstractTrainerClient):
             runtime_cr.spec.template.spec.replicated_jobs
         )
         if runtime_container is None:
-            raise RuntimeError(f"No runtime container found")
+            raise RuntimeError("No runtime container found")
 
         image = runtime_container.image
         if image is None:
-            raise RuntimeError(f"No runtime container image specified")
+            raise RuntimeError("No runtime container image specified")
 
         if trainer and trainer.func:
-            entrypoint, command = (
-                utils.get_entrypoint_using_train_func(
-                    runtime,
-                    trainer.func,
-                    trainer.func_args,
-                    trainer.pip_index_url,
-                    trainer.packages_to_install,
-                )
+            entrypoint, command = utils.get_entrypoint_using_train_func(
+                runtime,
+                trainer.func,
+                trainer.func_args,
+                trainer.pip_index_url,
+                trainer.packages_to_install,
             )
         else:
             entrypoint = runtime_container.command
@@ -107,7 +107,7 @@ class LocalTrainerClient(AbstractTrainerClient):
         return train_job_name
 
     def list_jobs(
-            self, runtime: Optional[types.Runtime] = None
+        self, runtime: Optional[types.Runtime] = None
     ) -> List[types.TrainJob]:
         raise NotImplementedError()
 
@@ -115,28 +115,25 @@ class LocalTrainerClient(AbstractTrainerClient):
         raise NotImplementedError()
 
     def get_job_logs(
-            self,
-            name: str,
-            follow: Optional[bool] = False,
-            step: str = constants.NODE,
-            node_rank: int = 0,
+        self,
+        name: str,
+        follow: Optional[bool] = False,
+        step: str = constants.NODE,
+        node_rank: int = 0,
     ) -> Dict[str, str]:
         """Gets logs for the specified training job
-            Args:
-                name (str): The name of the training job
-                follow (bool): If true, follows the job logs and prints them to standard out (default False)
-                step (int): The training job step to target (default "node")
-                node_rank (int): The node rank to retrieve logs from (default 0)
+        Args:
+            name (str): The name of the training job
+            follow (bool): If true, follows job logs and prints them to standard out (default False)
+            step (int): The training job step to target (default "node")
+            node_rank (int): The node rank to retrieve logs from (default 0)
 
-            Returns:
-                Dict[str, str]: The logs of the training job, where the key is the
-                step and node rank, and the value is the logs for that node.
-         """
+        Returns:
+            Dict[str, str]: The logs of the training job, where the key is the
+            step and node rank, and the value is the logs for that node.
+        """
         return self.docker_job_client.get_job_logs(
-            job_name=name,
-            follow=follow,
-            step=step,
-            node_rank=node_rank
+            job_name=name, follow=follow, step=step, node_rank=node_rank
         )
 
     def delete_job(self, name: str):
@@ -153,7 +150,10 @@ class LocalTrainerClient(AbstractTrainerClient):
                     runtime_crs.append(cr)
         return runtime_crs
 
-    def __get_runtime_cr(self, name: str) -> Optional[models.TrainerV1alpha1ClusterTrainingRuntime]:
+    def __get_runtime_cr(
+        self,
+        name: str,
+    ) -> Optional[models.TrainerV1alpha1ClusterTrainingRuntime]:
         for cr in self.__list_runtime_crs():
             if cr.metadata.name == name:
                 return cr

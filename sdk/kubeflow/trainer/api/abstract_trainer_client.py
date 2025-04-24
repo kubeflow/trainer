@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
@@ -44,7 +44,7 @@ class AbstractTrainerClient(ABC):
 
     @abstractmethod
     def list_jobs(
-            self, runtime: Optional[types.Runtime] = None
+        self, runtime: Optional[types.Runtime] = None
     ) -> List[types.TrainJob]:
         pass
 
@@ -54,9 +54,9 @@ class AbstractTrainerClient(ABC):
 
     @abstractmethod
     def train(
-            self,
-            runtime: types.Runtime = types.DEFAULT_RUNTIME,
-            initializer: Optional[types.Initializer] = None,
-            trainer: Optional[types.CustomTrainer] = None,
+        self,
+        runtime: types.Runtime = types.DEFAULT_RUNTIME,
+        initializer: Optional[types.Initializer] = None,
+        trainer: Optional[types.CustomTrainer] = None,
     ) -> str:
         pass

@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 import docker
-
-from kubeflow.trainer.types import types
 from kubeflow.trainer.constants import constants
+from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils
 
 
@@ -34,12 +33,14 @@ class DockerJobClient:
         entrypoint: List[str],
         command: List[str],
         num_nodes: int,
-        framework: types.Framework
+        framework: types.Framework,
     ) -> str:
         if framework != types.Framework.TORCH:
             raise RuntimeError(f"Framework '{framework}' is not currently supported.")
 
-        train_job_name = f"{constants.LOCAL_TRAIN_JOB_NAME_PREFIX}{utils.generate_train_job_name()}"
+        train_job_name = (
+            f"{constants.LOCAL_TRAIN_JOB_NAME_PREFIX}{utils.generate_train_job_name()}"
+        )
 
         docker_network = self.docker_client.networks.create(
             name=train_job_name,
@@ -50,7 +51,7 @@ class DockerJobClient:
         )
 
         for i in range(num_nodes):
-            c = self.docker_client.containers.run(
+            self.docker_client.containers.run(
                 name=f"{train_job_name}-{i}",
                 network=docker_network.id,
                 image=image,
@@ -85,7 +86,7 @@ class DockerJobClient:
 
         Args:
             job_name (str): The name of the training job
-            follow (bool): If true, follows the job logs and prints them to standard out (default False)
+            follow (bool): If true, follows job logs and prints them to standard out (default False)
             step (int): The training job step to target (default "node")
             node_rank (int): The node rank to retrieve logs from (default 0)
 
@@ -108,13 +109,11 @@ class DockerJobClient:
 
         logs: Dict[str, str] = {}
         if follow:
-            for l in containers[0].logs(stream=True):
-                decoded = l.decode("utf-8")
+            for line in containers[0].logs(stream=True):
+                decoded = line.decode("utf-8")
                 print(decoded)
                 logs[f"{step}-{node_rank}"] = (
-                    logs.get(f"{step}-{node_rank}", "")
-                    + decoded
-                    + "\n"
+                    logs.get(f"{step}-{node_rank}", "") + decoded + "\n"
                 )
         else:
             logs[f"{step}-{node_rank}"] = containers[0].logs().decode()
@@ -144,7 +143,7 @@ class DockerJobClient:
         """
         containers = self.docker_client.containers.list(
             all=True,
-            filters={"label": f"{constants.DOCKER_TRAIN_JOB_NAME_LABEL}={job_name}"}
+            filters={"label": f"{constants.DOCKER_TRAIN_JOB_NAME_LABEL}={job_name}"},
         )
         for c in containers:
             c.remove(force=True)
