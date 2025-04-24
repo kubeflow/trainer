@@ -17,7 +17,7 @@
 package externalversions
 
 import (
-	"fmt"
+	fmt "fmt"
 
 	v1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

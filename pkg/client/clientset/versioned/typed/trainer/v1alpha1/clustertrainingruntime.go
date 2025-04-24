@@ -17,10 +17,10 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/applyconfiguration/trainer/v1alpha1"
+	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	applyconfigurationtrainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/applyconfiguration/trainer/v1alpha1"
 	scheme "github.com/kubeflow/trainer/pkg/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,32 +36,35 @@ type ClusterTrainingRuntimesGetter interface {
 
 // ClusterTrainingRuntimeInterface has methods to work with ClusterTrainingRuntime resources.
 type ClusterTrainingRuntimeInterface interface {
-	Create(ctx context.Context, clusterTrainingRuntime *v1alpha1.ClusterTrainingRuntime, opts v1.CreateOptions) (*v1alpha1.ClusterTrainingRuntime, error)
-	Update(ctx context.Context, clusterTrainingRuntime *v1alpha1.ClusterTrainingRuntime, opts v1.UpdateOptions) (*v1alpha1.ClusterTrainingRuntime, error)
+	Create(ctx context.Context, clusterTrainingRuntime *trainerv1alpha1.ClusterTrainingRuntime, opts v1.CreateOptions) (*trainerv1alpha1.ClusterTrainingRuntime, error)
+	Update(ctx context.Context, clusterTrainingRuntime *trainerv1alpha1.ClusterTrainingRuntime, opts v1.UpdateOptions) (*trainerv1alpha1.ClusterTrainingRuntime, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.ClusterTrainingRuntime, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ClusterTrainingRuntimeList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*trainerv1alpha1.ClusterTrainingRuntime, error)
+	List(ctx context.Context, opts v1.ListOptions) (*trainerv1alpha1.ClusterTrainingRuntimeList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterTrainingRuntime, err error)
-	Apply(ctx context.Context, clusterTrainingRuntime *trainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterTrainingRuntime, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *trainerv1alpha1.ClusterTrainingRuntime, err error)
+	Apply(ctx context.Context, clusterTrainingRuntime *applyconfigurationtrainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration, opts v1.ApplyOptions) (result *trainerv1alpha1.ClusterTrainingRuntime, err error)
 	ClusterTrainingRuntimeExpansion
 }
 
 // clusterTrainingRuntimes implements ClusterTrainingRuntimeInterface
 type clusterTrainingRuntimes struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.ClusterTrainingRuntime, *v1alpha1.ClusterTrainingRuntimeList, *trainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration]
+	*gentype.ClientWithListAndApply[*trainerv1alpha1.ClusterTrainingRuntime, *trainerv1alpha1.ClusterTrainingRuntimeList, *applyconfigurationtrainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration]
 }
 
 // newClusterTrainingRuntimes returns a ClusterTrainingRuntimes
 func newClusterTrainingRuntimes(c *TrainerV1alpha1Client) *clusterTrainingRuntimes {
 	return &clusterTrainingRuntimes{
-		gentype.NewClientWithListAndApply[*v1alpha1.ClusterTrainingRuntime, *v1alpha1.ClusterTrainingRuntimeList, *trainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration](
+		gentype.NewClientWithListAndApply[*trainerv1alpha1.ClusterTrainingRuntime, *trainerv1alpha1.ClusterTrainingRuntimeList, *applyconfigurationtrainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration](
 			"clustertrainingruntimes",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.ClusterTrainingRuntime { return &v1alpha1.ClusterTrainingRuntime{} },
-			func() *v1alpha1.ClusterTrainingRuntimeList { return &v1alpha1.ClusterTrainingRuntimeList{} }),
+			func() *trainerv1alpha1.ClusterTrainingRuntime { return &trainerv1alpha1.ClusterTrainingRuntime{} },
+			func() *trainerv1alpha1.ClusterTrainingRuntimeList {
+				return &trainerv1alpha1.ClusterTrainingRuntimeList{}
+			},
+		),
 	}
 }

@@ -211,16 +211,20 @@ type TorchElasticPolicy struct {
 type MPIMLPolicySource struct {
 	// Number of processes per node.
 	// This value is equal to the number of slots for each node in the hostfile.
+	// Defaults to 1.
+	// +kubebuilder:default=1
 	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
 
 	// Implementation name for the MPI to create the appropriate hostfile.
 	// Defaults to OpenMPI.
 	// +kubebuilder:default=OpenMPI
-	MPIImplementation MPIImplementation `json:"mpiImplementation,omitempty"`
+	// +kubebuilder:validation:Enum=OpenMPI
+	MPIImplementation *MPIImplementation `json:"mpiImplementation,omitempty"`
 
 	// Directory where SSH keys are mounted.
 	// Defaults to /root/.ssh.
-	SSHAuthMountPath string `json:"sshAuthMountPath,omitempty"`
+	// +kubebuilder:default=/root/.ssh
+	SSHAuthMountPath *string `json:"sshAuthMountPath,omitempty"`
 
 	// Whether to run training process on the launcher Job.
 	// Defaults to false.

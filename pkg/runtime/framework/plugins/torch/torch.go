@@ -19,16 +19,19 @@ package torch
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/apply"
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
@@ -49,94 +52,139 @@ func (t *Torch) Name() string {
 	return Name
 }
 
-// TODO: Need to implement validations for Torch policy.
-func (t *Torch) Validate(oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
-	return nil, nil
+func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	var allErrs field.ErrorList
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
+		return nil, allErrs
+	}
+
+	specPath := field.NewPath("spec")
+
+	if newObj.Spec.Trainer != nil {
+		numProcPerNodePath := specPath.Child("trainer").Child("numProcPerNode")
+		numProcPerNode := *newObj.Spec.Trainer.NumProcPerNode
+		if numProcPerNode.Type == intstr.String {
+			allowed := sets.New("auto", "cpu", "gpu")
+			if !allowed.Has(numProcPerNode.StrVal) {
+				allErrs = append(allErrs, field.Invalid(numProcPerNodePath, numProcPerNode, fmt.Sprintf("must have an int value or %v", sets.List(allowed))))
+			}
+		}
+
+		torchEnvs := sets.New[string]()
+		for _, env := range newObj.Spec.Trainer.Env {
+			if constants.TorchRunReservedEnvNames.Has(env.Name) {
+				torchEnvs.Insert(env.Name)
+			}
+		}
+
+		if torchEnvs.Len() > 0 {
+			trainerEnvsPath := specPath.Child("trainer").Child("env")
+			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(torchEnvs))))
+		}
+	}
+
+	return nil, allErrs
 }
 
 // TODO (andreyvelich): Add support for PyTorch elastic when JobSet supports Elastic Jobs.
 func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
-	if info == nil || info.RuntimePolicy.MLPolicy == nil || info.RuntimePolicy.MLPolicy.Torch == nil {
+	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Torch == nil {
 		return nil
 	}
 
 	// TrainJob contains the actual information for the Trainer.
-	numNodes := info.RuntimePolicy.MLPolicy.NumNodes
-	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		numNodes = trainJob.Spec.Trainer.NumNodes
+	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	if trainerPS != nil && trainerPS.Count != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
 	}
-	info.Trainer.NumNodes = numNodes
 
-	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicy.Torch.NumProcPerNode, intstr.FromString("auto"))
+	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicySource.Torch.NumProcPerNode, intstr.FromString("auto"))
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
 		numProcPerNode = ptr.Deref(trainJob.Spec.Trainer.NumProcPerNode, intstr.FromString("auto"))
 	}
 
+	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
+		var (
+			shouldUseCPU           func(resources corev1.ResourceList) bool
+			fallbackNumProcPerNode intstr.IntOrString
+		)
+		switch numProcPerNode.String() {
+		case "auto":
+			shouldUseCPU = func(resources corev1.ResourceList) bool {
+				for resName := range resources {
+					if strings.Contains(strings.ToLower(resName.String()), "gpu") {
+						return false
+					}
+				}
+				return true
+			}
+			fallbackNumProcPerNode = intstr.FromString("auto")
+		case "cpu":
+			shouldUseCPU = func(resources corev1.ResourceList) bool {
+				_, ok := resources[corev1.ResourceCPU]
+				return ok
+			}
+			fallbackNumProcPerNode = intstr.FromInt32(1)
+		default:
+			shouldUseCPU = func(corev1.ResourceList) bool { return false }
+			fallbackNumProcPerNode = numProcPerNode
+		}
+		nppNode, usedCPU := calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Limits, shouldUseCPU)
+		if !usedCPU {
+			nppNode, _ = calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Requests, shouldUseCPU)
+		}
+		numProcPerNode = nppNode
+	}
+
 	// Update envs for Info object.
 	// Add PyTorch distributed "PET_" values for torchrun
-	// TODO (andreyvelich): Add validation to check that TrainJob doesn't have "PET_" envs.
 	// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
-
-	infoEnvs := []corev1.EnvVar{
-		{
-			Name:  constants.TorchEnvNumNodes,
-			Value: fmt.Sprintf("%d", ptr.Deref(numNodes, 1)),
-		},
-		{
-			Name:  constants.TorchEnvNumProcPerNode,
-			Value: numProcPerNode.String(),
-		},
-		{
-			Name: constants.TorchEnvNodeRank,
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: constants.JobCompletionIndexFieldPath,
-				},
-			},
-		},
-		{
-			Name:  constants.TorchEnvMasterAddr,
-			Value: fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.JobTrainerNode, trainJob.Name),
-		},
-		{
-			Name:  constants.TorchEnvMasterPort,
-			Value: fmt.Sprintf("%d", constants.ContainerTrainerPort),
-		},
-	}
-
-	// Set for all Info envs.
-	envNames := sets.New[string]()
-	for _, env := range infoEnvs {
-		envNames.Insert(env.Name)
-	}
-	// Info envs take precedence over TrainJob envs.
+	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
-		for _, env := range trainJob.Spec.Trainer.Env {
-			if !envNames.Has(env.Name) {
-				info.Trainer.Env = append(info.Trainer.Env, corev1.EnvVar{Name: env.Name, Value: env.Value})
-			}
+		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
+			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 		}
 	}
-	// Insert Torch distributed envs into the list end.
-	info.Trainer.Env = append(info.Trainer.Env, infoEnvs...)
-
-	// Add container port for the headless service.
-	info.Trainer.ContainerPort = &corev1.ContainerPort{
-		ContainerPort: constants.ContainerTrainerPort,
+	if trainerContainer != nil {
+		apply.UpsertEnvVar(&trainerContainer.Env,
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvNumNodes).
+				WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvNumProcPerNode).
+				WithValue(numProcPerNode.String()),
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvNodeRank).
+				WithValueFrom(corev1ac.EnvVarSource().
+					WithFieldRef(corev1ac.ObjectFieldSelector().
+						WithFieldPath(constants.JobCompletionIndexFieldPath))),
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvMasterAddr).
+				WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
+			*corev1ac.EnvVar().
+				WithName(constants.TorchEnvMasterPort).
+				WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+		)
+		// Add container port for the headless service.
+		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
 	}
-
-	// Update total Pod requests for the PodGroupPolicy plugin.
-	for rName := range info.TotalRequests {
-		// For other Jobs like the Initializer, replica is always equal to 1.
-		// TODO (andreyvelich): Add support for total requests from the TrainJob's ResourcesPerNode.
-		if rName == constants.JobTrainerNode {
-			info.TotalRequests[rName] = runtime.TotalResourceRequest{
-				Replicas:    ptr.Deref(numNodes, constants.DefaultJobReplicas),
-				PodRequests: info.TotalRequests[rName].PodRequests,
-			}
-		}
-	}
-
+	info.SyncPodSetsToTemplateSpec()
 	return nil
+}
+
+// calculateNumProcPerNode calculates the number of processes per node based on the provided resources.
+// It returns the calculated number of processes per node and a boolean indicating whether CPU resources were used.
+func calculateNumProcPerNode(
+	fallbackNumProcPerNode intstr.IntOrString, resources corev1.ResourceList, shouldUseCPU func(resources corev1.ResourceList) bool,
+) (intstr.IntOrString, bool) {
+	var defaultCPU int32 = 1
+	if resources != nil {
+		if shouldUseCPU(resources) {
+			cpuQ := resources[corev1.ResourceCPU]
+			return intstr.FromInt32(max(defaultCPU, int32(cpuQ.Value()))), true
+		}
+		return fallbackNumProcPerNode, false
+	}
+	return intstr.FromInt32(defaultCPU), false
 }

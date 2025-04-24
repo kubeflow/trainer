@@ -17,142 +17,35 @@
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/applyconfiguration/trainer/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	typedtrainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/clientset/versioned/typed/trainer/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeTrainingRuntimes implements TrainingRuntimeInterface
-type FakeTrainingRuntimes struct {
+// fakeTrainingRuntimes implements TrainingRuntimeInterface
+type fakeTrainingRuntimes struct {
+	*gentype.FakeClientWithListAndApply[*v1alpha1.TrainingRuntime, *v1alpha1.TrainingRuntimeList, *trainerv1alpha1.TrainingRuntimeApplyConfiguration]
 	Fake *FakeTrainerV1alpha1
-	ns   string
 }
 
-var trainingruntimesResource = v1alpha1.SchemeGroupVersion.WithResource("trainingruntimes")
-
-var trainingruntimesKind = v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntime")
-
-// Get takes name of the trainingRuntime, and returns the corresponding trainingRuntime object, and an error if there is any.
-func (c *FakeTrainingRuntimes) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.TrainingRuntime, err error) {
-	emptyResult := &v1alpha1.TrainingRuntime{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(trainingruntimesResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeTrainingRuntimes(fake *FakeTrainerV1alpha1, namespace string) typedtrainerv1alpha1.TrainingRuntimeInterface {
+	return &fakeTrainingRuntimes{
+		gentype.NewFakeClientWithListAndApply[*v1alpha1.TrainingRuntime, *v1alpha1.TrainingRuntimeList, *trainerv1alpha1.TrainingRuntimeApplyConfiguration](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("trainingruntimes"),
+			v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntime"),
+			func() *v1alpha1.TrainingRuntime { return &v1alpha1.TrainingRuntime{} },
+			func() *v1alpha1.TrainingRuntimeList { return &v1alpha1.TrainingRuntimeList{} },
+			func(dst, src *v1alpha1.TrainingRuntimeList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.TrainingRuntimeList) []*v1alpha1.TrainingRuntime {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.TrainingRuntimeList, items []*v1alpha1.TrainingRuntime) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.TrainingRuntime), err
-}
-
-// List takes label and field selectors, and returns the list of TrainingRuntimes that match those selectors.
-func (c *FakeTrainingRuntimes) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.TrainingRuntimeList, err error) {
-	emptyResult := &v1alpha1.TrainingRuntimeList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(trainingruntimesResource, trainingruntimesKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.TrainingRuntimeList{ListMeta: obj.(*v1alpha1.TrainingRuntimeList).ListMeta}
-	for _, item := range obj.(*v1alpha1.TrainingRuntimeList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested trainingRuntimes.
-func (c *FakeTrainingRuntimes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(trainingruntimesResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a trainingRuntime and creates it.  Returns the server's representation of the trainingRuntime, and an error, if there is any.
-func (c *FakeTrainingRuntimes) Create(ctx context.Context, trainingRuntime *v1alpha1.TrainingRuntime, opts v1.CreateOptions) (result *v1alpha1.TrainingRuntime, err error) {
-	emptyResult := &v1alpha1.TrainingRuntime{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(trainingruntimesResource, c.ns, trainingRuntime, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.TrainingRuntime), err
-}
-
-// Update takes the representation of a trainingRuntime and updates it. Returns the server's representation of the trainingRuntime, and an error, if there is any.
-func (c *FakeTrainingRuntimes) Update(ctx context.Context, trainingRuntime *v1alpha1.TrainingRuntime, opts v1.UpdateOptions) (result *v1alpha1.TrainingRuntime, err error) {
-	emptyResult := &v1alpha1.TrainingRuntime{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(trainingruntimesResource, c.ns, trainingRuntime, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.TrainingRuntime), err
-}
-
-// Delete takes name of the trainingRuntime and deletes it. Returns an error if one occurs.
-func (c *FakeTrainingRuntimes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(trainingruntimesResource, c.ns, name, opts), &v1alpha1.TrainingRuntime{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeTrainingRuntimes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(trainingruntimesResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.TrainingRuntimeList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched trainingRuntime.
-func (c *FakeTrainingRuntimes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.TrainingRuntime, err error) {
-	emptyResult := &v1alpha1.TrainingRuntime{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(trainingruntimesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.TrainingRuntime), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied trainingRuntime.
-func (c *FakeTrainingRuntimes) Apply(ctx context.Context, trainingRuntime *trainerv1alpha1.TrainingRuntimeApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.TrainingRuntime, err error) {
-	if trainingRuntime == nil {
-		return nil, fmt.Errorf("trainingRuntime provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(trainingRuntime)
-	if err != nil {
-		return nil, err
-	}
-	name := trainingRuntime.Name
-	if name == nil {
-		return nil, fmt.Errorf("trainingRuntime.Name must be provided to Apply")
-	}
-	emptyResult := &v1alpha1.TrainingRuntime{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(trainingruntimesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.TrainingRuntime), err
 }

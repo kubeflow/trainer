@@ -17,13 +17,13 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	apistrainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	versioned "github.com/kubeflow/trainer/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/kubeflow/trainer/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/kubeflow/trainer/pkg/client/listers/trainer/v1alpha1"
+	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/listers/trainer/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -34,7 +34,7 @@ import (
 // TrainingRuntimes.
 type TrainingRuntimeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.TrainingRuntimeLister
+	Lister() trainerv1alpha1.TrainingRuntimeLister
 }
 
 type trainingRuntimeInformer struct {
@@ -69,7 +69,7 @@ func NewFilteredTrainingRuntimeInformer(client versioned.Interface, namespace st
 				return client.TrainerV1alpha1().TrainingRuntimes(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&trainerv1alpha1.TrainingRuntime{},
+		&apistrainerv1alpha1.TrainingRuntime{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,9 +80,9 @@ func (f *trainingRuntimeInformer) defaultInformer(client versioned.Interface, re
 }
 
 func (f *trainingRuntimeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&trainerv1alpha1.TrainingRuntime{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistrainerv1alpha1.TrainingRuntime{}, f.defaultInformer)
 }
 
-func (f *trainingRuntimeInformer) Lister() v1alpha1.TrainingRuntimeLister {
-	return v1alpha1.NewTrainingRuntimeLister(f.Informer().GetIndexer())
+func (f *trainingRuntimeInformer) Lister() trainerv1alpha1.TrainingRuntimeLister {
+	return trainerv1alpha1.NewTrainingRuntimeLister(f.Informer().GetIndexer())
 }

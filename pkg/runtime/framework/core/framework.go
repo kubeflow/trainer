@@ -40,6 +40,7 @@ type Framework struct {
 	enforcePodGroupPolicyPlugins []framework.EnforcePodGroupPolicyPlugin
 	customValidationPlugins      []framework.CustomValidationPlugin
 	watchExtensionPlugins        []framework.WatchExtensionPlugin
+	podNetworkPlugins            []framework.PodNetworkPlugin
 	componentBuilderPlugins      []framework.ComponentBuilderPlugin
 	terminalConditionPlugins     []framework.TerminalConditionPlugin
 }
@@ -67,6 +68,9 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 		}
 		if p, ok := plugin.(framework.WatchExtensionPlugin); ok {
 			f.watchExtensionPlugins = append(f.watchExtensionPlugins, p)
+		}
+		if p, ok := plugin.(framework.PodNetworkPlugin); ok {
+			f.podNetworkPlugins = append(f.podNetworkPlugins, p)
 		}
 		if p, ok := plugin.(framework.ComponentBuilderPlugin); ok {
 			f.componentBuilderPlugins = append(f.componentBuilderPlugins, p)
@@ -97,11 +101,11 @@ func (f *Framework) RunEnforcePodGroupPolicyPlugins(info *runtime.Info, trainJob
 	return nil
 }
 
-func (f *Framework) RunCustomValidationPlugins(oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (f *Framework) RunCustomValidationPlugins(info *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var aggregatedWarnings admission.Warnings
 	var aggregatedErrors field.ErrorList
 	for _, plugin := range f.customValidationPlugins {
-		warnings, errs := plugin.Validate(oldObj, newObj)
+		warnings, errs := plugin.Validate(info, oldObj, newObj)
 		if len(warnings) != 0 {
 			aggregatedWarnings = append(aggregatedWarnings, warnings...)
 		}
@@ -112,16 +116,23 @@ func (f *Framework) RunCustomValidationPlugins(oldObj, newObj *trainer.TrainJob)
 	return aggregatedWarnings, aggregatedErrors
 }
 
-func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, runtimeJobTemplate client.Object, info *runtime.Info, trainJob *trainer.TrainJob) ([]client.Object, error) {
-	var objs []client.Object
+func (f *Framework) RunPodNetworkPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
+	for _, plugin := range f.podNetworkPlugins {
+		if err := plugin.IdentifyPodNetwork(info, trainJob); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
+	var objs []any
 	for _, plugin := range f.componentBuilderPlugins {
-		obj, err := plugin.Build(ctx, runtimeJobTemplate, info, trainJob)
+		components, err := plugin.Build(ctx, info, trainJob)
 		if err != nil {
 			return nil, err
 		}
-		if obj != nil {
-			objs = append(objs, obj...)
-		}
+		objs = append(objs, components...)
 	}
 	return objs, nil
 }

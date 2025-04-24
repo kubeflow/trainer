@@ -14,63 +14,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (andreyvelich): Refactor this script for Kubeflow Trainer V2
-
-# This bash script is used to run the example notebooks
+# This shell is used to run Jupyter Notebook with Papermill.
 
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
-NOTEBOOK_INPUT=""
-NOTEBOOK_OUTPUT="-" # outputs to console
-NAMESPACE="default"
-TRAINING_PYTHON_SDK="./sdk/python"
+if [ -z "${NOTEBOOK_INPUT}" ]; then
+    echo "NOTEBOOK_INPUT env variable must be set to run this script."
+    exit 1
+fi
 
-usage() {
-  echo "Usage: $0 -i <input_notebook> -o <output_notebook> [-p \"<param> <value>\"...] [-y <params.yaml>]"
-  echo "Options:"
-  echo "  -i  Input notebook (required)"
-  echo "  -o  Output notebook (required)"
-  echo "  -k  Kubeflow Training Operator Python SDK (optional)"
-  echo "  -n  Kubernetes namespace used by tests (optional)"
-  echo "  -h  Show this help message"
-  echo "NOTE: papermill, jupyter and ipykernel are required Python dependencies to run Notebooks"
-  exit 1
+if [ -z "${NOTEBOOK_OUTPUT}" ]; then
+    echo "NOTEBOOK_OUTPUT env variable must be set to run this script."
+    exit 1
+fi
+
+if [ -z "${PAPERMILL_TIMEOUT}" ]; then
+    echo "PAPERMILL_TIMEOUT env variable must be set to run this script."
+    exit 1
+fi
+
+print_results() {
+    kubectl get pods
+    kubectl describe pod
+    kubectl describe trainjob
+    kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
+    kubectl logs -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node,batch.kubernetes.io/job-completion-index=0 --tail -1
+    kubectl wait trainjob --for=condition=Complete --all --timeout 3s
 }
 
-while getopts "i:o:p:k:n:r:d:h:" opt; do
-  case "$opt" in
-  i) NOTEBOOK_INPUT="$OPTARG" ;;      # -i for notebook input path
-  o) NOTEBOOK_OUTPUT="$OPTARG" ;;     # -o for notebook output path
-  k) TRAINING_PYTHON_SDK="$OPTARG" ;; # -k for training operator python sdk
-  n) NAMESPACE="$OPTARG" ;;           # -n for kubernetes namespace used by tests
-  h) usage ;;                         # -h for help (usage)
-  *)
-    usage
-    exit 1
-    ;;
-  esac
-done
-
-if [ -z "$NOTEBOOK_INPUT" ]; then
-  echo "Error: -i notebook input path is required."
-  exit 1
-fi
-
-papermill_cmd="papermill $NOTEBOOK_INPUT $NOTEBOOK_OUTPUT -p training_python_sdk $TRAINING_PYTHON_SDK -p namespace $NAMESPACE"
-
-if ! command -v papermill &>/dev/null; then
-  echo "Error: papermill is not installed. Please install papermill to proceed."
-  exit 1
-fi
-
-echo "Running command: $papermill_cmd"
-$papermill_cmd
-
-if [ $? -ne 0 ]; then
-  echo "Error: papermill execution failed." >&2
-  exit 1
-fi
-
-echo "Notebook execution completed successfully"
+(papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" --execution-timeout "${PAPERMILL_TIMEOUT}" && print_results) ||
+    (print_results && exit 1)

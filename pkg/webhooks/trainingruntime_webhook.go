@@ -20,6 +20,7 @@ import (
 	"context"
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,7 +29,12 @@ import (
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
+)
+
+const (
+	rJobReplicasErrorMsg = "always must be 1"
 )
 
 type TrainingRuntimeWebhook struct {
@@ -54,15 +60,25 @@ func (w *TrainingRuntimeWebhook) ValidateCreate(ctx context.Context, obj apirunt
 }
 
 func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorList {
+	ancestors := sets.New(constants.AncestorTrainer, constants.ModelInitializer, constants.DatasetInitializer)
 	rJobsPath := field.NewPath("spec").
 		Child("template").
 		Child("spec").
 		Child("replicatedJobs")
 	var allErrs field.ErrorList
 	for idx, rJob := range rJobs {
-		if rJob.Replicas != 1 {
-			allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, "always must be 1"))
+		if rJob.Name == constants.Launcher && rJob.Replicas != 1 {
+			allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasErrorMsg))
 		}
+
+		if rJob.Template.Labels == nil {
+			continue
+		}
+
+		if labelAncestor, ok := rJob.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestors.Has(labelAncestor) && rJob.Replicas != 1 {
+			allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasErrorMsg))
+		}
+
 	}
 	return allErrs
 }

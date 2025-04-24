@@ -17,10 +17,10 @@
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // TrainingRuntimeLister helps list TrainingRuntimes.
@@ -28,7 +28,7 @@ import (
 type TrainingRuntimeLister interface {
 	// List lists all TrainingRuntimes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.TrainingRuntime, err error)
+	List(selector labels.Selector) (ret []*trainerv1alpha1.TrainingRuntime, err error)
 	// TrainingRuntimes returns an object that can list and get TrainingRuntimes.
 	TrainingRuntimes(namespace string) TrainingRuntimeNamespaceLister
 	TrainingRuntimeListerExpansion
@@ -36,17 +36,17 @@ type TrainingRuntimeLister interface {
 
 // trainingRuntimeLister implements the TrainingRuntimeLister interface.
 type trainingRuntimeLister struct {
-	listers.ResourceIndexer[*v1alpha1.TrainingRuntime]
+	listers.ResourceIndexer[*trainerv1alpha1.TrainingRuntime]
 }
 
 // NewTrainingRuntimeLister returns a new TrainingRuntimeLister.
 func NewTrainingRuntimeLister(indexer cache.Indexer) TrainingRuntimeLister {
-	return &trainingRuntimeLister{listers.New[*v1alpha1.TrainingRuntime](indexer, v1alpha1.Resource("trainingruntime"))}
+	return &trainingRuntimeLister{listers.New[*trainerv1alpha1.TrainingRuntime](indexer, trainerv1alpha1.Resource("trainingruntime"))}
 }
 
 // TrainingRuntimes returns an object that can list and get TrainingRuntimes.
 func (s *trainingRuntimeLister) TrainingRuntimes(namespace string) TrainingRuntimeNamespaceLister {
-	return trainingRuntimeNamespaceLister{listers.NewNamespaced[*v1alpha1.TrainingRuntime](s.ResourceIndexer, namespace)}
+	return trainingRuntimeNamespaceLister{listers.NewNamespaced[*trainerv1alpha1.TrainingRuntime](s.ResourceIndexer, namespace)}
 }
 
 // TrainingRuntimeNamespaceLister helps list and get TrainingRuntimes.
@@ -54,15 +54,15 @@ func (s *trainingRuntimeLister) TrainingRuntimes(namespace string) TrainingRunti
 type TrainingRuntimeNamespaceLister interface {
 	// List lists all TrainingRuntimes in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.TrainingRuntime, err error)
+	List(selector labels.Selector) (ret []*trainerv1alpha1.TrainingRuntime, err error)
 	// Get retrieves the TrainingRuntime from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.TrainingRuntime, error)
+	Get(name string) (*trainerv1alpha1.TrainingRuntime, error)
 	TrainingRuntimeNamespaceListerExpansion
 }
 
 // trainingRuntimeNamespaceLister implements the TrainingRuntimeNamespaceLister
 // interface.
 type trainingRuntimeNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.TrainingRuntime]
+	listers.ResourceIndexer[*trainerv1alpha1.TrainingRuntime]
 }

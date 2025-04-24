@@ -17,13 +17,13 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	apistrainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	versioned "github.com/kubeflow/trainer/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/kubeflow/trainer/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/kubeflow/trainer/pkg/client/listers/trainer/v1alpha1"
+	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/listers/trainer/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -34,7 +34,7 @@ import (
 // ClusterTrainingRuntimes.
 type ClusterTrainingRuntimeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ClusterTrainingRuntimeLister
+	Lister() trainerv1alpha1.ClusterTrainingRuntimeLister
 }
 
 type clusterTrainingRuntimeInformer struct {
@@ -68,7 +68,7 @@ func NewFilteredClusterTrainingRuntimeInformer(client versioned.Interface, resyn
 				return client.TrainerV1alpha1().ClusterTrainingRuntimes().Watch(context.TODO(), options)
 			},
 		},
-		&trainerv1alpha1.ClusterTrainingRuntime{},
+		&apistrainerv1alpha1.ClusterTrainingRuntime{},
 		resyncPeriod,
 		indexers,
 	)
@@ -79,9 +79,9 @@ func (f *clusterTrainingRuntimeInformer) defaultInformer(client versioned.Interf
 }
 
 func (f *clusterTrainingRuntimeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&trainerv1alpha1.ClusterTrainingRuntime{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistrainerv1alpha1.ClusterTrainingRuntime{}, f.defaultInformer)
 }
 
-func (f *clusterTrainingRuntimeInformer) Lister() v1alpha1.ClusterTrainingRuntimeLister {
-	return v1alpha1.NewClusterTrainingRuntimeLister(f.Informer().GetIndexer())
+func (f *clusterTrainingRuntimeInformer) Lister() trainerv1alpha1.ClusterTrainingRuntimeLister {
+	return trainerv1alpha1.NewClusterTrainingRuntimeLister(f.Informer().GetIndexer())
 }

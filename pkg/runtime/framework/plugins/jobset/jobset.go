@@ -22,24 +22,31 @@ import (
 	"maps"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
+)
+
+var (
+	runtimeRefPath = field.NewPath("spec").Child("runtimeRef")
 )
 
 type JobSet struct {
@@ -50,12 +57,14 @@ type JobSet struct {
 }
 
 var _ framework.WatchExtensionPlugin = (*JobSet)(nil)
+var _ framework.PodNetworkPlugin = (*JobSet)(nil)
 var _ framework.ComponentBuilderPlugin = (*JobSet)(nil)
 var _ framework.TerminalConditionPlugin = (*JobSet)(nil)
+var _ framework.CustomValidationPlugin = (*JobSet)(nil)
 
 const Name = constants.JobSetKind
 
-// +kubebuilder:rbac:groups=jobset.x-k8s.io,resources=jobsets,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups=jobset.x-k8s.io,resources=jobsets,verbs=create;get;list;watch;update;patch
 
 func New(ctx context.Context, client client.Client, _ client.FieldIndexer) (framework.Plugin, error) {
 	return &JobSet{
@@ -68,6 +77,42 @@ func New(ctx context.Context, client client.Client, _ client.FieldIndexer) (fram
 
 func (j *JobSet) Name() string {
 	return Name
+}
+
+func (j *JobSet) Validate(info *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	var allErrs field.ErrorList
+	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+	if !ok {
+		return nil, nil
+	}
+
+	// TODO (andreyvelich): Refactor this test to verify the ancestor label in PodTemplate.
+	rJobContainerNames := make(map[string]sets.Set[string])
+	for _, rJob := range jobSetSpec.ReplicatedJobs {
+		rJobContainerNames[*rJob.Name] = sets.New[string]()
+		for _, c := range rJob.Template.Spec.Template.Spec.Containers {
+			rJobContainerNames[*rJob.Name].Insert(*c.Name)
+		}
+	}
+
+	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Dataset != nil {
+		if containers, ok := rJobContainerNames[constants.DatasetInitializer]; !ok {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.DatasetInitializer)))
+		} else if !containers.Has(constants.DatasetInitializer) {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.DatasetInitializer, constants.DatasetInitializer)))
+		}
+
+	}
+
+	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Model != nil {
+		if containers, ok := rJobContainerNames[constants.ModelInitializer]; !ok {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input modelConfig", constants.ModelInitializer)))
+		} else if !containers.Has(constants.ModelInitializer) {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)))
+		}
+	}
+
+	return nil, allErrs
 }
 
 func (j *JobSet) ReconcilerBuilders() []runtime.ReconcilerBuilder {
@@ -85,63 +130,83 @@ func (j *JobSet) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	}
 }
 
-func (j *JobSet) Build(ctx context.Context, runtimeJobTemplate client.Object, info *runtime.Info, trainJob *trainer.TrainJob) ([]client.Object, error) {
-	if runtimeJobTemplate == nil || info == nil || trainJob == nil {
+func (j *JobSet) IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) error {
+	if info == nil || trainJob == nil {
+		return nil
+	}
+	spec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+	if !ok {
+		return nil
+	}
+	subDomain := trainJob.Name
+	if jobSetNet := spec.Network; jobSetNet != nil && jobSetNet.Subdomain != nil {
+		subDomain = *jobSetNet.Subdomain
+	}
+	for rJobIdx, rJob := range spec.ReplicatedJobs {
+		// TODO: Support multiple replicas for replicated Jobs.
+		// REF: https://github.com/kubeflow/trainer/issues/2318
+		podCount := info.TemplateSpec.PodSets[rJobIdx].Count
+		rJobReplicas := constants.DefaultJobReplicas
+		info.TemplateSpec.PodSets[rJobIdx].Endpoints = func(yield func(string) bool) {
+			for podIdx := range ptr.Deref(podCount, 1) {
+				endpoint := fmt.Sprintf("%s-%s-%d-%d.%s", trainJob.Name, *rJob.Name, rJobReplicas-1, podIdx, subDomain)
+				if !yield(endpoint) {
+					return
+				}
+			}
+		}
+	}
+	info.SyncPodSetsToTemplateSpec()
+	return nil
+}
+
+func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
+	if info == nil || trainJob == nil {
 		return nil, fmt.Errorf("runtime info or object is missing")
 	}
-
-	raw, ok := runtimeJobTemplate.(*jobsetv1alpha2.JobSet)
+	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
 	if !ok {
 		return nil, nil
 	}
 
-	var jobSetBuilder *Builder
+	// Do not update the JobSet if it already exists and is not suspended
 	oldJobSet := &jobsetv1alpha2.JobSet{}
 	if err := j.client.Get(ctx, client.ObjectKeyFromObject(trainJob), oldJobSet); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, err
 		}
-		jobSetBuilder = NewBuilder(client.ObjectKeyFromObject(trainJob), trainer.JobSetTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels:      info.Labels,
-				Annotations: info.Annotations,
-			},
-			Spec: raw.Spec,
-		})
 		oldJobSet = nil
-	} else {
-		jobSetBuilder = &Builder{
-			JobSet: *oldJobSet.DeepCopy(),
-		}
 	}
+	if oldJobSet != nil &&
+		!ptr.Deref(trainJob.Spec.Suspend, false) &&
+		!ptr.Deref(oldJobSet.Spec.Suspend, false) {
+		return nil, nil
+	}
+
+	// Init the JobSet apply configuration from the runtime template spec
+	jobSetBuilder := NewBuilder(jobsetv1alpha2ac.JobSet(trainJob.Name, trainJob.Namespace).
+		WithLabels(maps.Clone(info.Labels)).
+		WithAnnotations(maps.Clone(info.Annotations)).
+		WithSpec(jobSetSpec))
 
 	// TODO (andreyvelich): Add support for the PodSpecOverride.
 	// TODO (andreyvelich): Refactor the builder with wrappers for PodSpec.
+	// TODO: Once we remove deprecated runtime.Info.Trainer, we should remove JobSet Builder with DeprecatedTrainer().
 	jobSet := jobSetBuilder.
 		Initializer(trainJob).
-		Launcher(info, trainJob).
 		Trainer(info, trainJob).
-		PodLabels(info.PodLabels).
+		PodLabels(info.Scheduler.PodLabels).
 		Suspend(trainJob.Spec.Suspend).
-		Build()
-	if err := ctrlutil.SetControllerReference(trainJob, jobSet, j.scheme); err != nil {
-		return nil, err
-	}
+		Build().
+		WithOwnerReferences(metav1ac.OwnerReference().
+			WithAPIVersion(trainer.GroupVersion.String()).
+			WithKind(trainer.TrainJobKind).
+			WithName(trainJob.Name).
+			WithUID(trainJob.UID).
+			WithController(true).
+			WithBlockOwnerDeletion(true))
 
-	if needsCreateOrUpdate(oldJobSet, jobSet, ptr.Deref(trainJob.Spec.Suspend, false)) {
-		return []client.Object{jobSet}, nil
-	}
-	return nil, nil
-}
-
-func needsCreateOrUpdate(old, new *jobsetv1alpha2.JobSet, trainJobIsSuspended bool) bool {
-	return old == nil ||
-		(!trainJobIsSuspended && jobSetIsSuspended(old) && !jobSetIsSuspended(new)) ||
-		(trainJobIsSuspended && (!equality.Semantic.DeepEqual(old.Spec, new.Spec) || !maps.Equal(old.Labels, new.Labels) || !maps.Equal(old.Annotations, new.Annotations)))
-}
-
-func jobSetIsSuspended(jobSet *jobsetv1alpha2.JobSet) bool {
-	return ptr.Deref(jobSet.Spec.Suspend, false)
+	return []any{jobSet}, nil
 }
 
 func (j *JobSet) TerminalCondition(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error) {

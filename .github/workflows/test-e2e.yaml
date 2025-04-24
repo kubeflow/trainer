@@ -1,29 +1,67 @@
 name: E2E Test
 
 on:
-  - push
   - pull_request
 
 jobs:
   e2e-test:
     name: E2E Test
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: ubuntu-latest-16-cores
+    env:
+      GOPATH: ${{ github.workspace }}/go
+    defaults:
+      run:
+        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
     strategy:
       fail-fast: false
       matrix:
-        kubernetes-version: ["1.29.3", "1.30.0", "1.31.0"]
+        # Kubernetes versions for e2e tests on Kind cluster.
+        kubernetes-version: ["1.29.14", "1.30.0", "1.31.0"]
 
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+        with:
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.11
 
       - name: Install dependencies
         run: |
-          echo "TODO (andreyvelich): Implement E2E Tests"
-          # pip install -U './sdk'
+          echo "Install Papermill"
+          pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
+
+          echo "Install Kubeflow SDK"
+          pip install ./sdk
+
+      - name: Setup cluster
+        run: |
+          make test-e2e-setup-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
+
+      - name: Run e2e with Go
+        run: |
+          make test-e2e || (kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer && exit 1)
+
+      - name: Run e2e test for example Notebooks
+        run: |
+          mkdir -p artifacts/notebooks
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_mnist.ipynb TIMEOUT=900
+
+      # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
+      - name: Upload Artifacts to GitHub
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.kubernetes-version }}
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
+          retention-days: 1

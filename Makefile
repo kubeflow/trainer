@@ -11,6 +11,33 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
+REPO := github.com/kubeflow/trainer
+TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
+# Location to install tool binaries
+LOCALBIN ?= $(PROJECT_DIR)/bin
+
+# Tool versions
+K8S_VERSION ?= 1.32.0
+GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
+ENVTEST_VERSION ?= release-0.20
+CONTROLLER_GEN_VERSION ?= v0.17.2
+KIND_VERSION ?= $(shell go list -m -f '{{.Version}}' sigs.k8s.io/kind)
+HELM_VERSION ?= v3.15.3
+HELM_UNITTEST_VERSION ?= 0.5.1
+HELM_CHART_TESTING_VERSION ?= v3.12.0
+HELM_DOCS_VERSION ?= v1.14.2
+YQ_VERSION ?= v4.45.1
+
+# Tool binaries
+GINKGO ?= $(LOCALBIN)/ginkgo
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+KIND ?= $(LOCALBIN)/kind
+HELM ?= $(LOCALBIN)/helm
+HELM_DOCS ?= $(LOCALBIN)/helm-docs
+YQ ?= $(LOCALBIN)/yq
+
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
@@ -29,23 +56,42 @@ help: ## Display this help.
 
 ##@ Development
 
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-
-# Tool Binaries
-LOCALBIN ?= $(PROJECT_DIR)/bin
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST ?= $(LOCALBIN)/setup-envtest
-
-ENVTEST_K8S_VERSION ?= 1.31
-
 # Instructions to download tools for development.
+
+.PHONY: ginkgo
+ginkgo: ## Download the ginkgo binary if required.
+	GOBIN=$(LOCALBIN) go install github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION)
+
 .PHONY: envtest
 envtest: ## Download the setup-envtest binary if required.
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.19
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
 .PHONY: controller-gen
 controller-gen: ## Download the controller-gen binary if required.
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.5
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION)
+
+.PHONY: kind
+kind: ## Download Kind binary if required.
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind@$(KIND_VERSION)
+
+.PHONY: helm
+helm: ## Download helm locally if required.
+	GOBIN=$(LOCALBIN) go install helm.sh/helm/v3/cmd/helm@$(HELM_VERSION)
+
+.PHONY: helm-unittest-plugin
+helm-unittest-plugin: helm ## Download helm unittest plugin locally if required.
+	if [ -z "$(shell $(HELM) plugin list | grep unittest)" ]; then \
+		echo "Installing helm unittest plugin"; \
+		$(HELM) plugin install https://github.com/helm-unittest/helm-unittest.git --version $(HELM_UNITTEST_VERSION); \
+	fi
+
+.PHONY: helm-docs-plugin
+helm-docs-plugin: ## Download helm-docs plugin locally if required.
+	GOBIN=$(LOCALBIN) go install github.com/norwoodj/helm-docs/cmd/helm-docs@$(HELM_DOCS_VERSION)
+
+.PHONY: yq
+yq: # Download yq locally if required.
+	GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@$(YQ_VERSION)
 
 # Download external CRDs for Go integration testings.
 EXTERNAL_CRDS_DIR ?= $(PROJECT_DIR)/manifests/external-crds
@@ -102,25 +148,55 @@ endif
 # Instructions to run tests.
 .PHONY: test
 test: ## Run Go unit test.
-	go test $(shell go list ./... | grep -v '/test/') -coverprofile cover.out
+	go test $(shell go list ./... | grep -v '/test/' | grep -v '/cmd/' | grep -v '/hack/' | grep -v '/pkg/apis' | grep -v '/pkg/client') -coverprofile cover.out
 
 .PHONY: test-integration
-test-integration: envtest jobset-operator-crd scheduler-plugins-crd ## Run Go integration test.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./test/... -coverprofile cover.out
+test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd ## Run Go integration test.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(K8S_VERSION) -p path)" $(GINKGO) -v ./test/integration/... -coverprofile cover.out
 
+.PHONY: test-python
 test-python: ## Run Python unit test.
-	export PYTHONPATH=$(PROJECT_DIR)
 	pip install pytest
-	pip install -r ./cmd/initializer/dataset/requirements.txt
+	pip install -r ./cmd/initializers/dataset/requirements.txt
 	pip install ./sdk
 
-	pytest ./pkg/initializer/dataset
-	pytest ./pkg/initializer/model
-	pytest ./pkg/initializer/utils
+	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/dataset
+	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/model
+	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/utils
 
+.PHONY: test-python-integration
 test-python-integration: ## Run Python integration test.
-	export PYTHONPATH=$(PROJECT_DIR)
 	pip install pytest
-	pip install -r ./cmd/initializer/dataset/requirements.txt
+	pip install -r ./cmd/initializers/dataset/requirements.txt
 
-	pytest ./test/integration/initializer
+	PYTHONPATH=$(PROJECT_DIR) pytest ./test/integration/initializers
+
+.PHONY: test-e2e-setup-cluster
+test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.
+	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
+
+.PHONY: test-e2e
+test-e2e: ginkgo ## Run Go e2e test.
+	$(GINKGO) -v ./test/e2e/...
+
+# Input and output location for Notebooks executed with Papermill.
+NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
+NOTEBOOK_OUTPUT=$(PROJECT_DIR)/artifacts/notebooks/trainer_output.ipynb
+PAPERMILL_TIMEOUT=900
+.PHONY: test-e2e-notebook
+test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
+	NOTEBOOK_INPUT=$(NOTEBOOK_INPUT) NOTEBOOK_OUTPUT=$(NOTEBOOK_OUTPUT) PAPERMILL_TIMEOUT=$(PAPERMILL_TIMEOUT) ./hack/e2e-run-notebook.sh
+
+##@ Helm
+
+.PHONY: helm-unittest
+helm-unittest: helm-unittest-plugin ## Run Helm chart unittests.
+	$(HELM) unittest $(TRAINER_CHART_DIR) --strict --file "tests/**/*_test.yaml"
+
+.PHONY: helm-lint
+helm-lint: ## Run Helm chart lint test.
+	docker run --rm --workdir /workspace --volume "$$(pwd):/workspace" quay.io/helmpack/chart-testing:$(HELM_CHART_TESTING_VERSION) ct lint --target-branch master --validate-maintainers=false
+
+.PHONY: helm-docs
+helm-docs: helm-docs-plugin ## Generates markdown documentation for helm charts from requirements and values files.
+	$(HELM_DOCS) --sort-values-order=file

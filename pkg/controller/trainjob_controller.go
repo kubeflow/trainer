@@ -22,10 +22,11 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/kubeflow/trainer/pkg/constants"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -36,10 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/constants"
 	jobruntimes "github.com/kubeflow/trainer/pkg/runtime"
 )
-
-var errorUnsupportedRuntime = errors.New("the specified runtime is not supported")
 
 type objsOpState int
 
@@ -66,7 +66,7 @@ func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, 
 	}
 }
 
-// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=create;get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/finalizers,verbs=get;update;patch
 
@@ -83,10 +83,10 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	runtimeRefGK := runtimeRefToGroupKind(trainJob.Spec.RuntimeRef).String()
+	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := r.runtimes[runtimeRefGK]
 	if !ok {
-		return ctrl.Result{}, fmt.Errorf("%w: %s", errorUnsupportedRuntime, runtimeRefGK)
+		return ctrl.Result{}, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 	}
 	opState, err := r.reconcileObjects(ctx, runtime, &trainJob)
 
@@ -105,11 +105,29 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) (objsOpState, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	objs, err := runtime.NewObjects(ctx, trainJob)
+	objects, err := runtime.NewObjects(ctx, trainJob)
 	if err != nil {
 		return buildFailed, err
 	}
-	for _, obj := range objs {
+	for _, object := range objects {
+		// TODO (astefanutti): Remove conversion to unstructured when the runtime.ApplyConfiguration
+		//  interface becomes available and first-class SSA method is added to the controller-runtime
+		// client. See https://github.com/kubernetes/kubernetes/pull/129313
+		var obj client.Object
+		if o, ok := object.(client.Object); ok {
+			return buildFailed, fmt.Errorf("unsupported type client.Object for component: %v", o)
+		}
+
+		u, err := apiruntime.DefaultUnstructuredConverter.ToUnstructured(object)
+		if err != nil {
+			return buildFailed, err
+		}
+		obj = &unstructured.Unstructured{Object: u}
+
+		if err := r.client.Patch(ctx, obj, client.Apply, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
+			return buildFailed, err
+		}
+
 		var gvk schema.GroupVersionKind
 		if gvk, err = apiutil.GVKForObject(obj.DeepCopyObject(), r.client.Scheme()); err != nil {
 			return buildFailed, err
@@ -119,27 +137,8 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 			"namespace", obj.GetNamespace(),
 			"name", obj.GetName(),
 		}
-		// TODO (tenzen-y): Ideally, we should use the SSA instead of checking existence.
-		// Non-empty resourceVersion indicates UPDATE operation.
-		var creationErr error
-		var created bool
-		if obj.GetResourceVersion() == "" {
-			creationErr = r.client.Create(ctx, obj)
-			created = creationErr == nil
-		}
-		switch {
-		case created:
-			log.V(5).Info("Succeeded to create object", logKeysAndValues...)
-			continue
-		case client.IgnoreAlreadyExists(creationErr) != nil:
-			return creationFailed, creationErr
-		default:
-			// This indicates CREATE operation has not been performed or the object has already existed in the cluster.
-			if err = r.client.Update(ctx, obj); err != nil {
-				return updateFailed, err
-			}
-			log.V(5).Info("Succeeded to update object", logKeysAndValues...)
-		}
+
+		log.V(5).Info("Succeeded to update object", logKeysAndValues...)
 	}
 	return creationSucceeded, nil
 }
@@ -212,13 +211,6 @@ func setTerminalCondition(ctx context.Context, runtime jobruntimes.Runtime, trai
 func isTrainJobFinished(trainJob *trainer.TrainJob) bool {
 	return meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobComplete) ||
 		meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobFailed)
-}
-
-func runtimeRefToGroupKind(runtimeRef trainer.RuntimeRef) schema.GroupKind {
-	return schema.GroupKind{
-		Group: ptr.Deref(runtimeRef.APIGroup, ""),
-		Kind:  ptr.Deref(runtimeRef.Kind, ""),
-	}
 }
 
 func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
