@@ -28,8 +28,8 @@ type PodSpecOverrideApplyConfiguration struct {
 	NodeSelector       map[string]string                     `json:"nodeSelector,omitempty"`
 	Tolerations        []v1.TolerationApplyConfiguration     `json:"tolerations,omitempty"`
 	Volumes            []v1.VolumeApplyConfiguration         `json:"volumes,omitempty"`
-	Containers         []ContainerOverrideApplyConfiguration `json:"containers,omitempty"`
 	InitContainers     []ContainerOverrideApplyConfiguration `json:"initContainers,omitempty"`
+	Containers         []ContainerOverrideApplyConfiguration `json:"containers,omitempty"`
 }
 
 // PodSpecOverrideApplyConfiguration constructs a declarative configuration of the PodSpecOverride type for use with
@@ -96,19 +96,6 @@ func (b *PodSpecOverrideApplyConfiguration) WithVolumes(values ...*v1.VolumeAppl
 	return b
 }
 
-// WithContainers adds the given value to the Containers field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Containers field.
-func (b *PodSpecOverrideApplyConfiguration) WithContainers(values ...*ContainerOverrideApplyConfiguration) *PodSpecOverrideApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithContainers")
-		}
-		b.Containers = append(b.Containers, *values[i])
-	}
-	return b
-}
-
 // WithInitContainers adds the given value to the InitContainers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the InitContainers field.
@@ -118,6 +105,19 @@ func (b *PodSpecOverrideApplyConfiguration) WithInitContainers(values ...*Contai
 			panic("nil value passed to WithInitContainers")
 		}
 		b.InitContainers = append(b.InitContainers, *values[i])
+	}
+	return b
+}
+
+// WithContainers adds the given value to the Containers field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Containers field.
+func (b *PodSpecOverrideApplyConfiguration) WithContainers(values ...*ContainerOverrideApplyConfiguration) *PodSpecOverrideApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithContainers")
+		}
+		b.Containers = append(b.Containers, *values[i])
 	}
 	return b
 }
