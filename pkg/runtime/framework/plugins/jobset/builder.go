@@ -180,7 +180,6 @@ func (b *Builder) PodSpecOverrides(trainJob *trainer.TrainJob) *Builder {
 				if sa := podSpecOverride.ServiceAccountName; sa != nil {
 					b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.ServiceAccountName = sa
 				}
-
 				for _, containerOverride := range podSpecOverride.Containers {
 					for j, container := range rJob.Template.Spec.Template.Spec.Containers {
 						// Upsert values for the required container.
@@ -190,12 +189,11 @@ func (b *Builder) PodSpecOverrides(trainJob *trainer.TrainJob) *Builder {
 						}
 					}
 				}
-
 				for _, initContainerOverride := range podSpecOverride.InitContainers {
 					for j, initContainer := range rJob.Template.Spec.Template.Spec.InitContainers {
 						// Upsert values for the required initContainer.
 						if *initContainer.Name == initContainerOverride.Name {
-							env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
+							env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].Env
 							apply.UpsertEnvVars(env, apply.EnvVars(initContainerOverride.Env...)...)
 						}
 					}
