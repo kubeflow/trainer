@@ -232,9 +232,26 @@ type Trainer struct {
 
 // PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.
 type PodSpecOverride struct {
-	// TrainJobs is the training job replicas in the training runtime template to apply the overrides.
+	// TargetJobs are the names of the Jobs the override applies to.
+	// An empty list will apply to all Jobs.
 	// +listType=atomic
-	TargetJobs []PodSpecOverrideTargetJob `json:"targetJobs"`
+	// +optional
+	TargetJobs []string `json:"targetJobs,omitempty"`
+
+	// Override for the service account.
+	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
+
+	// Override for the node selector to place Pod on the specific mode.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Override for the Pod's tolerations.
+	// +listType=atomic
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Overrides for the Pod volume configuration.
+	// +listType=map
+	// +listMapKey=name
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// Overrides for the containers in the desired job templates.
 	// +listType=map
@@ -245,52 +262,20 @@ type PodSpecOverride struct {
 	// +listType=map
 	// +listMapKey=name
 	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
-
-	// Overrides for the Pod volume configuration.
-	// +listType=map
-	// +listMapKey=name
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
-
-	// Override for the service account.
-	ServiceAccountName string `json:"serviceAccountName,omitempty"`
-
-	// Override for the node selector to place Pod on the specific mode.
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Override for the Pod's tolerations.
-	// +listType=atomic
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-}
-
-type PodSpecOverrideTargetJob struct {
-	// Name is the target training job name for which the PodSpec is overridden.
-	Name string `json:"name"`
 }
 
 // ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
-// Parameters from the Trainer, DatasetConfig, and ModelConfig will take precedence.
 type ContainerOverride struct {
 	// Name for the container. TrainingRuntime must have this container.
+	// Name can't be equal to the `node`, `dataset-initializer`, `model-initializer`.
+	// This containers are pre-reserved for Trainer and Initializer APIs.
 	Name string `json:"name"`
-
-	// Entrypoint commands for the training container.
-	// +listType=atomic
-	Command []string `json:"command,omitempty"`
-
-	// Arguments to the entrypoint for the training container.
-	// +listType=atomic
-	Args []string `json:"args,omitempty"`
 
 	// List of environment variables to set in the container.
 	// These values will be merged with the TrainingRuntime's environments.
 	// +listType=map
 	// +listMapKey=name
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// List of sources to populate environment variables in the container.
-	// These   values will be merged with the TrainingRuntime's environments.
-	// +listType=atomic
-	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 
 	// Pod volumes to mount into the container's filesystem.
 	// +listType=map
