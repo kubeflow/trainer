@@ -22,7 +22,6 @@ from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow.trainer.models.io_k8s_api_core_v1_toleration import IoK8sApiCoreV1Toleration
 from kubeflow.trainer.models.io_k8s_api_core_v1_volume import IoK8sApiCoreV1Volume
 from kubeflow.trainer.models.trainer_v1alpha1_container_override import TrainerV1alpha1ContainerOverride
-from kubeflow.trainer.models.trainer_v1alpha1_pod_spec_override_target_job import TrainerV1alpha1PodSpecOverrideTargetJob
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -34,7 +33,7 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
     init_containers: Optional[List[TrainerV1alpha1ContainerOverride]] = Field(default=None, description="Overrides for the init container in the desired job templates.", alias="initContainers")
     node_selector: Optional[Dict[str, StrictStr]] = Field(default=None, description="Override for the node selector to place Pod on the specific mode.", alias="nodeSelector")
     service_account_name: Optional[StrictStr] = Field(default=None, description="Override for the service account.", alias="serviceAccountName")
-    target_jobs: List[TrainerV1alpha1PodSpecOverrideTargetJob] = Field(description="TrainJobs is the training job replicas in the training runtime template to apply the overrides.", alias="targetJobs")
+    target_jobs: Optional[List[StrictStr]] = Field(default=None, description="TargetJobs are the names of the Jobs the override applies to. An empty list will apply to all Jobs.", alias="targetJobs")
     tolerations: Optional[List[IoK8sApiCoreV1Toleration]] = Field(default=None, description="Override for the Pod's tolerations.")
     volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="Overrides for the Pod volume configuration.")
     __properties: ClassVar[List[str]] = ["containers", "initContainers", "nodeSelector", "serviceAccountName", "targetJobs", "tolerations", "volumes"]
@@ -92,13 +91,6 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
                 if _item_init_containers:
                     _items.append(_item_init_containers.to_dict())
             _dict['initContainers'] = _items
-        # override the default output from pydantic by calling `to_dict()` of each item in target_jobs (list)
-        _items = []
-        if self.target_jobs:
-            for _item_target_jobs in self.target_jobs:
-                if _item_target_jobs:
-                    _items.append(_item_target_jobs.to_dict())
-            _dict['targetJobs'] = _items
         # override the default output from pydantic by calling `to_dict()` of each item in tolerations (list)
         _items = []
         if self.tolerations:
@@ -129,7 +121,7 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
             "initContainers": [TrainerV1alpha1ContainerOverride.from_dict(_item) for _item in obj["initContainers"]] if obj.get("initContainers") is not None else None,
             "nodeSelector": obj.get("nodeSelector"),
             "serviceAccountName": obj.get("serviceAccountName"),
-            "targetJobs": [TrainerV1alpha1PodSpecOverrideTargetJob.from_dict(_item) for _item in obj["targetJobs"]] if obj.get("targetJobs") is not None else None,
+            "targetJobs": obj.get("targetJobs"),
             "tolerations": [IoK8sApiCoreV1Toleration.from_dict(_item) for _item in obj["tolerations"]] if obj.get("tolerations") is not None else None,
             "volumes": [IoK8sApiCoreV1Volume.from_dict(_item) for _item in obj["volumes"]] if obj.get("volumes") is not None else None
         })
