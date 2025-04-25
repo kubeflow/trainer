@@ -773,17 +773,8 @@ In the future, we can add more parameters if we find use-cases when it is requir
 ```golang
 type PodSpecOverride struct {
 	// TargetJobs are the names of the Jobs the override applies to.
-  // An empty list will apply to all Jobs.
-	TargetJobs []string `json:"targetJobs"`
-
-	// Overrides for the containers in the desired job templates.
-	Containers []ContainerOverride `json:"containers,omitempty"`
-
-	// Overrides for the init container in the desired job templates.
-	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
-
-	// Overrides for the Pod volume configuration.
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
+	// An empty list will apply to all Jobs.
+	TargetJobs []string `json:"targetJobs,omitempty"`
 
 	// Override for the service account.
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
@@ -793,17 +784,26 @@ type PodSpecOverride struct {
 
 	// Override for the Pod's tolerations.
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Overrides for the Pod volume configuration.
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// Overrides for the init container in the desired job templates.
+	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
+
+	// Overrides for the containers in the desired job templates.
+	Containers []ContainerOverride `json:"containers,omitempty"`
 }
 
-// ContainerOverride represents parameters that can be overridden using PodSpecOverride.
+// ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
 type ContainerOverride struct {
 	// Name for the container. TrainingRuntime must have this container.
-  // Name can't be equal to the `node`, `dataset-initializer`, `model-initializer`.
-	// These containers are pre-reserved for Trainer and Initializer APIs.
 	Name string `json:"name"`
 
 	// List of environment variables to set in the container.
 	// These values will be merged with the TrainingRuntime's environments.
+	// This value can't be set for container with the name: `node`, `dataset-initializer`, or
+	// `model-initializer`. For those containers the envs can be set via Trainer or Initializer APIs.
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
 	// Pod volumes to mount into the container's filesystem.

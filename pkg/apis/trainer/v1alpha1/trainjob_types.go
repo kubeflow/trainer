@@ -253,26 +253,26 @@ type PodSpecOverride struct {
 	// +listMapKey=name
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
-	// Overrides for the containers in the desired job templates.
-	// +listType=map
-	// +listMapKey=name
-	Containers []ContainerOverride `json:"containers,omitempty"`
-
 	// Overrides for the init container in the desired job templates.
 	// +listType=map
 	// +listMapKey=name
 	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
+
+	// Overrides for the containers in the desired job templates.
+	// +listType=map
+	// +listMapKey=name
+	Containers []ContainerOverride `json:"containers,omitempty"`
 }
 
 // ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
 type ContainerOverride struct {
 	// Name for the container. TrainingRuntime must have this container.
-	// Name can't be equal to the `node`, `dataset-initializer`, `model-initializer`.
-	// This containers are pre-reserved for Trainer and Initializer APIs.
 	Name string `json:"name"`
 
 	// List of environment variables to set in the container.
 	// These values will be merged with the TrainingRuntime's environments.
+	// This value can't be set for container with the name: `node`, `dataset-initializer`, or
+	// `model-initializer`. For those containers the envs can be set via Trainer or Initializer APIs.
 	// +listType=map
 	// +listMapKey=name
 	Env []corev1.EnvVar `json:"env,omitempty"`
