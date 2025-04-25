@@ -500,7 +500,7 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name for the container. TrainingRuntime must have this container. Name can't be equal to the `node`, `dataset-initializer`, `model-initializer`. This containers are pre-reserved for Trainer and Initializer APIs.",
+							Description: "Name for the container. TrainingRuntime must have this container.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -516,7 +516,7 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments.",
+							Description: "List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. This value can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can be set via Trainer or Initializer APIs.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1031,28 +1031,6 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 							},
 						},
 					},
-					"containers": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type": "map",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Overrides for the containers in the desired job templates.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ContainerOverride"),
-									},
-								},
-							},
-						},
-					},
 					"initContainers": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -1064,6 +1042,28 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Overrides for the init container in the desired job templates.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ContainerOverride"),
+									},
+								},
+							},
+						},
+					},
+					"containers": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Overrides for the containers in the desired job templates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

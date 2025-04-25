@@ -13162,7 +13162,7 @@
         ],
         "properties": {
           "env": {
-            "description": "List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments.",
+            "description": "List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. This value can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can be set via Trainer or Initializer APIs.",
             "type": "array",
             "items": {
               "default": {},
@@ -13178,7 +13178,7 @@
             "x-kubernetes-list-type": "map"
           },
           "name": {
-            "description": "Name for the container. TrainingRuntime must have this container. Name can't be equal to the `node`, `dataset-initializer`, `model-initializer`. This containers are pre-reserved for Trainer and Initializer APIs.",
+            "description": "Name for the container. TrainingRuntime must have this container.",
             "type": "string",
             "default": ""
           },

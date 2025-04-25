@@ -420,15 +420,15 @@ func (in *PodSpecOverride) DeepCopyInto(out *PodSpecOverride) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.Containers != nil {
-		in, out := &in.Containers, &out.Containers
+	if in.InitContainers != nil {
+		in, out := &in.InitContainers, &out.InitContainers
 		*out = make([]ContainerOverride, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.InitContainers != nil {
-		in, out := &in.InitContainers, &out.InitContainers
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
 		*out = make([]ContainerOverride, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

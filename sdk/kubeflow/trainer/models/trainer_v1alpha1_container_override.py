@@ -28,8 +28,8 @@ class TrainerV1alpha1ContainerOverride(BaseModel):
     """
     ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
     """ # noqa: E501
-    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments.")
-    name: StrictStr = Field(description="Name for the container. TrainingRuntime must have this container. Name can't be equal to the `node`, `dataset-initializer`, `model-initializer`. This containers are pre-reserved for Trainer and Initializer APIs.")
+    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. This value can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can be set via Trainer or Initializer APIs.")
+    name: StrictStr = Field(description="Name for the container. TrainingRuntime must have this container.")
     volume_mounts: Optional[List[IoK8sApiCoreV1VolumeMount]] = Field(default=None, description="Pod volumes to mount into the container's filesystem.", alias="volumeMounts")
     __properties: ClassVar[List[str]] = ["env", "name", "volumeMounts"]
 
