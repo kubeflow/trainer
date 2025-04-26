@@ -77,7 +77,7 @@ func TestIndexTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 							Spec: batchv1.JobSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
-										RuntimeClassName: ptr.To(constants.DatasetInitializer),
+										RuntimeClassName: ptr.To("containerd"),
 									},
 								},
 							},
@@ -89,7 +89,7 @@ func TestIndexTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 							Spec: batchv1.JobSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
-										RuntimeClassName: ptr.To(constants.ModelInitializer),
+										RuntimeClassName: ptr.To("containerd"),
 									},
 								},
 							},
@@ -98,7 +98,7 @@ func TestIndexTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 				},
 			},
 			).Obj()).Obj(),
-			want: []string{constants.DatasetInitializer, constants.ModelInitializer},
+			want: []string{"containerd", "containerd"},
 		},
 		"TrainingRuntime with one ReplicatedJob and RuntimeClassName set": {
 			obj: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test").RuntimeSpec(
@@ -110,7 +110,7 @@ func TestIndexTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 								Spec: batchv1.JobSpec{
 									Template: corev1.PodTemplateSpec{
 										Spec: corev1.PodSpec{
-											RuntimeClassName: ptr.To(constants.ModelInitializer),
+											RuntimeClassName: ptr.To("containerd"),
 										},
 									},
 								},
@@ -119,7 +119,7 @@ func TestIndexTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 					},
 				},
 				).Obj()).Obj(),
-			want: []string{constants.ModelInitializer},
+			want: []string{"containerd"},
 		},
 		"TrainingRuntime with ReplicatedJobs where some RuntimeClassName are set and others are nil": {
 			obj: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test").RuntimeSpec(
@@ -131,7 +131,7 @@ func TestIndexTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 								Spec: batchv1.JobSpec{
 									Template: corev1.PodTemplateSpec{
 										Spec: corev1.PodSpec{
-											RuntimeClassName: ptr.To(constants.DatasetInitializer),
+											RuntimeClassName: ptr.To("containerd"),
 										},
 									},
 								},
@@ -151,7 +151,7 @@ func TestIndexTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 						},
 					},
 				}).Obj()).Obj(),
-			want: []string{constants.DatasetInitializer},
+			want: []string{"containerd"},
 		},
 	}
 	for name, tc := range cases {
@@ -224,7 +224,7 @@ func TestIndexClusterTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 							Spec: batchv1.JobSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
-										RuntimeClassName: ptr.To(constants.DatasetInitializer),
+										RuntimeClassName: ptr.To("containerd"),
 									},
 								},
 							},
@@ -236,7 +236,7 @@ func TestIndexClusterTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 							Spec: batchv1.JobSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
-										RuntimeClassName: ptr.To(constants.ModelInitializer),
+										RuntimeClassName: ptr.To("containerd"),
 									},
 								},
 							},
@@ -245,7 +245,7 @@ func TestIndexClusterTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 				},
 			},
 			).Obj()).Obj(),
-			want: []string{constants.DatasetInitializer, constants.ModelInitializer},
+			want: []string{"containerd", "containerd"},
 		},
 		"ClusterTrainingRuntime with one ReplicatedJob and RuntimeClassName set": {
 			obj: utiltesting.MakeClusterTrainingRuntimeWrapper(metav1.NamespaceDefault).RuntimeSpec(
@@ -257,7 +257,7 @@ func TestIndexClusterTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 								Spec: batchv1.JobSpec{
 									Template: corev1.PodTemplateSpec{
 										Spec: corev1.PodSpec{
-											RuntimeClassName: ptr.To(constants.ModelInitializer),
+											RuntimeClassName: ptr.To("containerd"),
 										},
 									},
 								},
@@ -266,7 +266,7 @@ func TestIndexClusterTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 					},
 				},
 				).Obj()).Obj(),
-			want: []string{constants.ModelInitializer},
+			want: []string{"containerd"},
 		},
 		"ClusterTrainingRuntime with ReplicatedJobs where some RuntimeClassName are set and others are nil": {
 			obj: utiltesting.MakeClusterTrainingRuntimeWrapper(metav1.NamespaceDefault).RuntimeSpec(
@@ -278,7 +278,7 @@ func TestIndexClusterTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 								Spec: batchv1.JobSpec{
 									Template: corev1.PodTemplateSpec{
 										Spec: corev1.PodSpec{
-											RuntimeClassName: ptr.To(constants.DatasetInitializer),
+											RuntimeClassName: ptr.To("containerd"),
 										},
 									},
 								},
@@ -298,7 +298,7 @@ func TestIndexClusterTrainingRuntimeContainerRuntimeClass(t *testing.T) {
 						},
 					},
 				}).Obj()).Obj(),
-			want: []string{constants.DatasetInitializer},
+			want: []string{"containerd"},
 		},
 	}
 	for name, tc := range cases {
