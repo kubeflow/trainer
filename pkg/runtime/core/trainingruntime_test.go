@@ -525,14 +525,11 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					testingutil.MakeTrainJobTrainerWrapper().
 						Container(
 							"test:trainjob",
-							[]string{
-								"tune",
-								"run",
-							},
+							[]string{"tune", "run"},
 							[]string{
 								"dtype=fp16",
-								"batch_size=10",
-								"epochs=1",
+								"batch_size=32",
+								"epochs=10",
 								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
 							},
 							resRequests).
@@ -561,8 +558,8 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 						[]string{
 							"dtype=fp16",
-							"batch_size=10",
-							"epochs=1",
+							"batch_size=32",
+							"epochs=10",
 							"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
 						},
 						resRequests,
