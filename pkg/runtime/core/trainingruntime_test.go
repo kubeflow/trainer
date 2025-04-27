@@ -523,7 +523,19 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "torchtune-llama3.3-70b").
 				Trainer(
 					testingutil.MakeTrainJobTrainerWrapper().
-						Container("test:trainjob", []string{"tune", "run"}, []string{"runtime"}, resRequests).
+						Container(
+							"test:trainjob",
+							[]string{
+								"tune",
+								"run",
+							},
+							[]string{
+								"dtype=fp16",
+								"batch_size=10",
+								"epochs=1",
+								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+							},
+							resRequests).
 						NumNodes(30).
 						NumProcPerNode(intstr.FromInt32(3)).
 						Obj(),
@@ -547,7 +559,12 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							constants.TorchTuneFullFinetuneDistributed,
 							"--config llama3_3/70B_full_multinode.yaml",
 						},
-						[]string{"runtime"},
+						[]string{
+							"dtype=fp16",
+							"batch_size=10",
+							"epochs=1",
+							"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+						},
 						resRequests,
 					).
 					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
