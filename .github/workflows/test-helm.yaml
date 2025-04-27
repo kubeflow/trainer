@@ -41,14 +41,6 @@ jobs:
         run: |
           make helm-unittest
 
-      - name: Produce the Helm documentation
-        run: |
-          make helm-docs
-          if ! git diff --quiet -- charts/kubeflow-trainer/README.md; then
-            echo "Need to re-run 'make helm-docs' and commit the changes."
-            false
-          fi
-
       - name: Create kind cluster
         uses: helm/kind-action@v1.12.0
 

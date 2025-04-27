@@ -118,7 +118,7 @@ manifests: controller-gen ## Generate manifests.
 		output:webhook:artifacts:config=manifests/base/webhook
 
 .PHONY: generate
-generate: go-mod-download manifests ## Generate APIs and SDK.
+generate: go-mod-download manifests helm-docs ## Generate APIs, SDK and Helm documentation.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh
 	hack/python-sdk/gen-sdk.sh
