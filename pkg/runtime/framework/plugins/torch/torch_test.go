@@ -1183,11 +1183,6 @@ func TestTorch(t *testing.T) {
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.Node,
-							Command: []string{
-								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
-								constants.TorchTuneFullFinetuneDistributed,
-								"--config llama3_2/1B_full.yaml",
-							},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
 									Name:  ptr.To(constants.TorchEnvNumNodes),
@@ -1272,11 +1267,6 @@ func TestTorch(t *testing.T) {
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.Node,
-							Command: []string{
-								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
-								constants.TorchTuneFullFinetuneSingleDevice,
-								"--config llama3_2/1B_full_single_device.yaml",
-							},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
 									Name:  ptr.To(constants.TorchEnvNumNodes),
@@ -1361,11 +1351,6 @@ func TestTorch(t *testing.T) {
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.Node,
-							Command: []string{
-								fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "torchtune-job-node-0-0.torchtune-job:29500"),
-								constants.TorchTuneFullFinetuneDistributed,
-								"--config llama3_3/70B_full_multinode.yaml",
-							},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
 									Name:  ptr.To(constants.TorchEnvNumNodes),

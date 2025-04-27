@@ -34,10 +34,6 @@ var (
 	errorRequestedFieldPathNotFound = errors.New("requested field path not found")
 )
 
-func UpsertCommand(command *[]string, cmd ...string) {
-	*command = append(*command, cmd...)
-}
-
 func UpsertEnvVar(envVars *[]corev1ac.EnvVarApplyConfiguration, envVar ...corev1ac.EnvVarApplyConfiguration) {
 	for _, e := range envVar {
 		upsert(envVars, e, byEnvVarName)

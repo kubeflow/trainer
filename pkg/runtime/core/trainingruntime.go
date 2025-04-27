@@ -183,10 +183,6 @@ func syncPodSets(info *runtime.Info) {
 		}
 		apply.UpsertVolumes(&jsSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Volumes, ps.Volumes...)
 		for containerIdx, container := range ps.Containers {
-			apply.UpsertCommand(
-				&jsSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Command,
-				container.Command...,
-			)
 			apply.UpsertEnvVar(
 				&jsSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Env,
 				container.Env...,

@@ -201,7 +201,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, trainJob.Spec.RuntimeRef.Name, trainJob.Spec.Trainer.Args)
 			newCommand = append(newCommand, recipe, fmt.Sprintf("--config %s", config))
 
-			trainerContainer.Command = newCommand
+			trainJob.Spec.Trainer.Command = append(trainJob.Spec.Trainer.Command, newCommand...)
 		}
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
@@ -230,21 +230,12 @@ func calculateNumProcPerNode(
 // number of processes per node, runtime reference name, and command line arguments.
 func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, runtimeRefName string, _ []string) (string, string) {
 	recipe := constants.TorchTuneFullFinetuneDistributed
+	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
 	if numNodes == 1 && numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 {
 		recipe = constants.TorchTuneFullFinetuneSingleDevice
-	}
-
-	// Determine the config file name based on the recipe and number of nodes.
-	var suffix string
-	switch recipe {
-	case constants.TorchTuneFullFinetuneDistributed:
-		if numNodes == 1 {
-			suffix = constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
-		} else {
-			suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
-		}
-	case constants.TorchTuneFullFinetuneSingleDevice:
 		suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
+	} else if numNodes > 1 {
+		suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
 	}
 
 	return recipe, fmt.Sprintf("%s%s.yaml", getModelFromRuntimeRef(runtimeRefName), suffix)
