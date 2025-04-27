@@ -5,8 +5,8 @@ on:
   - pull_request
 
 jobs:
-  test-helm-chart:
-    name: Test Helm Chart
+  test:
+    name: Test
 
     runs-on: ubuntu-latest
 
