@@ -18,6 +18,7 @@ package webhooks
 
 import (
 	"context"
+	"reflect"
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -89,4 +90,21 @@ func (w *TrainingRuntimeWebhook) ValidateUpdate(context.Context, apiruntime.Obje
 
 func (w *TrainingRuntimeWebhook) ValidateDelete(context.Context, apiruntime.Object) (admission.Warnings, error) {
 	return nil, nil
+}
+
+func (w *TrainingRuntimeWebhook) ValidateImmutability(ctx context.Context, oldObj apiruntime.Object, newObj apiruntime.Object) (admission.Warnings, error) {
+	oldruntime := oldObj.(*trainer.TrainingRuntime)
+	newruntime := newObj.(*trainer.TrainingRuntime)
+
+	var allErrs field.ErrorList
+
+	if !reflect.DeepEqual(oldruntime.ObjectMeta.Labels, newruntime.ObjectMeta.Labels) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "labels"), newruntime.ObjectMeta.Labels, "labels are immutable"))
+	}
+
+	if !reflect.DeepEqual(oldruntime.ObjectMeta.Annotations, newruntime.ObjectMeta.Annotations) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations"), newruntime.ObjectMeta.Annotations, "annotations are immutable"))
+	}
+
+	return nil, allErrs.ToAggregate()
 }

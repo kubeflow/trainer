@@ -18,8 +18,10 @@ package webhooks
 
 import (
 	"context"
+	"reflect"
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -60,4 +62,21 @@ func (w *ClusterTrainingRuntimeWebhook) ValidateUpdate(ctx context.Context, oldO
 
 func (w *ClusterTrainingRuntimeWebhook) ValidateDelete(context.Context, apiruntime.Object) (admission.Warnings, error) {
 	return nil, nil
+}
+
+func (w *ClusterTrainingRuntimeWebhook) ValidateImmutability(ctx context.Context, oldObj apiruntime.Object, newObj apiruntime.Object) (admission.Warnings, error) {
+	oldruntime := oldObj.(*trainer.ClusterTrainingRuntime)
+	newruntime := newObj.(*trainer.ClusterTrainingRuntime)
+
+	var allErrs field.ErrorList
+
+	if !reflect.DeepEqual(oldruntime.ObjectMeta.Labels, newruntime.ObjectMeta.Labels) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "labels"), newruntime.ObjectMeta.Labels, "labels are immutable"))
+	}
+
+	if !reflect.DeepEqual(oldruntime.ObjectMeta.Annotations, newruntime.ObjectMeta.Annotations) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations"), newruntime.ObjectMeta.Annotations, "annotations are immutable"))
+	}
+
+	return nil, allErrs.ToAggregate()
 }
