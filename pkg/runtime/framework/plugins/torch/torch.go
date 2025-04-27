@@ -93,6 +93,12 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 			if !constants.TorchTuneSupportedPretrainedModels.Has(model) {
 				allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("must have a supported pretrained model, invalid model configured: %v", model)))
 			}
+
+			numNodesRefPath := specPath.Child("trainer").Child("numNodes")
+			numNodes := *newObj.Spec.Trainer.NumNodes
+			if numNodes > 1 && model != constants.TORCHTUNE_MODEL_LLAMA3_3_70B {
+				allErrs = append(allErrs, field.Invalid(numNodesRefPath, numNodes, fmt.Sprintf("must be 1 for %v model", model)))
+			}
 		}
 	}
 

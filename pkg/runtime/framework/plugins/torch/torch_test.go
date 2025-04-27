@@ -1592,6 +1592,7 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
 					NumProcPerNode(intstr.FromString("auto")).
+					NumNodes(int32(1)).
 					Container(
 						"ghcr.io/kubeflow/trainer/torchtune-trainer",
 						[]string{"tune", "run"},
@@ -1609,6 +1610,40 @@ func TestValidate(t *testing.T) {
 					field.NewPath("spec").Child("runtimeRef").Child("name"),
 					"torchtune-llama3.1-70b",
 					fmt.Sprintf("must have a supported pretrained model, invalid model configured: %s", "llama3_1/70B"),
+				),
+			},
+		},
+		"multi-node mode is only enabled for Llama-3.3-70b": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(intstr.FromString("auto")).
+					NumNodes(int32(2)).
+					Container(
+						"ghcr.io/kubeflow/trainer/torchtune-trainer",
+						[]string{"tune", "run"},
+						nil, corev1.ResourceList{},
+					).
+					Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.2-7b",
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("numNodes"),
+					int32(2),
+					fmt.Sprintf("must be 1 for %v model", "llama3_2/7B"),
 				),
 			},
 		},
