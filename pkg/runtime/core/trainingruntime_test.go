@@ -758,7 +758,6 @@ test-job-node-0-1.test-job slots=8
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			fmt.Println(name)
 			_, ctx := ktesting.NewTestContext(t)
 			var cancel func()
 			ctx, cancel = context.WithCancel(ctx)
