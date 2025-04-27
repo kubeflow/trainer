@@ -31,30 +31,17 @@ jobs:
       - name: Set up chart-testing
         uses: helm/chart-testing-action@v2.7.0
 
-      - name: Run chart-testing (list-changed)
-        id: list-changed
-        env:
-          BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
-        run: |
-          changed=$(ct list-changed --target-branch $BRANCH)
-          if [[ -n "$changed" ]]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Run chart-testing (lint)
-        if: steps.list-changed.outputs.changed == 'true'
         env:
           BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
         run: |
           ct lint --check-version-increment=false --target-branch $BRANCH
 
       - name: Run Helm unittest
-        if: steps.list-changed.outputs.changed == 'true'
         run: |
           make helm-unittest
 
       - name: Produce the Helm documentation
-        if: steps.list-changed.outputs.changed == 'true'
         run: |
           make helm-docs
           if ! git diff --quiet -- charts/kubeflow-trainer/README.md; then
@@ -63,11 +50,9 @@ jobs:
           fi
 
       - name: Create kind cluster
-        if: steps.list-changed.outputs.changed == 'true'
         uses: helm/kind-action@v1.12.0
 
       - name: Run chart-testing (install)
-        if: steps.list-changed.outputs.changed == 'true'
         env:
           BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
         run: |
