@@ -272,7 +272,7 @@ type ContainerOverride struct {
 	// List of environment variables to set in the container.
 	// These values will be merged with the TrainingRuntime's environments.
 	// This value can't be set for container with the name: `node`, `dataset-initializer`, or
-	// `model-initializer`. For those containers the envs can be set via Trainer or Initializer APIs.
+	// `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.
 	// +listType=map
 	// +listMapKey=name
 	Env []corev1.EnvVar `json:"env,omitempty"`
