@@ -466,6 +466,11 @@ func (t *TrainJobWrapper) ManagedBy(m string) *TrainJobWrapper {
 	return t
 }
 
+func (t *TrainJobWrapper) PodSpecOverrides(podSpecOverrides []trainer.PodSpecOverride) *TrainJobWrapper {
+	t.Spec.PodSpecOverrides = podSpecOverrides
+	return t
+}
+
 func (t *TrainJobWrapper) Obj() *trainer.TrainJob {
 	return &t.TrainJob
 }

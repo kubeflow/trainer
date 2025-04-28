@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
@@ -511,6 +512,208 @@ func TestValidate(t *testing.T) {
 				field.Invalid(runtimeRefPath,
 					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
 					fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)),
+			},
+		},
+		"podSpecOverrides contain invalid targetJob": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &v1.JobTemplateSpecApplyConfiguration{
+									Spec: &v1.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				PodSpecOverrides([]trainer.PodSpecOverride{
+					{
+						TargetJob: "invalid",
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(podSpecOverridePath,
+					[]trainer.PodSpecOverride{
+						{
+							TargetJob: "invalid",
+						},
+					},
+					"must not have targetJob that doesn't exist in the runtime job template"),
+			},
+		},
+		"podSpecOverrides contain invalid initContainer": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &v1.JobTemplateSpecApplyConfiguration{
+									Spec: &v1.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												InitContainers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To("custom-init"),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				PodSpecOverrides([]trainer.PodSpecOverride{
+					{
+						TargetJob: constants.Node,
+						InitContainers: []trainer.ContainerOverride{
+							{
+								Name: "invalid",
+							},
+						},
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(podSpecOverridePath,
+					[]trainer.PodSpecOverride{
+						{
+							TargetJob: constants.Node,
+							InitContainers: []trainer.ContainerOverride{
+								{
+									Name: "invalid",
+								},
+							},
+						},
+					},
+					fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", constants.Node)),
+			},
+		},
+		"podSpecOverrides contain invalid container": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &v1.JobTemplateSpecApplyConfiguration{
+									Spec: &v1.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.Node),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				PodSpecOverrides([]trainer.PodSpecOverride{
+					{
+						TargetJob: constants.Node,
+						Containers: []trainer.ContainerOverride{
+							{
+								Name: "invalid",
+							},
+						},
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(podSpecOverridePath,
+					[]trainer.PodSpecOverride{
+						{
+							TargetJob: constants.Node,
+							Containers: []trainer.ContainerOverride{
+								{
+									Name: "invalid",
+								},
+							},
+						},
+					},
+					fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", constants.Node)),
+			},
+		},
+		"podSpecOverrides contain envs for reserved container": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &v1.JobTemplateSpecApplyConfiguration{
+									Spec: &v1.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.Node),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				PodSpecOverrides([]trainer.PodSpecOverride{
+					{
+						TargetJob: constants.Node,
+						Containers: []trainer.ContainerOverride{
+							{
+								Name: constants.Node,
+								Env: []corev1.EnvVar{
+									{
+										Name:  "ENV_NAME",
+										Value: "OVERRIDE",
+									},
+								},
+							},
+						},
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(podSpecOverridePath,
+					[]trainer.PodSpecOverride{
+						{
+							TargetJob: constants.Node,
+							Containers: []trainer.ContainerOverride{
+								{
+									Name: constants.Node,
+									Env: []corev1.EnvVar{
+										{
+											Name:  "ENV_NAME",
+											Value: "OVERRIDE",
+										},
+									},
+								},
+							},
+						},
+					},
+					fmt.Sprintf("must not have envs for the %s, %s, %s containers", constants.DatasetInitializer, constants.ModelInitializer, constants.Node)),
 			},
 		},
 	}

@@ -33,10 +33,10 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
     init_containers: Optional[List[TrainerV1alpha1ContainerOverride]] = Field(default=None, description="Overrides for the init container in the desired job templates.", alias="initContainers")
     node_selector: Optional[Dict[str, StrictStr]] = Field(default=None, description="Override for the node selector to place Pod on the specific mode.", alias="nodeSelector")
     service_account_name: Optional[StrictStr] = Field(default=None, description="Override for the service account.", alias="serviceAccountName")
-    target_jobs: Optional[List[StrictStr]] = Field(default=None, description="TargetJobs are the names of the Jobs the override applies to. An empty list will apply to all Jobs.", alias="targetJobs")
+    target_job: StrictStr = Field(description="TargetJob is the name of the Job the override applies to.", alias="targetJob")
     tolerations: Optional[List[IoK8sApiCoreV1Toleration]] = Field(default=None, description="Override for the Pod's tolerations.")
     volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="Overrides for the Pod volume configuration.")
-    __properties: ClassVar[List[str]] = ["containers", "initContainers", "nodeSelector", "serviceAccountName", "targetJobs", "tolerations", "volumes"]
+    __properties: ClassVar[List[str]] = ["containers", "initContainers", "nodeSelector", "serviceAccountName", "targetJob", "tolerations", "volumes"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -121,7 +121,7 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
             "initContainers": [TrainerV1alpha1ContainerOverride.from_dict(_item) for _item in obj["initContainers"]] if obj.get("initContainers") is not None else None,
             "nodeSelector": obj.get("nodeSelector"),
             "serviceAccountName": obj.get("serviceAccountName"),
-            "targetJobs": obj.get("targetJobs"),
+            "targetJob": obj.get("targetJob") if obj.get("targetJob") is not None else '',
             "tolerations": [IoK8sApiCoreV1Toleration.from_dict(_item) for _item in obj["tolerations"]] if obj.get("tolerations") is not None else None,
             "volumes": [IoK8sApiCoreV1Volume.from_dict(_item) for _item in obj["volumes"]] if obj.get("volumes") is not None else None
         })

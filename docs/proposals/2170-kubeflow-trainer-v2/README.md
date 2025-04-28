@@ -836,9 +836,8 @@ spec:
   trainer:
     image: docker.io/custom-training
   podSpecOverrides:
-    - targetJobs:
-        - node
-      containers:
+    - targetJob: node
+      initContainers:
         - name: fetch-identity
           env:
             - name: USER_ID
@@ -851,6 +850,34 @@ spec:
         - name: user-123-volume
           persistentVolumeClaim:
             claimName: user-123-volume
+```
+
+Users can also define multiple PodSpecOverrides for every ReplicatedJob:
+
+```yaml
+apiVersion: trainer.kubeflow.org/v2alpha1
+kind: TrainJob
+metadata:
+  name: pytorch-distributed
+  namespace: tenant-alpha
+spec:
+  runtimeRef:
+    name: pytorch-distributed-gpu
+  trainer:
+    image: docker.io/custom-training
+  podSpecOverrides:
+    - targetJob: dataset-initializer
+      initContainers:
+        - name: fetch-identity
+          env:
+            - name: USER_ID
+              value: 123
+    - targetJob: node
+      initContainers:
+        - name: fetch-identity
+          env:
+            - name: USER_ID
+              value: 123
 ```
 
 ### State Transition

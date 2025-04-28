@@ -17,8 +17,6 @@ limitations under the License.
 package jobset
 
 import (
-	"slices"
-
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
@@ -175,7 +173,7 @@ func (b *Builder) Suspend(suspend *bool) *Builder {
 func (b *Builder) PodSpecOverrides(trainJob *trainer.TrainJob) *Builder {
 	for _, podSpecOverride := range trainJob.Spec.PodSpecOverrides {
 		for i, rJob := range b.Spec.ReplicatedJobs {
-			if len(podSpecOverride.TargetJobs) == 0 || slices.Contains(podSpecOverride.TargetJobs, *rJob.Name) {
+			if *rJob.Name == podSpecOverride.TargetJob {
 				// Update service account if that is required.
 				if sa := podSpecOverride.ServiceAccountName; sa != nil {
 					b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.ServiceAccountName = sa
