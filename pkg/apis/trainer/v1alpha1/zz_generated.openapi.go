@@ -516,7 +516,7 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. This value can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can be set via Trainer or Initializer APIs.",
+							Description: "List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. This value can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -947,24 +947,12 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 				Description: "PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"targetJobs": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
+					"targetJob": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TargetJobs are the names of the Jobs the override applies to. An empty list will apply to all Jobs.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
+							Description: "TargetJob is the name of the Job the override applies to.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"serviceAccountName": {
@@ -1076,6 +1064,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 						},
 					},
 				},
+				Required: []string{"targetJob"},
 			},
 		},
 		Dependencies: []string{
@@ -1363,7 +1352,10 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 					"podSpecOverrides": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-map-keys": []interface{}{
+									"targetJob",
+								},
+								"x-kubernetes-list-type": "map",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
