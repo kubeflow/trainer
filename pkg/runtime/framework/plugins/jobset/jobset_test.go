@@ -18,15 +18,19 @@ package jobset
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
+	v1 "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
@@ -321,6 +325,212 @@ func TestJobSet(t *testing.T) {
 				utiltesting.PodSetEndpointsCmpOpts,
 			); len(diff) != 0 {
 				t.Errorf("Unexpected Info from IdentifyPodNetwork (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidate(t *testing.T) {
+	cases := map[string]struct {
+		info         *runtime.Info
+		newObj       *trainer.TrainJob
+		wantError    field.ErrorList
+		wantWarnings admission.Warnings
+	}{
+		"no initializer job": {
+			info: &runtime.Info{TemplateSpec: runtime.TemplateSpec{
+				ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{},
+			}},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Initializer(nil).
+				Obj(),
+		},
+		"no dataset initializer job": {
+			info: &runtime.Info{TemplateSpec: runtime.TemplateSpec{
+				ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{},
+			}},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Initializer(&trainer.Initializer{Dataset: nil}).
+				Obj(),
+		},
+		"must have dataset initializer job when trainJob is configured with input datasetConfig": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To("random"),
+								Template: &v1.JobTemplateSpecApplyConfiguration{
+									Spec: &v1.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To("random"),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Dataset: &trainer.DatasetInitializer{},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.DatasetInitializer)),
+			},
+		},
+		"must have container with name - dataset initializer in the dataset initializer job": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.DatasetInitializer),
+								Template: &v1.JobTemplateSpecApplyConfiguration{
+									Spec: &v1.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Dataset: &trainer.DatasetInitializer{},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have container with name - %s in the %s job", constants.DatasetInitializer, constants.DatasetInitializer)),
+			},
+		},
+		"no model initializer job": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.DatasetInitializer),
+								Template: &v1.JobTemplateSpecApplyConfiguration{
+									Spec: &v1.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.DatasetInitializer),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Initializer(&trainer.Initializer{Dataset: nil}).
+				Obj(),
+		},
+		"must have model initializer job when trainJob is configured with input modelConfig": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To("random"),
+								Template: &v1.JobTemplateSpecApplyConfiguration{
+									Spec: &v1.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To("random"),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Model: &trainer.ModelInitializer{},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have %s job when trainJob is configured with input modelConfig", constants.ModelInitializer)),
+			},
+		},
+		"must have container with name - model initializer in the model initializer job": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.ModelInitializer),
+								Template: &v1.JobTemplateSpecApplyConfiguration{
+									Spec: &v1.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Model: &trainer.ModelInitializer{},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)),
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+			cli := utiltesting.NewClientBuilder().Build()
+			p, err := New(ctx, cli, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+			warnings, errs := p.(framework.CustomValidationPlugin).Validate(tc.info, nil, tc.newObj)
+			if diff := cmp.Diff(tc.wantError, errs); len(diff) != 0 {
+				t.Errorf("Unexpected error from Validate (-want, +got): %s", diff)
+			}
+			if diff := cmp.Diff(tc.wantWarnings, warnings); len(diff) != 0 {
+				t.Errorf("Unexpected warnings from Validate (-want, +got): %s", diff)
 			}
 		})
 	}

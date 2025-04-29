@@ -11,6 +11,33 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
+REPO := github.com/kubeflow/trainer
+TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
+# Location to install tool binaries
+LOCALBIN ?= $(PROJECT_DIR)/bin
+
+# Tool versions
+K8S_VERSION ?= 1.32.0
+GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
+ENVTEST_VERSION ?= release-0.20
+CONTROLLER_GEN_VERSION ?= v0.17.2
+KIND_VERSION ?= $(shell go list -m -f '{{.Version}}' sigs.k8s.io/kind)
+HELM_VERSION ?= v3.15.3
+HELM_UNITTEST_VERSION ?= 0.5.1
+HELM_CHART_TESTING_VERSION ?= v3.12.0
+HELM_DOCS_VERSION ?= v1.14.2
+YQ_VERSION ?= v4.45.1
+
+# Tool binaries
+GINKGO ?= $(LOCALBIN)/ginkgo
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+KIND ?= $(LOCALBIN)/kind
+HELM ?= $(LOCALBIN)/helm
+HELM_DOCS ?= $(LOCALBIN)/helm-docs
+YQ ?= $(LOCALBIN)/yq
+
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
@@ -29,35 +56,42 @@ help: ## Display this help.
 
 ##@ Development
 
-K8S_VERSION ?= 1.32.0
-
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-
-# Tool Binaries
-LOCALBIN ?= $(PROJECT_DIR)/bin
-
-GINKGO ?= $(LOCALBIN)/ginkgo
-ENVTEST ?= $(LOCALBIN)/setup-envtest
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-KIND ?= $(LOCALBIN)/kind
-
 # Instructions to download tools for development.
 
 .PHONY: ginkgo
 ginkgo: ## Download the ginkgo binary if required.
-	GOBIN=$(LOCALBIN) go install github.com/onsi/ginkgo/v2/ginkgo@$(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
+	GOBIN=$(LOCALBIN) go install github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION)
 
 .PHONY: envtest
 envtest: ## Download the setup-envtest binary if required.
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.20
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
 .PHONY: controller-gen
 controller-gen: ## Download the controller-gen binary if required.
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.2
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION)
 
 .PHONY: kind
 kind: ## Download Kind binary if required.
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind@$(shell go list -m -f '{{.Version}}' sigs.k8s.io/kind)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kind@$(KIND_VERSION)
+
+.PHONY: helm
+helm: ## Download helm locally if required.
+	GOBIN=$(LOCALBIN) go install helm.sh/helm/v3/cmd/helm@$(HELM_VERSION)
+
+.PHONY: helm-unittest-plugin
+helm-unittest-plugin: helm ## Download helm unittest plugin locally if required.
+	if [ -z "$(shell $(HELM) plugin list | grep unittest)" ]; then \
+		echo "Installing helm unittest plugin"; \
+		$(HELM) plugin install https://github.com/helm-unittest/helm-unittest.git --version $(HELM_UNITTEST_VERSION); \
+	fi
+
+.PHONY: helm-docs-plugin
+helm-docs-plugin: ## Download helm-docs plugin locally if required.
+	GOBIN=$(LOCALBIN) go install github.com/norwoodj/helm-docs/cmd/helm-docs@$(HELM_DOCS_VERSION)
+
+.PHONY: yq
+yq: # Download yq locally if required.
+	GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@$(YQ_VERSION)
 
 # Download external CRDs for Go integration testings.
 EXTERNAL_CRDS_DIR ?= $(PROJECT_DIR)/manifests/external-crds
@@ -106,10 +140,10 @@ GOLANGCI_LINT=$(shell which golangci-lint)
 .PHONY: golangci-lint
 golangci-lint: ## Run golangci-lint to verify Go files.
 ifeq ($(GOLANGCI_LINT),)
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.61.0
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.64.8
 	$(info golangci-lint has been installed)
 endif
-	golangci-lint run --timeout 5m --go 1.23 ./...
+	golangci-lint run --timeout 5m --go 1.24 ./...
 
 # Instructions to run tests.
 .PHONY: test
@@ -152,3 +186,17 @@ PAPERMILL_TIMEOUT=900
 .PHONY: test-e2e-notebook
 test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
 	NOTEBOOK_INPUT=$(NOTEBOOK_INPUT) NOTEBOOK_OUTPUT=$(NOTEBOOK_OUTPUT) PAPERMILL_TIMEOUT=$(PAPERMILL_TIMEOUT) ./hack/e2e-run-notebook.sh
+
+##@ Helm
+
+.PHONY: helm-unittest
+helm-unittest: helm-unittest-plugin ## Run Helm chart unittests.
+	$(HELM) unittest $(TRAINER_CHART_DIR) --strict --file "tests/**/*_test.yaml"
+
+.PHONY: helm-lint
+helm-lint: ## Run Helm chart lint test.
+	docker run --rm --workdir /workspace --volume "$$(pwd):/workspace" quay.io/helmpack/chart-testing:$(HELM_CHART_TESTING_VERSION) ct lint --target-branch master --validate-maintainers=false
+
+.PHONY: helm-docs
+helm-docs: helm-docs-plugin ## Generates markdown documentation for helm charts from requirements and values files.
+	$(HELM_DOCS) --sort-values-order=file

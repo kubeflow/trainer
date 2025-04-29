@@ -53,12 +53,6 @@ jobs:
       run:
         working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
-    strategy:
-      fail-fast: false
-      matrix:
-        # Kubernetes versions for setup-envtest integration tests.
-        kubernetes-version: ["1.29.3", "1.30.0", "1.31.0"]
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -76,7 +70,7 @@ jobs:
 
       - name: Run Go integration tests
         run: |
-          make test-integration K8S_VERSION=${{ matrix.kubernetes-version }}
+          make test-integration
 
       - name: Coveralls report
         uses: shogo82148/actions-goveralls@v1
