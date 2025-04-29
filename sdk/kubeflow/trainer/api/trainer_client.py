@@ -513,10 +513,10 @@ class TrainerClient:
         # Add the TrainJob status.
         # TODO (andreyvelich): Discuss how we should show TrainJob status to SDK users.
         if trainjob_crd.status and trainjob_crd.status.conditions:
+            # The TrainJob exists at that stage so its status can safely default to Created
+            status = constants.TRAINJOB_CREATED
             for c in trainjob_crd.status.conditions:
-                if c.type == "Created" and c.status == "True":
-                    status = "Created"
-                elif c.type == "Complete" and c.status == "True":
+                if c.type == "Complete" and c.status == "True":
                     status = "Succeeded"
                 elif c.type == "Failed" and c.status == "True":
                     status = "Failed"
