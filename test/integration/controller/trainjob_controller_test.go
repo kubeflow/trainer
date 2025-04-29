@@ -423,12 +423,6 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Reason:  trainer.TrainJobSuspendedReason,
 							Message: constants.TrainJobSuspendedMessage,
 						},
-						{
-							Type:    trainer.TrainJobCreated,
-							Status:  metav1.ConditionTrue,
-							Reason:  trainer.TrainJobJobsCreationSucceededReason,
-							Message: constants.TrainJobJobsCreationSucceededMessage,
-						},
 					}, util.IgnoreConditions))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
@@ -445,12 +439,6 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Status:  metav1.ConditionFalse,
 							Reason:  trainer.TrainJobResumedReason,
 							Message: constants.TrainJobResumedMessage,
-						},
-						{
-							Type:    trainer.TrainJobCreated,
-							Status:  metav1.ConditionTrue,
-							Reason:  trainer.TrainJobJobsCreationSucceededReason,
-							Message: constants.TrainJobJobsCreationSucceededMessage,
 						},
 					}, util.IgnoreConditions))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
@@ -478,12 +466,6 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Status:  metav1.ConditionFalse,
 							Reason:  trainer.TrainJobResumedReason,
 							Message: constants.TrainJobResumedMessage,
-						},
-						{
-							Type:    trainer.TrainJobCreated,
-							Status:  metav1.ConditionTrue,
-							Reason:  trainer.TrainJobJobsCreationSucceededReason,
-							Message: constants.TrainJobJobsCreationSucceededMessage,
 						},
 						{
 							Type:    trainer.TrainJobComplete,
@@ -528,12 +510,6 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Reason:  trainer.TrainJobResumedReason,
 							Message: constants.TrainJobResumedMessage,
 						},
-						{
-							Type:    trainer.TrainJobCreated,
-							Status:  metav1.ConditionTrue,
-							Reason:  trainer.TrainJobJobsCreationSucceededReason,
-							Message: constants.TrainJobJobsCreationSucceededMessage,
-						},
 					}, util.IgnoreConditions))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
@@ -560,12 +536,6 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Status:  metav1.ConditionFalse,
 							Reason:  trainer.TrainJobResumedReason,
 							Message: constants.TrainJobResumedMessage,
-						},
-						{
-							Type:    trainer.TrainJobCreated,
-							Status:  metav1.ConditionTrue,
-							Reason:  trainer.TrainJobJobsCreationSucceededReason,
-							Message: constants.TrainJobJobsCreationSucceededMessage,
 						},
 						{
 							Type:    trainer.TrainJobFailed,
@@ -799,12 +769,6 @@ alpha-node-0-1.alpha slots=8
 							Reason:  trainer.TrainJobSuspendedReason,
 							Message: constants.TrainJobSuspendedMessage,
 						},
-						{
-							Type:    trainer.TrainJobCreated,
-							Status:  metav1.ConditionTrue,
-							Reason:  trainer.TrainJobJobsCreationSucceededReason,
-							Message: constants.TrainJobJobsCreationSucceededMessage,
-						},
 					}, util.IgnoreConditions))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
@@ -821,12 +785,6 @@ alpha-node-0-1.alpha slots=8
 							Status:  metav1.ConditionFalse,
 							Reason:  trainer.TrainJobResumedReason,
 							Message: constants.TrainJobResumedMessage,
-						},
-						{
-							Type:    trainer.TrainJobCreated,
-							Status:  metav1.ConditionTrue,
-							Reason:  trainer.TrainJobJobsCreationSucceededReason,
-							Message: constants.TrainJobJobsCreationSucceededMessage,
 						},
 					}, util.IgnoreConditions))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
@@ -854,12 +812,6 @@ alpha-node-0-1.alpha slots=8
 							Status:  metav1.ConditionFalse,
 							Reason:  trainer.TrainJobResumedReason,
 							Message: constants.TrainJobResumedMessage,
-						},
-						{
-							Type:    trainer.TrainJobCreated,
-							Status:  metav1.ConditionTrue,
-							Reason:  trainer.TrainJobJobsCreationSucceededReason,
-							Message: constants.TrainJobJobsCreationSucceededMessage,
 						},
 						{
 							Type:    trainer.TrainJobComplete,
@@ -905,12 +857,6 @@ alpha-node-0-1.alpha slots=8
 							Reason:  trainer.TrainJobResumedReason,
 							Message: constants.TrainJobResumedMessage,
 						},
-						{
-							Type:    trainer.TrainJobCreated,
-							Status:  metav1.ConditionTrue,
-							Reason:  trainer.TrainJobJobsCreationSucceededReason,
-							Message: constants.TrainJobJobsCreationSucceededMessage,
-						},
 					}, util.IgnoreConditions))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
@@ -937,12 +883,6 @@ alpha-node-0-1.alpha slots=8
 							Status:  metav1.ConditionFalse,
 							Reason:  trainer.TrainJobResumedReason,
 							Message: constants.TrainJobResumedMessage,
-						},
-						{
-							Type:    trainer.TrainJobCreated,
-							Status:  metav1.ConditionTrue,
-							Reason:  trainer.TrainJobJobsCreationSucceededReason,
-							Message: constants.TrainJobJobsCreationSucceededMessage,
 						},
 						{
 							Type:    trainer.TrainJobFailed,

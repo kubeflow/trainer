@@ -49,15 +49,6 @@ import (
 	jobruntimes "github.com/kubeflow/trainer/pkg/runtime"
 )
 
-type objsOpState int
-
-const (
-	creationSucceeded objsOpState = iota
-	buildFailed       objsOpState = iota
-	creationFailed    objsOpState = iota
-	updateFailed      objsOpState = iota
-)
-
 type TrainJobWatcher interface {
 	NotifyTrainJobUpdate(oldJob, newJob *trainer.TrainJob)
 }
@@ -121,11 +112,10 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if !ok {
 		return ctrl.Result{}, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 	}
-	opState, err := r.reconcileObjects(ctx, runtime, &trainJob)
+	err := r.reconcileObjects(ctx, runtime, &trainJob)
 
 	originStatus := trainJob.Status.DeepCopy()
 	setSuspendedCondition(&trainJob)
-	setCreatedCondition(&trainJob, opState)
 	if terminalCondErr := setTerminalCondition(ctx, runtime, &trainJob); terminalCondErr != nil {
 		err = errors.Join(err, terminalCondErr)
 	}
@@ -135,12 +125,12 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, err
 }
 
-func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) (objsOpState, error) {
+func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
 	log := ctrl.LoggerFrom(ctx)
 
 	objects, err := runtime.NewObjects(ctx, trainJob)
 	if err != nil {
-		return buildFailed, err
+		return err
 	}
 	for _, object := range objects {
 		// TODO (astefanutti): Remove conversion to unstructured when the runtime.ApplyConfiguration
@@ -148,22 +138,22 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 		// client. See https://github.com/kubernetes/kubernetes/pull/129313
 		var obj client.Object
 		if o, ok := object.(client.Object); ok {
-			return buildFailed, fmt.Errorf("unsupported type client.Object for component: %v", o)
+			return fmt.Errorf("unsupported type client.Object for component: %v", o)
 		}
 
 		u, err := apiruntime.DefaultUnstructuredConverter.ToUnstructured(object)
 		if err != nil {
-			return buildFailed, err
+			return err
 		}
 		obj = &unstructured.Unstructured{Object: u}
 
 		if err := r.client.Patch(ctx, obj, client.Apply, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
-			return buildFailed, err
+			return err
 		}
 
 		var gvk schema.GroupVersionKind
 		if gvk, err = apiutil.GVKForObject(obj.DeepCopyObject(), r.client.Scheme()); err != nil {
-			return buildFailed, err
+			return err
 		}
 		logKeysAndValues := []any{
 			"groupVersionKind", gvk.String(),
@@ -173,7 +163,7 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 
 		log.V(5).Info("Succeeded to update object", logKeysAndValues...)
 	}
-	return creationSucceeded, nil
+	return nil
 }
 
 func (r *TrainJobReconciler) Create(e event.TypedCreateEvent[*trainer.TrainJob]) bool {
@@ -203,37 +193,6 @@ func (r *TrainJobReconciler) notifyWatchers(oldJob, newJob *trainer.TrainJob) {
 	for w := range r.watchers {
 		w.NotifyTrainJobUpdate(oldJob, newJob)
 	}
-}
-
-func setCreatedCondition(trainJob *trainer.TrainJob, opState objsOpState) {
-	var newCond metav1.Condition
-	switch opState {
-	case creationSucceeded:
-		newCond = metav1.Condition{
-			Type:    trainer.TrainJobCreated,
-			Status:  metav1.ConditionTrue,
-			Message: constants.TrainJobJobsCreationSucceededMessage,
-			Reason:  trainer.TrainJobJobsCreationSucceededReason,
-		}
-	case buildFailed:
-		newCond = metav1.Condition{
-			Type:    trainer.TrainJobCreated,
-			Status:  metav1.ConditionFalse,
-			Message: constants.TrainJobJobsBuildFailedMessage,
-			Reason:  trainer.TrainJobJobsBuildFailedReason,
-		}
-	// TODO (tenzen-y): Provide more granular message based on creation or update failure.
-	case creationFailed, updateFailed:
-		newCond = metav1.Condition{
-			Type:    trainer.TrainJobCreated,
-			Status:  metav1.ConditionFalse,
-			Message: constants.TrainJobJobsCreationFailedMessage,
-			Reason:  trainer.TrainJobJobsCreationFailedReason,
-		}
-	default:
-		return
-	}
-	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
 }
 
 func setSuspendedCondition(trainJob *trainer.TrainJob) {
