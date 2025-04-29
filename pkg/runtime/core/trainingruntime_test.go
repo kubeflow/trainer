@@ -179,6 +179,144 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Obj(),
 			},
 		},
+		"succeeded to build JobSet using PodSpecOverrides from the TrainJob.": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(100).
+							Obj(),
+					).
+					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime",
+						[]corev1.EnvVar{
+							{
+								Name:  "INIT_ENV",
+								Value: "original_init",
+							},
+						}...).
+					InitContainer(constants.Node, "override-init-container", "test:runtime",
+						[]corev1.EnvVar{
+							{
+								Name:  "INIT_ENV",
+								Value: "original_init",
+							},
+						}...).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Env(constants.Node, constants.Node,
+						[]corev1.EnvVar{
+							{
+								Name:  "TRAIN_JOB",
+								Value: "original",
+							},
+						}...,
+					).
+					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Env(constants.Node, "override-container",
+						[]corev1.EnvVar{
+							{
+								Name:  "CONTAINER_ENV",
+								Value: "original_container",
+							},
+						}...,
+					).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+						Obj(),
+				).
+				PodSpecOverrides([]trainer.PodSpecOverride{
+					{
+						TargetJob: constants.DatasetInitializer,
+						InitContainers: []trainer.ContainerOverride{
+							{
+								Name: "override-init-container",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "INIT_ENV",
+										Value: "override_init",
+									},
+								},
+							},
+						},
+					},
+					{
+						TargetJob:          constants.Node,
+						ServiceAccountName: ptr.To("override-sa"),
+						InitContainers: []trainer.ContainerOverride{
+							{
+								Name: "override-init-container",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "INIT_ENV",
+										Value: "override_init",
+									},
+								},
+							},
+						},
+						Containers: []trainer.ContainerOverride{
+							{
+								Name: "override-container",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "CONTAINER_ENV",
+										Value: "override_container",
+									},
+								},
+							},
+						},
+					},
+				}).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					ServiceAccountName(constants.Node, "override-sa").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+					NumNodes(100).
+					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime",
+						[]corev1.EnvVar{
+							{
+								Name:  "INIT_ENV",
+								Value: "override_init",
+							},
+						}...,
+					).
+					InitContainer(constants.Node, "override-init-container", "test:runtime",
+						[]corev1.EnvVar{
+							{
+								Name:  "INIT_ENV",
+								Value: "override_init",
+							},
+						}...,
+					).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Env(constants.Node, constants.Node,
+						[]corev1.EnvVar{
+							{
+								Name:  "TRAIN_JOB",
+								Value: "original",
+							},
+						}...,
+					).
+					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Env(constants.Node, "override-container",
+						[]corev1.EnvVar{
+							{
+								Name:  "CONTAINER_ENV",
+								Value: "override_container",
+							},
+						}...,
+					).
+					Obj(),
+			},
+		},
 		"succeeded to build JobSet with dataset and model initializer from the TrainJob.": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
