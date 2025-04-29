@@ -36,8 +36,7 @@ jobs:
             recent activity. It will be closed if no further activity occurs. Thank you
             for your contributions.
           close-pr-message: >
-            This pull request has been automatically marked as stale because it has not had
-            recent activity. It will be closed if no further activity occurs. Thank you
-            for your contributions.
+            This pull request has been automatically closed because it has not had recent
+            activity. Please comment "/reopen" to reopen it.
           stale-pr-label: lifecycle/stale
           exempt-pr-labels: lifecycle/frozen
