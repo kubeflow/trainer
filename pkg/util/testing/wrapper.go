@@ -225,6 +225,21 @@ func (j *JobSetWrapper) LauncherReplica() *JobSetWrapper {
 	return j
 }
 
+func (j *JobSetWrapper) InitContainer(rJobName, containerName, image string, envs ...corev1.EnvVar) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers = []corev1.Container{
+				{
+					Name:  containerName,
+					Image: image,
+					Env:   envs,
+				},
+			}
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) Container(rJobName, containerName, image string, command []string, args []string, res corev1.ResourceList) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {
@@ -234,8 +249,22 @@ func (j *JobSetWrapper) Container(rJobName, containerName, image string, command
 					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Command = command
 					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Args = args
 					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Resources.Requests = res
+					return j
 				}
 			}
+
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers = append(
+				j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers,
+				[]corev1.Container{
+					{
+						Name:      containerName,
+						Image:     image,
+						Command:   command,
+						Args:      args,
+						Resources: corev1.ResourceRequirements{Requests: res},
+					},
+				}...,
+			)
 		}
 	}
 	return j
@@ -309,6 +338,16 @@ func (j *JobSetWrapper) EnvFrom(rJobName, containerName string, envFrom ...corev
 					)
 				}
 			}
+		}
+	}
+	return j
+}
+
+func (j *JobSetWrapper) ServiceAccountName(rJobName string, serviceAccountName string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.ServiceAccountName = serviceAccountName
+
 		}
 	}
 	return j
@@ -461,13 +500,13 @@ func (t *TrainJobWrapper) Trainer(trainer *trainer.Trainer) *TrainJobWrapper {
 	return t
 }
 
-func (t *TrainJobWrapper) ManagedBy(m string) *TrainJobWrapper {
-	t.Spec.ManagedBy = &m
+func (t *TrainJobWrapper) PodSpecOverrides(podSpecOverrides []trainer.PodSpecOverride) *TrainJobWrapper {
+	t.Spec.PodSpecOverrides = podSpecOverrides
 	return t
 }
 
-func (t *TrainJobWrapper) PodSpecOverrides(podSpecOverrides []trainer.PodSpecOverride) *TrainJobWrapper {
-	t.Spec.PodSpecOverrides = podSpecOverrides
+func (t *TrainJobWrapper) ManagedBy(m string) *TrainJobWrapper {
+	t.Spec.ManagedBy = &m
 	return t
 }
 
@@ -953,6 +992,21 @@ func (s *TrainingRuntimeSpecWrapper) Replicas(replicas int32, rJobNames ...strin
 	return s
 }
 
+func (s *TrainingRuntimeSpecWrapper) InitContainer(rJobName, containerName, image string, envs ...corev1.EnvVar) *TrainingRuntimeSpecWrapper {
+	for i, rJob := range s.Template.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers = []corev1.Container{
+				{
+					Name:  containerName,
+					Image: image,
+					Env:   envs,
+				},
+			}
+		}
+	}
+	return s
+}
+
 func (s *TrainingRuntimeSpecWrapper) Container(rJobName, containerName, image string, command []string, args []string, res corev1.ResourceList) *TrainingRuntimeSpecWrapper {
 	for i, rJob := range s.Template.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {
@@ -962,8 +1016,21 @@ func (s *TrainingRuntimeSpecWrapper) Container(rJobName, containerName, image st
 					s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Command = command
 					s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = args
 					s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Resources.Requests = res
+					return s
 				}
 			}
+			s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers = append(
+				s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers,
+				[]corev1.Container{
+					{
+						Name:      containerName,
+						Image:     image,
+						Command:   command,
+						Args:      args,
+						Resources: corev1.ResourceRequirements{Requests: res},
+					},
+				}...,
+			)
 		}
 	}
 	return s
