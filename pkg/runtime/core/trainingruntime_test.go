@@ -193,14 +193,20 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								Name:  "INIT_ENV",
 								Value: "original_init",
 							},
-						}...).
+							{
+								Name:  "DATASET_PATH",
+								Value: "runtime",
+							},
+						}...,
+					).
 					InitContainer(constants.Node, "override-init-container", "test:runtime",
 						[]corev1.EnvVar{
 							{
 								Name:  "INIT_ENV",
 								Value: "original_init",
 							},
-						}...).
+						}...,
+					).
 					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Env(constants.Node, constants.Node,
 						[]corev1.EnvVar{
@@ -239,6 +245,10 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 									{
 										Name:  "INIT_ENV",
 										Value: "override_init",
+									},
+									{
+										Name:  "NEW_VALUE",
+										Value: "from_overrides",
 									},
 								},
 							},
@@ -285,6 +295,14 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							{
 								Name:  "INIT_ENV",
 								Value: "override_init",
+							},
+							{
+								Name:  "DATASET_PATH",
+								Value: "runtime",
+							},
+							{
+								Name:  "NEW_VALUE",
+								Value: "from_overrides",
 							},
 						}...,
 					).
