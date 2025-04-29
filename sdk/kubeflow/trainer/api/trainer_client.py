@@ -512,15 +512,15 @@ class TrainerClient:
 
         # Add the TrainJob status.
         # TODO (andreyvelich): Discuss how we should show TrainJob status to SDK users.
+        # The TrainJob exists at that stage so its status can safely default to Created
+        trainjob.status = constants.TRAINJOB_CREATED
+        # Then it can be read from the TrainJob conditions if any
         if trainjob_crd.status and trainjob_crd.status.conditions:
-            # The TrainJob exists at that stage so its status can safely default to Created
-            status = constants.TRAINJOB_CREATED
             for c in trainjob_crd.status.conditions:
                 if c.type == "Complete" and c.status == "True":
-                    status = "Succeeded"
+                    trainjob.status = "Succeeded"
                 elif c.type == "Failed" and c.status == "True":
-                    status = "Failed"
-            trainjob.status = status
+                    trainjob.status = "Failed"
 
         # Select Pods created by the appropriate JobSet. It checks the following ReplicatedJob.name:
         # dataset-initializer, model-initializer, launcher, node.
