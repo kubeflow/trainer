@@ -127,8 +127,8 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
 			//  the creation of the runtime resources failed and the TrainJob is backed off until
 			//  the next retry attempt.
-			r.recorder.Eventf(&trainJob, corev1.EventTypeWarning, "TrainJobReconcileFailed",
-				"Runtime resources reconciliation failed: %v", err.Error())
+			r.recorder.Eventf(&trainJob, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed",
+				"TrainJob resources reconciliation failed: %v", err.Error())
 		}
 	}
 
