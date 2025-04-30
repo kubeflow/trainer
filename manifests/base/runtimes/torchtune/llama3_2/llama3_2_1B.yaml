@@ -70,13 +70,10 @@ spec:
                     - name: node
                       image: ghcr.io/kubeflow/trainer/torchtune-trainer
                       command:
-                         - /bin/bash
-                          - -c
-                          - |
-                            echo "TorchTune Llama3.2-1B Finetuning Runtime"
-
-                            echo "--------------------------------------"
-                            pip list
+                        - tune
+                        - run
+                        - full_finetune_distributed
+                        - --config llama3_2/1B_full.yaml
                       resources:
                         limits:
                           nvidia.com/gpu: 2
