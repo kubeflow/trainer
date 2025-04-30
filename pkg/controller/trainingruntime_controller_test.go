@@ -143,10 +143,27 @@ func TestNotifyTrainJobUpdate_TrainingRuntimeReconciler(t *testing.T) {
 		newJob    *trainer.TrainJob
 		wantEvent event.TypedGenericEvent[iter.Seq[types.NamespacedName]]
 	}{
-		"UPDATE Event": {
+		"UPDATE Event: runtimeRef is TrainingRuntime": {
 			oldJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
 				Obj(),
 			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				SpecLabel("key", "value").
+				Obj(),
+			wantEvent: event.TypedGenericEvent[iter.Seq[types.NamespacedName]]{
+				Object: func(yield func(types.NamespacedName) bool) {
+					yield(types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "test-runtime"})
+				},
+			},
+		},
+		"UPDATE Event: runtimeRef is not TrainingRuntime": {
+			oldJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Obj(),
+			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				SpecLabel("key", "value").
 				Obj(),
 		},
 		"CREATE Event: runtimeRef is TrainingRuntime": {

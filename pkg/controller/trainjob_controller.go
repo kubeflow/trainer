@@ -190,6 +190,7 @@ func (r *TrainJobReconciler) Delete(e event.TypedDeleteEvent[*trainer.TrainJob])
 
 func (r *TrainJobReconciler) Update(e event.TypedUpdateEvent[*trainer.TrainJob]) bool {
 	r.log.WithValues("trainJob", klog.KObj(e.ObjectNew)).Info("TrainJob update event")
+	defer r.notifyWatchers(e.ObjectOld, e.ObjectNew)
 	return true
 }
 

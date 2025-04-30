@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/trainjob"
+	"github.com/kubeflow/trainer/pkg/util/trainjob"
 )
 
 const (

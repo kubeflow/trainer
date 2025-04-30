@@ -40,7 +40,7 @@ import (
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
 	idxer "github.com/kubeflow/trainer/pkg/runtime/indexer"
-	"github.com/kubeflow/trainer/pkg/trainjob"
+	"github.com/kubeflow/trainer/pkg/util/trainjob"
 )
 
 const (
@@ -99,7 +99,9 @@ func (r *TrainingRuntimeReconciler) NotifyTrainJobUpdate(oldJob, newJob *trainer
 	switch {
 	case oldJob != nil && newJob != nil:
 		// UPDATE Event.
-		return
+		if trainjob.RuntimeRefIsTrainingRuntime(newJob.Spec.RuntimeRef) {
+			runtimeNSName = &types.NamespacedName{Namespace: newJob.Namespace, Name: newJob.Spec.RuntimeRef.Name}
+		}
 	case oldJob == nil:
 		// CREATE Event.
 		if trainjob.RuntimeRefIsTrainingRuntime(newJob.Spec.RuntimeRef) {
