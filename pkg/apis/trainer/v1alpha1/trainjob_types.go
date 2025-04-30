@@ -69,9 +69,9 @@ const (
 	// when the TrainJob suspension is changed from True to False.
 	TrainJobResumedReason string = "Resumed"
 
-	// TrainJobRuntimeCreationFailedReason is the "Failed" condition reason
-	// when the creation of the runtime resources failed.
-	TrainJobRuntimeCreationFailedReason string = "RuntimeCreationFailed"
+	// TrainJobRuntimeNotSupportedReason is the "Failed" condition reason
+	// when the referenced TrainingRuntime is not supported.
+	TrainJobRuntimeNotSupportedReason string = "TrainingRuntimeNotSupported"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

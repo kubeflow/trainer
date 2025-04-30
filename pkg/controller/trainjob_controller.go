@@ -24,6 +24,7 @@ import (
 	"slices"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,20 +109,27 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	var err error
+	// Keep track of the origin TrainJob status
+	originStatus := trainJob.Status.DeepCopy()
+
+	// Let's clear the failed condition that could have been set previously.
+	// An external change to the TrainJob spec may transition it out of the Failed state.
+	removeFailedCondition(&trainJob)
 
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := r.runtimes[runtimeRefGK]
 	if !ok {
 		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
+		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
 	} else {
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
-	}
-
-	originStatus := trainJob.Status.DeepCopy()
-	if err != nil {
-		setFailedCondition(&trainJob, err.Error(), trainer.TrainJobRuntimeCreationFailedReason)
-	} else {
-		removeFailedCondition(&trainJob)
+		if err != nil {
+			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
+			//  the creation of the runtime resources failed and the TrainJob is backed off until
+			//  the next retry attempt.
+			r.recorder.Eventf(&trainJob, corev1.EventTypeWarning, "TrainJobReconcileFailed",
+				"Runtime resources reconciliation failed: %v", err.Error())
+		}
 	}
 
 	setSuspendedCondition(&trainJob)
