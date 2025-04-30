@@ -51,6 +51,7 @@ rules:
   - trainer.kubeflow.org
   resources:
   - clustertrainingruntimes
+  - trainingruntimes
   verbs:
   - get
   - list
@@ -58,7 +59,16 @@ rules:
 - apiGroups:
   - trainer.kubeflow.org
   resources:
-  - trainingruntimes
+  - trainingruntimes/finalizers
+  - trainjobs/finalizers
+  - trainjobs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - trainer.kubeflow.org
+  resources:
   - trainjobs
   verbs:
   - get
@@ -66,14 +76,3 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - trainer.kubeflow.org
-  resources:
-  - trainingruntimes/finalizers
-  - trainingruntimes/status
-  - trainjobs/finalizers
-  - trainjobs/status
-  verbs:
-  - get
-  - patch
-  - update
