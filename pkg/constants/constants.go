@@ -49,18 +49,6 @@ const (
 	// PodGroupKind is the Kind name for the PodGroup.
 	PodGroupKind string = "PodGroup"
 
-	// TrainJobJobsCreationSucceededMessage is status condition message for the
-	// {"type": "Created", "status": "True", "reason": "JobsCreationSucceeded"} condition.
-	TrainJobJobsCreationSucceededMessage = "Succeeded to create Jobs"
-
-	// TrainJobJobsBuildFailedMessage is status condition message for the
-	// {"type": "Created", "status": "True", "reason": "JobsBuildFailed"} condition.
-	TrainJobJobsBuildFailedMessage = "Failed to build Jobs"
-
-	// TrainJobJobsCreationFailedMessage is status condition message for the
-	// {"type": "Created", "status": "True", "reason": "JobsCreationFailed"} condition.
-	TrainJobJobsCreationFailedMessage = "Failed to create Jobs"
-
 	// TrainJobSuspendedMessage is status condition message for the
 	// {"type": "Suspended", "status": "True", "reason": "Suspended"} condition.
 	TrainJobSuspendedMessage = "TrainJob is suspended"

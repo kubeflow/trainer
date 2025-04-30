@@ -107,18 +107,28 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
+	var err error
+
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := r.runtimes[runtimeRefGK]
 	if !ok {
-		return ctrl.Result{}, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
+		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
+	} else {
+		err = r.reconcileObjects(ctx, runtime, &trainJob)
 	}
-	err := r.reconcileObjects(ctx, runtime, &trainJob)
 
 	originStatus := trainJob.Status.DeepCopy()
+	if err != nil {
+		setFailedCondition(&trainJob, err.Error(), trainer.TrainJobRuntimeCreationFailedReason)
+	} else {
+		removeFailedCondition(&trainJob)
+	}
+
 	setSuspendedCondition(&trainJob)
 	if terminalCondErr := setTerminalCondition(ctx, runtime, &trainJob); terminalCondErr != nil {
 		err = errors.Join(err, terminalCondErr)
 	}
+
 	if !equality.Semantic.DeepEqual(&trainJob.Status, originStatus) {
 		return ctrl.Result{}, errors.Join(err, r.client.Status().Update(ctx, &trainJob))
 	}
@@ -216,6 +226,20 @@ func setSuspendedCondition(trainJob *trainer.TrainJob) {
 		return
 	}
 	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
+}
+
+func setFailedCondition(trainJob *trainer.TrainJob, message, reason string) {
+	newCond := metav1.Condition{
+		Type:    trainer.TrainJobFailed,
+		Status:  metav1.ConditionTrue,
+		Message: message,
+		Reason:  reason,
+	}
+	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
+}
+
+func removeFailedCondition(trainJob *trainer.TrainJob) {
+	meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobFailed)
 }
 
 func setTerminalCondition(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {

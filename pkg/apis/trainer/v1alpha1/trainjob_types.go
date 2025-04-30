@@ -61,13 +61,17 @@ const (
 )
 
 const (
-	// TrainJobSuspendedReason is the "Suspended" condition reason.
-	// When the TrainJob is suspended, this is added.
+	// TrainJobSuspendedReason is the "Suspended" condition reason
+	// when the TrainJob is suspended.
 	TrainJobSuspendedReason string = "Suspended"
 
-	// TrainJobResumedReason is the "Suspended" condition reason.
-	// When the TrainJob suspension is changed from True to False, this is added.
+	// TrainJobResumedReason is the "Suspended" condition reason
+	// when the TrainJob suspension is changed from True to False.
 	TrainJobResumedReason string = "Resumed"
+
+	// TrainJobRuntimeCreationFailedReason is the "Failed" condition reason
+	// when the creation of the runtime resources failed.
+	TrainJobRuntimeCreationFailedReason string = "RuntimeCreationFailed"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
