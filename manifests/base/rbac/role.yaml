@@ -61,8 +61,6 @@ rules:
   resources:
   - trainjobs
   verbs:
-  - create
-  - delete
   - get
   - list
   - patch
