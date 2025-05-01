@@ -1189,3 +1189,31 @@ func (s *SecretWrapper) ControllerReference(gvk schema.GroupVersionKind, name, u
 func (s *SecretWrapper) Obj() *corev1.Secret {
 	return &s.Secret
 }
+
+type PersistentVolumeClaimWrapper struct {
+	corev1.PersistentVolumeClaim
+}
+
+func MakePersistentVolumeClaimWrapper(name, ns string) *PersistentVolumeClaimWrapper {
+	return &PersistentVolumeClaimWrapper{
+		PersistentVolumeClaim: corev1.PersistentVolumeClaim{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: corev1.SchemeGroupVersion.String(),
+				Kind:       "PersistentVolumeClaim",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+		},
+	}
+}
+
+func (p *PersistentVolumeClaimWrapper) WithPhase(phase corev1.PersistentVolumeClaimPhase) *PersistentVolumeClaimWrapper {
+	p.Status.Phase = phase
+	return p
+}
+
+func (p *PersistentVolumeClaimWrapper) Obj() *corev1.PersistentVolumeClaim {
+	return &p.PersistentVolumeClaim
+}

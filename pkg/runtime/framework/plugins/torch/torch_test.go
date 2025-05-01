@@ -18,6 +18,7 @@ package torch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -30,14 +31,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
+	jobsetplgconsts "github.com/kubeflow/trainer/pkg/runtime/framework/plugins/jobset/constants"
 	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
 )
 
@@ -1410,11 +1416,14 @@ func TestTorch(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
+	errorGetPVC := errors.New("error getting PVC")
 	cases := map[string]struct {
 		info         *runtime.Info
+		objs		 []client.Object
 		oldObj       *trainer.TrainJob
 		newObj       *trainer.TrainJob
 		wantError    field.ErrorList
+		wantBuildError error
 		wantWarnings admission.Warnings
 	}{
 		"no action when info is nil": {
@@ -1588,7 +1597,104 @@ func TestValidate(t *testing.T) {
 					).
 					Obj(),
 				),
+				runtime.WithTemplateSpecObjApply(
+					jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.DatasetInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.ModelInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.ModelInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+						),
+				),
 			),
+			objs: []client.Object{
+				utiltesting.MakePersistentVolumeClaimWrapper("initializer", metav1.NamespaceDefault).
+					WithPhase(corev1.ClaimBound).
+					Obj(),
+			},
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
 					NumProcPerNode(intstr.FromString("auto")).
@@ -1622,7 +1728,104 @@ func TestValidate(t *testing.T) {
 					).
 					Obj(),
 				),
+				runtime.WithTemplateSpecObjApply(
+					jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.DatasetInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.ModelInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.ModelInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+						),
+				),
 			),
+			objs: []client.Object{
+				utiltesting.MakePersistentVolumeClaimWrapper("initializer", metav1.NamespaceDefault).
+					WithPhase(corev1.ClaimBound).
+					Obj(),
+			},
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
 					NumProcPerNode(intstr.FromString("auto")).
@@ -1654,7 +1857,18 @@ func TestValidate(t *testing.T) {
 			var cancel func()
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
-			p, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil)
+			b := utiltesting.NewClientBuilder().WithObjects(tc.objs...)
+			b.WithInterceptorFuncs(interceptor.Funcs{
+				Get: func (ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					if _, ok := obj.(*corev1.PersistentVolumeClaim); ok && errors.Is(tc.wantBuildError, errorGetPVC) {
+						return errorGetPVC
+					}
+    				return client.Get(ctx, key, obj, opts...)
+				},
+			})
+			cli := b.Build()
+
+			p, err := New(ctx, cli, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize Torch plugin: %v", err)
 			}
