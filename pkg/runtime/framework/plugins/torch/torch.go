@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/apply"
@@ -38,15 +40,21 @@ import (
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
 )
 
-type Torch struct{}
+type Torch struct{
+	client client.Client
+	scheme *apiruntime.Scheme
+}
 
 var _ framework.EnforceMLPolicyPlugin = (*Torch)(nil)
 var _ framework.CustomValidationPlugin = (*Torch)(nil)
 
 const Name = "Torch"
 
-func New(context.Context, client.Client, client.FieldIndexer) (framework.Plugin, error) {
-	return &Torch{}, nil
+func New(_ context.Context, client client.Client, _ client.FieldIndexer) (framework.Plugin, error) {
+	return &Torch{
+		client: client,
+		scheme: client.Scheme(),
+	}, nil
 }
 
 func (t *Torch) Name() string {
@@ -84,16 +92,41 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(torchEnvs))))
 		}
 
-		// Check supported pretrained models for torchtune.
+		// Check supported pretrained models and the status of declared PVCs for torchtune.
 		// TODO(Electronic-Waste): Add more validation for torchtune when we support more arguments.
 		if slices.Equal(newObj.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
 			runtimeRefNamePath := specPath.Child("runtimeRef").Child("name")
 			model := getModelFromRuntimeRef(newObj.Spec.RuntimeRef.Name)
 
+			// Check supported pretrained models.
 			if !constants.TorchTuneSupportedPretrainedModels.Has(model) {
 				allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("must have a supported pretrained model, invalid model configured: %v", model)))
 			}
 
+			// PVCs must be created before the TrainJob is created.
+			jsSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](runtimeInfo)
+			if ok {
+				pvcNames := sets.New[string]()
+				for _, replicatedJob := range jsSpec.ReplicatedJobs {
+					for _, volume := range replicatedJob.Template.Spec.Template.Spec.Volumes {
+						if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName != nil {
+							pvcNames.Insert(*volume.PersistentVolumeClaim.ClaimName)
+						}
+					}
+				}
+
+				for _, name := range pvcNames.UnsortedList() {
+					pvc := corev1.PersistentVolumeClaim{}
+					if err := t.client.Get(context.TODO(), client.ObjectKey{Namespace: newObj.Namespace, Name: name}, &pvc); err != nil {
+						allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("PVC %s must be created before the TrainJob is created", name)))
+					} else if pvc.Status.Phase != corev1.ClaimBound {
+						allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("PVC %s must be bound before the TrainJob is created", name)))
+					}
+				}
+			}
+
+			// Check numNodes for torchtune.
+			// The number of nodes must be 1 for all models except for Llama3-3-70B.
 			numNodesRefPath := specPath.Child("trainer").Child("numNodes")
 			numNodes := *newObj.Spec.Trainer.NumNodes
 			if numNodes > 1 && model != constants.TORCHTUNE_MODEL_LLAMA3_3_70B {
