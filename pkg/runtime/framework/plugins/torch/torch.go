@@ -120,7 +120,7 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 					if err := t.client.Get(context.TODO(), client.ObjectKey{Namespace: newObj.Namespace, Name: name}, &pvc); err != nil {
 						allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("PVC %s must be created before the TrainJob is created", name)))
 					} else if pvc.Status.Phase != corev1.ClaimBound {
-						allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("PVC %s must be bound before the TrainJob is created", name)))
+						allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("PVC %s must be bounded before the TrainJob is created", name)))
 					}
 				}
 			}

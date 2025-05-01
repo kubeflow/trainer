@@ -18,7 +18,6 @@ package torch
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -35,7 +34,6 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
@@ -1416,14 +1414,12 @@ func TestTorch(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	errorGetPVC := errors.New("error getting PVC")
 	cases := map[string]struct {
 		info         *runtime.Info
 		objs		 []client.Object
 		oldObj       *trainer.TrainJob
 		newObj       *trainer.TrainJob
 		wantError    field.ErrorList
-		wantBuildError error
 		wantWarnings admission.Warnings
 	}{
 		"no action when info is nil": {
@@ -1719,6 +1715,263 @@ func TestValidate(t *testing.T) {
 				),
 			},
 		},
+		"pvc not created": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+					).
+					Obj(),
+				),
+				runtime.WithTemplateSpecObjApply(
+					jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.DatasetInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.ModelInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.ModelInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+						),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(intstr.FromString("auto")).
+					NumNodes(int32(1)).
+					Container(
+						"ghcr.io/kubeflow/trainer/torchtune-trainer",
+						[]string{"tune", "run"},
+						nil, corev1.ResourceList{},
+					).
+					Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.2-1b",
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("runtimeRef").Child("name"),
+					"torchtune-llama3.2-1b",
+					fmt.Sprintf("PVC %s must be created before the TrainJob is created", "initializer"),
+				),
+			},
+		},
+		"pvc unbounded": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+					).
+					Obj(),
+				),
+				runtime.WithTemplateSpecObjApply(
+					jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.DatasetInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.ModelInitializer).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.ModelInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(nil).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(nil).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														).
+														WithResources(corev1ac.ResourceRequirements()),
+												).
+												WithVolumes(corev1ac.Volume().
+													WithName(jobsetplgconsts.VolumeNameInitializer).
+													WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+														WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+													),
+												),
+											),
+										),
+									),
+								),
+						),
+				),
+			),
+			objs: []client.Object{
+				utiltesting.MakePersistentVolumeClaimWrapper("initializer", metav1.NamespaceDefault).
+					WithPhase(corev1.ClaimPending).
+					Obj(),
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(intstr.FromString("auto")).
+					NumNodes(int32(1)).
+					Container(
+						"ghcr.io/kubeflow/trainer/torchtune-trainer",
+						[]string{"tune", "run"},
+						nil, corev1.ResourceList{},
+					).
+					Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.2-1b",
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("runtimeRef").Child("name"),
+					"torchtune-llama3.2-1b",
+					fmt.Sprintf("PVC %s must be bounded before the TrainJob is created", "initializer"),
+				),
+			},
+		},
 		"multi-node mode is only enabled for Llama-3.3-70b": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
@@ -1857,18 +2110,8 @@ func TestValidate(t *testing.T) {
 			var cancel func()
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
-			b := utiltesting.NewClientBuilder().WithObjects(tc.objs...)
-			b.WithInterceptorFuncs(interceptor.Funcs{
-				Get: func (ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					if _, ok := obj.(*corev1.PersistentVolumeClaim); ok && errors.Is(tc.wantBuildError, errorGetPVC) {
-						return errorGetPVC
-					}
-    				return client.Get(ctx, key, obj, opts...)
-				},
-			})
-			cli := b.Build()
 
-			p, err := New(ctx, cli, nil)
+			p, err := New(ctx, utiltesting.NewClientBuilder().WithObjects(tc.objs...).Build(), nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize Torch plugin: %v", err)
 			}
