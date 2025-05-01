@@ -23,6 +23,13 @@ from kubeflow.trainer.utils import utils
 
 
 class DockerJobRunner(JobRunner):
+    """DockerJobRunner creates and manages training jobs using Docker.
+
+    Args:
+        docker_client: If provided, this client is used for Docker API calls.
+            If not provided, a new client will be created from the user's environment.
+    """
+
     def __init__(self, docker_client: Optional[docker.DockerClient] = None):
         if docker_client is None:
             self.docker_client = docker.from_env()
@@ -38,6 +45,22 @@ class DockerJobRunner(JobRunner):
         framework: types.Framework,
         runtime_name: str,
     ) -> str:
+        """Creates a training job.
+
+        Args:
+            image: The name of the container image to use for the job.
+            entrypoint: The entrypoint for the container.
+            command: The command to run in the container.
+            num_nodes: The number of nodes to run the job on.
+            framework: The framework being used.
+            runtime_name: The name of the runtime being used.
+
+        Returns:
+            The name of the created job.
+
+        Raises:
+            RuntimeError: If the framework provided is not supported.
+        """
         if framework != types.Framework.TORCH:
             raise RuntimeError(f"Framework '{framework}' is not currently supported.")
 
@@ -78,6 +101,14 @@ class DockerJobRunner(JobRunner):
         return train_job_name
 
     def get_job(self, job_name: str) -> types.ContainerJob:
+        """Get a specified container training job by its name.
+
+        Args:
+            job_name: The name of the training job to get.
+
+        Returns:
+            A container training job.
+        """
         network = self.docker_client.networks.get(job_name)
 
         docker_containers = self.docker_client.containers.list(
@@ -122,6 +153,9 @@ class DockerJobRunner(JobRunner):
         Returns:
             Dict[str, str]: The logs of the training job, where the key is the
             step and node rank, and the value is the logs for that node.
+
+        Raises:
+            RuntimeError: If the job is not found.
         """
         # TODO (eoinfennessy): use "step" in query.
         containers = self.docker_client.containers.list(
@@ -152,6 +186,14 @@ class DockerJobRunner(JobRunner):
         self,
         runtime_name: Optional[str] = None,
     ) -> List[types.ContainerJob]:
+        """Lists container training jobs.
+
+        Args:
+            runtime_name: If provided, only return jobs that use the given runtime name.
+
+        Returns:
+            A list of container training jobs.
+        """
         jobs = []
         for name in self.__list_job_names(runtime_name):
             jobs.append(self.get_job(name))

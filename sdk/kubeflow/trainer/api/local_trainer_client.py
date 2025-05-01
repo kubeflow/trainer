@@ -26,6 +26,19 @@ from kubeflow.trainer.utils import utils
 
 
 class LocalTrainerClient(AbstractTrainerClient):
+    """LocalTrainerClient exposes functionality for running training jobs locally.
+
+    A Kubernetes cluster is not required.
+    It exposes the same interface as the TrainerClient.
+
+    Args:
+        local_runtimes_path: The path to the directory containing runtime YAML files.
+            Defaults to the runtimes included with the package.
+        job_runner: The job runner to use for local training.
+            Options include the DockerJobRunner and PodmanJobRunner.
+            Defaults to the Docker job runner.
+    """
+
     def __init__(
         self,
         local_runtimes_path: Optional[Path] = None,
@@ -49,12 +62,28 @@ class LocalTrainerClient(AbstractTrainerClient):
             self.job_runner = job_runner
 
     def list_runtimes(self) -> List[types.Runtime]:
+        """Lists all runtimes.
+
+        Returns:
+            A list of runtime objects.
+        """
         runtimes = []
         for cr in self.__list_runtime_crs():
             runtimes.append(utils.get_runtime_from_crd(cr))
         return runtimes
 
     def get_runtime(self, name: str) -> types.Runtime:
+        """Get a specific runtime by name.
+
+        Args:
+            name: The name of the runtime.
+
+        Returns:
+            A runtime object.
+
+        Raises:
+            RuntimeError: if the specified runtime cannot be found.
+        """
         for r in self.list_runtimes():
             if r.name == name:
                 return r
@@ -66,6 +95,21 @@ class LocalTrainerClient(AbstractTrainerClient):
         initializer: Optional[types.Initializer] = None,
         trainer: Optional[types.CustomTrainer] = None,
     ) -> str:
+        """Starts a training job.
+
+        Args:
+            runtime: Config for the train job's runtime.
+            trainer:  Config for the function that encapsulates the model training process.
+            initializer: Config for dataset and model initialization.
+
+        Returns:
+            The generated name of the training job.
+
+        Raises:
+            RuntimeError: if the specified runtime cannot be found,
+                or the runtime container cannot be found,
+                or the runtime container image is not specified.
+        """
         runtime_cr = self.__get_runtime_cr(runtime.name)
         if runtime_cr is None:
             raise RuntimeError(f"No runtime found with name '{runtime.name}'")
@@ -110,6 +154,14 @@ class LocalTrainerClient(AbstractTrainerClient):
     def list_jobs(
         self, runtime: Optional[types.Runtime] = None
     ) -> List[types.TrainJob]:
+        """Lists all training jobs.
+
+        Args:
+            runtime: If provided, only return jobs that use the given runtime.
+
+        Returns:
+            A list of training jobs.
+        """
         runtime_name = runtime.name if runtime else None
         container_jobs = self.job_runner.list_jobs(runtime_name)
 
@@ -119,6 +171,14 @@ class LocalTrainerClient(AbstractTrainerClient):
         return train_jobs
 
     def get_job(self, name: str) -> types.TrainJob:
+        """Get a specific training job by name.
+
+        Args:
+            name: The name of the training job to get.
+
+        Returns:
+            A training job.
+        """
         container_job = self.job_runner.get_job(name)
         return self.__container_job_to_train_job(container_job)
 
@@ -145,6 +205,11 @@ class LocalTrainerClient(AbstractTrainerClient):
         )
 
     def delete_job(self, name: str):
+        """Deletes a specific training job.
+
+        Args:
+            name: The name of the training job to delete.
+        """
         self.job_runner.delete_job(job_name=name)
 
     def __list_runtime_crs(self) -> List[models.TrainerV1alpha1ClusterTrainingRuntime]:
