@@ -247,7 +247,7 @@ type PodSpecOverride struct {
 	// +listType=atomic
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// Overrides for the Pod volume configuration.
+	// Overrides for the Pod volume configurations.
 	// +listType=map
 	// +listMapKey=name
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
