@@ -40,9 +40,21 @@ echo "Create Kind cluster and load Kubeflow Trainer images"
 ${KIND} create cluster --image "${KIND_NODE_VERSION}"
 ${KIND} load docker-image ${CONTROLLER_MANAGER_CI_IMAGE}
 
+print_cluster_info() {
+  kubectl version
+  kubectl cluster-info
+  kubectl get nodes
+  kubectl get pods -n ${NAMESPACE}
+  kubectl describe pod -n ${NAMESPACE}
+}
+
 # This avoids a race condition where API server has not yet registered CRDs
 echo "Deploy Kubeflow Trainer CRDs first"
-kubectl apply --server-side -k manifests/base/crds
+kubectl apply --server-side -k manifests/base/crds || (
+  kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
+    print_cluster_info &&
+    exit 1
+)
 
 echo "Deploy Kubeflow Trainer"
 E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
@@ -57,7 +69,11 @@ cat <<EOF > "${E2E_MANIFESTS_DIR}/kustomization.yaml"
     newTag: "${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
 EOF
 
-kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
+kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}" || (
+  kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
+    print_cluster_info &&
+    exit 1
+)
 
 # We should wait until Deployment is in Ready status.
 echo "Wait for Kubeflow Trainer to be ready"
@@ -69,14 +85,6 @@ echo "Wait for Kubeflow Trainer to be ready"
       kubectl describe pods -n ${NAMESPACE} &&
       exit 1
   )
-
-print_cluster_info() {
-  kubectl version
-  kubectl cluster-info
-  kubectl get nodes
-  kubectl get pods -n ${NAMESPACE}
-  kubectl describe pod -n ${NAMESPACE}
-}
 
 # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
 TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.5.0-cuda12.4-cudnn9-runtime
