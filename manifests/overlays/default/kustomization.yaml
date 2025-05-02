@@ -15,9 +15,13 @@ resources:
   - ../../base/rbac
   - ../../base/webhook
 
-# Update the Kubeflow Trainer controller manager image tag.
+# Update the Kubeflow Trainer controller manager & runtimes image tag.
 images:
   - name: kubeflow/trainer-controller-manager
+    newTag: latest
+  - name: ghcr.io/kubeflow/trainer/deepspeed-runtime
+    newTag: latest
+  - name: ghcr.io/kubeflow/trainer/mlx-runtime
     newTag: latest
 
 # Secret for the Kubeflow Training webhook.
