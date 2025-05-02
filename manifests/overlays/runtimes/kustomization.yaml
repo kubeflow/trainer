@@ -2,3 +2,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base/runtimes
+
+# Update the Kubeflow Trainer runtimes image tag.
+images:
+  - name: ghcr.io/kubeflow/trainer/deepspeed-runtime
+    newTag: latest
+  - name: ghcr.io/kubeflow/trainer/mlx-runtime
+    newTag: latest
