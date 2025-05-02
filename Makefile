@@ -117,10 +117,12 @@ manifests: controller-gen ## Generate manifests.
 		output:rbac:artifacts:config=manifests/base/rbac \
 		output:webhook:artifacts:config=manifests/base/webhook
 
+## TODO (kramaranya): Remove gen-sdk.sh when moving SDK
 .PHONY: generate
 generate: go-mod-download manifests ## Generate APIs and SDK.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh
+	hack/python-api/gen-api.sh
 	hack/python-sdk/gen-sdk.sh
 
 .PHONY: go-mod-download
