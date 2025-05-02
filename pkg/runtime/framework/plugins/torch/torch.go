@@ -40,7 +40,7 @@ import (
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
 )
 
-type Torch struct{
+type Torch struct {
 	client client.Client
 	scheme *apiruntime.Scheme
 }

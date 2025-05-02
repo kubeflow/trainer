@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -1416,7 +1416,7 @@ func TestTorch(t *testing.T) {
 func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info
-		objs		 []client.Object
+		objs         []client.Object
 		oldObj       *trainer.TrainJob
 		newObj       *trainer.TrainJob
 		wantError    field.ErrorList
