@@ -1,5 +1,18 @@
 # Changelog
 
+# [v1.9.2](https://github.com/kubeflow/training-operator/tree/v1.9.2) (2025-05-02)
+
+## New Features
+
+- Add provision to provide labels and annotations for the pytorchjob an… ([#2612](https://github.com/kubeflow/trainer/pull/2612) by [@abhijeet-dhumal](https://github.com/abhijeet-dhumal))
+
+## Bug Fixes
+
+- Fix llm hp optimization error ([#2576](https://github.com/kubeflow/trainer/pull/2576) by [@helenxie-bit](https://github.com/helenxie-bit))
+- [bug] pull image from ghcr ([#2584](https://github.com/kubeflow/trainer/pull/2584) by [@mahdikhashan](https://github.com/mahdikhashan))
+
+[Full Changelog](https://github.com/kubeflow/trainer/compare/v1.9.1...v1.9.2)
+
 # [v1.9.1](https://github.com/kubeflow/training-operator/tree/v1.9.1) (2025-03-24)
 
 ## Breaking Changes
