@@ -286,9 +286,6 @@ const (
 
 	// TrainJobFailed means that the actual jobs have failed its execution.
 	TrainJobFailed string = "Failed"
-
-	// TrainJobCreated means that the actual jobs creation has succeeded.
-	TrainJobCreated string = "Created"
 )
 
 const (
@@ -299,19 +296,6 @@ const (
 	// TrainJobResumedReason is the "Suspended" condition reason.
 	// When the TrainJob suspension is changed from True to False, this is added.
 	TrainJobResumedReason string = "Resumed"
-
-	// TrainJobJobsCreationSucceededReason is the "Created" condition reason.
-	// When the creating objects succeeded after building succeeded, this is added.
-	TrainJobJobsCreationSucceededReason string = "JobsCreationSucceeded"
-
-	// TrainJobJobsBuildFailedReason is the "Created" condition reason.
-	// When the building objects based on the TrainJob and the specified runtime failed,
-	// this is added.
-	TrainJobJobsBuildFailedReason string = "JobsBuildFailed"
-
-	// TrainJobJobsCreationFailedReason is "Created" condition reason.
-	// When the creating objects failed even though building succeeded, this is added.
-	TrainJobJobsCreationFailedReason string = "JobsCreationFailed"
 )
 
 
@@ -884,23 +868,25 @@ instead of computing from JobSet conditions.
 stateDiagram-v2
     #CREATION
     state created_choice <<choice>>
-    [*] --> created_choice: TrainJob is submitted.
-    created_choice --> Created=True: Succeeded to build and deploy Jobs.
-    created_choice --> Created=False: Failed to build and deploy Jobs.
-    Created=False --> Created=False: Wait for updated appropriate TrainJob.
-    Created=False --> Created=True: Succeeded to build and deploy Jobs.
+    [*] --> created_choice: TrainJob is created.
+    created_choice --> Failed=True: Failed to resolve training runtime reference.
+
+    #INITIALISATION
+    state resources_applied_choice <<choice>>
+    created_choice --> resources_applied_choice: Apply TrainJob runtime resources.
+    resources_applied_choice --> resources_applied_choice: Backoff and retry on error.
 
     #SUSPENSION
     state suspended_choice <<choice>>
-    Created=True --> suspended_choice: Handle TrainJob suspension.
+    resources_applied_choice --> suspended_choice: Handle TrainJob suspension.
     suspended_choice --> Suspended=True: TrainJob is suspended.
     Suspended=True --> Suspended=True: Wait for unsuspending.
-    Suspended=True --> Suspended=False: TrainJob is unsuspended.
+    Suspended=True --> Suspended=False: TrainJob is resumed.
     suspended_choice --> Suspended=False: TrainJob is not suspended.
 
-    #FAILURE
+    #EXECUTION
     state terminal_choice <<choice>>
-    Suspended=False --> terminal_choice: Actual Jobs go to terminal phase.
+    Suspended=False --> terminal_choice: Actual Jobs go to execution phase.
     terminal_choice --> Failed=True: Actual Jobs (e.g., JobSet) failed.
     Failed=True --> [*]
 

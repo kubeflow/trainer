@@ -19,6 +19,7 @@ package torch
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -70,6 +71,7 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 			}
 		}
 
+		// Check reserved envs.
 		torchEnvs := sets.New[string]()
 		for _, env := range newObj.Spec.Trainer.Env {
 			if constants.TorchRunReservedEnvNames.Has(env.Name) {
@@ -80,6 +82,23 @@ func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob)
 		if torchEnvs.Len() > 0 {
 			trainerEnvsPath := specPath.Child("trainer").Child("env")
 			allErrs = append(allErrs, field.Invalid(trainerEnvsPath, newObj.Spec.Trainer.Env, fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(torchEnvs))))
+		}
+
+		// Check supported pretrained models for torchtune.
+		// TODO(Electronic-Waste): Add more validation for torchtune when we support more arguments.
+		if slices.Equal(newObj.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
+			runtimeRefNamePath := specPath.Child("runtimeRef").Child("name")
+			model := getModelFromRuntimeRef(newObj.Spec.RuntimeRef.Name)
+
+			if !constants.TorchTuneSupportedPretrainedModels.Has(model) {
+				allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("must have a supported pretrained model, invalid model configured: %v", model)))
+			}
+
+			numNodesRefPath := specPath.Child("trainer").Child("numNodes")
+			numNodes := *newObj.Spec.Trainer.NumNodes
+			if numNodes > 1 && model != constants.TORCHTUNE_MODEL_LLAMA3_3_70B {
+				allErrs = append(allErrs, field.Invalid(numNodesRefPath, numNodes, fmt.Sprintf("must be 1 for %v model", model)))
+			}
 		}
 	}
 
@@ -137,9 +156,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 
 	// Update envs for Info object.
-	// Add PyTorch distributed "PET_" values for torchrun
-	// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
-	// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
 		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
@@ -147,6 +163,9 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		}
 	}
 	if trainerContainer != nil {
+		// Add PyTorch distributed "PET_" values for torchrun and torchtune.
+		// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
+		// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
 		apply.UpsertEnvVar(&trainerContainer.Env,
 			*corev1ac.EnvVar().
 				WithName(constants.TorchEnvNumNodes).
@@ -159,13 +178,37 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 				WithValueFrom(corev1ac.EnvVarSource().
 					WithFieldRef(corev1ac.ObjectFieldSelector().
 						WithFieldPath(constants.JobCompletionIndexFieldPath))),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvMasterAddr).
-				WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvMasterPort).
-				WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 		)
+
+		if !slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
+			// Add PET_MASTER_ADDR and PET_MASTER_PORT envs for torchrun.
+			apply.UpsertEnvVar(&trainerContainer.Env,
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvMasterAddr).
+					WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvMasterPort).
+					WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+			)
+		} else {
+			// Mutate trainer command for torchtune.
+			// Ref: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2#complement-torch-plugin
+			// 1. Add rendezvous backend arg for torchtune.
+			var newCommand []string
+			newCommand = append(newCommand,
+				fmt.Sprintf("%s %s-%s-0-0.%s:%d",
+					constants.TorchTuneArgRdzvEndpoint,
+					trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort,
+				),
+			)
+
+			// 2. Get the recipe and config from old args and append them to newCommand.
+			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
+			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, trainJob.Spec.RuntimeRef.Name, trainJob.Spec.Trainer.Args)
+			newCommand = append(newCommand, recipe, fmt.Sprintf("--config %s", config))
+
+			trainJob.Spec.Trainer.Command = append(trainJob.Spec.Trainer.Command, newCommand...)
+		}
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
 	}
@@ -187,4 +230,28 @@ func calculateNumProcPerNode(
 		return fallbackNumProcPerNode, false
 	}
 	return intstr.FromInt32(defaultCPU), false
+}
+
+// getRecipeAndConfig returns the recipe and config file name based on the number of nodes,
+// number of processes per node, runtime reference name, and command line arguments.
+func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, runtimeRefName string, _ []string) (string, string) {
+	recipe := constants.TorchTuneFullFinetuneDistributed
+	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
+	if numNodes == 1 && numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 {
+		recipe = constants.TorchTuneFullFinetuneSingleDevice
+		suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
+	} else if numNodes > 1 {
+		suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
+	}
+
+	return recipe, fmt.Sprintf("%s%s.yaml", getModelFromRuntimeRef(runtimeRefName), suffix)
+}
+
+func getModelFromRuntimeRef(runtimeRefName string) string {
+	fields := strings.Split(runtimeRefName, "-")
+	if len(fields) != 3 {
+		return ""
+	}
+
+	return fmt.Sprintf("%s/%s", strings.ReplaceAll(fields[1], ".", "_"), strings.ToUpper(fields[2]))
 }

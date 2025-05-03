@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
@@ -125,7 +126,12 @@ func (j *JobSet) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	}
 	return []runtime.ReconcilerBuilder{
 		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
-			return b.Owns(&jobsetv1alpha2.JobSet{})
+			return b.Watches(
+				&jobsetv1alpha2.JobSet{},
+				handler.EnqueueRequestForOwner(
+					j.client.Scheme(), j.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
+				),
+			)
 		},
 	}
 }

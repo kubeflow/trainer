@@ -140,10 +140,10 @@ GOLANGCI_LINT=$(shell which golangci-lint)
 .PHONY: golangci-lint
 golangci-lint: ## Run golangci-lint to verify Go files.
 ifeq ($(GOLANGCI_LINT),)
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.61.0
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.64.8
 	$(info golangci-lint has been installed)
 endif
-	golangci-lint run --timeout 5m --go 1.23 ./...
+	golangci-lint run --timeout 5m --go 1.24 ./...
 
 # Instructions to run tests.
 .PHONY: test

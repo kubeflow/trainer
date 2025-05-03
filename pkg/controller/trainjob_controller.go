@@ -20,8 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
+	"slices"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,41 +35,63 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/constants"
 	jobruntimes "github.com/kubeflow/trainer/pkg/runtime"
 )
 
-type objsOpState int
-
-const (
-	creationSucceeded objsOpState = iota
-	buildFailed       objsOpState = iota
-	creationFailed    objsOpState = iota
-	updateFailed      objsOpState = iota
-)
+type TrainJobWatcher interface {
+	NotifyTrainJobUpdate(oldJob, newJob *trainer.TrainJob)
+}
 
 type TrainJobReconciler struct {
 	log      logr.Logger
 	client   client.Client
 	recorder record.EventRecorder
 	runtimes map[string]jobruntimes.Runtime
+	watchers iter.Seq[TrainJobWatcher]
 }
 
-func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, runtimes map[string]jobruntimes.Runtime) *TrainJobReconciler {
+type TrainJobReconcilerOptions struct {
+	Watchers iter.Seq[TrainJobWatcher]
+}
+
+type TrainJobReconcilerOption func(*TrainJobReconcilerOptions)
+
+func WithWatchers(watchers ...TrainJobWatcher) TrainJobReconcilerOption {
+	return func(o *TrainJobReconcilerOptions) {
+		o.Watchers = slices.Values(watchers)
+	}
+}
+
+var _ reconcile.Reconciler = (*TrainJobReconciler)(nil)
+var _ predicate.TypedPredicate[*trainer.TrainJob] = (*TrainJobReconciler)(nil)
+
+func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, runtimes map[string]jobruntimes.Runtime, opts ...TrainJobReconcilerOption) *TrainJobReconciler {
+	options := &TrainJobReconcilerOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
 	return &TrainJobReconciler{
 		log:      ctrl.Log.WithName("trainjob-controller"),
 		client:   client,
 		recorder: recorder,
 		runtimes: runtimes,
+		watchers: options.Watchers,
 	}
 }
 
-// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=create;get;list;watch;update;patch;delete
+// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/finalizers,verbs=get;update;patch
 
@@ -83,31 +108,51 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
+	var err error
+	// Keep track of the origin TrainJob status
+	originStatus := trainJob.Status.DeepCopy()
+
+	// Let's clear the failed condition that could have been set previously.
+	// An external change to the TrainJob spec may transition it out of the Failed state.
+	removeFailedCondition(&trainJob)
+
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := r.runtimes[runtimeRefGK]
 	if !ok {
-		return ctrl.Result{}, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
+		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
+		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
+	} else {
+		err = r.reconcileObjects(ctx, runtime, &trainJob)
+		if err != nil {
+			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
+			//  the creation of the runtime resources failed and the TrainJob is backed off until
+			//  the next retry attempt.
+			// The event message is truncated to stay within the maximum length limit (1024 chars).
+			message := fmt.Sprintf("TrainJob resources reconciliation failed: %.950v", err.Error())
+			if len(err.Error()) > 950 {
+				message = fmt.Sprintf("%s ...", message)
+			}
+			r.recorder.Event(&trainJob, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", message)
+		}
 	}
-	opState, err := r.reconcileObjects(ctx, runtime, &trainJob)
 
-	originStatus := trainJob.Status.DeepCopy()
 	setSuspendedCondition(&trainJob)
-	setCreatedCondition(&trainJob, opState)
 	if terminalCondErr := setTerminalCondition(ctx, runtime, &trainJob); terminalCondErr != nil {
 		err = errors.Join(err, terminalCondErr)
 	}
+
 	if !equality.Semantic.DeepEqual(&trainJob.Status, originStatus) {
 		return ctrl.Result{}, errors.Join(err, r.client.Status().Update(ctx, &trainJob))
 	}
 	return ctrl.Result{}, err
 }
 
-func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) (objsOpState, error) {
+func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
 	log := ctrl.LoggerFrom(ctx)
 
 	objects, err := runtime.NewObjects(ctx, trainJob)
 	if err != nil {
-		return buildFailed, err
+		return err
 	}
 	for _, object := range objects {
 		// TODO (astefanutti): Remove conversion to unstructured when the runtime.ApplyConfiguration
@@ -115,22 +160,22 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 		// client. See https://github.com/kubernetes/kubernetes/pull/129313
 		var obj client.Object
 		if o, ok := object.(client.Object); ok {
-			return buildFailed, fmt.Errorf("unsupported type client.Object for component: %v", o)
+			return fmt.Errorf("unsupported type client.Object for component: %v", o)
 		}
 
 		u, err := apiruntime.DefaultUnstructuredConverter.ToUnstructured(object)
 		if err != nil {
-			return buildFailed, err
+			return err
 		}
 		obj = &unstructured.Unstructured{Object: u}
 
 		if err := r.client.Patch(ctx, obj, client.Apply, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
-			return buildFailed, err
+			return err
 		}
 
 		var gvk schema.GroupVersionKind
 		if gvk, err = apiutil.GVKForObject(obj.DeepCopyObject(), r.client.Scheme()); err != nil {
-			return buildFailed, err
+			return err
 		}
 		logKeysAndValues := []any{
 			"groupVersionKind", gvk.String(),
@@ -140,38 +185,36 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 
 		log.V(5).Info("Succeeded to update object", logKeysAndValues...)
 	}
-	return creationSucceeded, nil
+	return nil
 }
 
-func setCreatedCondition(trainJob *trainer.TrainJob, opState objsOpState) {
-	var newCond metav1.Condition
-	switch opState {
-	case creationSucceeded:
-		newCond = metav1.Condition{
-			Type:    trainer.TrainJobCreated,
-			Status:  metav1.ConditionTrue,
-			Message: constants.TrainJobJobsCreationSucceededMessage,
-			Reason:  trainer.TrainJobJobsCreationSucceededReason,
-		}
-	case buildFailed:
-		newCond = metav1.Condition{
-			Type:    trainer.TrainJobCreated,
-			Status:  metav1.ConditionFalse,
-			Message: constants.TrainJobJobsBuildFailedMessage,
-			Reason:  trainer.TrainJobJobsBuildFailedReason,
-		}
-	// TODO (tenzen-y): Provide more granular message based on creation or update failure.
-	case creationFailed, updateFailed:
-		newCond = metav1.Condition{
-			Type:    trainer.TrainJobCreated,
-			Status:  metav1.ConditionFalse,
-			Message: constants.TrainJobJobsCreationFailedMessage,
-			Reason:  trainer.TrainJobJobsCreationFailedReason,
-		}
-	default:
-		return
+func (r *TrainJobReconciler) Create(e event.TypedCreateEvent[*trainer.TrainJob]) bool {
+	r.log.WithValues("trainJob", klog.KObj(e.Object)).Info("TrainJob create event")
+	defer r.notifyWatchers(nil, e.Object)
+	return true
+}
+
+func (r *TrainJobReconciler) Delete(e event.TypedDeleteEvent[*trainer.TrainJob]) bool {
+	r.log.WithValues("trainJob", klog.KObj(e.Object)).Info("TrainJob delete event")
+	defer r.notifyWatchers(e.Object, nil)
+	return true
+}
+
+func (r *TrainJobReconciler) Update(e event.TypedUpdateEvent[*trainer.TrainJob]) bool {
+	r.log.WithValues("trainJob", klog.KObj(e.ObjectNew)).Info("TrainJob update event")
+	defer r.notifyWatchers(e.ObjectOld, e.ObjectNew)
+	return true
+}
+
+func (r *TrainJobReconciler) Generic(e event.TypedGenericEvent[*trainer.TrainJob]) bool {
+	r.log.WithValues("trainJob", klog.KObj(e.Object)).Info("TrainJob generic event")
+	return true
+}
+
+func (r *TrainJobReconciler) notifyWatchers(oldJob, newJob *trainer.TrainJob) {
+	for w := range r.watchers {
+		w.NotifyTrainJobUpdate(oldJob, newJob)
 	}
-	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
 }
 
 func setSuspendedCondition(trainJob *trainer.TrainJob) {
@@ -197,6 +240,20 @@ func setSuspendedCondition(trainJob *trainer.TrainJob) {
 	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
 }
 
+func setFailedCondition(trainJob *trainer.TrainJob, message, reason string) {
+	newCond := metav1.Condition{
+		Type:    trainer.TrainJobFailed,
+		Status:  metav1.ConditionTrue,
+		Message: message,
+		Reason:  reason,
+	}
+	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
+}
+
+func removeFailedCondition(trainJob *trainer.TrainJob) {
+	meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobFailed)
+}
+
 func setTerminalCondition(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
 	terminalCond, err := runtime.TerminalCondition(ctx, trainJob)
 	if err != nil {
@@ -214,9 +271,15 @@ func isTrainJobFinished(trainJob *trainer.TrainJob) bool {
 }
 
 func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
-	b := ctrl.NewControllerManagedBy(mgr).
+	b := builder.TypedControllerManagedBy[reconcile.Request](mgr).
+		Named("trainjob_controller").
 		WithOptions(options).
-		For(&trainer.TrainJob{})
+		WatchesRawSource(source.TypedKind(
+			mgr.GetCache(),
+			&trainer.TrainJob{},
+			&handler.TypedEnqueueRequestForObject[*trainer.TrainJob]{},
+			r,
+		))
 	for _, runtime := range r.runtimes {
 		for _, registrar := range runtime.EventHandlerRegistrars() {
 			if registrar != nil {

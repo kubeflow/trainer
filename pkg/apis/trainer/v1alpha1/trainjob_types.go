@@ -58,32 +58,20 @@ const (
 
 	// TrainJobFailed means that the actual jobs have failed its execution.
 	TrainJobFailed string = "Failed"
-
-	// TrainJobCreated means that the actual jobs creation has succeeded.
-	TrainJobCreated string = "Created"
 )
 
 const (
-	// TrainJobSuspendedReason is the "Suspended" condition reason.
-	// When the TrainJob is suspended, this is added.
+	// TrainJobSuspendedReason is the "Suspended" condition reason
+	// when the TrainJob is suspended.
 	TrainJobSuspendedReason string = "Suspended"
 
-	// TrainJobResumedReason is the "Suspended" condition reason.
-	// When the TrainJob suspension is changed from True to False, this is added.
+	// TrainJobResumedReason is the "Suspended" condition reason
+	// when the TrainJob suspension is changed from True to False.
 	TrainJobResumedReason string = "Resumed"
 
-	// TrainJobJobsCreationSucceededReason is the "Created" condition reason.
-	// When the creating objects succeeded after building succeeded, this is added.
-	TrainJobJobsCreationSucceededReason string = "JobsCreationSucceeded"
-
-	// TrainJobJobsBuildFailedReason is the "Created" condition reason.
-	// When the building objects based on the TrainJob and the specified runtime failed,
-	// this is added.
-	TrainJobJobsBuildFailedReason string = "JobsBuildFailed"
-
-	// TrainJobJobsCreationFailedReason is the "Created" condition reason.
-	// When the creating objects failed even though building succeeded, this is added.
-	TrainJobJobsCreationFailedReason string = "JobsCreationFailed"
+	// TrainJobRuntimeNotSupportedReason is the "Failed" condition reason
+	// when the referenced TrainingRuntime is not supported.
+	TrainJobRuntimeNotSupportedReason string = "TrainingRuntimeNotSupported"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
