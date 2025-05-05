@@ -25,6 +25,7 @@ from kubernetes.client import (
     V1Volume,
     V1VolumeMount,
 )
+from kubernetes.client.rest import ApiException
 
 TEST_NAME = "test"
 TEST_IMAGE = "docker.io/test-training"
@@ -68,10 +69,22 @@ def serialize_k8s_object(obj):
 
 
 def get_namespaced_custom_object_response(*args, **kwargs):
-    if args[2] == TIMEOUT:
-        raise multiprocessing.TimeoutError()
-    elif args[2] == RUNTIME:
-        raise RuntimeError()
+    # Handle both positional and keyword arguments
+    group = args[0] if len(args) > 0 else kwargs.get("group")
+    version = args[1] if len(args) > 1 else kwargs.get("version")
+    plural = args[2] if len(args) > 2 else kwargs.get("plural")
+    namespace = args[3] if len(args) > 3 else kwargs.get("namespace")
+    name = args[4] if len(args) > 4 else kwargs.get("name")
+
+    if name == "non-existent-queue":
+        raise ApiException(status=404, reason="Not Found")
+    if group == "kueue.x-k8s.io" and version == "v1beta1" and plural == "localqueues":
+        mock_thread = Mock()
+        mock_thread.get.return_value = {
+            "metadata": {"name": name, "namespace": namespace},
+            "spec": {},
+        }
+        return mock_thread
 
     # Create a serialized Job
     serialized_job = serialize_k8s_object(generate_job_with_status(create_job()))
@@ -609,6 +622,69 @@ test_data_create_job = [
             labels=None,
             annotations={"purpose": "unit-test", "env": "test"},
         ),
+    ),
+    (
+        "valid flow with local_queue and matching label",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "local_queue": "test-queue",
+            "labels": {constants.LOCAL_QUEUE_LABEL: "test-queue"},
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            labels={constants.LOCAL_QUEUE_LABEL: "test-queue"},
+        ),
+    ),
+    (
+        "valid flow with local_queue and non-matching label",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "local_queue": "test-queue",
+            "labels": {constants.LOCAL_QUEUE_LABEL: "different-queue"},
+        },
+        ValueError,
+        create_job(
+            num_workers=1,
+            labels={constants.LOCAL_QUEUE_LABEL: "test-queue"},
+        ),
+    ),
+    (
+        "valid flow with local_queue and existing labels",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "local_queue": "test-queue",
+            "labels": {"existing-label": "value"},
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            labels={
+                "existing-label": "value",
+                constants.LOCAL_QUEUE_LABEL: "test-queue",
+            },
+        ),
+    ),
+    (
+        "invalid flow with non-existent local_queue",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "local_queue": "non-existent-queue",
+        },
+        ValueError,
+        None,
     ),
 ]
 
@@ -1532,14 +1608,16 @@ def test_create_job(training_client, test_name, kwargs, expected_output, expecte
     """
     print("Executing test:", test_name)
     try:
+
         training_client.create_job(**kwargs)
 
         assert expected_output == SUCCESS
 
+        # Verify create_namespaced_custom_object was called with correct parameters
         training_client.custom_api.create_namespaced_custom_object.assert_called_with(
             constants.GROUP,
             constants.VERSION,
-            kwargs["namespace"],
+            kwargs.get("namespace", constants.DEFAULT_NAMESPACE),
             constants.JOB_PARAMETERS[constants.PYTORCHJOB_KIND]["plural"],
             expected_job,
         )
