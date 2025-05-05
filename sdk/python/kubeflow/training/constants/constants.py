@@ -65,6 +65,9 @@ JOB_ROLE_MASTER = "master"
 REPLICA_TYPE_LABEL = "training.kubeflow.org/replica-type"
 REPLICA_INDEX_LABEL = "training.kubeflow.org/replica-index"
 
+# Queue Label Name
+LOCAL_QUEUE_LABEL = "kueue.x-k8s.io/queue-name"
+
 # Various replica types.
 REPLICA_TYPE_CHIEF = "Chief"
 REPLICA_TYPE_PS = "PS"

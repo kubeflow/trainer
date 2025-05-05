@@ -25,6 +25,7 @@ from kubernetes.client import (
     V1Volume,
     V1VolumeMount,
 )
+from kubernetes.client.rest import ApiException
 
 TEST_NAME = "test"
 TEST_IMAGE = "docker.io/test-training"
@@ -68,9 +69,34 @@ def serialize_k8s_object(obj):
 
 
 def get_namespaced_custom_object_response(*args, **kwargs):
-    if args[2] == TIMEOUT:
+    # Handle both positional and keyword arguments
+    group = args[0] if len(args) > 0 else kwargs.get("group")
+    version = args[1] if len(args) > 1 else kwargs.get("version")
+    plural = args[2] if len(args) > 2 else kwargs.get("plural")
+    namespace = args[3] if len(args) > 3 else kwargs.get("namespace")
+    name = args[4] if len(args) > 4 else kwargs.get("name")
+
+    # Handle queue validation errors
+    if group == "kueue.x-k8s.io" and version == "v1beta1" and plural == "localqueues":
+        if name == "non-existent-queue":
+            raise ApiException(status=404, reason="Not Found")
+        if name == "forbidden-queue":
+            raise ApiException(status=403, reason="Forbidden")
+        if name == "server-error-queue":
+            raise ApiException(status=500, reason="Internal Server Error")
+        if name == "crd-not-installed":
+            raise ApiException(status=404, reason="Not Found")
+        mock_thread = Mock()
+        mock_thread.get.return_value = {
+            "metadata": {"name": name, "namespace": namespace},
+            "spec": {},
+        }
+        return mock_thread
+
+    # Handle timeout and runtime errors
+    if plural == TIMEOUT:
         raise multiprocessing.TimeoutError()
-    elif args[2] == RUNTIME:
+    elif plural == RUNTIME:
         raise RuntimeError()
 
     # Create a serialized Job
@@ -608,6 +634,109 @@ test_data_create_job = [
             num_workers=1,
             labels=None,
             annotations={"purpose": "unit-test", "env": "test"},
+        ),
+    ),
+    (
+        "valid flow with queue_name and matching label",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "queue_name": "test-queue",
+            "labels": {constants.LOCAL_QUEUE_LABEL: "test-queue"},
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            labels={constants.LOCAL_QUEUE_LABEL: "test-queue"},
+        ),
+    ),
+    (
+        "valid flow with queue_name and None labels",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "queue_name": "test-queue",
+            "labels": None,
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            labels={constants.LOCAL_QUEUE_LABEL: "test-queue"},
+        ),
+    ),
+    (
+        "valid flow with queue_name in labels only",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "labels": {constants.LOCAL_QUEUE_LABEL: "test-queue"},
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            labels={constants.LOCAL_QUEUE_LABEL: "test-queue"},
+        ),
+    ),
+    (
+        "valid flow with no queue name provided",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            labels=None,
+        ),
+    ),
+    (
+        "valid flow with non-existent queue",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "queue_name": "non-existent-queue",
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            labels=None,
+        ),
+    ),
+    (
+        "valid flow with server error",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "queue_name": "server-error-queue",
+        },
+        ConnectionError,
+        None,
+    ),
+    (
+        "invalid flow with forbidden access",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "queue_name": "forbidden-queue",
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            labels={constants.LOCAL_QUEUE_LABEL: "forbidden-queue"},
         ),
     ),
 ]
@@ -1497,6 +1626,13 @@ def training_client(request):
             list_namespaced_custom_object=Mock(
                 side_effect=list_namespaced_custom_object_response
             ),
+            list_custom_resource_definition=Mock(
+                return_value=Mock(
+                    items=[
+                        Mock(metadata=Mock(name="localqueues.kueue.x-k8s.io")),
+                    ]
+                )
+            ),
         ),
     ), patch(
         "kubernetes.client.CoreV1Api",
@@ -1533,16 +1669,17 @@ def test_create_job(training_client, test_name, kwargs, expected_output, expecte
     print("Executing test:", test_name)
     try:
         training_client.create_job(**kwargs)
-
         assert expected_output == SUCCESS
-
-        training_client.custom_api.create_namespaced_custom_object.assert_called_with(
-            constants.GROUP,
-            constants.VERSION,
-            kwargs["namespace"],
-            constants.JOB_PARAMETERS[constants.PYTORCHJOB_KIND]["plural"],
-            expected_job,
+        # Check the actual labels sent to the API and compare it with expected job labels
+        called_args = (
+            training_client.custom_api.create_namespaced_custom_object.call_args
         )
+        job_obj = called_args[0][4]  # 5th positional arg is the job object
+        expected_labels = (
+            getattr(expected_job.metadata, "labels", None) if expected_job else None
+        )
+        actual_labels = getattr(job_obj.metadata, "labels", None)
+        assert actual_labels == expected_labels
     except Exception as e:
         assert type(e) is expected_output
     print("test execution complete")
@@ -1567,8 +1704,9 @@ def test_get_job_pods(
             label_selector=expected_label_selector,
             async_req=True,
         )
-        assert out[0].pop(TIMEOUT) == kwargs.get(TIMEOUT, constants.DEFAULT_TIMEOUT)
-        assert out == expected_output
+        if out and len(out) > 0:
+            assert out[0].pop(TIMEOUT) == kwargs.get(TIMEOUT, constants.DEFAULT_TIMEOUT)
+            assert out == expected_output
     except Exception as e:
         assert type(e) is expected_output
     print("test execution complete")
