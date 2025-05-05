@@ -28,6 +28,7 @@ from kubeflow.training.api_client import ApiClient
 from kubeflow.training.constants import constants
 from kubeflow.training.utils import utils
 from kubernetes import client, config, watch
+from kubernetes.client.rest import ApiException
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,7 @@ class TrainingClient(object):
             "storage_class": None,
             "access_modes": constants.PVC_DEFAULT_ACCESS_MODES,
         },
+        local_queue: Optional[str] = None,
     ):
         """High level API to fine-tune LLMs with distributed PyTorchJob. Follow this guide
         for more information about this feature: TODO (andreyvelich): Add link.
@@ -192,6 +194,9 @@ class TrainingClient(object):
                 https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1EnvFromSource.md)
             storage_config: Configuration for Storage Initializer PVC to download pre-trained model
                 and dataset. You can configure PVC size and storage class name in this argument.
+            local_queue: Local queue name for the job. If provided, it will automatically
+                add a Kueue queue label to the job and validate that the specified queue exists
+                in the cluster. If the queue doesn't exist, a ValueError will be raised.
         """
         try:
             import peft  # noqa: F401
@@ -341,6 +346,60 @@ class TrainingClient(object):
             num_procs_per_worker=num_procs_per_worker,
         )
 
+        # Handle Kueue queue label and validation
+        queue_label = constants.LOCAL_QUEUE_LABEL
+        queue_name = None
+        if labels is not None and queue_label in labels:
+            queue_name = labels[queue_label]
+        if local_queue is not None:
+            if queue_name is not None and queue_name != local_queue:
+                raise ValueError(
+                    f"Conflicting Kueue queue label: labels specify '{queue_name}',"
+                    f"local_queue specifies '{local_queue}'."
+                )
+            queue_name = local_queue
+            if labels is None:
+                labels = {}
+            labels[queue_label] = local_queue
+            logger.info(
+                f"Added Kueue queue label '{queue_label}={local_queue}' to job labels"
+            )
+        if queue_name is not None:
+            # Validate queue existence
+            try:
+                self.custom_api.get_namespaced_custom_object(
+                    group="kueue.x-k8s.io",
+                    namespace=namespace,
+                    plural="localqueues",
+                    version="v1beta1",
+                    name=queue_name,
+                )
+                logger.debug(
+                    f"Kueue queue '{queue_name}' exists in namespace '{namespace}'"
+                )
+            except ApiException as e:
+                if e.status == 404:
+                    raise ValueError(
+                        f"Kueue queue '{queue_name}' not found in namespace "
+                        f"'{namespace}'"
+                    )
+                elif e.status == 403:
+                    raise ValueError(
+                        f"Permission denied when accessing Kueue queue '{queue_name}' in namespace "
+                        f"'{namespace}'. Check your Kubernetes RBAC permissions."
+                    )
+                else:
+                    raise RuntimeError(
+                        f"Failed to validate Kueue queue '{queue_name}' in namespace "
+                        f"'{namespace}': {e}"
+                    )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Unexpected error while validating Kueue queue '{queue_name}' in namespace "
+                    f"'{namespace}': {e}"
+                )
+            job.metadata.labels = labels
+
         self.create_job(job, namespace=namespace)
 
     def create_job(
@@ -364,6 +423,7 @@ class TrainingClient(object):
         env_vars: Optional[
             Union[Dict[str, str], List[Union[models.V1EnvVar, models.V1EnvVar]]]
         ] = None,
+        local_queue: Optional[str] = None,
         volumes: Optional[List[models.V1Volume]] = None,
         volume_mounts: Optional[List[models.V1VolumeMount]] = None,
     ):
@@ -436,6 +496,9 @@ class TrainingClient(object):
                 https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1EnvFromSource.md)
             volumes: Volume(s) to be attached to the replicas.
             volume_mounts: VolumeMount(s) specifying where to mount the volume(s) into the replicas.
+            local_queue: Local queue name for the job. If provided, it will automatically
+                add a Kueue queue label to the job and validate that the specified queue exists
+                in the cluster. If the queue doesn't exist, a ValueError will be raised.
 
         Raises:
             ValueError: Invalid input parameters.
@@ -461,7 +524,7 @@ class TrainingClient(object):
                 ):
                     raise ValueError(
                         "If `job` is set only `namespace`, `labels`, and `annotations` "
-                        "arguments are allowed. "
+                        f"arguments are allowed. "
                         f"Argument `{key}` must be None."
                     )
 
@@ -584,6 +647,60 @@ class TrainingClient(object):
             raise ValueError(
                 f"Job must be one of these types: {constants.JOB_MODELS}, but Job is: {type(job)}"
             )
+
+        # Handle Kueue queue label and validation
+        queue_label = constants.LOCAL_QUEUE_LABEL
+        queue_name = None
+        if labels is not None and queue_label in labels:
+            queue_name = labels[queue_label]
+        if local_queue is not None:
+            if queue_name is not None and queue_name != local_queue:
+                raise ValueError(
+                    f"Conflicting Kueue queue label: labels specify '{queue_name}', "
+                    f"local_queue specifies '{local_queue}'."
+                )
+            queue_name = local_queue
+            if labels is None:
+                labels = {}
+            labels[queue_label] = local_queue
+            logger.info(
+                f"Added Kueue queue label '{queue_label}={local_queue}' to job labels"
+            )
+        if queue_name is not None:
+            # Validate queue existence
+            try:
+                self.custom_api.get_namespaced_custom_object(
+                    group="kueue.x-k8s.io",
+                    namespace=namespace,
+                    plural="localqueues",
+                    version="v1beta1",
+                    name=queue_name,
+                )
+                logger.debug(
+                    f"Kueue queue '{queue_name}' exists in namespace '{namespace}'"
+                )
+            except ApiException as e:
+                if e.status == 404:
+                    raise ValueError(
+                        f"Kueue queue '{queue_name}' not found in namespace "
+                        f"'{namespace}'"
+                    )
+                elif e.status == 403:
+                    raise ValueError(
+                        f"Permission denied when accessing Kueue queue '{queue_name}' in namespace "
+                        f"'{namespace}'. Check your Kubernetes RBAC permissions."
+                    )
+                else:
+                    raise RuntimeError(
+                        f"Failed to validate Kueue queue '{queue_name}' in namespace "
+                        f"'{namespace}': {e}"
+                    )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Unexpected error while validating Kueue queue '{queue_name}' in namespace "
+                    f"'{namespace}': {e}"
+                )
+            job.metadata.labels = labels
 
         # Create the Training Job.
         try:
@@ -1342,7 +1459,7 @@ class TrainingClient(object):
                         raise RuntimeError(
                             f"Failed to read logs for pod {namespace}/{pod.metadata.name}"
                         )
-        # If verbose is set, return Kubernetes events for Job and pods.
+        # If verbose is set, return Kubernetes events for Job and corresponding pods.
         if verbose:
             job = self.get_job(name=name, namespace=namespace)
             events = self.core_api.list_namespaced_event(namespace=namespace)
