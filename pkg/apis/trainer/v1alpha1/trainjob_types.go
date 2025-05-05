@@ -240,7 +240,7 @@ type PodSpecOverride struct {
 	// Override for the service account.
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 
-	// Override for the node selector to place Pod on the specific mode.
+	// Override for the node selector to place Pod on the specific node.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// Override for the Pod's tolerations.
