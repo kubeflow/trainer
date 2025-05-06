@@ -518,7 +518,8 @@ volumes:
 @datasetclass
 class InstructDataset:
     source: Optional[str] = None
-    data_files: Optional[str] = None
+    data_dir: Optional[str] = None
+    data_files: Optional[List[str]] = None
     split: Optional[str] = None
     train_on_input: Optional[bool] = None
     new_system_prompt: Optional[str] = None
@@ -532,7 +533,8 @@ class InstructDataset:
 @datasetclass
 class ChatDataset:
     source: Optional[str] = None
-    data_files: Optional[str] = None
+    data_dir: Optional[str] = None
+    data_files: Optional[List[str]] = None
     split: Optional[str] = None
     conversation_column: Optional[str] = None
     conversation_style: Optional[str] = None
@@ -547,7 +549,8 @@ class ChatDataset:
 @datasetclass
 class MultimodalDataset:
     source: Optional[str] = None
-    data_files: Optional[str] = None
+    data_dir: Optional[str] = None
+    data_files: Optional[List[str]] = None
     split: Optional[str] = None
     column_map: Optional[Dict[str, str]] = None
     image_dir: Optional[str] = None
