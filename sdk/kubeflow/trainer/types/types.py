@@ -61,6 +61,57 @@ class DataType(Enum):
     FP32 = "fp32"
 
 
+# Data file type for the TorchTune LLM Trainer.
+class DataFileType(Enum):
+    """Data file type for the TorchTune LLM Trainer."""
+
+    JSON = "json"
+    CSV = "csv"
+    PARQUET = "parquet"
+    ARROW = "arrow"
+    TEXT = "text"
+    XML = "xml"
+
+
+# Configuration for the TorchTune Instruct dataset.
+@dataclass
+class InstructDataset:
+    """
+    Configuration for the custom dataset with user instruction prompts and model responses.
+    REF: https://pytorch.org/torchtune/main/generated/torchtune.datasets.instruct_dataset.html
+
+    Args:
+        source (`Optional[DataFileType]`): Data file type.
+        data_dir (`Optional[str]`):
+            The path to the data directory. For HF dataset, the value should be `<repo>/<dir_path>`.
+            The behavior is equal to passing all data files under `data_dir` to `data_files`.
+            all the files in a directory. But if `data_files` is specified, `data_dir` is ignored.
+        data_files (`Optional[List[str]]`):
+            The path to the data files. For HF dataset, the value should be `<repo>/<file_path>`.
+        split (`Optional[str]`):
+            The split of the dataset to use.  You can use this argument to load a subset of
+            a given split, e.g. split="train[:10%]". Default is `train`.
+        train_on_input (`Optional[bool]`):
+            Whether the model is trained on the user prompt or not. Default is False.
+        new_system_prompt (`Optional[str]`):
+            The new system prompt to use. If specified, prepend a system message.
+            This can serve as instructions to guide the model response. Default is None.
+        column_map (`Optional[Dict[str, str]]`):
+            A mapping to change the expected "input" and "output" column names to the actual
+            column names in the dataset. Keys should be "input" and "output" and values should
+            be the actual column names. Default is None, keeping the default "input" and
+            "output" column names.
+    """
+
+    source: Optional[DataFileType] = None
+    data_dir: Optional[str] = None
+    data_files: Optional[List[str]] = None
+    split: Optional[str] = None
+    train_on_input: Optional[bool] = None
+    new_system_prompt: Optional[str] = None
+    column_map: Optional[Dict[str, str]] = None
+
+
 # Configuration for the TorchTune LLM Trainer.
 @dataclass
 class TorchTuneConfig:
@@ -78,6 +129,8 @@ class TorchTuneConfig:
         loss (`Optional[Loss]`): The loss algorithm we use to fine-tune the LLM,
             e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss`.
         num_nodes (`Optional[int]`): The number of nodes to use for training.
+        dataset_preprocess_config (`Optional[InstructDataset]`):
+            Configuration for the dataset preprocessing.
         resources_per_node (`Optional[Dict]`): The computing resources to allocate per node.
     """
 
@@ -86,6 +139,7 @@ class TorchTuneConfig:
     epochs: Optional[int] = None
     loss: Optional[Loss] = None
     num_nodes: Optional[int] = None
+    dataset_preprocess_config: Optional[InstructDataset] = None
     resources_per_node: Optional[Dict] = None
 
 
