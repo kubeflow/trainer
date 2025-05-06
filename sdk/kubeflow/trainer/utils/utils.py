@@ -352,6 +352,11 @@ def get_args_using_torchtune_config(
     if fine_tuning_config.loss:
         args.append(f"loss={fine_tuning_config.loss}")
 
+    if fine_tuning_config.dataset_preprocess_config:
+        args += get_args_in_dataset_preprocess_config(
+            fine_tuning_config.dataset_preprocess_config
+        )
+
     return constants.DEFAULT_TORCHTUNE_COMMAND, args
 
 
@@ -507,3 +512,57 @@ def get_log_queue_pool(log_streams: List[Any]) -> List[queue.Queue]:
         pool.append(q)
         threading.Thread(target=wrap_log_stream, args=(q, log_stream)).start()
     return pool
+
+
+def get_args_in_dataset_preprocess_config(
+    dataset_preprocess_config: types.InstructDataset,
+) -> List[str]:
+    """
+    Get the args from the given dataset preprocess config.
+    """
+    args = []
+
+    if not isinstance(dataset_preprocess_config, types.InstructDataset):
+        raise ValueError(
+            f"Invalid dataset preprocess config type: {type(dataset_preprocess_config)}."
+        )
+
+    # Override the dataset type field in the torchtune config.
+    args.append(f"dataset={constants.TORCHTUNE_INSTRUCT_DATASET}")
+
+    # Override the dataset source field if it is provided.
+    if dataset_preprocess_config.source:
+        if not isinstance(dataset_preprocess_config.source, types.DataFormat):
+            raise ValueError(
+                f"Invalid data format: {dataset_preprocess_config.source}."
+            )
+
+        args.append(f"dataset.source={dataset_preprocess_config.source}")
+
+    # Override the data dir or data files if it is provided.
+    if dataset_preprocess_config.data_files:
+        args.append(f"dataset.data_files={dataset_preprocess_config.data_files}")
+    elif dataset_preprocess_config.data_dir:
+        args.append(f"dataset.data_dir={dataset_preprocess_config.data_dir}")
+
+    # Override the split field if it is provided.
+    if dataset_preprocess_config.split:
+        args.append(f"dataset.split={dataset_preprocess_config.split}")
+
+    # Override the train_on_input field if it is provided.
+    if dataset_preprocess_config.train_on_input:
+        args.append(
+            f"dataset.train_on_input={dataset_preprocess_config.train_on_input}"
+        )
+
+    # Override the new_system_prompt field if it is provided.
+    if dataset_preprocess_config.new_system_prompt:
+        args.append(
+            f"dataset.new_system_prompt={dataset_preprocess_config.new_system_prompt}"
+        )
+
+    # Override the column_map field if it is provided.
+    if dataset_preprocess_config.column_map:
+        args.append(f"dataset.column_map={dataset_preprocess_config.column_map}")
+
+    return args

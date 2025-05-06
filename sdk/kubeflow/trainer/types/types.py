@@ -62,7 +62,7 @@ class DataType(Enum):
 
 
 # Data file type for the TorchTune LLM Trainer.
-class DataFileType(Enum):
+class DataFormat(Enum):
     """Data file type for the TorchTune LLM Trainer."""
 
     JSON = "json"
@@ -81,7 +81,7 @@ class InstructDataset:
     REF: https://pytorch.org/torchtune/main/generated/torchtune.datasets.instruct_dataset.html
 
     Args:
-        source (`Optional[DataFileType]`): Data file type.
+        source (`Optional[DataFormat]`): Data file type.
         data_dir (`Optional[str]`):
             The path to the data directory. For HF dataset, the value should be `<repo>/<dir_path>`.
             The behavior is equal to passing all data files under `data_dir` to `data_files`.
@@ -103,7 +103,7 @@ class InstructDataset:
             "output" column names.
     """
 
-    source: Optional[DataFileType] = None
+    source: Optional[DataFormat] = None
     data_dir: Optional[str] = None
     data_files: Optional[List[str]] = None
     split: Optional[str] = None
