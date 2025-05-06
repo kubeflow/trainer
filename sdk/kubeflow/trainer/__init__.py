@@ -27,11 +27,13 @@ from kubeflow.trainer.constants.constants import DATASET_PATH, MODEL_PATH
 from kubeflow.trainer.types.types import (
     BuiltinTrainer,
     CustomTrainer,
+    DataFormat,
     DataType,
     Framework,
     HuggingFaceDatasetInitializer,
     HuggingFaceModelInitializer,
     Initializer,
+    InstructDataset,
     Loss,
     Runtime,
     Trainer,
