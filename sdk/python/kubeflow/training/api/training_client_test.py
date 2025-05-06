@@ -171,7 +171,7 @@ def create_job(
         replicas=1,
         template=V1PodTemplateSpec(
             metadata=V1ObjectMeta(
-                annotations={constants.ISTIO_SIDECAR_INJECTION: "false"}
+                labels={constants.ISTIO_SIDECAR_INJECTION: "false"}
             ),
             spec=V1PodSpec(
                 containers=[container],
@@ -188,7 +188,7 @@ def create_job(
             replicas=num_workers - 1,
             template=V1PodTemplateSpec(
                 metadata=V1ObjectMeta(
-                    annotations={constants.ISTIO_SIDECAR_INJECTION: "false"}
+                    labels={constants.ISTIO_SIDECAR_INJECTION: "false"}
                 ),
                 spec=V1PodSpec(
                     containers=[container],

@@ -56,7 +56,7 @@ def test_sdk_e2e_with_gang_scheduling(job_namespace):
         restart_policy="OnFailure",
         template=V1PodTemplateSpec(
             metadata=V1ObjectMeta(
-                annotations={constants.ISTIO_SIDECAR_INJECTION: "false"}
+                labels={constants.ISTIO_SIDECAR_INJECTION: "false"}
             ),
             spec=V1PodSpec(
                 scheduler_name=utils.get_pod_spec_scheduler_name(GANG_SCHEDULER_NAME),
@@ -70,7 +70,7 @@ def test_sdk_e2e_with_gang_scheduling(job_namespace):
         restart_policy="OnFailure",
         template=V1PodTemplateSpec(
             metadata=V1ObjectMeta(
-                annotations={constants.ISTIO_SIDECAR_INJECTION: "false"}
+                labels={constants.ISTIO_SIDECAR_INJECTION: "false"}
             ),
             spec=V1PodSpec(
                 scheduler_name=utils.get_pod_spec_scheduler_name(GANG_SCHEDULER_NAME),
@@ -133,7 +133,7 @@ def test_sdk_e2e(job_namespace):
         restart_policy="OnFailure",
         template=V1PodTemplateSpec(
             metadata=V1ObjectMeta(
-                annotations={constants.ISTIO_SIDECAR_INJECTION: "false"}
+                labels={constants.ISTIO_SIDECAR_INJECTION: "false"}
             ),
             spec=V1PodSpec(containers=[container]),
         ),
@@ -144,7 +144,7 @@ def test_sdk_e2e(job_namespace):
         restart_policy="OnFailure",
         template=V1PodTemplateSpec(
             metadata=V1ObjectMeta(
-                annotations={constants.ISTIO_SIDECAR_INJECTION: "false"}
+                labels={constants.ISTIO_SIDECAR_INJECTION: "false"}
             ),
             spec=V1PodSpec(containers=[container]),
         ),
@@ -180,7 +180,7 @@ def test_sdk_e2e_managed_by(job_namespace):
         restart_policy="OnFailure",
         template=V1PodTemplateSpec(
             metadata=V1ObjectMeta(
-                annotations={constants.ISTIO_SIDECAR_INJECTION: "false"}
+                labels={constants.ISTIO_SIDECAR_INJECTION: "false"}
             ),
             spec=V1PodSpec(containers=[container]),
         ),
@@ -191,7 +191,7 @@ def test_sdk_e2e_managed_by(job_namespace):
         restart_policy="OnFailure",
         template=V1PodTemplateSpec(
             metadata=V1ObjectMeta(
-                annotations={constants.ISTIO_SIDECAR_INJECTION: "false"}
+                labels={constants.ISTIO_SIDECAR_INJECTION: "false"}
             ),
             spec=V1PodSpec(containers=[container]),
         ),
