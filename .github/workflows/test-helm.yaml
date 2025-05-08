@@ -1,0 +1,52 @@
+name: Unit and Integration Test - Helm
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  test:
+    name: Test
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine branch name
+        id: get_branch
+        run: |
+          BRANCH=""
+          if [ "${{ github.event_name }}" == "push" ]; then
+            BRANCH=${{ github.ref_name }}
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            BRANCH=${{ github.base_ref }}
+          fi
+          echo "Branch name: $BRANCH"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.7.0
+
+      - name: Run chart-testing (lint)
+        env:
+          BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
+        run: |
+          ct lint --check-version-increment=false --target-branch $BRANCH
+
+      - name: Run Helm unittest
+        run: |
+          make helm-unittest
+
+      - name: Create kind cluster
+        run: |
+          make test-e2e-setup-cluster
+
+      - name: Run chart-testing (install)
+        env:
+          BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
+        run: |
+          ct install --target-branch $BRANCH
