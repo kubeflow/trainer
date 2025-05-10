@@ -29,7 +29,7 @@ rules:
       - list
       - watch
   - apiGroups:
-      - kubeflow.org
+      - trainer.kubeflow.org
     resources:
       - trainjobs
     verbs:
