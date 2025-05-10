@@ -20,7 +20,7 @@ metadata:
     rbac.authorization.kubeflow.org/aggregate-to-kubeflow-trainer-admin: "true"
 rules:
   - apiGroups:
-      - kubeflow.org
+      - trainer.kubeflow.org
     resources:
       - clustertrainingruntimes
       - trainingruntimes
