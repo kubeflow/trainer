@@ -14,7 +14,7 @@ resources:
 
 # Update the Kubeflow Trainer controller manager & runtimes image tag.
 images:
-  - name: kubeflow/trainer-controller-manager
+  - name: ghcr.io/kubeflow/trainer/trainer-controller-manager
     newTag: latest
   - name: ghcr.io/kubeflow/trainer/deepspeed-runtime
     newTag: latest
