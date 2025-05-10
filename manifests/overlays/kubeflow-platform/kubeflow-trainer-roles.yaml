@@ -41,7 +41,7 @@ rules:
       - update
       - watch
   - apiGroups:
-      - kubeflow.org
+      - trainer.kubeflow.org
     resources:
       - trainjobs/status
     verbs:
