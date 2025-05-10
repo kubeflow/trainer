@@ -76,7 +76,7 @@ metadata:
     rbac.authorization.kubeflow.org/aggregate-to-kubeflow-view: "true"
 rules:
   - apiGroups:
-      - kubeflow.org
+      - trainer.kubeflow.org
     resources:
       - clustertrainingruntimes
       - trainingruntimes
