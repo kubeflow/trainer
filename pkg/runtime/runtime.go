@@ -134,7 +134,7 @@ func WithTemplateSpecObjApply(objApply any) InfoOption {
 }
 
 // WithPodSet construct Info.TemplateSpec.PodSet from PodSpec.
-// The third argument, 'typedPodSpec' is used only to calculate requested resources.
+// The forth argument, 'typedPodSpec' is used only to calculate requested resources.
 func WithPodSet(
 	psName string, ancestor *string, count int32, typedPodSpec corev1.PodSpec, podSpecApply *corev1ac.PodSpecApplyConfiguration,
 ) InfoOption {

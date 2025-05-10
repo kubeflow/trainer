@@ -23,7 +23,7 @@ set -o nounset
 SDK_VERSION="0.1.0"
 SDK_OUTPUT_PATH="sdk"
 
-OPENAPI_GENERATOR_VERSION="v7.11.0"
+OPENAPI_GENERATOR_VERSION="v7.13.0"
 TRAINER_ROOT="$(pwd)"
 SWAGGER_CODEGEN_CONF="hack/python-sdk/swagger_config.json"
 SWAGGER_CODEGEN_FILE="api/openapi-spec/swagger.json"

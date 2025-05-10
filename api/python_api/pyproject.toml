@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kubeflow_trainer_api"
+dynamic = ["version"]
+authors = [
+  { name = "The Kubeflow Authors", email = "kubeflow-discuss@googlegroups.com" },
+]
+license = { file = "../../LICENSE" }
+description = "Kubeflow Trainer API models for Kubernetes resources to interact with Kubeflow APIs."
+readme = "README.md"
+keywords = ["kubeflow", "trainer", "model training", "llm", "ai", "api"]
+classifiers = [
+  "Intended Audience :: Developers",
+  "Intended Audience :: Education",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = ["pydantic>=2.10.0"]
+
+[project.urls]
+Homepage = "https://github.com/kubeflow/trainer"
+Documentation = "https://www.kubeflow.org/docs/components/trainer/"
+Source = "https://github.com/kubeflow/trainer"
+
+[tool.hatch.build.targets.wheel]
+packages = ["kubeflow_trainer_api"]
+
+[tool.hatch.version]
+path = "kubeflow_trainer_api/__init__.py"

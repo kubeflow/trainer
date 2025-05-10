@@ -59,21 +59,21 @@ rules:
 - apiGroups:
   - trainer.kubeflow.org
   resources:
-  - trainjobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - trainer.kubeflow.org
-  resources:
+  - clustertrainingruntimes/finalizers
+  - trainingruntimes/finalizers
   - trainjobs/finalizers
   - trainjobs/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - trainer.kubeflow.org
+  resources:
+  - trainjobs
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch

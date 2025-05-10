@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         # Kubernetes versions for e2e tests on Kind cluster.
-        kubernetes-version: ["1.29.14", "1.30.0", "1.31.0"]
+        kubernetes-version: ["1.29.14", "1.30.0", "1.31.0", "1.32.3"]
 
     steps:
       - name: Check out code
@@ -56,6 +56,7 @@ jobs:
         run: |
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_mnist.ipynb TIMEOUT=900
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/question-answering/fine-tune-distilbert.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_fine-tune-distilbert.ipynb TIMEOUT=900
 
       # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
       - name: Upload Artifacts to GitHub

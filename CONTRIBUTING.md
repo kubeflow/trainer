@@ -5,7 +5,7 @@ For the Kubeflow Trainer documentation, please check [the official Kubeflow docu
 
 ## Requirements
 
-- [Go](https://golang.org/) (1.23 or later)
+- [Go](https://golang.org/) (1.24 or later)
 - [Docker](https://docs.docker.com/) (23 or later)
 - [Lima](https://github.com/lima-vm/lima?tab=readme-ov-file#adopters) (an alternative to DockerDesktop) (0.21.0 or later)
   - [Colima](https://github.com/abiosoft/colima) (Lima specifically for MacOS) (0.6.8 or later)
@@ -26,6 +26,7 @@ make generate
 ```
 
 You can see all available commands by running:
+
 ```sh
 make help
 ```
@@ -76,15 +77,16 @@ Run the end-to-end tests with:
 make test-e2e
 ```
 
-
 You can also run Jupyter notebook tests with Papermill:
 
 ```sh
 make test-e2e-notebook
 ```
+
 ## Best Practices
 
 ### Go Development
+
 When coding:
 
 Follow the [effective go](https://go.dev/doc/effective_go) guidelines.
@@ -99,7 +101,6 @@ On ubuntu the default go package appears to be gccgo-go which has problems. It's
 
 ## Code Style
 
-
 ### pre-commit
 
 Make sure to install [pre-commit](https://pre-commit.com/) (`pip install pre-commit`) and run `pre-commit install` from the root of the repository at least once before creating git commits.
@@ -108,11 +109,9 @@ The pre-commit hooks ensure code quality and consistency. They are executed in C
 
 Specific programmatically generated files listed in the `exclude` field in [.pre-commit-config.yaml](../../.pre-commit-config.yaml) are deliberately excluded from the hooks.
 
-
-
 ## Legacy Setup Instructions
 
-#### Manual Setup
+### Manual Setup
 
 Create a symbolic link inside your GOPATH to the location you checked out the code:
 
@@ -190,11 +189,13 @@ spec:
 ```
 
 Apply the job:
+
 ```sh
 kubectl apply -f pytorch-job.yaml
 ```
 
 Check the job status:
+
 ```sh
 kubectl get trainjobs
 kubectl describe trainjob pytorch-mnist-example

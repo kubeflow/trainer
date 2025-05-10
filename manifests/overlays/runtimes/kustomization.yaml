@@ -3,7 +3,7 @@ kind: Kustomization
 resources:
   - ../../base/runtimes
 
-# Update the Kubeflow Trainer runtimes image tag.
+# Update the Kubeflow LLM Trainer image tag.
 images:
   - name: ghcr.io/kubeflow/trainer/deepspeed-runtime
     newTag: latest

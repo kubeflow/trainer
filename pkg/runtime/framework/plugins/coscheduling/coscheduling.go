@@ -277,7 +277,12 @@ func (c *CoScheduling) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	}
 	return []runtime.ReconcilerBuilder{
 		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
-			return b.Owns(&schedulerpluginsv1alpha1.PodGroup{})
+			return b.Watches(
+				&schedulerpluginsv1alpha1.PodGroup{},
+				handler.EnqueueRequestForOwner(
+					c.client.Scheme(), c.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
+				),
+			)
 		},
 		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
 			return b.WatchesRawSource(source.TypedKind[*corev1.LimitRange, reconcile.Request](cache, &corev1.LimitRange{}, &PodGroupLimitRangeHandler{

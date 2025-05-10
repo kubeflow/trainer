@@ -1126,6 +1126,258 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
+		"multi-devices full fine-tuning with torchtune": {
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "torchtune-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(1).
+						NumProcPerNode(intstr.FromString("auto")).
+						Container(
+							"ghcr.io/kubeflow/trainer/torchtune-trainer",
+							[]string{"tune", "run"},
+							[]string{
+								"dtype=fp16",
+								"batch_size=32",
+								"epochs=10",
+								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+							},
+							corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("8"),
+								corev1.ResourceMemory: resource.MustParse("16Gi"),
+								"nvidia.com/gpu":      resource.MustParse("4"), // 4 GPUs per node
+							},
+						).
+						Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.2-1b",
+				).
+				Obj(),
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("auto"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+							},
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
+		"single-device full fine-tuning with torchtune": {
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "torchtune-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(1).
+						NumProcPerNode(intstr.FromInt(1)).
+						Container(
+							"ghcr.io/kubeflow/trainer/torchtune-trainer",
+							[]string{"tune", "run"},
+							[]string{
+								"dtype=fp16",
+								"batch_size=32",
+								"epochs=10",
+								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+							},
+							corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("8"),
+								corev1.ResourceMemory: resource.MustParse("16Gi"),
+								"nvidia.com/gpu":      resource.MustParse("1"), // 1 GPU per node
+							},
+						).
+						Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.2-1b",
+				).
+				Obj(),
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("1"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("1"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+							},
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
+		"multi-nodes full fine-tuning with torchtune": {
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "torchtune-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						NumProcPerNode(intstr.FromInt(8)).
+						Container(
+							"ghcr.io/kubeflow/trainer/torchtune-trainer",
+							[]string{"tune", "run"},
+							[]string{
+								"dtype=fp16",
+								"batch_size=32",
+								"epochs=10",
+								"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+							},
+							corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("8"),
+								corev1.ResourceMemory: resource.MustParse("16Gi"),
+								"nvidia.com/gpu":      resource.MustParse("8"), // 8 GPUs per node
+							},
+						).
+						Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.3-70b",
+				).
+				Obj(),
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](2),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("2"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("8"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+							},
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -1324,6 +1576,74 @@ func TestValidate(t *testing.T) {
 						torchEnvs.Insert(constants.TorchEnvNumProcPerNode)
 						return sets.List(torchEnvs)
 					}()),
+				),
+			},
+		},
+		"unsupported pretrained model": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(intstr.FromString("auto")).
+					NumNodes(int32(1)).
+					Container(
+						"ghcr.io/kubeflow/trainer/torchtune-trainer",
+						[]string{"tune", "run"},
+						nil, corev1.ResourceList{},
+					).
+					Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.1-70b",
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("runtimeRef").Child("name"),
+					"torchtune-llama3.1-70b",
+					fmt.Sprintf("must have a supported pretrained model, invalid model configured: %s", "llama3_1/70B"),
+				),
+			},
+		},
+		"multi-node mode is only enabled for Llama-3.3-70b": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(intstr.FromString("auto")).
+					NumNodes(int32(2)).
+					Container(
+						"ghcr.io/kubeflow/trainer/torchtune-trainer",
+						[]string{"tune", "run"},
+						nil, corev1.ResourceList{},
+					).
+					Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.2-7b",
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("numNodes"),
+					int32(2),
+					fmt.Sprintf("must be 1 for %v model", "llama3_2/7B"),
 				),
 			},
 		},

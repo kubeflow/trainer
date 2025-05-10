@@ -37,6 +37,9 @@ TRAINJOB_KIND = "TrainJob"
 # The plural for the TrainJob.
 TRAINJOB_PLURAL = "trainjobs"
 
+# The default status for the TrainJob.
+TRAINJOB_CREATED = "Created"
+
 # The label key to identify the relationship between TrainJob and Pod template in the runtime.
 # For example, what PodTemplate must be overridden by TrainJob's .spec.trainer APIs.
 TRAINJOB_ANCESTOR_LABEL = "trainer.kubeflow.org/trainjob-ancestor-step"

@@ -1,14 +1,23 @@
 name: Build and Publish Images
 
 on:
-  - push
-  - pull_request
+  push:
+    branches:
+      - master
+      - 'release-*'
+    tags:
+      - 'v*'
+  pull_request:
 
 jobs:
   build-and-publish:
     name: Build and Publish Images
+    if: github.repository == 'kubeflow/trainer'
     runs-on:
       labels: ubuntu-latest-16-cores
+
+    env:
+      SHOULD_PUBLISH: ${{ github.event_name == 'push' }}
 
     strategy:
       fail-fast: false
@@ -36,21 +45,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set publish condition
-        id: publish-condition
-        shell: bash
-        run: |
-          if [[ "${{ github.repository }}" == 'kubeflow/trainer' && \
-                ( "${{ github.ref }}" == 'refs/heads/master' || \
-                  "${{ github.ref }}" =~ ^refs/heads/release- || \
-                  "${{ github.ref }}" =~ ^refs/tags/v ) ]]; then
-            echo "should_publish=true" >> $GITHUB_OUTPUT
-          else
-            echo "should_publish=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: GHCR Login
-        if: steps.publish-condition.outputs.should_publish == 'true'
+        if: env.SHOULD_PUBLISH == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -58,7 +54,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker Hub Login
-        if: steps.publish-condition.outputs.should_publish == 'true'
+        if: env.SHOULD_PUBLISH == 'true'
         uses: docker/login-action@v3
         with:
           registry: docker.io
@@ -66,7 +62,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Publish Component ${{ matrix.component-name }}
-        if: steps.publish-condition.outputs.should_publish == 'true'
+        if: env.SHOULD_PUBLISH == 'true'
         id: publish
         uses: ./.github/workflows/template-publish-image
         with:
@@ -79,7 +75,7 @@ jobs:
           push: true
 
       - name: Test Build For Component ${{ matrix.component-name }}
-        if: steps.publish-condition.outputs.should_publish != 'true'
+        if: env.SHOULD_PUBLISH != 'true'
         uses: ./.github/workflows/template-publish-image
         with:
           image: |

@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/pkg/util/trainjob"
 )
 
 const (
@@ -33,8 +34,7 @@ func IndexTrainJobTrainingRuntime(obj client.Object) []string {
 	if !ok {
 		return nil
 	}
-	if ptr.Deref(trainJob.Spec.RuntimeRef.APIGroup, "") == trainer.GroupVersion.Group &&
-		ptr.Deref(trainJob.Spec.RuntimeRef.Kind, "") == trainer.TrainingRuntimeKind {
+	if trainjob.RuntimeRefIsTrainingRuntime(trainJob.Spec.RuntimeRef) {
 		return []string{trainJob.Spec.RuntimeRef.Name}
 	}
 	return nil

@@ -20,16 +20,32 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
+	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/runtime"
 )
 
 func SetupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, options controller.Options) (string, error) {
+	runtimeRec := NewTrainingRuntimeReconciler(
+		mgr.GetClient(),
+		mgr.GetEventRecorderFor("trainer-trainingruntime-controller"),
+	)
+	if err := runtimeRec.SetupWithManager(mgr, options); err != nil {
+		return trainer.TrainingRuntimeKind, err
+	}
+	clRuntimeRec := NewClusterTrainingRuntimeReconciler(
+		mgr.GetClient(),
+		mgr.GetEventRecorderFor("trainer-clustertrainingruntime-controller"),
+	)
+	if err := clRuntimeRec.SetupWithManager(mgr, options); err != nil {
+		return trainer.ClusterTrainingRuntimeKind, err
+	}
 	if err := NewTrainJobReconciler(
 		mgr.GetClient(),
 		mgr.GetEventRecorderFor("trainer-trainjob-controller"),
 		runtimes,
+		WithWatchers(runtimeRec, clRuntimeRec),
 	).SetupWithManager(mgr, options); err != nil {
-		return "TrainJob", err
+		return trainer.TrainJobKind, err
 	}
 	return "", nil
 }
