@@ -23,6 +23,12 @@ images:
     newTag: latest
   - name: ghcr.io/kubeflow/trainer/mlx-runtime
     newTag: latest
+  - name: ghcr.io/kubeflow/trainer/torchtune-trainer
+    newTag: latest
+  - name: ghcr.io/kubeflow/trainer/dataset-initializer
+    newTag: latest
+  - name: ghcr.io/kubeflow/trainer/model-initializer
+    newTag: latest
 
 # Secret for the Kubeflow Training webhook.
 secretGenerator:
