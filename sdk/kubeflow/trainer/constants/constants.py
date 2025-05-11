@@ -122,3 +122,6 @@ MPI_HOSTFILE = "/etc/mpi/hostfile"
 
 # The default entrypoint for mpirun.
 MPI_ENTRYPOINT = "mpirun"
+
+# The Instruct Datasets class in torchtune
+TORCHTUNE_INSTRUCT_DATASET = "torchtune.datasets.instruct_dataset"
