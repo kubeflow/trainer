@@ -19,6 +19,7 @@ package torch
 import (
 	"context"
 	"fmt"
+	"path"
 	"slices"
 	"strings"
 
@@ -204,8 +205,19 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 
 			// 2. Get the recipe and config from old args and append them to newCommand.
 			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
-			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, trainJob.Spec.RuntimeRef.Name, trainJob.Spec.Trainer.Args)
+			model := getModelFromRuntimeRef(trainJob.Spec.RuntimeRef.Name)
+			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, model, trainJob.Spec.Trainer.Args)
 			newCommand = append(newCommand, recipe, fmt.Sprintf("--config %s", config))
+
+			// 3. Load local model and export the fine-tuned model.
+			tokenizerPath := getTokenizerPath(model)
+			checkpointDir := getCheckpointDir(model)
+			outputDir := getModelOutputPath(model)
+			newCommand = append(newCommand,
+				fmt.Sprintf("%s=%s", constants.TorchTuneTokenizerPath, tokenizerPath),
+				fmt.Sprintf("%s=%s", constants.TorchTuneCheckpointDir, checkpointDir),
+				fmt.Sprintf("%s=%s", constants.TorchTuneModelOutputDir, outputDir),
+			)
 
 			trainJob.Spec.Trainer.Command = append(trainJob.Spec.Trainer.Command, newCommand...)
 		}
@@ -233,8 +245,8 @@ func calculateNumProcPerNode(
 }
 
 // getRecipeAndConfig returns the recipe and config file name based on the number of nodes,
-// number of processes per node, runtime reference name, and command line arguments.
-func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, runtimeRefName string, _ []string) (string, string) {
+// number of processes per node, model name, and command line arguments.
+func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, model string, _ []string) (string, string) {
 	recipe := constants.TorchTuneFullFinetuneDistributed
 	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
 	if numNodes == 1 && numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 {
@@ -244,7 +256,28 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, runti
 		suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
 	}
 
-	return recipe, fmt.Sprintf("%s%s.yaml", getModelFromRuntimeRef(runtimeRefName), suffix)
+	return recipe, fmt.Sprintf("%s%s.yaml", model, suffix)
+}
+
+// getTokenizerPath returns the path to local tokenizer for the given model name.
+func getTokenizerPath(model string) string {
+	torchtuneModel := constants.DefaultTorchTuneModels[model]
+	workDir := path.Join(constants.ModelMountPath, torchtuneModel.Name)
+
+	return path.Join(workDir, torchtuneModel.TokenizerPath)
+}
+
+// getCheckpointDir returns the path to local model for the given model name.
+func getCheckpointDir(model string) string {
+	torchtuneModel := constants.DefaultTorchTuneModels[model]
+	workDir := path.Join(constants.ModelMountPath, torchtuneModel.Name)
+
+	return path.Join(workDir, torchtuneModel.CheckpointDir)
+}
+
+// getModelOutputPath returns the model export path for the given model name.
+func getModelOutputPath(model string) string {
+	return path.Join(constants.ModelMountPath, model)
 }
 
 func getModelFromRuntimeRef(runtimeRefName string) string {

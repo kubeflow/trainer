@@ -142,6 +142,15 @@ const (
 
 	// TorchTuneFullFinetuneMultiNodesConfigSuffix is the config suffix for the multi node distributed full finetune.
 	TorchTuneFullFinetuneMultiNodesConfigSuffix string = "_full_multinode"
+
+	// TorchTuneModelOutputDir is the config item name for the model output directory.
+	TorchTuneModelOutputDir string = "output_dir"
+
+	// TorchTuneTokenizerPath is the config item name for the tokenizer path.
+	TorchTuneTokenizerPath string = "tokenizer.path"
+
+	// TorchTuneCheckpointerDir is the config item name for the checkpointer directory.
+	TorchTuneCheckpointDir string = "checkpointer.checkpoint_dir"
 )
 
 const (
@@ -171,3 +180,32 @@ var (
 	// TorchTuneEntrypoint is the entrypoint for the torchtune.
 	TorchTuneEntrypoint = []string{"tune", "run"}
 )
+
+type TorchTuneModel struct {
+	// Name is the name of the model in HuggingFace.
+	Name string
+
+	// CheckpointDir is the checkpointer directory relative to the model repo.
+	CheckpointDir string
+
+	// TokenizerPath is the tokenizer path relative to the model repo.
+	TokenizerPath string
+}
+
+var DefaultTorchTuneModels = map[string]TorchTuneModel{
+	TORCHTUNE_MODEL_LLAMA3_2_1B: {
+		Name:          "Llama-3.2-1B-Instruct",
+		CheckpointDir: "/",
+		TokenizerPath: "/original/tokenizer.model",
+	},
+	TORCHTUNE_MODEL_LLAMA3_2_7B: {
+		Name:          "Llama-3.2-1B-Instruct",
+		CheckpointDir: "/",
+		TokenizerPath: "/original/tokenizer.model",
+	},
+	TORCHTUNE_MODEL_LLAMA3_3_70B: {
+		Name:          "Llama-3.3-70B-Instruct",
+		CheckpointDir: "/",
+		TokenizerPath: "/original/tokenizer.model",
+	},
+}
