@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - master
-      - 'release-*'
-    tags:
-      - 'v*'
   pull_request:
 
 jobs:
@@ -73,6 +70,9 @@ jobs:
           platforms: ${{ matrix.platforms }}
           context: ${{ matrix.context }}
           push: true
+          tags: |
+            type=raw,latest
+            type=sha
 
       - name: Test Build For Component ${{ matrix.component-name }}
         if: env.SHOULD_PUBLISH != 'true'
@@ -85,3 +85,6 @@ jobs:
           platforms: ${{ matrix.platforms }}
           context: ${{ matrix.context }}
           push: false
+          tags: |
+            type=raw,latest
+            type=sha
