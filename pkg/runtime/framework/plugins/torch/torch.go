@@ -214,9 +214,9 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			checkpointDir := getCheckpointDir(model)
 			outputDir := getModelOutputPath(model)
 			newCommand = append(newCommand,
+				fmt.Sprintf("%s=%s", constants.TorchTuneModelOutputDir, outputDir),
 				fmt.Sprintf("%s=%s", constants.TorchTuneTokenizerPath, tokenizerPath),
 				fmt.Sprintf("%s=%s", constants.TorchTuneCheckpointDir, checkpointDir),
-				fmt.Sprintf("%s=%s", constants.TorchTuneModelOutputDir, outputDir),
 			)
 
 			trainJob.Spec.Trainer.Command = append(trainJob.Spec.Trainer.Command, newCommand...)

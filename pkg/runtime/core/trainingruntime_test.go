@@ -555,6 +555,9 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "test-job-node-0-0.test-job:29500"),
 							constants.TorchTuneFullFinetuneDistributed,
 							"--config llama3_3/70B_full_multinode.yaml",
+							"output_dir=/workspace/model/llama3_3/70B",
+							"tokenizer.path=/workspace/model/Llama-3.3-70B-Instruct/original/tokenizer.model",
+							"checkpointer.checkpoint_dir=/workspace/model/Llama-3.3-70B-Instruct",
 						},
 						[]string{
 							"dtype=fp16",
