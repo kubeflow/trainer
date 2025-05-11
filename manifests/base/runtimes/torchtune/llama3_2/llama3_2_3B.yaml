@@ -77,6 +77,9 @@ spec:
                         - dataset=torchtune.datasets.instruct_dataset
                         - dataset.source=parquet
                         - dataset.data_dir=/workspace/dataset/data
+                        - output_dir=/workspace/model/llama3_2/3B
+                        - tokenizer.path=/workspace/model/Llama-3.2-3B-Instruct/original/tokenizer.model
+                        - checkpointer.checkpoint_dir=/workspace/model/Llama-3.2-3B-Instruct
                       resources:
                         limits:
                           nvidia.com/gpu: 2
