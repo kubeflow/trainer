@@ -168,8 +168,6 @@ func (b *Builder) Suspend(suspend *bool) *Builder {
 	return b
 }
 
-// TODO: Need to support all TrainJob fields.
-
 func (b *Builder) Build() *jobsetv1alpha2ac.JobSetApplyConfiguration {
 	return b.JobSetApplyConfiguration
 }
