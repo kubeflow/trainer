@@ -18,7 +18,7 @@ import queue
 import random
 import string
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
@@ -153,20 +153,21 @@ class TrainerClient:
         self,
         runtime: types.Runtime = types.DEFAULT_RUNTIME,
         initializer: Optional[types.Initializer] = None,
-        trainer: Optional[types.CustomTrainer] = None,
+        trainer: Union[types.CustomTrainer, types.BuiltinTrainer, None] = None,
     ) -> str:
         """
         Create the TrainJob. You can configure these types of training task:
 
         - Custom Training Task: Training with a self-contained function that encapsulates
             the entire model training process, e.g. `CustomTrainer`.
+        - Builtin Training Task: Configures a post-training job using torchtune.
 
         Args:
             runtime (`types.Runtime`): Reference to one of existing Runtimes.
             initializer (`Optional[types.Initializer]`):
                 Configuration for the dataset and model initializers.
-            trainer (`Optional[types.CustomTrainer]`):
-                Configuration for Custom Training Task.
+            trainer (`Union[types.CustomTrainer, types.BuiltinTrainer, None]`):
+                Configuration for Custom or Builtin Training Task.
 
         Returns:
             str: The unique name of the TrainJob that has been generated.
