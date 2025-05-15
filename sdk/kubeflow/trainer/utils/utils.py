@@ -412,7 +412,9 @@ def get_trainer_crd_from_builtin_trainer(
     # Parse args in the TorchTuneConfig to the Trainer, preparing for the mutation of
     # the torchtune config in the runtime plugin.
     # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
-    trainer_crd.command, trainer_crd.args = get_args_using_torchtune_config(trainer)
+    trainer_crd.command, trainer_crd.args = get_args_using_torchtune_config(
+        trainer.config
+    )
 
     return trainer_crd
 
