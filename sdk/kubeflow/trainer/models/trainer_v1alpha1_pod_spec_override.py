@@ -31,11 +31,11 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
     """ # noqa: E501
     containers: Optional[List[TrainerV1alpha1ContainerOverride]] = Field(default=None, description="Overrides for the containers in the desired job templates.")
     init_containers: Optional[List[TrainerV1alpha1ContainerOverride]] = Field(default=None, description="Overrides for the init container in the desired job templates.", alias="initContainers")
-    node_selector: Optional[Dict[str, StrictStr]] = Field(default=None, description="Override for the node selector to place Pod on the specific mode.", alias="nodeSelector")
+    node_selector: Optional[Dict[str, StrictStr]] = Field(default=None, description="Override for the node selector to place Pod on the specific node.", alias="nodeSelector")
     service_account_name: Optional[StrictStr] = Field(default=None, description="Override for the service account.", alias="serviceAccountName")
     target_job: StrictStr = Field(description="TargetJob is the name of the Job the override applies to.", alias="targetJob")
     tolerations: Optional[List[IoK8sApiCoreV1Toleration]] = Field(default=None, description="Override for the Pod's tolerations.")
-    volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="Overrides for the Pod volume configuration.")
+    volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="Overrides for the Pod volume configurations.")
     __properties: ClassVar[List[str]] = ["containers", "initContainers", "nodeSelector", "serviceAccountName", "targetJob", "tolerations", "volumes"]
 
     model_config = ConfigDict(

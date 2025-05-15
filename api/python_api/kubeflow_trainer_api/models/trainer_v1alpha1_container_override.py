@@ -19,7 +19,6 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.io_k8s_api_core_v1_env_from_source import IoK8sApiCoreV1EnvFromSource
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_env_var import IoK8sApiCoreV1EnvVar
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_volume_mount import IoK8sApiCoreV1VolumeMount
 from typing import Optional, Set
@@ -27,15 +26,12 @@ from typing_extensions import Self
 
 class TrainerV1alpha1ContainerOverride(BaseModel):
     """
-    ContainerOverride represents parameters that can be overridden using PodSpecOverrides. Parameters from the Trainer, DatasetConfig, and ModelConfig will take precedence.
+    ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
     """ # noqa: E501
-    args: Optional[List[StrictStr]] = Field(default=None, description="Arguments to the entrypoint for the training container.")
-    command: Optional[List[StrictStr]] = Field(default=None, description="Entrypoint commands for the training container.")
-    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments.")
-    env_from: Optional[List[IoK8sApiCoreV1EnvFromSource]] = Field(default=None, description="List of sources to populate environment variables in the container. These   values will be merged with the TrainingRuntime's environments.", alias="envFrom")
+    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. These values can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.")
     name: StrictStr = Field(description="Name for the container. TrainingRuntime must have this container.")
     volume_mounts: Optional[List[IoK8sApiCoreV1VolumeMount]] = Field(default=None, description="Pod volumes to mount into the container's filesystem.", alias="volumeMounts")
-    __properties: ClassVar[List[str]] = ["args", "command", "env", "envFrom", "name", "volumeMounts"]
+    __properties: ClassVar[List[str]] = ["env", "name", "volumeMounts"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -83,13 +79,6 @@ class TrainerV1alpha1ContainerOverride(BaseModel):
                 if _item_env:
                     _items.append(_item_env.to_dict())
             _dict['env'] = _items
-        # override the default output from pydantic by calling `to_dict()` of each item in env_from (list)
-        _items = []
-        if self.env_from:
-            for _item_env_from in self.env_from:
-                if _item_env_from:
-                    _items.append(_item_env_from.to_dict())
-            _dict['envFrom'] = _items
         # override the default output from pydantic by calling `to_dict()` of each item in volume_mounts (list)
         _items = []
         if self.volume_mounts:
@@ -109,10 +98,7 @@ class TrainerV1alpha1ContainerOverride(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "args": obj.get("args"),
-            "command": obj.get("command"),
             "env": [IoK8sApiCoreV1EnvVar.from_dict(_item) for _item in obj["env"]] if obj.get("env") is not None else None,
-            "envFrom": [IoK8sApiCoreV1EnvFromSource.from_dict(_item) for _item in obj["envFrom"]] if obj.get("envFrom") is not None else None,
             "name": obj.get("name") if obj.get("name") is not None else '',
             "volumeMounts": [IoK8sApiCoreV1VolumeMount.from_dict(_item) for _item in obj["volumeMounts"]] if obj.get("volumeMounts") is not None else None
         })
