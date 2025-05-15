@@ -168,41 +168,6 @@ func (b *Builder) Suspend(suspend *bool) *Builder {
 	return b
 }
 
-// TODO (andreyvelich): Add support for Volumes and VolumeMounts.
-// TODO: Add support for node selectors and tolerations.
-func (b *Builder) PodSpecOverrides(trainJob *trainer.TrainJob) *Builder {
-	for _, podSpecOverride := range trainJob.Spec.PodSpecOverrides {
-		for i, rJob := range b.Spec.ReplicatedJobs {
-			if *rJob.Name == podSpecOverride.TargetJob {
-				// Update service account if that is required.
-				if sa := podSpecOverride.ServiceAccountName; sa != nil {
-					b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.ServiceAccountName = sa
-				}
-				for _, initContainerOverride := range podSpecOverride.InitContainers {
-					for j, initContainer := range rJob.Template.Spec.Template.Spec.InitContainers {
-						// Upsert values for the required initContainer.
-						if *initContainer.Name == initContainerOverride.Name {
-							env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.InitContainers[j].Env
-							apply.UpsertEnvVars(env, apply.EnvVars(initContainerOverride.Env...)...)
-						}
-					}
-				}
-				for _, containerOverride := range podSpecOverride.Containers {
-					for j, container := range rJob.Template.Spec.Template.Spec.Containers {
-						// Upsert values for the required container.
-						if *container.Name == containerOverride.Name {
-							env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
-							apply.UpsertEnvVars(env, apply.EnvVars(containerOverride.Env...)...)
-						}
-					}
-				}
-			}
-		}
-
-	}
-	return b
-}
-
 func (b *Builder) Build() *jobsetv1alpha2ac.JobSetApplyConfiguration {
 	return b.JobSetApplyConfiguration
 }

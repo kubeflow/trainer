@@ -626,20 +626,18 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							NumNodes(100).
 							ServiceAccountName(constants.Node, "override-sa").
 							InitContainer(constants.Node, "override-init-container", "test:runtime",
-								[]corev1.EnvVar{
-									{
-										Name:  "INIT_ENV",
-										Value: "override_init",
-									},
-									{
-										Name:  "DATASET_PATH",
-										Value: "runtime",
-									},
-									{
-										Name:  "NEW_VALUE",
-										Value: "from_overrides",
-									},
-								}...,
+								corev1.EnvVar{
+									Name:  "INIT_ENV",
+									Value: "override_init",
+								},
+								corev1.EnvVar{
+									Name:  "NEW_VALUE",
+									Value: "from_overrides",
+								},
+								corev1.EnvVar{
+									Name:  "DATASET_PATH",
+									Value: "runtime",
+								},
 							).
 							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 							ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort, Protocol: "TCP"}}).

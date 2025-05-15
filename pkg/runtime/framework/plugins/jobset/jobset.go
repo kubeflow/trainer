@@ -221,14 +221,12 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		WithAnnotations(maps.Clone(info.Annotations)).
 		WithSpec(jobSetSpec))
 
-	// TODO (andreyvelich): Add support for the PodSpecOverride.
 	// TODO (andreyvelich): Refactor the builder with wrappers for PodSpec.
 	// TODO: Once we remove deprecated runtime.Info.Trainer, we should remove JobSet Builder with DeprecatedTrainer().
 	jobSet := jobSetBuilder.
 		Initializer(trainJob).
 		Trainer(info, trainJob).
 		PodLabels(info.Scheduler.PodLabels).
-		PodSpecOverrides(trainJob).
 		Suspend(trainJob.Spec.Suspend).
 		Build().
 		WithOwnerReferences(metav1ac.OwnerReference().
