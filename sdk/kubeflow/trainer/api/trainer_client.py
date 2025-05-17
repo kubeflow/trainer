@@ -15,12 +15,10 @@
 import logging
 import multiprocessing
 import queue
-import random
-import string
-import uuid
 from typing import Dict, List, Optional
 
 import kubeflow.trainer.models as models
+from kubeflow.trainer.api.abstract_trainer_client import AbstractTrainerClient
 from kubeflow.trainer.constants import constants
 from kubeflow.trainer.types import types
 from kubeflow.trainer.utils import utils
@@ -29,7 +27,7 @@ from kubernetes import client, config, watch
 logger = logging.getLogger(__name__)
 
 
-class TrainerClient:
+class TrainerClient(AbstractTrainerClient):
     def __init__(
         self,
         config_file: Optional[str] = None,
@@ -105,7 +103,7 @@ class TrainerClient:
                 return result
 
             for runtime in runtime_list.items:
-                result.append(self.__get_runtime_from_crd(runtime))
+                result.append(utils.get_runtime_from_crd(runtime))
 
         except multiprocessing.TimeoutError:
             raise TimeoutError(
@@ -147,7 +145,7 @@ class TrainerClient:
                 f"{self.namespace}/{name}"
             )
 
-        return self.__get_runtime_from_crd(runtime)  # type: ignore
+        return utils.get_runtime_from_crd(runtime)  # type: ignore
 
     def train(
         self,
@@ -179,7 +177,7 @@ class TrainerClient:
 
         # Generate unique name for the TrainJob.
         # TODO (andreyvelich): Discuss this TrainJob name generation.
-        train_job_name = random.choice(string.ascii_lowercase) + uuid.uuid4().hex[:11]
+        train_job_name = utils.generate_train_job_name()
 
         # Build the Trainer.
         trainer_crd = models.TrainerV1alpha1Trainer()
@@ -459,30 +457,6 @@ class TrainerClient:
 
         logger.debug(
             f"{constants.TRAINJOB_KIND} {self.namespace}/{name} has been deleted"
-        )
-
-    def __get_runtime_from_crd(
-        self,
-        runtime_crd: models.TrainerV1alpha1ClusterTrainingRuntime,
-    ) -> types.Runtime:
-
-        if not (
-            runtime_crd.metadata
-            and runtime_crd.metadata.name
-            and runtime_crd.spec
-            and runtime_crd.spec.ml_policy
-            and runtime_crd.spec.template.spec
-            and runtime_crd.spec.template.spec.replicated_jobs
-        ):
-            raise Exception(f"ClusterTrainingRuntime CRD is invalid: {runtime_crd}")
-
-        return types.Runtime(
-            name=runtime_crd.metadata.name,
-            trainer=utils.get_runtime_trainer(
-                runtime_crd.spec.template.spec.replicated_jobs,
-                runtime_crd.spec.ml_policy,
-                runtime_crd.metadata,
-            ),
         )
 
     def __get_trainjob_from_crd(
