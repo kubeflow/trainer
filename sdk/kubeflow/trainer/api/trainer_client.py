@@ -153,7 +153,7 @@ class TrainerClient:
         self,
         runtime: types.Runtime = types.DEFAULT_RUNTIME,
         initializer: Optional[types.Initializer] = None,
-        trainer: Union[types.CustomTrainer, types.BuiltinTrainer, None] = None,
+        trainer: Optional[Union[types.CustomTrainer, types.BuiltinTrainer]] = None,
     ) -> str:
         """
         Create the TrainJob. You can configure these types of training task:
