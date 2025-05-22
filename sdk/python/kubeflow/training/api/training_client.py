@@ -28,6 +28,7 @@ from kubeflow.training.api_client import ApiClient
 from kubeflow.training.constants import constants
 from kubeflow.training.utils import utils
 from kubernetes import client, config, watch
+from kubernetes.client.rest import ApiException
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,7 @@ class TrainingClient(object):
             "storage_class": None,
             "access_modes": constants.PVC_DEFAULT_ACCESS_MODES,
         },
+        queue_name: Optional[str] = None,
     ):
         """High level API to fine-tune LLMs with distributed PyTorchJob. Follow this guide
         for more information about this feature: TODO (andreyvelich): Add link.
@@ -192,6 +194,9 @@ class TrainingClient(object):
                 https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1EnvFromSource.md)
             storage_config: Configuration for Storage Initializer PVC to download pre-trained model
                 and dataset. You can configure PVC size and storage class name in this argument.
+            queue_name: Local queue name for the job. If provided, it will automatically
+                add a Kueue queue label to the job and validate that the specified queue exists
+                in the cluster. If the queue doesn't exist, a ValueError will be raised.
         """
         try:
             import peft  # noqa: F401
@@ -341,7 +346,7 @@ class TrainingClient(object):
             num_procs_per_worker=num_procs_per_worker,
         )
 
-        self.create_job(job, namespace=namespace)
+        self.create_job(job, namespace=namespace, queue_name=queue_name)
 
     def create_job(
         self,
@@ -364,6 +369,7 @@ class TrainingClient(object):
         env_vars: Optional[
             Union[Dict[str, str], List[Union[models.V1EnvVar, models.V1EnvVar]]]
         ] = None,
+        queue_name: Optional[str] = None,
         volumes: Optional[List[models.V1Volume]] = None,
         volume_mounts: Optional[List[models.V1VolumeMount]] = None,
     ):
@@ -436,6 +442,9 @@ class TrainingClient(object):
                 https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/V1EnvFromSource.md)
             volumes: Volume(s) to be attached to the replicas.
             volume_mounts: VolumeMount(s) specifying where to mount the volume(s) into the replicas.
+            queue_name: Local queue name for the job. If provided, it will automatically
+                add a Kueue queue label to the job and validate that the specified queue exists
+                in the cluster. If the queue doesn't exist, a ValueError will be raised.
 
         Raises:
             ValueError: Invalid input parameters.
@@ -461,7 +470,7 @@ class TrainingClient(object):
                 ):
                     raise ValueError(
                         "If `job` is set only `namespace`, `labels`, and `annotations` "
-                        "arguments are allowed. "
+                        f"arguments are allowed. "
                         f"Argument `{key}` must be None."
                     )
 
@@ -585,6 +594,14 @@ class TrainingClient(object):
                 f"Job must be one of these types: {constants.JOB_MODELS}, but Job is: {type(job)}"
             )
 
+        # Handle Kueue queue label and validation
+        queue_exists = self.validate_queue(queue_name, namespace, labels)
+        if queue_name is not None and queue_exists:
+            if labels is None:
+                labels = {}
+            labels[constants.LOCAL_QUEUE_LABEL] = queue_name
+        job.metadata.labels = labels
+
         # Create the Training Job.
         try:
             self.custom_api.create_namespaced_custom_object(
@@ -598,9 +615,13 @@ class TrainingClient(object):
             raise TimeoutError(
                 f"Timeout to create {job_kind}: {namespace}/{job.metadata.name}"
             )
-        except Exception:
+        except ApiException as e:
             raise RuntimeError(
-                f"Failed to create {job_kind}: {namespace}/{job.metadata.name}"
+                f"Failed to create {job_kind}: {namespace}/{job.metadata.name}. Error: {str(e)}"
+            ) from e
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to create {job_kind}: {namespace}/{job.metadata.name}. Error: {str(e)}"
             )
 
         logger.debug(f"{job_kind} {namespace}/{job.metadata.name} has been created")
@@ -654,6 +675,10 @@ class TrainingClient(object):
 
         except multiprocessing.TimeoutError:
             raise TimeoutError(f"Timeout to get {job_kind}: {namespace}/{name}")
+        except ApiException as e:
+            raise RuntimeError(
+                f"Failed to get {job_kind}: {namespace}/{name}. Error: {str(e)}"
+            ) from e
         except Exception:
             raise RuntimeError(f"Failed to get {job_kind}: {namespace}/{name}")
 
@@ -711,6 +736,10 @@ class TrainingClient(object):
             ]
         except multiprocessing.TimeoutError:
             raise TimeoutError(f"Timeout to list {job_kind}s in namespace: {namespace}")
+        except ApiException as e:
+            raise RuntimeError(
+                f"Failed to list {job_kind}s in namespace: : {namespace}. Error: {str(e)}"
+            ) from e
         except Exception:
             raise RuntimeError(f"Failed to list {job_kind}s in namespace: {namespace}")
 
@@ -1139,6 +1168,10 @@ class TrainingClient(object):
             return thread.get(timeout).items
         except multiprocessing.TimeoutError:
             raise TimeoutError(f"Timeout to list pods for Job: {namespace}/{name}")
+        except ApiException as e:
+            raise RuntimeError(
+                f"Failed to list pods for Job: {namespace}/{name}. Error: {str(e)}"
+            ) from e
         except Exception:
             raise RuntimeError(f"Failed to list pods for Job: {namespace}/{name}")
 
@@ -1342,7 +1375,7 @@ class TrainingClient(object):
                         raise RuntimeError(
                             f"Failed to read logs for pod {namespace}/{pod.metadata.name}"
                         )
-        # If verbose is set, return Kubernetes events for Job and pods.
+        # If verbose is set, return Kubernetes events for Job and corresponding pods.
         if verbose:
             job = self.get_job(name=name, namespace=namespace)
             events = self.core_api.list_namespaced_event(namespace=namespace)
@@ -1409,6 +1442,10 @@ class TrainingClient(object):
             )
         except multiprocessing.TimeoutError:
             raise TimeoutError(f"Timeout to update {job_kind}: {namespace}/{name}")
+        except ApiException as e:
+            raise RuntimeError(
+                f"Failed to update {job_kind}: {namespace}/{name}. Error: {str(e)}"
+            ) from e
         except Exception:
             raise RuntimeError(f"Failed to update {job_kind}: {namespace}/{name}")
 
@@ -1451,7 +1488,115 @@ class TrainingClient(object):
             )
         except multiprocessing.TimeoutError:
             raise TimeoutError(f"Timeout to delete {job_kind}: {namespace}/{name}")
+        except ApiException as e:
+            raise RuntimeError(
+                f"Failed to delete {job_kind}: {namespace}/{name}. Error: {str(e)}"
+            ) from e
         except Exception:
             raise RuntimeError(f"Failed to delete {job_kind}: {namespace}/{name}")
 
         logger.debug(f"{job_kind} {namespace}/{name} has been deleted")
+
+    def validate_queue(
+        self,
+        queue_name: Optional[str],
+        namespace: str,
+        labels: Optional[Dict[str, str]] = None,
+    ) -> bool:
+        """Validate Kueue queue configuration.
+
+        Args:
+            queue_name: Name of the Kueue queue provided as a parameter.
+            namespace: Namespace where the queue should exist.
+            labels: Optional dictionary of labels that might contain the queue name.
+
+        Returns:
+            bool: True if the queue exists, False otherwise.
+
+        Raises:
+            ValueError: If queue names conflict.
+            RuntimeError: If there are permission issues.
+        """
+        # Get queue name from either parameter or labels
+        queue_name_from_labels = None
+        if labels is not None and constants.LOCAL_QUEUE_LABEL in labels:
+            queue_name_from_labels = labels[constants.LOCAL_QUEUE_LABEL]
+
+        # If both are provided, they must match
+        if queue_name is not None and queue_name_from_labels is not None:
+            if queue_name != queue_name_from_labels:
+                raise ValueError(
+                    f"Conflicting Kueue queue label: labels specify '{queue_name_from_labels}', "
+                    f"queue_name parameter specifies '{queue_name}'."
+                )
+            queue_name_to_validate = queue_name
+        else:
+            # Use whichever one is provided
+            queue_name_to_validate = queue_name or queue_name_from_labels
+
+        # If no queue name is provided, no validation needed
+        if not queue_name_to_validate:
+            return False
+
+        try:
+            # Check if Kueue CRD is installed
+            try:
+                api_extensions = client.ApiextensionsV1Api(self.custom_api.api_client)
+                api_extensions.read_custom_resource_definition(
+                    "localqueues.kueue.x-k8s.io"
+                )
+                logger.debug("Kueue CRD 'localqueues.kueue.x-k8s.io' is installed.")
+            except ApiException as e:
+                if e.status == 404:
+                    logger.warning(
+                        "Kueue CRD 'localqueues.kueue.x-k8s.io' is not installed in the cluster."
+                    )
+                    return False
+                else:
+                    logger.error(f"Error while checking Kueue CRD: {e}")
+                    raise
+
+            # Check if the specific queue exists
+            try:
+                self.custom_api.get_namespaced_custom_object(
+                    group="kueue.x-k8s.io",
+                    namespace=namespace,
+                    plural="localqueues",
+                    version="v1beta1",
+                    name=queue_name_to_validate,
+                )
+                logger.debug(
+                    f"Kueue queue '{queue_name_to_validate}' exists in namespace '{namespace}'"
+                )
+                return True
+            except ApiException as e:
+                if e.status == 404:
+                    logger.warning(
+                        f"Queue '{queue_name_to_validate}' does not exist"
+                        f" in namespace '{namespace}'. "
+                        "The job will be created but may not be managed by Kueue."
+                    )
+                    return False
+                elif e.status == 500:
+                    raise ConnectionError(
+                        "Kueue webhook or admission controller is not responding."
+                    )
+                elif e.status == 403:
+                    raise RuntimeError(
+                        "Permission denied: You do not have "
+                        f"permission to access Kueue queue '{queue_name_to_validate}' "
+                        f"in namespace '{namespace}'. Please ensure you have the necessary "
+                        "RBAC permissions to get/list LocalQueue resources."
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to validate Kueue queue '{queue_name_to_validate}'",
+                        "but may not be managed by Kueue.",
+                    )
+                    return False
+        except ApiException as e:
+            logger.warning(
+                f"Failed to validate Kueue configuration: {e}. "
+                "The job will be created but may not be managed by Kueue."
+            )
+            return False
