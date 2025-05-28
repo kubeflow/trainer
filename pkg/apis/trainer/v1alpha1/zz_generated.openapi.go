@@ -45,7 +45,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodGroupPolicy":                   schema_pkg_apis_trainer_v1alpha1_PodGroupPolicy(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodGroupPolicySource":             schema_pkg_apis_trainer_v1alpha1_PodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodSpecOverride":                  schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref),
-		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob":         schema_pkg_apis_trainer_v1alpha1_PodSpecOverrideTargetJob(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.RuntimeRef":                       schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.TorchElasticPolicy":               schema_pkg_apis_trainer_v1alpha1_TorchElasticPolicy(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.TorchMLPolicySource":              schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref),
@@ -496,7 +495,7 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ContainerOverride represents parameters that can be overridden using PodSpecOverrides. Parameters from the Trainer, DatasetConfig, and ModelConfig will take precedence.",
+				Description: "ContainerOverride represents parameters that can be overridden using PodSpecOverrides.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -505,46 +504,6 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref common.ReferenceCall
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
-						},
-					},
-					"command": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Entrypoint commands for the training container.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
-						},
-					},
-					"args": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Arguments to the entrypoint for the training container.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
 						},
 					},
 					"env": {
@@ -557,32 +516,13 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments.",
+							Description: "List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. These values can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
 										Ref:     ref("k8s.io/api/core/v1.EnvVar"),
-									},
-								},
-							},
-						},
-					},
-					"envFrom": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "List of sources to populate environment variables in the container. These   values will be merged with the TrainingRuntime's environments.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/core/v1.EnvFromSource"),
 									},
 								},
 							},
@@ -615,7 +555,7 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref common.ReferenceCall
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.EnvFromSource", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.VolumeMount"},
+			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.VolumeMount"},
 	}
 }
 
@@ -1007,89 +947,12 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 				Description: "PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"targetJobs": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
+					"targetJob": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TrainJobs is the training job replicas in the training runtime template to apply the overrides.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob"),
-									},
-								},
-							},
-						},
-					},
-					"containers": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type": "map",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Overrides for the containers in the desired job templates.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ContainerOverride"),
-									},
-								},
-							},
-						},
-					},
-					"initContainers": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type": "map",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Overrides for the init container in the desired job templates.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ContainerOverride"),
-									},
-								},
-							},
-						},
-					},
-					"volumes": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type": "map",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Overrides for the Pod volume configuration.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/core/v1.Volume"),
-									},
-								},
-							},
+							Description: "TargetJob is the name of the Job the override applies to.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"serviceAccountName": {
@@ -1101,7 +964,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 					},
 					"nodeSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Override for the node selector to place Pod on the specific mode.",
+							Description: "Override for the node selector to place Pod on the specific node.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -1134,33 +997,78 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 							},
 						},
 					},
-				},
-				Required: []string{"targetJobs"},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ContainerOverride", "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob", "k8s.io/api/core/v1.Toleration", "k8s.io/api/core/v1.Volume"},
-	}
-}
-
-func schema_pkg_apis_trainer_v1alpha1_PodSpecOverrideTargetJob(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
+					"volumes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is the target training job name for which the PodSpec is overridden.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Description: "Overrides for the Pod volume configurations.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.Volume"),
+									},
+								},
+							},
+						},
+					},
+					"initContainers": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Overrides for the init container in the desired job templates.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ContainerOverride"),
+									},
+								},
+							},
+						},
+					},
+					"containers": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Overrides for the containers in the desired job templates.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ContainerOverride"),
+									},
+								},
+							},
 						},
 					},
 				},
-				Required: []string{"name"},
+				Required: []string{"targetJob"},
 			},
 		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ContainerOverride", "k8s.io/api/core/v1.Toleration", "k8s.io/api/core/v1.Volume"},
 	}
 }
 
@@ -1444,7 +1352,10 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 					"podSpecOverrides": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-map-keys": []interface{}{
+									"targetJob",
+								},
+								"x-kubernetes-list-type": "map",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
