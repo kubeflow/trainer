@@ -80,9 +80,7 @@ runs:
       uses: docker/metadata-action@v5
       with:
         images: ${{ inputs.image }}
-        tags: |
-          type=raw,latest
-          type=sha
+        tags: ${{ inputs.tags }}
 
     - name: Build and Push
       uses: docker/build-push-action@v5
