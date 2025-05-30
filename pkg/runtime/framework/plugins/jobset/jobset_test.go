@@ -38,6 +38,8 @@ import (
 	"github.com/kubeflow/trainer/pkg/runtime"
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
 	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // TODO: Add tests for all Interfaces.
@@ -531,6 +533,370 @@ func TestValidate(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantWarnings, warnings); len(diff) != 0 {
 				t.Errorf("Unexpected warnings from Validate (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestTrainer(t *testing.T) {
+	cases := map[string]struct {
+		trainJob  *trainer.TrainJob
+		info      *runtime.Info
+		wantInfo  *runtime.Info
+		wantError error
+	}{
+		"resources per node should be applied to both launcher and node pods": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						Container("test:image", nil, nil, corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("5"),
+							corev1.ResourceMemory: resource.MustParse("16Gi"),
+							"nvidia.com/gpu":      resource.MustParse("1"),
+						}).
+						Obj(),
+				).
+				Obj(),
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(
+							ptr.To[int32](2),                         // numNodes
+							ptr.To(trainer.MPIImplementationOpenMPI), // implementation
+							nil,                                      // customArgs
+							ptr.To(true),                             // runLauncherAsNode
+						).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:       constants.Launcher,
+							Count:      ptr.To[int32](1),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.AncestorTrainer),
+						},
+						{
+							Name:       constants.Node,
+							Count:      ptr.To[int32](2),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.Node),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Launcher),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.Node,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+			wantInfo: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:       constants.Launcher,
+							Count:      ptr.To[int32](1),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.AncestorTrainer),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-launcher-0-0.trainJob")
+							},
+						},
+						{
+							Name:       constants.Node,
+							Count:      ptr.To[int32](2),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.Node),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-node-0-0.trainJob")
+								yield("trainJob-node-0-1.trainJob")
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Launcher).
+														WithImage("test:image").
+														WithResources(corev1ac.ResourceRequirements().
+															WithRequests(corev1.ResourceList{
+																corev1.ResourceCPU:    resource.MustParse("5"),
+																corev1.ResourceMemory: resource.MustParse("16Gi"),
+																"nvidia.com/gpu":      resource.MustParse("1"),
+															}),
+														),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.Node,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithImage("test:image").
+														WithResources(corev1ac.ResourceRequirements().
+															WithRequests(corev1.ResourceList{
+																corev1.ResourceCPU:    resource.MustParse("5"),
+																corev1.ResourceMemory: resource.MustParse("16Gi"),
+																"nvidia.com/gpu":      resource.MustParse("1"),
+															}),
+														),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+		},
+		"resources should only be applied to node when runLauncherAsNode is false": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						Container("test:image", nil, nil, corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
+							"nvidia.com/gpu":      resource.MustParse("1"),
+						}).
+						Obj(),
+				).
+				Obj(),
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(
+							ptr.To[int32](2),                         // numNodes
+							ptr.To(trainer.MPIImplementationOpenMPI), // implementation
+							nil,                                      // customArgs
+							ptr.To(false),                            // runLauncherAsNode
+						).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:       constants.Launcher,
+							Count:      ptr.To[int32](1),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.AncestorTrainer),
+						},
+						{
+							Name:       constants.Node,
+							Count:      ptr.To[int32](2),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.Node),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Launcher).
+														WithImage("launcher:latest"),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.Node,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node).
+														WithImage("node:latest"),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+			wantInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(
+							ptr.To[int32](2),                         // numNodes
+							ptr.To(trainer.MPIImplementationOpenMPI), // implementation
+							nil,                                      // customArgs
+							ptr.To(false),                            // runLauncherAsNode
+						).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:       constants.Launcher,
+							Count:      ptr.To[int32](1),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.AncestorTrainer),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-launcher-0-0.trainJob")
+							},
+						},
+						{
+							Name:       constants.Node,
+							Count:      ptr.To[int32](2),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.Node),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-node-0-0.trainJob")
+								yield("trainJob-node-0-1.trainJob")
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Launcher).
+														WithImage("launcher:latest"),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.Node,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithImage("test:image").
+														WithResources(corev1ac.ResourceRequirements().
+															WithRequests(corev1.ResourceList{
+																corev1.ResourceCPU:    resource.MustParse("1"),
+																corev1.ResourceMemory: resource.MustParse("1Gi"),
+																"nvidia.com/gpu":      resource.MustParse("1"),
+															}),
+														),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+			cli := utiltesting.NewClientBuilder().Build()
+			_, err := New(ctx, cli, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+
+			// Ensure all required fields are initialized
+			if tc.info == nil {
+				tc.info = &runtime.Info{}
+			}
+			if tc.info.TemplateSpec.ObjApply == nil {
+				tc.info.TemplateSpec.ObjApply = jobsetv1alpha2ac.JobSetSpec()
+			}
+			if tc.info.RuntimePolicy.MLPolicySource == nil {
+				tc.info.RuntimePolicy.MLPolicySource = utiltesting.MakeMLPolicySourceWrapper().Obj()
+			}
+
+			jobSetSpec := tc.info.TemplateSpec.ObjApply.(*jobsetv1alpha2ac.JobSetSpecApplyConfiguration)
+			builder := NewBuilder(jobsetv1alpha2ac.JobSet("test", "default").WithSpec(jobSetSpec))
+			builder.Trainer(tc.info, tc.trainJob)
+			if diff := cmp.Diff(tc.wantInfo.TemplateSpec.ObjApply, builder.Build().Spec,
+				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
+			); len(diff) != 0 {
+				t.Errorf("Unexpected JobSet from Trainer (-want,+got):\n%s", diff)
 			}
 		})
 	}
