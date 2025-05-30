@@ -3,6 +3,7 @@
 [![Build Status](https://github.com/kubeflow/trainer/actions/workflows/test-go.yaml/badge.svg?branch=master)](https://github.com/kubeflow/trainer/actions/workflows/test-go.yaml?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/kubeflow/trainer/badge.svg?branch=master)](https://coveralls.io/github/kubeflow/trainer?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubeflow/trainer)](https://goreportcard.com/report/github.com/kubeflow/trainer)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10435/badge)](https://www.bestpractices.dev/projects/10435)
 
 <h1 align="center">
     <img src="./docs/images/trainer-logo.svg" alt="logo" width="200">
