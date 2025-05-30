@@ -515,14 +515,14 @@ def get_log_queue_pool(log_streams: List[Any]) -> List[queue.Queue]:
 
 
 def get_args_in_dataset_preprocess_config(
-    dataset_preprocess_config: types.InstructDataset,
+    dataset_preprocess_config: types.TorchTuneInstructDataset,
 ) -> List[str]:
     """
     Get the args from the given dataset preprocess config.
     """
     args = []
 
-    if not isinstance(dataset_preprocess_config, types.InstructDataset):
+    if not isinstance(dataset_preprocess_config, types.TorchTuneInstructDataset):
         raise ValueError(
             f"Invalid dataset preprocess config type: {type(dataset_preprocess_config)}."
         )

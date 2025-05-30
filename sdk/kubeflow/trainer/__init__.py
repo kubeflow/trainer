@@ -33,7 +33,7 @@ from kubeflow.trainer.types.types import (
     HuggingFaceDatasetInitializer,
     HuggingFaceModelInitializer,
     Initializer,
-    InstructDataset,
+    TorchTuneInstructDataset,
     Loss,
     Runtime,
     Trainer,

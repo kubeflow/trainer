@@ -75,7 +75,7 @@ class DataFormat(Enum):
 
 # Configuration for the TorchTune Instruct dataset.
 @dataclass
-class InstructDataset:
+class TorchTuneInstructDataset:
     """
     Configuration for the custom dataset with user instruction prompts and model responses.
     REF: https://pytorch.org/torchtune/main/generated/torchtune.datasets.instruct_dataset.html
@@ -129,7 +129,7 @@ class TorchTuneConfig:
         loss (`Optional[Loss]`): The loss algorithm we use to fine-tune the LLM,
             e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss`.
         num_nodes (`Optional[int]`): The number of nodes to use for training.
-        dataset_preprocess_config (`Optional[InstructDataset]`):
+        dataset_preprocess_config (`Optional[TorchTuneInstructDataset]`):
             Configuration for the dataset preprocessing.
         resources_per_node (`Optional[Dict]`): The computing resources to allocate per node.
     """
@@ -139,7 +139,7 @@ class TorchTuneConfig:
     epochs: Optional[int] = None
     loss: Optional[Loss] = None
     num_nodes: Optional[int] = None
-    dataset_preprocess_config: Optional[InstructDataset] = None
+    dataset_preprocess_config: Optional[TorchTuneInstructDataset] = None
     resources_per_node: Optional[Dict] = None
 
 
