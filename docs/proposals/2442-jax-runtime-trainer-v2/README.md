@@ -24,7 +24,7 @@ differential programming, large-scale physics simulations and many more.
 
 ### Goals
 
-- Implement ClusterTrainingRuntime for JAX, supporting single-node and multi-node configurations
+- Implement ClusterTrainingRuntime for JAX, supporting multi-controller JAX
 - Build the necessary Docker images for JAX worker nodes used by the runtime
 - Implement the solution to work on CPU using Gloo backend
 - Document user guides for utilizing JAX TrainingRuntimes
