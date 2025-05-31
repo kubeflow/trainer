@@ -26,6 +26,7 @@ differential programming, large-scale physics simulations and many more.
 
 - Implement ClusterTrainingRuntime for JAX, supporting single-node and multi-node configurations
 - Build the necessary Docker images for JAX worker nodes used by the runtime
+- Implement the solution to work on CPU using Gloo backend
 - Document user guides for utilizing JAX TrainingRuntimes
 - Test the implementation thoroughly using unit tests and end-to-end (E2E) tests
 
@@ -33,6 +34,7 @@ differential programming, large-scale physics simulations and many more.
 
 - GPU support (due to lack of available GPU testing infrastructure)
 - TPU support (dut to lack of available TPU testing infrastructure)
+- Logic to set the messaging backend
 - Complex end-to-end examples demonstrating the runtimes (focus is on the runtime implementation itself; examples may require specific infrastructure)
 
 ## Proposal
