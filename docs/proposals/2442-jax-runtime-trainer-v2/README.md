@@ -55,7 +55,7 @@ As a Research Scientist, I want to train prototype of my new LLM model coded wit
 
 | Environment Variable       | JAX Parameter          | Description                                                                                               | Default Value                       |
 |----------------------------|------------------------|-----------------------------------------------------------------------------------------------------------|-----------------------------------------------|
-| `JAX_CPU_COLLECTIVES_IMPLEMENTATION`  | TODO  | TODO        | 'gloo' |
+| `JAX_CPU_COLLECTIVES_IMPLEMENTATION`  | TODO | Cross-process collective implementation used on CPU. Must be one of (“gloo”, “mpi”) | "gloo" |
 
 ### Test Plan
 
