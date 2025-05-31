@@ -1,0 +1,6 @@
+
+# JAX libraries, for CPU, NVIDIA GPU and TPU
+# Instructions: https://pypi.org/project/jax/
+jax==0.6.1
+# TODO(mahdi): after there are GPU testing infrastructure, implement this
+# jax[cuda12]==0.6.1

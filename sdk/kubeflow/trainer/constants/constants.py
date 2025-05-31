@@ -122,3 +122,6 @@ MPI_HOSTFILE = "/etc/mpi/hostfile"
 
 # The default entrypoint for mpirun.
 MPI_ENTRYPOINT = "mpirun"
+
+# The default entrypoint for jax.
+JAX_ENTRYPOINT = "python"

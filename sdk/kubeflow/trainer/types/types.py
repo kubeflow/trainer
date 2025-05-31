@@ -113,6 +113,7 @@ class Framework(Enum):
     DEEPSPEED = "deepspeed"
     MLX = "mlx"
     TORCHTUNE = "torchtune"
+    JAX = "jax"
 
 
 # Representation for the Trainer of the runtime.
@@ -215,6 +216,11 @@ ALL_TRAINERS: Dict[str, Trainer] = {
             "bash",
             "-c",
         ],
+    ),
+    "ghcr.io/kubeflow/trainer/jax-runtime": Trainer(
+        trainer_type=TrainerType.CUSTOM_TRAINER,
+        framework=Framework.JAX,
+        entrypoint=[constants.JAX_ENTRYPOINT],
     ),
     # Builtin Trainers.
     "ghcr.io/kubeflow/trainer/torchtune-trainer": Trainer(

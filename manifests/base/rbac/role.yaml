@@ -8,6 +8,8 @@ rules:
   - ""
   resources:
   - configmaps
+  - pods
+  - services
   - secrets
   verbs:
   - create
@@ -15,6 +17,14 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - admissionregistration.k8s.io
