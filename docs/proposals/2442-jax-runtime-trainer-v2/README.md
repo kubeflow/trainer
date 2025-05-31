@@ -25,13 +25,14 @@ differential programming, large-scale physics simulations and many more.
 ### Goals
 
 - Implement ClusterTrainingRuntime for JAX, supporting single-node and multi-node configurations
-- Build the necessary Docker images for JAX worker nodes used by the runtimes
+- Build the necessary Docker images for JAX worker nodes used by the runtime
 - Document user guides for utilizing JAX TrainingRuntimes
 - Test the implementation thoroughly using unit tests and end-to-end (E2E) tests
 
 ### Non-Goals
 
 - GPU support (due to lack of available GPU testing infrastructure)
+- TPU support (dut to lack of available TPU testing infrastructure)
 - Complex end-to-end examples demonstrating the runtimes (focus is on the runtime implementation itself; examples may require specific infrastructure)
 
 ## Proposal
@@ -44,7 +45,7 @@ As a MLOps Engineer or Platform Engineer, I want to manage JAX distributed train
 
 #### Story 2
 
-As a Data Scientist, I want to use the Trainer V2 SDK to run a distributed training job from notebook, in this way I can incorporate multiple devices (CPUs, TPUs or GPUs) for my training task.
+As a Data Scientist, I want to use the Trainer V2 SDK to run a distributed training job from notebook, in this way I can incorporate multiple devices for my training task.
 
 #### Story 3
 
@@ -52,7 +53,9 @@ As a Research Scientist, I want to train the prototype of my new LLM model writt
 
 ## Design Details
 
-TODO
+| Environment Variable       | JAX Parameter          | Description                                                                                               | How to Obtain/Configure                       |
+|----------------------------|------------------------|-----------------------------------------------------------------------------------------------------------|-----------------------------------------------|
+| `JAX_COORDINATOR_ADDRESS`  | `coordinator_address (str)`  | the IP address of process 0 in your cluster, together with a port available on that process. Process 0 will start a JAX service exposed via that IP address and port, to which the other processes in the cluster will connect.        | Set this in the coordinator pod spec and ensure it's the same for all worker pods. Example: `localhost:1234`. |
 
 ### Test Plan
 
