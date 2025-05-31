@@ -49,7 +49,7 @@ As a Data Scientist, I want to use the Trainer V2 SDK to run a distributed train
 
 #### Story 3
 
-As a Research Scientist, I want to train the prototype of my new LLM model written in JAX on multiple GPUs on Google Cloud Kubernetes Engine, Kubeflow Trainer V2 with JAX ClusterTrainingRuntime will enable this for me.
+As a Research Scientist, I want to train prototype of my new LLM model coded with JAX on a distributed training setup on my company Kubernetes cluster, Kubeflow Trainer V2 with JAX ClusterTrainingRuntime will enable this for me.
 
 ## Design Details
 
