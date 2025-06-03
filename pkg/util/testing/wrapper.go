@@ -283,6 +283,18 @@ func (j *JobSetWrapper) ContainerTrainerPorts(ports []corev1.ContainerPort) *Job
 	return j
 }
 
+func (j *JobSetWrapper) Tolerations(rJobName string, tolerations ...corev1.Toleration) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Tolerations = append(
+				j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Tolerations,
+				tolerations...,
+			)
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) Volumes(rJobName string, v ...corev1.Volume) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {
