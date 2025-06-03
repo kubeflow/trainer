@@ -188,18 +188,20 @@ func (r *TrainingRuntime) mergePodSpecOverrides(trainJob *trainer.TrainJob, jobS
 			if err != nil {
 				return err
 			}
-			spec, err := json.Marshal(job.Template.Spec.Template.Spec)
+			source, err := json.Marshal(job.Template.Spec.Template.Spec)
 			if err != nil {
 				return err
 			}
-			merged, err := strategicpatch.StrategicMergePatch(spec, patch, corev1.PodSpec{})
+			merged, err := strategicpatch.StrategicMergePatch(source, patch, corev1.PodSpec{})
 			if err != nil {
 				return err
 			}
-			err = json.Unmarshal(merged, &jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec)
+			spec := corev1.PodSpec{}
+			err = json.Unmarshal(merged, &spec)
 			if err != nil {
 				return err
 			}
+			jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec = spec
 		}
 	}
 	return nil
