@@ -179,7 +179,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Obj(),
 			},
 		},
-		"succeeded to build JobSet using PodSpecOverrides from the TrainJob.": {
+		"succeeded to build JobSet with container overrides from the TrainJob's PodSpecOverrides.": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
 					WithMLPolicy(
@@ -331,6 +331,173 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								Value: "override_container",
 							},
 						}...,
+					).
+					Obj(),
+			},
+		},
+		"succeeded to build JobSet with volume overrides from the TrainJob's PodSpecOverrides.": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(100).
+							Obj(),
+					).
+					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
+					InitContainer(constants.Node, "override-init-container", "test:runtime").
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+						Obj(),
+				).
+				PodSpecOverrides([]trainer.PodSpecOverride{
+					{
+						TargetJob: constants.DatasetInitializer,
+						Containers: []trainer.ContainerOverride{
+							{
+								Name: constants.DatasetInitializer,
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "initializer_secret",
+										MountPath: "initializer_secret_mount_path",
+									},
+									{
+										Name:      "initializer_claim",
+										MountPath: "initializer_claim_mount_path",
+									},
+								},
+							},
+						},
+						Volumes: []corev1.Volume{
+							{
+								Name: "initializer_secret",
+								VolumeSource: corev1.VolumeSource{
+									Secret: &corev1.SecretVolumeSource{
+										SecretName: "initializer_secret_name",
+									},
+								},
+							},
+							{
+								Name: "initializer_claim",
+								VolumeSource: corev1.VolumeSource{
+									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "initializer_claim_name",
+									},
+								},
+							},
+						},
+					},
+					{
+						TargetJob: constants.Node,
+						Containers: []trainer.ContainerOverride{
+							{
+								Name: constants.Node,
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "node_secret",
+										MountPath: "node_secret_mount_path",
+									},
+									{
+										Name:      "node_claim",
+										MountPath: "node_claim_mount_path",
+									},
+								},
+							},
+						},
+						Volumes: []corev1.Volume{
+							{
+								Name: "node_secret",
+								VolumeSource: corev1.VolumeSource{
+									Secret: &corev1.SecretVolumeSource{
+										SecretName: "node_secret_name",
+									},
+								},
+							},
+							{
+								Name: "node_claim",
+								VolumeSource: corev1.VolumeSource{
+									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "node_claim_name",
+									},
+								},
+							},
+						},
+					},
+				}).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+					NumNodes(100).
+					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
+					InitContainer(constants.Node, "override-init-container", "test:runtime").
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Volumes(constants.DatasetInitializer,
+						corev1.Volume{
+							Name: "initializer_claim",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "initializer_claim_name",
+								},
+							},
+						},
+						corev1.Volume{
+							Name: "initializer_secret",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: "initializer_secret_name",
+								},
+							},
+						},
+					).
+					VolumeMounts(constants.DatasetInitializer, constants.DatasetInitializer,
+						corev1.VolumeMount{
+							Name:      "initializer_secret",
+							MountPath: "initializer_secret_mount_path",
+						},
+						corev1.VolumeMount{
+							Name:      "initializer_claim",
+							MountPath: "initializer_claim_mount_path",
+						},
+					).
+					Volumes(constants.Node,
+						corev1.Volume{
+							Name: "node_claim",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "node_claim_name",
+								},
+							},
+						},
+						corev1.Volume{
+							Name: "node_secret",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: "node_secret_name",
+								},
+							},
+						},
+					).
+					VolumeMounts(constants.Node, constants.Node,
+						corev1.VolumeMount{
+							Name:      "node_secret",
+							MountPath: "node_secret_mount_path",
+						},
+						corev1.VolumeMount{
+							Name:      "node_claim",
+							MountPath: "node_claim_mount_path",
+						},
 					).
 					Obj(),
 			},
@@ -923,6 +1090,12 @@ test-job-node-0-1.test-job slots=8
 			return a.GetObjectKind().GroupVersionKind().String() < b.GetObjectKind().GroupVersionKind().String()
 		}),
 		cmpopts.SortSlices(func(a, b corev1.EnvVar) bool {
+			return a.Name < b.Name
+		}),
+		cmpopts.SortSlices(func(a, b corev1.Volume) bool {
+			return a.Name < b.Name
+		}),
+		cmpopts.SortSlices(func(a, b corev1.VolumeMount) bool {
 			return a.Name < b.Name
 		}),
 	}
