@@ -573,6 +573,65 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Obj(),
 			},
 		},
+		"succeeded to build JobSet with node selector overrides from the TrainJob's PodSpecOverrides.": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(100).
+							Obj(),
+					).
+					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
+					InitContainer(constants.Node, "override-init-container", "test:runtime").
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+						Obj(),
+				).
+				PodSpecOverrides([]trainer.PodSpecOverride{
+					{
+						TargetJob: constants.DatasetInitializer,
+						NodeSelector: map[string]string{
+							"node.kubernetes.io/instance-type": "p5.48xlarge",
+						},
+					},
+					{
+						TargetJob: constants.Node,
+						NodeSelector: map[string]string{
+							"node.kubernetes.io/instance-type": "p5.48xlarge",
+						},
+					},
+				}).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+					NumNodes(100).
+					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
+					InitContainer(constants.Node, "override-init-container", "test:runtime").
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					NodeSelector(constants.DatasetInitializer,
+						map[string]string{
+							"node.kubernetes.io/instance-type": "p5.48xlarge",
+						}).
+					NodeSelector(constants.Node,
+						map[string]string{
+							"node.kubernetes.io/instance-type": "p5.48xlarge",
+						}).
+					Obj(),
+			},
+		},
 		"succeeded to build JobSet with dataset and model initializer from the TrainJob.": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).

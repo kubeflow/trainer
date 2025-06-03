@@ -283,6 +283,16 @@ func (j *JobSetWrapper) ContainerTrainerPorts(ports []corev1.ContainerPort) *Job
 	return j
 }
 
+func (j *JobSetWrapper) NodeSelector(rJobName string, selector map[string]string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			// NodeSelector field is atomic
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.NodeSelector = selector
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) Tolerations(rJobName string, tolerations ...corev1.Toleration) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {
