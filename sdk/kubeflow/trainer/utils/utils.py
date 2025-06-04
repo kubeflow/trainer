@@ -15,9 +15,11 @@
 import inspect
 import os
 import queue
+import re
 import textwrap
 import threading
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 import kubeflow.trainer.models as models
 from kubeflow.trainer.constants import constants
@@ -327,6 +329,7 @@ def get_entrypoint_using_train_func(
 
 def get_args_using_torchtune_config(
     fine_tuning_config: types.TorchTuneConfig,
+    initializer: Optional[types.Initializer] = None,
 ) -> Tuple[List[str], List[str]]:
     """
     Get the Trainer args from the TorchTuneConfig.
@@ -351,6 +354,27 @@ def get_args_using_torchtune_config(
     # Override the loss if it is provided.
     if fine_tuning_config.loss:
         args.append(f"loss={fine_tuning_config.loss}")
+
+    # Override the data dir or data files if it is provided.
+    if isinstance(initializer, types.Initializer) and isinstance(
+        initializer.dataset, types.HuggingFaceDatasetInitializer
+    ):
+        storage_uri = (
+            "hf://" + initializer.dataset.storage_uri
+            if not initializer.dataset.storage_uri.startswith("hf://")
+            else initializer.dataset.storage_uri
+        )
+        storage_uri_parsed = urlparse(storage_uri)
+        relative_path = re.sub(r"^/[^/]+", "", storage_uri_parsed.path)
+
+        if "." in relative_path:
+            args.append(
+                f"dataset.data_files={os.path.join(constants.DATASET_PATH, relative_path)}"
+            )
+        else:
+            args.append(
+                f"dataset.data_dir={os.path.join(constants.DATASET_PATH, relative_path)}"
+            )
 
     if fine_tuning_config.dataset_preprocess_config:
         args += get_args_in_dataset_preprocess_config(
@@ -395,6 +419,7 @@ def get_trainer_crd_from_custom_trainer(
 
 def get_trainer_crd_from_builtin_trainer(
     trainer: types.BuiltinTrainer,
+    initializer: Optional[types.Initializer] = None,
 ) -> models.TrainerV1alpha1Trainer:
     """
     Get the Trainer CRD from the builtin trainer.
@@ -418,7 +443,7 @@ def get_trainer_crd_from_builtin_trainer(
     # the torchtune config in the runtime plugin.
     # Ref:https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2
     trainer_crd.command, trainer_crd.args = get_args_using_torchtune_config(
-        trainer.config
+        trainer.config, initializer
     )
 
     return trainer_crd

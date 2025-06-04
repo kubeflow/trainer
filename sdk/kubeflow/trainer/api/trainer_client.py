@@ -193,7 +193,9 @@ class TrainerClient:
 
             # If users choose to use a builtin trainer for post-training.
             elif isinstance(trainer, types.BuiltinTrainer):
-                trainer_crd = utils.get_trainer_crd_from_builtin_trainer(trainer)
+                trainer_crd = utils.get_trainer_crd_from_builtin_trainer(
+                    trainer, initializer
+                )
 
             else:
                 raise ValueError(

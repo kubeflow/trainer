@@ -21,9 +21,8 @@ class HuggingFace(utils.DatasetProvider):
 
     def download_dataset(self):
         storage_uri_parsed = urlparse(self.config.storage_uri)
-        dataset_uri = (
-            storage_uri_parsed.netloc + storage_uri_parsed.path.strip("/").split("/")[0]
-        )
+        repo_name = storage_uri_parsed.path.strip("/").split("/")[0]
+        dataset_uri = storage_uri_parsed.netloc + repo_name
 
         logging.info(f"Downloading dataset: {dataset_uri}")
         logging.info("-" * 40)
