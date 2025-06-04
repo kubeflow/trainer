@@ -76,7 +76,7 @@ spec:
                         - --config llama3_2/1B_full.yaml
                         - dataset=torchtune.datasets.instruct_dataset
                         - dataset.source=parquet
-                        - dataset.data_dir=/workspace/dataset/alpaca/data
+                        - dataset.data_dir=/workspace/dataset/data
                       resources:
                         limits:
                           nvidia.com/gpu: 2
