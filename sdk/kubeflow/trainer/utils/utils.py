@@ -540,23 +540,6 @@ def get_args_in_dataset_preprocess_config(
         args.append(f"dataset.source={dataset_preprocess_config.source}")
 
     # Override the data dir or data files if it is provided.
-    if dataset_preprocess_config.data_files:
-        if not isinstance(dataset_preprocess_config.data_files, List[str]):
-            raise ValueError(
-                f"Invalid data_files type: {type(dataset_preprocess_config.data_files)}."
-            )
-
-        paths = []
-        for path in dataset_preprocess_config.data_files:
-            paths.append(os.path.join(constants.DATASET_PATH, path))
-
-        args.append(f"dataset.data_files={paths}")
-
-    elif dataset_preprocess_config.data_dir:
-        data_dir = os.path.join(
-            constants.DATASET_PATH, dataset_preprocess_config.data_dir
-        )
-        args.append(f"dataset.data_dir={data_dir}")
 
     # Override the split field if it is provided.
     if dataset_preprocess_config.split:

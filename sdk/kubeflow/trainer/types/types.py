@@ -82,12 +82,6 @@ class TorchTuneInstructDataset:
 
     Args:
         source (`Optional[DataFormat]`): Data file type.
-        data_dir (`Optional[str]`):
-            The path to the data directory. For HF dataset, the value should be `<repo>/<dir_path>`.
-            The behavior is equal to passing all data files under `data_dir` to `data_files`.
-            all the files in a directory. But if `data_files` is specified, `data_dir` is ignored.
-        data_files (`Optional[List[str]]`):
-            The path to the data files. For HF dataset, the value should be `<repo>/<file_path>`.
         split (`Optional[str]`):
             The split of the dataset to use.  You can use this argument to load a subset of
             a given split, e.g. split="train[:10%]". Default is `train`.
@@ -104,8 +98,6 @@ class TorchTuneInstructDataset:
     """
 
     source: Optional[DataFormat] = None
-    data_dir: Optional[str] = None
-    data_files: Optional[List[str]] = None
     split: Optional[str] = None
     train_on_input: Optional[bool] = None
     new_system_prompt: Optional[str] = None
