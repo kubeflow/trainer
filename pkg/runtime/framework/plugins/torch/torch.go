@@ -210,13 +210,10 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			newCommand = append(newCommand, recipe, fmt.Sprintf("--config %s", config))
 
 			// 3. Load local model and export the fine-tuned model.
-			tokenizerPath := getTokenizerPath(model)
-			checkpointDir := getCheckpointDir(model)
-			outputDir := getModelOutputPath(model)
 			newCommand = append(newCommand,
-				fmt.Sprintf("%s=%s", constants.TorchTuneModelOutputDir, outputDir),
-				fmt.Sprintf("%s=%s", constants.TorchTuneTokenizerPath, tokenizerPath),
-				fmt.Sprintf("%s=%s", constants.TorchTuneCheckpointDir, checkpointDir),
+				fmt.Sprintf("%s=%s", constants.TorchTuneModelOutputDir, getModelOutputPath(model)),
+				fmt.Sprintf("%s=%s", constants.TorchTuneTokenizerPath, getTokenizerPath(model)),
+				fmt.Sprintf("%s=%s", constants.TorchTuneCheckpointDir, getCheckpointDir(model)),
 			)
 
 			trainJob.Spec.Trainer.Command = append(trainJob.Spec.Trainer.Command, newCommand...)
