@@ -556,8 +556,8 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							constants.TorchTuneFullFinetuneDistributed,
 							"--config llama3_3/70B_full_multinode.yaml",
 							"output_dir=/workspace/model/llama3_3/70B",
-							"tokenizer.path=/workspace/model/Llama-3.3-70B-Instruct/original/tokenizer.model",
-							"checkpointer.checkpoint_dir=/workspace/model/Llama-3.3-70B-Instruct",
+							"tokenizer.path=/workspace/model/original/tokenizer.model",
+							"checkpointer.checkpoint_dir=/workspace/model",
 						},
 						[]string{
 							"dtype=fp16",
