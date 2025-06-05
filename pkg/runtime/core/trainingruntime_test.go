@@ -255,7 +255,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
-						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
+						TargetJobs:         []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 						ServiceAccountName: ptr.To("override-sa"),
 						InitContainers: []trainer.ContainerOverride{
 							{
