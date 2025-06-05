@@ -1,12 +1,13 @@
 approvers:
   - andreyvelich
+  - Electronic-Waste
   - gaocegege
   - Jeffwan
   - johnugeorge
   - tenzen-y
   - terrytangyuan
 reviewers:
-  - Electronic-Waste
+  - astefanutti
   - jinchihe
   - kuizhiqing
 emeritus_approvers:
