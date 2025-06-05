@@ -182,24 +182,18 @@ var (
 )
 
 type TorchTuneModel struct {
-	// CheckpointDir is the checkpointer directory relative to the model repo.
-	CheckpointDir string
-
 	// TokenizerPath is the tokenizer path relative to the model repo.
 	TokenizerPath string
 }
 
 var DefaultTorchTuneModels = map[string]TorchTuneModel{
 	TORCHTUNE_MODEL_LLAMA3_2_1B: {
-		CheckpointDir: "/",
 		TokenizerPath: "/original/tokenizer.model",
 	},
 	TORCHTUNE_MODEL_LLAMA3_2_7B: {
-		CheckpointDir: "/",
 		TokenizerPath: "/original/tokenizer.model",
 	},
 	TORCHTUNE_MODEL_LLAMA3_3_70B: {
-		CheckpointDir: "/",
 		TokenizerPath: "/original/tokenizer.model",
 	},
 }

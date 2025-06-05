@@ -213,7 +213,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			newCommand = append(newCommand,
 				fmt.Sprintf("%s=%s", constants.TorchTuneModelOutputDir, getModelOutputPath(model)),
 				fmt.Sprintf("%s=%s", constants.TorchTuneTokenizerPath, getTokenizerPath(model)),
-				fmt.Sprintf("%s=%s", constants.TorchTuneCheckpointDir, getCheckpointDir(model)),
+				fmt.Sprintf("%s=%s", constants.TorchTuneCheckpointDir, constants.ModelMountPath),
 			)
 
 			trainJob.Spec.Trainer.Command = append(trainJob.Spec.Trainer.Command, newCommand...)
@@ -261,13 +261,6 @@ func getTokenizerPath(model string) string {
 	torchtuneModel := constants.DefaultTorchTuneModels[model]
 
 	return path.Join(constants.ModelMountPath, torchtuneModel.TokenizerPath)
-}
-
-// getCheckpointDir returns the path to local model for the given model name.
-func getCheckpointDir(model string) string {
-	torchtuneModel := constants.DefaultTorchTuneModels[model]
-
-	return path.Join(constants.ModelMountPath, torchtuneModel.CheckpointDir)
 }
 
 // getModelOutputPath returns the model export path for the given model name.
