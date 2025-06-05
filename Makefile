@@ -119,7 +119,7 @@ manifests: controller-gen ## Generate manifests.
 
 ## TODO (kramaranya): Remove gen-sdk.sh when moving SDK
 .PHONY: generate
-generate: go-mod-download manifests ## Generate APIs and SDK.
+generate: go-mod-download manifests helm-docs ## Generate APIs, SDK and Helm documentation.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh
 	hack/python-api/gen-api.sh
