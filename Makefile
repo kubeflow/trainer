@@ -121,7 +121,7 @@ manifests: controller-gen ## Generate manifests.
 		output:webhook:artifacts:config=manifests/base/webhook
 
 .PHONY: generate
-generate: go-mod-download manifests ## Generate APIs and SDK.
+generate: go-mod-download manifests ## Generate APIs.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh
 	CONTAINER_RUNTIME=$(CONTAINER_RUNTIME) hack/python-api/gen-api.sh
