@@ -309,11 +309,11 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
 						PodSpecOverrides([]trainer.PodSpecOverride{
 							{
-								TargetJob:          "node",
+								TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: "node"}},
 								ServiceAccountName: ptr.To("custom-sa"),
 							},
 							{
-								TargetJob:          "node",
+								TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: "node"}},
 								ServiceAccountName: ptr.To("custom-sa-two"),
 							},
 						}).

@@ -119,22 +119,24 @@ func (j *JobSet) Validate(info *runtime.Info, _, newObj *trainer.TrainJob) (admi
 
 	// TODO (andreyvelich): Validate Volumes, VolumeMounts, and Tolerations.
 	for _, podSpecOverride := range newObj.Spec.PodSpecOverrides {
-		containers, ok := rJobContainerNames[podSpecOverride.TargetJob]
-		if !ok {
-			allErrs = append(allErrs, field.Invalid(podSpecOverridePath, newObj.Spec.PodSpecOverrides, "must not have targetJob that doesn't exist in the runtime job template"))
-		}
-		for _, overrideContainer := range podSpecOverride.InitContainers {
-			if !containers.Has(overrideContainer.Name) {
-				allErrs = append(allErrs, field.Invalid(podSpecOverridePath, newObj.Spec.PodSpecOverrides, fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", podSpecOverride.TargetJob)))
+		for _, targetJob := range podSpecOverride.TargetJobs {
+			containers, ok := rJobContainerNames[targetJob.Name]
+			if !ok {
+				allErrs = append(allErrs, field.Invalid(podSpecOverridePath, newObj.Spec.PodSpecOverrides, "must not have targetJob that doesn't exist in the runtime job template"))
 			}
-		}
-		for _, overrideContainer := range podSpecOverride.Containers {
-			if !containers.Has(overrideContainer.Name) {
-				allErrs = append(allErrs, field.Invalid(podSpecOverridePath, newObj.Spec.PodSpecOverrides, fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", podSpecOverride.TargetJob)))
-				// Trainer and Initializer APIs should be used to set TrainJob envs for the reserved containers.
-			} else if len(overrideContainer.Env) > 0 && (overrideContainer.Name == constants.DatasetInitializer || overrideContainer.Name == constants.ModelInitializer || overrideContainer.Name == constants.Node) {
-				allErrs = append(allErrs, field.Invalid(podSpecOverridePath, newObj.Spec.PodSpecOverrides,
-					fmt.Sprintf("must not have envs for the %s, %s, %s containers", constants.DatasetInitializer, constants.ModelInitializer, constants.Node)))
+			for _, overrideContainer := range podSpecOverride.InitContainers {
+				if !containers.Has(overrideContainer.Name) {
+					allErrs = append(allErrs, field.Invalid(podSpecOverridePath, newObj.Spec.PodSpecOverrides, fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", targetJob.Name)))
+				}
+			}
+			for _, overrideContainer := range podSpecOverride.Containers {
+				if !containers.Has(overrideContainer.Name) {
+					allErrs = append(allErrs, field.Invalid(podSpecOverridePath, newObj.Spec.PodSpecOverrides, fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", targetJob.Name)))
+					// Trainer and Initializer APIs should be used to set TrainJob envs for the reserved containers.
+				} else if len(overrideContainer.Env) > 0 && (overrideContainer.Name == constants.DatasetInitializer || overrideContainer.Name == constants.ModelInitializer || overrideContainer.Name == constants.Node) {
+					allErrs = append(allErrs, field.Invalid(podSpecOverridePath, newObj.Spec.PodSpecOverrides,
+						fmt.Sprintf("must not have envs for the %s, %s, %s containers", constants.DatasetInitializer, constants.ModelInitializer, constants.Node)))
+				}
 			}
 		}
 	}

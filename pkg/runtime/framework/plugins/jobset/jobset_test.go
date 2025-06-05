@@ -538,14 +538,14 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
 				PodSpecOverrides([]trainer.PodSpecOverride{
 					{
-						TargetJob: "invalid",
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: "invalid"}},
 					},
 				}).Obj(),
 			wantError: field.ErrorList{
 				field.Invalid(podSpecOverridePath,
 					[]trainer.PodSpecOverride{
 						{
-							TargetJob: "invalid",
+							TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: "invalid"}},
 						},
 					},
 					"must not have targetJob that doesn't exist in the runtime job template"),
@@ -579,7 +579,7 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
 				PodSpecOverrides([]trainer.PodSpecOverride{
 					{
-						TargetJob: constants.Node,
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 						InitContainers: []trainer.ContainerOverride{
 							{
 								Name: "invalid",
@@ -591,7 +591,7 @@ func TestValidate(t *testing.T) {
 				field.Invalid(podSpecOverridePath,
 					[]trainer.PodSpecOverride{
 						{
-							TargetJob: constants.Node,
+							TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 							InitContainers: []trainer.ContainerOverride{
 								{
 									Name: "invalid",
@@ -630,7 +630,7 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
 				PodSpecOverrides([]trainer.PodSpecOverride{
 					{
-						TargetJob: constants.Node,
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 						Containers: []trainer.ContainerOverride{
 							{
 								Name: "invalid",
@@ -642,7 +642,7 @@ func TestValidate(t *testing.T) {
 				field.Invalid(podSpecOverridePath,
 					[]trainer.PodSpecOverride{
 						{
-							TargetJob: constants.Node,
+							TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 							Containers: []trainer.ContainerOverride{
 								{
 									Name: "invalid",
@@ -681,7 +681,7 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
 				PodSpecOverrides([]trainer.PodSpecOverride{
 					{
-						TargetJob: constants.Node,
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 						Containers: []trainer.ContainerOverride{
 							{
 								Name: constants.Node,
@@ -699,7 +699,7 @@ func TestValidate(t *testing.T) {
 				field.Invalid(podSpecOverridePath,
 					[]trainer.PodSpecOverride{
 						{
-							TargetJob: constants.Node,
+							TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 							Containers: []trainer.ContainerOverride{
 								{
 									Name: constants.Node,

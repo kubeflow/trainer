@@ -237,7 +237,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				).
 				PodSpecOverrides([]trainer.PodSpecOverride{
 					{
-						TargetJob: constants.DatasetInitializer,
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.DatasetInitializer}},
 						InitContainers: []trainer.ContainerOverride{
 							{
 								Name: "override-init-container",
@@ -255,7 +255,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
-						TargetJob:          constants.Node,
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 						ServiceAccountName: ptr.To("override-sa"),
 						InitContainers: []trainer.ContainerOverride{
 							{
@@ -359,7 +359,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				).
 				PodSpecOverrides([]trainer.PodSpecOverride{
 					{
-						TargetJob: constants.DatasetInitializer,
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.DatasetInitializer}},
 						Containers: []trainer.ContainerOverride{
 							{
 								Name: constants.DatasetInitializer,
@@ -395,7 +395,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
-						TargetJob: constants.Node,
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 						Containers: []trainer.ContainerOverride{
 							{
 								Name: constants.Node,
@@ -526,7 +526,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				).
 				PodSpecOverrides([]trainer.PodSpecOverride{
 					{
-						TargetJob: constants.DatasetInitializer,
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.DatasetInitializer}},
 						Tolerations: []corev1.Toleration{
 							{
 								Key:      "nvidia.com/gpu",
@@ -536,7 +536,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
-						TargetJob: constants.Node,
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 						Tolerations: []corev1.Toleration{
 							{
 								Key:      "nvidia.com/gpu",
@@ -597,13 +597,13 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				).
 				PodSpecOverrides([]trainer.PodSpecOverride{
 					{
-						TargetJob: constants.DatasetInitializer,
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.DatasetInitializer}},
 						NodeSelector: map[string]string{
 							"node.kubernetes.io/instance-type": "p5.48xlarge",
 						},
 					},
 					{
-						TargetJob: constants.Node,
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 						NodeSelector: map[string]string{
 							"node.kubernetes.io/instance-type": "p5.48xlarge",
 						},

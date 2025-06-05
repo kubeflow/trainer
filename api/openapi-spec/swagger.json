@@ -13477,7 +13477,7 @@
         "description": "PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.",
         "type": "object",
         "required": [
-          "targetJob"
+          "targetJobs"
         ],
         "properties": {
           "containers": {
@@ -13524,10 +13524,18 @@
             "description": "Override for the service account.",
             "type": "string"
           },
-          "targetJob": {
-            "description": "TargetJob is the name of the Job the override applies to.",
-            "type": "string",
-            "default": ""
+          "targetJobs": {
+            "description": "TrainJobs is the training job replicas in the training runtime template to apply the overrides.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.PodSpecOverrideTargetJob"
+                }
+              ]
+            },
+            "x-kubernetes-list-type": "atomic"
           },
           "tolerations": {
             "description": "Override for the Pod's tolerations.",
@@ -13557,6 +13565,19 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
+          }
+        }
+      },
+      "trainer.v1alpha1.PodSpecOverrideTargetJob": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "description": "Name is the target training job name for which the PodSpec is overridden.",
+            "type": "string",
+            "default": ""
           }
         }
       },
@@ -13762,11 +13783,7 @@
                   "$ref": "#/components/schemas/trainer.v1alpha1.PodSpecOverride"
                 }
               ]
-            },
-            "x-kubernetes-list-map-keys": [
-              "targetJob"
-            ],
-            "x-kubernetes-list-type": "map"
+            }
           },
           "runtimeRef": {
             "description": "Reference to the training runtime. The field is immutable.",

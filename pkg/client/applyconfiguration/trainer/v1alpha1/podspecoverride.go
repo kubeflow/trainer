@@ -23,13 +23,13 @@ import (
 // PodSpecOverrideApplyConfiguration represents a declarative configuration of the PodSpecOverride type for use
 // with apply.
 type PodSpecOverrideApplyConfiguration struct {
-	TargetJob          *string                               `json:"targetJob,omitempty"`
-	ServiceAccountName *string                               `json:"serviceAccountName,omitempty"`
-	NodeSelector       map[string]string                     `json:"nodeSelector,omitempty"`
-	Tolerations        []v1.TolerationApplyConfiguration     `json:"tolerations,omitempty"`
-	Volumes            []v1.VolumeApplyConfiguration         `json:"volumes,omitempty"`
-	InitContainers     []ContainerOverrideApplyConfiguration `json:"initContainers,omitempty"`
-	Containers         []ContainerOverrideApplyConfiguration `json:"containers,omitempty"`
+	TargetJobs         []PodSpecOverrideTargetJobApplyConfiguration `json:"targetJobs,omitempty"`
+	ServiceAccountName *string                                      `json:"serviceAccountName,omitempty"`
+	NodeSelector       map[string]string                            `json:"nodeSelector,omitempty"`
+	Tolerations        []v1.TolerationApplyConfiguration            `json:"tolerations,omitempty"`
+	Volumes            []v1.VolumeApplyConfiguration                `json:"volumes,omitempty"`
+	InitContainers     []ContainerOverrideApplyConfiguration        `json:"initContainers,omitempty"`
+	Containers         []ContainerOverrideApplyConfiguration        `json:"containers,omitempty"`
 }
 
 // PodSpecOverrideApplyConfiguration constructs a declarative configuration of the PodSpecOverride type for use with
@@ -38,11 +38,16 @@ func PodSpecOverride() *PodSpecOverrideApplyConfiguration {
 	return &PodSpecOverrideApplyConfiguration{}
 }
 
-// WithTargetJob sets the TargetJob field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the TargetJob field is set to the value of the last call.
-func (b *PodSpecOverrideApplyConfiguration) WithTargetJob(value string) *PodSpecOverrideApplyConfiguration {
-	b.TargetJob = &value
+// WithTargetJobs adds the given value to the TargetJobs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the TargetJobs field.
+func (b *PodSpecOverrideApplyConfiguration) WithTargetJobs(values ...*PodSpecOverrideTargetJobApplyConfiguration) *PodSpecOverrideApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithTargetJobs")
+		}
+		b.TargetJobs = append(b.TargetJobs, *values[i])
+	}
 	return b
 }
 

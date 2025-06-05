@@ -112,8 +112,6 @@ type TrainJobSpec struct {
 
 	// Custom overrides for the training runtime.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
-	// +listType=map
-	// +listMapKey=targetJob
 	PodSpecOverrides []PodSpecOverride `json:"podSpecOverrides,omitempty"`
 
 	// Whether the controller should suspend the running TrainJob.
@@ -234,8 +232,9 @@ type Trainer struct {
 
 // PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.
 type PodSpecOverride struct {
-	// TargetJob is the name of the Job the override applies to.
-	TargetJob string `json:"targetJob"`
+	// TrainJobs is the training job replicas in the training runtime template to apply the overrides.
+	// +listType=atomic
+	TargetJobs []PodSpecOverrideTargetJob `json:"targetJobs"`
 
 	// Override for the service account.
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
@@ -261,6 +260,11 @@ type PodSpecOverride struct {
 	// +listType=map
 	// +listMapKey=name
 	Containers []ContainerOverride `json:"containers,omitempty"`
+}
+
+type PodSpecOverrideTargetJob struct {
+	// Name is the target training job name for which the PodSpec is overridden.
+	Name string `json:"name"`
 }
 
 // ContainerOverride represents parameters that can be overridden using PodSpecOverrides.

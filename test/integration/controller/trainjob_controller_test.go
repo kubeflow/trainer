@@ -558,7 +558,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Obj()).
 					PodSpecOverrides([]trainer.PodSpecOverride{
 						{
-							TargetJob:          constants.Node,
+							TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 							ServiceAccountName: ptr.To("override-sa"),
 							InitContainers: []trainer.ContainerOverride{
 								{

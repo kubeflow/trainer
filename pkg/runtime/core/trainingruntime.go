@@ -181,7 +181,14 @@ func (r *TrainingRuntime) newRuntimeInfo(
 func (r *TrainingRuntime) mergePodSpecOverrides(trainJob *trainer.TrainJob, jobSetTemplateSpec *trainer.JobSetTemplateSpec) error {
 	for _, podSpecOverride := range trainJob.Spec.PodSpecOverrides {
 		for i, job := range jobSetTemplateSpec.Spec.ReplicatedJobs {
-			if podSpecOverride.TargetJob != job.Name {
+			jobMatchesTarget := false
+			for _, targetJob := range podSpecOverride.TargetJobs {
+				if targetJob.Name == job.Name {
+					jobMatchesTarget = true
+					break
+				}
+			}
+			if !jobMatchesTarget {
 				continue
 			}
 			patch, err := json.Marshal(podSpecOverride)

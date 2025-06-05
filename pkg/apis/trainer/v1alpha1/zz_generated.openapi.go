@@ -45,6 +45,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodGroupPolicy":                   schema_pkg_apis_trainer_v1alpha1_PodGroupPolicy(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodGroupPolicySource":             schema_pkg_apis_trainer_v1alpha1_PodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodSpecOverride":                  schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref),
+		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob":         schema_pkg_apis_trainer_v1alpha1_PodSpecOverrideTargetJob(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.RuntimeRef":                       schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.TorchElasticPolicy":               schema_pkg_apis_trainer_v1alpha1_TorchElasticPolicy(ref),
 		"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.TorchMLPolicySource":              schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref),
@@ -947,12 +948,23 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 				Description: "PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"targetJob": {
+					"targetJobs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
-							Description: "TargetJob is the name of the Job the override applies to.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Description: "TrainJobs is the training job replicas in the training runtime template to apply the overrides.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob"),
+									},
+								},
+							},
 						},
 					},
 					"serviceAccountName": {
@@ -1064,11 +1076,32 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"targetJob"},
+				Required: []string{"targetJobs"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ContainerOverride", "k8s.io/api/core/v1.Toleration", "k8s.io/api/core/v1.Volume"},
+			"github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.ContainerOverride", "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob", "k8s.io/api/core/v1.Toleration", "k8s.io/api/core/v1.Volume"},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_PodSpecOverrideTargetJob(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the target training job name for which the PodSpec is overridden.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
 	}
 }
 
@@ -1350,14 +1383,6 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 						},
 					},
 					"podSpecOverrides": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"targetJob",
-								},
-								"x-kubernetes-list-type": "map",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Custom overrides for the training runtime.",
 							Type:        []string{"array"},

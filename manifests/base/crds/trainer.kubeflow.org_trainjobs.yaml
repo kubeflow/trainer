@@ -820,10 +820,20 @@ spec:
                     serviceAccountName:
                       description: Override for the service account.
                       type: string
-                    targetJob:
-                      description: TargetJob is the name of the Job the override applies
-                        to.
-                      type: string
+                    targetJobs:
+                      description: TrainJobs is the training job replicas in the training
+                        runtime template to apply the overrides.
+                      items:
+                        properties:
+                          name:
+                            description: Name is the target training job name for
+                              which the PodSpec is overridden.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-type: atomic
                     tolerations:
                       description: Override for the Pod's tolerations.
                       items:
@@ -2683,12 +2693,9 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                   required:
-                  - targetJob
+                  - targetJobs
                   type: object
                 type: array
-                x-kubernetes-list-map-keys:
-                - targetJob
-                x-kubernetes-list-type: map
                 x-kubernetes-validations:
                 - message: Value is immutable
                   rule: self == oldSelf

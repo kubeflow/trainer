@@ -58,6 +58,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.PodGroupPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("PodSpecOverride"):
 		return &trainerv1alpha1.PodSpecOverrideApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("PodSpecOverrideTargetJob"):
+		return &trainerv1alpha1.PodSpecOverrideTargetJobApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimeRef"):
 		return &trainerv1alpha1.RuntimeRefApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TorchElasticPolicy"):
