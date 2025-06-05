@@ -182,9 +182,6 @@ var (
 )
 
 type TorchTuneModel struct {
-	// Name is the name of the model in HuggingFace.
-	Name string
-
 	// CheckpointDir is the checkpointer directory relative to the model repo.
 	CheckpointDir string
 
@@ -194,17 +191,14 @@ type TorchTuneModel struct {
 
 var DefaultTorchTuneModels = map[string]TorchTuneModel{
 	TORCHTUNE_MODEL_LLAMA3_2_1B: {
-		Name:          "Llama-3.2-1B-Instruct",
 		CheckpointDir: "/",
 		TokenizerPath: "/original/tokenizer.model",
 	},
 	TORCHTUNE_MODEL_LLAMA3_2_7B: {
-		Name:          "Llama-3.2-1B-Instruct",
 		CheckpointDir: "/",
 		TokenizerPath: "/original/tokenizer.model",
 	},
 	TORCHTUNE_MODEL_LLAMA3_3_70B: {
-		Name:          "Llama-3.3-70B-Instruct",
 		CheckpointDir: "/",
 		TokenizerPath: "/original/tokenizer.model",
 	},

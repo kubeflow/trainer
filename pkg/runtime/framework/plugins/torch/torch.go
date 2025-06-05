@@ -262,17 +262,15 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, model
 // getTokenizerPath returns the path to local tokenizer for the given model name.
 func getTokenizerPath(model string) string {
 	torchtuneModel := constants.DefaultTorchTuneModels[model]
-	workDir := path.Join(constants.ModelMountPath, torchtuneModel.Name)
 
-	return path.Join(workDir, torchtuneModel.TokenizerPath)
+	return path.Join(constants.ModelMountPath, torchtuneModel.TokenizerPath)
 }
 
 // getCheckpointDir returns the path to local model for the given model name.
 func getCheckpointDir(model string) string {
 	torchtuneModel := constants.DefaultTorchTuneModels[model]
-	workDir := path.Join(constants.ModelMountPath, torchtuneModel.Name)
 
-	return path.Join(workDir, torchtuneModel.CheckpointDir)
+	return path.Join(constants.ModelMountPath, torchtuneModel.CheckpointDir)
 }
 
 // getModelOutputPath returns the model export path for the given model name.
