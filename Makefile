@@ -161,7 +161,6 @@ test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd ## Ru
 test-python: ## Run Python unit test.
 	pip install pytest
 	pip install -r ./cmd/initializers/dataset/requirements.txt
-	pip install ./sdk
 
 	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/dataset
 	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/model
