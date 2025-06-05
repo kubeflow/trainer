@@ -19,6 +19,13 @@
 set -o errexit
 set -o nounset
 
+# Source container runtime utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../scripts/container-runtime.sh"
+
+# Setup container runtime
+setup_container_runtime
+
 # TODO (andreyvelich): Read this data from the global VERSION file.
 SDK_VERSION="0.1.0"
 SDK_OUTPUT_PATH="sdk"
@@ -28,9 +35,9 @@ TRAINER_ROOT="$(pwd)"
 SWAGGER_CODEGEN_CONF="hack/python-sdk/swagger_config.json"
 SWAGGER_CODEGEN_FILE="api/openapi-spec/swagger.json"
 
-echo "Generating Python SDK for Kubeflow Trainer V2 ..."
+echo "Generating Python SDK for Kubeflow Trainer V2 using ${CONTAINER_RUNTIME}..."
 # We need to add user to allow container override existing files.
-docker run --user "$(id -u)":"$(id -g)" --rm \
+${CONTAINER_RUNTIME} run --user "$(id -u)":"$(id -g)" --rm \
   -v "${TRAINER_ROOT}:/local" docker.io/openapitools/openapi-generator-cli:${OPENAPI_GENERATOR_VERSION} generate \
   -g python \
   -i "local/${SWAGGER_CODEGEN_FILE}" \
