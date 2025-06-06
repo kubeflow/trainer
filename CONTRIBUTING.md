@@ -21,7 +21,7 @@ Note for Lima the link is to the Adopters, which supports several different cont
 The Kubeflow Trainer project includes a Makefile with several helpful commands to streamline your development workflow:
 
 ```sh
-# Generate manifests, APIs and SDK
+# Generate manifests and APIs.
 make generate
 ```
 
@@ -215,24 +215,6 @@ kubectl logs -n kubeflow -l training.kubeflow.org/job-name=pytorch-simple --foll
 
 ### SDK Development
 
-To generate Python SDK for the operator, run:
+Changes to the Kubeflow Trainer Python SDK can be made in the https://github.com/kubeflow/sdk repo.
 
-```sh
-./hack/python-sdk/gen-sdk.sh
-```
-
-This command will re-generate the api and model files together with the documentation and model tests.
-The following files/folders in `sdk/python` are auto-generated and should not be modified directly:
-
-```
-sdk/python/docs
-sdk/python/kubeflow/training/models
-sdk/python/kubeflow/training/*.py
-sdk/python/test/*.py
-```
-
-The Training Operator client and public APIs are located here:
-
-```
-sdk/python/kubeflow/training/api
-```
+The Trainer SDK can be found at https://github.com/kubeflow/sdk/tree/main/python/kubeflow/trainer.

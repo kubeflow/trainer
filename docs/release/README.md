@@ -81,6 +81,9 @@ cherry pick your changes from the `master` branch and submit a PR.
 
 ### Release Training SDK
 
+TODO (eoinfennessy): This information no longer applies to Trainer V2 after moving the SDK to kubeflow/sdk.
+However, we should repurpose this information if we ever decide to publish the Trainer APIs.
+
 1. Update the the VERSION in the [gen-sdk.sh script](../../hack/python-sdk/gen-sdk.sh#L27),
    packageVersion in the [swagger_config.json file](../../hack/python-sdk/swagger_config.json#L4),
    and the version in the [setup.py file](../../sdk/python/setup.py#L36).
