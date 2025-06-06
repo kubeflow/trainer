@@ -1,4 +1,3 @@
-API rule violation: list_type_missing,github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1,TrainJobSpec,PodSpecOverrides
 API rule violation: list_type_missing,sigs.k8s.io/jobset/api/jobset/v1alpha2,FailurePolicy,Rules
 API rule violation: list_type_missing,sigs.k8s.io/jobset/api/jobset/v1alpha2,FailurePolicyRule,OnJobFailureReasons
 API rule violation: names_match,k8s.io/api/core/v1,AzureDiskVolumeSource,DataDiskURI

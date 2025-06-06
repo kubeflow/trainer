@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -181,14 +182,9 @@ func (r *TrainingRuntime) newRuntimeInfo(
 func (r *TrainingRuntime) mergePodSpecOverrides(trainJob *trainer.TrainJob, jobSetTemplateSpec *trainer.JobSetTemplateSpec) error {
 	for _, podSpecOverride := range trainJob.Spec.PodSpecOverrides {
 		for i, job := range jobSetTemplateSpec.Spec.ReplicatedJobs {
-			jobMatchesTarget := false
-			for _, targetJob := range podSpecOverride.TargetJobs {
-				if targetJob.Name == job.Name {
-					jobMatchesTarget = true
-					break
-				}
-			}
-			if !jobMatchesTarget {
+			if !slices.ContainsFunc(podSpecOverride.TargetJobs, func(targetJob trainer.PodSpecOverrideTargetJob) bool {
+				return targetJob.Name == job.Name
+			}) {
 				continue
 			}
 			patch, err := json.Marshal(podSpecOverride)

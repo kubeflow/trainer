@@ -13783,7 +13783,8 @@
                   "$ref": "#/components/schemas/trainer.v1alpha1.PodSpecOverride"
                 }
               ]
-            }
+            },
+            "x-kubernetes-list-type": "atomic"
           },
           "runtimeRef": {
             "description": "Reference to the training runtime. The field is immutable.",

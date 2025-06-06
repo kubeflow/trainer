@@ -118,14 +118,14 @@ func (j *JobSet) Validate(info *runtime.Info, _, newObj *trainer.TrainJob) (admi
 	}
 
 	// TODO (andreyvelich): Validate Volumes, VolumeMounts, and Tolerations.
-	targetJobNames := make(map[string]bool)
+	targetJobNames := sets.New[string]()
 	for _, podSpecOverride := range newObj.Spec.PodSpecOverrides {
 		// Validate that there are no duplicate target job names within the same PodSpecOverride
 		for _, targetJob := range podSpecOverride.TargetJobs {
-			if targetJobNames[targetJob.Name] {
-				allErrs = append(allErrs, field.Invalid(podSpecOverridePath, newObj.Spec.PodSpecOverrides, fmt.Sprintf("must not have duplicate targetJob name %s among the PodSpecOverrides", targetJob.Name)))
+			if targetJobNames.Has(targetJob.Name) {
+				allErrs = append(allErrs, field.Duplicate(podSpecOverridePath, targetJob.Name))
 			}
-			targetJobNames[targetJob.Name] = true
+			targetJobNames.Insert(targetJob.Name)
 		}
 
 		for _, targetJob := range podSpecOverride.TargetJobs {
