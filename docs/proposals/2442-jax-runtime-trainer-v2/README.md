@@ -22,6 +22,8 @@ This proposal implements key components of KEP-2170, introducing the Kubeflow Tr
 JAX is a powerful Computation library created by Google, It is widely used in machine learning research and ranks as the third most wide used deep learning framework. JAX is not only a deep learning framework but suggests its potential in 
 differential programming, large-scale physics simulations and many more. These usecases added on top of the new Runtime API for distributed training or calculation of objectives enables new users on top of kubeflow trainer, like distributed simulation or training of LLM prototypes developed with JAX, like vast models from Google Deep mind.
 
+In General the motivation it to enable users to use do Single-Program Multi-Data (SPMD) with JAX Framework. 
+
 ### Goals
 
 - Implement ClusterTrainingRuntime for JAX, supporting multi-controller JAX
@@ -54,6 +56,8 @@ As a Data Scientist, I want to use the Trainer V2 SDK to run a distributed train
 As a Research Scientist, I want to train prototype of my new LLM model coded with JAX on a distributed training setup on my company Kubernetes cluster, Kubeflow Trainer V2 with JAX ClusterTrainingRuntime will enable this for me.
 
 ## Design Details
+
+The proposed solution is a wrapper for JAX framework which enables usecases with Single-Program Multi-Data (SPMD) code pattern. Our wrapper, followes the multi-controller JAX feature, and the newly Runtime API which is itself a wrapper of top of JobSet API. We will enable the user to define the number of controllers (replicas), define the python process (objective function) and pass the required config. 
 
 | Environment Variable       | JAX Parameter          | Description                                                                                               | Default Value                       |
 |----------------------------|------------------------|-----------------------------------------------------------------------------------------------------------|-----------------------------------------------|
