@@ -179,4 +179,7 @@ var (
 
 	// TorchTuneEntrypoint is the entrypoint for the torchtune.
 	TorchTuneEntrypoint = []string{"tune", "run"}
+
+	// TorchTuneImmutableConfigs is the set of immutable configs for the TorchTune Trainer.
+	TorchTuneImmutableConfigs = sets.New(TorchTuneModelOutputDir, TorchTuneTokenizerPath, TorchTuneCheckpointDir)
 )
