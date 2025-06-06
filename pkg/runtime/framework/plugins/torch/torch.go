@@ -19,7 +19,6 @@ package torch
 import (
 	"context"
 	"fmt"
-	"path"
 	"slices"
 	"strings"
 
@@ -209,13 +208,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, model, trainJob.Spec.Trainer.Args)
 			newCommand = append(newCommand, recipe, fmt.Sprintf("--config %s", config))
 
-			// 3. Load local model and export the fine-tuned model.
-			newCommand = append(newCommand,
-				fmt.Sprintf("%s=%s", constants.TorchTuneModelOutputDir, getModelOutputPath(model)),
-				fmt.Sprintf("%s=%s", constants.TorchTuneTokenizerPath, getTokenizerPath(model)),
-				fmt.Sprintf("%s=%s", constants.TorchTuneCheckpointDir, constants.ModelMountPath),
-			)
-
 			trainJob.Spec.Trainer.Command = append(trainJob.Spec.Trainer.Command, newCommand...)
 		}
 		// Add container port for the headless service.
@@ -254,18 +246,6 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, model
 	}
 
 	return recipe, fmt.Sprintf("%s%s.yaml", model, suffix)
-}
-
-// getTokenizerPath returns the path to local tokenizer for the given model name.
-func getTokenizerPath(model string) string {
-	torchtuneModel := constants.DefaultTorchTuneModels[model]
-
-	return path.Join(constants.ModelMountPath, torchtuneModel.TokenizerPath)
-}
-
-// getModelOutputPath returns the model export path for the given model name.
-func getModelOutputPath(model string) string {
-	return path.Join(constants.ModelMountPath, model)
 }
 
 func getModelFromRuntimeRef(runtimeRefName string) string {

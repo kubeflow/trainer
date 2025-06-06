@@ -180,20 +180,3 @@ var (
 	// TorchTuneEntrypoint is the entrypoint for the torchtune.
 	TorchTuneEntrypoint = []string{"tune", "run"}
 )
-
-type TorchTuneModel struct {
-	// TokenizerPath is the tokenizer path relative to the model repo.
-	TokenizerPath string
-}
-
-var DefaultTorchTuneModels = map[string]TorchTuneModel{
-	TORCHTUNE_MODEL_LLAMA3_2_1B: {
-		TokenizerPath: "/original/tokenizer.model",
-	},
-	TORCHTUNE_MODEL_LLAMA3_2_7B: {
-		TokenizerPath: "/original/tokenizer.model",
-	},
-	TORCHTUNE_MODEL_LLAMA3_3_70B: {
-		TokenizerPath: "/original/tokenizer.model",
-	},
-}
