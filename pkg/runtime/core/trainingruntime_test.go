@@ -515,7 +515,22 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							Obj().
 							Spec,
 					).
-					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(
+						constants.Node,
+						constants.Node,
+						"test:runtime",
+						[]string{
+							"tune",
+							"run",
+							constants.TorchTuneFullFinetuneDistributed,
+							"--config llama3_3/70B_full_multinode.yaml",
+							"output_dir=/workspace/model/llama3_3/70B",
+							"tokenizer.path=/workspace/model/original/tokenizer.model",
+							"checkpointer.checkpoint_dir=/workspace/model",
+						},
+						[]string{"runtime"},
+						resRequests,
+					).
 					Obj(),
 			).Obj(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
