@@ -1,0 +1,201 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - release-*
+    paths:
+      - VERSION
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SEMVER_PATTERN: '^([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.([0-9]+))?$'
+  IMAGE_REGISTRY_GITHUB: ghcr.io
+  IMAGE_REGISTRY_DOCKER: docker.io
+
+jobs:
+  check-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check whether version matches semver pattern
+        run: |
+          VERSION=$(cat VERSION)
+          if [[ ${VERSION} =~ ${{ env.SEMVER_PATTERN }} ]]; then
+            echo "Version '${VERSION}' matches semver pattern."
+          else
+            echo "Version '${VERSION}' does not match semver pattern."
+            exit 1
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Check if tag exists
+        run: |
+          git fetch --tags
+          VERSION=$(cat VERSION)
+          TAG="v${VERSION}"
+          if git tag -l | grep -q "^${TAG}$"; then
+            echo "Tag '${TAG}' already exists."
+            exit 1
+          else
+            echo "Tag '${TAG}' does not exist."
+          fi
+
+      - name: Check if manifests image tag matches version
+        run: |
+          VERSION=$(cat VERSION)
+          TAG="v${VERSION}"
+          MANIFEST_TAGS=$(grep -r 'newTag:' manifests | sed 's/.*newTag:[[:space:]]*//' | tr -d '"' | tr -d "'" | sort | uniq)
+          if [ -z "$MANIFEST_TAGS" ]; then
+              echo "No newTag found in manifests."
+              exit 1
+          fi
+          for t in $MANIFEST_TAGS; do
+              if [ "$t" != "$TAG" ]; then
+                  echo "Image tag in manifests ($t) does not match version tag ($TAG)."
+                  exit 1
+              fi
+          done
+          echo "All image tags in manifests match version tag $TAG."
+
+  build_and_push_images:
+    needs:
+      - check-release
+    name: Build and Push Release Images
+    runs-on:
+      labels: ubuntu-latest-16-cores
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component-name: trainer-controller-manager
+            dockerfile: cmd/trainer-controller-manager/Dockerfile
+            platforms: linux/amd64,linux/arm64,linux/ppc64le
+          - component-name: model-initializer
+            dockerfile: cmd/initializers/model/Dockerfile
+            platforms: linux/amd64,linux/arm64
+          - component-name: dataset-initializer
+            dockerfile: cmd/initializers/dataset/Dockerfile
+            platforms: linux/amd64,linux/arm64
+          - component-name: deepspeed-runtime
+            dockerfile: cmd/runtimes/deepspeed/Dockerfile
+            platforms: linux/amd64,linux/arm64
+          - component-name: mlx-runtime
+            dockerfile: cmd/runtimes/mlx/Dockerfile
+            platforms: linux/arm64
+          - component-name: torchtune-trainer
+            dockerfile: cmd/trainers/torchtune/Dockerfile
+            platforms: linux/amd64,linux/arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from VERSION file
+        run: |
+          VERSION=$(cat VERSION)
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: GHCR Login
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.IMAGE_REGISTRY_GITHUB }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Hub Login
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.IMAGE_REGISTRY_DOCKER }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish Component ${{ matrix.component-name }}
+        uses: ./.github/workflows/template-publish-image
+        with:
+          image: |
+            ${{ env.IMAGE_REGISTRY_GITHUB }}/milinddethe15/kf-trainer/${{ matrix.component-name }}
+            ${{ env.IMAGE_REGISTRY_DOCKER }}/milinddethe15/${{ matrix.component-name }}
+          dockerfile: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platforms }}
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            type=raw,value=v${{ env.VERSION }}
+            type=sha
+
+  push_tag:
+    needs:
+      - build_and_push_images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Read version from VERSION file
+        run: |
+          VERSION=$(cat VERSION)
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Create and push tag
+        run: |
+          VERSION=$(cat VERSION)
+          TAG="v${VERSION}"
+          git tag -a "$TAG" -m "Kubeflow Trainer $TAG"
+          git push origin "$TAG"
+
+  draft_release:
+    needs:
+      - push_tag
+
+    permissions:
+      contents: write
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Read version from VERSION file
+        run: |
+          VERSION=$(cat VERSION)
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Release
+        id: release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: "Kubeflow Trainer v${{ env.VERSION }}"
+          tag_name: v${{ env.VERSION }}
+          prerelease: ${{ contains(env.VERSION, 'rc') }}
+          target_commitish: ${{ github.sha }}
+          draft: true
+          body: |
+            # Kubeflow Trainer v${{ env.VERSION }}
+
+            ## What's Changed
+            <!-- Add release changelog here manually -->
+            ```

@@ -1,0 +1,65 @@
+name: Check Release
+
+on:
+  pull_request:
+    branches:
+      - release-*
+    paths:
+      - VERSION
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SEMVER_PATTERN: '^([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.([0-9]+))?$'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check whether version matches semver pattern
+        run: |
+          VERSION=$(cat VERSION)
+          if [[ ${VERSION} =~ ${{ env.SEMVER_PATTERN }} ]]; then
+            echo "Version '${VERSION}' matches semver pattern."
+          else
+            echo "Version '${VERSION}' does not match semver pattern."
+            exit 1
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Check if tag exists
+        run: |
+          git fetch --tags
+          VERSION=$(cat VERSION)
+          TAG="v${VERSION}"
+          if git tag -l | grep -q "^${TAG}$"; then
+            echo "Tag '${TAG}' already exists."
+            exit 1
+          else
+            echo "Tag '${TAG}' does not exist."
+          fi
+
+      - name: Check if manifests image tag matches version
+        run: |
+          VERSION=$(cat VERSION)
+          TAG="v${VERSION}"
+          MANIFEST_TAGS=$(grep -r 'newTag:' manifests | sed 's/.*newTag:[[:space:]]*//' | tr -d '"' | tr -d "'" | sort | uniq)
+          if [ -z "$MANIFEST_TAGS" ]; then
+              echo "No newTag found in manifests."
+              exit 1
+          fi
+          for t in $MANIFEST_TAGS; do
+              if [ "$t" != "$TAG" ]; then
+                  echo "Image tag in manifests ($t) does not match version tag ($TAG)."
+                  exit 1
+              fi
+          done
+          echo "All image tags in manifests match version tag $TAG."
