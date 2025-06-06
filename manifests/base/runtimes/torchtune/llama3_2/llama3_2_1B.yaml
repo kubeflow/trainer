@@ -77,7 +77,7 @@ spec:
                         - dataset=torchtune.datasets.instruct_dataset
                         - dataset.source=parquet
                         - dataset.data_dir=/workspace/dataset/data
-                        - output_dir=/workspace/model/llama3_2/1B
+                        - output_dir=/workspace/model/output
                         - tokenizer.path=/workspace/model/original/tokenizer.model
                         - checkpointer.checkpoint_dir=/workspace/model
                       resources:
