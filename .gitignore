@@ -20,9 +20,6 @@ artifacts
 __pycache__/
 *.egg-info/
 
-# OpenAPI Generator CLI JAR file
-hack/python-sdk/openapi-generator-cli.jar
-
 # Coverage
 cover.out
 
