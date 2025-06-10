@@ -23,7 +23,7 @@ except Exception:
 # Get list of commits from the range.
 github_repo = Github(args.token).get_repo(REPO_NAME)
 comparison = github_repo.compare(previous_release, current_release)
-commits = comparison.commits
+commits = list(comparison.commits)
 
 # The latest commit contains the release date.
 release_date = str(commits[-1].commit.author.date).split(" ")[0]
