@@ -18,11 +18,15 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -126,6 +130,10 @@ func (r *TrainingRuntime) newRuntimeInfo(
 		// The JobSetTemplateSpec annotations are overridden by the TrainJob Annotations (.spec.annotations).
 		propagationAnnotations[k] = v
 	}
+	err := r.mergePodSpecOverrides(trainJob, &jobSetTemplateSpec)
+	if err != nil {
+		return nil, err
+	}
 	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: jobsetv1alpha2.GroupVersion.String(),
@@ -169,6 +177,37 @@ func (r *TrainingRuntime) newRuntimeInfo(
 	}
 
 	return runtime.NewInfo(opts...), nil
+}
+
+func (r *TrainingRuntime) mergePodSpecOverrides(trainJob *trainer.TrainJob, jobSetTemplateSpec *trainer.JobSetTemplateSpec) error {
+	for _, podSpecOverride := range trainJob.Spec.PodSpecOverrides {
+		for i, job := range jobSetTemplateSpec.Spec.ReplicatedJobs {
+			if !slices.ContainsFunc(podSpecOverride.TargetJobs, func(targetJob trainer.PodSpecOverrideTargetJob) bool {
+				return targetJob.Name == job.Name
+			}) {
+				continue
+			}
+			patch, err := json.Marshal(podSpecOverride)
+			if err != nil {
+				return err
+			}
+			source, err := json.Marshal(job.Template.Spec.Template.Spec)
+			if err != nil {
+				return err
+			}
+			merged, err := strategicpatch.StrategicMergePatch(source, patch, corev1.PodSpec{})
+			if err != nil {
+				return err
+			}
+			spec := corev1.PodSpec{}
+			err = json.Unmarshal(merged, &spec)
+			if err != nil {
+				return err
+			}
+			jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec = spec
+		}
+	}
+	return nil
 }
 
 func syncPodSets(info *runtime.Info) {

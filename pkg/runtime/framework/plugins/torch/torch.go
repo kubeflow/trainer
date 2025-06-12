@@ -30,6 +30,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/pkg/apply"
@@ -204,8 +205,12 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 
 			// 2. Get the recipe and config from old args and append them to newCommand.
 			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
-			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, trainJob.Spec.RuntimeRef.Name, trainJob.Spec.Trainer.Args)
+			model := getModelFromRuntimeRef(trainJob.Spec.RuntimeRef.Name)
+			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, model, trainJob.Spec.Trainer.Args)
 			newCommand = append(newCommand, recipe, fmt.Sprintf("--config %s", config))
+
+			// 3. Extract output directory, tokenizer path and model mount path from (Cluster)TrainingRuntime.
+			newCommand = append(newCommand, extractOverridesFromRuntime(info)...)
 
 			trainJob.Spec.Trainer.Command = append(trainJob.Spec.Trainer.Command, newCommand...)
 		}
@@ -233,8 +238,8 @@ func calculateNumProcPerNode(
 }
 
 // getRecipeAndConfig returns the recipe and config file name based on the number of nodes,
-// number of processes per node, runtime reference name, and command line arguments.
-func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, runtimeRefName string, _ []string) (string, string) {
+// number of processes per node, model name, and command line arguments.
+func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, model string, _ []string) (string, string) {
 	recipe := constants.TorchTuneFullFinetuneDistributed
 	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
 	if numNodes == 1 && numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 {
@@ -244,7 +249,36 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, runti
 		suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
 	}
 
-	return recipe, fmt.Sprintf("%s%s.yaml", getModelFromRuntimeRef(runtimeRefName), suffix)
+	return recipe, fmt.Sprintf("%s%s.yaml", model, suffix)
+}
+
+// extractOverridesFromRuntime extracts overrides from the TorchTune Trainer Node.
+func extractOverridesFromRuntime(info *runtime.Info) []string {
+	overrides := []string{}
+	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+	if !ok {
+		return overrides
+	}
+
+	for _, rJob := range jobSetSpec.ReplicatedJobs {
+		jobMetadata := rJob.Template.ObjectMetaApplyConfiguration
+		if jobMetadata == nil || jobMetadata.Labels == nil {
+			continue
+		}
+		if ancestor, ok := jobMetadata.Labels[constants.LabelTrainJobAncestor]; ok && ancestor == constants.AncestorTrainer {
+			for _, container := range rJob.Template.Spec.Template.Spec.Containers {
+				if container.Name != nil && *container.Name == constants.Node {
+					for _, command := range container.Command {
+						if constants.TorchTuneImmutableConfigs.Has(strings.Split(command, "=")[0]) {
+							overrides = append(overrides, command)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return overrides
 }
 
 func getModelFromRuntimeRef(runtimeRefName string) string {

@@ -142,6 +142,15 @@ const (
 
 	// TorchTuneFullFinetuneMultiNodesConfigSuffix is the config suffix for the multi node distributed full finetune.
 	TorchTuneFullFinetuneMultiNodesConfigSuffix string = "_full_multinode"
+
+	// TorchTuneModelOutputDir is the config item name for the model output directory.
+	TorchTuneModelOutputDir string = "output_dir"
+
+	// TorchTuneTokenizerPath is the config item name for the tokenizer path.
+	TorchTuneTokenizerPath string = "tokenizer.path"
+
+	// TorchTuneCheckpointerDir is the config item name for the checkpointer directory.
+	TorchTuneCheckpointDir string = "checkpointer.checkpoint_dir"
 )
 
 const (
@@ -170,4 +179,7 @@ var (
 
 	// TorchTuneEntrypoint is the entrypoint for the torchtune.
 	TorchTuneEntrypoint = []string{"tune", "run"}
+
+	// TorchTuneImmutableConfigs is the set of immutable configs for the TorchTune Trainer.
+	TorchTuneImmutableConfigs = sets.New(TorchTuneModelOutputDir, TorchTuneTokenizerPath, TorchTuneCheckpointDir)
 )

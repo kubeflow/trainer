@@ -772,57 +772,52 @@ In the future, we can add more parameters if we find use-cases when it is requir
 
 ```golang
 type PodSpecOverride struct {
-	// TrainJobs is the training job replicas in the training runtime template to apply the overrides.
-	TargetJobs []PodSpecOverrideTargetJob `json:"targetJobs"`
-
-	// Overrides for the containers in the desired job templates.
-	Containers []ContainerOverride `json:"containers,omitempty"`
-
-	// Overrides for the init container in the desired job templates.
-	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
-
-	// Overrides for the Pod volume configuration.
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
+	// TargetJobs are the names of the Jobs the override applies to.
+	// An empty list will apply to all Jobs.
+	TargetJobs []string `json:"targetJobs,omitempty"`
 
 	// Override for the service account.
-	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 
 	// Override for the node selector to place Pod on the specific mode.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// Override for the Pod's tolerations.
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Overrides for the Pod volume configuration.
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
+	// Overrides for the init container in the desired job templates.
+	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
+
+	// Overrides for the containers in the desired job templates.
+	Containers []ContainerOverride `json:"containers,omitempty"`
 }
 
-type PodSpecOverrideTargetJob struct {
-	// Name is the target training job name for which the PodSpec is overridden.
-	Name string `json:"name"`
-}
-
-// ContainerOverride represents parameters that can be overridden using PodSpecOverride.
-// Parameters from the Trainer, DatasetConfig, and ModelConfig will take precedence.
+// ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
 type ContainerOverride struct {
 	// Name for the container. TrainingRuntime must have this container.
 	Name string `json:"name"`
 
-	// Entrypoint commands for the training container.
-	Command []string `json:"command,omitempty"`
-
-	// Arguments to the entrypoint for the training container.
-	Args []string `json:"args,omitempty"`
-
 	// List of environment variables to set in the container.
 	// These values will be merged with the TrainingRuntime's environments.
+	// This value can't be set for container with the name: `node`, `dataset-initializer`, or
+	// `model-initializer`. For those containers the envs can be set via Trainer or Initializer APIs.
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// List of sources to populate environment variables in the container.
-	// These   values will be merged with the TrainingRuntime's environments.
-	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 
 	// Pod volumes to mount into the container's filesystem.
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 ```
+
+The webhook will validate that TargetJob and Container name exist in the Runtime Job template.
+
+The overrides will be applied during the build phase of [Pipelines Framework](#pipeline-framework)
+in the `ComponentBuilder` plugin.
+
+The PodSpecOverrides will override values of TrainJob and Runtime Job template,
+since it should contain the final value for the underlying Job.
 
 #### Example of TrainJob with Overrides
 
@@ -841,11 +836,12 @@ spec:
   trainer:
     image: docker.io/custom-training
   podSpecOverrides:
-    - targetJobs:
-        - name: node
-      containers:
-        - name: user-identity
-          value: 123
+    - targetJob: node
+      initContainers:
+        - name: fetch-identity
+          env:
+            - name: USER_ID
+              value: 123
         - name: trainer
           volumeMounts:
             - name: user-123-volume
@@ -854,6 +850,34 @@ spec:
         - name: user-123-volume
           persistentVolumeClaim:
             claimName: user-123-volume
+```
+
+Users can also define multiple PodSpecOverrides for every ReplicatedJob:
+
+```yaml
+apiVersion: trainer.kubeflow.org/v2alpha1
+kind: TrainJob
+metadata:
+  name: pytorch-distributed
+  namespace: tenant-alpha
+spec:
+  runtimeRef:
+    name: pytorch-distributed-gpu
+  trainer:
+    image: docker.io/custom-training
+  podSpecOverrides:
+    - targetJob: dataset-initializer
+      initContainers:
+        - name: fetch-identity
+          env:
+            - name: USER_ID
+              value: 123
+    - targetJob: node
+      initContainers:
+        - name: fetch-identity
+          env:
+            - name: USER_ID
+              value: 123
 ```
 
 ### State Transition

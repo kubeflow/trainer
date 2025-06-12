@@ -42,7 +42,7 @@ jobs:
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
 
           echo "Install Kubeflow SDK"
-          pip install ./sdk
+          pip install git+https://github.com/kubeflow/sdk.git@main#subdirectory=python
 
       - name: Setup cluster
         run: |
@@ -56,6 +56,7 @@ jobs:
         run: |
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_mnist.ipynb TIMEOUT=900
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/question-answering/fine-tune-distilbert.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_fine-tune-distilbert.ipynb TIMEOUT=900
 
       # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
       - name: Upload Artifacts to GitHub

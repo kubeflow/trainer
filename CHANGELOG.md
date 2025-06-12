@@ -1,5 +1,302 @@
 # Changelog
 
+# [v2.0.0-rc.0](https://github.com/kubeflow/trainer/tree/v2.0.0-rc.0) (2025-06-10)
+
+## Breaking Changes
+
+- KEP-2170: Change API Group Name to `trainer.kubeflow.org` ([#2413](https://github.com/kubeflow/trainer/pull/2413) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- Move generated Python models into kubeflow_trainer_api package ([#2632](https://github.com/kubeflow/trainer/pull/2632) by [@kramaranya](https://github.com/kramaranya))
+- Upgrade kubernetes Go module version to 1.32 ([#2450](https://github.com/kubeflow/trainer/pull/2450) by [@tenzen-y](https://github.com/tenzen-y))
+- Remove kubeflow-trainer prefix from jobset resource names ([#2596](https://github.com/kubeflow/trainer/pull/2596) by [@ChenYi015](https://github.com/ChenYi015))
+- Remove the Training Operator V1 Source Code ([#2389](https://github.com/kubeflow/trainer/pull/2389) by [@andreyvelich](https://github.com/andreyvelich))
+
+## New Features
+
+### LLM Trainer V2
+
+- KEP-2401: Support loading local LLMs ([#2644](https://github.com/kubeflow/trainer/pull/2644) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- KEP-2401: Support mutating dataset preprocessing config in SDK ([#2638](https://github.com/kubeflow/trainer/pull/2638) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- KEP-2401: Create LLM Training Runtimes for Llama 3.2 model family ([#2590](https://github.com/kubeflow/trainer/pull/2590) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- KEP-2401: Complement torch plugin to support torchtune config mutation ([#2587](https://github.com/kubeflow/trainer/pull/2587) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- KEP-2401: Create `torchtune` trainer image ([#2516](https://github.com/kubeflow/trainer/pull/2516) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- KEP-2401: Refactor current `train()` API ([#2513](https://github.com/kubeflow/trainer/pull/2513) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- KEP-2401: Kubeflow LLM Trainer V2 ([#2410](https://github.com/kubeflow/trainer/pull/2410) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+
+### Runtime Framework
+
+- feat(runtimes): Support MLX Distributed Runtime with OpenMPI ([#2565](https://github.com/kubeflow/trainer/pull/2565) by [@andreyvelich](https://github.com/andreyvelich))
+- feat(runtimes): Support DeepSpeed Runtime with OpenMPI ([#2559](https://github.com/kubeflow/trainer/pull/2559) by [@andreyvelich](https://github.com/andreyvelich))
+- feat(runtime): remove needless Launcher chainer. ([#2558](https://github.com/kubeflow/trainer/pull/2558) by [@IRONICBo](https://github.com/IRONICBo))
+- Store the TrainingRuntime numNodes as runtime.Info.PodSet.Count ([#2539](https://github.com/kubeflow/trainer/pull/2539) by [@tenzen-y](https://github.com/tenzen-y))
+- Add dependencies to RuntimeRegistrar ([#2476](https://github.com/kubeflow/trainer/pull/2476) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP: 2170: Adding cel validations on TrainingRuntime/ClusterTrainingRuntime CRDs ([#2313](https://github.com/kubeflow/trainer/pull/2313) by [@akshaychitneni](https://github.com/akshaychitneni))
+- Implement trainer.kubeflow.org/resource-in-use finalizer mechanism to ClusterTrainingRuntime ([#2625](https://github.com/kubeflow/trainer/pull/2625) by [@tenzen-y](https://github.com/tenzen-y))
+- Implement trainer.kubeflow.org/resource-in-use finalizer mechanism to TrainingRuntime ([#2608](https://github.com/kubeflow/trainer/pull/2608) by [@tenzen-y](https://github.com/tenzen-y))
+
+### MPI Plugin
+
+- [feature]:add validations for MPIRuntime with RunLauncherAsNode ([#2551](https://github.com/kubeflow/trainer/pull/2551) by [@Harshal292004](https://github.com/Harshal292004))
+- Implement CustomValidation UT for MPI plugin ([#2555](https://github.com/kubeflow/trainer/pull/2555) by [@tenzen-y](https://github.com/tenzen-y))
+- Implemenet MPI Plugin for OpenMPI ([#2493](https://github.com/kubeflow/trainer/pull/2493) by [@tenzen-y](https://github.com/tenzen-y))
+- Implement MPI plugin UTs ([#2481](https://github.com/kubeflow/trainer/pull/2481) by [@tenzen-y](https://github.com/tenzen-y))
+- Implement MPIImplementation Enum CRD validation ([#2482](https://github.com/kubeflow/trainer/pull/2482) by [@tenzen-y](https://github.com/tenzen-y))
+- Implement MPI numProcPerNode defaulter ([#2483](https://github.com/kubeflow/trainer/pull/2483) by [@tenzen-y](https://github.com/tenzen-y))
+- Add MPIMLPolicySource CRD defaulters ([#2474](https://github.com/kubeflow/trainer/pull/2474) by [@tenzen-y](https://github.com/tenzen-y))
+- Make MPIMLPolicySource optional fields as a pointer ([#2472](https://github.com/kubeflow/trainer/pull/2472) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Implement MPI Plugin for Kubeflow Trainer ([#2394](https://github.com/kubeflow/trainer/pull/2394) by [@andreyvelich](https://github.com/andreyvelich))
+
+### JobSet
+
+- Retrieve JobSetSpec from runtime.Info in CustomValidations ([#2557](https://github.com/kubeflow/trainer/pull/2557) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Deploy JobSet in `kubeflow-system` namespace ([#2388](https://github.com/kubeflow/trainer/pull/2388) by [@andreyvelich](https://github.com/andreyvelich))
+- Bump JobSet to v0.8.0 ([#2463](https://github.com/kubeflow/trainer/pull/2463) by [@andreyvelich](https://github.com/andreyvelich))
+- Upgrade jobset SDK version to v0.7.3 ([#2445](https://github.com/kubeflow/trainer/pull/2445) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+
+### New Examples
+
+- Add question-answer example for v2 trainer ([#2580](https://github.com/kubeflow/trainer/pull/2580) by [@solanyn](https://github.com/solanyn))
+- KEP-2170: Add PyTorch DDP MNIST training example ([#2387](https://github.com/kubeflow/trainer/pull/2387) by [@astefanutti](https://github.com/astefanutti))
+
+### SDK Updates
+
+- Remove SDK ([#2657](https://github.com/kubeflow/trainer/pull/2657) by [@eoinfennessy](https://github.com/eoinfennessy))
+- feat(sdk): Get namespace from the provided context ([#2593](https://github.com/kubeflow/trainer/pull/2593) by [@andreyvelich](https://github.com/andreyvelich))
+- feat(sdk): Support MPI-based TrainJobs  ([#2545](https://github.com/kubeflow/trainer/pull/2545) by [@andreyvelich](https://github.com/andreyvelich))
+- feat(sdk): Migrate to OpenAPI V3 ([#2490](https://github.com/kubeflow/trainer/pull/2490) by [@andreyvelich](https://github.com/andreyvelich))
+- feat(sdk): Generate external Kubernetes and JobSet models ([#2466](https://github.com/kubeflow/trainer/pull/2466) by [@andreyvelich](https://github.com/andreyvelich))
+
+## Bug Fixes
+
+- Revert "fix(sdk): Fix type annotation for `train` method's `trainer` parameter" ([#2651](https://github.com/kubeflow/trainer/pull/2651) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- fix(sdk): Fix bad arg passed to `get_args_using_torchtune_config` ([#2647](https://github.com/kubeflow/trainer/pull/2647) by [@eoinfennessy](https://github.com/eoinfennessy))
+- fix(sdk): Fix type annotation for `train` method's `trainer` parameter ([#2646](https://github.com/kubeflow/trainer/pull/2646) by [@eoinfennessy](https://github.com/eoinfennessy))
+- fix(controller): Fix RBAC permissions for TrainJob controller ([#2626](https://github.com/kubeflow/trainer/pull/2626) by [@andreyvelich](https://github.com/andreyvelich))
+- Fix close-pr message in Stale GitHub Action ([#2622](https://github.com/kubeflow/trainer/pull/2622) by [@kramaranya](https://github.com/kramaranya))
+- fix: remove redundant K8s version matrix from integration tests ([#2617](https://github.com/kubeflow/trainer/pull/2617) by [@tr33k](https://github.com/tr33k))
+- fix(doc): tidy up KEP-2401. ([#2594](https://github.com/kubeflow/trainer/pull/2594) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- Fix MPI Test runnable errors ([#2570](https://github.com/kubeflow/trainer/pull/2570) by [@tenzen-y](https://github.com/tenzen-y))
+- Fix issue with fetching clustertrainingruntime for validations ([#2564](https://github.com/kubeflow/trainer/pull/2564) by [@akshaychitneni](https://github.com/akshaychitneni))
+- fix(sdk): Add missing import types. ([#2566](https://github.com/kubeflow/trainer/pull/2566) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- fix(sdk): Using correct entrypoint for mpirun ([#2552](https://github.com/kubeflow/trainer/pull/2552) by [@andreyvelich](https://github.com/andreyvelich))
+- fix(sdk): add missing import type Initializer. ([#2541](https://github.com/kubeflow/trainer/pull/2541) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- fix(ci): update `test-go` coverage ci config and replace trainer badge with new address. ([#2534](https://github.com/kubeflow/trainer/pull/2534) by [@IRONICBo](https://github.com/IRONICBo))
+- fix(doc): Update `train()` API in KEP-2401 ([#2536](https://github.com/kubeflow/trainer/pull/2536) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- fix(test): Update images for DockerHub publish ([#2535](https://github.com/kubeflow/trainer/pull/2535) by [@andreyvelich](https://github.com/andreyvelich))
+- [hotfix] fix checkout on workflow ([#2531](https://github.com/kubeflow/trainer/pull/2531) by [@mahdikhashan](https://github.com/mahdikhashan))
+- [hotfix] fix docker cred ([#2530](https://github.com/kubeflow/trainer/pull/2530) by [@mahdikhashan](https://github.com/mahdikhashan))
+- fix: remove unused parameter name in default case of shouldUseCPU function ([#2521](https://github.com/kubeflow/trainer/pull/2521) by [@Diasker](https://github.com/Diasker))
+- Fix #2407: Cap nproc_per_node based on CPU resources for PyTorch TrainJob ([#2492](https://github.com/kubeflow/trainer/pull/2492) by [@Diasker](https://github.com/Diasker))
+- fix type in model initializer entrypoint ([#2489](https://github.com/kubeflow/trainer/pull/2489) by [@szaher](https://github.com/szaher))
+- fix(runtime): fix error label name. ([#2487](https://github.com/kubeflow/trainer/pull/2487) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- fix(sdk): resolve errors in deserialization ([#2457](https://github.com/kubeflow/trainer/pull/2457) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- Fix missing external types in apply configurations ([#2429](https://github.com/kubeflow/trainer/pull/2429) by [@astefanutti](https://github.com/astefanutti))
+- Fix API Group for Torch Runtime ([#2424](https://github.com/kubeflow/trainer/pull/2424) by [@andreyvelich](https://github.com/andreyvelich))
+- Fix Kustomize patchesStrategicMerge deprecation warning ([#2405](https://github.com/kubeflow/trainer/pull/2405) by [@astefanutti](https://github.com/astefanutti))
+- ControlPlane: Fix flaky integraion testings due to missing the latest version of object ([#2414](https://github.com/kubeflow/trainer/pull/2414) by [@tenzen-y](https://github.com/tenzen-y))
+
+## Misc
+
+- Tag Docker images with GitHub release tags ([#2662](https://github.com/kubeflow/trainer/pull/2662) by [@kramaranya](https://github.com/kramaranya))
+- feat(controller): Implement PodSpecOverride API ([#2614](https://github.com/kubeflow/trainer/pull/2614) by [@andreyvelich](https://github.com/andreyvelich))
+- Nominate @Electronic-Waste as approver and @astefanutti as reviewer ([#2659](https://github.com/kubeflow/trainer/pull/2659) by [@andreyvelich](https://github.com/andreyvelich))
+- chore(build): Support Podman to run OpenAPI generator ([#2656](https://github.com/kubeflow/trainer/pull/2656) by [@astefanutti](https://github.com/astefanutti))
+- chore(docs): Add OpenSSF Best Practices Badge ([#2611](https://github.com/kubeflow/trainer/pull/2611) by [@andreyvelich](https://github.com/andreyvelich))
+- [chore] update stale action version to latest ([#2642](https://github.com/kubeflow/trainer/pull/2642) by [@mahdikhashan](https://github.com/mahdikhashan))
+- Remove TrainJobCreated condition ([#2621](https://github.com/kubeflow/trainer/pull/2621) by [@astefanutti](https://github.com/astefanutti))
+- ci: refactor build-push-images workflow ([#2607](https://github.com/kubeflow/trainer/pull/2607) by [@milinddethe15](https://github.com/milinddethe15))
+- Update Go to v1.24 (#2615) ([#2620](https://github.com/kubeflow/trainer/pull/2620) by [@vzamboulingame](https://github.com/vzamboulingame))
+- test(runtime): add UT for IndexTrainJobTrainingRuntime ([#2603](https://github.com/kubeflow/trainer/pull/2603) by [@Harshal292004](https://github.com/Harshal292004))
+- ci: add k8s `v1.32` for tests env ([#2613](https://github.com/kubeflow/trainer/pull/2613) by [@milinddethe15](https://github.com/milinddethe15))
+- chore(deps): bump torch from 2.5.0 to 2.6.0 in /cmd/runtimes/deepspeed ([#2606](https://github.com/kubeflow/trainer/pull/2606) by [@dependabot[bot]](https://github.com/apps/dependabot))
+- chore(deps): bump golang.org/x/net from 0.36.0 to 0.38.0 ([#2602](https://github.com/kubeflow/trainer/pull/2602) by [@dependabot[bot]](https://github.com/apps/dependabot))
+- test(runtime): add UT for jobset runtime valid function. ([#2562](https://github.com/kubeflow/trainer/pull/2562) by [@Harshal292004](https://github.com/Harshal292004))
+- Add Helm chart for kubeflow trainer ([#2435](https://github.com/kubeflow/trainer/pull/2435) by [@ChenYi015](https://github.com/ChenYi015))
+- chore(test): Removed the no longer needed github-trigger-rerun-test.yaml ([#2589](https://github.com/kubeflow/trainer/pull/2589) by [@hbelmiro](https://github.com/hbelmiro))
+- Add PodNetwork plugin to KEP-2170 Job Pipeline Framework description ([#2578](https://github.com/kubeflow/trainer/pull/2578) by [@tenzen-y](https://github.com/tenzen-y))
+- chore(docs): Update Slack channel ([#2569](https://github.com/kubeflow/trainer/pull/2569) by [@andreyvelich](https://github.com/andreyvelich))
+- docs: update CONTRIBUTING.md for Kubeflow Trainer V2 ([#2561](https://github.com/kubeflow/trainer/pull/2561) by [@muzzlol](https://github.com/muzzlol))
+- test(runtime): add UT for torch runtime valid function. ([#2560](https://github.com/kubeflow/trainer/pull/2560) by [@IRONICBo](https://github.com/IRONICBo))
+- feat(doc): add Runtime API design in KEP-2401. ([#2501](https://github.com/kubeflow/trainer/pull/2501) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- Update CONTRIBUTING.md ([#2512](https://github.com/kubeflow/trainer/pull/2512) by [@MuhammedgitAli](https://github.com/MuhammedgitAli))
+- feat: add replicatedJobs.replicas validations in validateReplicatedJobs function. ([#2533](https://github.com/kubeflow/trainer/pull/2533) by [@IRONICBo](https://github.com/IRONICBo))
+- Construct Trainer based on trainer.kubeflow.org/trainjob-ancestor-step label ([#2548](https://github.com/kubeflow/trainer/pull/2548) by [@tenzen-y](https://github.com/tenzen-y))
+- chore: Enable GCI for golangci-lint ([#2540](https://github.com/kubeflow/trainer/pull/2540) by [@tenzen-y](https://github.com/tenzen-y))
+- [feature] merge GHCR and DockerHub CI jobs ([#2537](https://github.com/kubeflow/trainer/pull/2537) by [@ashwinr64](https://github.com/ashwinr64))
+- feat(controller): Refactor the Initializer APIs of TrainJob ([#2523](https://github.com/kubeflow/trainer/pull/2523) by [@andreyvelich](https://github.com/andreyvelich))
+- Migrate InfoOptions.podSpecReplias and info.Scheduler.TotalRequests to info.TemplateSpec.PodSet ([#2524](https://github.com/kubeflow/trainer/pull/2524) by [@tenzen-y](https://github.com/tenzen-y))
+- [feature] pull images in manifest from ghcr ([#2529](https://github.com/kubeflow/trainer/pull/2529) by [@mahdikhashan](https://github.com/mahdikhashan))
+- [feature] migrate images to ghcr ([#2455](https://github.com/kubeflow/trainer/pull/2455) by [@mahdikhashan](https://github.com/mahdikhashan))
+- KEP-2170: Adding validation webhook for v2 trainjob ([#2307](https://github.com/kubeflow/trainer/pull/2307) by [@akshaychitneni](https://github.com/akshaychitneni))
+- Migrate Info.Trainer to Info.TemplateSpec.PodSet ([#2520](https://github.com/kubeflow/trainer/pull/2520) by [@tenzen-y](https://github.com/tenzen-y))
+- Implement E2E for OpenMPI workload  ([#2500](https://github.com/kubeflow/trainer/pull/2500) by [@tenzen-y](https://github.com/tenzen-y))
+- Bump golang.org/x/net from 0.33.0 to 0.36.0 ([#2514](https://github.com/kubeflow/trainer/pull/2514) by [@dependabot[bot]](https://github.com/apps/dependabot))
+- Move TrainJob marker defaulting and validation integration tests to test/integration/webhooks pkg ([#2486](https://github.com/kubeflow/trainer/pull/2486) by [@tenzen-y](https://github.com/tenzen-y))
+- feat(controller): Integrate DependsOn API ([#2484](https://github.com/kubeflow/trainer/pull/2484) by [@andreyvelich](https://github.com/andreyvelich))
+- Store E2E manifests to artifacts directory ([#2478](https://github.com/kubeflow/trainer/pull/2478) by [@tenzen-y](https://github.com/tenzen-y))
+- Use large runner for building container image ([#2475](https://github.com/kubeflow/trainer/pull/2475) by [@tenzen-y](https://github.com/tenzen-y))
+- chore(test): Upload artifacts from dir ([#2473](https://github.com/kubeflow/trainer/pull/2473) by [@andreyvelich](https://github.com/andreyvelich))
+- Implement UTs for PlainML plugin ([#2469](https://github.com/kubeflow/trainer/pull/2469) by [@tenzen-y](https://github.com/tenzen-y))
+- chore(test): Add E2E tests for Kubeflow Trainer ([#2470](https://github.com/kubeflow/trainer/pull/2470) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Add Kubeflow Trainer Pipeline Framework Design ([#2439](https://github.com/kubeflow/trainer/pull/2439) by [@tenzen-y](https://github.com/tenzen-y))
+- Replace Kueue PodRequests helper with core k/k one ([#2461](https://github.com/kubeflow/trainer/pull/2461) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Use SSA to reconcile TrainJob components ([#2431](https://github.com/kubeflow/trainer/pull/2431) by [@astefanutti](https://github.com/astefanutti))
+- Bump golang.org/x/net from 0.30.0 to 0.33.0 ([#2451](https://github.com/kubeflow/trainer/pull/2451) by [@dependabot[bot]](https://github.com/apps/dependabot))
+- Use the correct apiVersion name ([#2444](https://github.com/kubeflow/trainer/pull/2444) by [@runzhen](https://github.com/runzhen))
+- Add 'KEP Usage' KEP and template link ([#2423](https://github.com/kubeflow/trainer/pull/2423) by [@anishasthana](https://github.com/anishasthana))
+- KEP-2170: Add validation to Torch `numProcPerNode` field ([#2409](https://github.com/kubeflow/trainer/pull/2409) by [@astefanutti](https://github.com/astefanutti))
+- update migration url on readme file ([#2436](https://github.com/kubeflow/trainer/pull/2436) by [@varodrig](https://github.com/varodrig))
+- IntegraionTests: Waiting for expected conditions before emulate JobSet controller manager ([#2425](https://github.com/kubeflow/trainer/pull/2425) by [@tenzen-y](https://github.com/tenzen-y))
+- Nominate @Electronic-Waste as a reviewer ([#2427](https://github.com/kubeflow/trainer/pull/2427) by [@andreyvelich](https://github.com/andreyvelich))
+- Update the naming conventions for Kubeflow Trainer  ([#2415](https://github.com/kubeflow/trainer/pull/2415) by [@andreyvelich](https://github.com/andreyvelich))
+- Rename paddlepaddle_defaults.go file name ([#2399](https://github.com/kubeflow/trainer/pull/2399) by [@ChristianZaccaria](https://github.com/ChristianZaccaria))
+- Bump golang.org/x/net from 0.30.0 to 0.33.0 ([#2391](https://github.com/kubeflow/trainer/pull/2391) by [@dependabot[bot]](https://github.com/apps/dependabot))
+- KEP-2170: Add unit and Integration tests for model and dataset initializers ([#2323](https://github.com/kubeflow/trainer/pull/2323) by [@seanlaii](https://github.com/seanlaii))
+- Testing CI in JAX example ([#2385](https://github.com/kubeflow/trainer/pull/2385) by [@saileshd1402](https://github.com/saileshd1402))
+- Upgrade huggingface_hub to v0.27.x in dataset initializer v2 ([#2379](https://github.com/kubeflow/trainer/pull/2379) by [@astefanutti](https://github.com/astefanutti))
+- Add Changelog for Training Operator v1.9.0-rc.0 ([#2380](https://github.com/kubeflow/trainer/pull/2380) by [@andreyvelich](https://github.com/andreyvelich))
+- Add release branch to the image push trigger ([#2376](https://github.com/kubeflow/trainer/pull/2376) by [@andreyvelich](https://github.com/andreyvelich))
+
+[Full Changelog](https://github.com/kubeflow/trainer/compare/v1.8.1...v2.0.0-rc.0)
+
+# [v1.9.0](https://github.com/kubeflow/training-operator/tree/v1.9.0) (2025-01-21)
+
+## Breaking Changes
+
+- Upgrade Kubernetes to v1.31.3 ([#2330](https://github.com/kubeflow/training-operator/pull/2330) by [@astefanutti](https://github.com/astefanutti))
+- Upgrade Kubernetes to v1.30.7 ([#2332](https://github.com/kubeflow/training-operator/pull/2332) by [@astefanutti](https://github.com/astefanutti))
+- Update the name of PVC in `train` API ([#2187](https://github.com/kubeflow/training-operator/pull/2187) by [@helenxie-bit](https://github.com/helenxie-bit))
+- Remove support for MXJob ([#2150](https://github.com/kubeflow/training-operator/pull/2150) by [@tariq-hasan](https://github.com/tariq-hasan))
+- Support Python 3.11 and Drop Python 3.7 ([#2105](https://github.com/kubeflow/training-operator/pull/2105) by [@tenzen-y](https://github.com/tenzen-y))
+
+## New Features
+
+### Distributed JAX
+
+- Add JAX controller ([#2194](https://github.com/kubeflow/training-operator/pull/2194) by [@sandipanpanda](https://github.com/sandipanpanda))
+- Add JAX API ([#2163](https://github.com/kubeflow/training-operator/pull/2163) by [@sandipanpanda](https://github.com/sandipanpanda))
+- JAX Integration Enhancement Proposal ([#2125](https://github.com/kubeflow/training-operator/pull/2125) by [@sandipanpanda](https://github.com/sandipanpanda))
+- JAX example for MNIST SPMD and add CI testing ([#2390](https://github.com/kubeflow/training-operator/pull/2390) by [@saileshd1402](https://github.com/saileshd1402))
+
+### New Examples
+
+- FSDP Example for T5 Fine-Tuning and PyTorchJob ([#2286](https://github.com/kubeflow/training-operator/pull/2286) by [@andreyvelich](https://github.com/andreyvelich))
+- Add DeepSpeed Example with Pytorch Operator ([#2235](https://github.com/kubeflow/training-operator/pull/2235) by [@Syulin7](https://github.com/Syulin7))
+
+### Control Plane Updates
+
+- Validate pytorchjob workers are configured when elasticpolicy is configured ([#2320](https://github.com/kubeflow/training-operator/pull/2320) by [@tarat44](https://github.com/tarat44))
+- [Feature] Support managed by external controller ([#2203](https://github.com/kubeflow/training-operator/pull/2203) by [@mszadkow](https://github.com/mszadkow))
+- Update trainer to ensure type consistency for `train_args` and `lora_config` ([#2181](https://github.com/kubeflow/training-operator/pull/2181) by [@helenxie-bit](https://github.com/helenxie-bit))
+- Support ARM64 platform in TensorFlow examples ([#2119](https://github.com/kubeflow/training-operator/pull/2119) by [@akhilsaivenkata](https://github.com/akhilsaivenkata))
+- Feat: Support ARM64 platform in XGBoost examples ([#2114](https://github.com/kubeflow/training-operator/pull/2114) by [@tico88612](https://github.com/tico88612))
+- ARM64 supported in PyTorch examples ([#2116](https://github.com/kubeflow/training-operator/pull/2116) by [@danielsuh05](https://github.com/danielsuh05))
+
+### SDK Updates
+
+- [SDK] Adding env vars ([#2285](https://github.com/kubeflow/training-operator/pull/2285) by [@tarekabouzeid](https://github.com/tarekabouzeid))
+- [SDK] Use torchrun to create PyTorchJob from function ([#2276](https://github.com/kubeflow/training-operator/pull/2276) by [@andreyvelich](https://github.com/andreyvelich))
+- [SDK] move env var to constants.py ([#2268](https://github.com/kubeflow/training-operator/pull/2268) by [@varshaprasad96](https://github.com/varshaprasad96))
+- [SDK] Allow customising base trainer and storage images in Train API ([#2261](https://github.com/kubeflow/training-operator/pull/2261) by [@varshaprasad96](https://github.com/varshaprasad96))
+- [SDK] Read namespace from the current context ([#2255](https://github.com/kubeflow/training-operator/pull/2255) by [@andreyvelich](https://github.com/andreyvelich))
+- [SDK] Sync Transformers version for train API ([#2146](https://github.com/kubeflow/training-operator/pull/2146) by [@andreyvelich](https://github.com/andreyvelich))
+- [SDK] Explain Python version support cycle ([#2144](https://github.com/kubeflow/training-operator/pull/2144) by [@andreyvelich](https://github.com/andreyvelich))
+
+### Kubeflow Training V2
+
+- KEP-2170: Kubeflow Training V2 API ([#2171](https://github.com/kubeflow/training-operator/pull/2171) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Update V2 KEP with MPI Runtime info ([#2345](https://github.com/kubeflow/training-operator/pull/2345) by [@andreyvelich](https://github.com/andreyvelich))
+- Always update TrainJob status on errors ([#2352](https://github.com/kubeflow/training-operator/pull/2352) by [@astefanutti](https://github.com/astefanutti))
+- Fix TrainJob status comparison and update ([#2353](https://github.com/kubeflow/training-operator/pull/2353) by [@astefanutti](https://github.com/astefanutti))
+- Add required RBAC on TrainJob finalizer sub-resources ([#2350](https://github.com/kubeflow/training-operator/pull/2350) by [@astefanutti](https://github.com/astefanutti))
+- KEP-2170: [SDK] Initial implementation of the Kubeflow Training V2 Python SDK ([#2324](https://github.com/kubeflow/training-operator/pull/2324) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Add Torch Distributed Runtime ([#2328](https://github.com/kubeflow/training-operator/pull/2328) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Add TrainJob conditions ([#2322](https://github.com/kubeflow/training-operator/pull/2322) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Add the TrainJob state transition design ([#2298](https://github.com/kubeflow/training-operator/pull/2298) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Implement Initializer builders in the JobSet plugin ([#2316](https://github.com/kubeflow/training-operator/pull/2316) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Implement JobSet, PlainML, and Torch Plugins ([#2308](https://github.com/kubeflow/training-operator/pull/2308) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Create model and dataset initializers ([#2303](https://github.com/kubeflow/training-operator/pull/2303) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Generate Python SDK for Kubeflow Training V2 ([#2310](https://github.com/kubeflow/training-operator/pull/2310) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Initialize runtimes before the manager starts ([#2306](https://github.com/kubeflow/training-operator/pull/2306) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Strictly verify the CRD marker validation and defaulting in the integration testings ([#2304](https://github.com/kubeflow/training-operator/pull/2304) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Decouple JobSet from TrainJob ([#2296](https://github.com/kubeflow/training-operator/pull/2296) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Implement TrainJob Reconciler to manage objects ([#2295](https://github.com/kubeflow/training-operator/pull/2295) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Add manifests for Kubeflow Training V2 ([#2289](https://github.com/kubeflow/training-operator/pull/2289) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Adding CEL validations on v2 TrainJob CRD ([#2260](https://github.com/kubeflow/training-operator/pull/2260) by [@akshaychitneni](https://github.com/akshaychitneni))
+- KEP-2170: Rename TrainingRuntimeRef to RuntimeRef API ([#2283](https://github.com/kubeflow/training-operator/pull/2283) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Implement runtime framework ([#2248](https://github.com/kubeflow/training-operator/pull/2248) by [@tenzen-y](https://github.com/tenzen-y))
+- [v2alpha] Move GV related codebase ([#2281](https://github.com/kubeflow/training-operator/pull/2281) by [@varshaprasad96](https://github.com/varshaprasad96))
+- KEP-2170: Generate clientset, openapi spec for the V2 APIs ([#2273](https://github.com/kubeflow/training-operator/pull/2273) by [@varshaprasad96](https://github.com/varshaprasad96))
+- KEP-2170: Implement skeleton webhook servers ([#2251](https://github.com/kubeflow/training-operator/pull/2251) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Initial Implementations for v2 Manager ([#2236](https://github.com/kubeflow/training-operator/pull/2236) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Generate CRD manifests for v2 CustomResources ([#2237](https://github.com/kubeflow/training-operator/pull/2237) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Update Training V2 APIs in the KEP ([#2240](https://github.com/kubeflow/training-operator/pull/2240) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Add TrainJob and TrainingRuntime APIs ([#2223](https://github.com/kubeflow/training-operator/pull/2223) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Bind repository into the build environment instead of filecopy ([#2222](https://github.com/kubeflow/training-operator/pull/2222) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Add directories for the V2 APIs ([#2221](https://github.com/kubeflow/training-operator/pull/2221) by [@andreyvelich](https://github.com/andreyvelich))
+- KEP-2170: Add the apiGroup to the TrainingRuntimeRef ([#2201](https://github.com/kubeflow/training-operator/pull/2201) by [@tenzen-y](https://github.com/tenzen-y))
+- KEP-2170: Make API specification more restricting ([#2198](https://github.com/kubeflow/training-operator/pull/2198) by [@tenzen-y](https://github.com/tenzen-y))
+
+## Bug Fixes
+
+- [release-1.9] V1: Fix versions in HuggingFace dataset initializer ([#2370](https://github.com/kubeflow/training-operator/pull/2370) by [@google-oss-robot](https://github.com/google-oss-robot))
+- Pin accelerate package version in trainer ([#2340](https://github.com/kubeflow/training-operator/pull/2340) by [@gavrissh](https://github.com/gavrissh))
+- [fix] Resolve v2alpha API exceptions ([#2317](https://github.com/kubeflow/training-operator/pull/2317) by [@varshaprasad96](https://github.com/varshaprasad96))
+- [SDK] Minor fix in wait_for_job_conditions with job_kind python training API ([#2265](https://github.com/kubeflow/training-operator/pull/2265) by [@saileshd1402](https://github.com/saileshd1402))
+- [SDK] Fix typo of "get_pvc_spec" ([#2250](https://github.com/kubeflow/training-operator/pull/2250) by [@helenxie-bit](https://github.com/helenxie-bit))
+- [Bug] Finish CleanupJob early if the job is suspended. ([#2243](https://github.com/kubeflow/training-operator/pull/2243) by [@mszadkow](https://github.com/mszadkow))
+- [SDK] Fix trainer error: Update the version of base image and add "num_labels" for downloading pretrained models ([#2230](https://github.com/kubeflow/training-operator/pull/2230) by [@helenxie-bit](https://github.com/helenxie-bit))
+- Update `huggingface_hub` Version in the storage initializer to fix ImportError ([#2180](https://github.com/kubeflow/training-operator/pull/2180) by [@helenxie-bit](https://github.com/helenxie-bit))
+- [SDK] Fix Failed condition in wait Job API ([#2160](https://github.com/kubeflow/training-operator/pull/2160) by [@andreyvelich](https://github.com/andreyvelich))
+- fix volcano podgroup update issue ([#2079](https://github.com/kubeflow/training-operator/pull/2079) by [@ckyuto](https://github.com/ckyuto))
+- [SDK] Fix Incorrect Events in get_job_logs API ([#2122](https://github.com/kubeflow/training-operator/pull/2122) by [@andreyvelich](https://github.com/andreyvelich))
+
+## Misc
+
+- [release-1.9] Add release branch to the image push trigger ([#2377](https://github.com/kubeflow/training-operator/pull/2377) by [@google-oss-robot](https://github.com/google-oss-robot))
+- Add e2e test for train API ([#2199](https://github.com/kubeflow/training-operator/pull/2199) by [@helenxie-bit](https://github.com/helenxie-bit))
+- buildx link was broken ([#2356](https://github.com/kubeflow/training-operator/pull/2356) by [@Veer0x1](https://github.com/Veer0x1))
+- Upgrade helm/kind-action to v1.11.0 ([#2357](https://github.com/kubeflow/training-operator/pull/2357) by [@astefanutti](https://github.com/astefanutti))
+- Upgrade Go version to v1.23 ([#2302](https://github.com/kubeflow/training-operator/pull/2302) by [@tenzen-y](https://github.com/tenzen-y))
+- Ensure code generation dependencies are downloaded ([#2339](https://github.com/kubeflow/training-operator/pull/2339) by [@astefanutti](https://github.com/astefanutti))
+- Added test for create-pytorchjob.ipynb python notebook ([#2274](https://github.com/kubeflow/training-operator/pull/2274) by [@saileshd1402](https://github.com/saileshd1402))
+- Remove zw0610 from approvers ([#2343](https://github.com/kubeflow/training-operator/pull/2343) by [@zw0610](https://github.com/zw0610))
+- Upgrade kustomization files to Kustomize v5 ([#2326](https://github.com/kubeflow/training-operator/pull/2326) by [@oksanabaza](https://github.com/oksanabaza))
+- Add openapi-generator CLI option to skip SDK v2 test generation ([#2338](https://github.com/kubeflow/training-operator/pull/2338) by [@astefanutti](https://github.com/astefanutti))
+- Refine the server-side apply installation args ([#2337](https://github.com/kubeflow/training-operator/pull/2337) by [@tenzen-y](https://github.com/tenzen-y))
+- Ignore cache exporting errors in the image building workflows ([#2336](https://github.com/kubeflow/training-operator/pull/2336) by [@tenzen-y](https://github.com/tenzen-y))
+- Pin Gloo repository in JAX Dockerfile to a specific commit ([#2329](https://github.com/kubeflow/training-operator/pull/2329) by [@sandipanpanda](https://github.com/sandipanpanda))
+- Update tf job examples to tf v2 ([#2270](https://github.com/kubeflow/training-operator/pull/2270) by [@YosiElias](https://github.com/YosiElias))
+- Remove Prometheus Monitoring doc ([#2301](https://github.com/kubeflow/training-operator/pull/2301) by [@sophie0730](https://github.com/sophie0730))
+- Upgrade Deepspeed demo dependencies ([#2294](https://github.com/kubeflow/training-operator/pull/2294) by [@Syulin7](https://github.com/Syulin7))
+- [SDK] test: add unit test for list_jobs method of the training_client ([#2267](https://github.com/kubeflow/training-operator/pull/2267) by [@seanlaii](https://github.com/seanlaii))
+- [SDK] Training Client Conditions related unit tests ([#2253](https://github.com/kubeflow/training-operator/pull/2253) by [@Bobbins228](https://github.com/Bobbins228))
+- [SDK] test: add unit test for get_job_logs method of the training_client ([#2275](https://github.com/kubeflow/training-operator/pull/2275) by [@seanlaii](https://github.com/seanlaii))
+- [SDK] test: add unit test for get_job method of the training_client ([#2205](https://github.com/kubeflow/training-operator/pull/2205) by [@Bobbins228](https://github.com/Bobbins228))
+- [SDK] test: add unit tests for delete_job() method ([#2232](https://github.com/kubeflow/training-operator/pull/2232) by [@Bobbins228](https://github.com/Bobbins228))
+- [SDK] Add UTs for `wait_for_job_conditions` ([#2196](https://github.com/kubeflow/training-operator/pull/2196) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- [SDK] Unit tests for TrainingClient APIs - get_job_pod_names and update_job ([#2192](https://github.com/kubeflow/training-operator/pull/2192) by [@YosiElias](https://github.com/YosiElias))
+- [SDK] Add more unit tests for TrainingClient APIs - get_job_pods ([#2175](https://github.com/kubeflow/training-operator/pull/2175) by [@YosiElias](https://github.com/YosiElias))
+- Update JAX image to use image published by Kubeflow ([#2264](https://github.com/kubeflow/training-operator/pull/2264) by [@sandipanpanda](https://github.com/sandipanpanda))
+- Update README and out-of-date docs ([#2252](https://github.com/kubeflow/training-operator/pull/2252) by [@andreyvelich](https://github.com/andreyvelich))
+- Clean up Go modules ([#2238](https://github.com/kubeflow/training-operator/pull/2238) by [@tenzen-y](https://github.com/tenzen-y))
+- Change isort profile to black for full compatibility ([#2234](https://github.com/kubeflow/training-operator/pull/2234) by [@Ygnas](https://github.com/Ygnas))
+- Enhance pre-commit hooks with flake8 linting ([#2195](https://github.com/kubeflow/training-operator/pull/2195) by [@Ygnas](https://github.com/Ygnas))
+- Implement pre-commit hooks ([#2184](https://github.com/kubeflow/training-operator/pull/2184) by [@droctothorpe](https://github.com/droctothorpe))
+- Add command to re-run GitHub Actions tests ([#2167](https://github.com/kubeflow/training-operator/pull/2167) by [@andreyvelich](https://github.com/andreyvelich))
+- Update JAX integration proposal ([#2165](https://github.com/kubeflow/training-operator/pull/2165) by [@sandipanpanda](https://github.com/sandipanpanda))
+- Update release document ([#2153](https://github.com/kubeflow/training-operator/pull/2153) by [@andreyvelich](https://github.com/andreyvelich))
+- update volcano to v1.9.0 ([#2148](https://github.com/kubeflow/training-operator/pull/2148) by [@lowang-bh](https://github.com/lowang-bh))
+- Update Slack Invitation ([#2142](https://github.com/kubeflow/training-operator/pull/2142) by [@andreyvelich](https://github.com/andreyvelich))
+- Refine the integration tests for the immutable PyTorchJob queueName ([#2130](https://github.com/kubeflow/training-operator/pull/2130) by [@tenzen-y](https://github.com/tenzen-y))
+- Add GitHub Issue Template ([#2129](https://github.com/kubeflow/training-operator/pull/2129) by [@andreyvelich](https://github.com/andreyvelich))
+- Update the images to the latest tag in master branch ([#2128](https://github.com/kubeflow/training-operator/pull/2128) by [@johnugeorge](https://github.com/johnugeorge))
+- Updated Github Action Workflows as per issue #2117 ([#2123](https://github.com/kubeflow/training-operator/pull/2123) by [@hkiiita](https://github.com/hkiiita))
+- changed package name to flake8 to fix pytests pip install ([#2109](https://github.com/kubeflow/training-operator/pull/2109) by [@ChristopheBrown](https://github.com/ChristopheBrown))
+- chore(fix): isort xgboost ([#2098](https://github.com/kubeflow/training-operator/pull/2098) by [@harshithbelagur](https://github.com/harshithbelagur))
+- Fix isort on examples/pytorch ([#2094](https://github.com/kubeflow/training-operator/pull/2094) by [@marcmaliar](https://github.com/marcmaliar))
+
+[Full Changelog](https://github.com/kubeflow/training-operator/compare/v1.8.1...v1.9.0)
+
 # [v1.9.0-rc.0](https://github.com/kubeflow/training-operator/tree/v1.9.0-rc.0) (2025-01-07)
 
 ## Breaking Changes

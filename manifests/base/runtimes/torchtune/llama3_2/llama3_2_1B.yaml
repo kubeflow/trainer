@@ -1,0 +1,94 @@
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: torchtune-llama3.2-1b
+spec:
+  mlPolicy:
+    numNodes: 1
+    torch:
+      numProcPerNode: 2
+  template:
+    spec:
+      replicatedJobs:
+        - name: dataset-initializer
+          template:
+            spec:
+              template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
+                spec:
+                  containers:
+                    - name: dataset-initializer
+                      image: ghcr.io/kubeflow/trainer/dataset-initializer
+                      env:
+                        - name: STORAGE_URI
+                          value: hf://tatsu-lab/alpaca
+                      volumeMounts:
+                        - mountPath: /workspace/dataset
+                          name: initializer
+                  volumes:
+                    - name: initializer
+                      persistentVolumeClaim:
+                        claimName: torchtune-llama3.2-1b
+        - name: model-initializer
+          dependsOn:
+            - name: dataset-initializer
+              status: Complete
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: model-initializer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: model-initializer
+                      image: ghcr.io/kubeflow/trainer/model-initializer
+                      env:
+                        - name: STORAGE_URI
+                          value: hf://meta-llama/Llama-3.2-1B-Instruct
+                      volumeMounts:
+                        - name: initializer
+                          mountPath: /workspace/model
+                  volumes:
+                    - name: initializer
+                      persistentVolumeClaim:
+                        claimName: torchtune-llama3.2-1b
+        - name: node
+          dependsOn:
+            - name: model-initializer
+              status: Complete
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: ghcr.io/kubeflow/trainer/torchtune-trainer
+                      command:
+                        - tune
+                        - run
+                        - full_finetune_distributed
+                        - --config llama3_2/1B_full.yaml
+                        - dataset=torchtune.datasets.instruct_dataset
+                        - dataset.source=parquet
+                        - dataset.data_dir=/workspace/dataset/data
+                        - output_dir=/workspace/model/output
+                        - tokenizer.path=/workspace/model/original/tokenizer.model
+                        - checkpointer.checkpoint_dir=/workspace/model
+                      resources:
+                        limits:
+                          nvidia.com/gpu: 2
+                      volumeMounts:
+                        - mountPath: /workspace/dataset
+                          name: initializer
+                        - mountPath: /workspace/model
+                          name: initializer
+                  volumes:
+                    - name: initializer
+                      persistentVolumeClaim:
+                        claimName: torchtune-llama3.2-1b

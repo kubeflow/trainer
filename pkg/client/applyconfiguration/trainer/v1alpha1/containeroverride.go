@@ -23,12 +23,9 @@ import (
 // ContainerOverrideApplyConfiguration represents a declarative configuration of the ContainerOverride type for use
 // with apply.
 type ContainerOverrideApplyConfiguration struct {
-	Name         *string                              `json:"name,omitempty"`
-	Command      []string                             `json:"command,omitempty"`
-	Args         []string                             `json:"args,omitempty"`
-	Env          []v1.EnvVarApplyConfiguration        `json:"env,omitempty"`
-	EnvFrom      []v1.EnvFromSourceApplyConfiguration `json:"envFrom,omitempty"`
-	VolumeMounts []v1.VolumeMountApplyConfiguration   `json:"volumeMounts,omitempty"`
+	Name         *string                            `json:"name,omitempty"`
+	Env          []v1.EnvVarApplyConfiguration      `json:"env,omitempty"`
+	VolumeMounts []v1.VolumeMountApplyConfiguration `json:"volumeMounts,omitempty"`
 }
 
 // ContainerOverrideApplyConfiguration constructs a declarative configuration of the ContainerOverride type for use with
@@ -45,26 +42,6 @@ func (b *ContainerOverrideApplyConfiguration) WithName(value string) *ContainerO
 	return b
 }
 
-// WithCommand adds the given value to the Command field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Command field.
-func (b *ContainerOverrideApplyConfiguration) WithCommand(values ...string) *ContainerOverrideApplyConfiguration {
-	for i := range values {
-		b.Command = append(b.Command, values[i])
-	}
-	return b
-}
-
-// WithArgs adds the given value to the Args field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Args field.
-func (b *ContainerOverrideApplyConfiguration) WithArgs(values ...string) *ContainerOverrideApplyConfiguration {
-	for i := range values {
-		b.Args = append(b.Args, values[i])
-	}
-	return b
-}
-
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
@@ -74,19 +51,6 @@ func (b *ContainerOverrideApplyConfiguration) WithEnv(values ...*v1.EnvVarApplyC
 			panic("nil value passed to WithEnv")
 		}
 		b.Env = append(b.Env, *values[i])
-	}
-	return b
-}
-
-// WithEnvFrom adds the given value to the EnvFrom field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the EnvFrom field.
-func (b *ContainerOverrideApplyConfiguration) WithEnvFrom(values ...*v1.EnvFromSourceApplyConfiguration) *ContainerOverrideApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithEnvFrom")
-		}
-		b.EnvFrom = append(b.EnvFrom, *values[i])
 	}
 	return b
 }

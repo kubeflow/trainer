@@ -81,6 +81,7 @@ runs:
       with:
         images: ${{ inputs.image }}
         tags: |
+          type=ref,event=tag
           type=raw,latest
           type=sha
 

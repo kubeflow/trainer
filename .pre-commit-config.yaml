@@ -26,8 +26,5 @@ exclude: |
   (?x)^(
     docs/images/.*|
     pkg/client/.*|
-    sdk/kubeflow/trainer/__init__.py|
-    sdk/kubeflow/trainer/api/__init__.py|
-    sdk/kubeflow/trainer/models/.*|
-    sdk/docs/.*
+    api/python_api/kubeflow_trainer_api/models/.*|
   )$
