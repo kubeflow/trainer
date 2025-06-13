@@ -4,7 +4,16 @@ kind: Kustomization
 # Namespace where all resources are deployed.
 namespace: kubeflow-system
 sortOptions:
-  order: fifo
+  order: legacy
+  legacySortOptions:
+    orderFirst:
+      - Namespace
+      - CustomResourceDefinition
+      - ServiceAccount
+      - Role
+    orderLast:
+      - ValidatingWebhookConfiguration
+
 
 resources:
   - namespace.yaml
