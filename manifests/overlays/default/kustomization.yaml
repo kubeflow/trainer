@@ -9,9 +9,8 @@ sortOptions:
     orderFirst:
       - Namespace
       - CustomResourceDefinition
-      - ServiceAccount
-      - Role
     orderLast:
+      - ClusterTrainingRuntime
       - ValidatingWebhookConfiguration
 
 
@@ -19,10 +18,10 @@ resources:
   - namespace.yaml
   - ../../third-party/jobset  # Comment this line if JobSet is installed on the Kubernetes cluster.
   - ../../base/crds
-  - ../../base/runtimes
   - ../../base/manager
   - ../../base/rbac
   - ../../base/webhook
+  - ../../base/runtimes
 
 # Update the Kubeflow Trainer controller manager & runtimes image tag.
 images:
