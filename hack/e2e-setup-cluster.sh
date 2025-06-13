@@ -48,13 +48,19 @@ print_cluster_info() {
   kubectl describe pod -n ${NAMESPACE}
 }
 
-## This avoids a race condition where API server has not yet registered CRDs
-#echo "Deploy Kubeflow Trainer CRDs first"
-#kubectl apply --server-side -k manifests/base/crds || (
-#  kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
-#    print_cluster_info &&
-#    exit 1
-#)
+# This avoids a race condition where API server has not yet registered CRDs
+echo "Deploy Kubeflow Trainer CRDs first"
+kubectl apply --server-side -k manifests/base/crds || (
+  kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
+    print_cluster_info &&
+    exit 1
+)
+kubectl wait --for condition=established crds/clustertrainingruntimes.trainer.kubeflow.org --timeout ${TIMEOUT} || (
+  echo "Failed to wait until CRDs are established" &&
+    kubectl get crds/clustertrainingruntimes.trainer.kubeflow.org &&
+    kubectl describe crds/clustertrainingruntimes.trainer.kubeflow.org &&
+    exit 1
+)
 
 echo "Deploy Kubeflow Trainer"
 E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
