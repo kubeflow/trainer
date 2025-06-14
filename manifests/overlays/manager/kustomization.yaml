@@ -15,8 +15,7 @@ resources:
 # Update the Kubeflow Trainer controller manager image tag.
 images:
   - name: ghcr.io/kubeflow/trainer/trainer-controller-manager
-    newName: docker.io/electronicwaste/trainer-controller-manager
-    newTag: v0.1
+    newTag: latest
 
 # Secret for the Kubeflow Training webhook.
 secretGenerator:

@@ -72,12 +72,14 @@ spec:
                       command:
                         - tune
                         - run
+                        - --rdzv_endpoint=localhost:29500
                         - full_finetune_distributed
-                        - --config llama3_2/1B_full.yaml
+                        - --config
+                        - llama3_2/1B_full
                         - dataset=torchtune.datasets.instruct_dataset
                         - dataset.source=parquet
                         - dataset.data_dir=/workspace/dataset/data
-                        - output_dir=/workspace/model/output
+                        - output_dir=/workspace/output/model
                         - tokenizer.path=/workspace/model/original/tokenizer.model
                         - checkpointer.checkpoint_dir=/workspace/model
                       resources:
@@ -87,6 +89,8 @@ spec:
                         - mountPath: /workspace/dataset
                           name: initializer
                         - mountPath: /workspace/model
+                          name: initializer
+                        - mountPath: /workspace/output
                           name: initializer
                   volumes:
                     - name: initializer
