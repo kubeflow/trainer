@@ -3,6 +3,7 @@
 [![Build Status](https://github.com/kubeflow/trainer/actions/workflows/test-go.yaml/badge.svg?branch=master)](https://github.com/kubeflow/trainer/actions/workflows/test-go.yaml?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/kubeflow/trainer/badge.svg?branch=master)](https://coveralls.io/github/kubeflow/trainer?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubeflow/trainer)](https://goreportcard.com/report/github.com/kubeflow/trainer)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10435/badge)](https://www.bestpractices.dev/projects/10435)
 
 <h1 align="center">
     <img src="./docs/images/trainer-logo.svg" alt="logo" width="200">
@@ -19,8 +20,9 @@ You can integrate other ML libraries such as [HuggingFace](https://huggingface.c
 [DeepSpeed](https://github.com/microsoft/DeepSpeed), or [Megatron-LM](https://github.com/NVIDIA/Megatron-LM)
 with Kubeflow Training to orchestrate their ML training on Kubernetes.
 
-Kubeflow Trainer allows you effortlessly develop your LLMs with the Kubeflow Python SDK and
-build Kubernetes-native Training Runtimes with Kubernetes Custom Resources APIs.
+Kubeflow Trainer enables you to effortlessly develop your LLMs with the
+[Kubeflow Python SDK](https://github.com/kubeflow/sdk/), and build Kubernetes-native Training
+Runtimes using Kubernetes Custom Resource APIs.
 
 <h1 align="center">
     <img src="./docs/images/trainer-tech-stack.drawio.svg" alt="logo" width="500">

@@ -30,7 +30,7 @@ spec:
                   volumes:
                     - name: initializer
                       persistentVolumeClaim:
-                        claimName: initializer
+                        claimName: torchtune-llama3.2-1b
         - name: model-initializer
           dependsOn:
             - name: dataset-initializer
@@ -54,7 +54,7 @@ spec:
                   volumes:
                     - name: initializer
                       persistentVolumeClaim:
-                        claimName: initializer
+                        claimName: torchtune-llama3.2-1b
         - name: node
           dependsOn:
             - name: model-initializer
@@ -74,6 +74,12 @@ spec:
                         - run
                         - full_finetune_distributed
                         - --config llama3_2/1B_full.yaml
+                        - dataset=torchtune.datasets.instruct_dataset
+                        - dataset.source=parquet
+                        - dataset.data_dir=/workspace/dataset/data
+                        - output_dir=/workspace/model/output
+                        - tokenizer.path=/workspace/model/original/tokenizer.model
+                        - checkpointer.checkpoint_dir=/workspace/model
                       resources:
                         limits:
                           nvidia.com/gpu: 2
@@ -85,4 +91,4 @@ spec:
                   volumes:
                     - name: initializer
                       persistentVolumeClaim:
-                        claimName: initializer
+                        claimName: torchtune-llama3.2-1b

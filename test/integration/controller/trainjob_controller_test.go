@@ -546,6 +546,137 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					}, util.IgnoreConditions))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
+
+			ginkgo.It("Should succeed to create TrainJob with PodSpecOverrides", func() {
+				ginkgo.By("Creating Torch TrainingRuntime and TrainJob")
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Env([]corev1.EnvVar{{Name: "TRAIN_JOB", Value: "value"}}...).
+							Obj()).
+					PodSpecOverrides([]trainer.PodSpecOverride{
+						{
+							TargetJobs:         []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
+							ServiceAccountName: ptr.To("override-sa"),
+							InitContainers: []trainer.ContainerOverride{
+								{
+									Name: "override-init-container",
+									Env: []corev1.EnvVar{
+										{
+											Name:  "INIT_ENV",
+											Value: "override_init",
+										},
+										{
+											Name:  "NEW_VALUE",
+											Value: "from_overrides",
+										},
+									},
+								},
+							},
+						},
+					}).
+					Obj()
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				trainingRuntime = testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").
+					RuntimeSpec(
+						testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").Spec).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									WithNumNodes(100).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+										Obj(),
+									).
+									Obj(),
+							).
+							InitContainer(constants.Node, "override-init-container", "test:runtime", []corev1.EnvVar{
+								{
+									Name:  "INIT_ENV",
+									Value: "original_init",
+								},
+								{
+									Name:  "DATASET_PATH",
+									Value: "runtime",
+								},
+							}...,
+							).
+							Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+							Obj()).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if the appropriate JobSet is created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(jobSet).Should(gomega.BeComparableTo(
+						testingutil.MakeJobSetWrapper(ns.Name, trainJobKey.Name).
+							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
+							Suspend(false).
+							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+							Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+							NumNodes(100).
+							ServiceAccountName(constants.Node, "override-sa").
+							InitContainer(constants.Node, "override-init-container", "test:runtime",
+								corev1.EnvVar{
+									Name:  "INIT_ENV",
+									Value: "override_init",
+								},
+								corev1.EnvVar{
+									Name:  "NEW_VALUE",
+									Value: "from_overrides",
+								},
+								corev1.EnvVar{
+									Name:  "DATASET_PATH",
+									Value: "runtime",
+								},
+							).
+							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort, Protocol: "TCP"}}).
+							Env(constants.Node, constants.Node,
+								[]corev1.EnvVar{
+									{
+										Name:  "TRAIN_JOB",
+										Value: "value",
+									},
+									{
+										Name:  constants.TorchEnvNumNodes,
+										Value: "100",
+									},
+									{
+										Name:  constants.TorchEnvNumProcPerNode,
+										Value: "1",
+									},
+									{
+										Name: constants.TorchEnvNodeRank,
+										ValueFrom: &corev1.EnvVarSource{
+											FieldRef: &corev1.ObjectFieldSelector{
+												FieldPath: constants.JobCompletionIndexFieldPath,
+											},
+										},
+									},
+									{
+										Name:  constants.TorchEnvMasterAddr,
+										Value: fmt.Sprintf("alpha-%s-0-0.alpha", constants.Node),
+									},
+									{
+										Name:  constants.TorchEnvMasterPort,
+										Value: fmt.Sprintf("%d", constants.ContainerTrainerPort),
+									},
+								}...,
+							).
+							Obj(),
+						util.IgnoreObjectMetadata))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
 		})
 
 		ginkgo.Context("Integration Tests for the OpenMPI Runtime", func() {

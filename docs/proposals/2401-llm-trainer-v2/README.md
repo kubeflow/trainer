@@ -242,7 +242,7 @@ We natively support all `recipe` and `config` supported by `torchtune`, since `t
 | epochs | Optional[int] | The number of samples processed before updating model weights. |
 | loss | Optional[Loss] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
 | peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
-| dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, MultimodalDataset]] | Configuration for dataset preprocessing. |
+| dataset_preprocess_config | Optional[Union[TorchTuneInstructDataset, TorchTuneChatDataset, TorchTuneMultimodalDataset]] | Configuration for dataset preprocessing. |
 | num_nodes | Optional[int] | The number of PyTorch Nodes in training |
 | resource_per_node | Optional[Dict] | The resource for each PyTorch Node |
 
@@ -267,7 +267,7 @@ class TorchTuneConfig:
     loss: Optional[Loss] = None
     peft_config: Optional[Union[LoraConfig]] = None
     dataset_preprocess_config: Optional[
-        Union[InstructDataset, ChatDataset, MultimodalDataset],
+        Union[TorchTuneInstructDataset, TorchTuneChatDataset, TorchTuneMultimodalDataset],
     ] = None
     num_nodes: Optional[int] = None,
     resources_per_node: Optional[Dict] = None,
@@ -516,9 +516,8 @@ volumes:
 
 ```python
 @datasetclass
-class InstructDataset:
+class TorchTuneInstructDataset:
     source: Optional[str] = None
-    data_files: Optional[str] = None
     split: Optional[str] = None
     train_on_input: Optional[bool] = None
     new_system_prompt: Optional[str] = None
@@ -530,9 +529,8 @@ class InstructDataset:
 
 ```python
 @datasetclass
-class ChatDataset:
+class TorchTuneChatDataset:
     source: Optional[str] = None
-    data_files: Optional[str] = None
     split: Optional[str] = None
     conversation_column: Optional[str] = None
     conversation_style: Optional[str] = None
@@ -545,9 +543,8 @@ class ChatDataset:
 
 ```python
 @datasetclass
-class MultimodalDataset:
+class TorchTuneMultimodalDataset:
     source: Optional[str] = None
-    data_files: Optional[str] = None
     split: Optional[str] = None
     column_map: Optional[Dict[str, str]] = None
     image_dir: Optional[str] = None
@@ -712,7 +709,7 @@ $ accelerate launch {my_script.py}
 | epochs | Optional[int] | The number of samples processed before updating model weights. |
 | loss | Optional[str] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
 | peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
-| dataset_preprocess_config | Optional[Union[InstructDataset, ChatDataset, MultimodalDataset]] | Configuration for dataset preprocessing. |
+| dataset_preprocess_config | Optional[Union[TorchTuneInstructDataset, TorchTuneChatDataset, TorchTuneMultimodalDataset]] | Configuration for dataset preprocessing. |
 | num_nodes | Optional[int] | The number of PyTorch Nodes in training |
 | resource_per_node | Optional[Dict] | The resource for each PyTorch Node |
 
@@ -728,7 +725,7 @@ class TorchTuneConfig:
     loss: Optional[str] = None
     peft_config: Optional[Union[LoraConfig]] = None
     dataset_preprocess_config: Optional[
-        Union[InstructDataset, ChatDataset, MultimodalDataset],
+        Union[TorchTuneInstructDataset, TorchTuneChatDataset, TorchTuneMultimodalDataset],
     ] = None
     num_nodes: Optional[int] = None,
     resources_per_node: Optional[Dict] = None,
