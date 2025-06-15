@@ -128,6 +128,9 @@ const (
 	// TorchTuneArgRdzvEndpoint is the arg name for the rendezvous endpoint.
 	TorchTuneArgRdzvEndpoint string = "--rdzv_endpoint"
 
+	// TorchTuneArgConfig is the arg name for the config file.
+	TorchTuneArgConfig string = "--config"
+
 	// TorchTuneFullFinetuneSingleDevice Recipe is the recipe for the single device full finetune.
 	TorchTuneFullFinetuneSingleDevice string = "full_finetune_single_device"
 
