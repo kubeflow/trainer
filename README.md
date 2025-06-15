@@ -20,8 +20,9 @@ You can integrate other ML libraries such as [HuggingFace](https://huggingface.c
 [DeepSpeed](https://github.com/microsoft/DeepSpeed), or [Megatron-LM](https://github.com/NVIDIA/Megatron-LM)
 with Kubeflow Training to orchestrate their ML training on Kubernetes.
 
-Kubeflow Trainer allows you effortlessly develop your LLMs with the Kubeflow Python SDK and
-build Kubernetes-native Training Runtimes with Kubernetes Custom Resources APIs.
+Kubeflow Trainer enables you to effortlessly develop your LLMs with the
+[Kubeflow Python SDK](https://github.com/kubeflow/sdk/), and build Kubernetes-native Training
+Runtimes using Kubernetes Custom Resource APIs.
 
 <h1 align="center">
     <img src="./docs/images/trainer-tech-stack.drawio.svg" alt="logo" width="500">

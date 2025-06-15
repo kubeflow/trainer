@@ -120,13 +120,11 @@ manifests: controller-gen ## Generate manifests.
 		output:rbac:artifacts:config=manifests/base/rbac \
 		output:webhook:artifacts:config=manifests/base/webhook
 
-## TODO (kramaranya): Remove gen-sdk.sh when moving SDK
 .PHONY: generate
-generate: go-mod-download manifests ## Generate APIs and SDK.
+generate: go-mod-download manifests ## Generate APIs.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh
 	CONTAINER_RUNTIME=$(CONTAINER_RUNTIME) hack/python-api/gen-api.sh
-	CONTAINER_RUNTIME=$(CONTAINER_RUNTIME) hack/python-sdk/gen-sdk.sh
 
 .PHONY: go-mod-download
 go-mod-download: ## Run go mod download to download modules.
@@ -163,7 +161,6 @@ test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd ## Ru
 test-python: ## Run Python unit test.
 	pip install pytest
 	pip install -r ./cmd/initializers/dataset/requirements.txt
-	pip install ./sdk
 
 	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/dataset
 	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/model
