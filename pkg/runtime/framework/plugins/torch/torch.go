@@ -249,7 +249,7 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, model
 		suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
 	}
 
-	return recipe, fmt.Sprintf("%s%s.yaml", model, suffix)
+	return recipe, fmt.Sprintf("%s%s", model, suffix)
 }
 
 // extractOverridesFromRuntime extracts overrides from the TorchTune Trainer Node.
