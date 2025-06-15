@@ -197,7 +197,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			// 1. Add rendezvous backend arg for torchtune.
 			var newCommand []string
 			newCommand = append(newCommand,
-				fmt.Sprintf("%s %s-%s-0-0.%s:%d",
+				fmt.Sprintf("%s=%s-%s-0-0.%s:%d",
 					constants.TorchTuneArgRdzvEndpoint,
 					trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort,
 				),
@@ -207,7 +207,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
 			model := getModelFromRuntimeRef(trainJob.Spec.RuntimeRef.Name)
 			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, model, trainJob.Spec.Trainer.Args)
-			newCommand = append(newCommand, recipe, fmt.Sprintf("--config %s", config))
+			newCommand = append(newCommand, recipe, constants.TorchTuneArgConfig, config)
 
 			// 3. Extract output directory, tokenizer path and model mount path from (Cluster)TrainingRuntime.
 			newCommand = append(newCommand, extractOverridesFromRuntime(info)...)
