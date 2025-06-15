@@ -1,6 +1,6 @@
 # KEP-2628: Support KAI Scheduler in Kubeflow Trainer
 
-This KEP proposes integrating NVIDIA's KAI Scheduler into Kubeflow Trainer V2 to enable gang-scheduling capabilities for TrainJob resources, extending the existing PodGroupPolicy API to support KAI alongside current schedulers like Co-Scheduling. The integration will leverage KAI's PodGrouper service to create scheduling queues and apply appropriate labels for efficient resource allocation in AI workloads.
+This KEP proposes integrating NVIDIA's KAI Scheduler into Kubeflow Trainer V2 to enable gang-scheduling capabilities for TrainJob resources, extending the existing PodGroupPolicy API to support KAI alongside current schedulers like Co-Scheduling. The integration will leverage KAI's PodGrouper service to create the PodGroup object and apply appropriate labels for efficient resource allocation in AI workloads. Queue creation will be handled separately, likely as a feature within the trainer plugin.
 
 ## Table of Contents
 
