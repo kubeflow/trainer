@@ -79,7 +79,7 @@ spec:
                         - dataset=torchtune.datasets.instruct_dataset
                         - dataset.source=parquet
                         - dataset.data_dir=/workspace/dataset/data
-                        - output_dir=/workspace/output/model
+                        - output_dir=/workspace/output
                         - tokenizer.path=/workspace/model/original/tokenizer.model
                         - checkpointer.checkpoint_dir=/workspace/model
                       resources:
