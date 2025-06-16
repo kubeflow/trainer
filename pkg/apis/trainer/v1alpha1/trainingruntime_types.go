@@ -134,7 +134,8 @@ type PodGroupPolicySource struct {
 	// Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.
 	Coscheduling *CoschedulingPodGroupPolicySource `json:"coscheduling,omitempty"`
 
-	// TODO (andreyvelich): Add support for Volcano gang-scheduler.
+	// Volcano plugin for gang-scheduling.
+	Volcano *VolcanoPodGroupPolicySource `json:"volcano,omitempty"`
 }
 
 // CoschedulingPodGroupPolicySource represents configuration for coscheduling plugin.
@@ -145,6 +146,19 @@ type CoschedulingPodGroupPolicySource struct {
 	// Defaults to 60 seconds.
 	// +kubebuilder:default=60
 	ScheduleTimeoutSeconds *int32 `json:"scheduleTimeoutSeconds,omitempty"`
+}
+
+// VolcanoPodGroupPolicySource represents configuration for the Volcano gang-scheduler.
+type VolcanoPodGroupPolicySource struct {
+	// Queue is the name of the Volcano queue to which the PodGroup will be submitted.
+	// Defaults to the “default” queue, which has the lowest weight.
+	// +kubebuilder:default=default
+	Queue *string `json:"queue,omitempty"`
+
+	// PriorityClassName is the name of the Kubernetes PriorityClass to use for the PodGroup.
+	// e.g. system-node-critical, system-cluster-critical.
+	// This field is optional.
+	PriorityClassName *string `json:"priorityClassName,omitempty"`
 }
 
 // MLPolicy represents configuration for the model trining with ML-specific parameters.
