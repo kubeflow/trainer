@@ -36,6 +36,9 @@ const (
 	// ModelMountPath is the volumeMount path for model.
 	ModelMountPath string = "/workspace/model"
 
+	// DeviceNvidiaGPU is the device type for NVIDIA GPU.
+	DeviceNvidiaGPU string = "nvidia.com/gpu"
+
 	// AncestorTrainer is the ancestor name for Trainer, which is mostly used for the value of
 	// 'trainer.kubeflow.org/trainjob-ancestor-step'.
 	AncestorTrainer string = "trainer"
