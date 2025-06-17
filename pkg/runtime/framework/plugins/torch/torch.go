@@ -195,18 +195,25 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			// Mutate trainer command for torchtune.
 			// Ref: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2#complement-torch-plugin
 			// 1. Add rendezvous backend arg for torchtune.
+			// Rendezvous backend is only enabled for multi-nodes or multi-devices training.
 			var newCommand []string
-			newCommand = append(newCommand,
-				fmt.Sprintf("%s=%s-%s-0-0.%s:%d",
-					constants.TorchTuneArgRdzvEndpoint,
-					trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort,
-				),
-			)
+			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
+			if numNodes > 1 || !(numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1) {
+				newCommand = append(newCommand,
+					fmt.Sprintf("%s=%s-%s-0-0.%s:%d",
+						constants.TorchTuneArgRdzvEndpoint,
+						trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort,
+					),
+				)
+			}
 
 			// 2. Get the recipe and config from old args and append them to newCommand.
-			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
-			model := getModelFromRuntimeRef(trainJob.Spec.RuntimeRef.Name)
-			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, model, trainJob.Spec.Trainer.Args)
+			recipe, config := getRecipeAndConfig(
+				numNodes,
+				numProcPerNode,
+				getModelFromRuntimeRef(trainJob.Spec.RuntimeRef.Name),
+				trainJob.Spec.Trainer.Args,
+			)
 			newCommand = append(newCommand, recipe, constants.TorchTuneArgConfig, config)
 
 			// 3. Extract output directory, tokenizer path and model mount path from (Cluster)TrainingRuntime.
@@ -231,6 +238,11 @@ func calculateNumProcPerNode(
 		if shouldUseCPU(resources) {
 			cpuQ := resources[corev1.ResourceCPU]
 			return intstr.FromInt32(max(defaultCPU, int32(cpuQ.Value()))), true
+		} else if fallbackNumProcPerNode.Type != intstr.String{
+			gpuQ, ok := resources[corev1.ResourceName(constants.DeviceNvidiaGPU)]
+			if ok && gpuQ.Value() > 0 {
+				return intstr.FromInt32(int32(gpuQ.Value())), false
+			}
 		}
 		return fallbackNumProcPerNode, false
 	}
