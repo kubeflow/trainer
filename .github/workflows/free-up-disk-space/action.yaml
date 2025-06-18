@@ -28,6 +28,22 @@ runs:
       run: |
         docker image prune -a -f
         docker system df
+        echo "Disk usage after image prune:"
+        df -hT
+
+    - name: Turn swap off
+      shell: bash
+      run: |
+        sudo swapoff -a
+        sudo rm -f /swapfile
+        echo "Disk usage after swap off:"
+        df -hT
+
+    - name: apt clean
+      shell: bash
+      run: |
+        sudo apt clean
+        echo "Disk usage after apt clean:"
         df -hT
 
     - name: Move docker data directory
