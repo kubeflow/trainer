@@ -60,7 +60,7 @@ A new plugin will be created in `pkg/runtime/framework/plugins/kai` that impleme
 The KAI plugin implementation includes several key components:
 
 - The plugin implements the `EnforcePodGroupPolicyPlugin` interface to apply the necessary labels for KAI scheduling
-- When a TrainJob specifies KAI as the scheduler, the plugin adds the `runai/queue` label with the specified queue name to ensure proper scheduling by the KAI Scheduler
+- When a TrainJob specifies KAI as the scheduler, the plugin adds the `kai.scheduler/queue` label with the specified queue name to ensure proper scheduling by the KAI Scheduler
 - The plugin also implements the `WatchExtensionPlugin` and `ComponentBuilderPlugin` interfaces to maintain consistency with the framework architecture, even though KAI primarily relies on external PodGroup creation through its PodGrouper service
 
 ### Integration with KAI PodGrouper
@@ -74,7 +74,7 @@ The integration process involves two main steps:
 
 ### Queue Management and Labeling
 
-The implementation will support the creation of scheduling queues as a trainer plugin feature. Users will specify the queue name in the KAI configuration, and the plugin will automatically apply the `runai/queue` label to the appropriate resources. This label can be placed either on the top-level owner (TrainJob) or directly on individual pods, depending on the specific requirements and KAI configuration.
+The implementation will support the creation of scheduling queues as a trainer plugin feature. Users will specify the queue name in the KAI configuration, and the plugin will automatically apply the `kai.scheduler/queue` label to the appropriate resources. This label can be placed either on the top-level owner (TrainJob) or directly on individual pods, depending on the specific requirements and KAI configuration.
 
 The queue configuration will be validated to ensure that specified queues exist in the KAI Scheduler configuration before allowing TrainJob creation. This prevents runtime errors and provides immediate feedback to users about configuration issues.
 
