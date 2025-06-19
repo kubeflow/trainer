@@ -132,9 +132,17 @@ type PodGroupPolicy struct {
 // Only one of its members may be specified.
 type PodGroupPolicySource struct {
 	// Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.
-	Coscheduling *CoschedulingPodGroupPolicySource `json:"coscheduling,omitempty"`
-
+	Coscheduling  *CoschedulingPodGroupPolicySource  `json:"coscheduling,omitempty"`
+	Kaischeduling *KaischedulingPodGroupPolicySource `json:"kaischeduling,omitempty"`
 	// TODO (andreyvelich): Add support for Volcano gang-scheduler.
+}
+
+type KaischedulingPodGroupPolicySource struct {
+	MinMember         *int32  `json:"minMember,omitempty"`
+	Queue             *string `json:"queue,omitempty"`
+	PriorityClassName *string `json:"priorityClassName,omitempty"`
+	MarkUnschedulable *bool   `json:"markUnschedulable,omitempty"`
+	SchedulingBackoff *int32  `json:"schedulingBackoff,omitempty"`
 }
 
 // CoschedulingPodGroupPolicySource represents configuration for coscheduling plugin.
