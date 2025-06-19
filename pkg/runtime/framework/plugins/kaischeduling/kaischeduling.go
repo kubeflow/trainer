@@ -14,16 +14,16 @@ import (
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
 )
 
-type KAIScheduler struct {
+type KAIScheduling struct {
 	client     client.Client
 	restMapper meta.RESTMapper
 	scheme     *apiruntime.Scheme
 }
 
 // Implementing interfaces required for GangScheduling
-var _ framework.EnforcePodGroupPolicyPlugin = (*KAIScheduler)(nil)
-var _ framework.WatchExtensionPlugin = (*KAIScheduler)(nil)
-var _ framework.ComponentBuilderPlugin = (*KAIScheduler)(nil)
+var _ framework.EnforcePodGroupPolicyPlugin = (*KAIScheduling)(nil)
+var _ framework.WatchExtensionPlugin = (*KAIScheduling)(nil)
+var _ framework.ComponentBuilderPlugin = (*KAIScheduling)(nil)
 
 var (
 	ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer        = errors.New("setting index on runtimeClass for TrainingRuntime")
@@ -33,18 +33,18 @@ var (
 const Name = "KAIScheduling"
 
 func New(ctx context.Context, client client.Client) (framework.Plugin, error) {
-	return &KAIScheduler{
+	return &KAIScheduling{
 		client:     client,
 		restMapper: client.RESTMapper(),
 		scheme:     client.Scheme(),
 	}, nil
 }
 
-func (k *KAIScheduler) Name() string {
+func (k *KAIScheduling) Name() string {
 	return Name
 }
 
-func (k *KAIScheduler) EnforcePodGroupPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
+func (k *KAIScheduling) EnforcePodGroupPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || trainJob == nil {
 		return nil
 	}
@@ -56,7 +56,7 @@ func (k *KAIScheduler) EnforcePodGroupPolicy(info *runtime.Info, trainJob *train
 	return nil
 }
 
-func (k *KAIScheduler) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
+func (k *KAIScheduling) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
 	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || info.RuntimePolicy.PodGroupPolicy.Kaischeduling == nil || trainJob == nil {
 		return nil, nil
 	}
@@ -67,6 +67,6 @@ func (k *KAIScheduler) Build(ctx context.Context, info *runtime.Info, trainJob *
 	return []any{}, nil
 }
 
-func (k *KAIScheduler) ReconcilerBuilders() []runtime.ReconcilerBuilder {
+func (k *KAIScheduling) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	return []runtime.ReconcilerBuilder{}
 }
