@@ -107,3 +107,18 @@ webhook:
   # -- Specifies how unrecognized errors are handled.
   # Available options are `Ignore` or `Fail`.
   failurePolicy: Fail
+  issuer:
+    name: training-operator-webhook-issuer
+  cert:
+    name: training-operator-webhook-cert
+    secretName: training-operator-webhook-cert
+    duration: 8760h
+    renewBefore: 360h
+    subject:
+      organizations:
+        - kubeflow
+    issuerRef:
+      name: training-operator-issuer
+      kind: Issuer
+    serviceName: training-operator-controller-manager
+
