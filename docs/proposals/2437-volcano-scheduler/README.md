@@ -41,7 +41,7 @@ We plan to integrate Volcano into Kubeflow Trainer as a runtime plugin, followin
 
 PodGroup is used as the basic scheduling unit. It is created based on the scheduling parameters specified in *Training Runtime*. Then the control components of Volcano implement the scheduling and management of the pods. This is similar to the approach used in Training Operator V1.
 
-The diagram below shows how the Volcano plugin is integrated into the TrainJob creation workflow.
+The diagram below shows how Volcano is integrated into the TrainJob creation workflow.
 
 ![user-roles](./user-roles-scheduler.drawio.svg)
 
