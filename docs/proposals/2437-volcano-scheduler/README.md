@@ -192,9 +192,14 @@ to implement this enhancement.
 
 #### Unit Tests
 
-// TODO: to update
+- **Volcano plugin logic**
+  - PodGroup creation based on the *TrainingRuntime* spec
+  - Resource calculations for `MinResources`, `MinMember`, etc.
+  - PodGroup update conditions
+- **Event handlers**
+  - Handling of relevant Kubernetes events (e.g., LimitRange updates, RuntimeClass updates)
+  - Triggering reconcile logic correctly
 
-- `<package>`: `<date>` - `<test coverage>`
 
 #### E2E tests
 
@@ -202,6 +207,22 @@ to implement this enhancement.
 Describe what E2E tests will be added to ensure proper quality of the enhancement.
 After the implementation PR is merged, add the names of the tests here.
 -->
+
+
+1. **Cluster Setup**
+- Start Kind-based Kubernetes cluster
+- Install Volcano from official manifest (volcano-development.yaml)
+- Deploy Trainer controller with Volcano plugin enabled
+- Verify:
+  - Volcano CRDs (PodGroup) are installed
+  - Trainer controller is running successfully
+2. **Training Job Execution**
+- Submit TrainJob using Python SDK
+- Verify:
+  - PodGroup created and bound to job
+  - Job enters Running state only when all pods are scheduled
+  - Job completes successfully
+  - PodGroup is deleted with job
 
 #### Integration tests
 
@@ -232,4 +253,3 @@ Major milestones might include:
 -->
 
 - 2025.6.2: KEP Creation
-
