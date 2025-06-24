@@ -8,7 +8,7 @@ This document outlines a proposal to support Volcano for gang-scheduling in Kube
 
 **Kubeflow Trainer** is a core component of the Kubeflow ecosystem, responsible for managing and executing distributed training jobs. In distributed training scenarios, an efficient **scheduling mechanism** is crucial:
 
-- A distributed training job typically involves multiple pods (such as parameter servers and worker nodes) running in coordination. To avoid the resource wastage, all pods need to be started at the same time. That’s why **Gang Scheduling** matters.
+- A distributed training job typically involves multiple pods (such as `torchrun`-based training) running in coordination. To avoid the resource wastage, all pods need to be started at the same time. That’s why **Gang Scheduling** matters.
 - The default Kubernetes scheduler was initially designed for long-running services. It uses a **pod-by-pod** scheduling approach, lacking support for batch tasks. As a result, it fails to support Gang Scheduling, which is strongly required  in AI and big data scenarios.
 
 Kubeflow Trainer V2 currently uses the **Coscheduling** plugin to provide  the Gang Scheduling support. However, it has some limitations, such as the inability to perform priority scheduling.
