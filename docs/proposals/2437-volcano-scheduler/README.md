@@ -47,8 +47,8 @@ The diagram below shows how Volcano is integrated into the TrainJob creation wor
 
 As shown in the diagram, advanced scheduling is applied through a two-stage workflow:
 
-1. Platform engineers define the scheduling strategy when customizing *ClusterTrainingRuntime* / *TrainRuntime*. This step requires familiarity with the Kubernetes API and the Volcano scheduler.
-2. Data scientists then submit TrainJobs by choosing a *TrainingRuntime* with a specific scheduling method in the *TrainJob*. They don't need to understand the underlying implementation details.
+1. First, platform engineers define the scheduling strategy when customizing *ClusterTrainingRuntime* / *TrainRuntime*. This step requires familiarity with the Kubernetes API and the Volcano scheduler.
+2. Then, data scientists will submit TrainJobs by choosing a *TrainingRuntime* with a specific scheduling method in the *TrainJob*. They don't need to understand the underlying implementation details.
 
 ### User Stories
 
