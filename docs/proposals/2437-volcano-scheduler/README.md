@@ -2,7 +2,7 @@
 
 ## Summary
 
-This document outlines a proposal to support Volcano for gang-scheduling in Kubeflow Trainer, so as to provide users with more AI-specific scheduling capacities like priority scheduling and queue resource management. Thanks to the [Kubeflow Trainer Pipeline Framework,](https://github.com/kubeflow/trainer/tree/master/docs/proposals/2170-kubeflow-trainer-v2#pipeline-framework) we can seamlessly integrate Volcano into Kubeflow Trainer as a runtime plugin.
+This document outlines a proposal to support Volcano for gang-scheduling in Kubeflow Trainer, so as to provide users with more AI-specific scheduling capacities like priority scheduling and queue resource management. Thanks to the [Kubeflow Trainer Pipeline Framework](https://github.com/kubeflow/trainer/tree/master/docs/proposals/2170-kubeflow-trainer-v2#pipeline-framework), we can seamlessly integrate Volcano into Kubeflow Trainer as a runtime plugin.
 
 ## Motivation
 
