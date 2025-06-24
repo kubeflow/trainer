@@ -27,7 +27,7 @@ Introducing the **Volcano** scheduler will enhance Trainer's scheduling capabili
 
 1. **Integrate Volcano Scheduler into Kubeflow Trainer.** Integrate the **Volcano** scheduler plugin into Trainer to support Gang Scheduling and resource management for distributed training jobs.
 2. **Support some advanced scheduling features**. Provide some advanced scheduling features, such as prioritizing high-priority jobs and assigning specific queues.
-3. **Provide user guidance**. Update the user-guide documentation with appropriate usage examples.
+3. **Provide user guidance**. Update the user documentation with appropriate use cases.
 
 ### Non-Goals
 
