@@ -123,25 +123,6 @@ podGroupPolicy:
       queue: high-priority-queue
 ```
 
-### Notes/Constraints/Caveats (Optional)
-
-<!--
-What are the caveats to the proposal?
-What are some important details that didn't come across above?
-Go in to as much detail as necessary here.
-This might be a good place to talk about core concepts and how they relate.
--->
-
-### Risks and Mitigations
-
-<!--
-What are the risks of this proposal, and how do we mitigate? Think broadly.
-For example, consider both security and how this will impact the larger
-Kubeflow ecosystem.
-How will security be reviewed, and by whom?
-How will UX be reviewed, and by whom?
-Consider including folks who also work outside the SIG or subproject.
--->
 
 ## Design Details
 
@@ -252,11 +233,3 @@ Major milestones might include:
 
 - 2025.6.2: KEP Creation
 
-
-## Alternatives
-
-<!--
-What other approaches did you consider, and why did you rule them out? These do
-not need to be as detailed as the proposal, but should include enough
-information to express the idea and why it was not acceptable.
--->
