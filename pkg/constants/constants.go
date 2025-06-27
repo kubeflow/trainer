@@ -36,6 +36,9 @@ const (
 	// ModelMountPath is the volumeMount path for model.
 	ModelMountPath string = "/workspace/model"
 
+	// DeviceNvidiaGPU is the device type for NVIDIA GPU.
+	DeviceNvidiaGPU string = "nvidia.com/gpu"
+
 	// AncestorTrainer is the ancestor name for Trainer, which is mostly used for the value of
 	// 'trainer.kubeflow.org/trainjob-ancestor-step'.
 	AncestorTrainer string = "trainer"
@@ -127,6 +130,9 @@ const (
 
 	// TorchTuneArgRdzvEndpoint is the arg name for the rendezvous endpoint.
 	TorchTuneArgRdzvEndpoint string = "--rdzv_endpoint"
+
+	// TorchTuneArgConfig is the arg name for the config file.
+	TorchTuneArgConfig string = "--config"
 
 	// TorchTuneFullFinetuneSingleDevice Recipe is the recipe for the single device full finetune.
 	TorchTuneFullFinetuneSingleDevice string = "full_finetune_single_device"
