@@ -1,5 +1,5 @@
 FROM mpioperator/base:v0.6.0 AS mpi
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.8.1-devel-ubuntu22.04
 
 # Disable interactive dialog from apt.
 ENV DEBIAN_FRONTEND noninteractive
