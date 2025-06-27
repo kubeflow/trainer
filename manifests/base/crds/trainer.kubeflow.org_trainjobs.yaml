@@ -2697,9 +2697,6 @@ spec:
                   type: object
                 type: array
                 x-kubernetes-list-type: atomic
-                x-kubernetes-validations:
-                - message: Value is immutable
-                  rule: self == oldSelf
               runtimeRef:
                 description: |-
                   Reference to the training runtime.

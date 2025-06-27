@@ -101,11 +101,11 @@ func (f *Framework) RunEnforcePodGroupPolicyPlugins(info *runtime.Info, trainJob
 	return nil
 }
 
-func (f *Framework) RunCustomValidationPlugins(info *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (f *Framework) RunCustomValidationPlugins(ctx context.Context, info *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var aggregatedWarnings admission.Warnings
 	var aggregatedErrors field.ErrorList
 	for _, plugin := range f.customValidationPlugins {
-		warnings, errs := plugin.Validate(info, oldObj, newObj)
+		warnings, errs := plugin.Validate(ctx, info, oldObj, newObj)
 		if len(warnings) != 0 {
 			aggregatedWarnings = append(aggregatedWarnings, warnings...)
 		}
