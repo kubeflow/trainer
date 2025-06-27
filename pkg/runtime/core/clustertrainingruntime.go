@@ -79,5 +79,5 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 		}
 	}
 	info, _ := r.newRuntimeInfo(new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy)
-	return r.framework.RunCustomValidationPlugins(info, old, new)
+	return r.framework.RunCustomValidationPlugins(ctx, info, old, new)
 }

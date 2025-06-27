@@ -415,6 +415,41 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 					return job
 				},
 				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to update PodSpecOverrides when TrainJob is not suspended",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "podspec-not-suspended").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						PodSpecOverrides([]trainer.PodSpecOverride{
+							{
+								TargetJobs:         []trainer.PodSpecOverrideTargetJob{{Name: "node"}},
+								ServiceAccountName: ptr.To("original-sa"),
+							},
+						}).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodSpecOverrides[0].ServiceAccountName = ptr.To("updated-sa")
+					return job
+				},
+				testingutil.BeForbiddenError()),
+			ginkgo.Entry("Should succeed to update PodSpecOverrides when TrainJob is suspended",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "podspec-suspended").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(true).
+						PodSpecOverrides([]trainer.PodSpecOverride{
+							{
+								TargetJobs:         []trainer.PodSpecOverrideTargetJob{{Name: "node"}},
+								ServiceAccountName: ptr.To("original-sa"),
+							},
+						}).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodSpecOverrides[0].ServiceAccountName = ptr.To("updated-sa")
+					return job
+				},
+				gomega.Succeed()),
 		)
 	})
 })
