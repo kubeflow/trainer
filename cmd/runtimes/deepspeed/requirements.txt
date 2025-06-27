@@ -1,7 +1,7 @@
 # Keep the same version as for Torch runtime.
-torch==2.6.0
+torch==2.7.1
 # DeepSpeed libraries.
-deepspeed==0.16.4
+deepspeed==0.17.1
 mpi4py==4.0.3
 # HuggingFace libraries.
 datasets==3.4.1
