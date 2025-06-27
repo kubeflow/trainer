@@ -62,7 +62,7 @@ func NewClusterTrainingRuntimeReconciler(cli client.Client, recorder record.Even
 	}
 }
 
-// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=clustertrainingruntimes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=clustertrainingruntimes,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=clustertrainingruntimes/finalizers,verbs=get;update;patch
 
 func (r *ClusterTrainingRuntimeReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
