@@ -33,7 +33,7 @@ type Plugin interface {
 
 type CustomValidationPlugin interface {
 	Plugin
-	Validate(info *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList)
+	Validate(ctx context.Context, info *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList)
 }
 
 type WatchExtensionPlugin interface {

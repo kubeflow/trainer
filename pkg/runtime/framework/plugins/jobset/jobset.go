@@ -22,6 +22,7 @@ import (
 	"maps"
 
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +82,7 @@ func (j *JobSet) Name() string {
 	return Name
 }
 
-func (j *JobSet) Validate(info *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
 	if !ok {
@@ -117,6 +118,8 @@ func (j *JobSet) Validate(info *runtime.Info, _, newObj *trainer.TrainJob) (admi
 		}
 	}
 
+	allErrs = append(allErrs, j.checkPodSpecOverridesImmutability(ctx, oldObj, newObj)...)
+
 	// TODO (andreyvelich): Validate Volumes, VolumeMounts, and Tolerations.
 	targetJobNames := sets.New[string]()
 	for _, podSpecOverride := range newObj.Spec.PodSpecOverrides {
@@ -151,6 +154,42 @@ func (j *JobSet) Validate(info *runtime.Info, _, newObj *trainer.TrainJob) (admi
 	}
 
 	return nil, allErrs
+}
+
+func (j *JobSet) checkPodSpecOverridesImmutability(ctx context.Context, oldObj, newObj *trainer.TrainJob) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if oldObj == nil {
+		// Checking immutability makes only sense on updates
+		return allErrs
+	}
+
+	jobSet := &jobsetv1alpha2.JobSet{}
+	if err := j.client.Get(ctx, client.ObjectKeyFromObject(newObj), jobSet); err != nil && !apierrors.IsNotFound(err) {
+		allErrs = append(allErrs, field.InternalError(podSpecOverridePath, err))
+	} else {
+		changed := !equality.Semantic.DeepEqual(oldObj.Spec.PodSpecOverrides, newObj.Spec.PodSpecOverrides)
+		suspended := newObj.Spec.Suspend != nil && *newObj.Spec.Suspend
+		if changed {
+			if !suspended {
+				allErrs = append(allErrs, field.Forbidden(podSpecOverridePath, "PodSpecOverrides can only be modified when the TrainJob is suspended"))
+			} else if !apierrors.IsNotFound(err) {
+				// If the JobSet exists, check whether it's inactive
+				// so changes won't have side effects on the JobSet's Pods
+				// that are still running.
+				// This can happen while the TrainJob is transitioning out
+				// from unsuspended state.
+				for _, replicatedJob := range jobSet.Status.ReplicatedJobsStatus {
+					if replicatedJob.Active > 0 {
+						allErrs = append(allErrs, field.Forbidden(podSpecOverridePath, "PodSpecOverrides cannot be modified when the JobSet is still active"))
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return allErrs
 }
 
 func (j *JobSet) ReconcilerBuilders() []runtime.ReconcilerBuilder {
