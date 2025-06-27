@@ -433,7 +433,7 @@ func TestRunCustomValidationPlugins(t *testing.T) {
 			runtimeInfo := runtime.NewInfo(
 				runtime.WithTemplateSpecObjApply(jobSetSpecApply),
 			)
-			warnings, errs := fwk.RunCustomValidationPlugins(runtimeInfo, tc.oldObj, tc.newObj)
+			warnings, errs := fwk.RunCustomValidationPlugins(ctx, runtimeInfo, tc.oldObj, tc.newObj)
 			if diff := cmp.Diff(tc.wantWarnings, warnings, cmpopts.SortSlices(func(a, b string) bool { return a < b })); len(diff) != 0 {
 				t.Errorf("Unexpected warninigs (-want,+got):\n%s", diff)
 			}

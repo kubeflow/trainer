@@ -1658,7 +1658,7 @@ func TestValidate(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to initialize Torch plugin: %v", err)
 			}
-			warnings, errs := p.(framework.CustomValidationPlugin).Validate(tc.info, tc.oldObj, tc.newObj)
+			warnings, errs := p.(framework.CustomValidationPlugin).Validate(ctx, tc.info, tc.oldObj, tc.newObj)
 			if diff := cmp.Diff(tc.wantError, errs); len(diff) != 0 {
 				t.Errorf("Unexpected error from Validate (-want, +got): %s", diff)
 			}
