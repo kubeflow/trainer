@@ -256,7 +256,7 @@ def get_pod_template_spec(
     # Create Pod template spec. If the value is None, Pod doesn't have that parameter
     pod_template_spec = models.V1PodTemplateSpec(
         metadata=models.V1ObjectMeta(
-            annotations={constants.ISTIO_SIDECAR_INJECTION: "false"}
+            labels={constants.ISTIO_SIDECAR_INJECTION: "false"}
         ),
         spec=models.V1PodSpec(
             init_containers=init_containers,
