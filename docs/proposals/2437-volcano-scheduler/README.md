@@ -129,7 +129,7 @@ podGroupPolicy:
 As shown in the workflow diagram above, we decide to implement a runtime plugin for Volcano with the Kubeflow Trainer Pipeline Framework. It will:
 
 - **Build PodGroups** based on the *Training Runtime* configuration and calculate resource limits (e.g., `MinResource`).
-- Manage PodGroups.
+- **Manage PodGroups**
    - Update PodGroups and perform rescheduling when there are changes in cluster resource demands (e.g., changes in `LimitRange`).
    - Support scheduling for suspended and resumed training jobs, with special handling of suspended jobs to ensure no new pods are started. (TrainJob may be set to suspend in its configuration or manually paused by the user.)
 - Bind PodGroups to TrainJobs, with their life cycle controlled by the TrainJob. For example, when a TrainJob is deleted, the associated PodGroup is also deleted.
