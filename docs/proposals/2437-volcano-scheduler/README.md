@@ -193,8 +193,8 @@ Additionally, we should make sure that the PodGroup is automatically cleaned up 
 
 The main installation steps are as follows:
 
-1. **Install Volcano** (users must install it beforehand). A deployment YAML file ([volcano-development.yaml](https://raw.githubusercontent.com/volcano-sh/volcano/release-1.10/installer/volcano-development.yaml)) is provided. The key CRDs include *PodGroup*, *Queue*. The main control components include *controller-manager*, *admission*, and *scheduler*.
-2. **Modify the RBAC permissions in the manifest.** We should ensure that Trainer has the necessary management rights for the Volcano PodGroup, Queue CRD.
+1. **Install Volcano** (users must install it beforehand). A deployment YAML file ([volcano-development.yaml](https://raw.githubusercontent.com/volcano-sh/volcano/release-1.10/installer/volcano-development.yaml)) is provided. Key CRDs include *PodGroup*, *Queue*. Main control components include *controller-manager*, *admission*, and *scheduler*.
+2. **Configure RBAC Permissions**. We should grant Trainer the necessary permissions to manage Volcano CRDs. Permissions can be declared using `+kubebuilder:rbac` annotations inside the runtime plugin code.
 
 
 ### Test Plan
