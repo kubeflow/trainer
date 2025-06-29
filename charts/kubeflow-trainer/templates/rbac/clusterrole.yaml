@@ -25,24 +25,14 @@ rules:
   - ""
   resources:
   - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-- apiGroups:
-  - ""
-  resources:
   - secrets
   verbs:
+  - create
   - get
   - list
-  - watch
-  - create
-  - update
   - patch
+  - update
+  - watch
 - apiGroups:
   - admissionregistration.k8s.io
   resources:
@@ -50,57 +40,50 @@ rules:
   verbs:
   - get
   - list
-  - watch
   - update
+  - watch
 - apiGroups:
   - jobset.x-k8s.io
   resources:
   - jobsets
   verbs:
+  - create
   - get
   - list
-  - watch
-  - create
-  - update
   - patch
+  - update
+  - watch
 - apiGroups:
   - scheduling.x-k8s.io
   resources:
   - podgroups
   verbs:
+  - create
   - get
   - list
-  - watch
-  - create
-  - update
   - patch
+  - update
+  - watch
 - apiGroups:
   - trainer.kubeflow.org
   resources:
   - clustertrainingruntimes
   - trainingruntimes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - trainer.kubeflow.org
-  resources:
   - trainjobs
   verbs:
   - get
   - list
-  - watch
-  - create
-  - update
   - patch
-  - delete
+  - update
+  - watch
 - apiGroups:
   - trainer.kubeflow.org
   resources:
+  - clustertrainingruntimes/finalizers
+  - trainingruntimes/finalizers
   - trainjobs/finalizers
   - trainjobs/status
   verbs:
   - get
-  - update
   - patch
+  - update
