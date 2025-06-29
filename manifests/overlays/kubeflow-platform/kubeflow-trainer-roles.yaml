@@ -1,0 +1,93 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeflow-trainer-admin
+  labels:
+    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-admin: "true"
+aggregationRule:
+  clusterRoleSelectors:
+    - matchLabels:
+        rbac.authorization.kubeflow.org/aggregate-to-kubeflow-trainer-admin: "true"
+rules: []
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeflow-trainer-edit
+  labels:
+    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-edit: "true"
+    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-trainer-admin: "true"
+rules:
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - clustertrainingruntimes
+      - trainingruntimes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainjobs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainjobs/status
+    verbs:
+      - get
+  - apiGroups:
+    - ""
+    resources:
+      - pods
+    verbs:
+      - list
+  - apiGroups:
+      - ""
+    resources:
+      - pods/log
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeflow-trainer-view
+  labels:
+    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-view: "true"
+rules:
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - clustertrainingruntimes
+      - trainingruntimes
+      - trainjobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainjobs/status
+    verbs:
+      - get
