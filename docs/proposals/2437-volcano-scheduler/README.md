@@ -126,7 +126,7 @@ podGroupPolicy:
 
 ## Design Details
 
-As shown in the workflow diagram above, the Volcano plugin's work includes:
+As shown in the workflow diagram above, we decide to implement a runtime plugin for Volcano with the Kubeflow Trainer Pipeline Framework. It will:
 
 - Build PodGroups based on the *Training Runtime* configuration and calculate resource limits (e.g., `MinResource`).
 - Manage PodGroups.
