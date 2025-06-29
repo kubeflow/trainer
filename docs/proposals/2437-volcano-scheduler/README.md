@@ -130,8 +130,8 @@ As shown in the workflow diagram above, we decide to implement a runtime plugin 
 
 - **Build PodGroups** based on the *Training Runtime* configuration and calculate resource limits (e.g., `MinResource`).
 - **Manage PodGroups**
-   - Update PodGroups and perform rescheduling when there are changes in cluster resource demands (e.g., changes in `LimitRange`).
-   - Support scheduling for suspended and resumed training jobs, with special handling of suspended jobs to ensure no new pods are started. (TrainJob may be set to suspend in its configuration or manually paused by the user.)
+   - Update: Update PodGroups and perform rescheduling when there are changes in cluster resource demands (e.g., changes in `LimitRange`).
+   - Suspended/Resumed: Support scheduling for suspended and resumed training jobs, with special handling of suspended jobs to ensure no new pods are started. (TrainJob may be set to suspend in its configuration or manually paused by the user.)
 - Bind PodGroups to TrainJobs, with their life cycle controlled by the TrainJob. For example, when a TrainJob is deleted, the associated PodGroup is also deleted.
 - Integrate with Volcano control components, submitting tasks to the Volcano Scheduler for scheduling.
 
