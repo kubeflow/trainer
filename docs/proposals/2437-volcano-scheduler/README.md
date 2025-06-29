@@ -139,12 +139,26 @@ Note: The plugin is responsible only for configuring scheduling parameters, buil
 
 ### Volcano Scheduling API
 
-Currently, scheduling strategy parameters are set in the `PodGroupPolicy` of the `TrainingRuntimeSpec`. We need to integrate Volcano as an optional scheduler plugin.
+Currently, scheduling strategy parameters are set in the `PodGroupPolicy` of the `TrainingRuntimeSpec`. We introduce a new configuration struct, `VolcanoPodPolicySource`, which extends the existing `PodGroupPolicySource`:
 
-Specifically, we create a new structure, `VolcanoPodPolicySource`, to store the Volcano scheduling configuration in `pkg/api/trainer/trainingruntime_type.go`. It will be added as an additional option within the `PodGroupPolicySource`, alongside Coscheduling. The key fields to configure are as follows:
+```golang
+// Only one of its members may be specified.
+type PodGroupPolicySource struct {
+	Coscheduling *CoschedulingPodGroupPolicySource `json:"coscheduling,omitempty"`
+	// Volcano plugin from the Volcano scheduler for gang-scheduling and advanced queue-based scheduling.
+	Volcano      *VolcanoPodPolicySource      `json:"volcano,omitempty"`
+}
 
-* `Queue`: The queue name used in Volcano. Defaults to the “default” queue, which has the lowest weight.
-* `PriorityClassName`: If specified, this indicates the PodGroup’s priority. (For example, "system-node-critical" and "system-cluster-critical" are special keywords that indicate the highest priorities, with the former being the highest.) This field is optional.
+// VolcanoPodPolicySource configures scheduling behavior for Volcano.
+type VolcanoPodPolicySource struct {
+    // Queue name in Volcano. Defaults to "default" queue with the lowest weight.
+    Queue string `json:"queue,omitempty"`
+    
+    // PriorityClassName sets PodGroup priority. Optional.
+    // "system-node-critical" and "system-cluster-critical" are special keywords with the highest priorities.
+    PriorityClassName string `json:"priorityClassName,omitempty"`
+}
+```
 
 ### Volcano Runtime Plugin
 
