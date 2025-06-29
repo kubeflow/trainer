@@ -153,7 +153,7 @@ type PodGroupPolicySource struct {
 type VolcanoPodPolicySource struct {
     // Queue name in Volcano. Defaults to "default" queue with the lowest weight.
     Queue string `json:"queue,omitempty"`
-    
+
     // PriorityClassName sets PodGroup priority. Optional.
     // "system-node-critical" and "system-cluster-critical" are special keywords with the highest priorities.
     PriorityClassName string `json:"priorityClassName,omitempty"`
