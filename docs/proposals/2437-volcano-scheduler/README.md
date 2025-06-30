@@ -219,10 +219,9 @@ Describe what E2E tests will be added to ensure proper quality of the enhancemen
 After the implementation PR is merged, add the names of the tests here.
 -->
 
-
 1. **Cluster Setup**
 - Start Kind-based Kubernetes cluster
-- Install Volcano from official manifest (volcano-development.yaml)
+- Install Volcano from official manifest ([volcano-development.yaml](https://raw.githubusercontent.com/volcano-sh/volcano/master/installer/volcano-development.yaml))
 - Deploy Trainer controller with Volcano plugin enabled
 - Verify:
   - Volcano CRDs (PodGroup) are installed
@@ -234,21 +233,6 @@ After the implementation PR is merged, add the names of the tests here.
   - Job enters Running state only when all pods are scheduled
   - Job completes successfully
   - PodGroup is deleted with job
-
-#### Integration tests
-
-Referring to the [Training Operator V1 strategy](https://github.com/kubeflow/trainer/blob/release-1.9/.github/workflows/integration-tests.yaml), integration tests validate Trainer's scheduling behavior under different **Gang-Scheduler** configurations (`none`, `coscheduling`, `volcano`). Additionally, tests cover multiple **Kubernetes** and **Python** versions.
-The test flow includes:
-
-1. **Checkout**: Clone the repository.
-2. **Setup E2E Tests**: Configure the test environment, install the specified **Kubernetes** and **Python** versions, and the corresponding Gang-Scheduler.
-3. **Create Custom Resources**:
-   * Create `ClusterTrainingRuntime` and `TrainingRuntime` CRs with different scheduling configurations.
-   * For **Volcano**, create the required `Queue` resources.
-4. **Run E2E Tests**:
-   * Use the Python SDK to create `TrainJob` instances and verify expected behavior across different scheduling environments.
-
-
 
 ## Implementation History
 
