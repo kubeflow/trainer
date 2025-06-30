@@ -238,11 +238,6 @@ func calculateNumProcPerNode(
 		if shouldUseCPU(resources) {
 			cpuQ := resources[corev1.ResourceCPU]
 			return intstr.FromInt32(max(defaultCPU, int32(cpuQ.Value()))), true
-		} else if fallbackNumProcPerNode.Type != intstr.String {
-			gpuQ, ok := resources[corev1.ResourceName(constants.DeviceNvidiaGPU)]
-			if ok && gpuQ.Value() > 0 {
-				return intstr.FromInt32(int32(gpuQ.Value())), false
-			}
 		}
 		return fallbackNumProcPerNode, false
 	}
