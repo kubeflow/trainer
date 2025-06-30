@@ -1215,7 +1215,7 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumNodes(1).
-						NumProcPerNode(intstr.FromInt(1)).
+						NumProcPerNode(intstr.FromInt32(1)).
 						Container(
 							"ghcr.io/kubeflow/trainer/torchtune-trainer",
 							[]string{"tune", "run"},
@@ -1299,7 +1299,7 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumNodes(2).
-						NumProcPerNode(intstr.FromInt(8)).
+						NumProcPerNode(intstr.FromInt32(8)).
 						Container(
 							"ghcr.io/kubeflow/trainer/torchtune-trainer",
 							[]string{"tune", "run"},
