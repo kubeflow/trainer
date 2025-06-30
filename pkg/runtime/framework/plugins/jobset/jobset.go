@@ -165,25 +165,23 @@ func (j *JobSet) checkPodSpecOverridesImmutability(ctx context.Context, oldObj, 
 	}
 
 	jobSet := &jobsetv1alpha2.JobSet{}
-	if err := j.client.Get(ctx, client.ObjectKeyFromObject(newObj), jobSet); err != nil && !apierrors.IsNotFound(err) {
-		allErrs = append(allErrs, field.InternalError(podSpecOverridePath, err))
-	} else {
-		changed := !equality.Semantic.DeepEqual(oldObj.Spec.PodSpecOverrides, newObj.Spec.PodSpecOverrides)
-		suspended := newObj.Spec.Suspend != nil && *newObj.Spec.Suspend
-		if changed {
-			if !suspended {
-				allErrs = append(allErrs, field.Forbidden(podSpecOverridePath, "PodSpecOverrides can only be modified when the TrainJob is suspended"))
-			} else if !apierrors.IsNotFound(err) {
-				// If the JobSet exists, check whether it's inactive
-				// so changes won't have side effects on the JobSet's Pods
-				// that are still running.
-				// This can happen while the TrainJob is transitioning out
-				// from unsuspended state.
-				for _, replicatedJob := range jobSet.Status.ReplicatedJobsStatus {
-					if replicatedJob.Active > 0 {
-						allErrs = append(allErrs, field.Forbidden(podSpecOverridePath, "PodSpecOverrides cannot be modified when the JobSet is still active"))
-						break
-					}
+	changed := !equality.Semantic.DeepEqual(oldObj.Spec.PodSpecOverrides, newObj.Spec.PodSpecOverrides)
+	suspended := ptr.Equal(newObj.Spec.Suspend, ptr.To(true))
+	if changed {
+		if !suspended {
+			allErrs = append(allErrs, field.Forbidden(podSpecOverridePath, "PodSpecOverrides can only be modified when the TrainJob is suspended"))
+		} else if err := j.client.Get(ctx, client.ObjectKeyFromObject(newObj), jobSet); client.IgnoreNotFound(err) != nil {
+			allErrs = append(allErrs, field.InternalError(podSpecOverridePath, err))
+		} else {
+			// If the JobSet exists, check whether it's inactive
+			// so changes won't have side effects on the JobSet's Pods
+			// that are still running.
+			// This can happen while the TrainJob is transitioning out
+			// from unsuspended state.
+			for _, replicatedJob := range jobSet.Status.ReplicatedJobsStatus {
+				if replicatedJob.Active > 0 {
+					allErrs = append(allErrs, field.Forbidden(podSpecOverridePath,
+						fmt.Sprintf("PodSpecOverrides cannot be modified when the JobSet's ReplicatedJob %s is still active", replicatedJob.Name)))
 				}
 			}
 		}
