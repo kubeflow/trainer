@@ -19,6 +19,7 @@ package plugins
 import (
 	"context"
 
+	volcano "github.com/kubeflow/trainer/pkg/runtime/framework/plugins/vocalno"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kubeflow/trainer/pkg/runtime/framework"
@@ -34,6 +35,7 @@ type Registry map[string]func(ctx context.Context, client client.Client, indexer
 func NewRegistry() Registry {
 	return Registry{
 		coscheduling.Name: coscheduling.New,
+		volcano.Name:      volcano.New,
 		mpi.Name:          mpi.New,
 		plainml.Name:      plainml.New,
 		torch.Name:        torch.New,
