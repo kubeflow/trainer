@@ -16,7 +16,7 @@ Kubeflow Trainer V2 currently uses the **Coscheduling** plugin to provide  the G
 Introducing the **Volcano** scheduler will enhance Trainer's scheduling capabilities.This will provide users with more flexible and efficient scheduling algorithms. Specifically, it can bring the following needs and values:
 
 1. **Provide advanced AI-specific features**
-   The existing Coscheduling plugin only supports basic Gang Scheduling functions. **Volcano**, a widely adopted scheduler in the industry, offers rich AI-specific scheduling capabilities, such as priority scheduling with **Queues** for and more detailed resource management.
+   The existing Coscheduling plugin only supports basic Gang Scheduling functions. **Volcano**, a widely adopted scheduler in the industry, offers rich AI-specific scheduling capabilities, such as priority scheduling with **Queues** for more detailed resource management.
 2. **Enrich Kubeflow Ecosystem**
    Volcano is a well-known and widely used scheduler in Kubernetes. Many users are familiar with it. We provided a Volcano scheduling option in Training Operator V1. Continuing to support Volcano in Trainer will help users migrate to Kubeflow Trainer V2 smoothly.
    Additionally, Volcano's [official documentation](https://volcano.sh/en/docs/kubeflow_on_volcano/) highlights Kubeflow as a key collaborator within its ecosystem.
