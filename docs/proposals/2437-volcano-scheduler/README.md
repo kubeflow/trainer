@@ -152,11 +152,11 @@ type PodGroupPolicySource struct {
 // VolcanoPodPolicySource configures scheduling behavior for Volcano.
 type VolcanoPodPolicySource struct {
     // Queue name in Volcano. Defaults to "default" queue with the lowest weight.
-    Queue string `json:"queue,omitempty"`
+	Queue *string `json:"queue,omitempty"`
 
     // PriorityClassName sets PodGroup priority. Optional.
     // "system-node-critical" and "system-cluster-critical" are special keywords with the highest priorities.
-    PriorityClassName string `json:"priorityClassName,omitempty"`
+    PriorityClassName *string `json:"priorityClassName,omitempty"`
 }
 ```
 
@@ -191,10 +191,7 @@ Additionally, we should make sure that the PodGroup is automatically cleaned up 
 
 ### Installation of Volcano plugin
 
-The main installation steps are as follows:
-
-1. **Install Volcano** (users must install it beforehand). A deployment YAML file ([volcano-development.yaml](https://raw.githubusercontent.com/volcano-sh/volcano/release-1.10/installer/volcano-development.yaml)) is provided. Key CRDs include *PodGroup*, *Queue*. Main control components include *controller-manager*, *admission*, and *scheduler*.
-2. **Configure RBAC Permissions**. We should grant Trainer the necessary permissions to manage Volcano CRDs. Permissions can be declared using `+kubebuilder:rbac` annotations inside the runtime plugin code.
+ **Configure RBAC Permissions**. We should grant Trainer the necessary permissions to manage Volcano CRDs. Permissions can be declared using `+kubebuilder:rbac` annotations inside the runtime plugin code.
 
 
 ### Test Plan
