@@ -6,7 +6,7 @@ spec:
   mlPolicy:
     numNodes: 1
     torch:
-      numProcPerNode: 2
+      numProcPerNode: auto
   template:
     spec:
       replicatedJobs:
