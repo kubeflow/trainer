@@ -1,35 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: kubeflow
-sortOptions:
-  order: fifo
 resources:
-  - ../../third-party/jobset # Comment this line if JobSet is installed on the Kubernetes cluster.
-  - ../../base/crds
-  - ../../base/runtimes
-  - ../../base/manager
-  - ../../base/rbac
-  - ../../base/webhook
+  - ../../overlays/manager
+  - ../../overlays/runtimes
   - kubeflow-trainer-roles.yaml
-
-# Update the Kubeflow Trainer controller manager & runtimes image tag.
-images:
-  - name: ghcr.io/kubeflow/trainer/trainer-controller-manager
-    newTag: latest
-  - name: ghcr.io/kubeflow/trainer/deepspeed-runtime
-    newTag: latest
-  - name: ghcr.io/kubeflow/trainer/mlx-runtime
-    newTag: latest
-  - name: ghcr.io/kubeflow/trainer/torchtune-trainer
-    newTag: latest
-  - name: ghcr.io/kubeflow/trainer/dataset-initializer
-    newTag: latest
-  - name: ghcr.io/kubeflow/trainer/model-initializer
-    newTag: latest
-
-# Secret for the Kubeflow Training webhook.
-secretGenerator:
-  - name: kubeflow-trainer-webhook-cert
-    namespace: kubeflow
-    options:
-      disableNameSuffixHash: true
