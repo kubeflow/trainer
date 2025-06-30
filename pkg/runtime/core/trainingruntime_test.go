@@ -529,7 +529,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.DatasetInitializer}},
 						Tolerations: []corev1.Toleration{
 							{
-								Key:      "nvidia.com/gpu",
+								Key:      "example.com/gpu",
 								Operator: corev1.TolerationOpExists,
 								Effect:   corev1.TaintEffectNoSchedule,
 							},
@@ -539,7 +539,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 						Tolerations: []corev1.Toleration{
 							{
-								Key:      "nvidia.com/gpu",
+								Key:      "example.com/gpu",
 								Operator: corev1.TolerationOpExists,
 								Effect:   corev1.TaintEffectNoSchedule,
 							},
@@ -560,13 +560,13 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Tolerations(constants.DatasetInitializer,
 						corev1.Toleration{
-							Key:      "nvidia.com/gpu",
+							Key:      "example.com/gpu",
 							Operator: corev1.TolerationOpExists,
 							Effect:   corev1.TaintEffectNoSchedule,
 						}).
 					Tolerations(constants.Node,
 						corev1.Toleration{
-							Key:      "nvidia.com/gpu",
+							Key:      "example.com/gpu",
 							Operator: corev1.TolerationOpExists,
 							Effect:   corev1.TaintEffectNoSchedule,
 						}).

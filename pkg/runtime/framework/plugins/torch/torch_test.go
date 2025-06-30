@@ -596,7 +596,7 @@ func TestTorch(t *testing.T) {
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumProcPerNode(intstr.FromString("auto")).
 						Container("test:image", nil, nil, corev1.ResourceList{
-							"nvidia.com/gpu": resource.MustParse("2"),
+							"example.com/gpu": resource.MustParse("2"),
 						}).
 						Obj(),
 				).
@@ -897,7 +897,7 @@ func TestTorch(t *testing.T) {
 						NumProcPerNode(intstr.FromString("cpu")).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("6"),
-							"nvidia.com/gpu":   resource.MustParse("2"),
+							"example.com/gpu":  resource.MustParse("2"),
 						}).
 						Obj(),
 				).
@@ -1050,7 +1050,7 @@ func TestTorch(t *testing.T) {
 						Container("pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("8"),
 							corev1.ResourceMemory: resource.MustParse("16Gi"),
-							"nvidia.com/gpu":      resource.MustParse("4"), // 4 GPUs per node
+							"example.com/gpu":     resource.MustParse("4"), // 4 GPUs per node
 						}).
 						Obj(),
 				).
@@ -1144,7 +1144,7 @@ func TestTorch(t *testing.T) {
 							corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("8"),
 								corev1.ResourceMemory: resource.MustParse("16Gi"),
-								"nvidia.com/gpu":      resource.MustParse("4"), // 4 GPUs per node
+								"example.com/gpu":     resource.MustParse("4"), // 4 GPUs per node
 							},
 						).
 						Obj(),
@@ -1228,7 +1228,7 @@ func TestTorch(t *testing.T) {
 							corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("8"),
 								corev1.ResourceMemory: resource.MustParse("16Gi"),
-								"nvidia.com/gpu":      resource.MustParse("1"), // 1 GPU per node
+								"example.com/gpu":     resource.MustParse("1"), // 1 GPU per node
 							},
 						).
 						Obj(),
@@ -1312,7 +1312,7 @@ func TestTorch(t *testing.T) {
 							corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("8"),
 								corev1.ResourceMemory: resource.MustParse("16Gi"),
-								"nvidia.com/gpu":      resource.MustParse("8"), // 8 GPUs per node
+								"example.com/gpu":     resource.MustParse("8"), // 8 GPUs per node
 							},
 						).
 						Obj(),
