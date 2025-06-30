@@ -31,7 +31,7 @@ Introducing the **Volcano** scheduler will enhance Trainer's scheduling capabili
 
 ### Non-Goals
 
-1. **Replace the existing Coscheduling plugin**. We maintain compatibility with the current scheduling plugin, allowing users to opt for Volcano scheduling.
+1. **Replace the existing Coscheduling plugin**. This proposal aim to provide an alternative scheduling option based on Volcano.
 2. **Modifying Volcano's core scheduling logic.** No modifications or control over the internal scheduling algorithms or mechanisms of the Volcano scheduler itself.
 3. **Integration with VolcanoJob (vcjob).** This proposal will not integrate with vcjob or manage the lifecycle of vcjob within the Volcano ecosystem. We support only PodGroup-based scheduling.
 
