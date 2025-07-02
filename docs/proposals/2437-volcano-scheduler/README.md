@@ -190,9 +190,9 @@ Specifically, the Volcano plugin uses `Owns()` and `WatchRawResource()` to regis
 
 Additionally, we should make sure that the PodGroup is automatically cleaned up when the TrainJob is deleted. We can use Kubernetes `OwnerReferences()` to bind the PodGroup to the TrainJob, ensuring their life cycles are synchronized.
 
-### Installation of Volcano plugin
+#### Configure RBAC Permissions
 
- **Configure RBAC Permissions**. We should grant Trainer the necessary permissions to manage Volcano CRDs. Permissions can be declared using `+kubebuilder:rbac` annotations inside the runtime plugin code.
+We should grant Trainer the necessary permissions to manage Volcano CRDs. Permissions can be declared using `+kubebuilder:rbac` annotations inside the runtime plugin code.
 
 
 ### Test Plan
