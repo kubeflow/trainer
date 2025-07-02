@@ -817,6 +817,26 @@ spec:
                       description: Override for the node selector to place Pod on
                         the specific node.
                       type: object
+                    schedulingGates:
+                      description: |-
+                        SchedulingGates overrides the scheduling gates of the Pods in the target job templates.
+                        More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/
+                      items:
+                        description: PodSchedulingGate is associated to a Pod to guard
+                          its scheduling.
+                        properties:
+                          name:
+                            description: |-
+                              Name of the scheduling gate.
+                              Each scheduling gate must have a unique name field.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     serviceAccountName:
                       description: Override for the service account.
                       type: string

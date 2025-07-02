@@ -293,6 +293,18 @@ func (j *JobSetWrapper) NodeSelector(rJobName string, selector map[string]string
 	return j
 }
 
+func (j *JobSetWrapper) SchedulingGates(rJobName string, schedulingGates ...corev1.PodSchedulingGate) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.SchedulingGates = append(
+				j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.SchedulingGates,
+				schedulingGates...,
+			)
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) Tolerations(rJobName string, tolerations ...corev1.Toleration) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {

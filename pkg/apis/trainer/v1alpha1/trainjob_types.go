@@ -260,6 +260,12 @@ type PodSpecOverride struct {
 	// +listType=map
 	// +listMapKey=name
 	Containers []ContainerOverride `json:"containers,omitempty"`
+
+	// SchedulingGates overrides the scheduling gates of the Pods in the target job templates.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/
+	// +listType=map
+	// +listMapKey=name
+	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
 }
 
 type PodSpecOverrideTargetJob struct {
