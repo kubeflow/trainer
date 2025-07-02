@@ -144,21 +144,22 @@ Currently, scheduling strategy parameters are set in the `PodGroupPolicy` of the
 ```golang
 // Only one of its members may be specified.
 type PodGroupPolicySource struct {
+        // Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.
 	Coscheduling *CoschedulingPodGroupPolicySource `json:"coscheduling,omitempty"`
+
 	// Volcano plugin from the Volcano scheduler for gang-scheduling and advanced queue-based scheduling.
 	Volcano      *VolcanoPodPolicySource      `json:"volcano,omitempty"`
 }
 
 // VolcanoPodPolicySource configures scheduling behavior for Volcano.
 type VolcanoPodPolicySource struct {
-    // Queue name in Volcano. Defaults to "default" queue with the lowest weight.
+        // Queue name in Volcano. Defaults to "default" queue with the lowest weight.
 	Queue *string `json:"queue,omitempty"`
 
-    // PriorityClassName sets PodGroup priority. Optional.
-    // "system-node-critical" and "system-cluster-critical" are special keywords with the highest priorities.
-    PriorityClassName *string `json:"priorityClassName,omitempty"`
+        // PriorityClassName sets PodGroup priority. Optional.
+        // "system-node-critical" and "system-cluster-critical" are special keywords with the highest priorities.
+        PriorityClassName *string `json:"priorityClassName,omitempty"`
 }
-```
 
 ### Volcano Runtime Plugin
 
