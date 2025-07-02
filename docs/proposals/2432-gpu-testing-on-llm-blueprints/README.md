@@ -17,8 +17,15 @@ For now, the idea is to have a specific policy that whenever any Jupyter Noteboo
 
 The scope of this project is set up on OKE, but theoretically, this is platform-agnostic; it can be deployed on any Kubernetes cluster with sufficient GPU resources.
 
+## **Motivation**
 
-## **Goals**
+I have been active in open source since my college days, and I like to experiment and contribute to open source in my free time. I have been past GSoCer as well. In my work at Oracle, internally, I was tasked to develop a PoC to leverage k8s to run CI/CD pipeline. We were looking to efficiently configure/allocate resources in OKE to run CI/CD pipeline, and that’s where I got to know about Volcano's batch scheduling. I started reading about Volcano and in turn, KubeFlow. I started reading and contributing to MLOps and KubeFlow.
+
+Then I started joining community calls of KubeFlow, that's where I told Chase Christensen that I work at Oracle. He motivated me to learn and contribute to Oracle distro of KubeFlow. I also had meet with Andrey, Francisco and Victor about the plan for Oracle to donate GPU infra to KubeFlow.
+
+After my little [experimentation](https://github.com/kubeflow/trainer/issues/2432#issuecomment-2766243340) and research on [trainer/issues/2432](https://github.com/kubeflow/trainer/issues/2432), I am confident to contribute to this project as a GSoC contributor.
+
+### **Goals**
 
 - [ ] Set up a sample LLM Blueprint
 
@@ -33,14 +40,16 @@ The scope of this project is set up on OKE, but theoretically, this is platform-
 - [ ] Develop an AI Playground on OKE
 
 
-## **Non-Goals**
+### **Non-Goals**
 
 1. The GPU cluster for production deployment should be provided by Oracle. For testing purposes, I have a sufficiently powerful personal machine (Ryzen 7 8600G, 32GB RAM, Nvidia RTX 4060) to conduct tests.
 
 2. Once the infrastructure for the self-runner is set up, running the AI Playground will require minimal setup. The primary focus of this project is to establish the infrastructure for running the LLM blueprint on OKE. The AI Playground is a secondary priority for this GSoC project, but I will continue working on it if it is not completed within the GSoC period.
 
 
-## **Estimation of Deliverables**
+## **Proposal**
+
+### Graduation Criteria
 
 1. **Milestone 0 (May 8 - June 1)**: Community Bonding Period
 
@@ -62,13 +71,21 @@ The scope of this project is set up on OKE, but theoretically, this is platform-
 
 10. **Final Submission (Aug 25 - Sept 1)**
 
-
-## **Technical Details**
-
 ### **TechStack**
 
 GitHub Actions (and [ARC](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller/about-actions-runner-controller)), Kubernetes, [Oracle Cloud](https://www.oracle.com/in/cloud/cloud-native/kubernetes-engine/), PyTorch, Python, Linux
 
+### User Stories
+
+ - Run GPU intensive tasks on self hosted gpu infra (here OKE) instead of default CPU based infra
+
+- [Planned] Run AI playground during KubeCon or other events leveraging full potential of KubeFlow Ecosystem
+  
+    The idea is to automate and setup sample models where user can just Open Kubeflow Jupyter Notebook -> select Kubeflow LLM blueprint -> fine-tune model with Kubeflow Trainer -> serve it with Kubeflow KServe. This will help us to show full potential of KubeFlow ecosystem.
+
+
+
+## Design Details
 
 ### **Setup LLM Blueprint (Milestone 1 (June 2 - June 10))**
 
@@ -162,8 +179,6 @@ Metrics needed
 | Avg GPU Usage  | Avg Build timing |
 | Peak GPU Usage |                  |
 
-\
-
 
 ![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXd7BOhUArK4CqKr17wrU2HgQlHWFlEq323slgMT9A6KQ75ALaucLgS6CpBqejeLKOvRNEp8UwOOZ0P7dEccGvnvwOe6_8N_5aLXUo06_YuwUB9mJ8F43LTu1XJUs1vv1Wp1ZjZv8A?key=nSj5OwtjFXw0peMUG5DbZheN)
 
@@ -178,7 +193,6 @@ This is the final phase of the project, with LLM CI deployment, as in various Ku
 During the GSoC period, until OKE infra is donated to KubeFlow. I will be testing local machine with 32GB RAM, Nvidia RTX 4060 GPU, Ryzen 7 8700G. I will have a demo during mid term evaluation in community call, once that is finalized by mentors. 
 
 I will be using OKE to deploy after production. To make sure there is no unnecessary usage of infra while testing, i will be putting certain guardrails on prod OKE.
-
 
 ## **Reference**
 
