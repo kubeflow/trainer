@@ -22,7 +22,7 @@ set -o pipefail
 
 CURRENT_DIR=$(dirname "${BASH_SOURCE[0]}")
 TRAINER_ROOT=$(realpath "${CURRENT_DIR}/..")
-TRAINER_PKG="github.com/kubeflow/trainer"
+TRAINER_PKG="github.com/kubeflow/trainer/v2"
 
 cd "$CURRENT_DIR/.."
 

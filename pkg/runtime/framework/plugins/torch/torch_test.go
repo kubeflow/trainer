@@ -34,11 +34,11 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
-	"github.com/kubeflow/trainer/pkg/runtime"
-	"github.com/kubeflow/trainer/pkg/runtime/framework"
-	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestTorch(t *testing.T) {

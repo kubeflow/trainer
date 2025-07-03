@@ -28,9 +28,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
-	"github.com/kubeflow/trainer/pkg/runtime"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
 const (

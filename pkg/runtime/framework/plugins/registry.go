@@ -21,12 +21,12 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubeflow/trainer/pkg/runtime/framework"
-	"github.com/kubeflow/trainer/pkg/runtime/framework/plugins/coscheduling"
-	"github.com/kubeflow/trainer/pkg/runtime/framework/plugins/jobset"
-	"github.com/kubeflow/trainer/pkg/runtime/framework/plugins/mpi"
-	"github.com/kubeflow/trainer/pkg/runtime/framework/plugins/plainml"
-	"github.com/kubeflow/trainer/pkg/runtime/framework/plugins/torch"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 )
 
 type Registry map[string]func(ctx context.Context, client client.Client, indexer client.FieldIndexer) (framework.Plugin, error)

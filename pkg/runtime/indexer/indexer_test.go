@@ -8,8 +8,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestIndexTrainJobTrainingRuntime(t *testing.T) {

@@ -26,7 +26,7 @@ import (
 	builderutil "k8s.io/kube-openapi/pkg/openapiconv"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
 
 // Generate Kubeflow Training OpenAPI specification.
@@ -80,7 +80,7 @@ func main() {
 }
 
 func swaggify(name string) string {
-	name = strings.Replace(name, "github.com/kubeflow/trainer/pkg/apis/", "", -1)
+	name = strings.Replace(name, "github.com/kubeflow/trainer/v2/pkg/apis/", "", -1)
 	name = strings.Replace(name, "sigs.k8s.io/jobset/api/", "", -1)
 	name = strings.Replace(name, "k8s.io", "io.k8s", -1)
 	name = strings.Replace(name, "/", ".", -1)

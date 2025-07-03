@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
-	"github.com/kubeflow/trainer/pkg/constants"
-	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestValidateReplicatedJobs(t *testing.T) {

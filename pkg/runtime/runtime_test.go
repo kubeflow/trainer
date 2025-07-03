@@ -28,8 +28,8 @@ import (
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
-	"github.com/kubeflow/trainer/pkg/constants"
-	jobsetplgconsts "github.com/kubeflow/trainer/pkg/runtime/framework/plugins/jobset/constants"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 )
 
 func TestNewInfo(t *testing.T) {

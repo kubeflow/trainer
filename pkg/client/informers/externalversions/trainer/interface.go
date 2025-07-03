@@ -17,8 +17,8 @@
 package trainer
 
 import (
-	internalinterfaces "github.com/kubeflow/trainer/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/kubeflow/trainer/pkg/client/informers/externalversions/trainer/v1alpha1"
+	internalinterfaces "github.com/kubeflow/trainer/v2/pkg/client/informers/externalversions/internalinterfaces"
+	v1alpha1 "github.com/kubeflow/trainer/v2/pkg/client/informers/externalversions/trainer/v1alpha1"
 )
 
 // Interface provides access to each of this group's versions.

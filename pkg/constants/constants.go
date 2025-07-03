@@ -6,7 +6,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
 
 const (

@@ -17,9 +17,9 @@
 package applyconfiguration
 
 import (
-	v1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	internal "github.com/kubeflow/trainer/pkg/client/applyconfiguration/internal"
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/applyconfiguration/trainer/v1alpha1"
+	v1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	internal "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/internal"
+	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	testing "k8s.io/client-go/testing"
