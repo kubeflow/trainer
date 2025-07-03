@@ -384,7 +384,7 @@ spec:
                     will be applied for the TrainJob's resources.
                   properties:
                     containers:
-                      description: Overrides for the containers in the desired job
+                      description: Overrides for the containers in the target job
                         templates.
                       items:
                         description: ContainerOverride represents parameters that
@@ -598,7 +598,7 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     initContainers:
-                      description: Overrides for the init container in the desired
+                      description: Overrides for the init container in the target
                         job templates.
                       items:
                         description: ContainerOverride represents parameters that

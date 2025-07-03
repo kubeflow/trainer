@@ -251,12 +251,12 @@ type PodSpecOverride struct {
 	// +listMapKey=name
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
-	// Overrides for the init container in the desired job templates.
+	// Overrides for the init container in the target job templates.
 	// +listType=map
 	// +listMapKey=name
 	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
 
-	// Overrides for the containers in the desired job templates.
+	// Overrides for the containers in the target job templates.
 	// +listType=map
 	// +listMapKey=name
 	Containers []ContainerOverride `json:"containers,omitempty"`
