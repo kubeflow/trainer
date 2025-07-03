@@ -17,7 +17,7 @@
 package v1alpha1
 
 import (
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
 
 // MPIMLPolicySourceApplyConfiguration represents a declarative configuration of the MPIMLPolicySource type for use

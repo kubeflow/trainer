@@ -27,7 +27,7 @@ import (
 	resourcehelpers "k8s.io/component-helpers/resource"
 	"k8s.io/utils/ptr"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
 
 var (

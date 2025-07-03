@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
 
 type ReconcilerBuilder func(*builder.Builder, client.Client, cache.Cache) *builder.Builder

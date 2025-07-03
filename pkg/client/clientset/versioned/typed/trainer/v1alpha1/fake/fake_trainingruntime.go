@@ -17,9 +17,9 @@
 package fake
 
 import (
-	v1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/applyconfiguration/trainer/v1alpha1"
-	typedtrainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/clientset/versioned/typed/trainer/v1alpha1"
+	v1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
+	typedtrainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/client/clientset/versioned/typed/trainer/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 )
 

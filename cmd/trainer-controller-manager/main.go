@@ -38,12 +38,12 @@ import (
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/controller"
-	"github.com/kubeflow/trainer/pkg/runtime"
-	runtimecore "github.com/kubeflow/trainer/pkg/runtime/core"
-	"github.com/kubeflow/trainer/pkg/util/cert"
-	webhooks "github.com/kubeflow/trainer/pkg/webhooks"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/controller"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
+	"github.com/kubeflow/trainer/v2/pkg/util/cert"
+	webhooks "github.com/kubeflow/trainer/v2/pkg/webhooks"
 )
 
 const (

@@ -33,12 +33,12 @@ import (
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
-	jobsetplgconsts "github.com/kubeflow/trainer/pkg/runtime/framework/plugins/jobset/constants"
-	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
-	"github.com/kubeflow/trainer/test/integration/framework"
-	"github.com/kubeflow/trainer/test/util"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
+	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
+	"github.com/kubeflow/trainer/v2/test/integration/framework"
+	"github.com/kubeflow/trainer/v2/test/util"
 )
 
 var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {

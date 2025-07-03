@@ -8,9 +8,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
-	"github.com/kubeflow/trainer/test/util"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
+	"github.com/kubeflow/trainer/v2/test/util"
 )
 
 const (

@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubeflow/trainer/test/integration/framework"
+	"github.com/kubeflow/trainer/v2/test/integration/framework"
 )
 
 var (

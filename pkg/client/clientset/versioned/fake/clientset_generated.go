@@ -17,10 +17,10 @@
 package fake
 
 import (
-	applyconfiguration "github.com/kubeflow/trainer/pkg/client/applyconfiguration"
-	clientset "github.com/kubeflow/trainer/pkg/client/clientset/versioned"
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/clientset/versioned/typed/trainer/v1alpha1"
-	faketrainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/clientset/versioned/typed/trainer/v1alpha1/fake"
+	applyconfiguration "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration"
+	clientset "github.com/kubeflow/trainer/v2/pkg/client/clientset/versioned"
+	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/client/clientset/versioned/typed/trainer/v1alpha1"
+	faketrainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/client/clientset/versioned/typed/trainer/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"

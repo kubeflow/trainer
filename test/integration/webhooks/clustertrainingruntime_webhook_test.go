@@ -22,9 +22,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
-	"github.com/kubeflow/trainer/test/integration/framework"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
+	"github.com/kubeflow/trainer/v2/test/integration/framework"
 )
 
 const clTrainingRuntimeName = "test-clustertrainingruntime"
