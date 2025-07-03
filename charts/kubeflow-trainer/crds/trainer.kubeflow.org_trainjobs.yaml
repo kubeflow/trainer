@@ -53,186 +53,159 @@ spec:
                   Annotations to apply for the derivative JobSet and Jobs.
                   They will be merged with the TrainingRuntime values.
                 type: object
-              datasetConfig:
-                description: Configuration of the training dataset.
+              initializer:
+                description: Configuration of the initializer.
                 properties:
-                  env:
-                    description: |-
-                      List of environment variables to set in the dataset initializer container.
-                      These values will be merged with the TrainingRuntime's dataset initializer environments.
-                    items:
-                      description: EnvVar represents an environment variable present
-                        in a Container.
-                      properties:
-                        name:
-                          description: Name of the environment variable. Must be a
-                            C_IDENTIFIER.
-                          type: string
-                        value:
-                          description: |-
-                            Variable references $(VAR_NAME) are expanded
-                            using the previously defined environment variables in the container and
-                            any service environment variables. If a variable cannot be resolved,
-                            the reference in the input string will be unchanged. Double $$ are reduced
-                            to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-                            "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
-                            Escaped references will never be expanded, regardless of whether the variable
-                            exists or not.
-                            Defaults to "".
-                          type: string
-                        valueFrom:
-                          description: Source for the environment variable's value.
-                            Cannot be used if value is not empty.
-                          properties:
-                            configMapKeyRef:
-                              description: Selects a key of a ConfigMap.
-                              properties:
-                                key:
-                                  description: The key to select.
-                                  type: string
-                                name:
-                                  default: ""
-                                  description: |-
-                                    Name of the referent.
-                                    This field is effectively required, but due to backwards compatibility is
-                                    allowed to be empty. Instances of this type with an empty value here are
-                                    almost certainly wrong.
-                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  type: string
-                                optional:
-                                  description: Specify whether the ConfigMap or its
-                                    key must be defined
-                                  type: boolean
-                              required:
-                              - key
-                              type: object
-                              x-kubernetes-map-type: atomic
-                            fieldRef:
-                              description: |-
-                                Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
-                                spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
-                              properties:
-                                apiVersion:
-                                  description: Version of the schema the FieldPath
-                                    is written in terms of, defaults to "v1".
-                                  type: string
-                                fieldPath:
-                                  description: Path of the field to select in the
-                                    specified API version.
-                                  type: string
-                              required:
-                              - fieldPath
-                              type: object
-                              x-kubernetes-map-type: atomic
-                            resourceFieldRef:
-                              description: |-
-                                Selects a resource of the container: only resources limits and requests
-                                (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
-                              properties:
-                                containerName:
-                                  description: 'Container name: required for volumes,
-                                    optional for env vars'
-                                  type: string
-                                divisor:
-                                  anyOf:
-                                  - type: integer
-                                  - type: string
-                                  description: Specifies the output format of the
-                                    exposed resources, defaults to "1"
-                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                  x-kubernetes-int-or-string: true
-                                resource:
-                                  description: 'Required: resource to select'
-                                  type: string
-                              required:
-                              - resource
-                              type: object
-                              x-kubernetes-map-type: atomic
-                            secretKeyRef:
-                              description: Selects a key of a secret in the pod's
-                                namespace
-                              properties:
-                                key:
-                                  description: The key of the secret to select from.  Must
-                                    be a valid secret key.
-                                  type: string
-                                name:
-                                  default: ""
-                                  description: |-
-                                    Name of the referent.
-                                    This field is effectively required, but due to backwards compatibility is
-                                    allowed to be empty. Instances of this type with an empty value here are
-                                    almost certainly wrong.
-                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  type: string
-                                optional:
-                                  description: Specify whether the Secret or its key
-                                    must be defined
-                                  type: boolean
-                              required:
-                              - key
-                              type: object
-                              x-kubernetes-map-type: atomic
-                          type: object
-                      required:
-                      - name
-                      type: object
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
-                  secretRef:
-                    description: |-
-                      Reference to the secret with credentials to download dataset.
-                      Secret must be created in the TrainJob's namespace.
+                  dataset:
+                    description: Configuration of the dataset initialization and pre-processing.
                     properties:
-                      name:
-                        default: ""
+                      env:
                         description: |-
-                          Name of the referent.
-                          This field is effectively required, but due to backwards compatibility is
-                          allowed to be empty. Instances of this type with an empty value here are
-                          almost certainly wrong.
-                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          List of environment variables to set in the dataset initializer container.
+                          These values will be merged with the TrainingRuntime's dataset initializer environments.
+                        items:
+                          description: EnvVar represents an environment variable present
+                            in a Container.
+                          properties:
+                            name:
+                              description: Name of the environment variable. Must
+                                be a C_IDENTIFIER.
+                              type: string
+                            value:
+                              description: |-
+                                Variable references $(VAR_NAME) are expanded
+                                using the previously defined environment variables in the container and
+                                any service environment variables. If a variable cannot be resolved,
+                                the reference in the input string will be unchanged. Double $$ are reduced
+                                to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                                "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                                Escaped references will never be expanded, regardless of whether the variable
+                                exists or not.
+                                Defaults to "".
+                              type: string
+                            valueFrom:
+                              description: Source for the environment variable's value.
+                                Cannot be used if value is not empty.
+                              properties:
+                                configMapKeyRef:
+                                  description: Selects a key of a ConfigMap.
+                                  properties:
+                                    key:
+                                      description: The key to select.
+                                      type: string
+                                    name:
+                                      default: ""
+                                      description: |-
+                                        Name of the referent.
+                                        This field is effectively required, but due to backwards compatibility is
+                                        allowed to be empty. Instances of this type with an empty value here are
+                                        almost certainly wrong.
+                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                      type: string
+                                    optional:
+                                      description: Specify whether the ConfigMap or
+                                        its key must be defined
+                                      type: boolean
+                                  required:
+                                  - key
+                                  type: object
+                                  x-kubernetes-map-type: atomic
+                                fieldRef:
+                                  description: |-
+                                    Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                                    spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                                  properties:
+                                    apiVersion:
+                                      description: Version of the schema the FieldPath
+                                        is written in terms of, defaults to "v1".
+                                      type: string
+                                    fieldPath:
+                                      description: Path of the field to select in
+                                        the specified API version.
+                                      type: string
+                                  required:
+                                  - fieldPath
+                                  type: object
+                                  x-kubernetes-map-type: atomic
+                                resourceFieldRef:
+                                  description: |-
+                                    Selects a resource of the container: only resources limits and requests
+                                    (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                                  properties:
+                                    containerName:
+                                      description: 'Container name: required for volumes,
+                                        optional for env vars'
+                                      type: string
+                                    divisor:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      description: Specifies the output format of
+                                        the exposed resources, defaults to "1"
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                    resource:
+                                      description: 'Required: resource to select'
+                                      type: string
+                                  required:
+                                  - resource
+                                  type: object
+                                  x-kubernetes-map-type: atomic
+                                secretKeyRef:
+                                  description: Selects a key of a secret in the pod's
+                                    namespace
+                                  properties:
+                                    key:
+                                      description: The key of the secret to select
+                                        from.  Must be a valid secret key.
+                                      type: string
+                                    name:
+                                      default: ""
+                                      description: |-
+                                        Name of the referent.
+                                        This field is effectively required, but due to backwards compatibility is
+                                        allowed to be empty. Instances of this type with an empty value here are
+                                        almost certainly wrong.
+                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                      type: string
+                                    optional:
+                                      description: Specify whether the Secret or its
+                                        key must be defined
+                                      type: boolean
+                                  required:
+                                  - key
+                                  type: object
+                                  x-kubernetes-map-type: atomic
+                              type: object
+                          required:
+                          - name
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
+                      secretRef:
+                        description: |-
+                          Reference to the secret with credentials to download dataset.
+                          Secret must be created in the TrainJob's namespace.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      storageUri:
+                        description: Storage uri for the dataset provider.
                         type: string
                     type: object
-                    x-kubernetes-map-type: atomic
-                  storageUri:
-                    description: Storage uri for the dataset provider.
-                    type: string
-                type: object
-              labels:
-                additionalProperties:
-                  type: string
-                description: |-
-                  Labels to apply for the derivative JobSet and Jobs.
-                  They will be merged with the TrainingRuntime values.
-                type: object
-              managedBy:
-                default: trainer.kubeflow.org/trainjob-controller
-                description: |-
-                  ManagedBy is used to indicate the controller or entity that manages a TrainJob.
-                  The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or
-                  `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which
-                  don't have this field at all or the field value is the reserved string
-                  `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs
-                  with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.
-                  Defaults to `trainer.kubeflow.org/trainjob-controller`
-                type: string
-                x-kubernetes-validations:
-                - message: ManagedBy must be trainer.kubeflow.org/trainjob-controller
-                    or kueue.x-k8s.io/multikueue if set
-                  rule: self in ['trainer.kubeflow.org/trainjob-controller', 'kueue.x-k8s.io/multikueue']
-                - message: ManagedBy value is immutable
-                  rule: self == oldSelf
-              modelConfig:
-                description: Configuration of the pre-trained and trained model.
-                properties:
-                  input:
-                    description: |-
-                      Configuration of the pre-trained model.
-                      When this API is used, the training runtime must have
-                      the `model-initializer` container in the `Initializer` Job.
+                  model:
+                    description: Configuration of the pre-trained model initialization
                     properties:
                       env:
                         description: |-
@@ -379,158 +352,31 @@ spec:
                         description: Storage uri for the model provider.
                         type: string
                     type: object
-                  output:
-                    description: |-
-                      Configuration of the trained model.
-                      When this API is used, the training runtime must have
-                      the `model-exporter` container in the `Exporter` Job.
-                    properties:
-                      env:
-                        description: |-
-                          List of environment variables to set in the model exporter container.
-                          These values will be merged with the TrainingRuntime's model exporter environments.
-                        items:
-                          description: EnvVar represents an environment variable present
-                            in a Container.
-                          properties:
-                            name:
-                              description: Name of the environment variable. Must
-                                be a C_IDENTIFIER.
-                              type: string
-                            value:
-                              description: |-
-                                Variable references $(VAR_NAME) are expanded
-                                using the previously defined environment variables in the container and
-                                any service environment variables. If a variable cannot be resolved,
-                                the reference in the input string will be unchanged. Double $$ are reduced
-                                to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-                                "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
-                                Escaped references will never be expanded, regardless of whether the variable
-                                exists or not.
-                                Defaults to "".
-                              type: string
-                            valueFrom:
-                              description: Source for the environment variable's value.
-                                Cannot be used if value is not empty.
-                              properties:
-                                configMapKeyRef:
-                                  description: Selects a key of a ConfigMap.
-                                  properties:
-                                    key:
-                                      description: The key to select.
-                                      type: string
-                                    name:
-                                      default: ""
-                                      description: |-
-                                        Name of the referent.
-                                        This field is effectively required, but due to backwards compatibility is
-                                        allowed to be empty. Instances of this type with an empty value here are
-                                        almost certainly wrong.
-                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      type: string
-                                    optional:
-                                      description: Specify whether the ConfigMap or
-                                        its key must be defined
-                                      type: boolean
-                                  required:
-                                  - key
-                                  type: object
-                                  x-kubernetes-map-type: atomic
-                                fieldRef:
-                                  description: |-
-                                    Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
-                                    spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
-                                  properties:
-                                    apiVersion:
-                                      description: Version of the schema the FieldPath
-                                        is written in terms of, defaults to "v1".
-                                      type: string
-                                    fieldPath:
-                                      description: Path of the field to select in
-                                        the specified API version.
-                                      type: string
-                                  required:
-                                  - fieldPath
-                                  type: object
-                                  x-kubernetes-map-type: atomic
-                                resourceFieldRef:
-                                  description: |-
-                                    Selects a resource of the container: only resources limits and requests
-                                    (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
-                                  properties:
-                                    containerName:
-                                      description: 'Container name: required for volumes,
-                                        optional for env vars'
-                                      type: string
-                                    divisor:
-                                      anyOf:
-                                      - type: integer
-                                      - type: string
-                                      description: Specifies the output format of
-                                        the exposed resources, defaults to "1"
-                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                      x-kubernetes-int-or-string: true
-                                    resource:
-                                      description: 'Required: resource to select'
-                                      type: string
-                                  required:
-                                  - resource
-                                  type: object
-                                  x-kubernetes-map-type: atomic
-                                secretKeyRef:
-                                  description: Selects a key of a secret in the pod's
-                                    namespace
-                                  properties:
-                                    key:
-                                      description: The key of the secret to select
-                                        from.  Must be a valid secret key.
-                                      type: string
-                                    name:
-                                      default: ""
-                                      description: |-
-                                        Name of the referent.
-                                        This field is effectively required, but due to backwards compatibility is
-                                        allowed to be empty. Instances of this type with an empty value here are
-                                        almost certainly wrong.
-                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      type: string
-                                    optional:
-                                      description: Specify whether the Secret or its
-                                        key must be defined
-                                      type: boolean
-                                  required:
-                                  - key
-                                  type: object
-                                  x-kubernetes-map-type: atomic
-                              type: object
-                          required:
-                          - name
-                          type: object
-                        type: array
-                        x-kubernetes-list-map-keys:
-                        - name
-                        x-kubernetes-list-type: map
-                      secretRef:
-                        description: |-
-                          Reference to the secret with credentials to export model.
-                          Secret must be created in the TrainJob's namespace.
-                        properties:
-                          name:
-                            default: ""
-                            description: |-
-                              Name of the referent.
-                              This field is effectively required, but due to backwards compatibility is
-                              allowed to be empty. Instances of this type with an empty value here are
-                              almost certainly wrong.
-                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            type: string
-                        type: object
-                        x-kubernetes-map-type: atomic
-                      storageUri:
-                        description: Storage uri for the model exporter.
-                        type: string
-                    type: object
                 type: object
+              labels:
+                additionalProperties:
+                  type: string
+                description: |-
+                  Labels to apply for the derivative JobSet and Jobs.
+                  They will be merged with the TrainingRuntime values.
+                type: object
+              managedBy:
+                default: trainer.kubeflow.org/trainjob-controller
+                description: |-
+                  ManagedBy is used to indicate the controller or entity that manages a TrainJob.
+                  The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or
+                  `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which
+                  don't have this field at all or the field value is the reserved string
+                  `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs
+                  with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.
+                  Defaults to `trainer.kubeflow.org/trainjob-controller`
+                type: string
+                x-kubernetes-validations:
+                - message: ManagedBy must be trainer.kubeflow.org/trainjob-controller
+                    or kueue.x-k8s.io/multikueue if set
+                  rule: self in ['trainer.kubeflow.org/trainjob-controller', 'kueue.x-k8s.io/multikueue']
+                - message: ManagedBy value is immutable
+                  rule: self == oldSelf
               podSpecOverrides:
                 description: Custom overrides for the training runtime.
                 items:
@@ -541,27 +387,15 @@ spec:
                       description: Overrides for the containers in the desired job
                         templates.
                       items:
-                        description: |-
-                          ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
-                          Parameters from the Trainer, DatasetConfig, and ModelConfig will take precedence.
+                        description: ContainerOverride represents parameters that
+                          can be overridden using PodSpecOverrides.
                         properties:
-                          args:
-                            description: Arguments to the entrypoint for the training
-                              container.
-                            items:
-                              type: string
-                            type: array
-                            x-kubernetes-list-type: atomic
-                          command:
-                            description: Entrypoint commands for the training container.
-                            items:
-                              type: string
-                            type: array
-                            x-kubernetes-list-type: atomic
                           env:
                             description: |-
                               List of environment variables to set in the container.
                               These values will be merged with the TrainingRuntime's environments.
+                              These values can't be set for container with the name: `node`, `dataset-initializer`, or
+                              `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.
                             items:
                               description: EnvVar represents an environment variable
                                 present in a Container.
@@ -684,57 +518,6 @@ spec:
                             x-kubernetes-list-map-keys:
                             - name
                             x-kubernetes-list-type: map
-                          envFrom:
-                            description: |-
-                              List of sources to populate environment variables in the container.
-                              These   values will be merged with the TrainingRuntime's environments.
-                            items:
-                              description: EnvFromSource represents the source of
-                                a set of ConfigMaps
-                              properties:
-                                configMapRef:
-                                  description: The ConfigMap to select from
-                                  properties:
-                                    name:
-                                      default: ""
-                                      description: |-
-                                        Name of the referent.
-                                        This field is effectively required, but due to backwards compatibility is
-                                        allowed to be empty. Instances of this type with an empty value here are
-                                        almost certainly wrong.
-                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      type: string
-                                    optional:
-                                      description: Specify whether the ConfigMap must
-                                        be defined
-                                      type: boolean
-                                  type: object
-                                  x-kubernetes-map-type: atomic
-                                prefix:
-                                  description: An optional identifier to prepend to
-                                    each key in the ConfigMap. Must be a C_IDENTIFIER.
-                                  type: string
-                                secretRef:
-                                  description: The Secret to select from
-                                  properties:
-                                    name:
-                                      default: ""
-                                      description: |-
-                                        Name of the referent.
-                                        This field is effectively required, but due to backwards compatibility is
-                                        allowed to be empty. Instances of this type with an empty value here are
-                                        almost certainly wrong.
-                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      type: string
-                                    optional:
-                                      description: Specify whether the Secret must
-                                        be defined
-                                      type: boolean
-                                  type: object
-                                  x-kubernetes-map-type: atomic
-                              type: object
-                            type: array
-                            x-kubernetes-list-type: atomic
                           name:
                             description: Name for the container. TrainingRuntime must
                               have this container.
@@ -818,27 +601,15 @@ spec:
                       description: Overrides for the init container in the desired
                         job templates.
                       items:
-                        description: |-
-                          ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
-                          Parameters from the Trainer, DatasetConfig, and ModelConfig will take precedence.
+                        description: ContainerOverride represents parameters that
+                          can be overridden using PodSpecOverrides.
                         properties:
-                          args:
-                            description: Arguments to the entrypoint for the training
-                              container.
-                            items:
-                              type: string
-                            type: array
-                            x-kubernetes-list-type: atomic
-                          command:
-                            description: Entrypoint commands for the training container.
-                            items:
-                              type: string
-                            type: array
-                            x-kubernetes-list-type: atomic
                           env:
                             description: |-
                               List of environment variables to set in the container.
                               These values will be merged with the TrainingRuntime's environments.
+                              These values can't be set for container with the name: `node`, `dataset-initializer`, or
+                              `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.
                             items:
                               description: EnvVar represents an environment variable
                                 present in a Container.
@@ -961,57 +732,6 @@ spec:
                             x-kubernetes-list-map-keys:
                             - name
                             x-kubernetes-list-type: map
-                          envFrom:
-                            description: |-
-                              List of sources to populate environment variables in the container.
-                              These   values will be merged with the TrainingRuntime's environments.
-                            items:
-                              description: EnvFromSource represents the source of
-                                a set of ConfigMaps
-                              properties:
-                                configMapRef:
-                                  description: The ConfigMap to select from
-                                  properties:
-                                    name:
-                                      default: ""
-                                      description: |-
-                                        Name of the referent.
-                                        This field is effectively required, but due to backwards compatibility is
-                                        allowed to be empty. Instances of this type with an empty value here are
-                                        almost certainly wrong.
-                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      type: string
-                                    optional:
-                                      description: Specify whether the ConfigMap must
-                                        be defined
-                                      type: boolean
-                                  type: object
-                                  x-kubernetes-map-type: atomic
-                                prefix:
-                                  description: An optional identifier to prepend to
-                                    each key in the ConfigMap. Must be a C_IDENTIFIER.
-                                  type: string
-                                secretRef:
-                                  description: The Secret to select from
-                                  properties:
-                                    name:
-                                      default: ""
-                                      description: |-
-                                        Name of the referent.
-                                        This field is effectively required, but due to backwards compatibility is
-                                        allowed to be empty. Instances of this type with an empty value here are
-                                        almost certainly wrong.
-                                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      type: string
-                                    optional:
-                                      description: Specify whether the Secret must
-                                        be defined
-                                      type: boolean
-                                  type: object
-                                  x-kubernetes-map-type: atomic
-                              type: object
-                            type: array
-                            x-kubernetes-list-type: atomic
                           name:
                             description: Name for the container. TrainingRuntime must
                               have this container.
@@ -1095,7 +815,7 @@ spec:
                       additionalProperties:
                         type: string
                       description: Override for the node selector to place Pod on
-                        the specific mode.
+                        the specific node.
                       type: object
                     serviceAccountName:
                       description: Override for the service account.
@@ -1155,7 +875,7 @@ spec:
                       type: array
                       x-kubernetes-list-type: atomic
                     volumes:
-                      description: Overrides for the Pod volume configuration.
+                      description: Overrides for the Pod volume configurations.
                       items:
                         description: Volume represents a named volume in a pod that
                           may be accessed by any container in the pod.
@@ -3013,7 +2733,7 @@ spec:
                   Defaults to false.
                 type: boolean
               trainer:
-                description: Configuration of the desired trainer.
+                description: Configuration of the trainer.
                 properties:
                   args:
                     description: Arguments to the entrypoint for the training container.
