@@ -13481,7 +13481,7 @@
         ],
         "properties": {
           "containers": {
-            "description": "Overrides for the containers in the desired job templates.",
+            "description": "Overrides for the containers in the target job templates.",
             "type": "array",
             "items": {
               "default": {},
@@ -13497,7 +13497,7 @@
             "x-kubernetes-list-type": "map"
           },
           "initContainers": {
-            "description": "Overrides for the init container in the desired job templates.",
+            "description": "Overrides for the init container in the target job templates.",
             "type": "array",
             "items": {
               "default": {},
