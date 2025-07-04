@@ -5,7 +5,6 @@
 ## New Features
 
 - [release-2.0] feat: Add schedulingGates to PodSpecOverrides ([#2705](https://github.com/kubeflow/trainer/pull/2705) by [@astefanutti](https://github.com/astefanutti))
-- [cherry-pick] feat(example): Add alpaca-trianjob-yaml.ipynb. (#2670) ([#2702](https://github.com/kubeflow/trainer/pull/2702) by [@Electronic-Waste](https://github.com/Electronic-Waste))
 - [release-2.0] feat: Mutable PodSpecOverrides for suspended TrainJob ([#2698](https://github.com/kubeflow/trainer/pull/2698) by [@astefanutti](https://github.com/astefanutti))
 - [Release 2.0] KEP-2170: Add the manifests overlay for Kubeflow Training V2 ([#2692](https://github.com/kubeflow/trainer/pull/2692) by [@Doris-xm](https://github.com/Doris-xm))
 
@@ -19,6 +18,7 @@
 ## Misc
 
 - [release-2.0] chore: Copy generated CRDs into Helm charts ([#2704](https://github.com/kubeflow/trainer/pull/2704) by [@astefanutti](https://github.com/astefanutti))
+- [cherry-pick] feat(example): Add alpaca-trianjob-yaml.ipynb. (#2670) ([#2702](https://github.com/kubeflow/trainer/pull/2702) by [@Electronic-Waste](https://github.com/Electronic-Waste))
 - [release-2.0] chore: Replace the deprecated intstr.FromInt with intstr.FromInt32 ([#2697](https://github.com/kubeflow/trainer/pull/2697) by [@tenzen-y](https://github.com/tenzen-y))
 - [release-2.0] chore: Remove the vendor specific parameters ([#2694](https://github.com/kubeflow/trainer/pull/2694) by [@tenzen-y](https://github.com/tenzen-y))
 - [release-2.0] chore(runtime): Bump Torch to 2.7.1 and DeepSpeed to 0.17.1 ([#2687](https://github.com/kubeflow/trainer/pull/2687) by [@andreyvelich](https://github.com/andreyvelich))
