@@ -98,7 +98,7 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 					NumNodes(100).
 					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob", "runtime"}, resRequests).
 					DependsOn(constants.Node,
 						[]jobsetv1alpha2.DependsOn{
 							{

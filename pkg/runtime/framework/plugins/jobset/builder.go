@@ -128,7 +128,8 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Command = command
 						}
 						if args := jobTrainer.Args; args != nil {
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = args
+							// Merge runtime args with TrainJob args
+							b.mergeContainerArgs(i, j, args)
 						}
 						if resourcesPerNode := jobTrainer.ResourcesPerNode; resourcesPerNode != nil &&
 							(resourcesPerNode.Limits != nil || resourcesPerNode.Requests != nil) {
@@ -152,6 +153,25 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 		}
 	}
 	return b
+}
+
+// mergeContainerArgs merges runtime args with TrainJob args using intelligent strategies
+func (b *Builder) mergeContainerArgs(jobIndex, containerIndex int, trainJobArgs []string) {
+	container := &b.Spec.ReplicatedJobs[jobIndex].Template.Spec.Template.Spec.Containers[containerIndex]
+
+	// Get existing runtime args
+	var runtimeArgs []string
+	if container.Args != nil {
+		runtimeArgs = container.Args
+	}
+
+	// Default behavior: TrainJob args first, then runtime args
+	mergedArgs := make([]string, 0, len(trainJobArgs)+len(runtimeArgs))
+	mergedArgs = append(mergedArgs, trainJobArgs...)
+	mergedArgs = append(mergedArgs, runtimeArgs...)
+
+	// Set the merged args
+	container.Args = mergedArgs
 }
 
 // TODO: Supporting merge labels would be great.

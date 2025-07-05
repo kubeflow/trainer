@@ -159,7 +159,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 					NumNodes(100).
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob", "runtime"}, resRequests).
 					Env(constants.Node, constants.Node,
 						[]corev1.EnvVar{
 							{
@@ -314,7 +314,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							},
 						}...,
 					).
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob", "runtime"}, resRequests).
 					Env(constants.Node, constants.Node,
 						[]corev1.EnvVar{
 							{
@@ -441,7 +441,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					NumNodes(100).
 					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
 					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob", "runtime"}, resRequests).
 					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Volumes(constants.DatasetInitializer,
 						corev1.Volume{
@@ -556,7 +556,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					NumNodes(100).
 					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
 					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob", "runtime"}, resRequests).
 					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Tolerations(constants.DatasetInitializer,
 						corev1.Toleration{
@@ -619,7 +619,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					NumNodes(100).
 					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
 					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob", "runtime"}, resRequests).
 					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					NodeSelector(constants.DatasetInitializer,
 						map[string]string{
@@ -682,7 +682,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					NumNodes(100).
 					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
 					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob", "runtime"}, resRequests).
 					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					SchedulingGates(constants.DatasetInitializer, corev1.PodSchedulingGate{
 						Name: "kueue.x-k8s.io/admission",
@@ -955,7 +955,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 					NumNodes(100).
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob", "runtime"}, resRequests).
 					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
 					Env(constants.Node, constants.Node,
 						[]corev1.EnvVar{
@@ -1095,6 +1095,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							"batch_size=32",
 							"epochs=10",
 							"loss=torchtune.modules.loss.CEWithChunkedOutputLoss",
+							"runtime",
 						},
 						resRequests,
 					).
