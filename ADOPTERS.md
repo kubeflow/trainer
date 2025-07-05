@@ -4,8 +4,8 @@ This page contains a list of organizations who are using Kubeflow Trainer.
 If you'd like to be included here, please send a pull request which modifies this file.
 Please keep the list in alphabetical order.
 
-| ------------ | ------- |
 | Organization | Contact |
+| ------------ | ------- |
 | [Akuity](https://akuity.io/) | [Yuan Tang](https://github.com/terrytangyuan) |
 | [Alibaba Cloud](https://us.alibabacloud.com/) | [Yang Che](https://github.com/cheyang) |
 | [Alibaba DAMO Academy](https://damo.alibaba.com/) | [Yanjun Huang](https://damo.alibaba.com/about/) |
