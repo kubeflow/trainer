@@ -4,8 +4,8 @@ This page contains a list of organizations who are using Kubeflow Trainer.
 If you'd like to be included here, please send a pull request which modifies this file.
 Please keep the list in alphabetical order.
 
-| Organization | Contact |
 | ------------ | ------- |
+| Organization | Contact |
 | [Akuity](https://akuity.io/) | [Yuan Tang](https://github.com/terrytangyuan) |
 | [Alibaba Cloud](https://us.alibabacloud.com/) | [Yang Che](https://github.com/cheyang) |
 | [Alibaba DAMO Academy](https://damo.alibaba.com/) | [Yanjun Huang](https://damo.alibaba.com/about/) |
@@ -23,6 +23,7 @@ Please keep the list in alphabetical order.
 | [Polyaxon](https://polyaxon.com/) | [Mourad Mourafiq](https://github.com/mouradmourafiq) |
 | [Qihoo 360](https://www.360.cn/) | [Xigang Wang](https://github.com/xigang) |
 | [Qutoutiao](https://www.qutoutiao.net/) | [Zhaojing Yu](https://github.com/yuzhaojing) |
+| [Red Hat](https://www.redhat.com/en/products/ai) | [Antonin Stefanutti](https://github.com/astefanutti) |
 | [Tencent](http://tencent.com/en-us/) | [Ce Gao](https://github.com/gaocegege), [Wang Zhang](https://github.com/zw0610) and [Lei Xue](https://github.com/carmark)  |
 | [TuSimple](https://www.tusimple.com/) | [Hengliang He](https://github.com/henglianghe) |
 | [vip](https://www.vip.com/) | [Harold Miao](https://github.com/oikomi) |
