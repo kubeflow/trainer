@@ -132,26 +132,32 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		if ps.Name != constants.Node && ps.Name != constants.Launcher {
 			continue
 		}
+
+		secretVolumeSource := corev1ac.SecretVolumeSource().
+			WithSecretName(fmt.Sprintf("%s%s", trainJob.Name, constants.MPISSHAuthSecretSuffix)).
+			WithItems(
+				corev1ac.KeyToPath().
+					WithKey(corev1.SSHAuthPrivateKey).
+					WithPath(constants.MPISSHPrivateKeyFile),
+				corev1ac.KeyToPath().
+					WithKey(constants.MPISSHPublicKey).
+					WithPath(constants.MPISSHPublicKeyFile),
+				corev1ac.KeyToPath().
+					WithKey(constants.MPISSHPublicKey).
+					WithPath(constants.MPISSHAuthorizedKeys),
+			)
+
+		if *info.RuntimePolicy.MLPolicySource.MPI.SSHAuthMountPath == "/root/.ssh" {
+			// Ensure the permissions are set correctly for the SSH keys.
+			secretVolumeSource = secretVolumeSource.WithDefaultMode(0600)
+		}
+
 		apply.UpsertVolumes(
 			&info.TemplateSpec.PodSets[psIdx].Volumes,
 			[]corev1ac.VolumeApplyConfiguration{
 				*corev1ac.Volume().
 					WithName(constants.MPISSHAuthVolumeName).
-					WithSecret(corev1ac.SecretVolumeSource().
-						WithSecretName(fmt.Sprintf("%s%s", trainJob.Name, constants.MPISSHAuthSecretSuffix)).
-						WithDefaultMode(0600).
-						WithItems(
-							corev1ac.KeyToPath().
-								WithKey(corev1.SSHAuthPrivateKey).
-								WithPath(constants.MPISSHPrivateKeyFile),
-							corev1ac.KeyToPath().
-								WithKey(constants.MPISSHPublicKey).
-								WithPath(constants.MPISSHPublicKeyFile),
-							corev1ac.KeyToPath().
-								WithKey(constants.MPISSHPublicKey).
-								WithPath(constants.MPISSHAuthorizedKeys),
-						),
-					),
+					WithSecret(secretVolumeSource),
 			}...,
 		)
 		if ps.Name == constants.Launcher {
