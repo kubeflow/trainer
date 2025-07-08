@@ -18,6 +18,7 @@ package webhooks
 
 import (
 	"context"
+	"fmt"
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,6 +36,7 @@ import (
 
 const (
 	rJobReplicasErrorMsg = "always must be 1"
+	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
 )
 
 type TrainingRuntimeWebhook struct {
@@ -75,10 +77,33 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 			continue
 		}
 
-		if labelAncestor, ok := rJob.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestors.Has(labelAncestor) && rJob.Replicas != 1 {
-			allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasErrorMsg))
-		}
+		if labelAncestor, ok := rJob.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestors.Has(labelAncestor) {
+			if rJob.Replicas != 1 {
+				allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasErrorMsg))
+			}
 
+			// Validate replicated job contains the required containers.
+			// Mapping of the ancestor labels to the containers:
+			// 1. dataset-initializer - dataset-initializer
+			// 2. model-initializer - model-initializer
+			// 3. trainer - node
+			hasRequiredContainer := false
+			for _, container := range rJob.Template.Spec.Template.Spec.Containers {
+				if labelAncestor == constants.DatasetInitializer && container.Name == constants.DatasetInitializer ||
+					labelAncestor == constants.ModelInitializer && container.Name == constants.ModelInitializer ||
+					labelAncestor == constants.AncestorTrainer && container.Name == constants.Node {
+					hasRequiredContainer = true
+					break
+				}
+			}
+			if !hasRequiredContainer {
+				allErrs = append(allErrs, field.Invalid(
+					rJobsPath.Index(idx).Child("template").Child("spec").Child("template").Child("spec").Child("containers"),
+					rJob.Template.Spec.Template.Spec.Containers,
+					fmt.Sprintf(rJobContainerNamesErrorMsg, labelAncestor),
+				))
+			}
+		}
 	}
 	return allErrs
 }
