@@ -139,7 +139,7 @@ Note: The plugin is responsible only for configuring scheduling parameters, buil
 
 ### Volcano Scheduling API
 
-Currently, scheduling strategy parameters are set in the `PodGroupPolicy` of the `TrainingRuntimeSpec`. We introduce a new configuration struct, `VolcanoPodPolicySource`, which extends the existing `PodGroupPolicySource`:
+Currently, scheduling strategy parameters are set in the `PodGroupPolicy` of the `TrainingRuntimeSpec`. We introduce a new configuration struct, `VolcanoPodGroupPolicySource`, which extends the existing `PodGroupPolicySource`:
 
 ```golang
 // Only one of its members may be specified.
