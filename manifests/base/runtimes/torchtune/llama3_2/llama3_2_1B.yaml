@@ -12,11 +12,11 @@ spec:
       replicatedJobs:
         - name: dataset-initializer
           template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
             spec:
               template:
-                metadata:
-                  labels:
-                    trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
                 spec:
                   containers:
                     - name: dataset-initializer
