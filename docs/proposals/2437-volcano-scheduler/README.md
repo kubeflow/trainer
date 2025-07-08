@@ -148,7 +148,7 @@ type PodGroupPolicySource struct {
 	Coscheduling *CoschedulingPodGroupPolicySource `json:"coscheduling,omitempty"`
 
 	// Volcano plugin from the Volcano scheduler for gang-scheduling and advanced queue-based scheduling.
-	Volcano      *VolcanoPodPolicySource      `json:"volcano,omitempty"`
+	Volcano      *VolcanoPodGroupPolicySource      `json:"volcano,omitempty"`
 }
 
 // VolcanoPodPolicySource configures scheduling behavior for Volcano.
