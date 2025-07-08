@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	rJobReplicasErrorMsg = "always must be 1"
+	rJobReplicasErrorMsg       = "always must be 1"
 	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
 )
 
