@@ -26,13 +26,11 @@ jobs:
           scopes: |
             api
             ci
-            controller
+            operator
             deps
             docs
             initializer
             manifests
-            plugins
             runtimes
             test
-            webhook
           requireScope: false
