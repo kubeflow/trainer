@@ -116,12 +116,19 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// An external change to the TrainJob spec may transition it out of the Failed state.
 	removeFailedCondition(&trainJob)
 
+	// Initialize status if it's empty or if this is a new TrainJob
+	r.initializeTrainJobStatus(&trainJob)
+
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := r.runtimes[runtimeRefGK]
 	if !ok {
 		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
 	} else {
+		// Set processing status if not suspended
+		if trainJob.Spec.Suspend == nil || !*trainJob.Spec.Suspend {
+			r.setProcessingStatus(&trainJob)
+		}
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
 		if err != nil {
 			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
@@ -268,6 +275,34 @@ func setTerminalCondition(ctx context.Context, runtime jobruntimes.Runtime, trai
 func isTrainJobFinished(trainJob *trainer.TrainJob) bool {
 	return meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobComplete) ||
 		meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobFailed)
+}
+
+// initializeTrainJobStatus sets the initial status for a new TrainJob
+func (r *TrainJobReconciler) initializeTrainJobStatus(trainJob *trainer.TrainJob) {
+	// Initialize conditions slice if it's nil
+	if trainJob.Status.Conditions == nil {
+		// Set initial "Pending" condition
+		meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
+			Type:    trainer.TrainJobPending,
+			Status:  metav1.ConditionTrue,
+			Reason:  trainer.TrainJobPendingReason,
+			Message: constants.TrainJobPendingMessage,
+		})
+	}
+}
+
+// setProcessingStatus sets the processing status for TrainJob
+func (r *TrainJobReconciler) setProcessingStatus(trainJob *trainer.TrainJob) {
+	// Only set processing status if we're not already in a terminal state
+	if !isTrainJobFinished(trainJob) {
+		// Set processing condition
+		meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
+			Type:    trainer.TrainJobRunning,
+			Status:  metav1.ConditionTrue,
+			Reason:  trainer.TrainJobRunningReason,
+			Message: constants.TrainJobRunningMessage,
+		})
+	}
 }
 
 func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {

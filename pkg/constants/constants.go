@@ -3,10 +3,9 @@ package constants
 import (
 	"fmt"
 
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
 
 const (
@@ -56,6 +55,14 @@ const (
 	// TrainJobResumedMessage is status condition message for the
 	// {"type": "Suspended", "status": "True", "reason": "Resumed"} condition.
 	TrainJobResumedMessage = "TrainJob is resumed"
+
+	// TrainJobPendingMessage is status condition message for the
+	// {"type": "Pending", "status": "True", "reason": "Pending"} condition.
+	TrainJobPendingMessage string = "TrainJob is pending"
+
+	// TrainJobRunningMessage is status condition message for the
+	// {"type": "Running", "status": "True", "reason": "Running"} condition.
+	TrainJobRunningMessage string = "TrainJob is running"
 
 	// Node is the name of the Job and container for the MPI launcher.
 	// When RunLauncherAsNode: true, for the launcher Job the container name is node.
