@@ -160,6 +160,7 @@ type VolcanoPodPolicySource struct {
         // "system-node-critical" and "system-cluster-critical" are special keywords with the highest priorities.
         PriorityClassName *string `json:"priorityClassName,omitempty"`
 }
+```
 
 ### Volcano Runtime Plugin
 
