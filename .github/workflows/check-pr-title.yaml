@@ -26,6 +26,7 @@ jobs:
           scopes: |
             api
             ci
+            examples
             operator
             deps
             docs
