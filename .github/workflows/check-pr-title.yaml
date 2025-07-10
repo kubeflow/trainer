@@ -29,6 +29,7 @@ jobs:
             deps
             docs
             examples
+            exporter
             operator
             initializer
             manifests
