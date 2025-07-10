@@ -37,3 +37,5 @@ jobs:
             scripts
             test
           requireScope: false
+          ignoreLabels: |
+            do-not-merge/work-in-progress
