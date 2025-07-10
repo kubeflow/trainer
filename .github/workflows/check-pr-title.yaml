@@ -26,12 +26,13 @@ jobs:
           scopes: |
             api
             ci
-            examples
-            operator
             deps
             docs
+            examples
+            operator
             initializer
             manifests
             runtimes
+            scripts
             test
           requireScope: false
