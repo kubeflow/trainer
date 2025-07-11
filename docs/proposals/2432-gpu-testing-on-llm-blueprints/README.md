@@ -79,12 +79,6 @@ Here is the branch -[ test-self-runner](https://github.com/jaiakash/trainer/tree
 
 Screenshot: 
 
-![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXfOCANBl_A9iJsleibJJkTWdbFIHVGJh3e_Nl1LA_NlcwbNv-b7SlgmS78kQx8AHViLjpjizWYkSA1s9pFlgGXLrX1N5wFD5EhrVKZBafIdW0UMdV_f6ea4sFZMLVHrilMHCBIv?key=nSj5OwtjFXw0peMUG5DbZheN)
-
-![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXfKHhs6R5nDv4a_0Wxj19o0U15k6GWsOXJ3T-fG8xc58khT_SgW8hEkyGi-o1iPGk-YWYvbUK_x5mbwJWDWrTR46DCEtEvQOGCOWa8CVKrkbDJungcuGIscxscUbMM8b1DwDnnp9w?key=nSj5OwtjFXw0peMUG5DbZheN)
-
-![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXcX3-uXa6nq0hLxwOieM8zW8PlJUsw_vKim6NAUYIVBC8yU0akDtTbLG9hOzemWPy-m3P5qpj51gLQjl1elUuLEJKbkJ84jNj-BOheSTMprPmGwjMv4oQoJj91hW98AbXVx8h2b1w?key=nSj5OwtjFXw0peMUG5DbZheN)
-
 
 ### **Setup and access control of OKE Cluster with GPU**
 
