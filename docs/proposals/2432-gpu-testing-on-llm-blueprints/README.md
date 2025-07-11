@@ -27,17 +27,17 @@ After my little [experimentation](https://github.com/kubeflow/trainer/issues/243
 
 ### **Goals**
 
-- [ ] Set up a sample LLM Blueprint
+- Set up a sample LLM Blueprint
 
-- [ ] Configure GPU nodes on OKE
+- Configure GPU nodes on OKE
 
-- [ ] Establish ACR on the OKE Cluster for deploying the LLM
+- Establish ACR on the OKE Cluster for deploying the LLM
 
-- [ ] Create a GitHub Action for manual triggers and runners on the OKE cluster
+- Create a GitHub Action for manual triggers and runners on the OKE cluster
 
-- [ ] Implement metrics and analytics for the GPU Cluster
+- Implement metrics and analytics for the GPU Cluster
 
-- [ ] Develop an AI Playground on OKE
+- Develop an AI Playground on OKE
 
 
 ### **Non-Goals**
@@ -48,28 +48,6 @@ After my little [experimentation](https://github.com/kubeflow/trainer/issues/243
 
 
 ## **Proposal**
-
-### Graduation Criteria
-
-1. **Milestone 0 (May 8 - June 1)**: Community Bonding Period
-
-2. [**Milestone 1 (June 2 - June 10): Setup sample LLM Blueprint**](#setup-llm-blueprint-milestone-1-june-2---june-10)
-
-3. [**Milestone 2 (June 11 - June 20): Setup Github Action**](https://docs.google.com/document/d/1UFqARt5avrIib9ayZhtpmxCFcWsKJwvQT5cYlLFa_Z0/edit?tab=t.0#heading=h.46pmjlmvy3ki)
-
-4. [**Milestone 3 (June 21 - July 6): Setup OKE with GPU nodes**](#setup-and-access-control-of-oke-cluster-with-gpu-milestone-3-june-21---july-6)
-
-5. [**Buffer Period (July 7 - July 13)**](#buffer-period-and-midterm-evaluation-buffer-period-july-7---july-13)
-
-6. **Midterm Evaluation (July 14 - July 18)**
-
-7. [**Milestone 4 (July 19 - July 27): Setup ACR on OKE Cluster**](#setup-github-actions-runner-controller-arc-milestone-4-july-19---july-27)
-
-8. [**Milestone 5 (July 28 - August 10): Metrics and analytics**](#oke-monitoring-milestone-5-july-28---august-10)
-
-9. [**Milestone 6 (August 11 - August 24): AI Playground on OKE**](#ai-playground-milestone-6-august-11---august-24)
-
-10. **Final Submission (Aug 25 - Sept 1)**
 
 ### **TechStack**
 
@@ -87,13 +65,13 @@ GitHub Actions (and [ARC](https://docs.github.com/en/actions/hosting-your-own-ru
 
 ## Design Details
 
-### **Setup LLM Blueprint (Milestone 1 (June 2 - June 10))**
+### **Setup LLM Blueprint**
 
 To set up the same LLM blueprint that can be triggered based on admin approval. We have already one sample on in trainer repo,[ here](https://github.com/kubeflow/trainer/blob/master/examples/deepspeed/text-summarization/T5-Fine-Tuning.ipynb) I have tested a sample project for running on my local system. I will be adding 2-3 base more samples with different requirements for our testing.
 
 These additional samples will be designed to cover a range of scenarios and configurations, thereby enhancing the versatility and applicability of the LLM blueprint. This approach will not only facilitate thorough testing but also provide valuable insights into optimizing the deployment and execution of LLMs on the OKE infrastructure.
 
-**Github Action (Milestone 2 (June 11 - June 20))**
+**Github Action**
 
 Create a GitHub action for checking changes in files in `trainer/example/self-runner` and wait to trigger the self-runner after approval from the maintainers. Once the maintainer approves the scan, the code is executed in the self-runner (that is OKE infra). Assuming it takes some time and resources, we will implement queuing so that resources don't get flooded with requests. We will maintain a queue for requests, and report the result back to CI accordingly.
 
@@ -108,7 +86,7 @@ Screenshot: 
 ![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXcX3-uXa6nq0hLxwOieM8zW8PlJUsw_vKim6NAUYIVBC8yU0akDtTbLG9hOzemWPy-m3P5qpj51gLQjl1elUuLEJKbkJ84jNj-BOheSTMprPmGwjMv4oQoJj91hW98AbXVx8h2b1w?key=nSj5OwtjFXw0peMUG5DbZheN)
 
 
-### **Setup and access control of OKE Cluster with GPU (Milestone 3 (June 21 - July 6))**
+### **Setup and access control of OKE Cluster with GPU**
 
 In this milestone, the aim is to setup an OKE Cluster with GPU node. System: Ubuntu 22.04 LTS The GPU image has the GPU drivers pre-installed.
 
@@ -153,19 +131,14 @@ Images for NVIDIA shapes
 * <https://blogs.oracle.com/java/post/create-k8s-clusters-and-deply-to-oci-from-vscode>
 
 
-### **Buffer period and midterm evaluation (Buffer period (July 7 - July 13))**
-
-This buffer period is for covering any backlogs and blockers. This time, I will use it to cover any pending changes and fixes. I will also try to demo in a community call. One of the agendas in this buffer period is to write a blog about the progress and status of the current project. By this time, the main project would have been completed.
-
-
-### **Setup GitHub Actions Runner Controller (ARC) (Milestone 4 (July 19 - July 27))**
+### **Setup GitHub Actions Runner Controller (ARC)**
 
 [Actions Runner Controller (ARC)](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller/about-actions-runner-controller) is a Kubernetes operator that orchestrates and scales self-hosted runners for GitHub Actions. This is advanced phase of our project where we use k8s operator that is useful to scale and orchestrate pods based on the action CI.
 
 ![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXfCFFFBFy4Eq_2zeFb7dhnA9QO_eFcas4vUIXhI2SZXF2RDvViMzM1gQX0vAEn1MEAs9xvEQ4zZUk8J_vtBYIqnyXkIkcC_bsQTpF01ix6ZNa2d4umWLpngHaqyWOOjNF-NSL0S?key=nSj5OwtjFXw0peMUG5DbZheN)
 
 
-### **OKE Monitoring (Milestone 5 (July 28 - August 10))**
+### **OKE Monitoring **
 
 For admins, we also need to maintain monitoring to see the metrics and resource utilisation of the OKE infra. Oracle already provides an open-source sample for[ OKE Monitoring](https://github.com/oracle-quickstart/oci-kubernetes-monitoring), so we can leverage that. Out of various options, installation via[ Helm](https://github.com/oracle-quickstart/oci-kubernetes-monitoring#helm) is sufficient for our basic needs.
 
@@ -183,7 +156,7 @@ Metrics needed
 ![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXd7BOhUArK4CqKr17wrU2HgQlHWFlEq323slgMT9A6KQ75ALaucLgS6CpBqejeLKOvRNEp8UwOOZ0P7dEccGvnvwOe6_8N_5aLXUo06_YuwUB9mJ8F43LTu1XJUs1vv1Wp1ZjZv8A?key=nSj5OwtjFXw0peMUG5DbZheN)
 
 
-### **AI Playground (Milestone 6 (August 11 - August 24))**
+### **AI Playground**
 
 This is the final phase of the project, with LLM CI deployment, as in various KubeCons various users wanted to deploy a model quickly to test and run KubeFlow. The idea is to setup sample models where user can Open Kubeflow Jupyter Notebook -> select Kubeflow LLM blueprint -> fine-tune model with Kubeflow Trainer -> serve it with Kubeflow KServe. We will set up similar GitHub action for it during events. Also we need to implement safeguards to prevent misuse, given our limited GPU infrastructure. One option is to implement GitHub OAuth and provide access on an as-needed basis during KubeCon.
 
