@@ -83,7 +83,7 @@ You can also run Jupyter notebook tests with Papermill:
 make test-e2e-notebook
 ```
 
-## Codding Style
+## Coding Style
 
 Make sure to install [pre-commit](https://pre-commit.com/) (`pip install pre-commit`) and run `pre-commit install` from the root of the repository at least once before creating git commits.
 

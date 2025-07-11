@@ -29,9 +29,9 @@ jobs:
             docs
             examples
             exporter
-            operator
             initializer
             manifests
+            operator
             runtimes
             scripts
             test
