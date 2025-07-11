@@ -19,7 +19,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	sigs.k8s.io/controller-runtime v0.20.2
-	sigs.k8s.io/jobset v0.8.0
+	sigs.k8s.io/jobset v0.8.2
 	sigs.k8s.io/kind v0.27.0
 	sigs.k8s.io/scheduler-plugins v0.30.6
 	sigs.k8s.io/structured-merge-diff/v4 v4.5.0
