@@ -17,6 +17,13 @@ from pkg.initializers.model.__main__ import main
             },
         ),
         (
+            "Successful download with S3 provider",
+            {
+                "storage_uri": "s3://model/path",
+                "expected_error": None,
+            },
+        ),
+        (
             "Missing storage URI environment variable",
             {
                 "storage_uri": None,
@@ -41,17 +48,21 @@ def test_model_main(test_name, test_case, mock_env_vars):
     # Setup mock environment variables
     env_vars = {
         "STORAGE_URI": test_case["storage_uri"],
-        "ACCESS_TOKEN": test_case["access_token"],
+        "ACCESS_TOKEN": test_case.get("access_token"),
     }
     mock_env_vars(**env_vars)
 
-    # Setup mock HuggingFace instance
+    # Setup mock instances
     mock_hf_instance = MagicMock()
+    mock_s3_instance = MagicMock()
 
     with patch(
         "pkg.initializers.model.__main__.HuggingFace",
         return_value=mock_hf_instance,
-    ) as mock_hf:
+    ) as mock_hf, patch(
+        "pkg.initializers.model.__main__.S3",
+        return_value=mock_s3_instance,
+    ) as mock_s3:
 
         # Execute test
         if test_case["expected_error"]:
@@ -60,12 +71,18 @@ def test_model_main(test_name, test_case, mock_env_vars):
         else:
             main()
 
-            # Verify HuggingFace instance methods were called
-            mock_hf_instance.load_config.assert_called_once()
-            mock_hf_instance.download_model.assert_called_once()
-
-        # Verify HuggingFace class instantiation
-        if test_case["storage_uri"] and test_case["storage_uri"].startswith("hf://"):
-            mock_hf.assert_called_once()
+            # Verify appropriate provider instance methods were called
+            if test_case["storage_uri"] and test_case["storage_uri"].startswith(
+                "hf://"
+            ):
+                mock_hf_instance.load_config.assert_called_once()
+                mock_hf_instance.download_model.assert_called_once()
+                mock_hf.assert_called_once()
+            elif test_case["storage_uri"] and test_case["storage_uri"].startswith(
+                "s3://"
+            ):
+                mock_s3_instance.load_config.assert_called_once()
+                mock_s3_instance.download_model.assert_called_once()
+                mock_s3.assert_called_once()
 
     print("Test execution completed")
