@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
+	volcanov1beta1 "volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
 )
 
 const (
@@ -159,6 +160,15 @@ type VolcanoPodGroupPolicySource struct {
 	// e.g. system-node-critical, system-cluster-critical.
 	// This field is optional.
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
+
+	// MinTaskMember defines the minimal number of pods to run each task in the pod group;
+	// if there's not enough resources to start each task, the scheduler
+	// will not start anyone.
+	MinTaskMember map[string]int32 `json:"minTaskMember,omitempty"`
+
+	// NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.
+	// +optional
+	NetworkTopology *volcanov1beta1.NetworkTopologySpecApplyConfiguration `json:"networkTopology,omitempty" protobuf:"bytes,5,opt,name=networkTopology"`
 }
 
 // MLPolicy represents configuration for the model trining with ML-specific parameters.

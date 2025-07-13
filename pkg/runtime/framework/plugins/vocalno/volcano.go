@@ -99,12 +99,22 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		return nil, nil
 	}
 
+	volcanoSpec := info.RuntimePolicy.PodGroupPolicy.Volcano
+
 	// Aggregate pod resource requests
-	var totalMembers int32
+	var minMembers int32
 	totalResources := make(corev1.ResourceList)
+	minTaskMembers := volcanoSpec.MinTaskMember
+	if minTaskMembers == nil {
+		minTaskMembers = make(map[string]int32)
+	}
 	for _, ps := range info.TemplateSpec.PodSets {
 		count := *ps.Count
-		totalMembers += count
+		if _, ok := minTaskMembers[ps.Name]; !ok {
+			// minTaskMember defaults to the number of replicas
+			minTaskMembers[ps.Name] = count
+		}
+		minMembers += minTaskMembers[ps.Name]
 		for resName, quantity := range ps.SinglePodRequests {
 			quantity.Mul(int64(count))
 			current := totalResources[resName]
@@ -112,18 +122,22 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 			totalResources[resName] = current
 		}
 	}
-
-	volcanoSpec := info.RuntimePolicy.PodGroupPolicy.Volcano
 	pg := volcanov1beta1ac.PodGroup(trainJob.Name, trainJob.Namespace).
 		WithSpec(volcanov1beta1ac.PodGroupSpec().
-			WithMinMember(totalMembers).
-			WithMinResources(totalResources))
+			WithMinMember(minMembers).
+			WithMinResources(totalResources).
+			WithMinTaskMember(minTaskMembers))
 
-	if *volcanoSpec.Queue != "" {
+	// Set Volcano-specific fields only if explicitly configured.
+	// Volcano uses default values when unset (nil),
+	if volcanoSpec.Queue != nil {
 		pg.Spec.WithQueue(*volcanoSpec.Queue)
 	}
-	if *volcanoSpec.PriorityClassName != "" {
+	if volcanoSpec.PriorityClassName != nil {
 		pg.Spec.WithPriorityClassName(*volcanoSpec.PriorityClassName)
+	}
+	if volcanoSpec.NetworkTopology != nil {
+		pg.Spec.WithNetworkTopology(volcanoSpec.NetworkTopology)
 	}
 
 	pg.WithOwnerReferences(metav1ac.OwnerReference().
@@ -132,8 +146,7 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		WithName(trainJob.Name).
 		WithUID(trainJob.UID).
 		WithController(true).
-		WithBlockOwnerDeletion(true),
-	)
+		WithBlockOwnerDeletion(true))
 
 	return []any{pg}, nil
 }
