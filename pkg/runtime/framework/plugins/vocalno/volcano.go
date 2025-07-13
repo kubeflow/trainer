@@ -116,7 +116,7 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		}
 		minMembers += minTaskMembers[ps.Name]
 		for resName, quantity := range ps.SinglePodRequests {
-			quantity.Mul(int64(count))
+			quantity.Mul(int64(minTaskMembers[ps.Name]))
 			current := totalResources[resName]
 			current.Add(quantity)
 			totalResources[resName] = current
