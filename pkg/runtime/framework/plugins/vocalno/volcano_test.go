@@ -12,12 +12,38 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 	"volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
 	volcanov1beta1ac "volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
 )
+
+type FieldIndexerFunc func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error
+
+func (f FieldIndexerFunc) IndexField(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
+	return f(ctx, obj, field, fn)
+}
+
+func TestNewVolcano(t *testing.T) {
+	scheme := apiruntime.NewScheme()
+	require.NoError(t, trainer.AddToScheme(scheme))
+
+	called := map[string]bool{}
+
+	indexer := FieldIndexerFunc(func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
+		called[field] = true
+		return nil
+	})
+
+	plugin, err := New(context.Background(), fake.NewClientBuilder().WithScheme(scheme).Build(), indexer)
+	require.NoError(t, err)
+	require.IsType(t, &Volcano{}, plugin)
+
+	require.True(t, called[TrainingRuntimeContainerRuntimeClassKey], "TrainingRuntime index should be registered")
+	require.True(t, called[ClusterTrainingRuntimeContainerRuntimeClassKey], "ClusterTrainingRuntime index should be registered")
+}
 
 func TestEnforcePodGroupPolicy(t *testing.T) {
 	v := &Volcano{}
@@ -184,14 +210,14 @@ func TestBuildPodGroup(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
-			builder := fake.NewClientBuilder().WithScheme(scheme)
+			clientBuilder := fake.NewClientBuilder().WithScheme(scheme)
 			// fake for get existing PodGroup
 			if c.existingPG != nil {
-				builder.WithObjects(c.existingPG)
+				clientBuilder.WithObjects(c.existingPG)
 			}
 
 			v := &Volcano{
-				client:     builder.Build(),
+				client:     clientBuilder.Build(),
 				restMapper: nil,
 				scheme:     scheme,
 			}
@@ -226,4 +252,24 @@ func TestBuildPodGroup(t *testing.T) {
 			}
 		})
 	}
+}
+func TestReconcilerBuilders(t *testing.T) {
+	scheme := apiruntime.NewScheme()
+	require.NoError(t, trainer.AddToScheme(scheme))
+	require.NoError(t, volcanov1beta1.AddToScheme(scheme))
+
+	v := &Volcano{
+		scheme:     scheme,
+		restMapper: nil, // not required for this test
+	}
+
+	builders := v.ReconcilerBuilders()
+	require.Len(t, builders, 1, "should return one builder function")
+
+	// We just check that the builder returns without panic
+	b := &builder.Builder{}
+	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	b = builders[0](b, cl, nil) // cache is not used in this test
+	require.NotNil(t, b, "builder should not be nil after applying the reconciler builder function")
 }
