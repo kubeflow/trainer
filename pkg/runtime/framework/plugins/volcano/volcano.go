@@ -129,7 +129,9 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		pg.Spec.WithPriorityClassName(*volcanoSpec.PriorityClassName)
 	}
 	if volcanoSpec.NetworkTopology != nil {
-		pg.Spec.WithNetworkTopology(volcanoSpec.NetworkTopology)
+		pg.Spec.WithNetworkTopology(volcanov1beta1ac.NetworkTopologySpec().
+			WithMode(volcanoSpec.NetworkTopology.Mode).
+			WithHighestTierAllowed(*volcanoSpec.NetworkTopology.HighestTierAllowed))
 	}
 
 	pg.WithOwnerReferences(metav1ac.OwnerReference().
