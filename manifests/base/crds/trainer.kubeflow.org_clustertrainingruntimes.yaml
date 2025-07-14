@@ -10008,8 +10008,6 @@ spec:
                     - message: StartupPolicy and DependsOn APIs are mutually exclusive
                       rule: '!(has(self.startupPolicy) && self.startupPolicy.startupPolicyOrder
                         == ''InOrder'' && self.replicatedJobs.exists(x, has(x.dependsOn)))'
-                    - message: DependsOn can't be set for the first ReplicatedJob
-                      rule: '!(has(self.replicatedJobs[0].dependsOn))'
                 type: object
             required:
             - template

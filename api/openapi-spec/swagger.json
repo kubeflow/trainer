@@ -13481,7 +13481,7 @@
         ],
         "properties": {
           "containers": {
-            "description": "Overrides for the containers in the desired job templates.",
+            "description": "Overrides for the containers in the target job templates.",
             "type": "array",
             "items": {
               "default": {},
@@ -13497,7 +13497,7 @@
             "x-kubernetes-list-type": "map"
           },
           "initContainers": {
-            "description": "Overrides for the init container in the desired job templates.",
+            "description": "Overrides for the init container in the target job templates.",
             "type": "array",
             "items": {
               "default": {},
@@ -13519,6 +13519,22 @@
               "type": "string",
               "default": ""
             }
+          },
+          "schedulingGates": {
+            "description": "SchedulingGates overrides the scheduling gates of the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.PodSchedulingGate"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
           },
           "serviceAccountName": {
             "description": "Override for the service account.",

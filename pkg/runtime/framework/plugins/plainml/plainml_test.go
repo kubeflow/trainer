@@ -29,11 +29,11 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
-	"github.com/kubeflow/trainer/pkg/runtime"
-	"github.com/kubeflow/trainer/pkg/runtime/framework"
-	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestPlainML(t *testing.T) {

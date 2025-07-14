@@ -20,8 +20,8 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/util/trainjob"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
 const (

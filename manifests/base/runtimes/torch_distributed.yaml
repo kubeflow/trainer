@@ -20,7 +20,7 @@ spec:
                 spec:
                   containers:
                     - name: node
-                      image: pytorch/pytorch:2.5.0-cuda12.4-cudnn9-runtime
+                      image: pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
                       command:
                         - /bin/bash
                         - -c

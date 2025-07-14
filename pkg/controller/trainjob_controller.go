@@ -45,9 +45,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
-	jobruntimes "github.com/kubeflow/trainer/pkg/runtime"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
 type TrainJobWatcher interface {
@@ -91,6 +91,7 @@ func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, 
 	}
 }
 
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;watch;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/finalizers,verbs=get;update;patch

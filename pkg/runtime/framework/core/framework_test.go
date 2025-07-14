@@ -39,19 +39,19 @@ import (
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/apply"
-	"github.com/kubeflow/trainer/pkg/constants"
-	"github.com/kubeflow/trainer/pkg/runtime"
-	"github.com/kubeflow/trainer/pkg/runtime/framework"
-	fwkplugins "github.com/kubeflow/trainer/pkg/runtime/framework/plugins"
-	"github.com/kubeflow/trainer/pkg/runtime/framework/plugins/coscheduling"
-	"github.com/kubeflow/trainer/pkg/runtime/framework/plugins/jobset"
-	jobsetplgconsts "github.com/kubeflow/trainer/pkg/runtime/framework/plugins/jobset/constants"
-	"github.com/kubeflow/trainer/pkg/runtime/framework/plugins/mpi"
-	"github.com/kubeflow/trainer/pkg/runtime/framework/plugins/plainml"
-	"github.com/kubeflow/trainer/pkg/runtime/framework/plugins/torch"
-	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/apply"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
+	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
+	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 // TODO: We should introduce mock plugins and use plugins in this framework testing.
@@ -433,7 +433,7 @@ func TestRunCustomValidationPlugins(t *testing.T) {
 			runtimeInfo := runtime.NewInfo(
 				runtime.WithTemplateSpecObjApply(jobSetSpecApply),
 			)
-			warnings, errs := fwk.RunCustomValidationPlugins(runtimeInfo, tc.oldObj, tc.newObj)
+			warnings, errs := fwk.RunCustomValidationPlugins(ctx, runtimeInfo, tc.oldObj, tc.newObj)
 			if diff := cmp.Diff(tc.wantWarnings, warnings, cmpopts.SortSlices(func(a, b string) bool { return a < b })); len(diff) != 0 {
 				t.Errorf("Unexpected warninigs (-want,+got):\n%s", diff)
 			}

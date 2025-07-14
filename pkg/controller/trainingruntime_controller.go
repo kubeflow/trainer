@@ -37,10 +37,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
-	idxer "github.com/kubeflow/trainer/pkg/runtime/indexer"
-	"github.com/kubeflow/trainer/pkg/util/trainjob"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	idxer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
+	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
 const (
@@ -66,7 +66,7 @@ func NewTrainingRuntimeReconciler(cli client.Client, recorder record.EventRecord
 	}
 }
 
-// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainingruntimes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainingruntimes,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainingruntimes/finalizers,verbs=get;update;patch
 
 func (r *TrainingRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

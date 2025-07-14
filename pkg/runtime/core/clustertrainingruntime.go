@@ -27,8 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/runtime"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
 var (
@@ -79,5 +79,5 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 		}
 	}
 	info, _ := r.newRuntimeInfo(new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy)
-	return r.framework.RunCustomValidationPlugins(info, old, new)
+	return r.framework.RunCustomValidationPlugins(ctx, info, old, new)
 }

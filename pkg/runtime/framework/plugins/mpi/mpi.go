@@ -41,11 +41,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/apply"
-	"github.com/kubeflow/trainer/pkg/constants"
-	"github.com/kubeflow/trainer/pkg/runtime"
-	"github.com/kubeflow/trainer/pkg/runtime/framework"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/apply"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 )
 
 var (
@@ -83,7 +83,7 @@ func (m *MPI) Name() string {
 // TODO (andreyvelich): Add validation to check that TrainJob doesn't have MPI envs.
 // TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 // Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
-func (m *MPI) Validate(runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (m *MPI) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.MPI == nil {
 		return nil, allErrs

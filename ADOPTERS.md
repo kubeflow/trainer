@@ -23,6 +23,7 @@ Please keep the list in alphabetical order.
 | [Polyaxon](https://polyaxon.com/) | [Mourad Mourafiq](https://github.com/mouradmourafiq) |
 | [Qihoo 360](https://www.360.cn/) | [Xigang Wang](https://github.com/xigang) |
 | [Qutoutiao](https://www.qutoutiao.net/) | [Zhaojing Yu](https://github.com/yuzhaojing) |
+| [Red Hat](https://www.redhat.com/en/products/ai) | [Antonin Stefanutti](https://github.com/astefanutti) |
 | [Tencent](http://tencent.com/en-us/) | [Ce Gao](https://github.com/gaocegege), [Wang Zhang](https://github.com/zw0610) and [Lei Xue](https://github.com/carmark)  |
 | [TuSimple](https://www.tusimple.com/) | [Hengliang He](https://github.com/henglianghe) |
 | [vip](https://www.vip.com/) | [Harold Miao](https://github.com/oikomi) |

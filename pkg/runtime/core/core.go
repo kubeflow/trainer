@@ -22,7 +22,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubeflow/trainer/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainingruntimes,verbs=get;list;watch

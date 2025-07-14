@@ -32,11 +32,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/apply"
-	"github.com/kubeflow/trainer/pkg/constants"
-	"github.com/kubeflow/trainer/pkg/runtime"
-	"github.com/kubeflow/trainer/pkg/runtime/framework"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/apply"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 )
 
 type Torch struct{}
@@ -54,7 +54,7 @@ func (t *Torch) Name() string {
 	return Name
 }
 
-func (t *Torch) Validate(runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
 		return nil, allErrs
@@ -195,19 +195,26 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			// Mutate trainer command for torchtune.
 			// Ref: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2#complement-torch-plugin
 			// 1. Add rendezvous backend arg for torchtune.
+			// Rendezvous backend is only enabled for multi-nodes or multi-devices training.
 			var newCommand []string
-			newCommand = append(newCommand,
-				fmt.Sprintf("%s %s-%s-0-0.%s:%d",
-					constants.TorchTuneArgRdzvEndpoint,
-					trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort,
-				),
-			)
+			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
+			if numNodes > 1 || !(numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1) {
+				newCommand = append(newCommand,
+					fmt.Sprintf("%s=%s-%s-0-0.%s:%d",
+						constants.TorchTuneArgRdzvEndpoint,
+						trainJob.Name, constants.Node, trainJob.Name, constants.ContainerTrainerPort,
+					),
+				)
+			}
 
 			// 2. Get the recipe and config from old args and append them to newCommand.
-			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
-			model := getModelFromRuntimeRef(trainJob.Spec.RuntimeRef.Name)
-			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, model, trainJob.Spec.Trainer.Args)
-			newCommand = append(newCommand, recipe, fmt.Sprintf("--config %s", config))
+			recipe, config := getRecipeAndConfig(
+				numNodes,
+				numProcPerNode,
+				getModelFromRuntimeRef(trainJob.Spec.RuntimeRef.Name),
+				trainJob.Spec.Trainer.Args,
+			)
+			newCommand = append(newCommand, recipe, constants.TorchTuneArgConfig, config)
 
 			// 3. Extract output directory, tokenizer path and model mount path from (Cluster)TrainingRuntime.
 			newCommand = append(newCommand, extractOverridesFromRuntime(info)...)
@@ -249,7 +256,7 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, model
 		suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
 	}
 
-	return recipe, fmt.Sprintf("%s%s.yaml", model, suffix)
+	return recipe, fmt.Sprintf("%s%s", model, suffix)
 }
 
 // extractOverridesFromRuntime extracts overrides from the TorchTune Trainer Node.

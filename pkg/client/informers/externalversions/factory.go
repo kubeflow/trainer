@@ -21,9 +21,9 @@ import (
 	sync "sync"
 	time "time"
 
-	versioned "github.com/kubeflow/trainer/pkg/client/clientset/versioned"
-	internalinterfaces "github.com/kubeflow/trainer/pkg/client/informers/externalversions/internalinterfaces"
-	trainer "github.com/kubeflow/trainer/pkg/client/informers/externalversions/trainer"
+	versioned "github.com/kubeflow/trainer/v2/pkg/client/clientset/versioned"
+	internalinterfaces "github.com/kubeflow/trainer/v2/pkg/client/informers/externalversions/internalinterfaces"
+	trainer "github.com/kubeflow/trainer/v2/pkg/client/informers/externalversions/trainer"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

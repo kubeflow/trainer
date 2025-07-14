@@ -19,8 +19,8 @@ package webhooks
 import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/runtime"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
 func Setup(mgr ctrl.Manager, runtimes map[string]runtime.Runtime) (string, error) {

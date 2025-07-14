@@ -43,7 +43,7 @@ ${KIND} load docker-image ${CONTROLLER_MANAGER_CI_IMAGE}
 echo "Deploy Kubeflow Trainer control plane"
 E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
 mkdir -p "${E2E_MANIFESTS_DIR}"
-cat <<EOF > "${E2E_MANIFESTS_DIR}/kustomization.yaml"
+cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
   apiVersion: kustomize.config.k8s.io/v1beta1
   kind: Kustomization
   resources:
@@ -83,7 +83,7 @@ kubectl apply --server-side -k manifests/overlays/runtimes || (
 )
 
 # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
-TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.5.0-cuda12.4-cudnn9-runtime
+TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
 docker pull ${TORCH_RUNTIME_IMAGE}
 ${KIND} load docker-image ${TORCH_RUNTIME_IMAGE}
 

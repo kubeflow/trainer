@@ -37,11 +37,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
-	"github.com/kubeflow/trainer/pkg/runtime"
-	"github.com/kubeflow/trainer/pkg/runtime/framework"
-	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestMPI(t *testing.T) {
@@ -884,7 +884,7 @@ func TestValidate(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to initialize MPI plugin: %v", err)
 			}
-			warnings, errs := p.(framework.CustomValidationPlugin).Validate(tc.info, tc.oldObj, tc.newObj)
+			warnings, errs := p.(framework.CustomValidationPlugin).Validate(ctx, tc.info, tc.oldObj, tc.newObj)
 			if diff := gocmp.Diff(tc.wantError, errs); len(diff) != 0 {
 				t.Errorf("Unexpected error from Validate (-want, +got): %s", diff)
 			}

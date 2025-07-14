@@ -434,6 +434,11 @@ func (in *PodSpecOverride) DeepCopyInto(out *PodSpecOverride) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.SchedulingGates != nil {
+		in, out := &in.SchedulingGates, &out.SchedulingGates
+		*out = make([]v1.PodSchedulingGate, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

@@ -1,0 +1,43 @@
+name: Check PR Title
+
+on:
+  pull_request_target:
+    branches:
+      - master
+    types:
+      - edited
+      - opened
+      - reopened
+      - synchronize
+
+jobs:
+  check:
+    name: Check PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5.5.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            chore
+            fix
+            feat
+            revert
+
+          scopes: |
+            api
+            ci
+            docs
+            examples
+            exporter
+            initializer
+            manifests
+            operator
+            runtimes
+            scripts
+            test
+          requireScope: false
+          ignoreLabels: |
+            do-not-merge/work-in-progress
+            dependencies

@@ -19,8 +19,8 @@ package v1alpha1
 import (
 	http "net/http"
 
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	scheme "github.com/kubeflow/trainer/pkg/client/clientset/versioned/scheme"
+	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	scheme "github.com/kubeflow/trainer/v2/pkg/client/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )
 

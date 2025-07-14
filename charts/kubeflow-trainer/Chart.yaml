@@ -26,8 +26,8 @@ type: application
 
 dependencies:
 - name: jobset
-  repository: oci://us-central1-docker.pkg.dev/k8s-staging-images/charts
-  version: v0.8.0
+  repository: oci://registry.k8s.io/jobset/charts/jobset
+  version: v0.8.2
   condition: jobset.install
 
 keywords:

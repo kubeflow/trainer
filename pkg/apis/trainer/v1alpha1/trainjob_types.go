@@ -111,7 +111,6 @@ type TrainJobSpec struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Custom overrides for the training runtime.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
 	// +listType=atomic
 	PodSpecOverrides []PodSpecOverride `json:"podSpecOverrides,omitempty"`
 
@@ -252,15 +251,21 @@ type PodSpecOverride struct {
 	// +listMapKey=name
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
-	// Overrides for the init container in the desired job templates.
+	// Overrides for the init container in the target job templates.
 	// +listType=map
 	// +listMapKey=name
 	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
 
-	// Overrides for the containers in the desired job templates.
+	// Overrides for the containers in the target job templates.
 	// +listType=map
 	// +listMapKey=name
 	Containers []ContainerOverride `json:"containers,omitempty"`
+
+	// SchedulingGates overrides the scheduling gates of the Pods in the target job templates.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/
+	// +listType=map
+	// +listMapKey=name
+	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
 }
 
 type PodSpecOverrideTargetJob struct {

@@ -11,3 +11,7 @@ images:
     newTag: latest
   - name: ghcr.io/kubeflow/trainer/model-initializer
     newTag: latest
+  - name: ghcr.io/kubeflow/trainer/mlx-runtime
+    newTag: latest
+  - name: ghcr.io/kubeflow/trainer/deepspeed-runtime
+    newTag: latest

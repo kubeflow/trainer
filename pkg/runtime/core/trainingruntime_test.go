@@ -33,10 +33,10 @@ import (
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
-	trainer "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/constants"
-	jobsetplgconsts "github.com/kubeflow/trainer/pkg/runtime/framework/plugins/jobset/constants"
-	testingutil "github.com/kubeflow/trainer/pkg/util/testing"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
+	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestTrainingRuntimeNewObjects(t *testing.T) {
@@ -529,7 +529,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.DatasetInitializer}},
 						Tolerations: []corev1.Toleration{
 							{
-								Key:      "nvidia.com/gpu",
+								Key:      "example.com/gpu",
 								Operator: corev1.TolerationOpExists,
 								Effect:   corev1.TaintEffectNoSchedule,
 							},
@@ -539,7 +539,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
 						Tolerations: []corev1.Toleration{
 							{
-								Key:      "nvidia.com/gpu",
+								Key:      "example.com/gpu",
 								Operator: corev1.TolerationOpExists,
 								Effect:   corev1.TaintEffectNoSchedule,
 							},
@@ -560,13 +560,13 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Tolerations(constants.DatasetInitializer,
 						corev1.Toleration{
-							Key:      "nvidia.com/gpu",
+							Key:      "example.com/gpu",
 							Operator: corev1.TolerationOpExists,
 							Effect:   corev1.TaintEffectNoSchedule,
 						}).
 					Tolerations(constants.Node,
 						corev1.Toleration{
-							Key:      "nvidia.com/gpu",
+							Key:      "example.com/gpu",
 							Operator: corev1.TolerationOpExists,
 							Effect:   corev1.TaintEffectNoSchedule,
 						}).
@@ -629,6 +629,67 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						map[string]string{
 							"node.kubernetes.io/instance-type": "p5.48xlarge",
 						}).
+					Obj(),
+			},
+		},
+		"succeeded to build JobSet with scheduling gates overrides from the TrainJob's PodSpecOverrides.": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(100).
+							Obj(),
+					).
+					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
+					InitContainer(constants.Node, "override-init-container", "test:runtime").
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+						Obj(),
+				).
+				PodSpecOverrides([]trainer.PodSpecOverride{
+					{
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.DatasetInitializer}},
+						SchedulingGates: []corev1.PodSchedulingGate{
+							{
+								Name: "kueue.x-k8s.io/admission",
+							},
+						},
+					},
+					{
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
+						SchedulingGates: []corev1.PodSchedulingGate{
+							{
+								Name: "kueue.x-k8s.io/admission",
+							},
+						},
+					},
+				}).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+					NumNodes(100).
+					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
+					InitContainer(constants.Node, "override-init-container", "test:runtime").
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					SchedulingGates(constants.DatasetInitializer, corev1.PodSchedulingGate{
+						Name: "kueue.x-k8s.io/admission",
+					}).
+					SchedulingGates(constants.Node, corev1.PodSchedulingGate{
+						Name: "kueue.x-k8s.io/admission",
+					}).
 					Obj(),
 			},
 		},
@@ -976,7 +1037,8 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							"tune",
 							"run",
 							constants.TorchTuneFullFinetuneDistributed,
-							"--config llama3_3/70B_full_multinode.yaml",
+							"--config",
+							"llama3_3/70B_full_multinode.yaml",
 							"output_dir=/workspace/model/llama3_3/70B",
 							"tokenizer.path=/workspace/model/original/tokenizer.model",
 							"checkpointer.checkpoint_dir=/workspace/model",
@@ -1020,9 +1082,10 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						[]string{
 							"tune",
 							"run",
-							fmt.Sprintf("%s %s", constants.TorchTuneArgRdzvEndpoint, "test-job-node-0-0.test-job:29500"),
+							fmt.Sprintf("%s=%s", constants.TorchTuneArgRdzvEndpoint, "test-job-node-0-0.test-job:29500"),
 							constants.TorchTuneFullFinetuneDistributed,
-							"--config llama3_3/70B_full_multinode.yaml",
+							"--config",
+							"llama3_3/70B_full_multinode",
 							"output_dir=/workspace/model/llama3_3/70B",
 							"tokenizer.path=/workspace/model/original/tokenizer.model",
 							"checkpointer.checkpoint_dir=/workspace/model",

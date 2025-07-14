@@ -19,9 +19,9 @@ package v1alpha1
 import (
 	context "context"
 
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	applyconfigurationtrainerv1alpha1 "github.com/kubeflow/trainer/pkg/client/applyconfiguration/trainer/v1alpha1"
-	scheme "github.com/kubeflow/trainer/pkg/client/clientset/versioned/scheme"
+	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	applyconfigurationtrainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
+	scheme "github.com/kubeflow/trainer/v2/pkg/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
