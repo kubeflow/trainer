@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -49,13 +51,21 @@ func (w *TrainJobWebhook) ValidateCreate(ctx context.Context, obj apiruntime.Obj
 	trainJob := obj.(*trainer.TrainJob)
 	log := ctrl.LoggerFrom(ctx).WithName("trainJob-webhook")
 	log.V(5).Info("Validating create", "TrainJob", klog.KObj(trainJob))
+
+	allErrs := field.ErrorList{}
+
+	// Check RFC 1035 name validation errors
+	for _, err := range validation.IsDNS1035Label(trainJob.Name) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), trainJob.Name, err))
+	}
+
 	runtimeRefGK := runtime.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := w.runtimes[runtimeRefGK]
 	if !ok {
 		return nil, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 	}
 	warnings, errors := runtime.ValidateObjects(ctx, nil, trainJob)
-	return warnings, errors.ToAggregate()
+	return warnings, append(allErrs, errors...).ToAggregate()
 }
 
 func (w *TrainJobWebhook) ValidateUpdate(ctx context.Context, oldObj apiruntime.Object, newObj apiruntime.Object) (admission.Warnings, error) {
