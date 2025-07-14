@@ -33,7 +33,7 @@ body:
         ```
         Kubeflow Trainer version:
         ```bash
-        $ kubectl get pods -n kubeflow -l app.kubernetes.io/name=trainer -o jsonpath="{.items[*].spec.containers[*].image}"
+        $ kubectl get pods -n kubeflow-system -l app.kubernetes.io/name=kubeflow-trainer -o jsonpath="{.items[*].spec.containers[*].image}"
 
         ```
         Kubeflow Python SDK version:
