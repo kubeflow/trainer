@@ -167,8 +167,10 @@ type VolcanoPodGroupPolicySource struct {
 	MinTaskMember map[string]int32 `json:"minTaskMember,omitempty"`
 
 	// NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.
+	// +kubebuilder:validation:EmbeddedResource
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	NetworkTopology *volcanov1beta1.NetworkTopologySpec `json:"networkTopology,omitempty" protobuf:"bytes,5,opt,name=networkTopology"`
+	NetworkTopology *volcanov1beta1.NetworkTopologySpec `json:"networkTopology,omitempty"`
 }
 
 // MLPolicy represents configuration for the model trining with ML-specific parameters.
