@@ -3,7 +3,7 @@
   "info": {
     "description": "Python SDK for Kubeflow Training",
     "title": "Kubeflow Training SDK",
-    "version": "v1.9.2"
+    "version": "v1.9.3"
   },
   "paths": {},
   "definitions": {
