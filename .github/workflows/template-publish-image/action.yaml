@@ -22,7 +22,7 @@ inputs:
   tag-prefix:
     required: false
     default: v1
-    description: Prefix for the image tag, e.g. v1 or v2alpha1
+    description: Prefix for the image tag, e.g. v1
 
 runs:
   using: composite

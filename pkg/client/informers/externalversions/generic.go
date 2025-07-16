@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	v2alpha1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v2alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -64,14 +63,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubeflow().V1().TFJobs().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("xgboostjobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubeflow().V1().XGBoostJobs().Informer()}, nil
-
-		// Group=kubeflow.org, Version=v2alpha1
-	case v2alpha1.SchemeGroupVersion.WithResource("clustertrainingruntimes"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubeflow().V2alpha1().ClusterTrainingRuntimes().Informer()}, nil
-	case v2alpha1.SchemeGroupVersion.WithResource("trainjobs"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubeflow().V2alpha1().TrainJobs().Informer()}, nil
-	case v2alpha1.SchemeGroupVersion.WithResource("trainingruntimes"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubeflow().V2alpha1().TrainingRuntimes().Informer()}, nil
 
 	}
 

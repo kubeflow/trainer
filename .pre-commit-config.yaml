@@ -36,7 +36,4 @@ exclude: |
     sdk/python/docs/.*|
     sdk/python/.openapi-generator/VERSION|
     sdk/python/kubeflow/__init__.py|
-    sdk_v2/kubeflow/training/[^/]*.py|
-    sdk_v2/kubeflow/training/models/.*|
-    sdk_v2/docs/.*
   )$

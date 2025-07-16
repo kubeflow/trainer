@@ -34,8 +34,3 @@ jobs:
       - name: Run Go test for v1
         run: |
           make test ENVTEST_K8S_VERSION=${{ matrix.kubernetes-version }}
-
-      - name: Run Go test for v2
-        run: |
-          make testv2
-          make test-integrationv2 ENVTEST_K8S_VERSION=${{ matrix.kubernetes-version }}

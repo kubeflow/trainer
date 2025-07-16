@@ -42,7 +42,6 @@ examples/.ipynb_checkpoints/
 
 # openapi-codegen tools and auto generated files but useless
 hack/python-sdk/openapi-generator-cli.jar
-hack/python-sdk-v2/openapi-generator-cli.jar
 
 # Coverage
 cover.out

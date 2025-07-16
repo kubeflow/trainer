@@ -41,17 +41,11 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 		output:crd:artifacts:config=manifests/base/crds \
 		output:rbac:artifacts:config=manifests/base/rbac \
 		output:webhook:artifacts:config=manifests/base/webhook
-	$(CONTROLLER_GEN) "crd:generateEmbeddedObjectMeta=true" rbac:roleName=training-operator-v2 webhook \
-		paths="./pkg/apis/kubeflow.org/v2alpha1/...;./pkg/controller.v2/...;./pkg/runtime.v2/...;./pkg/webhook.v2/...;./pkg/cert/..." \
-		output:crd:artifacts:config=manifests/v2/base/crds \
-		output:rbac:artifacts:config=manifests/v2/base/rbac \
-		output:webhook:artifacts:config=manifests/v2/base/webhook
 
 generate: go-mod-download manifests ## Generate apidoc, sdk and code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh
 	hack/python-sdk/gen-sdk.sh
-	hack/python-sdk-v2/gen-sdk.sh
 	$(MAKE) apidoc
 
 apidoc:
@@ -79,14 +73,6 @@ testall: manifests generate fmt vet golangci-lint test ## Run tests.
 test: envtest
 	KUBEBUILDER_ASSETS="$(shell setup-envtest use $(ENVTEST_K8S_VERSION) -p path)" \
 		go test ./pkg/apis/kubeflow.org/v1/... ./pkg/cert/... ./pkg/common/... ./pkg/config/... ./pkg/controller.v1/... ./pkg/core/... ./pkg/util/... ./pkg/webhooks/... -coverprofile cover.out
-
-.PHONY: test-integrationv2
-test-integrationv2: envtest jobset-operator-crd scheduler-plugins-crd
-	KUBEBUILDER_ASSETS="$(shell setup-envtest use $(ENVTEST_K8S_VERSION) -p path)" go test ./test/... -coverprofile cover.out
-
-.PHONY: testv2
-testv2:
-	go test ./pkg/apis/kubeflow.org/v2alpha1/... ./pkg/controller.v2/... ./pkg/runtime.v2/... ./pkg/webhook.v2/... ./pkg/util.v2/... -coverprofile cover.out
 
 envtest:
 ifndef HAS_SETUP_ENVTEST

@@ -19,13 +19,13 @@ source "${CODEGEN_PKG}/kube_codegen.sh"
 echo ">> Using ${CODEGEN_PKG}"
 
 # Generating deepcopy and defaults.
-echo "Generating deepcopy and defaults for kubeflow.org/v1 and kubeflow.org/v2alpha1"
+echo "Generating deepcopy and defaults for kubeflow.org/v1"
 kube::codegen::gen_helpers \
   --boilerplate "${TRAINING_OPERATOR_ROOT}/hack/boilerplate/boilerplate.go.txt" \
   "${TRAINING_OPERATOR_ROOT}/pkg/apis"
 
-# Generate clients for Training Operator V1 and V2
-echo "Generating clients for kubeflow.org/v1 and kubeflow.org/v2alpha1"
+# Generate clients for Training Operator V1
+echo "Generating clients for kubeflow.org/v1"
 kube::codegen::gen_client \
   --boilerplate "${TRAINING_OPERATOR_ROOT}/hack/boilerplate/boilerplate.go.txt" \
   --output-dir "${TRAINING_OPERATOR_ROOT}/pkg/client" \
@@ -46,16 +46,3 @@ go run ${OPENAPI_PKG}/cmd/openapi-gen \
   --output-file "zz_generated.openapi.go" \
   --report-filename "${TRAINING_OPERATOR_ROOT}/hack/violation_exception_v1.list" \
   "${TRAINING_OPERATOR_ROOT}/pkg/apis/kubeflow.org/v1"
-
-echo "Generating OpenAPI specification for kubeflow.org/v2alpha1"
-go run ${OPENAPI_PKG}/cmd/openapi-gen \
-  --go-header-file "${TRAINING_OPERATOR_ROOT}/hack/boilerplate/boilerplate.go.txt" \
-  --output-pkg "${TRAINING_OPERATOR_PKG}/pkg/apis/kubeflow.org/v2alpha1" \
-  --output-dir "${TRAINING_OPERATOR_ROOT}/pkg/apis/kubeflow.org/v2alpha1" \
-  --output-file "zz_generated.openapi.go" \
-  --report-filename "${TRAINING_OPERATOR_ROOT}/hack/violation_exception_v2alpha1.list" \
-  "${TRAINING_OPERATOR_ROOT}/pkg/apis/kubeflow.org/v2alpha1"
-
-# Generating OpenAPI Swagger for Training Operator V2.
-echo "Generate OpenAPI Swagger for kubeflow.org/v2alpha1"
-go run hack/swagger-v2/main.go >api.v2/openapi-spec/swagger.json
