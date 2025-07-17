@@ -50,6 +50,12 @@ type TrainJob struct {
 }
 
 const (
+	// TrainJobPending means that TrainJob is Pending.
+	TrainJobPending string = "Pending"
+
+	// TrainJobRunning means that TrainJob is Running.
+	TrainJobRunning string = "Running"
+
 	// TrainJobSuspended means that TrainJob is suspended.
 	TrainJobSuspended string = "Suspended"
 
@@ -61,6 +67,12 @@ const (
 )
 
 const (
+	// TrainJobPendingReason is the "Pending" condition reason
+	TrainJobPendingReason string = "Pending"
+
+	// TrainJobRunningReason is the "Running" condition reason
+	TrainJobRunningReason string = "Running"
+
 	// TrainJobSuspendedReason is the "Suspended" condition reason
 	// when the TrainJob is suspended.
 	TrainJobSuspendedReason string = "Suspended"
