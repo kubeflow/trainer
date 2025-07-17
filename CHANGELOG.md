@@ -2,16 +2,17 @@
 
 # [v2.0.0](https://github.com/kubeflow/trainer/tree/v2.0.0) (2025-07-17)
 
-This is the major release for Kubeflow Trainer 2.0 project.
+This is the major release of the Kubeflow Trainer 2.0 project.
 
 For more information, please see the
 
-- Blog post announcement: TODO(andreyvelich): Add link
+- [Blog post announcement](https://blog.kubeflow.org/trainer/intro/)
 
-- Migration guide from Training Operator v1: TODO(andreyvelich): Add link
+- [Migration guide from the Training Operator v1](https://www.kubeflow.org/docs/components/trainer/operator-guides/migration/)
 
 ## Breaking Changes
 
+- Migrate SDK to the `kubeflow/sdk` repository ([#2657](https://github.com/kubeflow/trainer/pull/2657) by [@eoinfennessy](https://github.com/eoinfennessy))
 - KEP-2170: Change API Group Name to `trainer.kubeflow.org` ([#2413](https://github.com/kubeflow/trainer/pull/2413) by [@Electronic-Waste](https://github.com/Electronic-Waste))
 - Move generated Python models into kubeflow_trainer_api package ([#2632](https://github.com/kubeflow/trainer/pull/2632) by [@kramaranya](https://github.com/kramaranya))
 - Upgrade kubernetes Go module version to 1.32 ([#2450](https://github.com/kubeflow/trainer/pull/2450) by [@tenzen-y](https://github.com/tenzen-y))
@@ -67,7 +68,6 @@ For more information, please see the
 
 ### SDK Updates
 
-- Remove SDK ([#2657](https://github.com/kubeflow/trainer/pull/2657) by [@eoinfennessy](https://github.com/eoinfennessy))
 - feat(sdk): Get namespace from the provided context ([#2593](https://github.com/kubeflow/trainer/pull/2593) by [@andreyvelich](https://github.com/andreyvelich))
 - feat(sdk): Support MPI-based TrainJobs ([#2545](https://github.com/kubeflow/trainer/pull/2545) by [@andreyvelich](https://github.com/andreyvelich))
 - feat(sdk): Migrate to OpenAPI V3 ([#2490](https://github.com/kubeflow/trainer/pull/2490) by [@andreyvelich](https://github.com/andreyvelich))
