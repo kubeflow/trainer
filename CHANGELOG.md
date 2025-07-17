@@ -2,6 +2,14 @@
 
 # [v2.0.0](https://github.com/kubeflow/trainer/tree/v2.0.0) (2025-07-17)
 
+This is the major release for Kubeflow Trainer 2.0 project.
+
+For more information, please see the
+
+- Blog post announcement: TODO(andreyvelich): Add link
+
+- Migration guide from Training Operator v1: TODO(andreyvelich): Add link
+
 ## Breaking Changes
 
 - KEP-2170: Change API Group Name to `trainer.kubeflow.org` ([#2413](https://github.com/kubeflow/trainer/pull/2413) by [@Electronic-Waste](https://github.com/Electronic-Waste))
