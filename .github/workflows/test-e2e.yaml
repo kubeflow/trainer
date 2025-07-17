@@ -6,8 +6,7 @@ on:
 jobs:
   e2e-test:
     name: E2E Test
-    runs-on:
-      labels: ubuntu-latest-16-cores
+    runs-on: oracle-vm-16cpu-64gb-x86-64
     env:
       GOPATH: ${{ github.workspace }}/go
     defaults:
