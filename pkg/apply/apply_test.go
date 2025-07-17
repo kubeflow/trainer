@@ -17,13 +17,16 @@ limitations under the License.
 package apply
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestUpsertEnvVar(t *testing.T) {
@@ -493,6 +496,106 @@ func TestEnvVars(t *testing.T) {
 			result := EnvVars(tc.input...)
 			if diff := cmp.Diff(tc.want, result); diff != "" {
 				t.Errorf("Unexpected EnvVars (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFromTypedObjWithFields(t *testing.T) {
+	cases := map[string]struct {
+		input      client.Object
+		fields     []string
+		want       interface{}
+		wantErr    bool
+		wantErrMsg string
+	}{
+		"extract simple field from Pod": {
+			input: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test-ns",
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyAlways,
+				},
+			},
+			fields: []string{"metadata", "name"},
+			want:   ptr.To("test-pod"),
+		},
+		"extract container from Pod spec": {
+			input: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test-container",
+							Image: "test:latest",
+							Env: []corev1.EnvVar{
+								{Name: "TEST_VAR", Value: "test-value"},
+							},
+						},
+					},
+				},
+			},
+			fields: []string{"spec", "containers"},
+			want: &[]interface{}{
+				map[string]interface{}{
+					"name":      "test-container",
+					"image":     "test:latest",
+					"resources": map[string]interface{}{},
+					"env": []interface{}{
+						map[string]interface{}{
+							"name":  "TEST_VAR",
+							"value": "test-value",
+						},
+					},
+				},
+			},
+		},
+		"field not found": {
+			input: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+			},
+			fields:     []string{"spec", "nonexistent"},
+			wantErr:    true,
+			wantErrMsg: "requested field path not found: '.spec.nonexistent'",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if tc.wantErr {
+				_, err := FromTypedObjWithFields[interface{}](tc.input, tc.fields...)
+				if err == nil {
+					t.Errorf("Expected error but got none")
+					return
+				}
+				if tc.wantErrMsg != "" && !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Errorf("Expected error message to contain %q, got %q", tc.wantErrMsg, err.Error())
+				}
+				return
+			}
+
+			switch tc.want.(type) {
+			case *string:
+				result, err := FromTypedObjWithFields[string](tc.input, tc.fields...)
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+					return
+				}
+				if diff := cmp.Diff(tc.want, result); diff != "" {
+					t.Errorf("Unexpected result (-want +got):\n%s", diff)
+				}
+			case *[]interface{}:
+				result, err := FromTypedObjWithFields[[]interface{}](tc.input, tc.fields...)
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+					return
+				}
+				if diff := cmp.Diff(tc.want, result); diff != "" {
+					t.Errorf("Unexpected result (-want +got):\n%s", diff)
+				}
 			}
 		})
 	}
