@@ -8,6 +8,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/open-policy-agent/cert-controller v0.12.0
+	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.36.0
 	k8s.io/api v0.32.2
@@ -23,6 +24,7 @@ require (
 	sigs.k8s.io/kind v0.27.0
 	sigs.k8s.io/scheduler-plugins v0.30.6
 	sigs.k8s.io/structured-merge-diff/v4 v4.5.0
+	volcano.sh/apis v1.12.1
 )
 
 require (
@@ -59,6 +61,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.21.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
