@@ -1,5 +1,18 @@
 # Changelog
 
+# [v1.9.3](https://github.com/kubeflow/training-operator/tree/v1.9.3) (2025-07-17)
+
+## New Features
+
+- [SDK] Add provision to provide local-queue for the training job ([#2636](https://github.com/kubeflow/trainer/pull/2636) by [@abhijeet-dhumal](https://github.com/abhijeet-dhumal))
+
+## Misc
+
+- chore: Remove V2 code from Training Operator 1.9 release branch ([#2737](https://github.com/kubeflow/trainer/pull/2737) by [@andreyvelich](https://github.com/andreyvelich))
+- chore(ci): Add more workaround no space left on device ([#2677](https://github.com/kubeflow/trainer/pull/2677) by [@astefanutti](https://github.com/astefanutti))
+
+[Full Changelog](https://github.com/kubeflow/trainer/compare/v1.9.2...v1.9.3)
+
 # [v1.9.2](https://github.com/kubeflow/training-operator/tree/v1.9.2) (2025-05-02)
 
 ## New Features
