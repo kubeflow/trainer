@@ -148,10 +148,14 @@ func TestUpsertPort(t *testing.T) {
 				*corev1ac.ContainerPort().WithContainerPort(8080),
 			},
 			toUpsert: []corev1ac.ContainerPortApplyConfiguration{
-				*corev1ac.ContainerPort().WithContainerPort(8080).WithProtocol("TCP"),
+				*corev1ac.ContainerPort().
+					WithContainerPort(8080).
+					WithProtocol("TCP"),
 			},
 			want: []corev1ac.ContainerPortApplyConfiguration{
-				*corev1ac.ContainerPort().WithContainerPort(8080).WithProtocol("TCP"),
+				*corev1ac.ContainerPort().
+					WithContainerPort(8080).
+					WithProtocol("TCP"),
 			},
 		},
 		"match by name": {
@@ -159,10 +163,14 @@ func TestUpsertPort(t *testing.T) {
 				*corev1ac.ContainerPort().WithName("http"),
 			},
 			toUpsert: []corev1ac.ContainerPortApplyConfiguration{
-				*corev1ac.ContainerPort().WithName("http").WithContainerPort(8080),
+				*corev1ac.ContainerPort().
+					WithName("http").
+					WithContainerPort(8080),
 			},
 			want: []corev1ac.ContainerPortApplyConfiguration{
-				*corev1ac.ContainerPort().WithName("http").WithContainerPort(8080),
+				*corev1ac.ContainerPort().
+					WithName("http").
+					WithContainerPort(8080),
 			},
 		},
 		"insert new port": {
@@ -173,19 +181,27 @@ func TestUpsertPort(t *testing.T) {
 				*corev1ac.ContainerPort().WithContainerPort(9090),
 			},
 			want: []corev1ac.ContainerPortApplyConfiguration{
-				*corev1ac.ContainerPort().WithContainerPort(9090), // Replaces because both have nil names
+				*corev1ac.ContainerPort().WithContainerPort(9090),
 			},
 		},
 		"insert new port with different names": {
 			existing: []corev1ac.ContainerPortApplyConfiguration{
-				*corev1ac.ContainerPort().WithName("http").WithContainerPort(8080),
+				*corev1ac.ContainerPort().
+					WithName("http").
+					WithContainerPort(8080),
 			},
 			toUpsert: []corev1ac.ContainerPortApplyConfiguration{
-				*corev1ac.ContainerPort().WithName("metrics").WithContainerPort(9090),
+				*corev1ac.ContainerPort().
+					WithName("metrics").
+					WithContainerPort(9090),
 			},
 			want: []corev1ac.ContainerPortApplyConfiguration{
-				*corev1ac.ContainerPort().WithName("http").WithContainerPort(8080),
-				*corev1ac.ContainerPort().WithName("metrics").WithContainerPort(9090),
+				*corev1ac.ContainerPort().
+					WithName("http").
+					WithContainerPort(8080),
+				*corev1ac.ContainerPort().
+					WithName("metrics").
+					WithContainerPort(9090),
 			},
 		},
 	}
@@ -213,10 +229,14 @@ func TestUpsertVolumes(t *testing.T) {
 				*corev1ac.Volume().WithName("data"),
 			},
 			toUpsert: []corev1ac.VolumeApplyConfiguration{
-				*corev1ac.Volume().WithName("data").WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
+				*corev1ac.Volume().
+					WithName("data").
+					WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
 			},
 			want: []corev1ac.VolumeApplyConfiguration{
-				*corev1ac.Volume().WithName("data").WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
+				*corev1ac.Volume().
+					WithName("data").
+					WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
 			},
 		},
 		"insert new volume": {
@@ -224,11 +244,15 @@ func TestUpsertVolumes(t *testing.T) {
 				*corev1ac.Volume().WithName("existing"),
 			},
 			toUpsert: []corev1ac.VolumeApplyConfiguration{
-				*corev1ac.Volume().WithName("new").WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
+				*corev1ac.Volume().
+					WithName("new").
+					WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
 			},
 			want: []corev1ac.VolumeApplyConfiguration{
 				*corev1ac.Volume().WithName("existing"),
-				*corev1ac.Volume().WithName("new").WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
+				*corev1ac.Volume().
+					WithName("new").
+					WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
 			},
 		},
 		"update multiple volumes": {
@@ -237,13 +261,21 @@ func TestUpsertVolumes(t *testing.T) {
 				*corev1ac.Volume().WithName("vol2"),
 			},
 			toUpsert: []corev1ac.VolumeApplyConfiguration{
-				*corev1ac.Volume().WithName("vol1").WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
-				*corev1ac.Volume().WithName("vol3").WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
+				*corev1ac.Volume().
+					WithName("vol1").
+					WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
+				*corev1ac.Volume().
+					WithName("vol3").
+					WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
 			},
 			want: []corev1ac.VolumeApplyConfiguration{
-				*corev1ac.Volume().WithName("vol1").WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
+				*corev1ac.Volume().
+					WithName("vol1").
+					WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
 				*corev1ac.Volume().WithName("vol2"),
-				*corev1ac.Volume().WithName("vol3").WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
+				*corev1ac.Volume().
+					WithName("vol3").
+					WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
 			},
 		},
 	}
@@ -268,38 +300,66 @@ func TestUpsertVolumeMounts(t *testing.T) {
 	}{
 		"update existing volume mount": {
 			existing: []corev1ac.VolumeMountApplyConfiguration{
-				*corev1ac.VolumeMount().WithName("data").WithMountPath("/old-data"),
+				*corev1ac.VolumeMount().
+					WithName("data").
+					WithMountPath("/old-data"),
 			},
 			toUpsert: []corev1ac.VolumeMountApplyConfiguration{
-				*corev1ac.VolumeMount().WithName("data").WithMountPath("/old-data").WithReadOnly(true),
+				*corev1ac.VolumeMount().
+					WithName("data").
+					WithMountPath("/old-data").
+					WithReadOnly(true),
 			},
 			want: []corev1ac.VolumeMountApplyConfiguration{
-				*corev1ac.VolumeMount().WithName("data").WithMountPath("/old-data").WithReadOnly(true),
+				*corev1ac.VolumeMount().
+					WithName("data").
+					WithMountPath("/old-data").
+					WithReadOnly(true),
 			},
 		},
 		"insert new volume mount": {
 			existing: []corev1ac.VolumeMountApplyConfiguration{
-				*corev1ac.VolumeMount().WithName("existing").WithMountPath("/existing"),
+				*corev1ac.VolumeMount().
+					WithName("existing").
+					WithMountPath("/existing"),
 			},
 			toUpsert: []corev1ac.VolumeMountApplyConfiguration{
-				*corev1ac.VolumeMount().WithName("new").WithMountPath("/new"),
+				*corev1ac.VolumeMount().
+					WithName("new").
+					WithMountPath("/new"),
 			},
 			want: []corev1ac.VolumeMountApplyConfiguration{
-				*corev1ac.VolumeMount().WithName("existing").WithMountPath("/existing"),
-				*corev1ac.VolumeMount().WithName("new").WithMountPath("/new"),
+				*corev1ac.VolumeMount().
+					WithName("existing").
+					WithMountPath("/existing"),
+				*corev1ac.VolumeMount().
+					WithName("new").
+					WithMountPath("/new"),
 			},
 		},
 		"update based on mount path": {
 			existing: []corev1ac.VolumeMountApplyConfiguration{
-				*corev1ac.VolumeMount().WithName("vol1").WithMountPath("/data"),
-				*corev1ac.VolumeMount().WithName("vol2").WithMountPath("/config"),
+				*corev1ac.VolumeMount().
+					WithName("vol1").
+					WithMountPath("/data"),
+				*corev1ac.VolumeMount().
+					WithName("vol2").
+					WithMountPath("/config"),
 			},
 			toUpsert: []corev1ac.VolumeMountApplyConfiguration{
-				*corev1ac.VolumeMount().WithName("vol3").WithMountPath("/data").WithReadOnly(true),
+				*corev1ac.VolumeMount().
+					WithName("vol3").
+					WithMountPath("/data").
+					WithReadOnly(true),
 			},
 			want: []corev1ac.VolumeMountApplyConfiguration{
-				*corev1ac.VolumeMount().WithName("vol3").WithMountPath("/data").WithReadOnly(true),
-				*corev1ac.VolumeMount().WithName("vol2").WithMountPath("/config"),
+				*corev1ac.VolumeMount().
+					WithName("vol3").
+					WithMountPath("/data").
+					WithReadOnly(true),
+				*corev1ac.VolumeMount().
+					WithName("vol2").
+					WithMountPath("/config"),
 			},
 		},
 	}
