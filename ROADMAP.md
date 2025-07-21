@@ -1,4 +1,31 @@
-# Roadmap
+# Kubeflow Trainer ROADMAP
+
+## 2025
+
+- Kubeflow Trainer v2 general availability.
+  - https://github.com/kubeflow/trainer/issues/2170
+- Local execution for Kubeflow Python SDK.
+  - https://github.com/kubeflow/sdk/issues/22
+- Distributed in-memory data cache powered by Apache Arrow and Apache DataFusion.
+  - https://github.com/kubeflow/trainer/issues/2655
+- Builtin trainer for LLMs fine-tuning with torchtune.
+  - https://github.com/kubeflow/trainer/issues/2401
+- Support for PyTorch, JAX, HuggingFace, DeepSpeed and MLX runtimes.
+  - https://github.com/kubeflow/trainer/issues/2211
+  - https://github.com/kubeflow/trainer/issues/2517
+  - https://github.com/kubeflow/trainer/issues/2047
+  - https://github.com/kubeflow/trainer/issues/2442
+- Elastic PyTorch training jobs.
+  - https://github.com/kubernetes-sigs/jobset/issues/463
+- Gang-scheduling with Coscheduling, Kueue, Volcano, and KAI Scheduler
+  - https://github.com/kubeflow/trainer/issues/2671
+  - https://github.com/kubeflow/trainer/issues/2628
+  - https://github.com/kubernetes-sigs/kueue/issues/5719
+- Enhanced MPI orchestration with SSH-based node communication.
+- GPU testing infrastructure for LLMs fine-tuning blueprints.
+  - https://github.com/kubeflow/trainer/issues/2432
+- Automation checkpointing for GPU-accelerated TrainJobs
+  - https://github.com/kubeflow/trainer/issues/2245
 
 ## 2023/2024
 
