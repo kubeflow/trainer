@@ -747,7 +747,8 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									Name: constants.MPISSHAuthVolumeName,
 									VolumeSource: corev1.VolumeSource{
 										Secret: &corev1.SecretVolumeSource{
-											SecretName: fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											SecretName:  fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											DefaultMode: ptr.To[int32](0600),
 											Items: []corev1.KeyToPath{
 												{
 													Key:  corev1.SSHAuthPrivateKey,
@@ -786,7 +787,8 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									Name: constants.MPISSHAuthVolumeName,
 									VolumeSource: corev1.VolumeSource{
 										Secret: &corev1.SecretVolumeSource{
-											SecretName: fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											SecretName:  fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											DefaultMode: ptr.To[int32](0600),
 											Items: []corev1.KeyToPath{
 												{
 													Key:  corev1.SSHAuthPrivateKey,
