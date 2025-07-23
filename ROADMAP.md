@@ -28,7 +28,7 @@
 - GPU testing infrastructure: https://github.com/kubeflow/trainer/issues/2432
 - Automation checkpointing for GPU-accelerated TrainJobs: https://github.com/kubeflow/trainer/issues/2245
 - Automation of Kubeflow Trainer releases: https://github.com/kubeflow/trainer/issues/2155
-- Kubeflow Trainer UI and TrainJob History Server.
+- Kubeflow Trainer UI and TrainJob History Server: https://github.com/kubeflow/trainer/issues/2648
 
 ## 2023/2024
 
