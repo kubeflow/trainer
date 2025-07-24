@@ -7,7 +7,7 @@
 - Distributed in-memory data cache powered by Apache Arrow and Apache DataFusion: https://github.com/kubeflow/trainer/issues/2655
 - `BuiltinTrainers` for LLMs Fine-Tuning
   - TorchTune support: https://github.com/kubeflow/trainer/issues/2401
-  - Explore other libraries for fine-tuning like [Unsloth](https://github.com/unslothai/unsloth), [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory), [HuggingFace TRL](https://github.com/huggingface/trl)
+  - Explore other libraries for fine-tuning like [Unsloth](https://github.com/unslothai/unsloth), [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory), [HuggingFace TRL](https://github.com/huggingface/trl): https://github.com/kubeflow/trainer/issues/2752
   - Design extensible architecture for `BuiltinTrainers`
 - Training Runtime support
   - PyTorch: https://github.com/kubeflow/trainer/issues/2211
