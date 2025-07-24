@@ -23,8 +23,8 @@
 - Multi-cluster TrainJob dispatching with [Multi-Kueue](https://kueue.sigs.k8s.io/docs/concepts/multikueue/).
 - Topology aware scheduling with [Kueue](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling/).
 - Implement registration mechanism in the Pipeline Framework to extend plugins and supported ML
-  frameworks in the Kubeflow Trainer.
-- Enhanced MPI orchestration with SSH-based node communication.
+  frameworks in the Kubeflow Trainer: https://github.com/kubeflow/trainer/issues/2750
+- Enhanced MPI orchestration with SSH-based node communication: https://github.com/kubeflow/trainer/issues/2751
 - GPU testing infrastructure: https://github.com/kubeflow/trainer/issues/2432
 - Automation checkpointing for GPU-accelerated TrainJobs: https://github.com/kubeflow/trainer/issues/2245
 - Automation of Kubeflow Trainer releases: https://github.com/kubeflow/trainer/issues/2155
