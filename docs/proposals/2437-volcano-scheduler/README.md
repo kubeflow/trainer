@@ -174,12 +174,17 @@ Now, let’s dive into the specific functionality the Volcano plugin provides.
 
 **PodGroup** is created based on the policy defined in `runtime.Info`. First, we need to check the existing PodGroup and corresponding TrainJob’s runtime status to determine whether to update the PodGroup. (Update the PodGroup only if it exists and the TrainJob is not suspended.)
 
-Note that the PodGroup spec in **Volcano** differs from the one defined in the Kubernetes **scheduler-plugins**. In the Volcano plugin, the following parameters need to be calculated:
+In the **Volcano** plugin, the following parameters need to be calculated (similar to the **scheduler-plugins**):
 
 - `MinMember`: Defines the minimum number of members/tasks required to run the PodGroup. This is the total count of all Pods in the PodSet.
 - `MinResources`: Defines the minimal resource of members/tasks to run the pod group. This is the sum of resource requests (such as CPU and memory) for all Pods in the PodSet.
-- `MinTaskMember`: Defines the minimum number of Pods required to run each task in the PodGroup. If not specified, the default is the PodSet.Count.
 
+We also need to specify these APIs (different from the **scheduler-plugins**):
+- `Queue`: A collection of PodGroups, which adopts `FIFO`. It is also used as the basis for resource division.
+- `PriorityClassName`: Represents the priority of the PodGroup and is used by the scheduler to sort all the PodGroups in the queue during scheduling.
+- `NetworkTopology`: Supports the Network Topology Aware Scheduling strategy for advanced scheduling.
+
+> Since the current Trainer does not require fine-grained scheduling guarantees per task, we omit `minTaskMember` API and use only `minMember` to control the minimal number of Pods required to start scheduling.
 #### Handle Resource Events
 
 Referring to implement of **Coscheduling**, we update the scheduling queue in the following two cases:
