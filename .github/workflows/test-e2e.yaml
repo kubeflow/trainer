@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         # Kubernetes versions for e2e tests on Kind cluster.
-        kubernetes-version: ["1.29.14", "1.30.0", "1.31.0", "1.32.3"]
+        kubernetes-version: ["1.30.0", "1.31.0", "1.32.3", "1.33.1"]
 
     steps:
       - name: Check out code
