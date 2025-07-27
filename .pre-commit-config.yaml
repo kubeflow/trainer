@@ -22,6 +22,17 @@ repos:
     rev: 7.1.1
     hooks:
       - id: flake8
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+        name: cargo fmt (data_cache)
+        files: ^pkg/data_cache/.*\.rs$
+        args: [--manifest-path, pkg/data_cache/Cargo.toml, --]
+      - id: cargo-check
+        name: cargo check (data_cache)
+        files: ^pkg/data_cache/.*\.rs$
+        args: [--manifest-path, pkg/data_cache/Cargo.toml]
 exclude: |
   (?x)^(
     docs/images/.*|
