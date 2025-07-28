@@ -153,10 +153,6 @@ func TestBuildPodGroup(t *testing.T) {
 							Volcano: &trainer.VolcanoPodGroupPolicySource{
 								Queue:             ptr.To("q1"),
 								PriorityClassName: ptr.To("high-priority"),
-								MinTaskMember: map[string]int32{
-									"launcher": 1,
-									"worker":   2,
-								},
 							},
 						},
 					},
@@ -165,45 +161,13 @@ func TestBuildPodGroup(t *testing.T) {
 			existingPG: &volcanov1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "job-update", Namespace: "test-ns"}},
 			expectPG: volcanov1beta1ac.PodGroup("job-update", "test-ns").
 				WithSpec(volcanov1beta1ac.PodGroupSpec().
-					WithMinMember(3).
-					WithMinResources(corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("1300m"),
-						corev1.ResourceMemory: resource.MustParse("2Gi"),
-					}).
-					WithMinTaskMember(map[string]int32{
-						"launcher": 1,
-						"worker":   2}).
-					WithQueue("q1").
-					WithPriorityClassName("high-priority")),
-			expectErr: nil,
-		},
-		{
-			testName: "Test PodGroup creation with default value of minTaskMember",
-			trainJob: &trainer.TrainJob{
-				ObjectMeta: metav1.ObjectMeta{Name: "job-new", Namespace: "test-ns", UID: "3"},
-				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
-			},
-			info: &runtime.Info{
-				TemplateSpec: baseInfo().TemplateSpec,
-				RuntimePolicy: runtime.RuntimePolicy{
-					PodGroupPolicy: &trainer.PodGroupPolicy{
-						PodGroupPolicySource: trainer.PodGroupPolicySource{
-							Volcano: &trainer.VolcanoPodGroupPolicySource{},
-						},
-					},
-				},
-			},
-			existingPG: nil,
-			expectPG: volcanov1beta1ac.PodGroup("job-new", "test-ns").
-				WithSpec(volcanov1beta1ac.PodGroupSpec().
 					WithMinMember(5).
 					WithMinResources(corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("2300m"),
 						corev1.ResourceMemory: resource.MustParse("3Gi"),
 					}).
-					WithMinTaskMember(map[string]int32{
-						"launcher": 1,
-						"worker":   4})),
+					WithQueue("q1").
+					WithPriorityClassName("high-priority")),
 			expectErr: nil,
 		},
 	}
@@ -245,7 +209,6 @@ func TestBuildPodGroup(t *testing.T) {
 			require.Equal(t, c.expectPG.Spec.Queue, actualPodGroup.Spec.Queue, "Queue should match")
 			require.Equal(t, c.expectPG.Spec.PriorityClassName, actualPodGroup.Spec.PriorityClassName, "PriorityClassName should match")
 			require.Equal(t, c.expectPG.Spec.MinMember, actualPodGroup.Spec.MinMember, "MinMember should match")
-			require.Equal(t, c.expectPG.Spec.MinTaskMember, actualPodGroup.Spec.MinTaskMember, "MinTaskMember should match")
 			for k, v := range *c.expectPG.Spec.MinResources {
 				actualValue := (*actualPodGroup.Spec.MinResources)[k]
 				require.Equal(t, v.String(), actualValue.String(), "MinResources for %s should match", k)

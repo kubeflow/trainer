@@ -161,11 +161,6 @@ type VolcanoPodGroupPolicySource struct {
 	// This field is optional.
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
 
-	// MinTaskMember defines the minimal number of pods to run each task in the pod group;
-	// if there's not enough resources to start each task, the scheduler
-	// will not start anyone.
-	MinTaskMember map[string]int32 `json:"minTaskMember,omitempty"`
-
 	// NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.
 	// +kubebuilder:validation:EmbeddedResource
 	// +kubebuilder:pruning:PreserveUnknownFields

@@ -94,21 +94,13 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 	volcanoSpec := info.RuntimePolicy.PodGroupPolicy.Volcano
 
 	// Aggregate pod resource requests
-	var minMembers int32
+	var totalMembers int32
 	totalResources := make(corev1.ResourceList)
-	minTaskMembers := volcanoSpec.MinTaskMember
-	if minTaskMembers == nil {
-		minTaskMembers = make(map[string]int32)
-	}
 	for _, ps := range info.TemplateSpec.PodSets {
 		count := *ps.Count
-		if _, ok := minTaskMembers[ps.Name]; !ok {
-			// minTaskMember defaults to the number of replicas
-			minTaskMembers[ps.Name] = count
-		}
-		minMembers += minTaskMembers[ps.Name]
+		totalMembers += count
 		for resName, quantity := range ps.SinglePodRequests {
-			quantity.Mul(int64(minTaskMembers[ps.Name]))
+			quantity.Mul(int64(count))
 			current := totalResources[resName]
 			current.Add(quantity)
 			totalResources[resName] = current
@@ -116,9 +108,8 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 	}
 	pg := volcanov1beta1ac.PodGroup(trainJob.Name, trainJob.Namespace).
 		WithSpec(volcanov1beta1ac.PodGroupSpec().
-			WithMinMember(minMembers).
-			WithMinResources(totalResources).
-			WithMinTaskMember(minTaskMembers))
+			WithMinMember(totalMembers).
+			WithMinResources(totalResources))
 
 	// Set Volcano-specific fields only if explicitly configured.
 	// Volcano uses default values when unset (nil),
