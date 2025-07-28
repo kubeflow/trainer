@@ -2,12 +2,14 @@ package volcano
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
@@ -30,8 +32,8 @@ func TestNewVolcano(t *testing.T) {
 	scheme := apiruntime.NewScheme()
 	require.NoError(t, trainer.AddToScheme(scheme))
 
+	// Case 1: Success case, no error in indexer
 	called := map[string]bool{}
-
 	indexer := FieldIndexerFunc(func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
 		called[field] = true
 		return nil
@@ -43,6 +45,38 @@ func TestNewVolcano(t *testing.T) {
 
 	require.True(t, called[TrainingRuntimeContainerRuntimeClassKey], "TrainingRuntime index should be registered")
 	require.True(t, called[ClusterTrainingRuntimeContainerRuntimeClassKey], "ClusterTrainingRuntime index should be registered")
+
+	// Case 2: Simulate error in IndexField for TrainingRuntime
+	indexerWithError := FieldIndexerFunc(func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
+		if field == TrainingRuntimeContainerRuntimeClassKey {
+			return fmt.Errorf("test error")
+		}
+		return nil
+	})
+
+	plugin, err = New(context.Background(), fake.NewClientBuilder().WithScheme(scheme).Build(), indexerWithError)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "test error", "Error should contain the simulated error message")
+
+	// Case 3: Simulate error in IndexField for ClusterTrainingRuntime
+	indexerWithError = FieldIndexerFunc(func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
+		if field == ClusterTrainingRuntimeContainerRuntimeClassKey {
+			return fmt.Errorf("test error")
+		}
+		return nil
+	})
+
+	plugin, err = New(context.Background(), fake.NewClientBuilder().WithScheme(scheme).Build(), indexerWithError)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "test error", "Error should contain the simulated error message")
+}
+
+func TestName(t *testing.T) {
+	v := &Volcano{}
+	expectedName := "Volcano"
+	if v.Name() != expectedName {
+		t.Errorf("expected name %s, got %s", expectedName, v.Name())
+	}
 }
 
 func TestEnforcePodGroupPolicy(t *testing.T) {
@@ -51,7 +85,7 @@ func TestEnforcePodGroupPolicy(t *testing.T) {
 	jobName := "test-trainjob"
 	info := &runtime.Info{
 		Scheduler: &runtime.Scheduler{
-			PodLabels: map[string]string{},
+			PodLabels: nil,
 		},
 		RuntimePolicy: runtime.RuntimePolicy{
 			PodGroupPolicy: &trainer.PodGroupPolicy{
@@ -69,13 +103,32 @@ func TestEnforcePodGroupPolicy(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	got := info.Scheduler.PodLabels["volcano.sh/podgroup"]
-	if got != jobName {
-		t.Errorf("expected label volcano.sh/podgroup=%s, got %s", jobName, got)
+	got := info.Scheduler.PodLabels[volcanov1beta1.VolcanoGroupNameAnnotationKey]
+	require.Equal(t, jobName, got, "PodGroup label should match the train job name")
+
+	// Test with nil info
+	err = v.EnforcePodGroupPolicy(nil, trainJob)
+	require.Nil(t, err, "should return nil when info is nil")
+}
+
+type errorClient struct {
+	client.WithWatch
+	errNotFound bool
+}
+
+func (e *errorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if !e.errNotFound {
+		return apierrors.NewNotFound(corev1.Resource("podgroups"), key.Name)
 	}
+	return fmt.Errorf("mock get error")
 }
 
 func TestBuildPodGroup(t *testing.T) {
+	// Test with nil info
+	v := &Volcano{}
+	res, _ := v.Build(context.Background(), nil, &trainer.TrainJob{})
+	require.Nil(t, res, "should return nil when info is nil")
+
 	scheme := apiruntime.NewScheme()
 	require.NoError(t, trainer.AddToScheme(scheme))
 	require.NoError(t, volcanov1beta1.AddToScheme(scheme))
@@ -153,6 +206,10 @@ func TestBuildPodGroup(t *testing.T) {
 							Volcano: &trainer.VolcanoPodGroupPolicySource{
 								Queue:             ptr.To("q1"),
 								PriorityClassName: ptr.To("high-priority"),
+								NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
+									Mode:               volcanov1beta1.HardNetworkTopologyMode,
+									HighestTierAllowed: ptr.To(1),
+								},
 							},
 						},
 					},
@@ -167,8 +224,32 @@ func TestBuildPodGroup(t *testing.T) {
 						corev1.ResourceMemory: resource.MustParse("3Gi"),
 					}).
 					WithQueue("q1").
-					WithPriorityClassName("high-priority")),
+					WithPriorityClassName("high-priority").
+					WithNetworkTopology(&volcanov1beta1ac.NetworkTopologySpecApplyConfiguration{
+						Mode:               ptr.To(volcanov1beta1.HardNetworkTopologyMode),
+						HighestTierAllowed: ptr.To(1),
+					})),
 			expectErr: nil,
+		},
+		{
+			testName: "Error when getting existing PodGroup",
+			trainJob: &trainer.TrainJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "job-error", Namespace: "test-ns", UID: "3"},
+				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
+			},
+			info: &runtime.Info{
+				TemplateSpec: baseInfo().TemplateSpec,
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+			},
+			existingPG: nil,
+			expectPG:   nil,
+			expectErr:  fmt.Errorf("mock get error"),
 		},
 	}
 
@@ -179,9 +260,18 @@ func TestBuildPodGroup(t *testing.T) {
 			if c.existingPG != nil {
 				clientBuilder.WithObjects(c.existingPG)
 			}
+			client_ := clientBuilder.Build()
+
+			// fake for error handling
+			if c.testName == "Error when getting existing PodGroup" {
+				client_ = &errorClient{WithWatch: client_, errNotFound: true}
+			}
+			if c.testName == "PodGroup exists but trainjob suspended" {
+				client_ = &errorClient{WithWatch: client_, errNotFound: false}
+			}
 
 			v := &Volcano{
-				client:     clientBuilder.Build(),
+				client:     client_,
 				restMapper: nil,
 				scheme:     scheme,
 			}

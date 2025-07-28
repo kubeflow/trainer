@@ -70,7 +70,7 @@ func (v *Volcano) EnforcePodGroupPolicy(info *runtime.Info, trainJob *trainer.Tr
 	if info.Scheduler.PodLabels == nil {
 		info.Scheduler.PodLabels = map[string]string{}
 	}
-	info.Scheduler.PodLabels["volcano.sh/podgroup"] = trainJob.Name // TODO: use a constant
+	info.Scheduler.PodLabels[volcanov1beta1.VolcanoGroupNameAnnotationKey] = trainJob.Name
 	return nil
 }
 
