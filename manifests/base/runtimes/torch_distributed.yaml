@@ -21,14 +21,3 @@ spec:
                   containers:
                     - name: node
                       image: pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
-                      command:
-                        - /bin/bash
-                        - -c
-                        - |
-                          echo "Torch Distributed Runtime"
-
-                          echo "--------------------------------------"
-                          echo "Torch Default Runtime Env"
-                          env | grep PET_
-
-                          pip list

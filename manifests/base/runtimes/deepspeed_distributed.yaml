@@ -34,20 +34,6 @@ spec:
                       image: ghcr.io/kubeflow/trainer/deepspeed-runtime
                       securityContext:
                         runAsUser: 1000
-                      command:
-                        - mpirun
-                        - -n
-                        - "1"
-                        - bash
-                        - -c
-                        - |
-                          echo "DeepSpeed Distributed Runtime"
-
-                          echo "--------------------------------------"
-                          set -e
-                          mpirun --version
-                          python --version
-                          pip list
         - name: node
           template:
             spec:

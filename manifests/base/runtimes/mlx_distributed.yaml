@@ -32,20 +32,6 @@ spec:
                       image: ghcr.io/kubeflow/trainer/mlx-runtime
                       securityContext:
                         runAsUser: 1000
-                      command:
-                        - mpirun
-                        - -n
-                        - "1"
-                        - bash
-                        - -c
-                        - |
-                          echo "MLX Distributed Runtime"
-
-                          echo "--------------------------------------"
-                          set -e
-                          mpirun --version
-                          python --version
-                          pip list
         - name: node
           template:
             spec:
