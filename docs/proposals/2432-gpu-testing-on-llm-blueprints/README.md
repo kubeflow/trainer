@@ -58,7 +58,7 @@ GitHub Actions (and [ARC](https://docs.github.com/en/actions/hosting-your-own-ru
  - Run GPU intensive tasks on self hosted gpu infra (here OKE) instead of default CPU based infra
 
 - [Planned] Run AI playground during KubeCon or other events leveraging full potential of KubeFlow Ecosystem
-  
+
     The idea is to automate and setup sample models where user can just Open Kubeflow Jupyter Notebook -> select Kubeflow LLM blueprint -> fine-tune model with Kubeflow Trainer -> serve it with Kubeflow KServe. This will help us to show full potential of KubeFlow ecosystem.
 
 
