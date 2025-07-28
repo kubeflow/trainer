@@ -18,7 +18,7 @@ TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
 LOCALBIN ?= $(PROJECT_DIR)/bin
 
 # Tool versions
-K8S_VERSION ?= 1.33.1
+K8S_VERSION ?= 1.33.0
 GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
 ENVTEST_VERSION ?= release-0.21
 CONTROLLER_GEN_VERSION ?= v0.18.0
@@ -156,7 +156,7 @@ test: ## Run Go unit test.
 
 .PHONY: test-integration
 test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd ## Run Go integration test.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(K8S_VERSION) -p path)" $(GINKGO) -v ./test/integration/... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(K8S_VERSION) -p path)" $(GINKGO) -coverprofile cover.out -v ./test/integration/...
 
 .PHONY: test-python
 test-python: ## Run Python unit test.
