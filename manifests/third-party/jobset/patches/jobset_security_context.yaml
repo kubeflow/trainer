@@ -9,6 +9,9 @@ spec:
     matchLabels:
       control-plane: jobset-controller-manager
   template:
+    metadata:
+      labels:
+        control-plane: jobset-controller-manager
     spec:
       containers:
         - name: manager
