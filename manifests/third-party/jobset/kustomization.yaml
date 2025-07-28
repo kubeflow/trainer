@@ -12,3 +12,10 @@ patches:
       group: ""
       version: v1
       kind: Namespace
+  # Add security context to jobset-controller-manager.
+  - path: patches/jobset_security_context.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: jobset-controller-manager

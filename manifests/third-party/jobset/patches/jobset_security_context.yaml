@@ -1,0 +1,23 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jobset-controller-manager
+  namespace: kubeflow-system
+spec:
+  selector:
+    matchLabels:
+      control-plane: jobset-controller-manager
+  template:
+    spec:
+      containers:
+        - name: manager
+          securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 65534
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
