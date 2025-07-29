@@ -160,7 +160,7 @@ type VolcanoPodPolicySource struct {
         // PriorityClassName sets PodGroup priority. Optional.
         // "system-node-critical" and "system-cluster-critical" are special keywords with the highest priorities.
         PriorityClassName *string `json:"priorityClassName,omitempty"`
-        
+
         // NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.
         NetworkTopology *volcanov1beta1.NetworkTopologySpec `json:"networkTopology,omitempty"`
 }
