@@ -118,9 +118,13 @@ spec:
 Then I specify the Queue name in ClusterTrainingRuntime spec:
 
 ```yaml
-podGroupPolicy:
+spec:
+  podGroupPolicy:
     volcano:
-      queue: high-priority-queue
+      priorityClassName: "p2"
+  template:
+    metadata:
+      scheduling.volcano.sh/queue-name: "high-priority-queue"
 ```
 
 
@@ -153,12 +157,12 @@ type PodGroupPolicySource struct {
 
 // VolcanoPodPolicySource configures scheduling behavior for Volcano.
 type VolcanoPodPolicySource struct {
-        // Queue name in Volcano. Defaults to "default" queue with the lowest weight.
-	Queue *string `json:"queue,omitempty"`
-
         // PriorityClassName sets PodGroup priority. Optional.
         // "system-node-critical" and "system-cluster-critical" are special keywords with the highest priorities.
         PriorityClassName *string `json:"priorityClassName,omitempty"`
+        
+        // NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.
+        NetworkTopology *volcanov1beta1.NetworkTopologySpec `json:"networkTopology,omitempty"`
 }
 ```
 
@@ -174,13 +178,14 @@ Now, let’s dive into the specific functionality the Volcano plugin provides.
 
 **PodGroup** is created based on the policy defined in `runtime.Info`. First, we need to check the existing PodGroup and corresponding TrainJob’s runtime status to determine whether to update the PodGroup. (Update the PodGroup only if it exists and the TrainJob is not suspended.)
 
-In the **Volcano** plugin, the following parameters need to be calculated (similar to the **scheduler-plugins**):
+The following parameters are calculated in both **Volcano** and **Coscheduling** plugin, with similar semantics:
 
 - `MinMember`: Defines the minimum number of members/tasks required to run the PodGroup. This is the total count of all Pods in the PodSet.
 - `MinResources`: Defines the minimal resource of members/tasks to run the pod group. This is the sum of resource requests (such as CPU and memory) for all Pods in the PodSet.
 
-We also need to specify these APIs (different from the **scheduler-plugins**):
+Volcano additionally supports the following parameters (**different from the Coscheduling plugin**):
 - `Queue`: A collection of PodGroups, which adopts `FIFO`. It is also used as the basis for resource division.
+  - It is configured via annotations `scheduling.volcano.sh/queue-name`. This design follows Kueue and maintains flexibility for future override by the `TrainJob`.
 - `PriorityClassName`: Represents the priority of the PodGroup and is used by the scheduler to sort all the PodGroups in the queue during scheduling.
 - `NetworkTopology`: Supports the Network Topology Aware Scheduling strategy for advanced scheduling.
 
