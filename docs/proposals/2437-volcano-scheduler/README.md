@@ -21,7 +21,7 @@ Introducing the **Volcano** scheduler will enhance Trainer's scheduling capabili
    Volcano is a well-known and widely used scheduler in Kubernetes. Many users are familiar with it. We provided a Volcano scheduling option in Training Operator V1. Continuing to support Volcano in Trainer will help users migrate to Kubeflow Trainer V2 smoothly.
    Additionally, Volcano's [official documentation](https://volcano.sh/en/docs/kubeflow_on_volcano/) highlights Kubeflow as a key collaborator within its ecosystem.
 3. **Mitigating limitations in edge cases**
-   For example, the KubeEdge Sedna project ([kubeedge/sedna\#463](https://github.com/kubeedge/sedna/issues/463)) faced limitations when implementing edge-cloud federated learning. It was unable to set independent parameters for each Worker due to the homogeneous scheduling restrictions of the current Coscheduling setup.
+   The introduction of the Volcano scheduler enhances the scheduling flexibility for federated learning, as requested by the Sedna project ([kubeedge/sedna\#463](https://github.com/kubeedge/sedna/issues/463)), which needed gang-scheduling support in Trainer V2.
 
 ### Goals
 
