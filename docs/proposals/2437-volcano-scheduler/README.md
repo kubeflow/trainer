@@ -70,9 +70,7 @@ spec:
     torch:
       numProcPerNode: 5
   podGroupPolicy:
-    volcano:
-      minResources:
-    	  cpu: "1"
+    volcano: {}
   template:
     spec:
       replicatedJobs:
@@ -82,11 +80,14 @@ spec:
               template:
                 spec:
                   schedulerName: volcano
+                  priorityClassName: "high-priority"
                   containers:
                     - name: trainer
                       image: docker.io/kubeflow/pytorch-mnist
                       resources:
-                        limits:
+                        requests:
+                          cpu: "1000m"
+                          memory: "2Gi"
                           nvidia.com/gpu: 1
                       env:
                         - name: MASTER_ADDR
@@ -120,8 +121,7 @@ Then I specify the Queue name in ClusterTrainingRuntime spec:
 ```yaml
 spec:
   podGroupPolicy:
-    volcano:
-      priorityClassName: "p2"
+    volcano: {}
   template:
     metadata:
       scheduling.volcano.sh/queue-name: "high-priority-queue"
@@ -157,10 +157,6 @@ type PodGroupPolicySource struct {
 
 // VolcanoPodPolicySource configures scheduling behavior for Volcano.
 type VolcanoPodPolicySource struct {
-        // PriorityClassName sets PodGroup priority. Optional.
-        // "system-node-critical" and "system-cluster-critical" are special keywords with the highest priorities.
-        PriorityClassName *string `json:"priorityClassName,omitempty"`
-
         // NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.
         NetworkTopology *volcanov1beta1.NetworkTopologySpec `json:"networkTopology,omitempty"`
 }
@@ -187,6 +183,7 @@ Volcano additionally supports the following parameters (**different from the Cos
 - `Queue`: A collection of PodGroups, which adopts `FIFO`. It is also used as the basis for resource division.
   - It is configured via annotations `scheduling.volcano.sh/queue-name`. This design follows Kueue and maintains flexibility for future override by the `TrainJob`.
 - `PriorityClassName`: Represents the priority of the PodGroup and is used by the scheduler to sort all the PodGroups in the queue during scheduling.
+  - It is inferred from the Pod template's `.spec.priorityClassName` field.
 - `NetworkTopology`: Supports the Network Topology Aware Scheduling strategy for advanced scheduling.
 
 > Since the current Trainer does not require fine-grained scheduling guarantees per task, we omit `minTaskMember` API and use only `minMember` to control the minimal number of Pods required to start scheduling.
