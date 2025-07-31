@@ -3,7 +3,6 @@ kind: ClusterTrainingRuntime
 metadata:
   name: torchtune-llama3.2-3b
   labels:
-    trainer.kubeflow.org/trainer-type: builtin
     trainer.kubeflow.org/framework: torchtune
 spec:
   mlPolicy:

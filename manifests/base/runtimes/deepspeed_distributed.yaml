@@ -3,7 +3,6 @@ kind: ClusterTrainingRuntime
 metadata:
   name: deepspeed-distributed
   labels:
-    trainer.kubeflow.org/trainer-type: custom
     trainer.kubeflow.org/framework: deepspeed
 spec:
   mlPolicy:

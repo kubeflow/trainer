@@ -3,7 +3,6 @@ kind: ClusterTrainingRuntime
 metadata:
   name: mlx-distributed
   labels:
-    trainer.kubeflow.org/trainer-type: custom
     trainer.kubeflow.org/framework: mlx
 spec:
   mlPolicy:
