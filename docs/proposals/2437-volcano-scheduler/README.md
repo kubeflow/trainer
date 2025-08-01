@@ -202,6 +202,30 @@ Additionally, we should make sure that the PodGroup is automatically cleaned up 
 
 We should grant Trainer the necessary permissions to manage Volcano CRDs. Permissions can be declared using `+kubebuilder:rbac` annotations inside the runtime plugin code.
 
+#### Volcano Scheduler Plugin Configuration
+
+To enable features like [network topology-aware](https://volcano.sh/en/docs/network_topology_aware_scheduling/#configure-the-volcano-scheduler) scheduling, users need to modify the Volcano scheduler’s configuration and enable [plugins](https://volcano.sh/en/docs/plugins).
+For example, the following configuration is recommended when using Trainer with Volcano integration:
+
+```yaml
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: volcano-scheduler-configmap
+  namespace: volcano-system
+data:
+  volcano-scheduler.conf: |
+    actions: "enqueue, allocate, backfill"
+    tiers:
+    - plugins:
+      - name: priority  # Handles job or task sorting based on PriorityClassName, createTime or id in turn
+      - name: gang  # Gang scheduling strategy
+    - plugins:
+      - name: predicates  # Evaluate and pre-select jobs by the PredicateGPU
+      - name: proportion  # Filter out those that require the GPU for centralized scheduling
+      - name: binpack  # Help with compact task scheduling
+      - name: network-topology-aware  # Enable network-topology-aware plugin
+```
 
 ### Test Plan
 
