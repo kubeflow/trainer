@@ -181,7 +181,7 @@ The following parameters are calculated in both **Volcano** and **Coscheduling**
 
 Volcano additionally supports the following parameters (**different from the Coscheduling plugin**):
 - `Queue`: A collection of PodGroups, which adopts `FIFO`. It is also used as the basis for resource division.
-  - It is configured via annotations `scheduling.volcano.sh/queue-name`. This design follows Kueue and maintains flexibility for future override by the `TrainJob`.
+  - It is configured via annotations `scheduling.volcano.sh/queue-name`. The field is initially set in TrainingRuntime, but can **be overridden by the TrainJob**.
 - `PriorityClassName`: Represents the priority of the PodGroup and is used by the scheduler to sort all the PodGroups in the queue during scheduling.
   - It is inferred from the Pod template's `.spec.priorityClassName` field.
 - `NetworkTopology`: Supports the Network Topology Aware Scheduling strategy for advanced scheduling.
