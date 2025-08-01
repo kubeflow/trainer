@@ -166,7 +166,7 @@ type VolcanoPodPolicySource struct {
 
 Similar to the Coscheduling plugin, we define the Volcano plugin struct in `pkg/runtime/framework/plugins/volcano/volcano.go`. This struct includes key fields like `client`, `restMapper`, `scheme`, and `logger`.During initialization, we need to set indexes for *TrainingRuntime* and *ClusterTrainingRuntime* to support efficient queries.
 
-The **PodGroupInterface** is defined in `volcano.sh/apis/pkg/client/clientset/versioned/typed/scheduling/v1beta1`, which provides methods to work with **PodGroup** resources. The PodGroup CRD is managed by the **volcano-controller**.
+The Trainer declares the desired state of PodGroup based on the job configuration, and the Volcano controller acts on it to perform scheduling decisions.
 
 Now, let’s dive into the specific functionality the Volcano plugin provides.
 
