@@ -77,25 +77,32 @@ To hide users from complex Kubernetes configuations, we will provide a simple ye
 
 ```python
 job_id = TrainerClient().train(
+    runtime=Runtime(
+      name="torchtune-llama3.2-1b",
+    ),
+    initializer=Initializer(
+        dataset=HuggingFaceDatasetInitializer(
+            storage_uri="tatsu-lab/alpaca/data",
+        ),
+        model=HuggingFaceModelInitializer(
+            storage_uri="hf://meta-llama/Llama-3.2-1B-Instruct",
+            access_token="<YOUR_HF_TOKEN>",  # Replace with your Hugging Face token,
+        ),
+    ),
     trainer=BuiltinTrainer(
         config=TorchTuneConfig(
-            dtype="bf16",
             batch_size=1,
+            dataset_preprocess_config=TorchTuneInstructDataset(
+                source=DataFormat.PARQUET,
+            ),
+            dtype="bf16",
             epochs=1,
+            num_nodes=5,
             peft_config=LoraConfig(
                 lora_rank=64,
                 lora_alpha=128,
             ),
-            num_nodes=5,
         ),
-    ),
-    initializer=Initializer(
-        dataset=HuggingFaceDatasetInitializer(
-            storage_uri="tatsu-lab/alpaca",
-        )
-    ),
-    runtime=Runtime(
-      name="torchtune-llama3.1-8b",
     ),
 )
 ```
@@ -112,8 +119,8 @@ As is shown in the official guides, we can pass distributed arguments to `torcht
 # Note that tune run only supports launching distributed runs by passing through arguments preceding the recipe directly to torchrun.
 # Official document: https://pytorch.org/torchtune/main/tune_cli.html#run-a-recipe
 # Proof from source code: https://github.com/pytorch/torchtune/blob/75965d4281b9b76c454630d015221b9933c77bf3/torchtune/_cli/run.py#L113-L118
-tune run --nnodes=1 --nproc-per-node=4 lora_finetune_distributed \
-    --config llama3_1/8B_lora \
+tune run --nnodes=1 --nproc-per-node=2 lora_finetune_distributed \
+    --config llama3_2/1B_lora \
     model.lora_attn_modules=[q_proj,k_proj,v_proj] \
     model.apply_lora_to_mlp=True \
     model.lora_rank=64 \
@@ -127,7 +134,7 @@ The CLI-based way allows us to mutate these parameters by overriding the `comman
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
-  name: torchtune-llama3.1-8b
+  name: torchtune-llama3.2-1b
   labels:
 spec:
   mlPolicy:
@@ -150,7 +157,7 @@ spec:
                       args:
                         - full_finetune_single_device
                         - --config
-                        - llama3_1/8B_full_single_device
+                        - llama3_2/1B_full_single_device
 ...
 ---
 apiVersion: trainer.kubeflow.org/v1alpha1
@@ -160,7 +167,7 @@ metadata:
   namespace: tenant-alpha
 spec:
   runtimeRef:
-    name: torchtune-llama3.1-8B
+    name: torchtune-llama3.2-1B
   trainer:
     command:
       - tune run
@@ -169,7 +176,7 @@ spec:
       - --nproc_per_node=2
       - lora_finetune_distributed
       - --config
-      - llama3_1/8B_full
+      - llama3_2/1B_full
       - model.lora_attn_modules=[q_proj,k_proj,v_proj]
       - model.apply_lora_to_mlp=True
       - model.lora_rank=64
@@ -190,7 +197,7 @@ To provide a better user experience, we need to offer a simple SDK that allows u
 ```python
 # By default we can fine-tune models without any additional configurations from users
 TrainerClient().train(
-    runtime=Runtime(name="torchtune-llama3.3-70b"),
+    runtime=client.get_runtime("torchtune-llama3.2-1b"),
 )
 ```
 
@@ -237,14 +244,14 @@ We natively support all `recipe` and `config` supported by `torchtune`, since `t
 
 | Parameters | Type | What is it? |
 | - | - | - |
-| dtype | Optional[DataType] | The underlying data type used to represent the model and optimizer parameters. Currently, we only support `bf16` and `fp32`. |
 | batch_size | Optional[int] | The number of samples processed before updating model weights. |
-| epochs | Optional[int] | The number of samples processed before updating model weights. |
-| loss | Optional[Loss] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
-| peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
 | dataset_preprocess_config | Optional[Union[TorchTuneInstructDataset, TorchTuneChatDataset, TorchTuneMultimodalDataset]] | Configuration for dataset preprocessing. |
+| dtype | Optional[DataType] | The underlying data type used to represent the model and optimizer parameters. Currently, we only support `bf16` and `fp32`. |
+| epochs | Optional[int] | The number of times the entire dataset is processed during training. |
+| loss | Optional[Loss] | The loss algorithm we use to fine-tune the LLM, e.g. `torchtune.modules.loss.CEWithChunkedOutputLoss` |
 | num_nodes | Optional[int] | The number of PyTorch Nodes in training |
-| resource_per_node | Optional[Dict] | The resource for each PyTorch Node |
+| peft_config | Optional[Union[LoraConfig]] | Configuration for the PEFT(Parameter-Efficient Fine-Tuning), including LoRA/QLoRA/DoRA, etc. |
+| resources_per_node | Optional[Dict] | The resource for each PyTorch Node |
 
 ```python
 # Loss function for the TorchTune LLM Trainer.
@@ -296,8 +303,8 @@ In that case, we plan to design `Runtime` dataclass as the following:
 | Fields | Type | What is it? |
 | - | - | - |
 | name | str | The name of TrainingRuntime/ClusterTrainingRuntime. |
-| trainer_type | str | The training method of this runtime, chosen from `custom-trainer`, `builtin-trainer`. |
 | pretrained_model | Optional[str] | The pretrained model specified for this runtime, e.g. `llama3.1-8B`. |
+| trainer_type | str | The training method of this runtime, chosen from `custom-trainer`, `builtin-trainer`. |
 
 
 ```python
@@ -313,11 +320,11 @@ class Runtime:
 `Trainer` dataclass:
 
 | Fields | Type | What is it? |
-| trainer_type | TrainerType | Selected from CustomTrainer and BuiltinTrainer. |
-| framework | Framework | The ML framework used for training, e.g. `torch`, `torchtune`. |
-| entrypoint | Optional[List[str]] | Entrypoint for the trainer node. |
 | accelerator | str | The type of devices, e.g. `nvidia.com/gpu`. |
 | accelerator_count | Union[str, float, int] | The number of devices. |
+| entrypoint | Optional[List[str]] | Entrypoint for the trainer node. |
+| framework | Framework | The ML framework used for training, e.g. `torch`, `torchtune`. |
+| trainer_type | TrainerType | Selected from CustomTrainer and BuiltinTrainer. |
 
 ```python
 class TrainerType(Enum):
