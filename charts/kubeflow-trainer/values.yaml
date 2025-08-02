@@ -30,19 +30,6 @@ jobset:
   install: true
   # -- String to fully override jobset release name.
   fullnameOverride: jobset
-  controller:
-    # -- Security context of the jobset controller container.
-    securityContext:
-      allowPrivilegeEscalation: false
-      readOnlyRootFilesystem: true
-      capabilities:
-        drop:
-          - ALL
-    # -- Security context of the jobset controller pods.
-    podSecurityContext:
-      runAsNonRoot: true
-      seccompProfile:
-        type: RuntimeDefault
 
 # -- Common labels to add to the resources.
 commonLabels: {}
