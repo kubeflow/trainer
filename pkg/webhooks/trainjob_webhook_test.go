@@ -58,6 +58,18 @@ func TestValidateCreate(t *testing.T) {
 			},
 			wantWarnings: nil,
 		},
+        "trainjob name exceeds 63 characters": {
+            obj: testingutil.MakeTrainJobWrapper("default", "this-name-is-way-too-long-for-a-rfc1035-label-and-should-fail-validation").
+                RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+                Obj(),
+            wantError: field.ErrorList{
+                &field.Error{
+                    Type:     field.ErrorTypeInvalid,
+                    Field:    "metadata.name",
+                    BadValue: "this-name-is-way-too-long-for-a-rfc1035-label-and-should-fail-validation"                },
+            },
+            wantWarnings: nil,
+         },
 		"unsupported runtime": {
 			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "unsupported-runtime").
