@@ -54,10 +54,8 @@ func (w *TrainJobWebhook) ValidateCreate(ctx context.Context, obj apiruntime.Obj
 
 	allErrs := field.ErrorList{}
 
-	// Check RFC 1035 name validation errors
-	for _, err := range validation.IsDNS1035Label(trainJob.Name) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), trainJob.Name, err))
-	}
+	// Validate TrainJob name (RFC 1035 compliance)
+    allErrs = append(allErrs, validateTrainJobNameRFC1035(trainJob.Name)...)
 
 	runtimeRefGK := runtime.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := w.runtimes[runtimeRefGK]
@@ -84,4 +82,18 @@ func (w *TrainJobWebhook) ValidateUpdate(ctx context.Context, oldObj apiruntime.
 
 func (w *TrainJobWebhook) ValidateDelete(context.Context, apiruntime.Object) (admission.Warnings, error) {
 	return nil, nil
+}
+
+// validateTrainJobNameRFC1035 checks if the name is compliant with RFC 1035 label requirements
+func validateTrainJobNameRFC1035(name string) field.ErrorList {
+	var allErrs field.ErrorList
+	namePath := field.NewPath("metadata", "name")
+
+	for _, err := range validation.IsDNS1035Label(name) {
+		allErrs = append(allErrs, field.Invalid(namePath, name, err))
+	}
+	if len(name) > 63 {
+		allErrs = append(allErrs, field.Invalid(namePath, name, "must be no more than 63 characters"))
+	}
+	return allErrs
 }
