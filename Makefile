@@ -175,8 +175,16 @@ test-python-integration: ## Run Python integration test.
 	PYTHONPATH=$(PROJECT_DIR) pytest ./test/integration/initializers
 
 .PHONY: test-e2e-setup-cluster
-test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.
+test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test
 	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
+
+.PHONY: test-e2e-setup-gpu-cluster
+test-e2e-setup-cluster: kind ## Setup Kind cluster with GPU for e2e test.
+	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-gpu-cluster.sh
+
+.PHONY: test-e2e-delete-cluster
+test-e2e-delete-gpu cluster: kind ## Delete Kind cluster after e2e test.
+	./hack/e2e-delete-gpu-cluster.sh
 
 .PHONY: test-e2e
 test-e2e: ginkgo ## Run Go e2e test.
