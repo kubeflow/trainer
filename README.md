@@ -15,11 +15,11 @@ Latest News 🔥
 
 - [2025/07] PyTorch on Kubernetes: Kubeflow Trainer Joins the PyTorch Ecosystem. Find the
   announcement in [the PyTorch blog post](https://pytorch.org/blog/pytorch-on-kubernetes-kubeflow-trainer-joins-the-pytorch-ecosystem/).
-- [2025/07] Kubeflow Trainer v2.0 has been releases. Check out
+- [2025/07] Kubeflow Trainer v2.0 has been officially released. Check out
   [the blog post announcement](https://blog.kubeflow.org/trainer/intro/) and [the
   release notes](https://github.com/kubeflow/trainer/releases/tag/v2.0.0).
 - [2025/04] From High Performance Computing To AI Workloads on Kubernetes: MPI Runtime in
-  Kubeflow TrainJob. See the [KubeCon + CloudNativeCon talk](https://youtu.be/Fnb1a5Kaxgo)
+  Kubeflow TrainJob. See the [KubeCon + CloudNativeCon London talk](https://youtu.be/Fnb1a5Kaxgo)
 
 <details>
 <summary>More</summary>
