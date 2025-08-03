@@ -43,7 +43,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
-	webhooks "github.com/kubeflow/trainer/v2/pkg/webhooks"
+	"github.com/kubeflow/trainer/v2/pkg/webhooks"
 )
 
 const (

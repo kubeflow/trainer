@@ -60,13 +60,25 @@ func NewFilteredTrainJobInformer(client versioned.Interface, namespace string, r
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TrainerV1alpha1().TrainJobs(namespace).List(context.TODO(), options)
+				return client.TrainerV1alpha1().TrainJobs(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.TrainerV1alpha1().TrainJobs(namespace).Watch(context.TODO(), options)
+				return client.TrainerV1alpha1().TrainJobs(namespace).Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TrainerV1alpha1().TrainJobs(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.TrainerV1alpha1().TrainJobs(namespace).Watch(ctx, options)
 			},
 		},
 		&apistrainerv1alpha1.TrainJob{},

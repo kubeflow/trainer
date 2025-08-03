@@ -2,6 +2,8 @@ apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: torchtune-llama3.2-3b
+  labels:
+    trainer.kubeflow.org/framework: torchtune
 spec:
   mlPolicy:
     numNodes: 1

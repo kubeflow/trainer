@@ -2,6 +2,8 @@ apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: mlx-distributed
+  labels:
+    trainer.kubeflow.org/framework: mlx
 spec:
   mlPolicy:
     numNodes: 1
@@ -32,20 +34,6 @@ spec:
                       image: ghcr.io/kubeflow/trainer/mlx-runtime
                       securityContext:
                         runAsUser: 1000
-                      command:
-                        - mpirun
-                        - -n
-                        - "1"
-                        - bash
-                        - -c
-                        - |
-                          echo "MLX Distributed Runtime"
-
-                          echo "--------------------------------------"
-                          set -e
-                          mpirun --version
-                          python --version
-                          pip list
         - name: node
           template:
             spec:

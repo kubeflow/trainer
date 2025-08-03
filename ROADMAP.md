@@ -1,4 +1,34 @@
-# Roadmap
+# Kubeflow Trainer ROADMAP
+
+## 2025
+
+- Kubeflow Trainer v2 general availability: https://github.com/kubeflow/trainer/issues/2170
+- Local execution for Kubeflow Python SDK: https://github.com/kubeflow/sdk/issues/22
+- Distributed in-memory data cache powered by Apache Arrow and Apache DataFusion: https://github.com/kubeflow/trainer/issues/2655
+- `BuiltinTrainers` for LLMs Fine-Tuning
+  - TorchTune support: https://github.com/kubeflow/trainer/issues/2401
+  - Explore other libraries for fine-tuning like [Unsloth](https://github.com/unslothai/unsloth), [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory), [HuggingFace TRL](https://github.com/huggingface/trl): https://github.com/kubeflow/trainer/issues/2752
+  - Design extensible architecture for `BuiltinTrainers`
+- Training Runtime support
+  - PyTorch: https://github.com/kubeflow/trainer/issues/2211
+  - DeepSpeed: https://github.com/kubeflow/trainer/issues/2517
+  - MLX: https://github.com/kubeflow/trainer/issues/2047
+  - JAX: https://github.com/kubeflow/trainer/issues/2442
+- Elastic PyTorch training jobs: https://github.com/kubernetes-sigs/jobset/issues/463
+- Gang-scheduling capability for TrainJob
+  - Coscheduling: https://github.com/kubeflow/trainer/pull/2248
+  - Kueue: https://github.com/kubernetes-sigs/kueue/issues/5719
+  - Volcano: https://github.com/kubeflow/trainer/issues/2671
+  - KAI Scheduler: https://github.com/kubeflow/trainer/issues/2628
+- Multi-cluster TrainJob dispatching with [Multi-Kueue](https://kueue.sigs.k8s.io/docs/concepts/multikueue/).
+- Topology aware scheduling with [Kueue](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling/).
+- Implement registration mechanism in the Pipeline Framework to extend plugins and supported ML
+  frameworks in the Kubeflow Trainer: https://github.com/kubeflow/trainer/issues/2750
+- Enhanced MPI orchestration with SSH-based node communication: https://github.com/kubeflow/trainer/issues/2751
+- GPU testing infrastructure: https://github.com/kubeflow/trainer/issues/2432
+- Automation checkpointing for GPU-accelerated TrainJobs: https://github.com/kubeflow/trainer/issues/2245
+- Automation of Kubeflow Trainer releases: https://github.com/kubeflow/trainer/issues/2155
+- Kubeflow Trainer UI and TrainJob History Server: https://github.com/kubeflow/trainer/issues/2648
 
 ## 2023/2024
 
