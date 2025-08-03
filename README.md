@@ -1,14 +1,30 @@
 # Kubeflow Trainer
 
-[![Build Status](https://github.com/kubeflow/trainer/actions/workflows/test-go.yaml/badge.svg?branch=master)](https://github.com/kubeflow/trainer/actions/workflows/test-go.yaml?branch=master)
+[![Join Slack](https://img.shields.io/badge/Join_Slack-blue?logo=slack)](https://www.kubeflow.org/docs/about/community/#kubeflow-slack-channels)
 [![Coverage Status](https://coveralls.io/repos/github/kubeflow/trainer/badge.svg?branch=master)](https://coveralls.io/github/kubeflow/trainer?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubeflow/trainer)](https://goreportcard.com/report/github.com/kubeflow/trainer)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10435/badge)](https://www.bestpractices.dev/projects/10435)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kubeflow/trainer)
 
 <h1 align="center">
     <img src="./docs/images/trainer-logo.svg" alt="logo" width="200">
   <br>
 </h1>
+
+Latest News 🔥
+
+- [2025/07] PyTorch on Kubernetes: Kubeflow Trainer Joins the PyTorch Ecosystem. Find the
+  announcement in [the PyTorch blog post](https://pytorch.org/blog/pytorch-on-kubernetes-kubeflow-trainer-joins-the-pytorch-ecosystem/).
+- [2025/07] Kubeflow Trainer v2.0 has been releases. Check out
+  [the blog post announcement](https://blog.kubeflow.org/trainer/intro/) and [the
+  release notes](https://github.com/kubeflow/trainer/releases/tag/v2.0.0).
+- [2025/04] From High Performance Computing To AI Workloads on Kubernetes: MPI Runtime in
+  Kubeflow TrainJob. See the [KubeCon + CloudNativeCon talk](https://youtu.be/Fnb1a5Kaxgo)
+
+<details>
+<summary>More</summary>
+
+</details>
 
 ## Overview
 
@@ -37,7 +53,7 @@ The following KubeCon + CloudNativeCon 2024 talk provides an overview of Kubeflo
 
 ## Getting Started
 
-Please check [the official Kubeflow documentation](https://www.kubeflow.org/docs/components/trainer/getting-started)
+Please check [the official Kubeflow Trainer documentation](https://www.kubeflow.org/docs/components/trainer/getting-started)
 to install and get started with Kubeflow Trainer.
 
 ## Community
