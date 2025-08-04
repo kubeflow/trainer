@@ -21,11 +21,6 @@ Latest News 🔥
 - [2025/04] From High Performance Computing To AI Workloads on Kubernetes: MPI Runtime in
   Kubeflow TrainJob. See the [KubeCon + CloudNativeCon London talk](https://youtu.be/Fnb1a5Kaxgo)
 
-<details>
-<summary>More</summary>
-
-</details>
-
 ## Overview
 
 Kubeflow Trainer is a Kubernetes-native project designed for large language models (LLMs)
@@ -34,7 +29,7 @@ various frameworks, including PyTorch, JAX, TensorFlow, and others.
 
 You can integrate other ML libraries such as [HuggingFace](https://huggingface.co),
 [DeepSpeed](https://github.com/microsoft/DeepSpeed), or [Megatron-LM](https://github.com/NVIDIA/Megatron-LM)
-with Kubeflow Training to orchestrate their ML training on Kubernetes.
+with Kubeflow Trainer to run them on Kubernetes.
 
 Kubeflow Trainer enables you to effortlessly develop your LLMs with the
 [Kubeflow Python SDK](https://github.com/kubeflow/sdk/), and build Kubernetes-native Training
