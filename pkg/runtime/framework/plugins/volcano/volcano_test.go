@@ -3,18 +3,21 @@ package volcano
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
-	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,45 +37,69 @@ func (f FieldIndexerFunc) IndexField(ctx context.Context, obj client.Object, fie
 
 func TestNewVolcano(t *testing.T) {
 	scheme := apiruntime.NewScheme()
-	require.NoError(t, trainer.AddToScheme(scheme))
+	if err := trainer.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add trainer scheme: %v", err)
+	}
 
-	// Case 1: Success case, no error in indexer
-	called := map[string]bool{}
-	indexer := FieldIndexerFunc(func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
-		called[field] = true
-		return nil
-	})
+	cases := map[string]struct {
+		indexerFunc     FieldIndexerFunc
+		expectErr       string
+		expectCalledSet map[string]bool
+	}{
+		"successfully registers all indexers": {
+			indexerFunc: func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
+				return nil
+			},
+			expectErr: "",
+			expectCalledSet: map[string]bool{
+				TrainingRuntimeContainerRuntimeClassKey:        true,
+				ClusterTrainingRuntimeContainerRuntimeClassKey: true,
+			},
+		},
+		"training runtime indexer fails": {
+			indexerFunc: func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
+				if field == TrainingRuntimeContainerRuntimeClassKey {
+					return fmt.Errorf("test error")
+				}
+				return nil
+			},
+			expectErr: "setting index on runtimeClass for TrainingRuntime: test error",
+		},
+		"cluster training runtime indexer fails": {
+			indexerFunc: func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
+				if field == ClusterTrainingRuntimeContainerRuntimeClassKey {
+					return fmt.Errorf("test error")
+				}
+				return nil
+			},
+			expectErr: "setting index on runtimeClass for ClusterTrainingRuntime: test error",
+		},
+	}
 
-	plugin, err := New(context.Background(), fake.NewClientBuilder().WithScheme(scheme).Build(), indexer)
-	require.NoError(t, err)
-	require.IsType(t, &Volcano{}, plugin)
+	for name, tc := range cases {
+		called := map[string]bool{}
+		wrappedIndexer := FieldIndexerFunc(func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
+			called[field] = true
+			return tc.indexerFunc(ctx, obj, field, fn)
+		})
 
-	require.True(t, called[TrainingRuntimeContainerRuntimeClassKey], "TrainingRuntime index should be registered")
-	require.True(t, called[ClusterTrainingRuntimeContainerRuntimeClassKey], "ClusterTrainingRuntime index should be registered")
+		_, err := New(context.Background(), fake.NewClientBuilder().WithScheme(scheme).Build(), wrappedIndexer)
 
-	// Case 2: Simulate error in IndexField for TrainingRuntime
-	indexerWithError := FieldIndexerFunc(func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
-		if field == TrainingRuntimeContainerRuntimeClassKey {
-			return fmt.Errorf("test error")
+		gotErrStr := ""
+		if err != nil {
+			gotErrStr = err.Error()
 		}
-		return nil
-	})
 
-	plugin, err = New(context.Background(), fake.NewClientBuilder().WithScheme(scheme).Build(), indexerWithError)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "test error", "Error should contain the simulated error message")
-
-	// Case 3: Simulate error in IndexField for ClusterTrainingRuntime
-	indexerWithError = FieldIndexerFunc(func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
-		if field == ClusterTrainingRuntimeContainerRuntimeClassKey {
-			return fmt.Errorf("test error")
+		if diff := cmp.Diff(tc.expectErr, gotErrStr); diff != "" {
+			t.Errorf("%s: unexpected error (-want +got):\n%s", name, diff)
 		}
-		return nil
-	})
 
-	plugin, err = New(context.Background(), fake.NewClientBuilder().WithScheme(scheme).Build(), indexerWithError)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "test error", "Error should contain the simulated error message")
+		if tc.expectCalledSet != nil {
+			if diff := cmp.Diff(tc.expectCalledSet, called); diff != "" {
+				t.Errorf("%s: indexer calls mismatch (-want +got):\n%s", name, diff)
+			}
+		}
+	}
 }
 
 func TestName(t *testing.T) {
@@ -108,11 +135,16 @@ func TestEnforcePodGroupPolicy(t *testing.T) {
 	}
 
 	got := info.Scheduler.PodLabels[volcanov1beta1.VolcanoGroupNameAnnotationKey]
-	require.Equal(t, jobName, got, "PodGroup label should match the train job name")
+	want := jobName
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected PodLabel (-want +got):\n%s", diff)
+	}
 
 	// Test with nil info
 	err = v.EnforcePodGroupPolicy(nil, trainJob)
-	require.Nil(t, err, "should return nil when info is nil")
+	if err != nil {
+		t.Errorf("expected nil error when info is nil, got: %v", err)
+	}
 }
 
 type errorClient struct {
@@ -128,14 +160,13 @@ func (e *errorClient) Get(ctx context.Context, key client.ObjectKey, obj client.
 }
 
 func TestBuildPodGroup(t *testing.T) {
-	// Test with nil info
-	v := &Volcano{}
-	res, _ := v.Build(context.Background(), nil, &trainer.TrainJob{})
-	require.Nil(t, res, "should return nil when info is nil")
-
 	scheme := apiruntime.NewScheme()
-	require.NoError(t, trainer.AddToScheme(scheme))
-	require.NoError(t, volcanov1beta1.AddToScheme(scheme))
+	if err := trainer.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add trainer scheme: %v", err)
+	}
+	if err := volcanov1beta1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add volcano scheme: %v", err)
+	}
 
 	ctx := context.Background()
 
@@ -191,16 +222,21 @@ func TestBuildPodGroup(t *testing.T) {
 		}
 	}
 
-	cases := []struct {
-		testName   string
+	cases := map[string]struct {
 		trainJob   *trainer.TrainJob
 		info       *runtime.Info
 		existingPG client.Object
 		expectPG   *v1beta1.PodGroupApplyConfiguration
 		expectErr  error
 	}{
-		{
-			testName: "PodGroup exists and trainjob not suspended",
+		"Test nil info": {
+			trainJob:   &trainer.TrainJob{},
+			info:       nil,
+			existingPG: nil,
+			expectPG:   nil,
+			expectErr:  nil,
+		},
+		"PodGroup exists and trainjob not suspended": {
 			trainJob: &trainer.TrainJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "job-exist-running", Namespace: "test-ns", UID: "1"},
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
@@ -221,8 +257,7 @@ func TestBuildPodGroup(t *testing.T) {
 			expectPG:  nil,
 			expectErr: nil,
 		},
-		{
-			testName: "PodGroup exists but trainjob suspended",
+		"PodGroup exists but trainjob suspended": {
 			trainJob: &trainer.TrainJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "job-update", Namespace: "test-ns", UID: "2"},
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(true)},
@@ -247,6 +282,13 @@ func TestBuildPodGroup(t *testing.T) {
 			},
 			existingPG: &volcanov1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "job-update", Namespace: "test-ns"}},
 			expectPG: volcanov1beta1ac.PodGroup("job-update", "test-ns").
+				WithOwnerReferences(metav1ac.OwnerReference().
+					WithAPIVersion(trainer.GroupVersion.String()).
+					WithKind(trainer.TrainJobKind).
+					WithName("job-update").
+					WithUID(types.UID(strconv.Itoa(2))).
+					WithController(true).
+					WithBlockOwnerDeletion(true)).
 				WithSpec(volcanov1beta1ac.PodGroupSpec().
 					WithMinMember(5).
 					WithMinResources(corev1.ResourceList{
@@ -261,8 +303,7 @@ func TestBuildPodGroup(t *testing.T) {
 					})),
 			expectErr: nil,
 		},
-		{
-			testName: "Error when getting existing PodGroup",
+		"Error when getting existing PodGroup": {
 			trainJob: &trainer.TrainJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "job-error", Namespace: "test-ns", UID: "3"},
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
@@ -283,8 +324,8 @@ func TestBuildPodGroup(t *testing.T) {
 		},
 	}
 
-	for _, c := range cases {
-		t.Run(c.testName, func(t *testing.T) {
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
 			clientBuilder := fake.NewClientBuilder().WithScheme(scheme)
 			// fake for get existing PodGroup
 			if c.existingPG != nil {
@@ -293,10 +334,10 @@ func TestBuildPodGroup(t *testing.T) {
 			client_ := clientBuilder.Build()
 
 			// fake for error handling
-			if c.testName == "Error when getting existing PodGroup" {
+			if name == "Error when getting existing PodGroup" {
 				client_ = &errorClient{WithWatch: client_, errNotFound: true}
 			}
-			if c.testName == "PodGroup exists but trainjob suspended" {
+			if name == "PodGroup exists but trainjob suspended" {
 				client_ = &errorClient{WithWatch: client_, errNotFound: false}
 			}
 
@@ -308,38 +349,47 @@ func TestBuildPodGroup(t *testing.T) {
 			objs, err := v.Build(ctx, c.info, c.trainJob)
 
 			if c.expectErr != nil {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("expected error: %v, got nil", c.expectErr)
+				}
+				if diff := cmp.Diff(c.expectErr.Error(), err.Error()); diff != "" {
+					t.Errorf("unexpected error (-want +got):\n%s", diff)
+				}
 				return
 			}
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
 			if c.expectPG == nil {
-				require.Nil(t, objs)
+				if objs != nil {
+					t.Errorf("expected nil result, got: %+v", objs)
+				}
 				return
 			}
-			require.NotNil(t, objs)
-			require.Len(t, objs, 1)
 
-			actualPodGroup, ok := objs[0].(*v1beta1.PodGroupApplyConfiguration)
+			if len(objs) != 1 {
+				t.Fatalf("expected 1 object, got %d", len(objs))
+			}
+			actualPG, ok := objs[0].(*v1beta1.PodGroupApplyConfiguration)
 			if !ok {
 				t.Fatalf("expected PodGroupApplyConfiguration, got %T", objs[0])
 			}
-			require.Equal(t, c.expectPG.Name, actualPodGroup.Name, "PodGroup name should match")
-			require.Equal(t, c.expectPG.Namespace, actualPodGroup.Namespace, "PodGroup namespace should match")
-			require.Equal(t, c.expectPG.Spec.Queue, actualPodGroup.Spec.Queue, "Queue should match")
-			require.Equal(t, c.expectPG.Spec.PriorityClassName, actualPodGroup.Spec.PriorityClassName, "PriorityClassName should match")
-			require.Equal(t, c.expectPG.Spec.MinMember, actualPodGroup.Spec.MinMember, "MinMember should match")
-			for k, v := range *c.expectPG.Spec.MinResources {
-				actualValue := (*actualPodGroup.Spec.MinResources)[k]
-				require.Equal(t, v.String(), actualValue.String(), "MinResources for %s should match", k)
+
+			if diff := cmp.Diff(c.expectPG, actualPG); diff != "" {
+				t.Errorf("mismatch in PodGroup (-want +got):\n%s", diff)
 			}
 		})
 	}
 }
 func TestReconcilerBuilders(t *testing.T) {
 	scheme := apiruntime.NewScheme()
-	require.NoError(t, trainer.AddToScheme(scheme))
-	require.NoError(t, volcanov1beta1.AddToScheme(scheme))
+	if err := trainer.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add trainer scheme: %v", err)
+	}
+	if err := volcanov1beta1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add volcano scheme: %v", err)
+	}
 
 	v := &Volcano{
 		scheme:     scheme,
@@ -347,12 +397,16 @@ func TestReconcilerBuilders(t *testing.T) {
 	}
 
 	builders := v.ReconcilerBuilders()
-	require.Len(t, builders, 1, "should return one builder function")
+	if diff := cmp.Diff(1, len(builders)); diff != "" {
+		t.Errorf("unexpected builder count (-want +got):\n%s", diff)
+	}
 
-	// We just check that the builder returns without panic
 	b := &builder.Builder{}
 	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	b = builders[0](b, cl, nil) // cache is not used in this test
-	require.NotNil(t, b, "builder should not be nil after applying the reconciler builder function")
+	// Ensure builder function does not return nil
+	b2 := builders[0](b, cl, nil)
+	if b2 == nil {
+		t.Errorf("builder should not be nil after applying reconciler builder function")
+	}
 }

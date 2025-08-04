@@ -23,6 +23,7 @@ require (
 	sigs.k8s.io/kind v0.29.0
 	sigs.k8s.io/scheduler-plugins v0.30.6
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0
+	volcano.sh/apis v1.12.1
 )
 
 require (
