@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/stretchr/testify/require"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -17,6 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 	"volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
 	volcanov1beta1ac "volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
@@ -135,9 +139,36 @@ func TestBuildPodGroup(t *testing.T) {
 
 	ctx := context.Background()
 
+	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: jobsetv1alpha2.GroupVersion.String(),
+			Kind:       "JobSet",
+		},
+		Spec: jobsetv1alpha2.JobSetSpec{
+			ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+				{
+					Name: "launcher",
+					Template: batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: corev1.PodTemplateSpec{
+								Spec: corev1.PodSpec{
+									PriorityClassName: "high-priority",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}, "spec")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	baseInfo := func() *runtime.Info {
 		return &runtime.Info{
 			TemplateSpec: runtime.TemplateSpec{
+				ObjApply: jobSetSpecApply,
 				PodSets: []runtime.PodSet{
 					{
 						Name:  "launcher",
@@ -179,9 +210,7 @@ func TestBuildPodGroup(t *testing.T) {
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
-							Volcano: &trainer.VolcanoPodGroupPolicySource{
-								Queue: ptr.To("q1"),
-							},
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
 						},
 					},
 				},
@@ -200,12 +229,13 @@ func TestBuildPodGroup(t *testing.T) {
 			},
 			info: &runtime.Info{
 				TemplateSpec: baseInfo().TemplateSpec,
+				Annotations: map[string]string{
+					"scheduling.volcano.sh/queue-name": "q1",
+				},
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
 							Volcano: &trainer.VolcanoPodGroupPolicySource{
-								Queue:             ptr.To("q1"),
-								PriorityClassName: ptr.To("high-priority"),
 								NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
 									Mode:               volcanov1beta1.HardNetworkTopologyMode,
 									HighestTierAllowed: ptr.To(1),

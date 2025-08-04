@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 	volcanov1beta1ac "volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
 )
@@ -111,14 +112,25 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 			WithMinMember(totalMembers).
 			WithMinResources(totalResources))
 
-	// Set Volcano-specific fields only if explicitly configured.
-	// Volcano uses default values when unset (nil),
-	if volcanoSpec.Queue != nil {
-		pg.Spec.WithQueue(*volcanoSpec.Queue)
+	// Configure queue via annotations `scheduling.volcano.sh/queue-name`.
+	// The field is initially set in TrainingRuntime, but can be overridden by the TrainJob.
+	if queue, ok := info.Annotations[volcanov1beta1.QueueNameAnnotationKey]; ok {
+		pg.Spec.WithQueue(queue)
 	}
-	if volcanoSpec.PriorityClassName != nil {
-		pg.Spec.WithPriorityClassName(*volcanoSpec.PriorityClassName)
+
+	// Configure priorityClassName from the Pod template
+	jobSetSpec, ok := runtime.TemplateSpecApply[v1alpha2.JobSetSpecApplyConfiguration](info)
+	if ok && jobSetSpec != nil {
+		for _, rj := range jobSetSpec.ReplicatedJobs {
+			if rj.Template != nil && rj.Template.Spec != nil && rj.Template.Spec.Template != nil && rj.Template.Spec.Template.Spec != nil {
+				priorityClassName := rj.Template.Spec.Template.Spec.PriorityClassName
+				if priorityClassName != nil {
+					pg.Spec.WithPriorityClassName(*priorityClassName)
+				}
+			}
+		}
 	}
+
 	if volcanoSpec.NetworkTopology != nil {
 		pg.Spec.WithNetworkTopology(volcanov1beta1ac.NetworkTopologySpec().
 			WithMode(volcanoSpec.NetworkTopology.Mode).

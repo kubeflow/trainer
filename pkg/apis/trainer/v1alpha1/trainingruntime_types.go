@@ -151,16 +151,6 @@ type CoschedulingPodGroupPolicySource struct {
 
 // VolcanoPodGroupPolicySource represents configuration for the Volcano gang-scheduler.
 type VolcanoPodGroupPolicySource struct {
-	// Queue is the name of the Volcano queue to which the PodGroup will be submitted.
-	// Defaults to the “default” queue, which has the lowest weight.
-	// +kubebuilder:default=default
-	Queue *string `json:"queue,omitempty"`
-
-	// PriorityClassName is the name of the Kubernetes PriorityClass to use for the PodGroup.
-	// e.g. system-node-critical, system-cluster-critical.
-	// This field is optional.
-	PriorityClassName *string `json:"priorityClassName,omitempty"`
-
 	// NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.
 	// +kubebuilder:validation:EmbeddedResource
 	// +kubebuilder:pruning:PreserveUnknownFields
