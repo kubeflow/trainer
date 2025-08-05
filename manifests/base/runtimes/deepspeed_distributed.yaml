@@ -8,9 +8,7 @@ spec:
   mlPolicy:
     numNodes: 1
     mpi:
-      # TODO (andreyvelich): Change num proc to 1 and remove container resources after we
-      # allow to override it via TrainJob APIs.
-      numProcPerNode: 4
+      numProcPerNode: 1
       mpiImplementation: OpenMPI
       sshAuthMountPath: /home/mpiuser/.ssh
       runLauncherAsNode: true
