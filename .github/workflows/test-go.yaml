@@ -67,6 +67,11 @@ jobs:
       - name: Run Go unit tests
         run: |
           make test
+          # This hack is required for Coveralls to correctly render report.
+          sed -i 's|github.com/kubeflow/trainer/v2/|github.com/kubeflow/trainer/|g' cover.out
+          sed -i 's|^module github.com/kubeflow/trainer/v2|module github.com/kubeflow/trainer|' go.mod
+          head -n 10 cover.out
+          cat go.mod
 
       - name: Run Go integration tests
         run: |

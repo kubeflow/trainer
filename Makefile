@@ -153,7 +153,6 @@ endif
 .PHONY: test
 test: ## Run Go unit test.
 	go test $(shell go list ./... | grep -Ev '/(test|cmd|hack|pkg/apis|pkg/client|pkg/util/testing)') -coverprofile cover.out
-# 	sed -i.bak 's|github.com/kubeflow/trainer/v2/|github.com/kubeflow/trainer/|g' cover.out && rm cover.out.bak
 
 .PHONY: test-integration
 test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd ## Run Go integration test.
