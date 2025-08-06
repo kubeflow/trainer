@@ -5,7 +5,7 @@ requires-python = ">=3.9"
 authors = [
   { name = "The Kubeflow Authors", email = "kubeflow-discuss@googlegroups.com" },
 ]
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
 description = "Kubeflow Trainer API models for Kubernetes resources to interact with Kubeflow APIs."
 readme = "README.md"
 keywords = ["kubeflow", "trainer", "model training", "llm", "ai", "api"]
