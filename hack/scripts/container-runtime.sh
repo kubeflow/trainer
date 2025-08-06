@@ -18,10 +18,10 @@
 
 # Detect available container runtime (Docker or Podman)
 detect_container_runtime() {
-  if command -v docker &> /dev/null; then
-    echo "docker"
-  elif command -v podman &> /dev/null; then
+  if command -v podman &> /dev/null; then
     echo "podman"
+  elif command -v docker &> /dev/null; then
+    echo "docker"
   else
     echo "Error: Neither docker nor podman found" >&2
     exit 1
