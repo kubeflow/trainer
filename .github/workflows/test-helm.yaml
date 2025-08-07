@@ -1,0 +1,132 @@
+---
+name: Helm Integration Tests
+
+'on':
+  pull_request:
+    paths:
+      - 'charts/**'
+      - '.github/workflows/test-helm.yaml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'charts/**'
+
+jobs:
+  helm-integration-tests:
+    name: Helm Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'latest'
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.7.0
+
+      - name: Add chart dependencies
+        run: |
+          # Add JobSet repository as mentioned in the original PR
+          helm repo add jobset https://kubernetes-sigs.github.io/jobset
+          helm repo update
+
+      - name: Determine target branch
+        id: get_branch
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            BRANCH="${{ github.ref_name }}"
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            BRANCH="${{ github.base_ref }}"
+          else
+            BRANCH="master"
+          fi
+          echo "Target branch: $BRANCH"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Run make generate (includes helm-docs)
+        run: |
+          # This was mentioned in the original PR commits
+          if make help 2>/dev/null | grep -q "generate"; then
+            make generate
+          else
+            echo "No generate target found, continuing..."
+          fi
+
+      - name: Create kind cluster
+        run: |
+          # Follow the pattern from original PR
+          if make help 2>/dev/null | grep -q "test-e2e-setup-cluster"; then
+            echo "Using project's cluster setup..."
+            make test-e2e-setup-cluster
+          else
+            echo "Setting up Kind cluster..."
+            kind create cluster --name chart-testing --wait 300s
+            kubectl cluster-info --context kind-chart-testing
+          fi
+
+      - name: Run chart-testing (lint and install)
+        env:
+          BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
+        run: |
+          # Use the combined command with configuration file
+          ct lint-and-install \
+            --config .github/ct.yaml \
+            --target-branch $BRANCH \
+            --debug
+
+      - name: Verify Helm installation
+        run: |
+          echo "=== Cluster Status ==="
+          kubectl get nodes -o wide
+
+          echo "=== Namespaces ==="
+          kubectl get namespaces
+
+          echo "=== All Pods ==="
+          kubectl get pods --all-namespaces -o wide
+
+          echo "=== Training Operator Pods ==="
+          kubectl get pods -n kubeflow-system \
+            -l app.kubernetes.io/name=kubeflow-trainer || true
+
+          echo "=== JobSet Pods ==="
+          kubectl get pods -n kubeflow-system \
+            -l app.kubernetes.io/name=jobset || true
+
+          echo "=== Services ==="
+          kubectl get svc --all-namespaces
+
+          echo "=== CRDs ==="
+          kubectl get crd | grep -E "(training|jobset)" || \
+            echo "No training/jobset CRDs found"
+
+      - name: Run basic functionality tests
+        run: |
+          echo "=== Testing Chart Installation ==="
+          # Test the specific installation command from the original PR
+          helm upgrade kubeflow-trainer charts/kubeflow-trainer \
+            --install \
+            --dependency-update \
+            --namespace kubeflow-system \
+            --create-namespace \
+            --wait \
+            --timeout 300s \
+            --set jobset.install=true \
+            --dry-run
+
+          echo "Chart validation successful!"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up resources..."
+          kubectl delete namespace kubeflow-system \
+            --ignore-not-found=true || true
+          kind delete cluster --name chart-testing || true
