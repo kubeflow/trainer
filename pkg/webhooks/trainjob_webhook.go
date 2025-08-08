@@ -21,8 +21,6 @@ import (
 	"fmt"
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -52,18 +50,13 @@ func (w *TrainJobWebhook) ValidateCreate(ctx context.Context, obj apiruntime.Obj
 	log := ctrl.LoggerFrom(ctx).WithName("trainJob-webhook")
 	log.V(5).Info("Validating create", "TrainJob", klog.KObj(trainJob))
 
-	allErrs := field.ErrorList{}
-
-	// Validate TrainJob name (RFC 1035 compliance)
-    allErrs = append(allErrs, validateTrainJobNameRFC1035(trainJob.Name)...)
-
 	runtimeRefGK := runtime.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := w.runtimes[runtimeRefGK]
 	if !ok {
 		return nil, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 	}
 	warnings, errors := runtime.ValidateObjects(ctx, nil, trainJob)
-	return warnings, append(allErrs, errors...).ToAggregate()
+	return warnings, errors.ToAggregate()
 }
 
 func (w *TrainJobWebhook) ValidateUpdate(ctx context.Context, oldObj apiruntime.Object, newObj apiruntime.Object) (admission.Warnings, error) {
@@ -82,18 +75,4 @@ func (w *TrainJobWebhook) ValidateUpdate(ctx context.Context, oldObj apiruntime.
 
 func (w *TrainJobWebhook) ValidateDelete(context.Context, apiruntime.Object) (admission.Warnings, error) {
 	return nil, nil
-}
-
-// validateTrainJobNameRFC1035 checks if the name is compliant with RFC 1035 label requirements
-func validateTrainJobNameRFC1035(name string) field.ErrorList {
-	var allErrs field.ErrorList
-	namePath := field.NewPath("metadata", "name")
-
-	for _, err := range validation.IsDNS1035Label(name) {
-		allErrs = append(allErrs, field.Invalid(namePath, name, err))
-	}
-	if len(name) > 63 {
-		allErrs = append(allErrs, field.Invalid(namePath, name, "must be no more than 63 characters"))
-	}
-	return allErrs
 }
