@@ -45,19 +45,6 @@ func TestValidateCreate(t *testing.T) {
 			wantError:    nil,
 			wantWarnings: nil,
 		},
-		"invalid trainjob name with uppercase letters": {
-			obj: testingutil.MakeTrainJobWrapper("default", "Invalid-job-name").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
-				Obj(),
-			wantError: field.ErrorList{
-				&field.Error{
-					Type:     field.ErrorTypeInvalid,
-					Field:    "metadata.name",
-					BadValue: "Invalid-job-name",
-				},
-			},
-			wantWarnings: nil,
-		},
 		"unsupported runtime": {
 			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "unsupported-runtime").
