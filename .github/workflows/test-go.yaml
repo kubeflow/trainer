@@ -77,12 +77,3 @@ jobs:
         with:
           path-to-profile: cover.out
           working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
-          parallel: true
-
-  finish:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: shogo82148/actions-goveralls@v1
-        with:
-          parallel-finished: true

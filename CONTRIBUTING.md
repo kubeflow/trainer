@@ -135,4 +135,4 @@ On ubuntu the default go package appears to be gccgo-go which has problems. It's
 
 Changes to the Kubeflow Trainer Python SDK can be made in the https://github.com/kubeflow/sdk repo.
 
-The Trainer SDK can be found at https://github.com/kubeflow/sdk/tree/main/python/kubeflow/trainer.
+The Trainer SDK can be found at https://github.com/kubeflow/sdk/tree/main/kubeflow/trainer.

@@ -92,16 +92,14 @@ manager:
     #   memory: 300Mi
 
   # -- Security context for manager containers.
-  securityContext: {}
-    # readOnlyRootFilesystem: true
-    # privileged: false
-    # allowPrivilegeEscalation: false
-    # runAsNonRoot: true
-    # capabilities:
-    #   drop:
-    #   - ALL
-    # seccompProfile:
-    #   type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    runAsNonRoot: true
+    capabilities:
+      drop:
+      - ALL
+    seccompProfile:
+      type: RuntimeDefault
 
 webhook:
   # -- Specifies how unrecognized errors are handled.
