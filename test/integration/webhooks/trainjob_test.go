@@ -351,18 +351,22 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						Obj()
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("Should succeed to create trainJob with podSpecOverrides containing duplicate targetJob",
+			ginkgo.Entry("Should succeed to create trainJob with podTemplateOverrides containing duplicate targetJob",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name, "duplicated-podspecoverrides-target-jobs").
 						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
-						PodSpecOverrides([]trainer.PodSpecOverride{
+						PodTemplateOverrides([]trainer.PodTemplateOverride{
 							{
-								TargetJobs:         []trainer.PodSpecOverrideTargetJob{{Name: "node"}},
-								ServiceAccountName: ptr.To("custom-sa"),
+								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
+								Spec: &trainer.PodTemplateSpecOverride{
+									ServiceAccountName: ptr.To("custom-sa"),
+								},
 							},
 							{
-								TargetJobs:         []trainer.PodSpecOverrideTargetJob{{Name: "node"}},
-								ServiceAccountName: ptr.To("custom-sa-two"),
+								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
+								Spec: &trainer.PodTemplateSpecOverride{
+									ServiceAccountName: ptr.To("custom-sa-two"),
+								},
 							},
 						}).
 						Obj()

@@ -115,7 +115,7 @@ type TrainJobSpec struct {
 	// Custom overrides for the training runtime.
 	// When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.
 	// +listType=atomic
-	PodSpecOverrides []PodSpecOverride `json:"podSpecOverrides,omitempty"`
+	PodTemplateOverrides []PodTemplateOverride `json:"podTemplateOverrides,omitempty"`
 
 	// Whether the controller should suspend the running TrainJob.
 	// Defaults to false.
@@ -233,12 +233,28 @@ type Trainer struct {
 	NumProcPerNode *intstr.IntOrString `json:"numProcPerNode,omitempty"`
 }
 
-// PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.
-type PodSpecOverride struct {
+// PodTemplateOverride represents the custom overrides that will be applied for the TrainJob's resources.
+type PodTemplateOverride struct {
 	// TrainJobs is the training job replicas in the training runtime template to apply the overrides.
 	// +listType=atomic
-	TargetJobs []PodSpecOverrideTargetJob `json:"targetJobs"`
+	TargetJobs []PodTemplateOverrideTargetJob `json:"targetJobs"`
 
+	// Override for the Pod template metadata.
+	// These values will be merged with the TrainingRuntime's Pod template metadata.
+	Metadata *metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Override for the Pod template spec.
+	// These values will be merged with the TrainingRuntime's Pod template spec.
+	Spec *PodTemplateSpecOverride `json:"spec,omitempty"`
+}
+
+type PodTemplateOverrideTargetJob struct {
+	// Name is the target training job name for which the PodSpec is overridden.
+	Name string `json:"name"`
+}
+
+// PodTemplateSpecOverride represents the spec overrides for Pod template.
+type PodTemplateSpecOverride struct {
 	// Override for the service account.
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 
@@ -277,11 +293,6 @@ type PodSpecOverride struct {
 	// +listType=map
 	// +listMapKey=name
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-}
-
-type PodSpecOverrideTargetJob struct {
-	// Name is the target training job name for which the PodSpec is overridden.
-	Name string `json:"name"`
 }
 
 // ContainerOverride represents parameters that can be overridden using PodSpecOverrides.

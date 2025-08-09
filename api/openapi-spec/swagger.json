@@ -13931,12 +13931,60 @@
           }
         }
       },
-      "trainer.v1alpha1.PodSpecOverride": {
-        "description": "PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.",
+      "trainer.v1alpha1.PodTemplateOverride": {
+        "description": "PodTemplateOverride represents the custom overrides that will be applied for the TrainJob's resources.",
         "type": "object",
         "required": [
           "targetJobs"
         ],
+        "properties": {
+          "metadata": {
+            "description": "Override for the Pod template metadata. These values will be merged with the TrainingRuntime's Pod template metadata.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "description": "Override for the Pod template spec. These values will be merged with the TrainingRuntime's Pod template spec.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.PodTemplateSpecOverride"
+              }
+            ]
+          },
+          "targetJobs": {
+            "description": "TrainJobs is the training job replicas in the training runtime template to apply the overrides.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.PodTemplateOverrideTargetJob"
+                }
+              ]
+            },
+            "x-kubernetes-list-type": "atomic"
+          }
+        }
+      },
+      "trainer.v1alpha1.PodTemplateOverrideTargetJob": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "description": "Name is the target training job name for which the PodSpec is overridden.",
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
+      "trainer.v1alpha1.PodTemplateSpecOverride": {
+        "description": "PodTemplateSpecOverride represents the spec overrides for Pod template.",
+        "type": "object",
         "properties": {
           "affinity": {
             "description": "Override for the Pod's affinity.",
@@ -14022,19 +14070,6 @@
             "description": "Override for the service account.",
             "type": "string"
           },
-          "targetJobs": {
-            "description": "TrainJobs is the training job replicas in the training runtime template to apply the overrides.",
-            "type": "array",
-            "items": {
-              "default": {},
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/trainer.v1alpha1.PodSpecOverrideTargetJob"
-                }
-              ]
-            },
-            "x-kubernetes-list-type": "atomic"
-          },
           "tolerations": {
             "description": "Override for the Pod's tolerations.",
             "type": "array",
@@ -14063,19 +14098,6 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
-          }
-        }
-      },
-      "trainer.v1alpha1.PodSpecOverrideTargetJob": {
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "properties": {
-          "name": {
-            "description": "Name is the target training job name for which the PodSpec is overridden.",
-            "type": "string",
-            "default": ""
           }
         }
       },
@@ -14271,14 +14293,14 @@
             "description": "ManagedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`",
             "type": "string"
           },
-          "podSpecOverrides": {
+          "podTemplateOverrides": {
             "description": "Custom overrides for the training runtime. When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.",
             "type": "array",
             "items": {
               "default": {},
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/trainer.v1alpha1.PodSpecOverride"
+                  "$ref": "#/components/schemas/trainer.v1alpha1.PodTemplateOverride"
                 }
               ]
             },

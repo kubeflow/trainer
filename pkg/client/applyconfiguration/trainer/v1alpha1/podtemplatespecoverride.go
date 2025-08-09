@@ -21,44 +21,30 @@ import (
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
-// PodSpecOverrideApplyConfiguration represents a declarative configuration of the PodSpecOverride type for use
+// PodTemplateSpecOverrideApplyConfiguration represents a declarative configuration of the PodTemplateSpecOverride type for use
 // with apply.
-type PodSpecOverrideApplyConfiguration struct {
-	TargetJobs         []PodSpecOverrideTargetJobApplyConfiguration `json:"targetJobs,omitempty"`
-	ServiceAccountName *string                                      `json:"serviceAccountName,omitempty"`
-	NodeSelector       map[string]string                            `json:"nodeSelector,omitempty"`
-	Affinity           *v1.Affinity                                 `json:"affinity,omitempty"`
-	Tolerations        []corev1.TolerationApplyConfiguration        `json:"tolerations,omitempty"`
-	Volumes            []corev1.VolumeApplyConfiguration            `json:"volumes,omitempty"`
-	InitContainers     []ContainerOverrideApplyConfiguration        `json:"initContainers,omitempty"`
-	Containers         []ContainerOverrideApplyConfiguration        `json:"containers,omitempty"`
-	SchedulingGates    []v1.PodSchedulingGate                       `json:"schedulingGates,omitempty"`
-	ImagePullSecrets   []v1.LocalObjectReference                    `json:"imagePullSecrets,omitempty"`
+type PodTemplateSpecOverrideApplyConfiguration struct {
+	ServiceAccountName *string                               `json:"serviceAccountName,omitempty"`
+	NodeSelector       map[string]string                     `json:"nodeSelector,omitempty"`
+	Affinity           *v1.Affinity                          `json:"affinity,omitempty"`
+	Tolerations        []corev1.TolerationApplyConfiguration `json:"tolerations,omitempty"`
+	Volumes            []corev1.VolumeApplyConfiguration     `json:"volumes,omitempty"`
+	InitContainers     []ContainerOverrideApplyConfiguration `json:"initContainers,omitempty"`
+	Containers         []ContainerOverrideApplyConfiguration `json:"containers,omitempty"`
+	SchedulingGates    []v1.PodSchedulingGate                `json:"schedulingGates,omitempty"`
+	ImagePullSecrets   []v1.LocalObjectReference             `json:"imagePullSecrets,omitempty"`
 }
 
-// PodSpecOverrideApplyConfiguration constructs a declarative configuration of the PodSpecOverride type for use with
+// PodTemplateSpecOverrideApplyConfiguration constructs a declarative configuration of the PodTemplateSpecOverride type for use with
 // apply.
-func PodSpecOverride() *PodSpecOverrideApplyConfiguration {
-	return &PodSpecOverrideApplyConfiguration{}
-}
-
-// WithTargetJobs adds the given value to the TargetJobs field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the TargetJobs field.
-func (b *PodSpecOverrideApplyConfiguration) WithTargetJobs(values ...*PodSpecOverrideTargetJobApplyConfiguration) *PodSpecOverrideApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithTargetJobs")
-		}
-		b.TargetJobs = append(b.TargetJobs, *values[i])
-	}
-	return b
+func PodTemplateSpecOverride() *PodTemplateSpecOverrideApplyConfiguration {
+	return &PodTemplateSpecOverrideApplyConfiguration{}
 }
 
 // WithServiceAccountName sets the ServiceAccountName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ServiceAccountName field is set to the value of the last call.
-func (b *PodSpecOverrideApplyConfiguration) WithServiceAccountName(value string) *PodSpecOverrideApplyConfiguration {
+func (b *PodTemplateSpecOverrideApplyConfiguration) WithServiceAccountName(value string) *PodTemplateSpecOverrideApplyConfiguration {
 	b.ServiceAccountName = &value
 	return b
 }
@@ -67,7 +53,7 @@ func (b *PodSpecOverrideApplyConfiguration) WithServiceAccountName(value string)
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the NodeSelector field,
 // overwriting an existing map entries in NodeSelector field with the same key.
-func (b *PodSpecOverrideApplyConfiguration) WithNodeSelector(entries map[string]string) *PodSpecOverrideApplyConfiguration {
+func (b *PodTemplateSpecOverrideApplyConfiguration) WithNodeSelector(entries map[string]string) *PodTemplateSpecOverrideApplyConfiguration {
 	if b.NodeSelector == nil && len(entries) > 0 {
 		b.NodeSelector = make(map[string]string, len(entries))
 	}
@@ -80,7 +66,7 @@ func (b *PodSpecOverrideApplyConfiguration) WithNodeSelector(entries map[string]
 // WithAffinity sets the Affinity field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Affinity field is set to the value of the last call.
-func (b *PodSpecOverrideApplyConfiguration) WithAffinity(value v1.Affinity) *PodSpecOverrideApplyConfiguration {
+func (b *PodTemplateSpecOverrideApplyConfiguration) WithAffinity(value v1.Affinity) *PodTemplateSpecOverrideApplyConfiguration {
 	b.Affinity = &value
 	return b
 }
@@ -88,7 +74,7 @@ func (b *PodSpecOverrideApplyConfiguration) WithAffinity(value v1.Affinity) *Pod
 // WithTolerations adds the given value to the Tolerations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Tolerations field.
-func (b *PodSpecOverrideApplyConfiguration) WithTolerations(values ...*corev1.TolerationApplyConfiguration) *PodSpecOverrideApplyConfiguration {
+func (b *PodTemplateSpecOverrideApplyConfiguration) WithTolerations(values ...*corev1.TolerationApplyConfiguration) *PodTemplateSpecOverrideApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithTolerations")
@@ -101,7 +87,7 @@ func (b *PodSpecOverrideApplyConfiguration) WithTolerations(values ...*corev1.To
 // WithVolumes adds the given value to the Volumes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Volumes field.
-func (b *PodSpecOverrideApplyConfiguration) WithVolumes(values ...*corev1.VolumeApplyConfiguration) *PodSpecOverrideApplyConfiguration {
+func (b *PodTemplateSpecOverrideApplyConfiguration) WithVolumes(values ...*corev1.VolumeApplyConfiguration) *PodTemplateSpecOverrideApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithVolumes")
@@ -114,7 +100,7 @@ func (b *PodSpecOverrideApplyConfiguration) WithVolumes(values ...*corev1.Volume
 // WithInitContainers adds the given value to the InitContainers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the InitContainers field.
-func (b *PodSpecOverrideApplyConfiguration) WithInitContainers(values ...*ContainerOverrideApplyConfiguration) *PodSpecOverrideApplyConfiguration {
+func (b *PodTemplateSpecOverrideApplyConfiguration) WithInitContainers(values ...*ContainerOverrideApplyConfiguration) *PodTemplateSpecOverrideApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithInitContainers")
@@ -127,7 +113,7 @@ func (b *PodSpecOverrideApplyConfiguration) WithInitContainers(values ...*Contai
 // WithContainers adds the given value to the Containers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Containers field.
-func (b *PodSpecOverrideApplyConfiguration) WithContainers(values ...*ContainerOverrideApplyConfiguration) *PodSpecOverrideApplyConfiguration {
+func (b *PodTemplateSpecOverrideApplyConfiguration) WithContainers(values ...*ContainerOverrideApplyConfiguration) *PodTemplateSpecOverrideApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithContainers")
@@ -140,7 +126,7 @@ func (b *PodSpecOverrideApplyConfiguration) WithContainers(values ...*ContainerO
 // WithSchedulingGates adds the given value to the SchedulingGates field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the SchedulingGates field.
-func (b *PodSpecOverrideApplyConfiguration) WithSchedulingGates(values ...v1.PodSchedulingGate) *PodSpecOverrideApplyConfiguration {
+func (b *PodTemplateSpecOverrideApplyConfiguration) WithSchedulingGates(values ...v1.PodSchedulingGate) *PodTemplateSpecOverrideApplyConfiguration {
 	for i := range values {
 		b.SchedulingGates = append(b.SchedulingGates, values[i])
 	}
@@ -150,7 +136,7 @@ func (b *PodSpecOverrideApplyConfiguration) WithSchedulingGates(values ...v1.Pod
 // WithImagePullSecrets adds the given value to the ImagePullSecrets field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ImagePullSecrets field.
-func (b *PodSpecOverrideApplyConfiguration) WithImagePullSecrets(values ...v1.LocalObjectReference) *PodSpecOverrideApplyConfiguration {
+func (b *PodTemplateSpecOverrideApplyConfiguration) WithImagePullSecrets(values ...v1.LocalObjectReference) *PodTemplateSpecOverrideApplyConfiguration {
 	for i := range values {
 		b.ImagePullSecrets = append(b.ImagePullSecrets, values[i])
 	}

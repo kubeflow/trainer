@@ -464,6 +464,34 @@ func (j *JobSetWrapper) PodAnnotation(key, value string) *JobSetWrapper {
 	return j
 }
 
+func (j *JobSetWrapper) PodLabelForJobs(key, value string, rJobNames ...string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		for _, rJobName := range rJobNames {
+			if rJob.Name == rJobName {
+				if rJob.Template.Spec.Template.Labels == nil {
+					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Labels = make(map[string]string, 1)
+				}
+				j.Spec.ReplicatedJobs[i].Template.Spec.Template.Labels[key] = value
+			}
+		}
+	}
+	return j
+}
+
+func (j *JobSetWrapper) PodAnnotationForJobs(key, value string, rJobNames ...string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		for _, rJobName := range rJobNames {
+			if rJob.Name == rJobName {
+				if rJob.Template.Spec.Template.Annotations == nil {
+					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Annotations = make(map[string]string, 1)
+				}
+				j.Spec.ReplicatedJobs[i].Template.Spec.Template.Annotations[key] = value
+			}
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) PodPriorityClassName(value string) *JobSetWrapper {
 	for i := range j.Spec.ReplicatedJobs {
 		j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.PriorityClassName = value
@@ -582,8 +610,8 @@ func (t *TrainJobWrapper) Trainer(trainer *trainer.Trainer) *TrainJobWrapper {
 	return t
 }
 
-func (t *TrainJobWrapper) PodSpecOverrides(podSpecOverrides []trainer.PodSpecOverride) *TrainJobWrapper {
-	t.Spec.PodSpecOverrides = podSpecOverrides
+func (t *TrainJobWrapper) PodTemplateOverrides(podTemplateOverrides []trainer.PodTemplateOverride) *TrainJobWrapper {
+	t.Spec.PodTemplateOverrides = podTemplateOverrides
 	return t
 }
 

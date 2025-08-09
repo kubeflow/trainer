@@ -805,7 +805,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 
-			ginkgo.It("Should succeed to create TrainJob with PodSpecOverrides", func() {
+			ginkgo.It("Should succeed to create TrainJob with PodTemplateOverrides", func() {
 				ginkgo.By("Creating Torch TrainingRuntime and TrainJob")
 				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
 					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
@@ -814,21 +814,33 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 							Env([]corev1.EnvVar{{Name: "TRAIN_JOB", Value: "value"}}...).
 							Obj()).
-					PodSpecOverrides([]trainer.PodSpecOverride{
+					PodTemplateOverrides([]trainer.PodTemplateOverride{
 						{
-							TargetJobs:         []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
-							ServiceAccountName: ptr.To("override-sa"),
-							InitContainers: []trainer.ContainerOverride{
-								{
-									Name: "override-init-container",
-									Env: []corev1.EnvVar{
-										{
-											Name:  "INIT_ENV",
-											Value: "override_init",
-										},
-										{
-											Name:  "NEW_VALUE",
-											Value: "from_overrides",
+							TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
+							Metadata: &metav1.ObjectMeta{
+								Labels: map[string]string{
+									"override-label-key": "override-label-value",
+									"custom-label":       "custom-value",
+								},
+								Annotations: map[string]string{
+									"override-annotation-key": "override-annotation-value",
+									"custom-annotation":       "custom-annotation-value",
+								},
+							},
+							Spec: &trainer.PodTemplateSpecOverride{
+								ServiceAccountName: ptr.To("override-sa"),
+								InitContainers: []trainer.ContainerOverride{
+									{
+										Name: "override-init-container",
+										Env: []corev1.EnvVar{
+											{
+												Name:  "INIT_ENV",
+												Value: "override_init",
+											},
+											{
+												Name:  "NEW_VALUE",
+												Value: "from_overrides",
+											},
 										},
 									},
 								},
@@ -883,6 +895,10 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 							NumNodes(100).
 							ServiceAccountName(constants.Node, "override-sa").
+							PodLabelForJobs("override-label-key", "override-label-value", constants.Node).
+							PodLabelForJobs("custom-label", "custom-value", constants.Node).
+							PodAnnotationForJobs("override-annotation-key", "override-annotation-value", constants.Node).
+							PodAnnotationForJobs("custom-annotation", "custom-annotation-value", constants.Node).
 							InitContainer(constants.Node, "override-init-container", "test:runtime",
 								corev1.EnvVar{
 									Name:  "INIT_ENV",

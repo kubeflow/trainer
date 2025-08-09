@@ -44,8 +44,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ModelInitializer":                 schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicy":                   schema_pkg_apis_trainer_v1alpha1_PodGroupPolicy(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicySource":             schema_pkg_apis_trainer_v1alpha1_PodGroupPolicySource(ref),
-		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodSpecOverride":                  schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref),
-		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob":         schema_pkg_apis_trainer_v1alpha1_PodSpecOverrideTargetJob(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateOverride":              schema_pkg_apis_trainer_v1alpha1_PodTemplateOverride(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateOverrideTargetJob":     schema_pkg_apis_trainer_v1alpha1_PodTemplateOverrideTargetJob(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateSpecOverride":          schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef":                       schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchElasticPolicy":               schema_pkg_apis_trainer_v1alpha1_TorchElasticPolicy(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource":              schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref),
@@ -977,11 +978,11 @@ func schema_pkg_apis_trainer_v1alpha1_PodGroupPolicySource(ref common.ReferenceC
 	}
 }
 
-func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_trainer_v1alpha1_PodTemplateOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.",
+				Description: "PodTemplateOverride represents the custom overrides that will be applied for the TrainJob's resources.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"targetJobs": {
@@ -997,12 +998,61 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob"),
+										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateOverrideTargetJob"),
 									},
 								},
 							},
 						},
 					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Override for the Pod template metadata. These values will be merged with the TrainingRuntime's Pod template metadata.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Override for the Pod template spec. These values will be merged with the TrainingRuntime's Pod template spec.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateSpecOverride"),
+						},
+					},
+				},
+				Required: []string{"targetJobs"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateOverrideTargetJob", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateSpecOverride", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_PodTemplateOverrideTargetJob(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is the target training job name for which the PodSpec is overridden.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodTemplateSpecOverride represents the spec overrides for Pod template.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
 					"serviceAccountName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Override for the service account.",
@@ -1162,32 +1212,10 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"targetJobs"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ContainerOverride", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.PodSchedulingGate", "k8s.io/api/core/v1.Toleration", "k8s.io/api/core/v1.Volume"},
-	}
-}
-
-func schema_pkg_apis_trainer_v1alpha1_PodSpecOverrideTargetJob(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name is the target training job name for which the PodSpec is overridden.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"name"},
-			},
-		},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ContainerOverride", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.PodSchedulingGate", "k8s.io/api/core/v1.Toleration", "k8s.io/api/core/v1.Volume"},
 	}
 }
 
@@ -1468,7 +1496,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 							},
 						},
 					},
-					"podSpecOverrides": {
+					"podTemplateOverrides": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
 								"x-kubernetes-list-type": "atomic",
@@ -1481,7 +1509,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodSpecOverride"),
+										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateOverride"),
 									},
 								},
 							},
@@ -1506,7 +1534,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Initializer", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodSpecOverride", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Trainer"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Initializer", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateOverride", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Trainer"},
 	}
 }
 

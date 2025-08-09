@@ -16,22 +16,22 @@
 
 package v1alpha1
 
-// PodSpecOverrideTargetJobApplyConfiguration represents a declarative configuration of the PodSpecOverrideTargetJob type for use
+// PodTemplateOverrideTargetJobApplyConfiguration represents a declarative configuration of the PodTemplateOverrideTargetJob type for use
 // with apply.
-type PodSpecOverrideTargetJobApplyConfiguration struct {
+type PodTemplateOverrideTargetJobApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// PodSpecOverrideTargetJobApplyConfiguration constructs a declarative configuration of the PodSpecOverrideTargetJob type for use with
+// PodTemplateOverrideTargetJobApplyConfiguration constructs a declarative configuration of the PodTemplateOverrideTargetJob type for use with
 // apply.
-func PodSpecOverrideTargetJob() *PodSpecOverrideTargetJobApplyConfiguration {
-	return &PodSpecOverrideTargetJobApplyConfiguration{}
+func PodTemplateOverrideTargetJob() *PodTemplateOverrideTargetJobApplyConfiguration {
+	return &PodTemplateOverrideTargetJobApplyConfiguration{}
 }
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *PodSpecOverrideTargetJobApplyConfiguration) WithName(value string) *PodSpecOverrideTargetJobApplyConfiguration {
+func (b *PodTemplateOverrideTargetJobApplyConfiguration) WithName(value string) *PodTemplateOverrideTargetJobApplyConfiguration {
 	b.Name = &value
 	return b
 }
