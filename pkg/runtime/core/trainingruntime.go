@@ -187,24 +187,40 @@ func (r *TrainingRuntime) mergePodSpecOverrides(trainJob *trainer.TrainJob, jobS
 			}) {
 				continue
 			}
-			patch, err := json.Marshal(podSpecOverride)
+
+			overrideBytes, err := json.Marshal(podSpecOverride)
 			if err != nil {
 				return err
 			}
-			source, err := json.Marshal(job.Template.Spec.Template.Spec)
+			overrideMap := map[string]any{}
+			if err := json.Unmarshal(overrideBytes, &overrideMap); err != nil {
+				return err
+			}
+
+			// Strategic merge patch ignores invalid values for metadata and spec.
+			podTemplatePatch := map[string]any{
+				"metadata": overrideMap,
+				"spec":     overrideMap,
+			}
+
+			// Apply a strategic merge patch against the full PodTemplateSpec
+			source, err := json.Marshal(job.Template.Spec.Template)
 			if err != nil {
 				return err
 			}
-			merged, err := strategicpatch.StrategicMergePatch(source, patch, corev1.PodSpec{})
+			patch, err := json.Marshal(podTemplatePatch)
 			if err != nil {
 				return err
 			}
-			spec := corev1.PodSpec{}
-			err = json.Unmarshal(merged, &spec)
+			merged, err := strategicpatch.StrategicMergePatch(source, patch, corev1.PodTemplateSpec{})
 			if err != nil {
 				return err
 			}
-			jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec = spec
+			mergedTemplate := corev1.PodTemplateSpec{}
+			if err := json.Unmarshal(merged, &mergedTemplate); err != nil {
+				return err
+			}
+			jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template = mergedTemplate
 		}
 	}
 	return nil

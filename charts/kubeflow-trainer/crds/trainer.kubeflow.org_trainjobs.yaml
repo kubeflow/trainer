@@ -383,6 +383,13 @@ spec:
                   description: PodSpecOverride represents the custom overrides that
                     will be applied for the TrainJob's resources.
                   properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: |-
+                        Override for the Pod's annotations.
+                        These values will be merged with the TrainingRuntime's Pod annotations.
+                      type: object
                     containers:
                       description: Overrides for the containers in the target job
                         templates.
@@ -811,6 +818,13 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
+                    labels:
+                      additionalProperties:
+                        type: string
+                      description: |-
+                        Override for the Pod's labels.
+                        These values will be merged with the TrainingRuntime's Pod labels.
+                      type: object
                     nodeSelector:
                       additionalProperties:
                         type: string
