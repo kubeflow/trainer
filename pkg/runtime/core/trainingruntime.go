@@ -187,6 +187,25 @@ func (r *TrainingRuntime) mergePodSpecOverrides(trainJob *trainer.TrainJob, jobS
 			}) {
 				continue
 			}
+
+			if len(podSpecOverride.Labels) > 0 {
+				if jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Labels == nil {
+					jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Labels = make(map[string]string)
+				}
+				for k, v := range podSpecOverride.Labels {
+					jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Labels[k] = v
+				}
+			}
+
+			if len(podSpecOverride.Annotations) > 0 {
+				if jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Annotations == nil {
+					jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Annotations = make(map[string]string)
+				}
+				for k, v := range podSpecOverride.Annotations {
+					jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Annotations[k] = v
+				}
+			}
+
 			patch, err := json.Marshal(podSpecOverride)
 			if err != nil {
 				return err
