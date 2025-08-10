@@ -5,6 +5,8 @@
 - [Write](https://docs.github.com/en/organizations/managing-access-to-your-organizations-repositories/repository-permission-levels-for-an-organization#permission-levels-for-repositories-owned-by-an-organization)
   permission for the Kubeflow Trainer repository.
 
+- Maintainer access to [the Kubeflow Trainer API Python modules](https://pypi.org/project/kubeflow-trainer-api/).
+
 - Create a [GitHub Token](https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token).
 
 - Install `PyGithub` to generate the [Changelog](./../../CHANGELOG.md):
@@ -12,6 +14,23 @@
   ```
   pip install PyGithub>=1.55
   ```
+
+- Install `twine` and `build` to publish the SDK package:
+
+  ```
+  pip install twine>=6.1.0
+  pip install build>=1.3.0
+  ```
+
+  - Create a [PyPI Token](https://pypi.org/help/#apitoken) to publish Training SDK.
+
+  - Add the following config to your `~/.pypirc` file:
+
+    ```
+    [pypi]
+       username = __token__
+       password = <PYPI_TOKEN>
+    ```
 
 ## Versioning policy
 
@@ -57,6 +76,28 @@ cherry pick your changes from the `master` branch and submit a PR.
    ```
    git checkout release-X.Y
    git rebase upstream/release-X.Y
+   ```
+
+### Release Kubeflow Trainer API Modules
+
+1. Update the `API_VERSION` in [the `gen-api.sh` file](../../hack/python-api/gen-api.sh).
+
+   You must follow this semantic `X.Y.ZrcN` for the RC or `X.Y.Z` for the public release.
+
+   For example:
+
+   ```sh
+   API_VERSION = "2.1.0rc0"
+   ```
+
+1. Generate and publish the Kubeflow Trainer Python API models:
+
+   ```
+   make generate
+   cd api/python_api
+   rm -rf dist
+   python -m build
+   twine upload dist/*
    ```
 
 ### Release Kubeflow Trainer images
