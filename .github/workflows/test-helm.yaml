@@ -31,11 +31,11 @@ jobs:
       - name: Set up chart-testing
         uses: helm/chart-testing-action@v2.7.0
 
-      - name: Add chart dependencies
-        run: |
-          # Add JobSet repository as mentioned in the original PR
-          helm repo add jobset https://kubernetes-sigs.github.io/jobset
-          helm repo update
+      - name: Set up Kind
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: chart-testing
+          wait: 300s
 
       - name: Determine target branch
         id: get_branch
@@ -59,24 +59,37 @@ jobs:
             echo "No generate target found, continuing..."
           fi
 
-      - name: Create kind cluster
-        run: |
-          # Follow the pattern from original PR
-          if make help 2>/dev/null | grep -q "test-e2e-setup-cluster"; then
-            echo "Using project's cluster setup..."
-            make test-e2e-setup-cluster
-          else
-            echo "Setting up Kind cluster..."
-            kind create cluster --name chart-testing --wait 300s
-            kubectl cluster-info --context kind-chart-testing
-          fi
-
-      - name: Run chart-testing (lint and install)
+      - name: Run chart-testing (lint)
         env:
           BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
         run: |
-          # Use the combined command with configuration file
-          ct lint-and-install \
+          # First run linting only
+          ct lint \
+            --config .github/ct.yaml \
+            --target-branch $BRANCH \
+            --debug
+
+      - name: Install JobSet dependency manually
+        run: |
+          # Since JobSet uses OCI registry, we need to install it manually
+          # Use the latest stable version
+          JOBSET_VERSION="v0.8.1"
+          helm install jobset oci://registry.k8s.io/jobset/charts/jobset \
+            --version $JOBSET_VERSION \
+            --create-namespace \
+            --namespace=jobset-system \
+            --wait \
+            --timeout=300s
+
+          echo "JobSet installed successfully"
+          kubectl get pods -n jobset-system
+
+      - name: Run chart-testing (install)
+        env:
+          BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
+        run: |
+          # Now install our charts
+          ct install \
             --config .github/ct.yaml \
             --target-branch $BRANCH \
             --debug
@@ -97,8 +110,7 @@ jobs:
             -l app.kubernetes.io/name=kubeflow-trainer || true
 
           echo "=== JobSet Pods ==="
-          kubectl get pods -n kubeflow-system \
-            -l app.kubernetes.io/name=jobset || true
+          kubectl get pods -n jobset-system || true
 
           echo "=== Services ==="
           kubectl get svc --all-namespaces
@@ -118,7 +130,7 @@ jobs:
             --create-namespace \
             --wait \
             --timeout 300s \
-            --set jobset.install=true \
+            --set jobset.install=false \
             --dry-run
 
           echo "Chart validation successful!"
@@ -129,4 +141,5 @@ jobs:
           echo "Cleaning up resources..."
           kubectl delete namespace kubeflow-system \
             --ignore-not-found=true || true
-          kind delete cluster --name chart-testing || true
+          kubectl delete namespace jobset-system \
+            --ignore-not-found=true || true

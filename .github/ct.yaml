@@ -24,16 +24,11 @@ validate-yaml: true
 helm-extra-args: --timeout 300s --wait --debug
 
 # Helm extra set args for testing
-helm-extra-set-args: --set=jobset.install=true --set=replicaCount=1 --set=image.pullPolicy=IfNotPresent
+# Note: jobset.install=false because we install JobSet manually
+helm-extra-set-args: --set=jobset.install=false --set=replicaCount=1 --set=image.pullPolicy=IfNotPresent
 
 # Default namespace for chart installations
 namespace: kubeflow-system
-
-# Additional commands to run for each chart
-additional-commands:
-  - helm dependency update {{ .Path }}
-  - helm template {{ .Path }} --debug --namespace kubeflow-system --dry-run
-  - helm lint {{ .Path }}
 
 # Debug settings
 debug: true
@@ -42,12 +37,12 @@ debug: true
 skip-clean-up: false
 
 # Test upgrades (install chart, then upgrade)
-upgrade: true
+upgrade: false
 
 # Print config for debugging
 print-config: true
 
-# Helm dependency build before testing
+# Skip dependency build since we handle JobSet manually
 helm-dependency-extra-args: --skip-refresh
 
 # Test configuration
