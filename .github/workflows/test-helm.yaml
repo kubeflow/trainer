@@ -1,27 +1,47 @@
 ---
-name: Helm Integration Tests
+name: Unit and Integration Test - Helm
 
-'on':
+on:
   pull_request:
-    paths:
-      - 'charts/**'
-      - '.github/workflows/test-helm.yaml'
-  push:
-    branches:
-      - master
-    paths:
-      - 'charts/**'
 
 jobs:
-  helm-integration-tests:
-    name: Helm Integration Tests
+  generate:
+    name: Generate
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
         with:
-          fetch-depth: 0
+          version: 'latest'
+
+      - name: Run make generate
+        run: |
+          if make help 2>/dev/null | grep -q "generate"; then
+            make generate
+          else
+            echo "No generate target found, skipping..."
+          fi
+
+      - name: Run make helm-unittest
+        run: |
+          if make help 2>/dev/null | grep -q "helm-unittest"; then
+            make helm-unittest
+          else
+            echo "No helm-unittest target found, skipping..."
+          fi
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: generate
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
@@ -50,20 +70,10 @@ jobs:
           echo "Target branch: $BRANCH"
           echo "BRANCH=$BRANCH" >> "$GITHUB_OUTPUT"
 
-      - name: Run make generate (includes helm-docs)
-        run: |
-          # This was mentioned in the original PR commits
-          if make help 2>/dev/null | grep -q "generate"; then
-            make generate
-          else
-            echo "No generate target found, continuing..."
-          fi
-
       - name: Run chart-testing (lint)
         env:
           BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
         run: |
-          # First run linting only
           ct lint \
             --config .github/ct.yaml \
             --target-branch $BRANCH \
@@ -71,9 +81,7 @@ jobs:
 
       - name: Install JobSet dependency manually
         run: |
-          # Since JobSet uses OCI registry, we need to install it manually
-          # Use the latest stable version
-          JOBSET_VERSION="v0.8.1"
+          JOBSET_VERSION="v0.8.2"
           helm install jobset oci://registry.k8s.io/jobset/charts/jobset \
             --version $JOBSET_VERSION \
             --create-namespace \
@@ -88,7 +96,6 @@ jobs:
         env:
           BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
         run: |
-          # Now install our charts
           ct install \
             --config .github/ct.yaml \
             --target-branch $BRANCH \
@@ -122,7 +129,6 @@ jobs:
       - name: Run basic functionality tests
         run: |
           echo "=== Testing Chart Installation ==="
-          # Test the specific installation command from the original PR
           helm upgrade kubeflow-trainer charts/kubeflow-trainer \
             --install \
             --dependency-update \
