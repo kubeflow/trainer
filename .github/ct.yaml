@@ -27,9 +27,6 @@ helm-extra-args: --timeout 300s --wait --debug
 # Note: jobset.install=false because we install JobSet manually
 helm-extra-set-args: --set=jobset.install=false --set=replicaCount=1 --set=image.pullPolicy=IfNotPresent
 
-# Default namespace for chart installations
-namespace: kubeflow-system
-
 # Debug settings
 debug: true
 
@@ -47,6 +44,3 @@ helm-dependency-extra-args: --skip-refresh
 
 # Test configuration
 test-extra-args: --logs
-
-# Release name template
-release-label-selector: app.kubernetes.io/instance={{ .Release.Name }}
