@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
@@ -42,6 +44,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
@@ -57,26 +61,11 @@ jobs:
           cluster_name: chart-testing
           wait: 300s
 
-      - name: Determine target branch
-        id: get_branch
-        run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            BRANCH="${{ github.ref_name }}"
-          elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            BRANCH="${{ github.base_ref }}"
-          else
-            BRANCH="master"
-          fi
-          echo "Target branch: $BRANCH"
-          echo "BRANCH=$BRANCH" >> "$GITHUB_OUTPUT"
-
       - name: Run chart-testing (lint)
-        env:
-          BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
         run: |
           ct lint \
             --config .github/ct.yaml \
-            --target-branch $BRANCH \
+            --all \
             --debug
 
       - name: Install JobSet dependency manually
@@ -93,12 +82,10 @@ jobs:
           kubectl get pods -n jobset-system
 
       - name: Run chart-testing (install)
-        env:
-          BRANCH: ${{ steps.get_branch.outputs.BRANCH }}
         run: |
           ct install \
             --config .github/ct.yaml \
-            --target-branch $BRANCH \
+            --all \
             --debug
 
       - name: Verify Helm installation

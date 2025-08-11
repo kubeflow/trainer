@@ -9,7 +9,10 @@ chart-dirs:
 excluded-charts: []
 
 # Target branch for comparison (used for detecting changes)
-target-branch: master
+target-branch: main
+
+# Remote repository for comparison
+remote: origin
 
 # Version increment checking
 # Set to false for initial setup, enable later for strict versioning
