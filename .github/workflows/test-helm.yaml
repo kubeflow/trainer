@@ -70,7 +70,8 @@ jobs:
 
       - name: Install JobSet dependency manually
         run: |
-          JOBSET_VERSION="v0.8.2"
+          JOBSET_VERSION="v0.8.1"
+          echo "Installing JobSet $JOBSET_VERSION..."
           helm install jobset oci://registry.k8s.io/jobset/charts/jobset \
             --version $JOBSET_VERSION \
             --create-namespace \
@@ -81,14 +82,66 @@ jobs:
           echo "JobSet installed successfully"
           kubectl get pods -n jobset-system
 
-      - name: Run chart-testing (install)
+          # Wait for JobSet to be ready
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=jobset --timeout=300s -n jobset-system
+
+      - name: Create test values file for chart testing
         run: |
+          mkdir -p charts/kubeflow-trainer/ci
+          cat > charts/kubeflow-trainer/ci/ci-values.yaml << 'EOF'
+          # CI-specific values for chart testing
+          replicaCount: 1
+          image:
+            pullPolicy: IfNotPresent
+          jobset:
+            install: false  # We install JobSet manually
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          # Minimal configuration for testing
+          controller:
+            replicas: 1
+          EOF
+
+      - name: Run chart-testing (install) with better error handling
+        run: |
+          set -e
+          echo "Starting chart installation tests..."
+
+          # Run with more verbose output and longer timeout
           ct install \
             --config .github/ct.yaml \
             --all \
-            --debug
+            --debug \
+            --helm-extra-args "--timeout=600s --debug" \
+            --skip-clean-up || {
+              echo "Chart testing failed, checking cluster state..."
+
+              echo "=== Cluster Nodes ==="
+              kubectl get nodes -o wide || true
+
+              echo "=== All Namespaces ==="
+              kubectl get namespaces || true
+
+              echo "=== All Pods ==="
+              kubectl get pods --all-namespaces -o wide || true
+
+              echo "=== Events ==="
+              kubectl get events --all-namespaces --sort-by='.lastTimestamp' || true
+
+              echo "=== Helm Releases ==="
+              helm list --all-namespaces || true
+
+              # Still exit with error
+              exit 1
+            }
 
       - name: Verify Helm installation
+        if: success()
         run: |
           echo "=== Cluster Status ==="
           kubectl get nodes -o wide
@@ -100,7 +153,7 @@ jobs:
           kubectl get pods --all-namespaces -o wide
 
           echo "=== Training Operator Pods ==="
-          kubectl get pods -n kubeflow-system \
+          kubectl get pods --all-namespaces \
             -l app.kubernetes.io/name=kubeflow-trainer || true
 
           echo "=== JobSet Pods ==="
@@ -113,9 +166,13 @@ jobs:
           kubectl get crd | grep -E "(training|jobset)" || \
             echo "No training/jobset CRDs found"
 
+          echo "=== Helm Releases ==="
+          helm list --all-namespaces
+
       - name: Run basic functionality tests
+        if: success()
         run: |
-          echo "=== Testing Chart Installation ==="
+          echo "=== Testing Chart Installation (Dry Run) ==="
           helm upgrade kubeflow-trainer charts/kubeflow-trainer \
             --install \
             --dependency-update \
@@ -132,7 +189,15 @@ jobs:
         if: always()
         run: |
           echo "Cleaning up resources..."
+
+          # Clean up any helm releases first
+          helm list --all-namespaces -q | xargs -I {} helm uninstall {} --ignore-not-found || true
+
+          # Clean up namespaces
           kubectl delete namespace kubeflow-system \
-            --ignore-not-found=true || true
+            --ignore-not-found=true --timeout=60s || true
           kubectl delete namespace jobset-system \
-            --ignore-not-found=true || true
+            --ignore-not-found=true --timeout=60s || true
+
+          # Clean up any remaining test namespaces
+          kubectl get namespaces -o name | grep -E "(kubeflow-trainer|test-)" | xargs kubectl delete --timeout=60s || true
