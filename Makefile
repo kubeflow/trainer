@@ -175,7 +175,7 @@ test-python-integration: ## Run Python integration test.
 	PYTHONPATH=$(PROJECT_DIR) pytest ./test/integration/initializers
 
 .PHONY: test-e2e-setup-cluster
-test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test
+test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.
 	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
 
 .PHONY: test-e2e-setup-gpu-cluster
