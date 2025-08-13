@@ -1,4 +1,4 @@
-name: Request GPU Test Label
+name: Request GPU Runner Label
 
 permissions:
   pull-requests: write
@@ -55,5 +55,5 @@ jobs:
               issue_number: context.issue.number,
               body: `Hello @andreyvelich @varodrig @jaiakash 👋,
               Changes were detected in the LLM blueprint directories (\`examples/deepseed\` or \`examples/torchtune\`).
-              To run on GPU infra, please add the **ok-to-test-gpu-runner** label to this PR.`
+              To run the test on GPU infra, please add the **ok-to-test-gpu-runner** label to this PR.`
                           });
