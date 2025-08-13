@@ -152,11 +152,11 @@ endif
 # Instructions to run tests.
 .PHONY: test
 test: ## Run Go unit test.
-	go test $(shell go list ./... | grep -v '/test/' | grep -v '/cmd/' | grep -v '/hack/' | grep -v '/pkg/apis' | grep -v '/pkg/client') -coverprofile cover.out
+	go test $(shell go list ./... | grep -Ev '/(test|cmd|hack|pkg/apis|pkg/client|pkg/util/testing)') -coverprofile cover.out
 
 .PHONY: test-integration
 test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd ## Run Go integration test.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(K8S_VERSION) -p path)" $(GINKGO) -coverprofile cover.out -v ./test/integration/...
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(K8S_VERSION) -p path)" $(GINKGO) -v ./test/integration/...
 
 .PHONY: test-python
 test-python: ## Run Python unit test.
