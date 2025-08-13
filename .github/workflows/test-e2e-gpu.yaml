@@ -1,13 +1,15 @@
-name: E2E Test
+name: GPU E2E Test
 
 on:
-  - pull_request
+  pull_request_target:
+    types:
+      - labeled
 
 jobs:
   e2e-test:
     if: contains(github.event.pull_request.labels.*.name, 'ok-to-test-gpu-runner')
     name: E2E Test
-    runs-on: oracle-vm-16cpu-64gb-x86-64
+    runs-on: oracle-vm-16cpu-a10gpu-240gb
 
     env:
       GOPATH: ${{ github.workspace }}/go
@@ -19,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         # Kubernetes versions for e2e tests on Kind cluster.
-        kubernetes-version: ["1.31.0", "1.32.3", "1.33.1", "1.34.0"]
+        kubernetes-version: ["1.33.1"]
 
     steps:
       - name: Check out code
@@ -47,7 +49,7 @@ jobs:
 
       - name: Setup cluster
         run: |
-          make test-e2e-setup-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
+          make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
 
       - name: Run e2e with Go
         run: |
@@ -58,6 +60,10 @@ jobs:
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_mnist.ipynb TIMEOUT=900
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/question-answering/fine-tune-distilbert.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_fine-tune-distilbert.ipynb TIMEOUT=900
+
+      - name: Delete cluster
+        run: |
+          make test-e2e-delete-gpu-cluster
 
       # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
       - name: Upload Artifacts to GitHub
