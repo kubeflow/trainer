@@ -1,11 +1,13 @@
 name: E2E Test
 
 on:
-  - push
-  - pull_request
+  pull_request_target:
+    types:
+      - labeled
 
 jobs:
   e2e-test:
+    if: contains(github.event.pull_request.labels.*.name, 'ok-to-test-gpu-runner')
     name: E2E Test
     runs-on: oracle-vm-16cpu-a10gpu-240gb
 
