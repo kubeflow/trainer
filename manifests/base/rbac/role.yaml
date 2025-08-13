@@ -26,6 +26,14 @@ rules:
   - update
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - limitranges
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - admissionregistration.k8s.io
   resources:
   - validatingwebhookconfigurations
@@ -44,6 +52,14 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - node.k8s.io
+  resources:
+  - runtimeclasses
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - scheduling.x-k8s.io
