@@ -17,7 +17,7 @@ limitations under the License.
 package apply
 
 import (
-	"strings"
+	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -522,11 +522,10 @@ func TestEnvVars(t *testing.T) {
 
 func TestFromTypedObjWithFields(t *testing.T) {
 	cases := map[string]struct {
-		input      client.Object
-		fields     []string
-		want       interface{}
-		wantErr    bool
-		wantErrMsg string
+		input     client.Object
+		fields    []string
+		want      interface{}
+		wantError error
 	}{
 		"extract simple field from Pod": {
 			input: &corev1.Pod{
@@ -576,22 +575,21 @@ func TestFromTypedObjWithFields(t *testing.T) {
 					Name: "test-pod",
 				},
 			},
-			fields:     []string{"spec", "nonexistent"},
-			wantErr:    true,
-			wantErrMsg: "requested field path not found: '.spec.nonexistent'",
+			fields:    []string{"spec", "nonexistent"},
+			wantError: errorRequestedFieldPathNotFound,
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if tc.wantErr {
+			if tc.wantError != nil {
 				_, err := FromTypedObjWithFields[interface{}](tc.input, tc.fields...)
 				if err == nil {
-					t.Errorf("Expected error but got none")
+					t.Errorf("expected error %v but got none", tc.wantError)
 					return
 				}
-				if tc.wantErrMsg != "" && !strings.Contains(err.Error(), tc.wantErrMsg) {
-					t.Errorf("Expected error message to contain %q, got %q", tc.wantErrMsg, err.Error())
+				if !errors.Is(err, tc.wantError) {
+					t.Errorf("expected error %v, got %v", tc.wantError, err)
 				}
 				return
 			}
