@@ -586,7 +586,6 @@ func TestFromTypedObjWithFields(t *testing.T) {
 				_, err := FromTypedObjWithFields[interface{}](tc.input, tc.fields...)
 				if err == nil {
 					t.Errorf("expected error %v but got none", tc.wantError)
-					return
 				}
 				if !errors.Is(err, tc.wantError) {
 					t.Errorf("expected error %v, got %v", tc.wantError, err)
@@ -599,7 +598,6 @@ func TestFromTypedObjWithFields(t *testing.T) {
 				result, err := FromTypedObjWithFields[string](tc.input, tc.fields...)
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
-					return
 				}
 				if diff := cmp.Diff(tc.want, result); diff != "" {
 					t.Errorf("Unexpected result (-want +got):\n%s", diff)
@@ -608,7 +606,6 @@ func TestFromTypedObjWithFields(t *testing.T) {
 				result, err := FromTypedObjWithFields[[]interface{}](tc.input, tc.fields...)
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
-					return
 				}
 				if diff := cmp.Diff(tc.want, result); diff != "" {
 					t.Errorf("Unexpected result (-want +got):\n%s", diff)
