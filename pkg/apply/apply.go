@@ -41,9 +41,7 @@ func UpsertEnvVar(envVars *[]corev1ac.EnvVarApplyConfiguration, envVar ...corev1
 }
 
 func UpsertEnvVars(envVars *[]corev1ac.EnvVarApplyConfiguration, upEnvVars ...corev1ac.EnvVarApplyConfiguration) {
-	for _, e := range upEnvVars {
-		upsert(envVars, e, byEnvVarName)
-	}
+	UpsertEnvVar(envVars, upEnvVars...)
 }
 
 func UpsertPort(ports *[]corev1ac.ContainerPortApplyConfiguration, port ...corev1ac.ContainerPortApplyConfiguration) {

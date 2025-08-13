@@ -84,56 +84,15 @@ func TestUpsertEnvVar(t *testing.T) {
 }
 
 func TestUpsertEnvVars(t *testing.T) {
-	cases := map[string]struct {
-		existing []corev1ac.EnvVarApplyConfiguration
-		toUpsert []corev1ac.EnvVarApplyConfiguration
-		want     []corev1ac.EnvVarApplyConfiguration
-	}{
-		"insert new env var to empty list": {
-			existing: []corev1ac.EnvVarApplyConfiguration{},
-			toUpsert: []corev1ac.EnvVarApplyConfiguration{
-				*corev1ac.EnvVar().WithName("NEW").WithValue("value"),
-			},
-			want: []corev1ac.EnvVarApplyConfiguration{
-				*corev1ac.EnvVar().WithName("NEW").WithValue("value"),
-			},
-		},
-		"update existing env var": {
-			existing: []corev1ac.EnvVarApplyConfiguration{
-				*corev1ac.EnvVar().WithName("TEST").WithValue("old"),
-			},
-			toUpsert: []corev1ac.EnvVarApplyConfiguration{
-				*corev1ac.EnvVar().WithName("TEST").WithValue("new"),
-			},
-			want: []corev1ac.EnvVarApplyConfiguration{
-				*corev1ac.EnvVar().WithName("TEST").WithValue("new"),
-			},
-		},
-		"insert multiple env vars": {
-			existing: []corev1ac.EnvVarApplyConfiguration{
-				*corev1ac.EnvVar().WithName("EXISTING").WithValue("value"),
-			},
-			toUpsert: []corev1ac.EnvVarApplyConfiguration{
-				*corev1ac.EnvVar().WithName("NEW1").WithValue("value1"),
-				*corev1ac.EnvVar().WithName("NEW2").WithValue("value2"),
-			},
-			want: []corev1ac.EnvVarApplyConfiguration{
-				*corev1ac.EnvVar().WithName("EXISTING").WithValue("value"),
-				*corev1ac.EnvVar().WithName("NEW1").WithValue("value1"),
-				*corev1ac.EnvVar().WithName("NEW2").WithValue("value2"),
-			},
-		},
+	envVars := []corev1ac.EnvVarApplyConfiguration{
+		*corev1ac.EnvVar().WithName("TEST").WithValue("old"),
 	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			envVars := make([]corev1ac.EnvVarApplyConfiguration, len(tc.existing))
-			copy(envVars, tc.existing)
-			UpsertEnvVars(&envVars, tc.toUpsert...)
-			if diff := cmp.Diff(tc.want, envVars); diff != "" {
-				t.Errorf("Unexpected env vars (-want +got):\n%s", diff)
-			}
-		})
+	UpsertEnvVars(&envVars, *corev1ac.EnvVar().WithName("TEST").WithValue("new"))
+	want := []corev1ac.EnvVarApplyConfiguration{
+		*corev1ac.EnvVar().WithName("TEST").WithValue("new"),
+	}
+	if diff := cmp.Diff(want, envVars); diff != "" {
+		t.Errorf("Unexpected env vars (-want +got):\n%s", diff)
 	}
 }
 
