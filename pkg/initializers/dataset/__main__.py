@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 import pkg.initializers.utils.utils as utils
 from pkg.initializers.dataset.huggingface import HuggingFace
+from pkg.initializers.dataset.s3 import S3
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
@@ -27,6 +28,10 @@ def main():
             hf = HuggingFace()
             hf.load_config()
             hf.download_dataset()
+        case utils.S3_SCHEME:
+            s3 = S3()
+            s3.load_config()
+            s3.download_dataset()
         case _:
             logging.error("STORAGE_URI must have the valid dataset provider")
             raise Exception
