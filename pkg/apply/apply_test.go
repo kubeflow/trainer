@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func TestUpsertEnvVar(t *testing.T) {
+func TestUpsertEnvVars(t *testing.T) {
 	cases := map[string]struct {
 		existing []corev1ac.EnvVarApplyConfiguration
 		toUpsert []corev1ac.EnvVarApplyConfiguration
@@ -75,24 +75,11 @@ func TestUpsertEnvVar(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			envVars := make([]corev1ac.EnvVarApplyConfiguration, len(tc.existing))
 			copy(envVars, tc.existing)
-			UpsertEnvVar(&envVars, tc.toUpsert...)
+			UpsertEnvVars(&envVars, tc.toUpsert...)
 			if diff := cmp.Diff(tc.want, envVars); diff != "" {
 				t.Errorf("Unexpected env vars (-want +got):\n%s", diff)
 			}
 		})
-	}
-}
-
-func TestUpsertEnvVars(t *testing.T) {
-	envVars := []corev1ac.EnvVarApplyConfiguration{
-		*corev1ac.EnvVar().WithName("TEST").WithValue("old"),
-	}
-	UpsertEnvVars(&envVars, *corev1ac.EnvVar().WithName("TEST").WithValue("new"))
-	want := []corev1ac.EnvVarApplyConfiguration{
-		*corev1ac.EnvVar().WithName("TEST").WithValue("new"),
-	}
-	if diff := cmp.Diff(want, envVars); diff != "" {
-		t.Errorf("Unexpected env vars (-want +got):\n%s", diff)
 	}
 }
 

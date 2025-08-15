@@ -56,7 +56,7 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
 					// Update the dataset initializer envs.
 					if storageUri := trainJob.Spec.Initializer.Dataset.StorageUri; storageUri != nil {
-						apply.UpsertEnvVar(env, *corev1ac.EnvVar().
+						apply.UpsertEnvVars(env, *corev1ac.EnvVar().
 							WithName(jobsetplgconsts.InitializerEnvStorageUri).
 							WithValue(*storageUri))
 					}
@@ -82,7 +82,7 @@ func (b *Builder) Initializer(trainJob *trainer.TrainJob) *Builder {
 					env := &b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env
 					// Update the model initializer envs.
 					if storageUri := trainJob.Spec.Initializer.Model.StorageUri; storageUri != nil {
-						apply.UpsertEnvVar(env, *corev1ac.EnvVar().
+						apply.UpsertEnvVars(env, *corev1ac.EnvVar().
 							WithName(jobsetplgconsts.InitializerEnvStorageUri).
 							WithValue(*storageUri))
 					}

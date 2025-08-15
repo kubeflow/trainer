@@ -34,14 +34,10 @@ var (
 	errorRequestedFieldPathNotFound = errors.New("requested field path not found")
 )
 
-func UpsertEnvVar(envVars *[]corev1ac.EnvVarApplyConfiguration, envVar ...corev1ac.EnvVarApplyConfiguration) {
-	for _, e := range envVar {
+func UpsertEnvVars(envVars *[]corev1ac.EnvVarApplyConfiguration, upEnvVars ...corev1ac.EnvVarApplyConfiguration) {
+	for _, e := range upEnvVars {
 		upsert(envVars, e, byEnvVarName)
 	}
-}
-
-func UpsertEnvVars(envVars *[]corev1ac.EnvVarApplyConfiguration, upEnvVars ...corev1ac.EnvVarApplyConfiguration) {
-	UpsertEnvVar(envVars, upEnvVars...)
 }
 
 func UpsertPort(ports *[]corev1ac.ContainerPortApplyConfiguration, port ...corev1ac.ContainerPortApplyConfiguration) {
