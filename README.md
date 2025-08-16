@@ -5,6 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubeflow/trainer)](https://goreportcard.com/report/github.com/kubeflow/trainer)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10435/badge)](https://www.bestpractices.dev/projects/10435)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kubeflow/trainer)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkubeflow%2Ftrainer.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkubeflow%2Ftrainer?ref=badge_shield)
 
 <h1 align="center">
     <img src="./docs/images/trainer-logo.svg" alt="logo" width="200">
@@ -93,3 +94,7 @@ We'd also like to thank everyone who's contributed to and maintained the origina
   and [maintainers](https://github.com/kubeflow/xgboost-operator/blob/master/OWNERS).
 - Common library: [list of contributors](https://github.com/kubeflow/common/graphs/contributors) and
   [maintainers](https://github.com/kubeflow/common/blob/master/OWNERS).
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkubeflow%2Ftrainer.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkubeflow%2Ftrainer?ref=badge_large)
