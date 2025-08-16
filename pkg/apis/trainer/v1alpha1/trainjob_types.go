@@ -238,6 +238,14 @@ type PodSpecOverride struct {
 	// +listType=atomic
 	TargetJobs []PodSpecOverrideTargetJob `json:"targetJobs"`
 
+	// Override for the Pod's labels.
+	// These values will be merged with the TrainingRuntime's Pod labels.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Override for the Pod's annotations.
+	// These values will be merged with the TrainingRuntime's Pod annotations.
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// Override for the service account.
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 

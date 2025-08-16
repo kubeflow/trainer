@@ -31,15 +31,17 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
     """
     PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.
     """ # noqa: E501
+    annotations: Optional[Dict[str, StrictStr]] = Field(default=None, description="Override for the Pod's annotations. These values will be merged with the TrainingRuntime's Pod annotations.")
     containers: Optional[List[TrainerV1alpha1ContainerOverride]] = Field(default=None, description="Overrides for the containers in the target job templates.")
     init_containers: Optional[List[TrainerV1alpha1ContainerOverride]] = Field(default=None, description="Overrides for the init container in the target job templates.", alias="initContainers")
+    labels: Optional[Dict[str, StrictStr]] = Field(default=None, description="Override for the Pod's labels. These values will be merged with the TrainingRuntime's Pod labels.")
     node_selector: Optional[Dict[str, StrictStr]] = Field(default=None, description="Override for the node selector to place Pod on the specific node.", alias="nodeSelector")
     scheduling_gates: Optional[List[IoK8sApiCoreV1PodSchedulingGate]] = Field(default=None, description="SchedulingGates overrides the scheduling gates of the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/", alias="schedulingGates")
     service_account_name: Optional[StrictStr] = Field(default=None, description="Override for the service account.", alias="serviceAccountName")
     target_jobs: List[TrainerV1alpha1PodSpecOverrideTargetJob] = Field(description="TrainJobs is the training job replicas in the training runtime template to apply the overrides.", alias="targetJobs")
     tolerations: Optional[List[IoK8sApiCoreV1Toleration]] = Field(default=None, description="Override for the Pod's tolerations.")
     volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="Overrides for the Pod volume configurations.")
-    __properties: ClassVar[List[str]] = ["containers", "initContainers", "nodeSelector", "schedulingGates", "serviceAccountName", "targetJobs", "tolerations", "volumes"]
+    __properties: ClassVar[List[str]] = ["annotations", "containers", "initContainers", "labels", "nodeSelector", "schedulingGates", "serviceAccountName", "targetJobs", "tolerations", "volumes"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -134,8 +136,10 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
+            "annotations": obj.get("annotations"),
             "containers": [TrainerV1alpha1ContainerOverride.from_dict(_item) for _item in obj["containers"]] if obj.get("containers") is not None else None,
             "initContainers": [TrainerV1alpha1ContainerOverride.from_dict(_item) for _item in obj["initContainers"]] if obj.get("initContainers") is not None else None,
+            "labels": obj.get("labels"),
             "nodeSelector": obj.get("nodeSelector"),
             "schedulingGates": [IoK8sApiCoreV1PodSchedulingGate.from_dict(_item) for _item in obj["schedulingGates"]] if obj.get("schedulingGates") is not None else None,
             "serviceAccountName": obj.get("serviceAccountName"),
