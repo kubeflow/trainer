@@ -82,9 +82,14 @@ kubectl apply --server-side -k manifests/overlays/runtimes || (
     exit 1
 )
 
-# TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
+# TODO (andreyvelich): We should build runtime images before adding them.
 TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
+DEEPSPEED_RUNTIME_IMAGE=ghcr.io/kubeflow/trainer/deepspeed-runtime:latest
+MLX_RUNTIME_IMAGE=ghcr.io/kubeflow/trainer/mlx-runtime:latest
+
 docker pull ${TORCH_RUNTIME_IMAGE}
-${KIND} load docker-image ${TORCH_RUNTIME_IMAGE}
+docker pull ${DEEPSPEED_RUNTIME_IMAGE}
+docker pull ${MLX_RUNTIME_IMAGE}
+${KIND} load docker-image ${TORCH_RUNTIME_IMAGE} ${DEEPSPEED_RUNTIME_IMAGE} ${MLX_RUNTIME_IMAGE}
 
 print_cluster_info
