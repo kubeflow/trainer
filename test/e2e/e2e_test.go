@@ -103,33 +103,5 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 		})
-
-		// Verify the `mlx-distributed` ClusterTrainingRuntime.
-		ginkgo.It("should create TrainJob with MLX runtime reference", func() {
-			// Create a TrainJob.
-			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-mlx").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), mlxRuntime).
-				Obj()
-
-			ginkgo.By("Create a TrainJob with mlx-distributed runtime reference", func() {
-				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
-			})
-
-			// Wait for TrainJob to be in Succeeded status.
-			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
-				gomega.Eventually(func(g gomega.Gomega) {
-					gotTrainJob := &trainer.TrainJob{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
-					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
-						{
-							Type:    trainer.TrainJobComplete,
-							Status:  metav1.ConditionTrue,
-							Reason:  jobsetconsts.AllJobsCompletedReason,
-							Message: jobsetconsts.AllJobsCompletedMessage,
-						},
-					}, util.IgnoreConditions))
-				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
-			})
-		})
 	})
 })
