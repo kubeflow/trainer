@@ -133,7 +133,7 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 
 	if volcanoSpec.NetworkTopology != nil {
 		pg.Spec.WithNetworkTopology(volcanov1beta1ac.NetworkTopologySpec().
-			WithMode(volcanoSpec.NetworkTopology.Mode).
+			WithMode(volcanov1beta1.NetworkTopologyMode(volcanoSpec.NetworkTopology.Mode)).
 			WithHighestTierAllowed(*volcanoSpec.NetworkTopology.HighestTierAllowed))
 	}
 

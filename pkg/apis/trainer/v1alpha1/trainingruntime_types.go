@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
-	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 )
 
 const (
@@ -152,8 +151,35 @@ type CoschedulingPodGroupPolicySource struct {
 // VolcanoPodGroupPolicySource represents configuration for the Volcano gang-scheduler.
 type VolcanoPodGroupPolicySource struct {
 	// NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.
-	NetworkTopology *volcanov1beta1.NetworkTopologySpec `json:"networkTopology,omitempty"`
+	// +kubebuilder:validation:EmbeddedResource
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	NetworkTopology *NetworkTopologySpec `json:"networkTopology,omitempty"`
 }
+
+type NetworkTopologySpec struct {
+	// Mode specifies the mode of the network topology constrain.
+	// +kubebuilder:validation:Enum=hard;soft
+	// +kubebuilder:default=hard
+	// +optional
+	Mode NetworkTopologyMode `json:"mode,omitempty" protobuf:"bytes,1,opt,name=mode"`
+
+	// HighestTierAllowed specifies the highest tier that a job allowed to cross when scheduling.
+	// +kubebuilder:default=1
+	// +optional
+	HighestTierAllowed *int `json:"highestTierAllowed,omitempty" protobuf:"bytes,2,opt,name=highestTierAllowed"`
+}
+
+type NetworkTopologyMode string
+
+const (
+	// HardNetworkTopologyMode represents a strict network topology constraint that jobs must adhere to.
+	HardNetworkTopologyMode NetworkTopologyMode = "hard"
+
+	// SoftNetworkTopologyMode represents a flexible network topology constraint that allows jobs
+	// to cross network boundaries under certain conditions.
+	SoftNetworkTopologyMode NetworkTopologyMode = "soft"
+)
 
 // MLPolicy represents configuration for the model trining with ML-specific parameters.
 // +kubebuilder:validation:XValidation:rule="!(has(self.numNodes) && (has(self.torch) && has(self.torch.elasticPolicy)))", message="numNodes should not be set if torch.elasticPolicy is configured"

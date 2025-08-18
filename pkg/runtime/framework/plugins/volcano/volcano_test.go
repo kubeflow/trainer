@@ -271,8 +271,8 @@ func TestBuildPodGroup(t *testing.T) {
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
 							Volcano: &trainer.VolcanoPodGroupPolicySource{
-								NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
-									Mode:               volcanov1beta1.HardNetworkTopologyMode,
+								NetworkTopology: &trainer.NetworkTopologySpec{
+									Mode:               trainer.HardNetworkTopologyMode,
 									HighestTierAllowed: ptr.To(1),
 								},
 							},
