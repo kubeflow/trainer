@@ -525,7 +525,7 @@ func TestFromTypedObjWithFields(t *testing.T) {
 				},
 			},
 			fields: []string{"metadata", "name"},
-			want:   ptr.To("test-pod"),
+			want:   ptr.To(interface{}("test-pod")),
 		},
 		"extract container from Pod spec": {
 			input: &corev1.Pod{
@@ -542,7 +542,7 @@ func TestFromTypedObjWithFields(t *testing.T) {
 				},
 			},
 			fields: []string{"spec", "containers"},
-			want: &[]interface{}{
+			want: ptr.To(interface{}([]interface{}{
 				map[string]interface{}{
 					"name":      "test-container",
 					"image":     "test:latest",
@@ -554,7 +554,7 @@ func TestFromTypedObjWithFields(t *testing.T) {
 						},
 					},
 				},
-			},
+			})),
 		},
 		"field not found": {
 			input: &corev1.Pod{
@@ -580,23 +580,12 @@ func TestFromTypedObjWithFields(t *testing.T) {
 				return
 			}
 
-			switch tc.want.(type) {
-			case *string:
-				result, err := FromTypedObjWithFields[string](tc.input, tc.fields...)
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if diff := cmp.Diff(tc.want, result); diff != "" {
-					t.Errorf("Unexpected result (-want +got):\n%s", diff)
-				}
-			case *[]interface{}:
-				result, err := FromTypedObjWithFields[[]interface{}](tc.input, tc.fields...)
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if diff := cmp.Diff(tc.want, result); diff != "" {
-					t.Errorf("Unexpected result (-want +got):\n%s", diff)
-				}
+			result, err := FromTypedObjWithFields[interface{}](tc.input, tc.fields...)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.want, result); diff != "" {
+				t.Errorf("Unexpected result (-want +got):\n%s", diff)
 			}
 		})
 	}
