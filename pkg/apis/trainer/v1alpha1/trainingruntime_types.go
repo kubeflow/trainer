@@ -152,9 +152,6 @@ type CoschedulingPodGroupPolicySource struct {
 // VolcanoPodGroupPolicySource represents configuration for the Volcano gang-scheduler.
 type VolcanoPodGroupPolicySource struct {
 	// NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.
-	// +kubebuilder:validation:EmbeddedResource
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
 	NetworkTopology *volcanov1beta1.NetworkTopologySpec `json:"networkTopology,omitempty"`
 }
 
