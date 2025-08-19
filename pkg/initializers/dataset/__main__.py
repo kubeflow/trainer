@@ -3,6 +3,7 @@ import os
 from urllib.parse import urlparse
 
 import pkg.initializers.utils.utils as utils
+from pkg.initializers.dataset.cache import CacheInitializer
 from pkg.initializers.dataset.huggingface import HuggingFace
 
 logging.basicConfig(
@@ -27,6 +28,10 @@ def main():
             hf = HuggingFace()
             hf.load_config()
             hf.download_dataset()
+        case utils.CACHE_SCHEME:
+            cache = CacheInitializer()
+            cache.load_config()
+            cache.download_dataset()
         case _:
             logging.error("STORAGE_URI must have the valid dataset provider")
             raise Exception
