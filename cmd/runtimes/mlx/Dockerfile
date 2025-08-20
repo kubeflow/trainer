@@ -20,9 +20,9 @@ COPY --from=mpi /etc/ssh/sshd_config /etc/ssh/sshd_config
 COPY --from=mpi /home/mpiuser/.sshd_config /home/mpiuser/.sshd_config
 
 # Install the required Python packages.
-RUN apt install -y python3-dev pip && rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python
+RUN apt install -y python3-dev pip && rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python && rm -rf /var/lib/apt/lists/*
 
-ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/mpi/lib:/usr/local/mpi/lib64:${LD_LIBRARY_PATH}
+# Set home directory for mpiuser.
 ENV HOME=/home/mpiuser
 ENV PATH=$HOME/.local/bin:$PATH
 

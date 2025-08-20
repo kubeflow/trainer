@@ -2,7 +2,7 @@ FROM mpioperator/base:v0.6.0 AS mpi
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04
 
 # Disable interactive dialog from apt.
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install libraries required for OpenMPI to work.
 RUN apt-get update && apt install -y --no-install-recommends \
@@ -25,9 +25,9 @@ COPY --from=mpi /etc/ssh/sshd_config /etc/ssh/sshd_config
 COPY --from=mpi /home/mpiuser/.sshd_config /home/mpiuser/.sshd_config
 
 # Install the required Python packages.
-RUN apt install -y python3-dev pip && rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python
+RUN apt install -y python3-dev pip && rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python && rm -rf /var/lib/apt/lists/*
 
-ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/mpi/lib:/usr/local/mpi/lib64:${LD_LIBRARY_PATH}
+# Set home directory for mpiuser.
 ENV HOME=/home/mpiuser
 ENV PATH=$HOME/.local/bin:$PATH
 
