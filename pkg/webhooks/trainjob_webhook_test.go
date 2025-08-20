@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
@@ -37,6 +38,7 @@ func TestValidateCreate(t *testing.T) {
 		obj          *trainer.TrainJob
 		wantError    field.ErrorList
 		wantWarnings admission.Warnings
+		deprecate    bool
 	}{
 		"valid trainjob name compliant with RFC 1035": {
 			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
@@ -62,6 +64,14 @@ func TestValidateCreate(t *testing.T) {
 			},
 			wantWarnings: nil,
 		},
+		"deprecated runtime referenced": {
+			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Obj(),
+			wantError:    nil,
+			wantWarnings: admission.Warnings{"Referenced ClusterTrainingRuntime \"test-runtime\" is marked deprecated (trainer.kubeflow.org/deprecated=true). See runtime deprecation policy: https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy"},
+			deprecate:    true,
+		},
 	}
 
 	for name, tc := range cases {
@@ -78,6 +88,13 @@ func TestValidateCreate(t *testing.T) {
 						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
 					},
 				}).Obj()
+
+			if tc.deprecate {
+				if clusterTrainingRuntime.Labels == nil {
+					clusterTrainingRuntime.Labels = map[string]string{}
+				}
+				clusterTrainingRuntime.Labels[constants.LabelDeprecated] = constants.DeprecatedTrueValue
+			}
 
 			clientBuilder := testingutil.NewClientBuilder().WithObjects(clusterTrainingRuntime)
 			runtimes, err := runtimecore.New(context.Background(), clientBuilder.Build(), testingutil.AsIndex(clientBuilder))
