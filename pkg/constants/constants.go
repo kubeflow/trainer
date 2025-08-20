@@ -24,6 +24,12 @@ const (
 	// trainer.kubeflow.org/trainjob-ancestor-step: trainer              - trainJob.spec.trainer
 	LabelTrainJobAncestor string = "trainer.kubeflow.org/trainjob-ancestor-step"
 
+	// LabelDeprecated marks a runtime as deprecated when set to "true".
+	LabelDeprecated string = "trainer.kubeflow.org/deprecated"
+
+	// DeprecatedTrueValue is the value indicating deprecation when used with LabelDeprecated.
+	DeprecatedTrueValue string = "true"
+
 	// DatasetInitializer is the name of the Job, volume mount, container, and label value for the dataset initializer.
 	DatasetInitializer string = "dataset-initializer"
 
