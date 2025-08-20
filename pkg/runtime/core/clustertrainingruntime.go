@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
@@ -78,6 +79,18 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 				fmt.Sprintf("%v: specified clusterTrainingRuntime must be created before the TrainJob is created", err)),
 		}
 	}
+	var warnings admission.Warnings
+	if clusterTrainingRuntime.Labels != nil {
+		if val, ok := clusterTrainingRuntime.Labels[constants.LabelDeprecated]; ok && val == constants.DeprecatedTrueValue {
+			warnings = append(warnings, fmt.Sprintf("Referenced ClusterTrainingRuntime \"%s\" is marked deprecated (%s=%s). See runtime deprecation policy: %s",
+				clusterTrainingRuntime.Name, constants.LabelDeprecated, constants.DeprecatedTrueValue,
+				"https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy"))
+		}
+	}
 	info, _ := r.newRuntimeInfo(new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy)
-	return r.framework.RunCustomValidationPlugins(ctx, info, old, new)
+	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)
+	if len(fwWarnings) != 0 {
+		warnings = append(warnings, fwWarnings...)
+	}
+	return warnings, errs
 }
