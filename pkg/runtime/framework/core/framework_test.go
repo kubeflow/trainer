@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -38,6 +39,7 @@ import (
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
@@ -72,6 +74,7 @@ func TestNew(t *testing.T) {
 				registry: fwkplugins.NewRegistry(),
 				plugins: map[string]framework.Plugin{
 					coscheduling.Name: &coscheduling.CoScheduling{},
+					volcano.Name:      &volcano.Volcano{},
 					mpi.Name:          &mpi.MPI{},
 					plainml.Name:      &plainml.PlainML{},
 					torch.Name:        &torch.Torch{},
@@ -84,6 +87,7 @@ func TestNew(t *testing.T) {
 				},
 				enforcePodGroupPolicyPlugins: []framework.EnforcePodGroupPolicyPlugin{
 					&coscheduling.CoScheduling{},
+					&volcano.Volcano{},
 				},
 				customValidationPlugins: []framework.CustomValidationPlugin{
 					&mpi.MPI{},
@@ -92,6 +96,7 @@ func TestNew(t *testing.T) {
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
 					&coscheduling.CoScheduling{},
+					&volcano.Volcano{},
 					&jobset.JobSet{},
 					&mpi.MPI{},
 				},
@@ -100,6 +105,7 @@ func TestNew(t *testing.T) {
 				},
 				componentBuilderPlugins: []framework.ComponentBuilderPlugin{
 					&coscheduling.CoScheduling{},
+					&volcano.Volcano{},
 					&jobset.JobSet{},
 					&mpi.MPI{},
 				},
@@ -126,7 +132,9 @@ func TestNew(t *testing.T) {
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(Framework{}),
 		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
+		cmpopts.IgnoreUnexported(volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
 		cmpopts.IgnoreFields(coscheduling.CoScheduling{}, "client"),
+		cmpopts.IgnoreFields(volcano.Volcano{}, "client"),
 		cmpopts.IgnoreFields(jobset.JobSet{}, "client"),
 		cmpopts.IgnoreTypes(apiruntime.Scheme{}, meta.DefaultRESTMapper{}, fwkplugins.Registry{}),
 		cmpopts.SortMaps(func(a, b string) bool { return a < b }),
@@ -362,7 +370,8 @@ func TestRunEnforcePodGroupPolicyPlugins(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{
 					PodLabels: map[string]string{
-						schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
+						schedulerpluginsv1alpha1.PodGroupLabel:       "test-job",
+						volcanov1beta1.VolcanoGroupNameAnnotationKey: "test-job",
 					},
 				},
 			},
@@ -669,7 +678,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
-												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
+												schedulerpluginsv1alpha1.PodGroupLabel:       "test-job",
+												volcanov1beta1.VolcanoGroupNameAnnotationKey: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -701,7 +711,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
-												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
+												schedulerpluginsv1alpha1.PodGroupLabel:       "test-job",
+												volcanov1beta1.VolcanoGroupNameAnnotationKey: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -735,7 +746,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithCompletions(100).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
-												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
+												schedulerpluginsv1alpha1.PodGroupLabel:       "test-job",
+												volcanov1beta1.VolcanoGroupNameAnnotationKey: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -842,7 +854,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 					},
 				},
 				Scheduler: &runtime.Scheduler{
-					PodLabels: map[string]string{schedulerpluginsv1alpha1.PodGroupLabel: "test-job"},
+					PodLabels: map[string]string{schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
+						volcanov1beta1.VolcanoGroupNameAnnotationKey: "test-job"},
 				},
 			},
 			wantObjs: []apiruntime.Object{
@@ -858,6 +871,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-job", "uid").
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
+					PodLabel(volcanov1beta1.VolcanoGroupNameAnnotationKey, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					NumNodes(100).
 					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
@@ -925,6 +939,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 			registry: fwkplugins.NewRegistry(),
 			wantPlugins: []framework.WatchExtensionPlugin{
 				&coscheduling.CoScheduling{},
+				&volcano.Volcano{},
 				&jobset.JobSet{},
 				&mpi.MPI{},
 			},
@@ -935,7 +950,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortSlices(func(a, b framework.Plugin) bool { return a.Name() < b.Name() }),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, jobset.JobSet{}, mpi.MPI{}),
+		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, jobset.JobSet{}, mpi.MPI{}),
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
