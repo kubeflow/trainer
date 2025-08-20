@@ -5,7 +5,7 @@ FROM nvidia/cuda:12.8.1-devel-ubuntu22.04
 RUN apt update && apt install -y --no-install-recommends \
     openssh-server openssh-client libcap2-bin \
     libopenmpi-dev \
-    git g++ libblas-dev liblapack-dev liblapacke-dev
+    g++ libblas-dev liblapack-dev liblapacke-dev && rm -rf /var/lib/apt/lists/*
 
 # Add capability to run sshd as non-root.
 RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/sbin/sshd

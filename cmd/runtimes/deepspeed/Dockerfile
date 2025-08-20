@@ -9,7 +9,7 @@ RUN apt-get update && apt install -y --no-install-recommends \
     cmake g++ gcc \
     wget vim \
     openssh-client openssh-server libcap2-bin \
-    libopenmpi-dev openmpi-bin
+    libopenmpi-dev openmpi-bin && rm -rf /var/lib/apt/lists/*
 
 # Add capability to run sshd as non-root.
 RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/sbin/sshd
