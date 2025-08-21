@@ -57,7 +57,7 @@ func TestClusterTrainingRuntime_ValidateCreate_DeprecatedWarning(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	var want admission.Warnings
-	want = append(want, "ClusterTrainingRuntime \"test-runtime\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy")
+	want = append(want, "ClusterTrainingRuntime \"test-runtime\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: "+constants.RuntimeDeprecationPolicyURL)
 	if diff := cmp.Diff(want, warnings); diff != "" {
 		t.Fatalf("unexpected warnings (-want, +got): %s", diff)
 	}
