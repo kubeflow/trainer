@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	torchRuntime = "torch-distributed"
-	mpiRuntime   = "mpi-distributed"
+	torchRuntime     = "torch-distributed"
+	deepSpeedRuntime = "deepspeed-distributed"
+	mlxRuntime       = "mlx-distributed"
 )
 
 var _ = ginkgo.Describe("TrainJob e2e", func() {
@@ -45,7 +46,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 
 	// These tests create TrainJob that reference supported runtime without any additional changes.
 	ginkgo.When("Creating TrainJob to perform the PyTorch workload", func() {
-		// Verify `torch-distributed` ClusterTrainingRuntime.
+		// Verify the `torch-distributed` ClusterTrainingRuntime.
 		ginkgo.It("should create TrainJob with PyTorch runtime reference", func() {
 			// Create a TrainJob.
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-torch").
@@ -75,12 +76,14 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 	})
 
 	ginkgo.When("Creating TrainJob to perform OpenMPI workload", func() {
-		ginkgo.It("should create TrainJob with OpenMPI runtime reference", func() {
-			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-openmpi").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), mpiRuntime).
+		// Verify the `deepspeed-distributed` ClusterTrainingRuntime.
+		ginkgo.It("should create TrainJob with DeepSpeed runtime reference", func() {
+			// Create a TrainJob.
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-deepspeed").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), deepSpeedRuntime).
 				Obj()
 
-			ginkgo.By("Create a TrainJob with mpi-distributed runtime reference", func() {
+			ginkgo.By("Create a TrainJob with deepspeed-distributed runtime reference", func() {
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 			})
 

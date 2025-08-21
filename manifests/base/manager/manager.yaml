@@ -23,6 +23,14 @@ spec:
       containers:
         - name: manager
           image: ghcr.io/kubeflow/trainer/trainer-controller-manager
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           volumeMounts:
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
