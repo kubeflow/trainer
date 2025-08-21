@@ -69,7 +69,7 @@ func TestValidateCreate(t *testing.T) {
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
 				Obj(),
 			wantError:    nil,
-			wantWarnings: admission.Warnings{"Referenced ClusterTrainingRuntime \"test-runtime\" is marked deprecated (trainer.kubeflow.org/deprecated=true). See runtime deprecation policy: https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy"},
+			wantWarnings: admission.Warnings{"Referenced ClusterTrainingRuntime \"test-runtime\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy"},
 			deprecate:    true,
 		},
 	}
