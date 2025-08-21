@@ -17,20 +17,22 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.trainer_v1alpha1_coscheduling_pod_group_policy_source import TrainerV1alpha1CoschedulingPodGroupPolicySource
-from kubeflow_trainer_api.models.trainer_v1alpha1_volcano_pod_group_policy_source import TrainerV1alpha1VolcanoPodGroupPolicySource
+from kubeflow_trainer_api.models.scheduling_v1beta1_pod_group_condition import SchedulingV1beta1PodGroupCondition
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1PodGroupPolicySource(BaseModel):
+class SchedulingV1beta1PodGroupStatus(BaseModel):
     """
-    PodGroupPolicySource represents supported plugins for gang-scheduling. Only one of its members may be specified.
+    PodGroupStatus represents the current state of a pod group.
     """ # noqa: E501
-    coscheduling: Optional[TrainerV1alpha1CoschedulingPodGroupPolicySource] = Field(default=None, description="Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.")
-    volcano: Optional[TrainerV1alpha1VolcanoPodGroupPolicySource] = Field(default=None, description="Volcano plugin for gang-scheduling.")
-    __properties: ClassVar[List[str]] = ["coscheduling", "volcano"]
+    conditions: Optional[List[SchedulingV1beta1PodGroupCondition]] = Field(default=None, description="The conditions of PodGroup.")
+    failed: Optional[StrictInt] = Field(default=None, description="The number of pods which reached phase Failed.")
+    phase: Optional[StrictStr] = Field(default=None, description="Current phase of PodGroup.")
+    running: Optional[StrictInt] = Field(default=None, description="The number of actively running pods.")
+    succeeded: Optional[StrictInt] = Field(default=None, description="The number of pods which reached phase Succeeded.")
+    __properties: ClassVar[List[str]] = ["conditions", "failed", "phase", "running", "succeeded"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -50,7 +52,7 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodGroupPolicySource from a JSON string"""
+        """Create an instance of SchedulingV1beta1PodGroupStatus from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -71,17 +73,18 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of coscheduling
-        if self.coscheduling:
-            _dict['coscheduling'] = self.coscheduling.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of volcano
-        if self.volcano:
-            _dict['volcano'] = self.volcano.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of each item in conditions (list)
+        _items = []
+        if self.conditions:
+            for _item_conditions in self.conditions:
+                if _item_conditions:
+                    _items.append(_item_conditions.to_dict())
+            _dict['conditions'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodGroupPolicySource from a dict"""
+        """Create an instance of SchedulingV1beta1PodGroupStatus from a dict"""
         if obj is None:
             return None
 
@@ -89,8 +92,11 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "coscheduling": TrainerV1alpha1CoschedulingPodGroupPolicySource.from_dict(obj["coscheduling"]) if obj.get("coscheduling") is not None else None,
-            "volcano": TrainerV1alpha1VolcanoPodGroupPolicySource.from_dict(obj["volcano"]) if obj.get("volcano") is not None else None
+            "conditions": [SchedulingV1beta1PodGroupCondition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
+            "failed": obj.get("failed"),
+            "phase": obj.get("phase"),
+            "running": obj.get("running"),
+            "succeeded": obj.get("succeeded")
         })
         return _obj
 

@@ -17,20 +17,19 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.trainer_v1alpha1_coscheduling_pod_group_policy_source import TrainerV1alpha1CoschedulingPodGroupPolicySource
-from kubeflow_trainer_api.models.trainer_v1alpha1_volcano_pod_group_policy_source import TrainerV1alpha1VolcanoPodGroupPolicySource
+from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_api_resource_quantity import IoK8sApimachineryPkgApiResourceQuantity
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1PodGroupPolicySource(BaseModel):
+class SchedulingV1beta1Reservation(BaseModel):
     """
-    PodGroupPolicySource represents supported plugins for gang-scheduling. Only one of its members may be specified.
+    Reservation represents current condition about resource reservation
     """ # noqa: E501
-    coscheduling: Optional[TrainerV1alpha1CoschedulingPodGroupPolicySource] = Field(default=None, description="Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.")
-    volcano: Optional[TrainerV1alpha1VolcanoPodGroupPolicySource] = Field(default=None, description="Volcano plugin for gang-scheduling.")
-    __properties: ClassVar[List[str]] = ["coscheduling", "volcano"]
+    nodes: Optional[List[StrictStr]] = Field(default=None, description="Nodes are Locked nodes for queue")
+    resource: Optional[Dict[str, IoK8sApimachineryPkgApiResourceQuantity]] = Field(default=None, description="Resource is a list of total idle resource in locked nodes.")
+    __properties: ClassVar[List[str]] = ["nodes", "resource"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -50,7 +49,7 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodGroupPolicySource from a JSON string"""
+        """Create an instance of SchedulingV1beta1Reservation from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -71,17 +70,18 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of coscheduling
-        if self.coscheduling:
-            _dict['coscheduling'] = self.coscheduling.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of volcano
-        if self.volcano:
-            _dict['volcano'] = self.volcano.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of each value in resource (dict)
+        _field_dict = {}
+        if self.resource:
+            for _key_resource in self.resource:
+                if self.resource[_key_resource]:
+                    _field_dict[_key_resource] = self.resource[_key_resource].to_dict()
+            _dict['resource'] = _field_dict
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodGroupPolicySource from a dict"""
+        """Create an instance of SchedulingV1beta1Reservation from a dict"""
         if obj is None:
             return None
 
@@ -89,8 +89,13 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "coscheduling": TrainerV1alpha1CoschedulingPodGroupPolicySource.from_dict(obj["coscheduling"]) if obj.get("coscheduling") is not None else None,
-            "volcano": TrainerV1alpha1VolcanoPodGroupPolicySource.from_dict(obj["volcano"]) if obj.get("volcano") is not None else None
+            "nodes": obj.get("nodes"),
+            "resource": dict(
+                (_k, IoK8sApimachineryPkgApiResourceQuantity.from_dict(_v))
+                for _k, _v in obj["resource"].items()
+            )
+            if obj.get("resource") is not None
+            else None
         })
         return _obj
 

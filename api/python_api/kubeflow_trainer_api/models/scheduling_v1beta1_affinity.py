@@ -19,18 +19,18 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.trainer_v1alpha1_coscheduling_pod_group_policy_source import TrainerV1alpha1CoschedulingPodGroupPolicySource
-from kubeflow_trainer_api.models.trainer_v1alpha1_volcano_pod_group_policy_source import TrainerV1alpha1VolcanoPodGroupPolicySource
+from kubeflow_trainer_api.models.scheduling_v1beta1_node_group_affinity import SchedulingV1beta1NodeGroupAffinity
+from kubeflow_trainer_api.models.scheduling_v1beta1_node_group_anti_affinity import SchedulingV1beta1NodeGroupAntiAffinity
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1PodGroupPolicySource(BaseModel):
+class SchedulingV1beta1Affinity(BaseModel):
     """
-    PodGroupPolicySource represents supported plugins for gang-scheduling. Only one of its members may be specified.
+    Affinity is a group of affinity scheduling rules.
     """ # noqa: E501
-    coscheduling: Optional[TrainerV1alpha1CoschedulingPodGroupPolicySource] = Field(default=None, description="Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.")
-    volcano: Optional[TrainerV1alpha1VolcanoPodGroupPolicySource] = Field(default=None, description="Volcano plugin for gang-scheduling.")
-    __properties: ClassVar[List[str]] = ["coscheduling", "volcano"]
+    node_group_affinity: Optional[SchedulingV1beta1NodeGroupAffinity] = Field(default=None, description="Describes nodegroup affinity scheduling rules for the queue(e.g. putting pods of the queue in the nodes of the nodegroup)", alias="nodeGroupAffinity")
+    node_group_anti_affinity: Optional[SchedulingV1beta1NodeGroupAntiAffinity] = Field(default=None, description="Describes nodegroup anti-affinity scheduling rules for the queue(e.g. avoid putting pods of the queue in the nodes of the nodegroup).", alias="nodeGroupAntiAffinity")
+    __properties: ClassVar[List[str]] = ["nodeGroupAffinity", "nodeGroupAntiAffinity"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -50,7 +50,7 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodGroupPolicySource from a JSON string"""
+        """Create an instance of SchedulingV1beta1Affinity from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -71,17 +71,17 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of coscheduling
-        if self.coscheduling:
-            _dict['coscheduling'] = self.coscheduling.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of volcano
-        if self.volcano:
-            _dict['volcano'] = self.volcano.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of node_group_affinity
+        if self.node_group_affinity:
+            _dict['nodeGroupAffinity'] = self.node_group_affinity.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of node_group_anti_affinity
+        if self.node_group_anti_affinity:
+            _dict['nodeGroupAntiAffinity'] = self.node_group_anti_affinity.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodGroupPolicySource from a dict"""
+        """Create an instance of SchedulingV1beta1Affinity from a dict"""
         if obj is None:
             return None
 
@@ -89,8 +89,8 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "coscheduling": TrainerV1alpha1CoschedulingPodGroupPolicySource.from_dict(obj["coscheduling"]) if obj.get("coscheduling") is not None else None,
-            "volcano": TrainerV1alpha1VolcanoPodGroupPolicySource.from_dict(obj["volcano"]) if obj.get("volcano") is not None else None
+            "nodeGroupAffinity": SchedulingV1beta1NodeGroupAffinity.from_dict(obj["nodeGroupAffinity"]) if obj.get("nodeGroupAffinity") is not None else None,
+            "nodeGroupAntiAffinity": SchedulingV1beta1NodeGroupAntiAffinity.from_dict(obj["nodeGroupAntiAffinity"]) if obj.get("nodeGroupAntiAffinity") is not None else None
         })
         return _obj
 

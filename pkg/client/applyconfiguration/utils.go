@@ -78,6 +78,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.TrainJobSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobStatus"):
 		return &trainerv1alpha1.TrainJobStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("VolcanoPodGroupPolicySource"):
+		return &trainerv1alpha1.VolcanoPodGroupPolicySourceApplyConfiguration{}
 
 	}
 	return nil

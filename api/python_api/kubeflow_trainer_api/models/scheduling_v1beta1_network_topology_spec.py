@@ -17,20 +17,18 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.trainer_v1alpha1_coscheduling_pod_group_policy_source import TrainerV1alpha1CoschedulingPodGroupPolicySource
-from kubeflow_trainer_api.models.trainer_v1alpha1_volcano_pod_group_policy_source import TrainerV1alpha1VolcanoPodGroupPolicySource
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1PodGroupPolicySource(BaseModel):
+class SchedulingV1beta1NetworkTopologySpec(BaseModel):
     """
-    PodGroupPolicySource represents supported plugins for gang-scheduling. Only one of its members may be specified.
+    SchedulingV1beta1NetworkTopologySpec
     """ # noqa: E501
-    coscheduling: Optional[TrainerV1alpha1CoschedulingPodGroupPolicySource] = Field(default=None, description="Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.")
-    volcano: Optional[TrainerV1alpha1VolcanoPodGroupPolicySource] = Field(default=None, description="Volcano plugin for gang-scheduling.")
-    __properties: ClassVar[List[str]] = ["coscheduling", "volcano"]
+    highest_tier_allowed: Optional[StrictInt] = Field(default=None, description="HighestTierAllowed specifies the highest tier that a job allowed to cross when scheduling.", alias="highestTierAllowed")
+    mode: Optional[StrictStr] = Field(default=None, description="Mode specifies the mode of the network topology constrain.")
+    __properties: ClassVar[List[str]] = ["highestTierAllowed", "mode"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -50,7 +48,7 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodGroupPolicySource from a JSON string"""
+        """Create an instance of SchedulingV1beta1NetworkTopologySpec from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -71,17 +69,11 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of coscheduling
-        if self.coscheduling:
-            _dict['coscheduling'] = self.coscheduling.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of volcano
-        if self.volcano:
-            _dict['volcano'] = self.volcano.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodGroupPolicySource from a dict"""
+        """Create an instance of SchedulingV1beta1NetworkTopologySpec from a dict"""
         if obj is None:
             return None
 
@@ -89,8 +81,8 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "coscheduling": TrainerV1alpha1CoschedulingPodGroupPolicySource.from_dict(obj["coscheduling"]) if obj.get("coscheduling") is not None else None,
-            "volcano": TrainerV1alpha1VolcanoPodGroupPolicySource.from_dict(obj["volcano"]) if obj.get("volcano") is not None else None
+            "highestTierAllowed": obj.get("highestTierAllowed"),
+            "mode": obj.get("mode")
         })
         return _obj
 
