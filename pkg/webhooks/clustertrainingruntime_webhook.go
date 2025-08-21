@@ -53,9 +53,11 @@ func (w *ClusterTrainingRuntimeWebhook) ValidateCreate(ctx context.Context, obj 
 	var warnings admission.Warnings
 	if clTrainingRuntime.Labels != nil {
 		if val, ok := clTrainingRuntime.Labels[constants.LabelDeprecated]; ok && val == constants.DeprecatedTrueValue {
-			warnings = append(warnings, fmt.Sprintf("ClusterTrainingRuntime \"%s\" is marked deprecated (%s=%s). See runtime deprecation policy: %s",
-				clTrainingRuntime.Name, constants.LabelDeprecated, constants.DeprecatedTrueValue,
-				"https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy"))
+			warnings = append(warnings, fmt.Sprintf(
+				"ClusterTrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
+				clTrainingRuntime.Name,
+				"https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy",
+			))
 		}
 	}
 	return warnings, validateReplicatedJobs(clTrainingRuntime.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
