@@ -5,10 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-logr/logr"
-	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/v2/pkg/runtime"
-	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -22,13 +18,17 @@ import (
 	"sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 	volcanov1beta1ac "volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
+
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 )
 
 type Volcano struct {
 	client     client.Client
 	restMapper meta.RESTMapper
 	scheme     *apiruntime.Scheme
-	logger     logr.Logger
+	//logger     logr.Logger // TODO: to be used in podgrouphandler
 }
 
 var _ framework.EnforcePodGroupPolicyPlugin = (*Volcano)(nil)

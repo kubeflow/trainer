@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/controller"
@@ -77,6 +78,7 @@ func (f *Framework) RunManager(cfg *rest.Config, startControllers bool) (context
 	gomega.ExpectWithOffset(1, trainer.AddToScheme(scheme.Scheme)).NotTo(gomega.HaveOccurred())
 	gomega.ExpectWithOffset(1, jobsetv1alpha2.AddToScheme(scheme.Scheme)).NotTo(gomega.HaveOccurred())
 	gomega.ExpectWithOffset(1, schedulerpluginsv1alpha1.AddToScheme(scheme.Scheme)).NotTo(gomega.HaveOccurred())
+	gomega.ExpectWithOffset(1, volcanov1beta1.AddToScheme(scheme.Scheme)).NotTo(gomega.HaveOccurred())
 
 	k8sClient, err := client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
