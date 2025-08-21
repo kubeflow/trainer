@@ -13663,6 +13663,14 @@
           "targetJobs"
         ],
         "properties": {
+          "annotations": {
+            "description": "Override for the Pod's annotations. These values will be merged with the TrainingRuntime's Pod annotations.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "default": ""
+            }
+          },
           "containers": {
             "description": "Overrides for the containers in the target job templates.",
             "type": "array",
@@ -13694,6 +13702,14 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
+          },
+          "labels": {
+            "description": "Override for the Pod's labels. These values will be merged with the TrainingRuntime's Pod labels.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "default": ""
+            }
           },
           "nodeSelector": {
             "description": "Override for the node selector to place Pod on the specific node.",
