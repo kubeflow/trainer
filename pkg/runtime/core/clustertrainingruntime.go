@@ -85,7 +85,7 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 			warnings = append(warnings, fmt.Sprintf(
 				"Referenced ClusterTrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
 				clusterTrainingRuntime.Name,
-				"https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy",
+				constants.RuntimeDeprecationPolicyURL,
 			))
 		}
 	}

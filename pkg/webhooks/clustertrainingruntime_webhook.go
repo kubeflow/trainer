@@ -56,7 +56,7 @@ func (w *ClusterTrainingRuntimeWebhook) ValidateCreate(ctx context.Context, obj 
 			warnings = append(warnings, fmt.Sprintf(
 				"ClusterTrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
 				clTrainingRuntime.Name,
-				"https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy",
+				constants.RuntimeDeprecationPolicyURL,
 			))
 		}
 	}
