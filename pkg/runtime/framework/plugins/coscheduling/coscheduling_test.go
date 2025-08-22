@@ -25,6 +25,7 @@ import (
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
@@ -33,10 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
-	trainerv1alpha1 "github.com/kubeflow/trainer/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/pkg/runtime"
-	"github.com/kubeflow/trainer/pkg/runtime/framework"
-	utiltesting "github.com/kubeflow/trainer/pkg/util/testing"
+	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestCoScheduling(t *testing.T) {
@@ -184,6 +185,168 @@ func TestCoScheduling(t *testing.T) {
 					Obj(),
 			},
 		},
+		"succeeded to build PodGroup with multiple PodSets": {
+			info: &runtime.Info{
+				Scheduler: &runtime.Scheduler{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
+						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
+								ScheduleTimeoutSeconds: ptr.To[int32](30),
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "node",
+							Count: ptr.To[int32](2),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+						{
+							Name:  "dataset-initializer",
+							Count: ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("250m"),
+								corev1.ResourceMemory: resource.MustParse("512Mi"),
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				UID("trainJob").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						Obj()).
+				Obj(),
+			wantInfo: &runtime.Info{
+				Scheduler: &runtime.Scheduler{
+					PodLabels: map[string]string{
+						"scheduling.x-k8s.io/pod-group": "trainJob",
+					},
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
+						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
+								ScheduleTimeoutSeconds: ptr.To[int32](30),
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "node",
+							Count: ptr.To[int32](2),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+						{
+							Name:  "dataset-initializer",
+							Count: ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("250m"),
+								corev1.ResourceMemory: resource.MustParse("512Mi"),
+							},
+						},
+					},
+				},
+			},
+			objs: []client.Object{}, // Simulate no existing PodGroup
+			wantObjs: []apiruntime.Object{
+				utiltesting.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "trainJob").
+					MinMember(3).
+					MinResources(corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1.25"),
+						corev1.ResourceMemory: resource.MustParse("2.5Gi"),
+					}).
+					SchedulingTimeout(30).
+					ControllerReference(trainerv1alpha1.GroupVersion.WithKind(trainerv1alpha1.TrainJobKind), "trainJob", "trainJob").
+					Obj(),
+			},
+		},
+		"succeeded to build PodGroup with MinResources": {
+			info: &runtime.Info{
+				Scheduler: &runtime.Scheduler{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
+						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
+								ScheduleTimeoutSeconds: ptr.To[int32](30),
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "node",
+							Count: ptr.To[int32](2),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				UID("trainJob").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						Obj()).
+				Obj(),
+			wantInfo: &runtime.Info{
+				Scheduler: &runtime.Scheduler{
+					PodLabels: map[string]string{
+						"scheduling.x-k8s.io/pod-group": "trainJob",
+					},
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
+						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
+								ScheduleTimeoutSeconds: ptr.To[int32](30),
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "node",
+							Count: ptr.To[int32](2),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			objs: []client.Object{}, // Simulate no existing PodGroup
+			wantObjs: []apiruntime.Object{
+				utiltesting.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "trainJob").
+					MinMember(2).
+					MinResources(corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					}).
+					SchedulingTimeout(30).
+					ControllerReference(trainerv1alpha1.GroupVersion.WithKind(trainerv1alpha1.TrainJobKind), "trainJob", "trainJob").
+					Obj(),
+			},
+		},
 		"failed to get PodGroup due to API error": {
 			info: &runtime.Info{
 				Scheduler: &runtime.Scheduler{},
@@ -275,6 +438,86 @@ func TestCoScheduling(t *testing.T) {
 			wantPodGroupPolicyError: nil,
 			wantBuildError:          nil,
 		},
+		"no action when TrainJob is suspended": {
+			info: &runtime.Info{
+				Scheduler: &runtime.Scheduler{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
+						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
+								ScheduleTimeoutSeconds: ptr.To[int32](30),
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "node",
+							Count: ptr.To[int32](2),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			trainJob: &trainerv1alpha1.TrainJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "existingTrainJob",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: trainerv1alpha1.TrainJobSpec{
+					Suspend: ptr.To(false),
+				},
+			},
+			wantInfo: &runtime.Info{
+				Scheduler: &runtime.Scheduler{
+					PodLabels: map[string]string{
+						"scheduling.x-k8s.io/pod-group": "existingTrainJob",
+					},
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
+						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
+								ScheduleTimeoutSeconds: ptr.To[int32](30),
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "node",
+							Count: ptr.To[int32](2),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			objs: []client.Object{
+				&schedulerpluginsv1alpha1.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "existingTrainJob",
+						Namespace: metav1.NamespaceDefault,
+					},
+					Spec: schedulerpluginsv1alpha1.PodGroupSpec{
+						MinMember: 2,
+						MinResources: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+						ScheduleTimeoutSeconds: ptr.To[int32](30),
+					},
+				},
+			},
+			wantObjs: nil, // No new objects should be created
+		},
 	}
 
 	for name, tc := range cases {
@@ -286,6 +529,28 @@ func TestCoScheduling(t *testing.T) {
 			clientBuilder := utiltesting.NewClientBuilder().WithObjects(tc.objs...)
 			clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
 				Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					if podGroup, ok := obj.(*schedulerpluginsv1alpha1.PodGroup); ok {
+						// Check if the key matches the expected PodGroup
+						if key.Name == "existingTrainJob" && key.Namespace == metav1.NamespaceDefault {
+							// Simulate finding the PodGroup by copying the expected object into the provided obj
+							*podGroup = schedulerpluginsv1alpha1.PodGroup{
+								ObjectMeta: metav1.ObjectMeta{
+									Name:      "existingTrainJob",
+									Namespace: metav1.NamespaceDefault,
+								},
+								Spec: schedulerpluginsv1alpha1.PodGroupSpec{
+									MinMember: 2,
+									MinResources: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("1"),
+										corev1.ResourceMemory: resource.MustParse("2Gi"),
+									},
+									ScheduleTimeoutSeconds: ptr.To[int32](30),
+								},
+							}
+							return nil
+						}
+					}
+
 					if _, ok := obj.(*schedulerpluginsv1alpha1.PodGroup); ok && errors.Is(tc.wantBuildError, errorGetPodGroup) {
 						return errorGetPodGroup
 					}
