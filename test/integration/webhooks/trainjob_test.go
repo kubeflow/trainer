@@ -110,6 +110,23 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should succeed in creating trainJob referencing deprecated ClusterTrainingRuntime (warning expected)",
+				func() *trainer.TrainJob {
+					// Mark the existing ClusterTrainingRuntime as deprecated
+					gomega.Eventually(func(g gomega.Gomega) {
+						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterTrainingRuntime), clusterTrainingRuntime)).Should(gomega.Succeed())
+					}, util.Timeout, util.Interval).Should(gomega.Succeed())
+					if clusterTrainingRuntime.Labels == nil {
+						clusterTrainingRuntime.Labels = map[string]string{}
+					}
+					clusterTrainingRuntime.Labels[constants.LabelDeprecated] = constants.DeprecatedTrueValue
+					gomega.Expect(k8sClient.Update(ctx, clusterTrainingRuntime)).To(gomega.Succeed())
+
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
+						Obj()
+				},
+				gomega.Succeed()),
 			ginkgo.Entry("Should fail in creating trainJob with pre-trained model config when referencing a trainingRuntime without an initializer",
 				func() *trainer.TrainJob {
 					newContainers := []corev1.Container{}
