@@ -7,9 +7,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/v2/pkg/apply"
-	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,6 +24,10 @@ import (
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 	"volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
 	volcanov1beta1ac "volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
+
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/apply"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
 type FieldIndexerFunc func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error
