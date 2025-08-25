@@ -534,6 +534,23 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								Effect:   corev1.TaintEffectNoSchedule,
 							},
 						},
+						Affinity: &corev1.Affinity{
+							NodeAffinity: &corev1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
+										{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
+												{
+													Key:      "topology.kubernetes.io/zone",
+													Operator: corev1.NodeSelectorOpIn,
+													Values:   []string{"antarctica-east1", "antarctica-west1"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 					{
 						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
@@ -542,6 +559,23 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								Key:      "example.com/gpu",
 								Operator: corev1.TolerationOpExists,
 								Effect:   corev1.TaintEffectNoSchedule,
+							},
+						},
+						Affinity: &corev1.Affinity{
+							NodeAffinity: &corev1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
+										{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
+												{
+													Key:      "topology.kubernetes.io/zone",
+													Operator: corev1.NodeSelectorOpIn,
+													Values:   []string{"antarctica-east1", "antarctica-west1"},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -564,12 +598,50 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							Operator: corev1.TolerationOpExists,
 							Effect:   corev1.TaintEffectNoSchedule,
 						}).
+					Affinity(constants.DatasetInitializer,
+						corev1.Affinity{
+							NodeAffinity: &corev1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
+										{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
+												{
+													Key:      "topology.kubernetes.io/zone",
+													Operator: corev1.NodeSelectorOpIn,
+													Values:   []string{"antarctica-east1", "antarctica-west1"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					).
 					Tolerations(constants.Node,
 						corev1.Toleration{
 							Key:      "example.com/gpu",
 							Operator: corev1.TolerationOpExists,
 							Effect:   corev1.TaintEffectNoSchedule,
 						}).
+					Affinity(constants.Node,
+						corev1.Affinity{
+							NodeAffinity: &corev1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
+										{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
+												{
+													Key:      "topology.kubernetes.io/zone",
+													Operator: corev1.NodeSelectorOpIn,
+													Values:   []string{"antarctica-east1", "antarctica-west1"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					).
 					Obj(),
 			},
 		},
