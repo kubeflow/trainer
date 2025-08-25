@@ -13663,6 +13663,14 @@
           "targetJobs"
         ],
         "properties": {
+          "affinity": {
+            "description": "Override for the Pod's affinity.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.Affinity"
+              }
+            ]
+          },
           "containers": {
             "description": "Overrides for the containers in the target job templates.",
             "type": "array",

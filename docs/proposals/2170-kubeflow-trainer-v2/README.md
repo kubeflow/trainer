@@ -782,6 +782,9 @@ type PodSpecOverride struct {
 	// Override for the node selector to place Pod on the specific mode.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
+	// Override for the Pod's affinity.
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
 	// Override for the Pod's tolerations.
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
