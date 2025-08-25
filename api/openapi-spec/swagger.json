@@ -13267,6 +13267,523 @@
           }
         }
       },
+      "scheduling.v1beta1.Affinity": {
+        "description": "Affinity is a group of affinity scheduling rules.",
+        "type": "object",
+        "properties": {
+          "nodeGroupAffinity": {
+            "description": "Describes nodegroup affinity scheduling rules for the queue(e.g. putting pods of the queue in the nodes of the nodegroup)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.NodeGroupAffinity"
+              }
+            ]
+          },
+          "nodeGroupAntiAffinity": {
+            "description": "Describes nodegroup anti-affinity scheduling rules for the queue(e.g. avoid putting pods of the queue in the nodes of the nodegroup).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.NodeGroupAntiAffinity"
+              }
+            ]
+          }
+        }
+      },
+      "scheduling.v1beta1.Cluster": {
+        "description": "CluterSpec represents the template of Cluster",
+        "type": "object",
+        "properties": {
+          "capacity": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "scheduling.v1beta1.Guarantee": {
+        "description": "Guarantee represents configuration of queue resource reservation",
+        "type": "object",
+        "properties": {
+          "resource": {
+            "description": "The amount of cluster resource reserved for queue. Just set either `percentage` or `resource`",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            }
+          }
+        }
+      },
+      "scheduling.v1beta1.NetworkTopologySpec": {
+        "type": "object",
+        "properties": {
+          "highestTierAllowed": {
+            "description": "HighestTierAllowed specifies the highest tier that a job allowed to cross when scheduling.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "mode": {
+            "description": "Mode specifies the mode of the network topology constrain.",
+            "type": "string"
+          }
+        }
+      },
+      "scheduling.v1beta1.NodeGroupAffinity": {
+        "type": "object",
+        "properties": {
+          "preferredDuringSchedulingIgnoredDuringExecution": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "default": ""
+            }
+          }
+        }
+      },
+      "scheduling.v1beta1.NodeGroupAntiAffinity": {
+        "type": "object",
+        "properties": {
+          "preferredDuringSchedulingIgnoredDuringExecution": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "requiredDuringSchedulingIgnoredDuringExecution": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "default": ""
+            }
+          }
+        }
+      },
+      "scheduling.v1beta1.PodGroup": {
+        "description": "PodGroup is a collection of Pod; used for batch workload.",
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "description": "Specification of the desired behavior of the pod group. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.PodGroupSpec"
+              }
+            ]
+          },
+          "status": {
+            "description": "Status represents the current information about a pod group. This data may not be up to date.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.PodGroupStatus"
+              }
+            ]
+          }
+        }
+      },
+      "scheduling.v1beta1.PodGroupCondition": {
+        "description": "PodGroupCondition contains details for the current state of this pod group.",
+        "type": "object",
+        "properties": {
+          "lastTransitionTime": {
+            "description": "Last time the phase transitioned from another to current phase.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ]
+          },
+          "message": {
+            "description": "Human-readable message indicating details about last transition.",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Unique, one-word, CamelCase reason for the phase's last transition.",
+            "type": "string"
+          },
+          "status": {
+            "description": "Status is the status of the condition.",
+            "type": "string"
+          },
+          "transitionID": {
+            "description": "The ID of condition transition.",
+            "type": "string"
+          },
+          "type": {
+            "description": "Type is the type of the condition",
+            "type": "string"
+          }
+        }
+      },
+      "scheduling.v1beta1.PodGroupList": {
+        "description": "PodGroupList is a collection of pod groups.",
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "description": "items is the list of PodGroup",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/scheduling.v1beta1.PodGroup"
+                }
+              ]
+            }
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "description": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ]
+          }
+        }
+      },
+      "scheduling.v1beta1.PodGroupSpec": {
+        "description": "PodGroupSpec represents the template of a pod group.",
+        "type": "object",
+        "properties": {
+          "minMember": {
+            "description": "MinMember defines the minimal number of members/tasks to run the pod group; if there's not enough resources to start all tasks, the scheduler will not start anyone.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "minResources": {
+            "description": "MinResources defines the minimal resource of members/tasks to run the pod group; if there's not enough resources to start all tasks, the scheduler will not start anyone.",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            }
+          },
+          "minTaskMember": {
+            "description": "MinTaskMember defines the minimal number of pods to run each task in the pod group; if there's not enough resources to start each task, the scheduler will not start anyone.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          "networkTopology": {
+            "description": "NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.NetworkTopologySpec"
+              }
+            ]
+          },
+          "priorityClassName": {
+            "description": "If specified, indicates the PodGroup's priority. \"system-node-critical\" and \"system-cluster-critical\" are two special keywords which indicate the highest priorities with the former being the highest priority. Any other name must be defined by creating a PriorityClass object with that name. If not specified, the PodGroup priority will be default or zero if there is no default.",
+            "type": "string"
+          },
+          "queue": {
+            "description": "Queue defines the queue to allocate resource for PodGroup; if queue does not exist, the PodGroup will not be scheduled. Defaults to `default` Queue with the lowest weight.",
+            "type": "string"
+          }
+        }
+      },
+      "scheduling.v1beta1.PodGroupStatus": {
+        "description": "PodGroupStatus represents the current state of a pod group.",
+        "type": "object",
+        "properties": {
+          "conditions": {
+            "description": "The conditions of PodGroup.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/scheduling.v1beta1.PodGroupCondition"
+                }
+              ]
+            }
+          },
+          "failed": {
+            "description": "The number of pods which reached phase Failed.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "phase": {
+            "description": "Current phase of PodGroup.",
+            "type": "string"
+          },
+          "running": {
+            "description": "The number of actively running pods.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "succeeded": {
+            "description": "The number of pods which reached phase Succeeded.",
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "scheduling.v1beta1.Queue": {
+        "description": "Queue is a queue of PodGroup.",
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "description": "Specification of the desired behavior of the queue. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.QueueSpec"
+              }
+            ]
+          },
+          "status": {
+            "description": "The status of queue.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.QueueStatus"
+              }
+            ]
+          }
+        }
+      },
+      "scheduling.v1beta1.QueueList": {
+        "description": "QueueList is a collection of queues.",
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "description": "items is the list of PodGroup",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/scheduling.v1beta1.Queue"
+                }
+              ]
+            }
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "description": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ]
+          }
+        }
+      },
+      "scheduling.v1beta1.QueueSpec": {
+        "description": "QueueSpec represents the template of Queue.",
+        "type": "object",
+        "properties": {
+          "affinity": {
+            "description": "If specified, the pod owned by the queue will be scheduled with constraint",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.Affinity"
+              }
+            ]
+          },
+          "capability": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            }
+          },
+          "deserved": {
+            "description": "The amount of resources configured by the user. This part of resource can be shared with other queues and reclaimed back.",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            }
+          },
+          "extendClusters": {
+            "description": "extendCluster indicate the jobs in this Queue will be dispatched to these clusters.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/scheduling.v1beta1.Cluster"
+                }
+              ]
+            }
+          },
+          "guarantee": {
+            "description": "Guarantee indicate configuration about resource reservation",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.Guarantee"
+              }
+            ]
+          },
+          "parent": {
+            "description": "Parent define the parent of queue",
+            "type": "string"
+          },
+          "priority": {
+            "description": "Priority define the priority of queue. Higher values are prioritized for scheduling and considered later during reclamation.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "reclaimable": {
+            "description": "Reclaimable indicate whether the queue can be reclaimed by other queue",
+            "type": "boolean"
+          },
+          "type": {
+            "description": "Type define the type of queue",
+            "type": "string"
+          },
+          "weight": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "scheduling.v1beta1.QueueStatus": {
+        "description": "QueueStatus represents the status of Queue.",
+        "type": "object",
+        "properties": {
+          "allocated": {
+            "description": "Allocated is allocated resources in queue",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            }
+          },
+          "completed": {
+            "description": "The number of `Completed` PodGroup in this queue.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "inqueue": {
+            "description": "The number of `Inqueue` PodGroup in this queue.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "pending": {
+            "description": "The number of 'Pending' PodGroup in this queue.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "reservation": {
+            "description": "Reservation is the profile of resource reservation for queue",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.Reservation"
+              }
+            ]
+          },
+          "running": {
+            "description": "The number of 'Running' PodGroup in this queue.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "description": "State is state of queue",
+            "type": "string"
+          },
+          "unknown": {
+            "description": "The number of 'Unknown' PodGroup in this queue.",
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "scheduling.v1beta1.Reservation": {
+        "description": "Reservation represents current condition about resource reservation",
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "description": "Nodes are Locked nodes for queue",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "resource": {
+            "description": "Resource is a list of total idle resource in locked nodes.",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
+            }
+          }
+        }
+      },
       "trainer.v1alpha1.ClusterTrainingRuntime": {
         "description": "ClusterTrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced by TrainJob that created in *any* namespace.",
         "type": "object",
@@ -13639,6 +14156,14 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.CoschedulingPodGroupPolicySource"
               }
             ]
+          },
+          "volcano": {
+            "description": "Volcano plugin for gang-scheduling.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.VolcanoPodGroupPolicySource"
+              }
+            ]
           }
         }
       },
@@ -13651,6 +14176,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.CoschedulingPodGroupPolicySource"
+              }
+            ]
+          },
+          "volcano": {
+            "description": "Volcano plugin for gang-scheduling.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.VolcanoPodGroupPolicySource"
               }
             ]
           }
@@ -14212,6 +14745,20 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobSetTemplateSpec"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.VolcanoPodGroupPolicySource": {
+        "description": "VolcanoPodGroupPolicySource represents configuration for the Volcano gang-scheduler.",
+        "type": "object",
+        "properties": {
+          "networkTopology": {
+            "description": "NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.NetworkTopologySpec"
               }
             ]
           }
