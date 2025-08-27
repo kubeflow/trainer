@@ -6,12 +6,12 @@ on:
 
 jobs:
   gpu-e2e-test:
-    if: contains(join(github.event.pull_request.labels.*.name, ','), 'ok-to-test-gpu-runner')
     name: GPU E2E Test
     runs-on: oracle-vm-16cpu-a10gpu-240gb
 
     env:
       GOPATH: ${{ github.workspace }}/go
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     defaults:
       run:
         working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
@@ -27,110 +27,64 @@ jobs:
         with:
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
+      - name: Check GPU label
+        id: check-label
+        run: |
+          if [[ "${{ join(github.event.pull_request.labels.*.name, ',') }}" != *"ok-to-test-gpu-runner"* ]]; then
+            echo "Label 'ok-to-test-gpu-runner' not found. Skipping GPU tests."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "Label found. Running GPU tests."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip message
+        if: steps.check-label.outputs.skip == 'true'
+        run: echo "✅ Skipped GPU E2E tests (label not present)."
+
       - name: Setup Go
+        if: steps.check-label.outputs.skip == 'false'
         uses: actions/setup-go@v5
         with:
           go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
 
       - name: Setup Python
+        if: steps.check-label.outputs.skip == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: 3.11
 
       - name: Install dependencies
+        if: steps.check-label.outputs.skip == 'false'
         run: |
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
           pip install git+https://github.com/kubeflow/sdk.git@main
 
-      - name: Setup cluster
+      - name: Setup cluster with GPU
+        if: steps.check-label.outputs.skip == 'false'
         run: |
           make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
 
       - name: Run e2e with Go
+        if: steps.check-label.outputs.skip == 'false'
         run: |
           make test-e2e || (kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer && exit 1)
 
       - name: Run e2e test for example Notebooks
+        if: steps.check-label.outputs.skip == 'false'
         run: |
           mkdir -p artifacts/notebooks
-          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_mnist.ipynb TIMEOUT=900
-          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/question-answering/fine-tune-distilbert.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_fine-tune-distilbert.ipynb TIMEOUT=900
+          make test-e2e-notebook NOTEBOOK_INPUT=.examples/deepspeed/text-summarization/T5-Fine-Tuning.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_mnist.ipynb TIMEOUT=900
 
       - name: Delete cluster
+        if: steps.check-label.outputs.skip == 'false'
         run: |
           make test-e2e-delete-gpu-cluster
 
       - name: Upload Artifacts to GitHub
+        if: always() && steps.check-label.outputs.skip == 'false'
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: ${{ matrix.kubernetes-version }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
           retention-days: 1
-
-  comment-if-missing-label:
-    if: github.event_name == 'pull_request' || (github.event_name == 'pull_request_target' && github.actor != 'github-actions[bot]')
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-
-      - name: Detect changes in LLM blueprint directories
-        id: changes
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.sha }} --depth=1
-          git fetch origin ${{ github.event.pull_request.head.sha }} --depth=1
-
-          if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} \
-            | grep -E '^examples/(deepspeed|torchtune)/' >/dev/null; then
-            echo "found_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "found_changes=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Check for ok-to-test-gpu-runner label
-        id: label-check
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number
-            });
-            const hasLabel = labels.some(l => l.name === 'ok-to-test-gpu-runner');
-            core.setOutput('has_label', hasLabel ? 'true' : 'false');
-
-      - name: Check if comment already exists
-        id: comment-exists
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number
-            });
-            const botCommentExists = comments.some(c =>
-              c.user.type === 'Bot' &&
-              c.body.includes('ok-to-test-gpu-runner')
-            );
-            core.setOutput('exists', botCommentExists ? 'true' : 'false');
-
-      - name: Post comment requesting label
-        if: steps.changes.outputs.found_changes == 'true' && steps.label-check.outputs.has_label == 'false' && steps.comment-exists.outputs.exists == 'false'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `Hi @andreyvelich @varodrig @jaiakash 👋,
-              Changes were detected in the LLM blueprint directories (\`examples/deepspeed\` or \`examples/torchtune\`).
-              To run the test on GPU self runner, please add the **ok-to-test-gpu-runner** label to this PR.`
-            });

@@ -5,10 +5,8 @@ on:
 
 jobs:
   e2e-test:
-    if: contains(github.event.pull_request.labels.*.name, 'ok-to-test-gpu-runner')
     name: E2E Test
     runs-on: oracle-vm-16cpu-64gb-x86-64
-
     env:
       GOPATH: ${{ github.workspace }}/go
     defaults:
