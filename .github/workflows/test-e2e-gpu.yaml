@@ -3,14 +3,10 @@ name: GPU E2E Test
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled]
-  pull_request_target:
-    types: [labeled]
 
 jobs:
   gpu-e2e-test:
-    if: |
-      contains(join(github.event.pull_request.labels.*.name, ','), 'ok-to-test-gpu-runner') ||
-      (github.event_name == 'pull_request_target' && github.event.label && github.event.label.name == 'ok-to-test-gpu-runner')
+    if: contains(join(github.event.pull_request.labels.*.name, ','), 'ok-to-test-gpu-runner')
     name: GPU E2E Test
     runs-on: oracle-vm-16cpu-a10gpu-240gb
 
