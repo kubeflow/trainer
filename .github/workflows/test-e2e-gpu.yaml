@@ -1,14 +1,17 @@
 name: GPU E2E Test
 
 on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
   pull_request_target:
-    types:
-      - labeled
+    types: [labeled]
 
 jobs:
-  e2e-test:
-    if: contains(github.event.pull_request.labels.*.name, 'ok-to-test-gpu-runner')
-    name: E2E Test
+  gpu-e2e-test:
+    if: |
+      contains(join(github.event.pull_request.labels.*.name, ','), 'ok-to-test-gpu-runner') ||
+      (github.event_name == 'pull_request_target' && github.event.label && github.event.label.name == 'ok-to-test-gpu-runner')
+    name: GPU E2E Test
     runs-on: oracle-vm-16cpu-a10gpu-240gb
 
     env:
@@ -20,7 +23,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Kubernetes versions for e2e tests on Kind cluster.
         kubernetes-version: ["1.33.1"]
 
     steps:
@@ -41,10 +43,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          echo "Install Papermill"
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
-
-          echo "Install Kubeflow SDK"
           pip install git+https://github.com/kubeflow/sdk.git@main
 
       - name: Setup cluster
@@ -65,7 +64,6 @@ jobs:
         run: |
           make test-e2e-delete-gpu-cluster
 
-      # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
       - name: Upload Artifacts to GitHub
         uses: actions/upload-artifact@v4
         if: always()
@@ -73,3 +71,70 @@ jobs:
           name: ${{ matrix.kubernetes-version }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
           retention-days: 1
+
+  comment-if-missing-label:
+    if: github.event_name == 'pull_request' || (github.event_name == 'pull_request_target' && github.actor != 'github-actions[bot]')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Detect changes in LLM blueprint directories
+        id: changes
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.sha }} --depth=1
+          git fetch origin ${{ github.event.pull_request.head.sha }} --depth=1
+
+          if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} \
+            | grep -E '^examples/(deepspeed|torchtune)/' >/dev/null; then
+            echo "found_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "found_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for ok-to-test-gpu-runner label
+        id: label-check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            const hasLabel = labels.some(l => l.name === 'ok-to-test-gpu-runner');
+            core.setOutput('has_label', hasLabel ? 'true' : 'false');
+
+      - name: Check if comment already exists
+        id: comment-exists
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            const botCommentExists = comments.some(c =>
+              c.user.type === 'Bot' &&
+              c.body.includes('ok-to-test-gpu-runner')
+            );
+            core.setOutput('exists', botCommentExists ? 'true' : 'false');
+
+      - name: Post comment requesting label
+        if: steps.changes.outputs.found_changes == 'true' && steps.label-check.outputs.has_label == 'false' && steps.comment-exists.outputs.exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Hi @andreyvelich @varodrig @jaiakash 👋,
+              Changes were detected in the LLM blueprint directories (\`examples/deepspeed\` or \`examples/torchtune\`).
+              To run the test on GPU self runner, please add the **ok-to-test-gpu-runner** label to this PR.`
+            });
