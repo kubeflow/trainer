@@ -38,6 +38,7 @@ type Runtime interface {
 
 	NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]any, error)
 	TerminalCondition(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error)
+	JobsStatus(ctx context.Context, trainJob *trainer.TrainJob) ([]trainer.JobStatus, error)
 	EventHandlerRegistrars() []ReconcilerBuilder
 	ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList)
 }
