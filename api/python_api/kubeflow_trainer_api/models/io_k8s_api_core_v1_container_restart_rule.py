@@ -19,19 +19,17 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.io_k8s_api_core_v1_config_map_env_source import IoK8sApiCoreV1ConfigMapEnvSource
-from kubeflow_trainer_api.models.io_k8s_api_core_v1_secret_env_source import IoK8sApiCoreV1SecretEnvSource
+from kubeflow_trainer_api.models.io_k8s_api_core_v1_container_restart_rule_on_exit_codes import IoK8sApiCoreV1ContainerRestartRuleOnExitCodes
 from typing import Optional, Set
 from typing_extensions import Self
 
-class IoK8sApiCoreV1EnvFromSource(BaseModel):
+class IoK8sApiCoreV1ContainerRestartRule(BaseModel):
     """
-    EnvFromSource represents the source of a set of ConfigMaps or Secrets
+    ContainerRestartRule describes how a container exit is handled.
     """ # noqa: E501
-    config_map_ref: Optional[IoK8sApiCoreV1ConfigMapEnvSource] = Field(default=None, description="The ConfigMap to select from", alias="configMapRef")
-    prefix: Optional[StrictStr] = Field(default=None, description="Optional text to prepend to the name of each environment variable. May consist of any printable ASCII characters except '='.")
-    secret_ref: Optional[IoK8sApiCoreV1SecretEnvSource] = Field(default=None, description="The Secret to select from", alias="secretRef")
-    __properties: ClassVar[List[str]] = ["configMapRef", "prefix", "secretRef"]
+    action: StrictStr = Field(description="Specifies the action taken on a container exit if the requirements are satisfied. The only possible value is \"Restart\" to restart the container.")
+    exit_codes: Optional[IoK8sApiCoreV1ContainerRestartRuleOnExitCodes] = Field(default=None, description="Represents the exit codes to check on container exits.", alias="exitCodes")
+    __properties: ClassVar[List[str]] = ["action", "exitCodes"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -51,7 +49,7 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of IoK8sApiCoreV1EnvFromSource from a JSON string"""
+        """Create an instance of IoK8sApiCoreV1ContainerRestartRule from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -72,17 +70,14 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of config_map_ref
-        if self.config_map_ref:
-            _dict['configMapRef'] = self.config_map_ref.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of secret_ref
-        if self.secret_ref:
-            _dict['secretRef'] = self.secret_ref.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of exit_codes
+        if self.exit_codes:
+            _dict['exitCodes'] = self.exit_codes.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of IoK8sApiCoreV1EnvFromSource from a dict"""
+        """Create an instance of IoK8sApiCoreV1ContainerRestartRule from a dict"""
         if obj is None:
             return None
 
@@ -90,9 +85,8 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "configMapRef": IoK8sApiCoreV1ConfigMapEnvSource.from_dict(obj["configMapRef"]) if obj.get("configMapRef") is not None else None,
-            "prefix": obj.get("prefix"),
-            "secretRef": IoK8sApiCoreV1SecretEnvSource.from_dict(obj["secretRef"]) if obj.get("secretRef") is not None else None
+            "action": obj.get("action"),
+            "exitCodes": IoK8sApiCoreV1ContainerRestartRuleOnExitCodes.from_dict(obj["exitCodes"]) if obj.get("exitCodes") is not None else None
         })
         return _obj
 

@@ -17,21 +17,20 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.io_k8s_api_core_v1_config_map_env_source import IoK8sApiCoreV1ConfigMapEnvSource
-from kubeflow_trainer_api.models.io_k8s_api_core_v1_secret_env_source import IoK8sApiCoreV1SecretEnvSource
 from typing import Optional, Set
 from typing_extensions import Self
 
-class IoK8sApiCoreV1EnvFromSource(BaseModel):
+class IoK8sApiCoreV1FileKeySelector(BaseModel):
     """
-    EnvFromSource represents the source of a set of ConfigMaps or Secrets
+    FileKeySelector selects a key of the env file.
     """ # noqa: E501
-    config_map_ref: Optional[IoK8sApiCoreV1ConfigMapEnvSource] = Field(default=None, description="The ConfigMap to select from", alias="configMapRef")
-    prefix: Optional[StrictStr] = Field(default=None, description="Optional text to prepend to the name of each environment variable. May consist of any printable ASCII characters except '='.")
-    secret_ref: Optional[IoK8sApiCoreV1SecretEnvSource] = Field(default=None, description="The Secret to select from", alias="secretRef")
-    __properties: ClassVar[List[str]] = ["configMapRef", "prefix", "secretRef"]
+    key: StrictStr = Field(description="The key within the env file. An invalid key will prevent the pod from starting. The keys defined within a source may consist of any printable ASCII characters except '='. During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.")
+    optional: Optional[StrictBool] = Field(default=False, description="Specify whether the file or its key must be defined. If the file or key does not exist, then the env var is not published. If optional is set to true and the specified key does not exist, the environment variable will not be set in the Pod's containers.  If optional is set to false and the specified key does not exist, an error will be returned during Pod creation.")
+    path: StrictStr = Field(description="The path within the volume from which to select the file. Must be relative and may not contain the '..' path or start with '..'.")
+    volume_name: StrictStr = Field(description="The name of the volume mount containing the env file.", alias="volumeName")
+    __properties: ClassVar[List[str]] = ["key", "optional", "path", "volumeName"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -51,7 +50,7 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of IoK8sApiCoreV1EnvFromSource from a JSON string"""
+        """Create an instance of IoK8sApiCoreV1FileKeySelector from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -72,17 +71,11 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of config_map_ref
-        if self.config_map_ref:
-            _dict['configMapRef'] = self.config_map_ref.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of secret_ref
-        if self.secret_ref:
-            _dict['secretRef'] = self.secret_ref.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of IoK8sApiCoreV1EnvFromSource from a dict"""
+        """Create an instance of IoK8sApiCoreV1FileKeySelector from a dict"""
         if obj is None:
             return None
 
@@ -90,9 +83,10 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "configMapRef": IoK8sApiCoreV1ConfigMapEnvSource.from_dict(obj["configMapRef"]) if obj.get("configMapRef") is not None else None,
-            "prefix": obj.get("prefix"),
-            "secretRef": IoK8sApiCoreV1SecretEnvSource.from_dict(obj["secretRef"]) if obj.get("secretRef") is not None else None
+            "key": obj.get("key") if obj.get("key") is not None else '',
+            "optional": obj.get("optional") if obj.get("optional") is not None else False,
+            "path": obj.get("path") if obj.get("path") is not None else '',
+            "volumeName": obj.get("volumeName") if obj.get("volumeName") is not None else ''
         })
         return _obj
 

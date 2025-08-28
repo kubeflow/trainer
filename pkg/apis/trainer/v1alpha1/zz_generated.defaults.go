@@ -93,6 +93,17 @@ func SetObjectDefaults_ClusterTrainingRuntime(in *ClusterTrainingRuntime) {
 					c.Protocol = "TCP"
 				}
 			}
+			for k := range b.Env {
+				c := &b.Env[k]
+				if c.ValueFrom != nil {
+					if c.ValueFrom.FileKeyRef != nil {
+						if c.ValueFrom.FileKeyRef.Optional == nil {
+							var ptrVar1 bool = false
+							c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						}
+					}
+				}
+			}
 			if b.LivenessProbe != nil {
 				if b.LivenessProbe.ProbeHandler.GRPC != nil {
 					if b.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -126,6 +137,17 @@ func SetObjectDefaults_ClusterTrainingRuntime(in *ClusterTrainingRuntime) {
 					c.Protocol = "TCP"
 				}
 			}
+			for k := range b.Env {
+				c := &b.Env[k]
+				if c.ValueFrom != nil {
+					if c.ValueFrom.FileKeyRef != nil {
+						if c.ValueFrom.FileKeyRef.Optional == nil {
+							var ptrVar1 bool = false
+							c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						}
+					}
+				}
+			}
 			if b.LivenessProbe != nil {
 				if b.LivenessProbe.ProbeHandler.GRPC != nil {
 					if b.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -157,6 +179,17 @@ func SetObjectDefaults_ClusterTrainingRuntime(in *ClusterTrainingRuntime) {
 				c := &b.EphemeralContainerCommon.Ports[k]
 				if c.Protocol == "" {
 					c.Protocol = "TCP"
+				}
+			}
+			for k := range b.EphemeralContainerCommon.Env {
+				c := &b.EphemeralContainerCommon.Env[k]
+				if c.ValueFrom != nil {
+					if c.ValueFrom.FileKeyRef != nil {
+						if c.ValueFrom.FileKeyRef.Optional == nil {
+							var ptrVar1 bool = false
+							c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						}
+					}
 				}
 			}
 			if b.EphemeralContainerCommon.LivenessProbe != nil {
@@ -195,6 +228,47 @@ func SetObjectDefaults_ClusterTrainingRuntimeList(in *ClusterTrainingRuntimeList
 }
 
 func SetObjectDefaults_TrainJob(in *TrainJob) {
+	if in.Spec.Initializer != nil {
+		if in.Spec.Initializer.Dataset != nil {
+			for i := range in.Spec.Initializer.Dataset.Env {
+				a := &in.Spec.Initializer.Dataset.Env[i]
+				if a.ValueFrom != nil {
+					if a.ValueFrom.FileKeyRef != nil {
+						if a.ValueFrom.FileKeyRef.Optional == nil {
+							var ptrVar1 bool = false
+							a.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						}
+					}
+				}
+			}
+		}
+		if in.Spec.Initializer.Model != nil {
+			for i := range in.Spec.Initializer.Model.Env {
+				a := &in.Spec.Initializer.Model.Env[i]
+				if a.ValueFrom != nil {
+					if a.ValueFrom.FileKeyRef != nil {
+						if a.ValueFrom.FileKeyRef.Optional == nil {
+							var ptrVar1 bool = false
+							a.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						}
+					}
+				}
+			}
+		}
+	}
+	if in.Spec.Trainer != nil {
+		for i := range in.Spec.Trainer.Env {
+			a := &in.Spec.Trainer.Env[i]
+			if a.ValueFrom != nil {
+				if a.ValueFrom.FileKeyRef != nil {
+					if a.ValueFrom.FileKeyRef.Optional == nil {
+						var ptrVar1 bool = false
+						a.ValueFrom.FileKeyRef.Optional = &ptrVar1
+					}
+				}
+			}
+		}
+	}
 	for i := range in.Spec.PodSpecOverrides {
 		a := &in.Spec.PodSpecOverrides[i]
 		for j := range a.Volumes {
@@ -239,6 +313,34 @@ func SetObjectDefaults_TrainJob(in *TrainJob) {
 				}
 				if b.VolumeSource.ScaleIO.FSType == "" {
 					b.VolumeSource.ScaleIO.FSType = "xfs"
+				}
+			}
+		}
+		for j := range a.InitContainers {
+			b := &a.InitContainers[j]
+			for k := range b.Env {
+				c := &b.Env[k]
+				if c.ValueFrom != nil {
+					if c.ValueFrom.FileKeyRef != nil {
+						if c.ValueFrom.FileKeyRef.Optional == nil {
+							var ptrVar1 bool = false
+							c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						}
+					}
+				}
+			}
+		}
+		for j := range a.Containers {
+			b := &a.Containers[j]
+			for k := range b.Env {
+				c := &b.Env[k]
+				if c.ValueFrom != nil {
+					if c.ValueFrom.FileKeyRef != nil {
+						if c.ValueFrom.FileKeyRef.Optional == nil {
+							var ptrVar1 bool = false
+							c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						}
+					}
 				}
 			}
 		}
@@ -308,6 +410,17 @@ func SetObjectDefaults_TrainingRuntime(in *TrainingRuntime) {
 					c.Protocol = "TCP"
 				}
 			}
+			for k := range b.Env {
+				c := &b.Env[k]
+				if c.ValueFrom != nil {
+					if c.ValueFrom.FileKeyRef != nil {
+						if c.ValueFrom.FileKeyRef.Optional == nil {
+							var ptrVar1 bool = false
+							c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						}
+					}
+				}
+			}
 			if b.LivenessProbe != nil {
 				if b.LivenessProbe.ProbeHandler.GRPC != nil {
 					if b.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -341,6 +454,17 @@ func SetObjectDefaults_TrainingRuntime(in *TrainingRuntime) {
 					c.Protocol = "TCP"
 				}
 			}
+			for k := range b.Env {
+				c := &b.Env[k]
+				if c.ValueFrom != nil {
+					if c.ValueFrom.FileKeyRef != nil {
+						if c.ValueFrom.FileKeyRef.Optional == nil {
+							var ptrVar1 bool = false
+							c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						}
+					}
+				}
+			}
 			if b.LivenessProbe != nil {
 				if b.LivenessProbe.ProbeHandler.GRPC != nil {
 					if b.LivenessProbe.ProbeHandler.GRPC.Service == nil {
@@ -372,6 +496,17 @@ func SetObjectDefaults_TrainingRuntime(in *TrainingRuntime) {
 				c := &b.EphemeralContainerCommon.Ports[k]
 				if c.Protocol == "" {
 					c.Protocol = "TCP"
+				}
+			}
+			for k := range b.EphemeralContainerCommon.Env {
+				c := &b.EphemeralContainerCommon.Env[k]
+				if c.ValueFrom != nil {
+					if c.ValueFrom.FileKeyRef != nil {
+						if c.ValueFrom.FileKeyRef.Optional == nil {
+							var ptrVar1 bool = false
+							c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+						}
+					}
 				}
 			}
 			if b.EphemeralContainerCommon.LivenessProbe != nil {

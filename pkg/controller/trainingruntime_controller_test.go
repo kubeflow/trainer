@@ -129,6 +129,7 @@ func TestReconcile_TrainingRuntimeReconciler(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantTrainingRuntime, &gotRuntime,
 				cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion"),
+				cmpopts.IgnoreFields(metav1.TypeMeta{}, "Kind", "APIVersion"),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected TrainingRuntime: (-want, +got): \n%s", diff)
 			}

@@ -18,20 +18,18 @@ import re  # noqa: F401
 import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
-from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.io_k8s_api_core_v1_config_map_env_source import IoK8sApiCoreV1ConfigMapEnvSource
-from kubeflow_trainer_api.models.io_k8s_api_core_v1_secret_env_source import IoK8sApiCoreV1SecretEnvSource
+from typing import Any, ClassVar, Dict, List
+from kubeflow_trainer_api.models.io_k8s_api_core_v1_container_extended_resource_request import IoK8sApiCoreV1ContainerExtendedResourceRequest
 from typing import Optional, Set
 from typing_extensions import Self
 
-class IoK8sApiCoreV1EnvFromSource(BaseModel):
+class IoK8sApiCoreV1PodExtendedResourceClaimStatus(BaseModel):
     """
-    EnvFromSource represents the source of a set of ConfigMaps or Secrets
+    PodExtendedResourceClaimStatus is stored in the PodStatus for the extended resource requests backed by DRA. It stores the generated name for the corresponding special ResourceClaim created by the scheduler.
     """ # noqa: E501
-    config_map_ref: Optional[IoK8sApiCoreV1ConfigMapEnvSource] = Field(default=None, description="The ConfigMap to select from", alias="configMapRef")
-    prefix: Optional[StrictStr] = Field(default=None, description="Optional text to prepend to the name of each environment variable. May consist of any printable ASCII characters except '='.")
-    secret_ref: Optional[IoK8sApiCoreV1SecretEnvSource] = Field(default=None, description="The Secret to select from", alias="secretRef")
-    __properties: ClassVar[List[str]] = ["configMapRef", "prefix", "secretRef"]
+    request_mappings: List[IoK8sApiCoreV1ContainerExtendedResourceRequest] = Field(description="RequestMappings identifies the mapping of <container, extended resource backed by DRA> to  device request in the generated ResourceClaim.", alias="requestMappings")
+    resource_claim_name: StrictStr = Field(description="ResourceClaimName is the name of the ResourceClaim that was generated for the Pod in the namespace of the Pod.", alias="resourceClaimName")
+    __properties: ClassVar[List[str]] = ["requestMappings", "resourceClaimName"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -51,7 +49,7 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of IoK8sApiCoreV1EnvFromSource from a JSON string"""
+        """Create an instance of IoK8sApiCoreV1PodExtendedResourceClaimStatus from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -72,17 +70,18 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of config_map_ref
-        if self.config_map_ref:
-            _dict['configMapRef'] = self.config_map_ref.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of secret_ref
-        if self.secret_ref:
-            _dict['secretRef'] = self.secret_ref.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of each item in request_mappings (list)
+        _items = []
+        if self.request_mappings:
+            for _item_request_mappings in self.request_mappings:
+                if _item_request_mappings:
+                    _items.append(_item_request_mappings.to_dict())
+            _dict['requestMappings'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of IoK8sApiCoreV1EnvFromSource from a dict"""
+        """Create an instance of IoK8sApiCoreV1PodExtendedResourceClaimStatus from a dict"""
         if obj is None:
             return None
 
@@ -90,9 +89,8 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "configMapRef": IoK8sApiCoreV1ConfigMapEnvSource.from_dict(obj["configMapRef"]) if obj.get("configMapRef") is not None else None,
-            "prefix": obj.get("prefix"),
-            "secretRef": IoK8sApiCoreV1SecretEnvSource.from_dict(obj["secretRef"]) if obj.get("secretRef") is not None else None
+            "requestMappings": [IoK8sApiCoreV1ContainerExtendedResourceRequest.from_dict(_item) for _item in obj["requestMappings"]] if obj.get("requestMappings") is not None else None,
+            "resourceClaimName": obj.get("resourceClaimName") if obj.get("resourceClaimName") is not None else ''
         })
         return _obj
 

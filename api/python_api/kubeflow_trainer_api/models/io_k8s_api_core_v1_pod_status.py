@@ -23,6 +23,7 @@ from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_container_status import IoK8sApiCoreV1ContainerStatus
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_host_ip import IoK8sApiCoreV1HostIP
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_condition import IoK8sApiCoreV1PodCondition
+from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_extended_resource_claim_status import IoK8sApiCoreV1PodExtendedResourceClaimStatus
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_ip import IoK8sApiCoreV1PodIP
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_resource_claim_status import IoK8sApiCoreV1PodResourceClaimStatus
 from typing import Optional, Set
@@ -35,6 +36,7 @@ class IoK8sApiCoreV1PodStatus(BaseModel):
     conditions: Optional[List[IoK8sApiCoreV1PodCondition]] = Field(default=None, description="Current service state of pod. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions")
     container_statuses: Optional[List[IoK8sApiCoreV1ContainerStatus]] = Field(default=None, description="Statuses of containers in this pod. Each container in the pod should have at most one status in this list, and all statuses should be for containers in the pod. However this is not enforced. If a status for a non-existent container is present in the list, or the list has duplicate names, the behavior of various Kubernetes components is not defined and those statuses might be ignored. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status", alias="containerStatuses")
     ephemeral_container_statuses: Optional[List[IoK8sApiCoreV1ContainerStatus]] = Field(default=None, description="Statuses for any ephemeral containers that have run in this pod. Each ephemeral container in the pod should have at most one status in this list, and all statuses should be for containers in the pod. However this is not enforced. If a status for a non-existent container is present in the list, or the list has duplicate names, the behavior of various Kubernetes components is not defined and those statuses might be ignored. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status", alias="ephemeralContainerStatuses")
+    extended_resource_claim_status: Optional[IoK8sApiCoreV1PodExtendedResourceClaimStatus] = Field(default=None, description="Status of extended resource claim backed by DRA.", alias="extendedResourceClaimStatus")
     host_ip: Optional[StrictStr] = Field(default=None, description="hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will not be updated even if there is a node is assigned to pod", alias="hostIP")
     host_ips: Optional[List[IoK8sApiCoreV1HostIP]] = Field(default=None, description="hostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must match the hostIP field. This list is empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will not be updated even if there is a node is assigned to this pod.", alias="hostIPs")
     init_container_statuses: Optional[List[IoK8sApiCoreV1ContainerStatus]] = Field(default=None, description="Statuses of init containers in this pod. The most recent successful non-restartable init container will have ready = true, the most recently started container will have startTime set. Each init container in the pod should have at most one status in this list, and all statuses should be for containers in the pod. However this is not enforced. If a status for a non-existent container is present in the list, or the list has duplicate names, the behavior of various Kubernetes components is not defined and those statuses might be ignored. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status", alias="initContainerStatuses")
@@ -49,7 +51,7 @@ class IoK8sApiCoreV1PodStatus(BaseModel):
     resize: Optional[StrictStr] = Field(default=None, description="Status of resources resize desired for pod's containers. It is empty if no resources resize is pending. Any changes to container resources will automatically set this to \"Proposed\" Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress. PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources. PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.")
     resource_claim_statuses: Optional[List[IoK8sApiCoreV1PodResourceClaimStatus]] = Field(default=None, description="Status of resource claims.", alias="resourceClaimStatuses")
     start_time: Optional[datetime] = Field(default=None, description="RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.", alias="startTime")
-    __properties: ClassVar[List[str]] = ["conditions", "containerStatuses", "ephemeralContainerStatuses", "hostIP", "hostIPs", "initContainerStatuses", "message", "nominatedNodeName", "observedGeneration", "phase", "podIP", "podIPs", "qosClass", "reason", "resize", "resourceClaimStatuses", "startTime"]
+    __properties: ClassVar[List[str]] = ["conditions", "containerStatuses", "ephemeralContainerStatuses", "extendedResourceClaimStatus", "hostIP", "hostIPs", "initContainerStatuses", "message", "nominatedNodeName", "observedGeneration", "phase", "podIP", "podIPs", "qosClass", "reason", "resize", "resourceClaimStatuses", "startTime"]
 
     @field_validator('phase')
     def phase_validate_enum(cls, value):
@@ -131,6 +133,9 @@ class IoK8sApiCoreV1PodStatus(BaseModel):
                 if _item_ephemeral_container_statuses:
                     _items.append(_item_ephemeral_container_statuses.to_dict())
             _dict['ephemeralContainerStatuses'] = _items
+        # override the default output from pydantic by calling `to_dict()` of extended_resource_claim_status
+        if self.extended_resource_claim_status:
+            _dict['extendedResourceClaimStatus'] = self.extended_resource_claim_status.to_dict()
         # override the default output from pydantic by calling `to_dict()` of each item in host_ips (list)
         _items = []
         if self.host_ips:
@@ -174,6 +179,7 @@ class IoK8sApiCoreV1PodStatus(BaseModel):
             "conditions": [IoK8sApiCoreV1PodCondition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
             "containerStatuses": [IoK8sApiCoreV1ContainerStatus.from_dict(_item) for _item in obj["containerStatuses"]] if obj.get("containerStatuses") is not None else None,
             "ephemeralContainerStatuses": [IoK8sApiCoreV1ContainerStatus.from_dict(_item) for _item in obj["ephemeralContainerStatuses"]] if obj.get("ephemeralContainerStatuses") is not None else None,
+            "extendedResourceClaimStatus": IoK8sApiCoreV1PodExtendedResourceClaimStatus.from_dict(obj["extendedResourceClaimStatus"]) if obj.get("extendedResourceClaimStatus") is not None else None,
             "hostIP": obj.get("hostIP"),
             "hostIPs": [IoK8sApiCoreV1HostIP.from_dict(_item) for _item in obj["hostIPs"]] if obj.get("hostIPs") is not None else None,
             "initContainerStatuses": [IoK8sApiCoreV1ContainerStatus.from_dict(_item) for _item in obj["initContainerStatuses"]] if obj.get("initContainerStatuses") is not None else None,
