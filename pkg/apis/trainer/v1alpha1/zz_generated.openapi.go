@@ -1110,12 +1110,34 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref common.ReferenceCallba
 							},
 						},
 					},
+					"imagePullSecrets": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ImagePullSecrets overrides the image pull secrets for the Pods in the target job templates.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.LocalObjectReference"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"targetJobs"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ContainerOverride", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.PodSchedulingGate", "k8s.io/api/core/v1.Toleration", "k8s.io/api/core/v1.Volume"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ContainerOverride", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.PodSchedulingGate", "k8s.io/api/core/v1.Toleration", "k8s.io/api/core/v1.Volume"},
 	}
 }
 

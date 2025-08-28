@@ -314,6 +314,18 @@ func (j *JobSetWrapper) SchedulingGates(rJobName string, schedulingGates ...core
 	return j
 }
 
+func (j *JobSetWrapper) ImagePullSecrets(rJobName string, imagePullSecrets ...corev1.LocalObjectReference) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.ImagePullSecrets = append(
+				j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.ImagePullSecrets,
+				imagePullSecrets...,
+			)
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) Tolerations(rJobName string, tolerations ...corev1.Toleration) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {

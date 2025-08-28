@@ -13919,6 +13919,22 @@
             ],
             "x-kubernetes-list-type": "map"
           },
+          "imagePullSecrets": {
+            "description": "ImagePullSecrets overrides the image pull secrets for the Pods in the target job templates.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.LocalObjectReference"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
           "initContainers": {
             "description": "Overrides for the init container in the target job templates.",
             "type": "array",

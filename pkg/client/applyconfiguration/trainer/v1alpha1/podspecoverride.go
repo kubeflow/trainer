@@ -33,6 +33,7 @@ type PodSpecOverrideApplyConfiguration struct {
 	InitContainers     []ContainerOverrideApplyConfiguration        `json:"initContainers,omitempty"`
 	Containers         []ContainerOverrideApplyConfiguration        `json:"containers,omitempty"`
 	SchedulingGates    []v1.PodSchedulingGate                       `json:"schedulingGates,omitempty"`
+	ImagePullSecrets   []v1.LocalObjectReference                    `json:"imagePullSecrets,omitempty"`
 }
 
 // PodSpecOverrideApplyConfiguration constructs a declarative configuration of the PodSpecOverride type for use with
@@ -142,6 +143,16 @@ func (b *PodSpecOverrideApplyConfiguration) WithContainers(values ...*ContainerO
 func (b *PodSpecOverrideApplyConfiguration) WithSchedulingGates(values ...v1.PodSchedulingGate) *PodSpecOverrideApplyConfiguration {
 	for i := range values {
 		b.SchedulingGates = append(b.SchedulingGates, values[i])
+	}
+	return b
+}
+
+// WithImagePullSecrets adds the given value to the ImagePullSecrets field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ImagePullSecrets field.
+func (b *PodSpecOverrideApplyConfiguration) WithImagePullSecrets(values ...v1.LocalObjectReference) *PodSpecOverrideApplyConfiguration {
+	for i := range values {
+		b.ImagePullSecrets = append(b.ImagePullSecrets, values[i])
 	}
 	return b
 }
