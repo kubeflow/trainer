@@ -142,6 +142,10 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = errors.Join(err, terminalCondErr)
 	}
 
+	if jobsStatusErr := setJobsStatus(ctx, runtime, &trainJob); jobsStatusErr != nil {
+		err = errors.Join(err, jobsStatusErr)
+	}
+
 	if !equality.Semantic.DeepEqual(&trainJob.Status, originStatus) {
 		return ctrl.Result{}, errors.Join(err, r.client.Status().Update(ctx, &trainJob))
 	}
@@ -264,6 +268,18 @@ func setTerminalCondition(ctx context.Context, runtime jobruntimes.Runtime, trai
 	if terminalCond != nil {
 		meta.SetStatusCondition(&trainJob.Status.Conditions, *terminalCond)
 	}
+	return nil
+}
+
+func setJobsStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
+	statuses, err := runtime.JobsStatus(ctx, trainJob)
+	if err != nil {
+		return err
+	}
+	if statuses == nil {
+		return nil
+	}
+	trainJob.Status.JobsStatus = statuses
 	return nil
 }
 
