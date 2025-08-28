@@ -503,6 +503,11 @@ func (j *JobSetWrapper) DependsOn(rJobName string, dependsOn ...jobsetv1alpha2.D
 	return j
 }
 
+func (j *JobSetWrapper) ReplicatedJobsStatuses(statuses []jobsetv1alpha2.ReplicatedJobStatus) *JobSetWrapper {
+	j.Status.ReplicatedJobsStatus = statuses
+	return j
+}
+
 func (j *JobSetWrapper) Obj() *jobsetv1alpha2.JobSet {
 	return &j.JobSet
 }

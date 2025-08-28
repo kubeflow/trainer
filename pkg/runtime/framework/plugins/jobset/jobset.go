@@ -63,6 +63,7 @@ var _ framework.WatchExtensionPlugin = (*JobSet)(nil)
 var _ framework.PodNetworkPlugin = (*JobSet)(nil)
 var _ framework.ComponentBuilderPlugin = (*JobSet)(nil)
 var _ framework.TerminalConditionPlugin = (*JobSet)(nil)
+var _ framework.JobsStatusPlugin = (*JobSet)(nil)
 var _ framework.CustomValidationPlugin = (*JobSet)(nil)
 
 const Name = constants.JobSetKind
@@ -303,4 +304,23 @@ func (j *JobSet) TerminalCondition(ctx context.Context, trainJob *trainer.TrainJ
 		return failed, nil
 	}
 	return nil, nil
+}
+
+func (j *JobSet) JobsStatus(ctx context.Context, trainJob *trainer.TrainJob) ([]trainer.JobStatus, error) {
+	jobSet := &jobsetv1alpha2.JobSet{}
+	if err := j.client.Get(ctx, client.ObjectKeyFromObject(trainJob), jobSet); err != nil {
+		return nil, err
+	}
+	var statuses []trainer.JobStatus
+	for _, status := range jobSet.Status.ReplicatedJobsStatus {
+		statuses = append(statuses, trainer.JobStatus{
+			Name:      status.Name,
+			Ready:     status.Ready,
+			Succeeded: status.Succeeded,
+			Failed:    status.Failed,
+			Active:    status.Active,
+			Suspended: status.Suspended,
+		})
+	}
+	return statuses, nil
 }

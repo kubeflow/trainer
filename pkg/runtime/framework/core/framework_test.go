@@ -114,6 +114,9 @@ func TestNew(t *testing.T) {
 				terminalConditionPlugins: []framework.TerminalConditionPlugin{
 					&jobset.JobSet{},
 				},
+				jobsStatusPlugins: []framework.JobsStatusPlugin{
+					&jobset.JobSet{},
+				},
 			},
 		},
 		"indexer key for trainingRuntime and runtimeClass is an empty": {
@@ -136,7 +139,7 @@ func TestNew(t *testing.T) {
 		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
 		cmpopts.IgnoreFields(coscheduling.CoScheduling{}, "client"),
 		cmpopts.IgnoreFields(volcano.Volcano{}, "client"),
-		cmpopts.IgnoreFields(jobset.JobSet{}, "client"),
+		cmpopts.IgnoreFields(jobset.JobSet{}, "client", "restMapper", "scheme", "logger"),
 		cmpopts.IgnoreTypes(apiruntime.Scheme{}, meta.DefaultRESTMapper{}, fwkplugins.Registry{}),
 		cmpopts.SortMaps(func(a, b string) bool { return a < b }),
 		cmpopts.SortSlices(func(a, b framework.Plugin) bool { return a.Name() < b.Name() }),
@@ -1544,6 +1547,160 @@ func TestTerminalConditionPlugins(t *testing.T) {
 
 			if diff := cmp.Diff(tc.wantCondition, gotCond); len(diff) != 0 {
 				t.Errorf("Unexpected terminal condition (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+type fakeJobsStatusPlugin struct{}
+
+var _ framework.JobsStatusPlugin = (*fakeJobsStatusPlugin)(nil)
+
+func newFakeJobsStatusPlugin(context.Context, client.Client, client.FieldIndexer) (framework.Plugin, error) {
+	return &fakeJobsStatusPlugin{}, nil
+}
+
+const fakeJobsStatusPluginName = "fake-jobs-status"
+
+func (f fakeJobsStatusPlugin) Name() string { return fakeJobsStatusPluginName }
+func (f fakeJobsStatusPlugin) JobsStatus(context.Context, *trainer.TrainJob) ([]trainer.JobStatus, error) {
+	return []trainer.JobStatus{
+		{Name: "fake-job", Ready: 1, Succeeded: 0, Failed: 0, Active: 1, Suspended: 0},
+	}, nil
+}
+
+func TestJobsStatusPlugins(t *testing.T) {
+	cases := map[string]struct {
+		registry     fwkplugins.Registry
+		trainJob     *trainer.TrainJob
+		jobSet       *jobsetv1alpha2.JobSet
+		wantStatuses []trainer.JobStatus
+		wantError    error
+	}{
+		"JobSet with empty replicated jobs status": {
+			registry: fwkplugins.NewRegistry(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				Obj(),
+			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				Obj(),
+			wantStatuses: nil,
+		},
+		"succeeded to obtain JobsStatus from JobSet with multiple replicated jobs": {
+			registry: fwkplugins.NewRegistry(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				Obj(),
+			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				ReplicatedJobsStatuses([]jobsetv1alpha2.ReplicatedJobStatus{
+					{
+						Name:      constants.DatasetInitializer,
+						Ready:     1,
+						Succeeded: 1,
+						Failed:    0,
+						Active:    0,
+						Suspended: 0,
+					},
+					{
+						Name:      constants.ModelInitializer,
+						Ready:     1,
+						Succeeded: 1,
+						Failed:    0,
+						Active:    0,
+						Suspended: 0,
+					},
+					{
+						Name:      constants.Node,
+						Ready:     2,
+						Succeeded: 0,
+						Failed:    0,
+						Active:    2,
+						Suspended: 0,
+					},
+				}).
+				Obj(),
+			wantStatuses: []trainer.JobStatus{
+				{
+					Name:      constants.DatasetInitializer,
+					Ready:     1,
+					Succeeded: 1,
+					Failed:    0,
+					Active:    0,
+					Suspended: 0,
+				},
+				{
+					Name:      constants.ModelInitializer,
+					Ready:     1,
+					Succeeded: 1,
+					Failed:    0,
+					Active:    0,
+					Suspended: 0,
+				},
+				{
+					Name:      constants.Node,
+					Ready:     2,
+					Succeeded: 0,
+					Failed:    0,
+					Active:    2,
+					Suspended: 0,
+				},
+			},
+		},
+		"succeeded to obtain JobsStatus from JobSet with failed job": {
+			registry: fwkplugins.NewRegistry(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				Obj(),
+			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				ReplicatedJobsStatuses([]jobsetv1alpha2.ReplicatedJobStatus{
+					{
+						Name:      constants.Node,
+						Ready:     0,
+						Succeeded: 0,
+						Failed:    1,
+						Active:    0,
+						Suspended: 0,
+					},
+				}).
+				Obj(),
+			wantStatuses: []trainer.JobStatus{
+				{
+					Name:      constants.Node,
+					Ready:     0,
+					Succeeded: 0,
+					Failed:    1,
+					Active:    0,
+					Suspended: 0,
+				},
+			},
+		},
+		"failed to obtain JobsStatus due to multiple JobsStatusPlugins": {
+			registry: fwkplugins.Registry{
+				jobset.Name:              jobset.New,
+				fakeJobsStatusPluginName: newFakeJobsStatusPlugin,
+			},
+			wantError: errorTooManyJobsStatusPlugin,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			clientBuilder := testingutil.NewClientBuilder()
+			if tc.jobSet != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.jobSet)
+			}
+			c := clientBuilder.Build()
+
+			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			gotStatuses, gotErr := fwk.RunJobsStatusPlugins(ctx, tc.trainJob)
+			if diff := cmp.Diff(tc.wantError, gotErr, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff(tc.wantStatuses, gotStatuses); len(diff) != 0 {
+				t.Errorf("Unexpected jobs status (-want,+got):\n%s", diff)
 			}
 		})
 	}
