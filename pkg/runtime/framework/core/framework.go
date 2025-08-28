@@ -31,7 +31,10 @@ import (
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
 )
 
-var errorTooManyTerminalConditionPlugin = errors.New("too many TerminalCondition plugins are registered")
+var (
+	errorTooManyTerminalConditionPlugin = errors.New("too many TerminalCondition plugins are registered")
+	errorTooManyJobsStatusPlugin        = errors.New("too many JobsStatus plugins are registered")
+)
 
 type Framework struct {
 	registry                     fwkplugins.Registry
@@ -43,6 +46,7 @@ type Framework struct {
 	podNetworkPlugins            []framework.PodNetworkPlugin
 	componentBuilderPlugins      []framework.ComponentBuilderPlugin
 	terminalConditionPlugins     []framework.TerminalConditionPlugin
+	jobsStatusPlugins            []framework.JobsStatusPlugin
 }
 
 func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer client.FieldIndexer) (*Framework, error) {
@@ -77,6 +81,9 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 		}
 		if p, ok := plugin.(framework.TerminalConditionPlugin); ok {
 			f.terminalConditionPlugins = append(f.terminalConditionPlugins, p)
+		}
+		if p, ok := plugin.(framework.JobsStatusPlugin); ok {
+			f.jobsStatusPlugins = append(f.jobsStatusPlugins, p)
 		}
 	}
 	f.plugins = plugins
@@ -144,6 +151,16 @@ func (f *Framework) RunTerminalConditionPlugins(ctx context.Context, trainJob *t
 	}
 	if len(f.terminalConditionPlugins) != 0 {
 		return f.terminalConditionPlugins[0].TerminalCondition(ctx, trainJob)
+	}
+	return nil, nil
+}
+
+func (f *Framework) RunJobsStatusPlugins(ctx context.Context, trainJob *trainer.TrainJob) ([]trainer.JobStatus, error) {
+	if len(f.jobsStatusPlugins) > 1 {
+		return nil, errorTooManyJobsStatusPlugin
+	}
+	if len(f.jobsStatusPlugins) != 0 {
+		return f.jobsStatusPlugins[0].JobsStatus(ctx, trainJob)
 	}
 	return nil, nil
 }
