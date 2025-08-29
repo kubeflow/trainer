@@ -183,7 +183,7 @@ test-e2e-setup-gpu-cluster: kind ## Setup Kind cluster with GPU for e2e test.
 	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-gpu-cluster.sh
 
 .PHONY: test-e2e-delete-cluster
-test-e2e-delete-gpu cluster: kind ## Delete Kind cluster after e2e test.
+test-e2e-delete-gpu-cluster: kind ## Delete Kind cluster after e2e test.
 	./hack/e2e-delete-gpu-cluster.sh
 
 .PHONY: test-e2e

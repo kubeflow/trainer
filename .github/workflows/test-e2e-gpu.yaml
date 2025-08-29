@@ -74,7 +74,7 @@ jobs:
         if: steps.check-label.outputs.skip == 'false'
         run: |
           mkdir -p artifacts/notebooks
-          make test-e2e-notebook NOTEBOOK_INPUT=.examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_alpaca-trainjob-yaml.ipynb TIMEOUT=900
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_alpaca-trainjob-yaml.ipynb TIMEOUT=900
 
       - name: Delete cluster
         if: always()
