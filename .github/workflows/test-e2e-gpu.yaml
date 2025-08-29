@@ -74,15 +74,15 @@ jobs:
         if: steps.check-label.outputs.skip == 'false'
         run: |
           mkdir -p artifacts/notebooks
-          make test-e2e-notebook NOTEBOOK_INPUT=.examples/deepspeed/text-summarization/T5-Fine-Tuning.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_mnist.ipynb TIMEOUT=900
+          make test-e2e-notebook NOTEBOOK_INPUT=.examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_alpaca-trainjob-yaml.ipynb TIMEOUT=900
 
       - name: Delete cluster
-        if: steps.check-label.outputs.skip == 'false'
+        if: always()
         run: |
           make test-e2e-delete-gpu-cluster
 
       - name: Upload Artifacts to GitHub
-        if: always() && steps.check-label.outputs.skip == 'false'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.kubernetes-version }}
