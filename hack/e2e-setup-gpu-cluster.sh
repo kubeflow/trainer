@@ -44,15 +44,7 @@ CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CONTROLLER_MA
 echo "Build Kubeflow Trainer images"
 sudo docker build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
 
-# Set up Docker to use NVIDIA runtime.
-sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enabled
-sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
-sudo systemctl restart docker
-
-# Install nvkind and create a Kind cluster with GPU support.
-echo "Install nvkind"
-sudo go install github.com/NVIDIA/nvkind/cmd/nvkind@latest
-
+# Create a Kind cluster with GPU support.
 nvkind cluster create --image "${KIND_NODE_VERSION}"
 CLUSTER_NAME=$(kind get clusters | grep nvkind)
 nvkind cluster print-gpus
@@ -86,8 +78,8 @@ kind load docker-image "${CONTROLLER_MANAGER_CI_IMAGE}" --name "${CLUSTER_NAME}"
 # Deploy Kubeflow Trainer control plane
 echo "Deploy Kubeflow Trainer control plane"
 E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
-sudo mkdir -p "${E2E_MANIFESTS_DIR}"
-sudo cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
+mkdir -p "${E2E_MANIFESTS_DIR}"
+cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
   apiVersion: kustomize.config.k8s.io/v1beta1
   kind: Kustomization
   resources:
