@@ -44,6 +44,11 @@ CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CONTROLLER_MA
 echo "Build Kubeflow Trainer images"
 sudo docker build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
 
+# Set up Docker to use NVIDIA runtime.
+sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enabled
+sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
+sudo systemctl restart docker
+
 # Create a Kind cluster with GPU support.
 nvkind cluster create --image "${KIND_NODE_VERSION}"
 CLUSTER_NAME=$(kind get clusters | grep nvkind)
