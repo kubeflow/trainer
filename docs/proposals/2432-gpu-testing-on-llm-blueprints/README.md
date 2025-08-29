@@ -13,12 +13,11 @@ Project Size: 350 hrs
 
 This project aims to use self-hosted runners to run GPU-intensive tasks like LLM blueprint or (planned) AI Playground. The necessary infra is provided by Oracle, plan is to use Oracle Kubernetes Engine (OKE) with NVIDIA GPUs for this task. Any code or sample that requires GPU-intensive resources will be transferred to OKE infra instead of generic GitHub infra for faster and more efficient execution.
 
-To ensure robust and efficient testing, a dedicated policy will be implemented: whenever code is updated in either of the following notebooks—
+For gpu runner testing, main idea to verify the below example by running it on GPU infra —
 
-- DeepSpeed: `master/examples/deepspeed/text-summarization/T5-Fine-Tuning.ipynb`
 - TorchTune: `master/examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb`
 
-The workflow will monitor changes in these paths and, upon approval from maintainer, execute the notebooks using a GitHub self-hosted runner on the OKE infrastructure. The GitHub Action will be triggered only when a specific label (e.g., `run-gpu-e2e`) is applied to a pull request. For security, this workflow requires the lavel to be added from a maintainer before execution.
+The workflow will monitor the label on PRs and, upon approval from maintainer, execute the notebooks using gpu enabled self-hosted runner on the OKE infrastructure. The GitHub Action will be triggered only when a specific label (e.g., `ok-to-test-gpu-runner`) is applied to a pull request. For security, this workflow requires the label to be added from a maintainer before execution.
 
 A monitoring dashboard will be established to track metrics, resource usage, and identify bottlenecks. While this setup is designed for OKE, the approach is platform-agnostic and can be adapted to any Kubernetes cluster with adequate GPU resources.
 
@@ -83,7 +82,7 @@ These samples would be used to cover a range of scenarios and configurations, th
 
 ### Github Action
 
-Create a GitHub action for checking changes in files in `trainer/example/deepspeed/` or `trainer/examples/torchtune/` and wait to trigger the self-runner after approval from the maintainers and only when a specific label (e.g., `run-gpu-e2e`) is applied to a pull request. Once the maintainer approves the scan, the code is executed in the self-runner (that is OKE infra). Assuming it takes some time and resources, we will implement queuing so that resources don't get flooded with requests. We will maintain a queue for requests, and report the result back to CI accordingly.
+Create a GitHub action `GPU E2E Test` which add functionality to run and validate the changes on the gpu based self runner. Once the maintainer adds the (`ok-to-test-gpu-runner) label, the torchtune example is executed in the gpu enabled self-runner. Assuming it takes some time and resources, we will implement queuing so that resources don't get flooded with requests. We will maintain a queue for requests, and report the result back to CI accordingly.
 
 Here is the branch which demonstrats the running of self runner on gpu enabled infra -[test-on-oci-vm](https://github.com/jaiakash/trainer/tree/refs/heads/test-on-oci-vm)
 
