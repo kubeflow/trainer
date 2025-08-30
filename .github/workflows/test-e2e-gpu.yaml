@@ -76,12 +76,10 @@ jobs:
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_alpaca-trainjob-yaml.ipynb TIMEOUT=900
 
-      ## Remove this in prod, for now keep it for debugging
-      # - name: Delete cluster
-        
-      #   if: steps.check-label.outputs.skip == 'false'
-      #   run: |
-      #     make test-e2e-delete-gpu-cluster
+      - name: Delete cluster
+        if: steps.check-label.outputs.skip == 'false'
+        run: |
+          make test-e2e-delete-gpu-cluster
 
       - name: Upload Artifacts to GitHub
         if: always()
