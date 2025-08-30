@@ -1,6 +1,8 @@
 # pkg and bin directories currently contain build artifacts
 # only so we exclude them.
 bin/
+!pkg/data_cache/src/head/bin/
+!pkg/data_cache/src/worker/bin/
 manifests/external-crds/
 
 # IDEs
@@ -27,3 +29,8 @@ cover.out
 # Helm
 charts/kubeflow-trainer/charts/
 charts/kubeflow-trainer/Chart.lock
+
+# data_cache
+pkg/data_cache/target
+pkg/data_cache/test/target/
+hack/data_cache/*.log
