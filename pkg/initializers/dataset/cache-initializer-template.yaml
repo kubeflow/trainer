@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: $NAME-sa
+  annotations:
+    eks.amazonaws.com/sts-regional-endpoints: "true"
+    eks.amazonaws.com/role-arn: $IAM_ROLE
+---
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: $NAME-cache
+spec:
+  replicas: 1
+  leaderWorkerTemplate:
+    size: $SIZE
+    leaderTemplate:
+      metadata:
+        labels:
+          app: $NAME-cache-head
+      spec:
+        serviceAccountName: $NAME-sa
+        containers:
+        - name: head
+          image: $IMAGE
+          command: [ "head" ]
+          args:
+            - "0.0.0.0"
+            - "50051"
+          resources:
+            limits:
+              cpu: "$HEAD_CPU"
+              memory: "$HEAD_MEM"
+            requests:
+              cpu: "$HEAD_CPU"
+              memory: "$HEAD_MEM"
+          env:
+            - name: METADATA_LOC
+              value: $METADATA_LOC
+            - name: TABLE_NAME
+              value: $TABLE_NAME
+            - name: SCHEMA_NAME
+              value: $SCHEMA_NAME
+          ports:
+            - containerPort: 50051
+    workerTemplate:
+      spec:
+        serviceAccountName: $NAME-sa
+        containers:
+        - name: worker
+          image: $IMAGE
+          command: ["worker"]
+          args:
+            - "0.0.0.0"
+            - "50051"
+          resources:
+            limits:
+              cpu: "$WORKER_CPU"
+              memory: "$WORKER_MEM"
+            requests:
+              cpu: "$WORKER_CPU"
+              memory: "$WORKER_MEM"
+          ports:
+          - containerPort: 50051
+          env:
+            - name: METADATA_LOC
+              value: $METADATA_LOC
+            - name: TABLE_NAME
+              value: $TABLE_NAME
+            - name: SCHEMA_NAME
+              value: $SCHEMA_NAME
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: $NAME-cache-service
+spec:
+  selector:
+    app: $NAME-cache-head
+  ports:
+    - protocol: TCP
+      port: 50051
+      targetPort: 50051

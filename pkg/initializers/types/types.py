@@ -15,3 +15,20 @@ class HuggingFaceDatasetInitializer:
 class HuggingFaceModelInitializer:
     storage_uri: str
     access_token: Optional[str] = None
+
+
+# Configuration for the cache dataset initializer.
+@dataclass
+class CacheDatasetInitializer:
+    storage_uri: str
+    train_job_name: Optional[str] = None
+    cache_image: Optional[str] = None
+    cluster_size: Optional[str] = None
+    metadata_loc: Optional[str] = None
+    table_name: Optional[str] = None
+    schema_name: Optional[str] = None
+    iam_role: Optional[str] = None
+    head_cpu: Optional[str] = None
+    head_mem: Optional[str] = None
+    worker_cpu: Optional[str] = None
+    worker_mem: Optional[str] = None
