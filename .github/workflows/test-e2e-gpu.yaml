@@ -1,0 +1,90 @@
+name: GPU E2E Test
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+
+jobs:
+  gpu-e2e-test:
+    name: GPU E2E Test
+    runs-on: oracle-vm-16cpu-a10gpu-240gb
+
+    env:
+      GOPATH: ${{ github.workspace }}/go
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    defaults:
+      run:
+        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+
+    strategy:
+      fail-fast: false
+      matrix:
+        kubernetes-version: ["1.33.1"]
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+
+      - name: Check GPU label
+        id: check-label
+        run: |
+          if [[ "${{ join(github.event.pull_request.labels.*.name, ',') }}" != *"ok-to-test-gpu-runner"* ]]; then
+            echo "Label 'ok-to-test-gpu-runner' not found. Skipping GPU tests."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "Label found. Running GPU tests."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip message
+        if: steps.check-label.outputs.skip == 'true'
+        run: echo "✅ Skipped GPU E2E tests (label not present)."
+
+      - name: Setup Go
+        if: steps.check-label.outputs.skip == 'false'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
+
+      - name: Setup Python
+        if: steps.check-label.outputs.skip == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        if: steps.check-label.outputs.skip == 'false'
+        run: |
+          pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
+          pip install git+https://github.com/kubeflow/sdk.git@main
+
+      - name: Setup cluster with GPU
+        if: steps.check-label.outputs.skip == 'false'
+        run: |
+          make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
+
+      - name: Run e2e with Go
+        if: steps.check-label.outputs.skip == 'false'
+        run: |
+          make test-e2e || (kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer && exit 1)
+
+      - name: Run e2e test for example Notebooks
+        if: steps.check-label.outputs.skip == 'false'
+        run: |
+          mkdir -p artifacts/notebooks
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_alpaca-trainjob-yaml.ipynb TIMEOUT=900
+
+      - name: Delete cluster
+        if: always()
+        run: |
+          make test-e2e-delete-gpu-cluster
+
+      - name: Upload Artifacts to GitHub
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.kubernetes-version }}
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
+          retention-days: 1
