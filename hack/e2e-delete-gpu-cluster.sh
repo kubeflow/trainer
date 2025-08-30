@@ -21,9 +21,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-alias kind="sudo kind"
-alias nvkind="sudo nvkind"
-
 CLUSTER_NAME=$(kind get clusters | grep nvkind)
 
 # Delete Kind cluster after validation

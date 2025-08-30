@@ -29,12 +29,10 @@ KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
 NAMESPACE="kubeflow-system"
 TIMEOUT="5m"
 
-## privilaged access for docker to make sure Kind can access GPU resources
-alias docker="sudo docker"
-alias kubectl="sudo kubectl"
-alias kind="sudo kind"
-alias helm="sudo helm"
-alias nvkind="sudo nvkind"
+# Set up Docker to use NVIDIA runtime.
+sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enabled
+sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
+sudo systemctl restart docker
 
 # Kubeflow Trainer images.
 # TODO (andreyvelich): Support initializers images.
@@ -43,11 +41,6 @@ CONTROLLER_MANAGER_CI_IMAGE_TAG="test"
 CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
 echo "Build Kubeflow Trainer images"
 sudo docker build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
-
-# Set up Docker to use NVIDIA runtime.
-sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enabled
-sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
-sudo systemctl restart docker
 
 # Create a Kind cluster with GPU support.
 nvkind cluster create --image "${KIND_NODE_VERSION}"
