@@ -65,3 +65,8 @@ type TerminalConditionPlugin interface {
 	Plugin
 	TerminalCondition(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error)
 }
+
+type JobsStatusPlugin interface {
+	Plugin
+	JobsStatus(ctx context.Context, trainJob *trainer.TrainJob) ([]trainer.JobStatus, error)
+}
