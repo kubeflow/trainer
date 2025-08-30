@@ -58,7 +58,7 @@ jobs:
         if: steps.check-label.outputs.skip == 'false'
         run: |
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
-          pip install git+https://github.com/kubeflow/sdk.git@main
+          pip install git+https://github.com/jaiakash/sdk.git@backend-public
 
       - name: Setup cluster with GPU
         if: steps.check-label.outputs.skip == 'false'
@@ -76,10 +76,12 @@ jobs:
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_alpaca-trainjob-yaml.ipynb TIMEOUT=900
 
-      - name: Delete cluster
-        if: always()
-        run: |
-          make test-e2e-delete-gpu-cluster
+      ## Remove this in prod, for now keep it for debugging
+      # - name: Delete cluster
+        
+      #   if: steps.check-label.outputs.skip == 'false'
+      #   run: |
+      #     make test-e2e-delete-gpu-cluster
 
       - name: Upload Artifacts to GitHub
         if: always()
