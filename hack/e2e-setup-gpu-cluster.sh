@@ -122,6 +122,3 @@ docker pull ${TORCH_RUNTIME_IMAGE}
 kind load docker-image ${TORCH_RUNTIME_IMAGE} --name ${CLUSTER_NAME}
 
 print_cluster_info
-
-sudo cp /root/.kube/config /home/ubuntu/.kube/config
-sudo chown ubuntu:ubuntu /home/ubuntu/.kube/config
