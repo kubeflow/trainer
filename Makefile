@@ -184,6 +184,7 @@ test-e2e-setup-gpu-cluster: kind ## Setup Kind cluster with GPU e2e test.
 
 .PHONY: test-e2e-delete-cluster
 test-e2e-delete-gpu-cluster: kind ## Delete Kind cluster.
+	KIND=$(KIND) ./hack/e2e-delete-gpu-cluster.sh
 
 .PHONY: test-e2e
 test-e2e: ginkgo ## Run Go e2e test.
