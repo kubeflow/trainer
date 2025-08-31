@@ -21,8 +21,19 @@ set -o nounset
 set -o pipefail
 set -x
 
-CLUSTER_NAME=$(kind get clusters | grep nvkind)
+# Find all clusters with prefix "nvkind"
+CLUSTERS=$(kind get clusters | grep '^nvkind' || true)
 
-# Delete Kind cluster after validation
-echo "Deleting Kind cluster: ${CLUSTER_NAME}"
-kind delete cluster --name "${CLUSTER_NAME}"
+if [[ -z "${CLUSTERS}" ]]; then
+  echo "No nvkind clusters found. Nothing to delete."
+  exit 0
+fi
+
+for CLUSTER_NAME in ${CLUSTERS}; do
+  echo "Deleting Kind cluster: ${CLUSTER_NAME}"
+  if kind delete cluster --name "${CLUSTER_NAME}"; then
+    echo "Successfully deleted ${CLUSTER_NAME}"
+  else
+    echo "Warning: Failed to delete ${CLUSTER_NAME}, continuing..."
+  fi
+done
