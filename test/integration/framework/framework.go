@@ -60,6 +60,7 @@ func (f *Framework) Init() *rest.Config {
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "..", "manifests", "base", "crds"),
 			filepath.Join("..", "..", "..", "manifests", "external-crds", "scheduler-plugins", "crd.yaml"),
+			filepath.Join("..", "..", "..", "manifests", "external-crds", "volcano", "scheduling.volcano.sh_podgroups.yaml"),
 			filepath.Join("..", "..", "..", "manifests", "external-crds", "jobset-operator"),
 		},
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
