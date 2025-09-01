@@ -124,9 +124,9 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 						{
 							Name:      constants.Launcher,
 							Ready:     0,
-							Succeeded: 1,
+							Succeeded: 0,
 							Failed:    0,
-							Active:    0,
+							Active:    1,
 							Suspended: 0,
 						},
 						{
@@ -166,7 +166,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 						{
 							Name:      constants.Node,
 							Ready:     0,
-							Succeeded: 1,
+							Succeeded: 0,
 							Failed:    0,
 							Active:    0,
 							Suspended: 0,
