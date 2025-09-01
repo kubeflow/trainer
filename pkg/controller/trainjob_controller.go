@@ -276,9 +276,6 @@ func setJobsStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *t
 	if err != nil {
 		return err
 	}
-	if statuses == nil {
-		return nil
-	}
 	trainJob.Status.JobsStatus = statuses
 	return nil
 }
