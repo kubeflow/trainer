@@ -42,9 +42,21 @@ func main() {
 		oAPIDefs[k] = v
 	}
 
+	volcanoWhitelist := map[string]bool{
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec": true,
+	}
+
 	for defName, val := range oAPIDefs {
 		// Exclude InternalEvent from the OpenAPI spec since it requires runtime.Object dependency.
 		if defName != "k8s.io/apimachinery/pkg/apis/meta/v1.InternalEvent" {
+
+			// If it's from volcano, apply whitelist
+			if strings.HasPrefix(defName, "volcano.sh/apis/") {
+				if !volcanoWhitelist[defName] {
+					continue
+				}
+			}
+
 			// OpenAPI generator incorrectly creates models if enum doesn't have default value.
 			// Therefore, we remove the default value when it is equal to ""
 			// Kubernetes OpenAPI spec doesn't have enums: https://github.com/kubernetes/kubernetes/issues/109177
@@ -56,6 +68,7 @@ func main() {
 			}
 			defs[swaggify(defName)] = val.Schema
 		}
+		// TODO
 	}
 	swagger := spec.Swagger{
 		SwaggerProps: spec.SwaggerProps{
