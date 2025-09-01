@@ -170,6 +170,7 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 		}
 		obj = &unstructured.Unstructured{Object: u}
 
+		//nolint:staticcheck
 		if err := r.client.Patch(ctx, obj, client.Apply, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
 			return err
 		}

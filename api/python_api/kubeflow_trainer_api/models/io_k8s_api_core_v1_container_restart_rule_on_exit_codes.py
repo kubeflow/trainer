@@ -17,21 +17,18 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.io_k8s_api_core_v1_config_map_env_source import IoK8sApiCoreV1ConfigMapEnvSource
-from kubeflow_trainer_api.models.io_k8s_api_core_v1_secret_env_source import IoK8sApiCoreV1SecretEnvSource
 from typing import Optional, Set
 from typing_extensions import Self
 
-class IoK8sApiCoreV1EnvFromSource(BaseModel):
+class IoK8sApiCoreV1ContainerRestartRuleOnExitCodes(BaseModel):
     """
-    EnvFromSource represents the source of a set of ConfigMaps or Secrets
+    ContainerRestartRuleOnExitCodes describes the condition for handling an exited container based on its exit codes.
     """ # noqa: E501
-    config_map_ref: Optional[IoK8sApiCoreV1ConfigMapEnvSource] = Field(default=None, description="The ConfigMap to select from", alias="configMapRef")
-    prefix: Optional[StrictStr] = Field(default=None, description="Optional text to prepend to the name of each environment variable. May consist of any printable ASCII characters except '='.")
-    secret_ref: Optional[IoK8sApiCoreV1SecretEnvSource] = Field(default=None, description="The Secret to select from", alias="secretRef")
-    __properties: ClassVar[List[str]] = ["configMapRef", "prefix", "secretRef"]
+    operator: StrictStr = Field(description="Represents the relationship between the container exit code(s) and the specified values. Possible values are: - In: the requirement is satisfied if the container exit code is in the   set of specified values. - NotIn: the requirement is satisfied if the container exit code is   not in the set of specified values.")
+    values: Optional[List[StrictInt]] = Field(default=None, description="Specifies the set of values to check for container exit codes. At most 255 elements are allowed.")
+    __properties: ClassVar[List[str]] = ["operator", "values"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -51,7 +48,7 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of IoK8sApiCoreV1EnvFromSource from a JSON string"""
+        """Create an instance of IoK8sApiCoreV1ContainerRestartRuleOnExitCodes from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -72,17 +69,11 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of config_map_ref
-        if self.config_map_ref:
-            _dict['configMapRef'] = self.config_map_ref.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of secret_ref
-        if self.secret_ref:
-            _dict['secretRef'] = self.secret_ref.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of IoK8sApiCoreV1EnvFromSource from a dict"""
+        """Create an instance of IoK8sApiCoreV1ContainerRestartRuleOnExitCodes from a dict"""
         if obj is None:
             return None
 
@@ -90,9 +81,8 @@ class IoK8sApiCoreV1EnvFromSource(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "configMapRef": IoK8sApiCoreV1ConfigMapEnvSource.from_dict(obj["configMapRef"]) if obj.get("configMapRef") is not None else None,
-            "prefix": obj.get("prefix"),
-            "secretRef": IoK8sApiCoreV1SecretEnvSource.from_dict(obj["secretRef"]) if obj.get("secretRef") is not None else None
+            "operator": obj.get("operator"),
+            "values": obj.get("values")
         })
         return _obj
 

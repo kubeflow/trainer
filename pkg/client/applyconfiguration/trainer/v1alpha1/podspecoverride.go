@@ -17,8 +17,8 @@
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/client-go/applyconfigurations/core/v1"
+	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // PodSpecOverrideApplyConfiguration represents a declarative configuration of the PodSpecOverride type for use
@@ -27,11 +27,12 @@ type PodSpecOverrideApplyConfiguration struct {
 	TargetJobs         []PodSpecOverrideTargetJobApplyConfiguration `json:"targetJobs,omitempty"`
 	ServiceAccountName *string                                      `json:"serviceAccountName,omitempty"`
 	NodeSelector       map[string]string                            `json:"nodeSelector,omitempty"`
-	Tolerations        []v1.TolerationApplyConfiguration            `json:"tolerations,omitempty"`
-	Volumes            []v1.VolumeApplyConfiguration                `json:"volumes,omitempty"`
+	Affinity           *v1.Affinity                                 `json:"affinity,omitempty"`
+	Tolerations        []corev1.TolerationApplyConfiguration        `json:"tolerations,omitempty"`
+	Volumes            []corev1.VolumeApplyConfiguration            `json:"volumes,omitempty"`
 	InitContainers     []ContainerOverrideApplyConfiguration        `json:"initContainers,omitempty"`
 	Containers         []ContainerOverrideApplyConfiguration        `json:"containers,omitempty"`
-	SchedulingGates    []corev1.PodSchedulingGate                   `json:"schedulingGates,omitempty"`
+	SchedulingGates    []v1.PodSchedulingGate                       `json:"schedulingGates,omitempty"`
 }
 
 // PodSpecOverrideApplyConfiguration constructs a declarative configuration of the PodSpecOverride type for use with
@@ -75,10 +76,18 @@ func (b *PodSpecOverrideApplyConfiguration) WithNodeSelector(entries map[string]
 	return b
 }
 
+// WithAffinity sets the Affinity field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Affinity field is set to the value of the last call.
+func (b *PodSpecOverrideApplyConfiguration) WithAffinity(value v1.Affinity) *PodSpecOverrideApplyConfiguration {
+	b.Affinity = &value
+	return b
+}
+
 // WithTolerations adds the given value to the Tolerations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Tolerations field.
-func (b *PodSpecOverrideApplyConfiguration) WithTolerations(values ...*v1.TolerationApplyConfiguration) *PodSpecOverrideApplyConfiguration {
+func (b *PodSpecOverrideApplyConfiguration) WithTolerations(values ...*corev1.TolerationApplyConfiguration) *PodSpecOverrideApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithTolerations")
@@ -91,7 +100,7 @@ func (b *PodSpecOverrideApplyConfiguration) WithTolerations(values ...*v1.Tolera
 // WithVolumes adds the given value to the Volumes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Volumes field.
-func (b *PodSpecOverrideApplyConfiguration) WithVolumes(values ...*v1.VolumeApplyConfiguration) *PodSpecOverrideApplyConfiguration {
+func (b *PodSpecOverrideApplyConfiguration) WithVolumes(values ...*corev1.VolumeApplyConfiguration) *PodSpecOverrideApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithVolumes")
@@ -130,7 +139,7 @@ func (b *PodSpecOverrideApplyConfiguration) WithContainers(values ...*ContainerO
 // WithSchedulingGates adds the given value to the SchedulingGates field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the SchedulingGates field.
-func (b *PodSpecOverrideApplyConfiguration) WithSchedulingGates(values ...corev1.PodSchedulingGate) *PodSpecOverrideApplyConfiguration {
+func (b *PodSpecOverrideApplyConfiguration) WithSchedulingGates(values ...v1.PodSchedulingGate) *PodSpecOverrideApplyConfiguration {
 	for i := range values {
 		b.SchedulingGates = append(b.SchedulingGates, values[i])
 	}

@@ -35,8 +35,5 @@ Source = "https://github.com/kubeflow/trainer"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.hatch.build.targets.wheel]
-packages = ["kubeflow_trainer_api"]
-
 [tool.hatch.version]
 path = "kubeflow_trainer_api/__init__.py"
