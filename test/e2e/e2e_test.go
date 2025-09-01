@@ -62,8 +62,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
-
-					expectedJobsStatus := []trainer.JobStatus{
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
 						{
 							Name:      constants.Node,
 							Ready:     0,
@@ -72,8 +71,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 							Active:    1,
 							Suspended: 0,
 						},
-					}
-					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo(expectedJobsStatus))
+					}, util.SortJobsStatus))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 
@@ -90,8 +88,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 							Message: jobsetconsts.AllJobsCompletedMessage,
 						},
 					}, util.IgnoreConditions))
-
-					expectedJobsStatus := []trainer.JobStatus{
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
 						{
 							Name:      constants.Node,
 							Ready:     0,
@@ -100,8 +97,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 							Active:    0,
 							Suspended: 0,
 						},
-					}
-					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo(expectedJobsStatus))
+					}, util.SortJobsStatus))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 		})
@@ -124,8 +120,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
-
-					expectedJobsStatus := []trainer.JobStatus{
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
 						{
 							Name:      constants.Launcher,
 							Ready:     0,
@@ -142,8 +137,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 							Active:    1,
 							Suspended: 0,
 						},
-					}
-					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo(expectedJobsStatus))
+					}, util.SortJobsStatus))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 
@@ -160,8 +154,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 							Message: jobsetconsts.AllJobsCompletedMessage,
 						},
 					}, util.IgnoreConditions))
-
-					expectedJobsStatus := []trainer.JobStatus{
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
 						{
 							Name:      constants.Launcher,
 							Ready:     0,
@@ -178,8 +171,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 							Active:    0,
 							Suspended: 0,
 						},
-					}
-					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo(expectedJobsStatus))
+					}, util.SortJobsStatus))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 		})
