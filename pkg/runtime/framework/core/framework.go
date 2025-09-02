@@ -46,8 +46,8 @@ type Framework struct {
 	watchExtensionPlugins        []framework.WatchExtensionPlugin
 	podNetworkPlugins            []framework.PodNetworkPlugin
 	componentBuilderPlugins      []framework.ComponentBuilderPlugin
-	terminalConditionPlugins     []framework.TerminalConditionPlugin
-	jobsStatusPlugins            []framework.JobsStatusPlugin
+	terminalConditionPlugin      framework.TerminalConditionPlugin
+	jobsStatusPlugin             framework.JobsStatusPlugin
 }
 
 func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer client.FieldIndexer) (*Framework, error) {
@@ -84,10 +84,16 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 			f.componentBuilderPlugins = append(f.componentBuilderPlugins, p)
 		}
 		if p, ok := plugin.(framework.TerminalConditionPlugin); ok {
-			f.terminalConditionPlugins = append(f.terminalConditionPlugins, p)
+			if f.terminalConditionPlugin != nil {
+				return nil, errorTooManyTerminalConditionPlugin
+			}
+			f.terminalConditionPlugin = p
 		}
 		if p, ok := plugin.(framework.JobsStatusPlugin); ok {
-			f.jobsStatusPlugins = append(f.jobsStatusPlugins, p)
+			if f.jobsStatusPlugin != nil {
+				return nil, errorTooManyJobsStatusPlugin
+			}
+			f.jobsStatusPlugin = p
 		}
 	}
 	f.plugins = plugins
@@ -149,22 +155,15 @@ func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtim
 }
 
 func (f *Framework) RunTerminalConditionPlugins(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error) {
-	// TODO (tenzen-y): Once we provide the Configuration API, we should validate which plugin should have terminalCondition execution points.
-	if len(f.terminalConditionPlugins) > 1 {
-		return nil, errorTooManyTerminalConditionPlugin
-	}
-	if len(f.terminalConditionPlugins) != 0 {
-		return f.terminalConditionPlugins[0].TerminalCondition(ctx, trainJob)
+	if f.terminalConditionPlugin != nil {
+		return f.terminalConditionPlugin.TerminalCondition(ctx, trainJob)
 	}
 	return nil, nil
 }
 
 func (f *Framework) RunJobsStatusPlugins(ctx context.Context, trainJob *trainer.TrainJob) ([]trainer.JobStatus, error) {
-	if len(f.jobsStatusPlugins) > 1 {
-		return nil, errorTooManyJobsStatusPlugin
-	}
-	if len(f.jobsStatusPlugins) != 0 {
-		return f.jobsStatusPlugins[0].JobsStatus(ctx, trainJob)
+	if f.jobsStatusPlugin != nil {
+		return f.jobsStatusPlugin.JobsStatus(ctx, trainJob)
 	}
 	return nil, nil
 }

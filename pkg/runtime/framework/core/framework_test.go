@@ -111,12 +111,8 @@ func TestNew(t *testing.T) {
 					&jobset.JobSet{},
 					&mpi.MPI{},
 				},
-				terminalConditionPlugins: []framework.TerminalConditionPlugin{
-					&jobset.JobSet{},
-				},
-				jobsStatusPlugins: []framework.JobsStatusPlugin{
-					&jobset.JobSet{},
-				},
+				terminalConditionPlugin: &jobset.JobSet{},
+				jobsStatusPlugin:        &jobset.JobSet{},
 			},
 		},
 		"indexer key for trainingRuntime and runtimeClass is an empty": {
@@ -1537,7 +1533,10 @@ func TestTerminalConditionPlugins(t *testing.T) {
 
 			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder))
 			if err != nil {
-				t.Fatal(err)
+				if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+					t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+				}
+				return
 			}
 
 			gotCond, gotErr := fwk.RunTerminalConditionPlugins(ctx, tc.trainJob)
@@ -1691,7 +1690,10 @@ func TestJobsStatusPlugins(t *testing.T) {
 
 			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder))
 			if err != nil {
-				t.Fatal(err)
+				if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+					t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+				}
+				return
 			}
 
 			gotStatuses, gotErr := fwk.RunJobsStatusPlugins(ctx, tc.trainJob)
