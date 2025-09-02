@@ -126,7 +126,7 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.FindPodSetByAncestor(constants.AncestorTrainer).Count
 		}
 
-		// Apply resources to containers
+		// Apply trainer configuration to containers
 		for j, container := range rJob.Template.Spec.Template.Spec.Containers {
 			// Skip if container is neither node nor launcher
 			if *container.Name != constants.Node && *container.Name != constants.Launcher {
@@ -140,15 +140,24 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 
 			// Update values from the TrainJob trainer.
 			if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
-				if image := jobTrainer.Image; image != nil {
-					b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Image = image
+				// Apply full trainer configuration only to Node containers
+				if *container.Name == constants.Node {
+					if image := jobTrainer.Image; image != nil {
+						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Image = image
+					}
+					if command := jobTrainer.Command; command != nil {
+						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Command = command
+					}
+					if args := jobTrainer.Args; args != nil {
+						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = args
+					}
+					apply.UpsertEnvVars(
+						&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env,
+						apply.EnvVars(jobTrainer.Env...)...,
+					)
 				}
-				if command := jobTrainer.Command; command != nil {
-					b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Command = command
-				}
-				if args := jobTrainer.Args; args != nil {
-					b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = args
-				}
+
+				// Apply resources to both Node and Launcher containers (when launcher is included)
 				if resourcesPerNode := jobTrainer.ResourcesPerNode; resourcesPerNode != nil &&
 					(resourcesPerNode.Limits != nil || resourcesPerNode.Requests != nil) {
 					requirements := corev1ac.ResourceRequirements()
@@ -161,10 +170,6 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 					b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
 						WithResources(requirements)
 				}
-				apply.UpsertEnvVars(
-					&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env,
-					apply.EnvVars(jobTrainer.Env...)...,
-				)
 			}
 		}
 	}

@@ -1293,7 +1293,7 @@ func TestTrainer(t *testing.T) {
 		wantInfo  *runtime.Info
 		wantError error
 	}{
-		"resources per node should be applied to both launcher and node pods": {
+		"resources per node should be applied to both launcher and node pods, but launcher should only get resources when runLauncherAsNode is true": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
@@ -1409,7 +1409,6 @@ func TestTrainer(t *testing.T) {
 												WithContainers(
 													corev1ac.Container().
 														WithName(constants.Launcher).
-														WithImage("test:image").
 														WithResources(corev1ac.ResourceRequirements().
 															WithRequests(corev1.ResourceList{
 																corev1.ResourceCPU:    resource.MustParse("5"),
@@ -1601,6 +1600,176 @@ func TestTrainer(t *testing.T) {
 															WithRequests(corev1.ResourceList{
 																corev1.ResourceCPU:    resource.MustParse("1"),
 																corev1.ResourceMemory: resource.MustParse("1Gi"),
+																"nvidia.com/gpu":      resource.MustParse("1"),
+															}),
+														),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+		},
+		"launcher should only get resources when runLauncherAsNode is true, not full trainer config": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						Container("trainer:image", []string{"trainer", "command"}, []string{"trainer", "args"}, corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2"),
+							corev1.ResourceMemory: resource.MustParse("8Gi"),
+							"nvidia.com/gpu":      resource.MustParse("1"),
+						}).
+						Obj(),
+				).
+				Obj(),
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(
+							ptr.To[int32](2),                         // numNodes
+							ptr.To(trainer.MPIImplementationOpenMPI), // implementation
+							nil,                                      // customArgs
+							ptr.To(true),                             // runLauncherAsNode
+						).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:       constants.Launcher,
+							Count:      ptr.To[int32](1),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.AncestorTrainer),
+						},
+						{
+							Name:       constants.Node,
+							Count:      ptr.To[int32](2),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.Node),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Launcher).
+														WithImage("launcher:original").
+														WithCommand("launcher", "command").
+														WithArgs("launcher", "args"),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.Node,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node).
+														WithImage("node:original").
+														WithCommand("node", "command").
+														WithArgs("node", "args"),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+			wantInfo: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:       constants.Launcher,
+							Count:      ptr.To[int32](1),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.AncestorTrainer),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-launcher-0-0.trainJob")
+							},
+						},
+						{
+							Name:       constants.Node,
+							Count:      ptr.To[int32](2),
+							Containers: make([]runtime.Container, 1),
+							Ancestor:   ptr.To(constants.Node),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-node-0-0.trainJob")
+								yield("trainJob-node-0-1.trainJob")
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													// Launcher should keep original image, command, args but get resources
+													corev1ac.Container().
+														WithName(constants.Launcher).
+														WithImage("launcher:original").
+														WithCommand("launcher", "command").
+														WithArgs("launcher", "args").
+														WithResources(corev1ac.ResourceRequirements().
+															WithRequests(corev1.ResourceList{
+																corev1.ResourceCPU:    resource.MustParse("2"),
+																corev1.ResourceMemory: resource.MustParse("8Gi"),
+																"nvidia.com/gpu":      resource.MustParse("1"),
+															}),
+														),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.Node,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													// Node should get full trainer config
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithImage("trainer:image").
+														WithCommand("trainer", "command").
+														WithArgs("trainer", "args").
+														WithResources(corev1ac.ResourceRequirements().
+															WithRequests(corev1.ResourceList{
+																corev1.ResourceCPU:    resource.MustParse("2"),
+																corev1.ResourceMemory: resource.MustParse("8Gi"),
 																"nvidia.com/gpu":      resource.MustParse("1"),
 															}),
 														),
