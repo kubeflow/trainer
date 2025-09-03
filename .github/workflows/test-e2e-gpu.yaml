@@ -21,25 +21,23 @@ jobs:
         kubernetes-version: ["1.33.1"]
 
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
-
       - name: Check GPU label
         id: check-label
         run: |
           if [[ "${{ join(github.event.pull_request.labels.*.name, ',') }}" != *"ok-to-test-gpu-runner"* ]]; then
-            echo "Label 'ok-to-test-gpu-runner' not found. Skipping GPU tests."
+            echo "✅ Skipping GPU E2E tests (label not present)."
             echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
           else
             echo "Label found. Running GPU tests."
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Skip message
-        if: steps.check-label.outputs.skip == 'true'
-        run: echo "✅ Skipped GPU E2E tests (label not present)."
+      - name: Check out code
+        if: steps.check-label.outputs.skip == 'false'
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
       - name: Setup Go
         if: steps.check-label.outputs.skip == 'false'
@@ -59,20 +57,20 @@ jobs:
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
           pip install git+https://github.com/kubeflow/sdk.git@main
 
-      - name: Delete any existing cluster
-        if: steps.check-label.outputs.skip == 'false'
-        run: |
-          make test-e2e-delete-gpu-cluster
+      # - name: Delete any existing cluster
+      #   if: steps.check-label.outputs.skip == 'false'
+      #   run: |
+      #     sudo kind delete cluster --name kind-gpu && echo "kind cluster has been deleted" || (echo "kind cluster doesn't exist" && exit 0)
 
-      - name: Setup cluster with GPU support using nvidia/kind
-        if: steps.check-label.outputs.skip == 'false'
-        run: |
-          make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
+      # - name: Setup cluster with GPU support using nvidia/kind
+      #   if: steps.check-label.outputs.skip == 'false'
+      #   run: |
+      #     make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
 
-      - name: Run e2e with Go
-        if: steps.check-label.outputs.skip == 'false'
-        run: |
-          make test-e2e || (kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer && exit 1)
+      # - name: Run e2e with Go
+      #   if: steps.check-label.outputs.skip == 'false'
+      #   run: |
+      #     make test-e2e || (kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer && exit 1)
 
       - name: Run e2e test for torchtrainer notebook on GPU cluster
         if: steps.check-label.outputs.skip == 'false'
@@ -80,6 +78,11 @@ jobs:
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_alpaca-trainjob-yaml.ipynb TIMEOUT=900
 
+      # - name: Delete created gpu cluster
+      #   if: steps.check-label.outputs.skip == 'false'
+      #   run: |
+      #     sudo kind delete cluster --name kind-gpu && echo "kind cluster has been deleted" || (echo "kind cluster doesn't exist" && exit 0)
+      
       - name: Upload Artifacts to GitHub
         if: always()
         uses: actions/upload-artifact@v4

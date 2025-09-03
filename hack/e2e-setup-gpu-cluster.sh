@@ -26,6 +26,7 @@ KIND=${KIND:-./bin/kind}
 K8S_VERSION=${K8S_VERSION:-1.32.0}
 GPU_OPERATOR_VERSION="v25.3.2"
 KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
+GPU_CLUSTER_NAME="kind-gpu"
 NAMESPACE="kubeflow-system"
 TIMEOUT="5m"
 
@@ -43,8 +44,7 @@ sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true
 sudo systemctl restart docker
 
 # Create a Kind cluster with GPU support.
-nvkind cluster create --image "${KIND_NODE_VERSION}"
-CLUSTER_NAME=$(kind get clusters | grep nvkind)
+nvkind cluster create --name ${GPU_CLUSTER_NAME} --image "${KIND_NODE_VERSION}"
 nvkind cluster print-gpus
 
 # Install gpu-operator to make sure we can run GPU workloads.
@@ -71,7 +71,7 @@ kubectl get nodes -o=custom-columns=NAME:.metadata.name,GPU:.status.allocatable.
 
 # Load Kubeflow Trainer images
 echo "Load Kubeflow Trainer images"
-kind load docker-image "${CONTROLLER_MANAGER_CI_IMAGE}" --name "${CLUSTER_NAME}"
+kind load docker-image "${CONTROLLER_MANAGER_CI_IMAGE}" --name "${GPU_CLUSTER_NAME}"
 
 # Deploy Kubeflow Trainer control plane
 echo "Deploy Kubeflow Trainer control plane"
