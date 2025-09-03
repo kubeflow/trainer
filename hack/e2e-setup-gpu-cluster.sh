@@ -119,6 +119,6 @@ kubectl apply --server-side -k manifests/overlays/runtimes || (
 # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
 TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
 docker pull ${TORCH_RUNTIME_IMAGE}
-kind load docker-image ${TORCH_RUNTIME_IMAGE} --name ${CLUSTER_NAME}
+kind load docker-image ${TORCH_RUNTIME_IMAGE} --name ${GPU_CLUSTER_NAME}
 
 print_cluster_info
