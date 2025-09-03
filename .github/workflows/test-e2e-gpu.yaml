@@ -82,7 +82,7 @@ jobs:
         if: steps.check-label.outputs.skip == 'false'
         run: |
           sudo kind delete cluster --name kind-gpu && echo "kind cluster has been deleted" || (echo "kind cluster doesn't exist" && exit 0)
-      
+
       - name: Upload Artifacts to GitHub
         if: always()
         uses: actions/upload-artifact@v4
