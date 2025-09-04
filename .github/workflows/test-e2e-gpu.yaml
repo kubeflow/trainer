@@ -7,7 +7,7 @@ on:
 jobs:
   gpu-e2e-test:
     name: GPU E2E Test
-    runs-on: oracle-vm-16cpu-a10gpu-240gb
+    runs-on: self-hosted
 
     env:
       GOPATH: ${{ github.workspace }}/go
