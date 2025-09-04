@@ -104,10 +104,6 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log := ctrl.LoggerFrom(ctx).WithValues("trainJob", klog.KObj(&trainJob))
 	ctx = ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling TrainJob")
-	if isTrainJobFinished(&trainJob) {
-		log.V(5).Info("TrainJob has already been finished")
-		return ctrl.Result{}, nil
-	}
 
 	var err error
 	// Keep track of the origin TrainJob status
@@ -140,6 +136,10 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	setSuspendedCondition(&trainJob)
 	if terminalCondErr := setTerminalCondition(ctx, runtime, &trainJob); terminalCondErr != nil {
 		err = errors.Join(err, terminalCondErr)
+	}
+
+	if jobsStatusErr := setJobsStatus(ctx, runtime, &trainJob); jobsStatusErr != nil {
+		err = errors.Join(err, jobsStatusErr)
 	}
 
 	if !equality.Semantic.DeepEqual(&trainJob.Status, originStatus) {
@@ -267,9 +267,13 @@ func setTerminalCondition(ctx context.Context, runtime jobruntimes.Runtime, trai
 	return nil
 }
 
-func isTrainJobFinished(trainJob *trainer.TrainJob) bool {
-	return meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobComplete) ||
-		meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobFailed)
+func setJobsStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
+	statuses, err := runtime.JobsStatus(ctx, trainJob)
+	if err != nil {
+		return err
+	}
+	trainJob.Status.JobsStatus = statuses
+	return nil
 }
 
 func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
