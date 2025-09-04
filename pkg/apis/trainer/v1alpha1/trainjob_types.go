@@ -271,6 +271,11 @@ type PodSpecOverride struct {
 	// +listType=map
 	// +listMapKey=name
 	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
+
+	// ImagePullSecrets overrides the image pull secrets for the Pods in the target job templates.
+	// +listType=map
+	// +listMapKey=name
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 type PodSpecOverrideTargetJob struct {
