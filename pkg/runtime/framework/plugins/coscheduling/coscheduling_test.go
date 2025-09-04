@@ -386,7 +386,7 @@ func TestCoScheduling(t *testing.T) {
 			},
 			wantBuildError: errorGetPodGroup,
 		},
-		"no action when PodGroup already exists": {
+		"no action when PodGroup already exists and TrainJob is not suspended": {
 			info: &runtime.Info{
 				Scheduler: &runtime.Scheduler{},
 				Labels:    map[string]string{"key": "value"},
@@ -438,7 +438,7 @@ func TestCoScheduling(t *testing.T) {
 			wantPodGroupPolicyError: nil,
 			wantBuildError:          nil,
 		},
-		"no action when TrainJob is suspended": {
+		"no action when TrainJob is not suspended": {
 			info: &runtime.Info{
 				Scheduler: &runtime.Scheduler{},
 				RuntimePolicy: runtime.RuntimePolicy{
@@ -574,7 +574,7 @@ func TestCoScheduling(t *testing.T) {
 			}
 
 			var objs []any
-			objs, err = plugin.(framework.ComponentBuilderPlugin).Build(context.Background(), tc.info, tc.trainJob)
+			objs, err = plugin.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
 			if diff := gocmp.Diff(tc.wantBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
 			}
