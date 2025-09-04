@@ -38,6 +38,7 @@ jobs:
         if: steps.check-label.outputs.skip == 'false'
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
       - name: Setup Go
