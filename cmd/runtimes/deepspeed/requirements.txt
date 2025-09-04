@@ -1,5 +1,5 @@
 # Keep the same version as for Torch runtime.
-torch==2.7.1
+torch==2.8.0
 # DeepSpeed libraries.
 deepspeed==0.17.4
 mpi4py==4.1.0
