@@ -38,7 +38,6 @@ import (
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
-	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
@@ -370,8 +369,7 @@ func TestRunEnforcePodGroupPolicyPlugins(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{
 					PodLabels: map[string]string{
-						schedulerpluginsv1alpha1.PodGroupLabel:       "test-job",
-						volcanov1beta1.VolcanoGroupNameAnnotationKey: "test-job",
+						schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
 					},
 				},
 			},
@@ -678,8 +676,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
-												schedulerpluginsv1alpha1.PodGroupLabel:       "test-job",
-												volcanov1beta1.VolcanoGroupNameAnnotationKey: "test-job",
+												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -711,8 +708,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
-												schedulerpluginsv1alpha1.PodGroupLabel:       "test-job",
-												volcanov1beta1.VolcanoGroupNameAnnotationKey: "test-job",
+												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -746,8 +742,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithCompletions(100).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
-												schedulerpluginsv1alpha1.PodGroupLabel:       "test-job",
-												volcanov1beta1.VolcanoGroupNameAnnotationKey: "test-job",
+												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -854,10 +849,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 					},
 				},
 				Scheduler: &runtime.Scheduler{
-					PodLabels: map[string]string{schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
-						volcanov1beta1.VolcanoGroupNameAnnotationKey: "test-job"},
-				},
-			},
+					PodLabels: map[string]string{schedulerpluginsv1alpha1.PodGroupLabel: "test-job"},
+				}},
 			wantObjs: []apiruntime.Object{
 				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
 					SchedulingTimeout(300).
@@ -871,7 +864,6 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-job", "uid").
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
-					PodLabel(volcanov1beta1.VolcanoGroupNameAnnotationKey, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					NumNodes(100).
 					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
