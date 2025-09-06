@@ -93,7 +93,7 @@ func TestValidateCreate(t *testing.T) {
 				if clusterTrainingRuntime.Labels == nil {
 					clusterTrainingRuntime.Labels = map[string]string{}
 				}
-				clusterTrainingRuntime.Labels[constants.LabelDeprecated] = constants.DeprecatedTrueValue
+				clusterTrainingRuntime.Labels[constants.LabelSupport] = constants.SupportDeprecated
 			}
 
 			clientBuilder := testingutil.NewClientBuilder().WithObjects(clusterTrainingRuntime)

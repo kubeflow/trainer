@@ -29,6 +29,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	labelutil "github.com/kubeflow/trainer/v2/pkg/util/labels"
 )
 
 type ClusterTrainingRuntimeWebhook struct {
@@ -51,14 +52,12 @@ func (w *ClusterTrainingRuntimeWebhook) ValidateCreate(ctx context.Context, obj 
 	log := ctrl.LoggerFrom(ctx).WithName("clustertrainingruntime-webhook")
 	log.V(5).Info("Validating create", "clusterTrainingRuntime", klog.KObj(clTrainingRuntime))
 	var warnings admission.Warnings
-	if clTrainingRuntime.Labels != nil {
-		if val, ok := clTrainingRuntime.Labels[constants.LabelDeprecated]; ok && val == constants.DeprecatedTrueValue {
-			warnings = append(warnings, fmt.Sprintf(
-				"ClusterTrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
-				clTrainingRuntime.Name,
-				constants.RuntimeDeprecationPolicyURL,
-			))
-		}
+	if labelutil.IsSupportDeprecated(clTrainingRuntime.Labels) {
+		warnings = append(warnings, fmt.Sprintf(
+			"ClusterTrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
+			clTrainingRuntime.Name,
+			constants.RuntimeDeprecationPolicyURL,
+		))
 	}
 	return warnings, validateReplicatedJobs(clTrainingRuntime.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
 }

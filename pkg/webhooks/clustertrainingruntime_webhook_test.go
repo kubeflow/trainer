@@ -49,7 +49,7 @@ func TestClusterTrainingRuntime_ValidateCreate_DeprecatedWarning(t *testing.T) {
 	if obj.Labels == nil {
 		obj.Labels = map[string]string{}
 	}
-	obj.Labels[constants.LabelDeprecated] = constants.DeprecatedTrueValue
+	obj.Labels[constants.LabelSupport] = constants.SupportDeprecated
 
 	validator := &ClusterTrainingRuntimeWebhook{}
 	warnings, err := validator.ValidateCreate(ctx, obj)

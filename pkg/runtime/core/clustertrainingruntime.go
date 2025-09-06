@@ -30,6 +30,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	labelutil "github.com/kubeflow/trainer/v2/pkg/util/labels"
 )
 
 var (
@@ -80,14 +81,12 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 		}
 	}
 	var warnings admission.Warnings
-	if clusterTrainingRuntime.Labels != nil {
-		if val, ok := clusterTrainingRuntime.Labels[constants.LabelDeprecated]; ok && val == constants.DeprecatedTrueValue {
-			warnings = append(warnings, fmt.Sprintf(
-				"Referenced ClusterTrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
-				clusterTrainingRuntime.Name,
-				constants.RuntimeDeprecationPolicyURL,
-			))
-		}
+	if labelutil.IsSupportDeprecated(clusterTrainingRuntime.Labels) {
+		warnings = append(warnings, fmt.Sprintf(
+			"Referenced ClusterTrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
+			clusterTrainingRuntime.Name,
+			constants.RuntimeDeprecationPolicyURL,
+		))
 	}
 	info, _ := r.newRuntimeInfo(new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy)
 	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)

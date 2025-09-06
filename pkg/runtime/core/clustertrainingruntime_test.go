@@ -196,7 +196,7 @@ func TestClusterTrainingRuntime_ValidateObjects_DeprecatedWarning(t *testing.T) 
 	if deprecated.Labels == nil {
 		deprecated.Labels = map[string]string{}
 	}
-	deprecated.Labels[constants.LabelDeprecated] = constants.DeprecatedTrueValue
+	deprecated.Labels[constants.LabelSupport] = constants.SupportDeprecated
 
 	clientBuilder := testingutil.NewClientBuilder().WithObjects(deprecated)
 	c := clientBuilder.Build()

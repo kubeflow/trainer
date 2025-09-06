@@ -24,11 +24,11 @@ const (
 	// trainer.kubeflow.org/trainjob-ancestor-step: trainer              - trainJob.spec.trainer
 	LabelTrainJobAncestor string = "trainer.kubeflow.org/trainjob-ancestor-step"
 
-	// LabelDeprecated marks a runtime as deprecated when set to "true".
-	LabelDeprecated string = "trainer.kubeflow.org/deprecated"
+	// LabelSupport indicates support status for a runtime, e.g. "deprecated".
+	LabelSupport string = "trainer.kubeflow.org/support"
 
-	// DeprecatedTrueValue is the value indicating deprecation when used with LabelDeprecated.
-	DeprecatedTrueValue string = "true"
+	// SupportDeprecated indicates the runtime is deprecated when used with LabelSupport.
+	SupportDeprecated string = "deprecated"
 
 	// RuntimeDeprecationPolicyURL is the URL to the runtime deprecation policy documentation.
 	RuntimeDeprecationPolicyURL string = "https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy"
