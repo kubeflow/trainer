@@ -30,35 +30,52 @@ import (
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
-func TestClusterTrainingRuntime_ValidateCreate_DeprecatedWarning(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	t.Cleanup(cancel)
-
-	obj := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
-		RuntimeSpec(trainer.TrainingRuntimeSpec{
-			Template: trainer.JobSetTemplateSpec{
-				Spec: func() jobsetv1alpha2.JobSetSpec {
-					js := testingutil.MakeJobSetWrapper("", "")
-					js.Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
-					return js.Obj().Spec
-				}(),
+func TestClusterTrainingRuntimeValidateCreate(t *testing.T) {
+	cases := map[string]struct {
+		labels   map[string]string
+		warnings admission.Warnings
+	}{
+		"no deprecation label": {
+			labels:   nil,
+			warnings: nil,
+		},
+		"support=deprecated": {
+			labels: map[string]string{constants.LabelSupport: constants.SupportDeprecated},
+			warnings: admission.Warnings{
+				"ClusterTrainingRuntime \"test-runtime\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: " + constants.RuntimeDeprecationPolicyURL,
 			},
-		}).Obj()
-
-	if obj.Labels == nil {
-		obj.Labels = map[string]string{}
+		},
 	}
-	obj.Labels[constants.LabelSupport] = constants.SupportDeprecated
 
-	validator := &ClusterTrainingRuntimeWebhook{}
-	warnings, err := validator.ValidateCreate(ctx, obj)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	var want admission.Warnings
-	want = append(want, "ClusterTrainingRuntime \"test-runtime\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: "+constants.RuntimeDeprecationPolicyURL)
-	if diff := cmp.Diff(want, warnings); diff != "" {
-		t.Fatalf("unexpected warnings (-want, +got): %s", diff)
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			obj := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: func() jobsetv1alpha2.JobSetSpec {
+							js := testingutil.MakeJobSetWrapper("", "")
+							js.Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node)
+							return js.Obj().Spec
+						}(),
+					},
+				}).Obj()
+
+			if len(tc.labels) != 0 {
+				obj.Labels = tc.labels
+			}
+
+			validator := &ClusterTrainingRuntimeWebhook{}
+			warnings, err := validator.ValidateCreate(ctx, obj)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.warnings, warnings); diff != "" {
+				t.Fatalf("unexpected warnings (-want, +got): %s", diff)
+			}
+		})
 	}
 }
