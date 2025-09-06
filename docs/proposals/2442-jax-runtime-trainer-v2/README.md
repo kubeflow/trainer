@@ -105,32 +105,14 @@ In order to address this functionality, we propose the following design:
 
 To understand the **JAX runtime** in Kubeflow Trainer V2, it's important to clarify the terminology used in JAX for distributed training:
 
-#### Host
+| Concept | Description |
+|---------|-------------|
+| **Host** | A physical or virtual machine participating in distributed training. Each host runs a **single JAX process**, which manages all local devices (e.g., GPUs, CPUs). JAX auto-detects and utilizes all available devices. (In Kubernetes, a host maps to a **Node**, and typically one **Pod** is scheduled per host.) |
+| **JAX Process / Controller** | A Python process running the JAX program (exactly one per host). Responsible for executing the training loop, managing all local devices, and synchronizing with other JAX processes over the network. Uses **SPMD** across processes. |
+| **Devices** | Compute units on a host (CPU cores, GPUs, TPUs). JAX detects devices automatically and runs parallel computations via `jax.pmap`, `jax.shard_map`, or `pjit`. Each JAX process accesses all devices on its host. **No need to spawn multiple processes per GPU** (unlike PyTorch). |
+| **Pod** | A Kubernetes Pod runs a single JAX process. Scheduled on a node and may use one or more GPUs depending on resource specifications. |
+| **Node** | A Kubernetes Node is a worker machine. In multi-node JAX jobs, each node typically runs one pod, mapping to one JAX host. |
 
-In JAX, a **host** refers to a physical or virtual machine that participates in distributed training. Each host runs a **single JAX process**, which manages all the local devices (e.g., GPUs or CPUs). JAX automatically detects and utilizes all available devices on a host.
-
->In Kubernetes, a host maps to a Node, and in the runtime implementation, one Pod is typically scheduled per host.
-
-**JAX Process/Controller**
-
-A **JAX process** (or sometimes called a **controller**) is a Python process running the JAX program. There is exactly one JAX process per host. This process is responsible for executing the training loop, managing all local devices, and communicating with other JAX processes over the network for synchronization
-
-JAX uses **Single Program Multiple Data (SPMD)** across these processes.
-
-**Devices**
-
-Devices refer to individual compute units on a host (like CPU cores, GPUs, or TPUs). JAX handles device detection automatically and runs parallel computations using `jax.pmap`, `jax.shard_map`, or `pjit`.
-
-Each JAX process has access to **all devices on its host**. There is **no need to spawn multiple processes per GPU**, unlike PyTorch.
-
-
-**Pod**
-
-A **Pod** in Kubernetes runs a JAX process. It is scheduled on a node and may use one or more GPUs depending on the resource specification.
-
-**Node**
-
-In Kubernetes, a **Node** is a worker machine in the cluster. When we run multi-node JAX jobs, each node typically runs one pod, which maps to one JAX host.
 
 ### JAX Training Workflow
 
