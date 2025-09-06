@@ -178,6 +178,10 @@ test-python-integration: ## Run Python integration test.
 test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.
 	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
 
+.PHONY: test-e2e-setup-gpu-cluster
+test-e2e-setup-gpu-cluster: kind ## Setup Kind cluster for GPU e2e test.
+	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-gpu-cluster.sh
+
 .PHONY: test-e2e
 test-e2e: ginkgo ## Run Go e2e test.
 	$(GINKGO) -v ./test/e2e/...

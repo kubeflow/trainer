@@ -39,6 +39,19 @@ sudo apt-get update -y
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # -------------------------------
+# Install Kind and nvkind
+# -------------------------------
+
+# For AMD64 / x86_64
+[ $(uname -m) = x86_64 ] && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64
+chmod +x ./kind
+sudo mv ./kind /usr/local/bin/kind
+
+echo "Install nvkind"
+sudo go install github.com/NVIDIA/nvkind/cmd/nvkind@latest
+sudo cp /root/go/bin/nvkind /usr/local/bin/
+
+# -------------------------------
 # Install NVIDIA Container Toolkit
 # -------------------------------
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
@@ -70,6 +83,18 @@ KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
 curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 rm kubectl
+
+# Install NVIDIA Driver
+sudo apt update
+sudo apt install nvidia-driver-535 -y
+sudo apt install nvidia-utils-535
+
+## Privilaged access for docker to make sure Kind can access GPU resources
+alias docker="sudo docker"
+alias kubectl="sudo kubectl"
+alias kind="sudo kind"
+alias helm="sudo helm"
+alias nvkind="sudo nvkind"
 
 # Verify installs
 echo "✅ Installed versions:"

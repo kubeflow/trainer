@@ -1,5 +1,6 @@
 approvers:
   - andreyvelich
+  - astefanutti
   - Electronic-Waste
   - gaocegege
   - Jeffwan
@@ -7,7 +8,6 @@ approvers:
   - tenzen-y
   - terrytangyuan
 reviewers:
-  - astefanutti
   - jinchihe
   - kuizhiqing
 emeritus_approvers:
