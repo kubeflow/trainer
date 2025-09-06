@@ -156,6 +156,82 @@ This section explains the architecture and flow of executing a distributed JAX t
 
 The number of **JAX hosts** is configured using the `numNodes` field in the **MLPolicy** section of the **ClusterTrainingRuntime**. Each host runs a single JAX process inside a Pod.
 
+#### JAXMLPolicySource
+
+ JAXMLPolicySource allows detailed configuration of JAX distributed initialization, backend, devices, and precision.
+
+```golang
+type MLPolicySource struct {
+  [...]
+
+  JAX *JAXMLPolicySource `json:"jax,omitempty"`
+}
+
+type JAXMLPolicySource struct {
+
+  // Backend for JAX distributed communication.
+  // +kubebuilder:default="nccl"  
+  // +kubebuilder:validation:Enum=nccl;gloo;mpi
+  TargetBackend *string `json:"targetBackend,omitempty"`
+
+  // Platforms is comma-separated list of platform names
+  // specifying which platforms jax should initialize
+  // +kubebuilder:default="gpu,tpu,cpu"
+  Platforms *string `json:"platform,omitempty"`
+
+  // Whether to disable JAX compilation optimizations.  
+  // +kubebuilder:default=false
+  DisableJIT *bool `json:"disableJIT,omitempty"`
+
+  // Check for and raise errors on NaNs
+  // +kubebuilder:default=false
+  DebugNaNs *bool `json:"debugNaNs,omitempty"`
+
+  // Set default precision for matrix multiplication
+  // +kubebuilder:validation:Enum=default;high;highest;bfloat16;tensorfloat32;float32;
+  // ANY_F8_ANY_F8_F32;ANY_F8_ANY_F8_F32_FAST_ACCUM;ANY_F8_ANY_F8_ANY;
+  // ANY_F8_ANY_F8_ANY_FAST_ACCUM;F16_F16_F16;F16_F16_F32;BF16_BF16_BF16;
+  // BF16_BF16_F32;BF16_BF16_F32_X3;BF16_BF16_F32_X6;BF16_BF16_F32_X9;
+  // TF32_TF32_F32;TF32_TF32_F32_X3;F32_F32_F32;F64_F64_F64
+  DefaultMatMulPrecision *string `json:"defaultMatmulPrecision,omitempty"`
+
+  // Additional specific configurations.  
+  // +listType=map  
+  // +listMapKey=name  
+  ExtraEnv []corev1.EnvVar `json:"extraEnv,omitempty"`
+
+  // Distributed contains explicit args used when calling jax.distributed.initialize().
+  // This should be provided when not relying on automatic cluster detection (Slurm, MPI launcher, Cloud TPU, etc).
+  Distributed *DistributedConfig `json:"distributed,omitempty"`
+}
+
+type DistributedConfig struct {
+  // CoordinatorAddress is the address (host:port) of the coordinator process.
+  // +kubebuilder:validation:Required
+  CoordinatorAddress string `json:"coordinatorAddress"`
+
+  // NumProcesses is the total number of processes across all hosts.
+  // +kubebuilder:validation:Minimum=1
+  // +kubebuilder:validation:Required
+  NumProcesses int `json:"numProcesses"`
+
+  // ProcessID is the unique integer id for this process (0..NumProcesses-1).
+  // +kubebuilder:validation:Minimum=0
+  // +kubebuilder:validation:Required
+  ProcessID int `json:"processID"`
+
+  // LocalDeviceIDs lists local device indexes assigned to this process (e.g. [0,1]).
+  // +kubebuilder:validation:MinItems=1
+  // +kubebuilder:validation:Required
+  LocalDeviceIDs []int `json:"localDeviceIDs"`
+
+  // ClusterDetectionMethod (optional) — a hint for automatic detection strategies
+  // (e.g., "slurm", "openmpi", "tpu", "env", "none"). If unset and not using an
+  // automatic launcher, Distributed must be provided with the required fields above.
+  ClusterDetectionMethod *string `json:"clusterDetectionMethod,omitempty"`
+}
+```
+
 ### Communication Backend
 
 #### OpenMPI
