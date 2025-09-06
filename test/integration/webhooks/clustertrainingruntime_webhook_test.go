@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/v2/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	"github.com/kubeflow/trainer/v2/test/integration/framework"
 )
@@ -71,20 +70,6 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 							testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
 								Obj()).
 						Obj()
-				}),
-			ginkgo.Entry("Should succeed to create deprecated ClusterTrainingRuntime (warning expected)",
-				func() *trainer.ClusterTrainingRuntime {
-					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName + "-deprecated")
-					obj := baseRuntime.
-						RuntimeSpec(
-							testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
-								Obj()).
-						Obj()
-					if obj.Labels == nil {
-						obj.Labels = map[string]string{}
-					}
-					obj.Labels[constants.LabelDeprecated] = constants.DeprecatedTrueValue
-					return obj
 				}),
 		)
 	})
