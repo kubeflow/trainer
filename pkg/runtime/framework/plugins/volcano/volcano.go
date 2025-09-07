@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -28,7 +30,7 @@ type Volcano struct {
 	client     client.Client
 	restMapper meta.RESTMapper
 	scheme     *apiruntime.Scheme
-	//logger     logr.Logger // TODO: to be used in podgrouphandler
+	logger     logr.Logger
 }
 
 var _ framework.EnforcePodGroupPolicyPlugin = (*Volcano)(nil)
@@ -149,12 +151,19 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 }
 
 func (v *Volcano) ReconcilerBuilders() []runtime.ReconcilerBuilder {
+	if _, err := v.restMapper.RESTMapping(
+		schema.GroupKind{Group: volcanov1beta1.SchemeGroupVersion.Group, Kind: "PodGroup"},
+		volcanov1beta1.SchemeGroupVersion.Version,
+	); err != nil {
+		v.logger.Error(err, "PodGroup CRDs must be installed in advance")
+		return nil
+	}
 	return []runtime.ReconcilerBuilder{
 		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
 			return b.Watches(
 				&volcanov1beta1.PodGroup{},
 				handler.EnqueueRequestForOwner(
-					v.scheme, v.restMapper, &trainer.TrainJob{}, handler.OnlyControllerOwner(),
+					v.client.Scheme(), v.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
 				),
 			)
 		},

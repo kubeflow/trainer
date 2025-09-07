@@ -10,9 +10,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
@@ -392,9 +394,13 @@ func TestReconcilerBuilders(t *testing.T) {
 		t.Fatalf("failed to add volcano scheme: %v", err)
 	}
 
+	gvk := volcanov1beta1.SchemeGroupVersion.WithKind("PodGroup")
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{volcanov1beta1.SchemeGroupVersion})
+	mapper.Add(gvk, meta.RESTScopeNamespace)
 	v := &Volcano{
 		scheme:     scheme,
-		restMapper: nil, // not required for this test
+		client:     fake.NewClientBuilder().WithScheme(scheme).Build(),
+		restMapper: mapper,
 	}
 
 	builders := v.ReconcilerBuilders()
