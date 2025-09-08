@@ -317,6 +317,63 @@ type TrainJobStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	JobsStatus []JobStatus `json:"jobsStatus,omitempty"`
+
+	// ProgressionStatus tracks the training progression from rank 0 node.
+	// +optional
+	ProgressionStatus *ProgressionStatus `json:"progressionStatus,omitempty"`
+}
+
+// ProgressionStatus represents the training progression status read from rank 0 node.
+type ProgressionStatus struct {
+	// CurrentStep is the current training step/iteration.
+	CurrentStep *int64 `json:"currentStep,omitempty"`
+
+	// TotalSteps is the total number of training steps/iterations.
+	TotalSteps *int64 `json:"totalSteps,omitempty"`
+
+	// PercentageComplete represents the completion percentage (0-100) as a string.
+	PercentageComplete *string `json:"percentageComplete,omitempty"`
+
+	// EstimatedTimeRemaining is the estimated time remaining in seconds.
+	EstimatedTimeRemaining *int64 `json:"estimatedTimeRemaining,omitempty"`
+
+	// CurrentEpoch is the current training epoch.
+	CurrentEpoch *int64 `json:"currentEpoch,omitempty"`
+
+	// TotalEpochs is the total number of training epochs.
+	TotalEpochs *int64 `json:"totalEpochs,omitempty"`
+
+	// LastUpdateTime is the timestamp when the progression was last updated.
+	LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
+
+	// Message provides additional information about the training progression.
+	Message string `json:"message,omitempty"`
+
+	// TrainingMetrics contains structured training metrics.
+	// +optional
+	TrainingMetrics *TrainingMetrics `json:"trainingMetrics,omitempty"`
+
+	// Metrics contains additional training metrics as key-value pairs.
+	// +optional
+	Metrics map[string]string `json:"metrics,omitempty"`
+}
+
+// TrainingMetrics represents structured training metrics.
+type TrainingMetrics struct {
+	// Loss represents the current training loss.
+	Loss *string `json:"loss,omitempty"`
+
+	// LearningRate represents the current learning rate.
+	LearningRate *string `json:"learningRate,omitempty"`
+
+	// CheckpointsStored represents the number of checkpoints stored.
+	CheckpointsStored *int64 `json:"checkpointsStored,omitempty"`
+
+	// LatestCheckpointPath represents the path to the latest checkpoint file.
+	LatestCheckpointPath *string `json:"latestCheckpointPath,omitempty"`
+
+	// Accuracy represents the current model accuracy.
+	Accuracy *string `json:"accuracy,omitempty"`
 }
 
 type JobStatus struct {
