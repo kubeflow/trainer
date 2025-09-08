@@ -404,7 +404,7 @@ func TestReconcilerBuilders(t *testing.T) {
 	}
 
 	builders := v.ReconcilerBuilders()
-	if diff := cmp.Diff(1, len(builders)); diff != "" {
+	if diff := cmp.Diff(3, len(builders)); diff != "" {
 		t.Errorf("unexpected builder count (-want +got):\n%s", diff)
 	}
 
