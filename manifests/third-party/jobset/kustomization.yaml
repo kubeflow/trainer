@@ -2,7 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - https://github.com/kubernetes-sigs/jobset/releases/download/v0.8.2/manifests.yaml
+  - https://github.com/kubernetes-sigs/jobset/releases/download/v0.9.0/manifests.yaml
 
 # Add required patches.
 patches:

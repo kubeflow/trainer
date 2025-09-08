@@ -13341,7 +13341,8 @@
           "restarts": {
             "description": "Restarts tracks the number of times the JobSet has restarted (i.e. recreated in case of RecreateAll policy).",
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "default": 0
           },
           "restartsCountTowardsMax": {
             "description": "RestartsCountTowardsMax tracks the number of times the JobSet has restarted that counts towards the maximum allowed number of restarts.",
@@ -13349,7 +13350,7 @@
             "format": "int32"
           },
           "terminalState": {
-            "description": "TerminalState the state of the JobSet when it finishes execution. It can be either Complete or Failed. Otherwise, it is empty by default.",
+            "description": "TerminalState the state of the JobSet when it finishes execution. It can be either Completed or Failed. Otherwise, it is empty by default.",
             "type": "string"
           }
         }
@@ -13393,6 +13394,10 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
+          },
+          "groupName": {
+            "description": "GroupName defines the name of the group this ReplicatedJob belongs to. Defaults to \"default\"",
+            "type": "string"
           },
           "name": {
             "description": "Name is the name of the entry and will be used as a suffix for the Job name.",

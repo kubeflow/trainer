@@ -829,7 +829,7 @@ spec:
                                 - name
                                 - status
                                 type: object
-                              maxItems: 1
+                              maxItems: 5
                               type: array
                               x-kubernetes-list-map-keys:
                               - name
@@ -837,6 +837,11 @@ spec:
                               x-kubernetes-validations:
                               - message: Value is immutable
                                 rule: self == oldSelf
+                            groupName:
+                              default: default
+                              description: GroupName defines the name of the group
+                                this ReplicatedJob belongs to. Defaults to "default"
+                              type: string
                             name:
                               description: |-
                                 Name is the name of the entry and will be used as a suffix

@@ -20502,6 +20502,7 @@ func schema_jobset_api_jobset_v1alpha2_JobSetStatus(ref common.ReferenceCallback
 					"restarts": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Restarts tracks the number of times the JobSet has restarted (i.e. recreated in case of RecreateAll policy).",
+							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -20515,7 +20516,7 @@ func schema_jobset_api_jobset_v1alpha2_JobSetStatus(ref common.ReferenceCallback
 					},
 					"terminalState": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TerminalState the state of the JobSet when it finishes execution. It can be either Complete or Failed. Otherwise, it is empty by default.",
+							Description: "TerminalState the state of the JobSet when it finishes execution. It can be either Completed or Failed. Otherwise, it is empty by default.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -20593,6 +20594,13 @@ func schema_jobset_api_jobset_v1alpha2_ReplicatedJob(ref common.ReferenceCallbac
 						SchemaProps: spec.SchemaProps{
 							Description: "Name is the name of the entry and will be used as a suffix for the Job name.",
 							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"groupName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "GroupName defines the name of the group this ReplicatedJob belongs to. Defaults to \"default\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
