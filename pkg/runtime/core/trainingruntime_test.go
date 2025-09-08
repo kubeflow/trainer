@@ -335,7 +335,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Obj(),
 			},
 		},
-		"succeeded to build JobSet with volume overrides from the TrainJob's PodSpecOverrides.": {
+		"succeeded to build JobSet with TrainJob's PodSpecOverrides.": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
 					WithMLPolicy(
@@ -346,7 +346,9 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
 					InitContainer(constants.Node, "override-init-container", "test:runtime").
 					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Env(constants.Node, constants.Node).
 					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Env(constants.Node, "override-container").
 					Obj(),
 			).Obj(),
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
@@ -373,6 +375,38 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 										MountPath: "initializer_claim_mount_path",
 									},
 								},
+							},
+						},
+						Affinity: &corev1.Affinity{
+							NodeAffinity: &corev1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
+										{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
+												{
+													Key:      "topology.kubernetes.io/zone",
+													Operator: corev1.NodeSelectorOpIn,
+													Values:   []string{"antarctica-east1", "antarctica-west1"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						NodeSelector: map[string]string{
+							"node.kubernetes.io/instance-type": "p5.48xlarge",
+						},
+						SchedulingGates: []corev1.PodSchedulingGate{
+							{
+								Name: "kueue.x-k8s.io/admission",
+							},
+						},
+						Tolerations: []corev1.Toleration{
+							{
+								Key:      "example.com/gpu",
+								Operator: corev1.TolerationOpExists,
+								Effect:   corev1.TaintEffectNoSchedule,
 							},
 						},
 						Volumes: []corev1.Volume{
@@ -411,6 +445,41 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								},
 							},
 						},
+						Affinity: &corev1.Affinity{
+							NodeAffinity: &corev1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
+										{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
+												{
+													Key:      "topology.kubernetes.io/zone",
+													Operator: corev1.NodeSelectorOpIn,
+													Values:   []string{"antarctica-east1", "antarctica-west1"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						ImagePullSecrets: []corev1.LocalObjectReference{
+							{Name: "registry-credential"},
+						},
+						NodeSelector: map[string]string{
+							"node.kubernetes.io/instance-type": "p5.48xlarge",
+						},
+						SchedulingGates: []corev1.PodSchedulingGate{
+							{
+								Name: "kueue.x-k8s.io/admission",
+							},
+						},
+						Tolerations: []corev1.Toleration{
+							{
+								Key:      "example.com/gpu",
+								Operator: corev1.TolerationOpExists,
+								Effect:   corev1.TaintEffectNoSchedule,
+							},
+						},
 						Volumes: []corev1.Volume{
 							{
 								Name: "node_secret",
@@ -443,6 +512,73 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					InitContainer(constants.Node, "override-init-container", "test:runtime").
 					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Affinity(constants.DatasetInitializer,
+						corev1.Affinity{
+							NodeAffinity: &corev1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
+										{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
+												{
+													Key:      "topology.kubernetes.io/zone",
+													Operator: corev1.NodeSelectorOpIn,
+													Values:   []string{"antarctica-east1", "antarctica-west1"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					).
+					Affinity(constants.Node,
+						corev1.Affinity{
+							NodeAffinity: &corev1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
+										{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
+												{
+													Key:      "topology.kubernetes.io/zone",
+													Operator: corev1.NodeSelectorOpIn,
+													Values:   []string{"antarctica-east1", "antarctica-west1"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					).
+					ImagePullSecrets(constants.Node,
+						corev1.LocalObjectReference{Name: "registry-credential"},
+					).
+					NodeSelector(constants.DatasetInitializer,
+						map[string]string{
+							"node.kubernetes.io/instance-type": "p5.48xlarge",
+						}).
+					NodeSelector(constants.Node,
+						map[string]string{
+							"node.kubernetes.io/instance-type": "p5.48xlarge",
+						}).
+					SchedulingGates(constants.DatasetInitializer, corev1.PodSchedulingGate{
+						Name: "kueue.x-k8s.io/admission",
+					}).
+					SchedulingGates(constants.Node, corev1.PodSchedulingGate{
+						Name: "kueue.x-k8s.io/admission",
+					}).
+					Tolerations(constants.DatasetInitializer,
+						corev1.Toleration{
+							Key:      "example.com/gpu",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						}).
+					Tolerations(constants.Node,
+						corev1.Toleration{
+							Key:      "example.com/gpu",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						}).
 					Volumes(constants.DatasetInitializer,
 						corev1.Volume{
 							Name: "initializer_claim",
@@ -502,77 +638,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Obj(),
 			},
 		},
-		"succeeded to build JobSet with toleration overrides from the TrainJob's PodSpecOverrides.": {
-			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
-				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-					WithMLPolicy(
-						testingutil.MakeMLPolicyWrapper().
-							WithNumNodes(100).
-							Obj(),
-					).
-					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
-					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Obj(),
-			).Obj(),
-			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-				UID("uid").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				Trainer(
-					testingutil.MakeTrainJobTrainerWrapper().
-						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-						Obj(),
-				).
-				PodSpecOverrides([]trainer.PodSpecOverride{
-					{
-						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.DatasetInitializer}},
-						Tolerations: []corev1.Toleration{
-							{
-								Key:      "example.com/gpu",
-								Operator: corev1.TolerationOpExists,
-								Effect:   corev1.TaintEffectNoSchedule,
-							},
-						},
-					},
-					{
-						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
-						Tolerations: []corev1.Toleration{
-							{
-								Key:      "example.com/gpu",
-								Operator: corev1.TolerationOpExists,
-								Effect:   corev1.TaintEffectNoSchedule,
-							},
-						},
-					},
-				}).
-				Obj(),
-			wantObjs: []runtime.Object{
-				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
-					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
-					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
-					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
-					NumNodes(100).
-					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
-					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Tolerations(constants.DatasetInitializer,
-						corev1.Toleration{
-							Key:      "example.com/gpu",
-							Operator: corev1.TolerationOpExists,
-							Effect:   corev1.TaintEffectNoSchedule,
-						}).
-					Tolerations(constants.Node,
-						corev1.Toleration{
-							Key:      "example.com/gpu",
-							Operator: corev1.TolerationOpExists,
-							Effect:   corev1.TaintEffectNoSchedule,
-						}).
-					Obj(),
-			},
-		},
 		"succeeded to build JobSet with nil affinity overrides from the TrainJob's PodSpecOverrides.": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
@@ -617,291 +682,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					InitContainer(constants.Node, "override-init-container", "test:runtime").
 					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Obj(),
-			},
-		},
-		"succeeded to build JobSet with affinity overrides from the TrainJob's PodSpecOverrides.": {
-			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
-				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-					WithMLPolicy(
-						testingutil.MakeMLPolicyWrapper().
-							WithNumNodes(100).
-							Obj(),
-					).
-					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
-					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Obj(),
-			).Obj(),
-			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-				UID("uid").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				Trainer(
-					testingutil.MakeTrainJobTrainerWrapper().
-						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-						Obj(),
-				).
-				PodSpecOverrides([]trainer.PodSpecOverride{
-					{
-						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.DatasetInitializer}},
-						Affinity: &corev1.Affinity{
-							NodeAffinity: &corev1.NodeAffinity{
-								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-									NodeSelectorTerms: []corev1.NodeSelectorTerm{
-										{
-											MatchExpressions: []corev1.NodeSelectorRequirement{
-												{
-													Key:      "topology.kubernetes.io/zone",
-													Operator: corev1.NodeSelectorOpIn,
-													Values:   []string{"antarctica-east1", "antarctica-west1"},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-					{
-						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
-						Affinity: &corev1.Affinity{
-							NodeAffinity: &corev1.NodeAffinity{
-								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-									NodeSelectorTerms: []corev1.NodeSelectorTerm{
-										{
-											MatchExpressions: []corev1.NodeSelectorRequirement{
-												{
-													Key:      "topology.kubernetes.io/zone",
-													Operator: corev1.NodeSelectorOpIn,
-													Values:   []string{"antarctica-east1", "antarctica-west1"},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				}).
-				Obj(),
-			wantObjs: []runtime.Object{
-				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
-					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
-					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
-					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
-					NumNodes(100).
-					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
-					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Affinity(constants.DatasetInitializer,
-						corev1.Affinity{
-							NodeAffinity: &corev1.NodeAffinity{
-								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-									NodeSelectorTerms: []corev1.NodeSelectorTerm{
-										{
-											MatchExpressions: []corev1.NodeSelectorRequirement{
-												{
-													Key:      "topology.kubernetes.io/zone",
-													Operator: corev1.NodeSelectorOpIn,
-													Values:   []string{"antarctica-east1", "antarctica-west1"},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					).
-					Affinity(constants.Node,
-						corev1.Affinity{
-							NodeAffinity: &corev1.NodeAffinity{
-								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-									NodeSelectorTerms: []corev1.NodeSelectorTerm{
-										{
-											MatchExpressions: []corev1.NodeSelectorRequirement{
-												{
-													Key:      "topology.kubernetes.io/zone",
-													Operator: corev1.NodeSelectorOpIn,
-													Values:   []string{"antarctica-east1", "antarctica-west1"},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					).
-					Obj(),
-			},
-		},
-		"succeeded to build JobSet with node selector overrides from the TrainJob's PodSpecOverrides.": {
-			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
-				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-					WithMLPolicy(
-						testingutil.MakeMLPolicyWrapper().
-							WithNumNodes(100).
-							Obj(),
-					).
-					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
-					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Obj(),
-			).Obj(),
-			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-				UID("uid").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				Trainer(
-					testingutil.MakeTrainJobTrainerWrapper().
-						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-						Obj(),
-				).
-				PodSpecOverrides([]trainer.PodSpecOverride{
-					{
-						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.DatasetInitializer}},
-						NodeSelector: map[string]string{
-							"node.kubernetes.io/instance-type": "p5.48xlarge",
-						},
-					},
-					{
-						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
-						NodeSelector: map[string]string{
-							"node.kubernetes.io/instance-type": "p5.48xlarge",
-						},
-					},
-				}).
-				Obj(),
-			wantObjs: []runtime.Object{
-				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
-					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
-					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
-					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
-					NumNodes(100).
-					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
-					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					NodeSelector(constants.DatasetInitializer,
-						map[string]string{
-							"node.kubernetes.io/instance-type": "p5.48xlarge",
-						}).
-					NodeSelector(constants.Node,
-						map[string]string{
-							"node.kubernetes.io/instance-type": "p5.48xlarge",
-						}).
-					Obj(),
-			},
-		},
-		"succeeded to build JobSet with scheduling gates overrides from the TrainJob's PodSpecOverrides.": {
-			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
-				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-					WithMLPolicy(
-						testingutil.MakeMLPolicyWrapper().
-							WithNumNodes(100).
-							Obj(),
-					).
-					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
-					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Obj(),
-			).Obj(),
-			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-				UID("uid").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				Trainer(
-					testingutil.MakeTrainJobTrainerWrapper().
-						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-						Obj(),
-				).
-				PodSpecOverrides([]trainer.PodSpecOverride{
-					{
-						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.DatasetInitializer}},
-						SchedulingGates: []corev1.PodSchedulingGate{
-							{
-								Name: "kueue.x-k8s.io/admission",
-							},
-						},
-					},
-					{
-						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
-						SchedulingGates: []corev1.PodSchedulingGate{
-							{
-								Name: "kueue.x-k8s.io/admission",
-							},
-						},
-					},
-				}).
-				Obj(),
-			wantObjs: []runtime.Object{
-				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
-					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
-					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
-					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
-					NumNodes(100).
-					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
-					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					SchedulingGates(constants.DatasetInitializer, corev1.PodSchedulingGate{
-						Name: "kueue.x-k8s.io/admission",
-					}).
-					SchedulingGates(constants.Node, corev1.PodSchedulingGate{
-						Name: "kueue.x-k8s.io/admission",
-					}).
-					Obj(),
-			},
-		},
-		"succeeded to build JobSet with imagePullSecrets overrides from the TrainJob's PodSpecOverrides.": {
-			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
-				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-					WithMLPolicy(
-						testingutil.MakeMLPolicyWrapper().
-							WithNumNodes(100).
-							Obj(),
-					).
-					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
-					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					Obj(),
-			).Obj(),
-			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-				UID("uid").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				Trainer(
-					testingutil.MakeTrainJobTrainerWrapper().
-						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-						Obj(),
-				).
-				PodSpecOverrides([]trainer.PodSpecOverride{
-					{
-						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
-						ImagePullSecrets: []corev1.LocalObjectReference{
-							{Name: "registry-credential"},
-						},
-					},
-				}).
-				Obj(),
-			wantObjs: []runtime.Object{
-				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
-					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
-					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
-					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
-					NumNodes(100).
-					InitContainer(constants.DatasetInitializer, "override-init-container", "test:runtime").
-					InitContainer(constants.Node, "override-init-container", "test:runtime").
-					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
-					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-					ImagePullSecrets(constants.Node,
-						corev1.LocalObjectReference{Name: "registry-credential"},
-					).
 					Obj(),
 			},
 		},
