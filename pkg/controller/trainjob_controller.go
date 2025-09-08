@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"iter"
 	"slices"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -48,6 +51,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/util/progression"
 )
 
 type TrainJobWatcher interface {
@@ -55,11 +59,12 @@ type TrainJobWatcher interface {
 }
 
 type TrainJobReconciler struct {
-	log      logr.Logger
-	client   client.Client
-	recorder record.EventRecorder
-	runtimes map[string]jobruntimes.Runtime
-	watchers iter.Seq[TrainJobWatcher]
+	log               logr.Logger
+	client            client.Client
+	recorder          record.EventRecorder
+	runtimes          map[string]jobruntimes.Runtime
+	watchers          iter.Seq[TrainJobWatcher]
+	progressionReader *progression.Reader
 }
 
 type TrainJobReconcilerOptions struct {
@@ -77,21 +82,28 @@ func WithWatchers(watchers ...TrainJobWatcher) TrainJobReconcilerOption {
 var _ reconcile.Reconciler = (*TrainJobReconciler)(nil)
 var _ predicate.TypedPredicate[*trainer.TrainJob] = (*TrainJobReconciler)(nil)
 
-func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, runtimes map[string]jobruntimes.Runtime, opts ...TrainJobReconcilerOption) *TrainJobReconciler {
+func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, runtimes map[string]jobruntimes.Runtime, config *rest.Config, opts ...TrainJobReconcilerOption) *TrainJobReconciler {
 	options := &TrainJobReconcilerOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}
+
+	clientset, _ := kubernetes.NewForConfig(config)
+	progressionReader := progression.NewReader(clientset, config)
+
 	return &TrainJobReconciler{
-		log:      ctrl.Log.WithName("trainjob-controller"),
-		client:   client,
-		recorder: recorder,
-		runtimes: runtimes,
-		watchers: options.Watchers,
+		log:               ctrl.Log.WithName("trainjob-controller"),
+		client:            client,
+		recorder:          recorder,
+		runtimes:          runtimes,
+		watchers:          options.Watchers,
+		progressionReader: progressionReader,
 	}
 }
 
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;watch;update;patch
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=pods/exec,verbs=create
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/finalizers,verbs=get;update;patch
@@ -142,10 +154,14 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = errors.Join(err, terminalCondErr)
 	}
 
-	if !equality.Semantic.DeepEqual(&trainJob.Status, originStatus) {
-		return ctrl.Result{}, errors.Join(err, r.client.Status().Update(ctx, &trainJob))
+	if progressionErr := r.updateProgressionStatus(ctx, &trainJob); progressionErr != nil {
+		log.V(5).Info("Failed to update progression status", "error", progressionErr)
 	}
-	return ctrl.Result{}, err
+
+	if !equality.Semantic.DeepEqual(&trainJob.Status, originStatus) {
+		return ctrl.Result{RequeueAfter: time.Duration(constants.ProgressionProbeIntervalSeconds) * time.Second}, errors.Join(err, r.client.Status().Update(ctx, &trainJob))
+	}
+	return ctrl.Result{RequeueAfter: time.Duration(constants.ProgressionProbeIntervalSeconds) * time.Second}, err
 }
 
 func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
@@ -290,4 +306,52 @@ func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controll
 		}
 	}
 	return b.Complete(r)
+}
+
+func (r *TrainJobReconciler) updateProgressionStatus(ctx context.Context, trainJob *trainer.TrainJob) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	if isTrainJobFinished(trainJob) {
+		return nil
+	}
+
+	rank0PodName, err := r.findRank0Pod(ctx, trainJob)
+	if err != nil {
+		return fmt.Errorf("failed to find rank 0 pod: %w", err)
+	}
+	if rank0PodName == "" {
+		return nil
+	}
+
+	progressionStatus, err := r.progressionReader.ReadProgressionStatus(ctx, trainJob.Namespace, rank0PodName)
+	if err != nil {
+		return fmt.Errorf("failed to read progression status: %w", err)
+	}
+
+	trainJob.Status.ProgressionStatus = progressionStatus
+	log.V(5).Info("Updated progression status", "currentStep", progressionStatus.CurrentStep, "totalSteps", progressionStatus.TotalSteps)
+	return nil
+}
+
+func (r *TrainJobReconciler) findRank0Pod(ctx context.Context, trainJob *trainer.TrainJob) (string, error) {
+	podList := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(trainJob.Namespace),
+		client.MatchingLabels{
+			"jobset.sigs.k8s.io/jobset-name":           trainJob.Name,
+			"batch.kubernetes.io/job-completion-index": "0",
+		},
+	}
+
+	if err := r.client.List(ctx, podList, listOpts...); err != nil {
+		return "", err
+	}
+
+	for _, pod := range podList.Items {
+		if pod.Status.Phase == corev1.PodRunning {
+			return pod.Name, nil
+		}
+	}
+
+	return "", nil
 }

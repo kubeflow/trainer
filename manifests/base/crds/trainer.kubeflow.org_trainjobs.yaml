@@ -4312,6 +4312,74 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              progressionStatus:
+                description: ProgressionStatus tracks the training progression from
+                  rank 0 node.
+                properties:
+                  currentEpoch:
+                    description: CurrentEpoch is the current training epoch.
+                    format: int64
+                    type: integer
+                  currentStep:
+                    description: CurrentStep is the current training step/iteration.
+                    format: int64
+                    type: integer
+                  estimatedTimeRemaining:
+                    description: EstimatedTimeRemaining is the estimated time remaining
+                      in seconds.
+                    format: int64
+                    type: integer
+                  lastUpdateTime:
+                    description: LastUpdateTime is the timestamp when the progression
+                      was last updated.
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message provides additional information about the
+                      training progression.
+                    type: string
+                  metrics:
+                    additionalProperties:
+                      type: string
+                    description: Metrics contains additional training metrics as key-value
+                      pairs.
+                    type: object
+                  percentageComplete:
+                    description: PercentageComplete represents the completion percentage
+                      (0-100) as a string.
+                    type: string
+                  totalEpochs:
+                    description: TotalEpochs is the total number of training epochs.
+                    format: int64
+                    type: integer
+                  totalSteps:
+                    description: TotalSteps is the total number of training steps/iterations.
+                    format: int64
+                    type: integer
+                  trainingMetrics:
+                    description: TrainingMetrics contains structured training metrics.
+                    properties:
+                      accuracy:
+                        description: Accuracy represents the current model accuracy.
+                        type: string
+                      checkpointsStored:
+                        description: CheckpointsStored represents the number of checkpoints
+                          stored.
+                        format: int64
+                        type: integer
+                      latestCheckpointPath:
+                        description: LatestCheckpointPath represents the path to the
+                          latest checkpoint file.
+                        type: string
+                      learningRate:
+                        description: LearningRate represents the current learning
+                          rate.
+                        type: string
+                      loss:
+                        description: Loss represents the current training loss.
+                        type: string
+                    type: object
+                type: object
             type: object
         type: object
         x-kubernetes-validations:

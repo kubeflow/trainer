@@ -23,8 +23,9 @@ import (
 // TrainJobStatusApplyConfiguration represents a declarative configuration of the TrainJobStatus type for use
 // with apply.
 type TrainJobStatusApplyConfiguration struct {
-	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	JobsStatus []JobStatusApplyConfiguration    `json:"jobsStatus,omitempty"`
+	Conditions        []v1.ConditionApplyConfiguration     `json:"conditions,omitempty"`
+	JobsStatus        []JobStatusApplyConfiguration        `json:"jobsStatus,omitempty"`
+	ProgressionStatus *ProgressionStatusApplyConfiguration `json:"progressionStatus,omitempty"`
 }
 
 // TrainJobStatusApplyConfiguration constructs a declarative configuration of the TrainJobStatus type for use with
@@ -56,5 +57,13 @@ func (b *TrainJobStatusApplyConfiguration) WithJobsStatus(values ...*JobStatusAp
 		}
 		b.JobsStatus = append(b.JobsStatus, *values[i])
 	}
+	return b
+}
+
+// WithProgressionStatus sets the ProgressionStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ProgressionStatus field is set to the value of the last call.
+func (b *TrainJobStatusApplyConfiguration) WithProgressionStatus(value *ProgressionStatusApplyConfiguration) *TrainJobStatusApplyConfiguration {
+	b.ProgressionStatus = value
 	return b
 }

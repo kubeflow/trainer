@@ -46,6 +46,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicySource":             schema_pkg_apis_trainer_v1alpha1_PodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodSpecOverride":                  schema_pkg_apis_trainer_v1alpha1_PodSpecOverride(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodSpecOverrideTargetJob":         schema_pkg_apis_trainer_v1alpha1_PodSpecOverrideTargetJob(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ProgressionStatus":                schema_pkg_apis_trainer_v1alpha1_ProgressionStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef":                       schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchElasticPolicy":               schema_pkg_apis_trainer_v1alpha1_TorchElasticPolicy(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource":              schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref),
@@ -54,6 +55,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobSpec":                     schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobStatus":                   schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Trainer":                          schema_pkg_apis_trainer_v1alpha1_Trainer(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingMetrics":                  schema_pkg_apis_trainer_v1alpha1_TrainingMetrics(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntime":                  schema_pkg_apis_trainer_v1alpha1_TrainingRuntime(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeList":              schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeList(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeSpec":              schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref),
@@ -1162,6 +1164,98 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecOverrideTargetJob(ref common.Refere
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_ProgressionStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ProgressionStatus represents the training progression status read from rank 0 node.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"currentStep": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CurrentStep is the current training step/iteration.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"totalSteps": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TotalSteps is the total number of training steps/iterations.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"percentageComplete": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PercentageComplete represents the completion percentage (0-100) as a string.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"estimatedTimeRemaining": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EstimatedTimeRemaining is the estimated time remaining in seconds.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"currentEpoch": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CurrentEpoch is the current training epoch.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"totalEpochs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TotalEpochs is the total number of training epochs.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"lastUpdateTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LastUpdateTime is the timestamp when the progression was last updated.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Message provides additional information about the training progression.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"trainingMetrics": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TrainingMetrics contains structured training metrics.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingMetrics"),
+						},
+					},
+					"metrics": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Metrics contains additional training metrics as key-value pairs.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingMetrics", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -1534,11 +1628,17 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref common.ReferenceCallbac
 							},
 						},
 					},
+					"progressionStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ProgressionStatus tracks the training progression from rank 0 node.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ProgressionStatus"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobStatus", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ProgressionStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
 	}
 }
 
@@ -1642,6 +1742,54 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 		},
 		Dependencies: []string{
 			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_TrainingMetrics(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TrainingMetrics represents structured training metrics.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"loss": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Loss represents the current training loss.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"learningRate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LearningRate represents the current learning rate.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"checkpointsStored": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CheckpointsStored represents the number of checkpoints stored.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"latestCheckpointPath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LatestCheckpointPath represents the path to the latest checkpoint file.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"accuracy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Accuracy represents the current model accuracy.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
 	}
 }
 

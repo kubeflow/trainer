@@ -29,10 +29,17 @@ rules:
   - ""
   resources:
   - limitranges
+  - pods
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
 - apiGroups:
   - admissionregistration.k8s.io
   resources:

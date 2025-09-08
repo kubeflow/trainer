@@ -14036,6 +14036,69 @@
           }
         }
       },
+      "trainer.v1alpha1.ProgressionStatus": {
+        "description": "ProgressionStatus represents the training progression status read from rank 0 node.",
+        "type": "object",
+        "properties": {
+          "currentEpoch": {
+            "description": "CurrentEpoch is the current training epoch.",
+            "type": "integer",
+            "format": "int64"
+          },
+          "currentStep": {
+            "description": "CurrentStep is the current training step/iteration.",
+            "type": "integer",
+            "format": "int64"
+          },
+          "estimatedTimeRemaining": {
+            "description": "EstimatedTimeRemaining is the estimated time remaining in seconds.",
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastUpdateTime": {
+            "description": "LastUpdateTime is the timestamp when the progression was last updated.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ]
+          },
+          "message": {
+            "description": "Message provides additional information about the training progression.",
+            "type": "string"
+          },
+          "metrics": {
+            "description": "Metrics contains additional training metrics as key-value pairs.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "percentageComplete": {
+            "description": "PercentageComplete represents the completion percentage (0-100) as a string.",
+            "type": "string"
+          },
+          "totalEpochs": {
+            "description": "TotalEpochs is the total number of training epochs.",
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalSteps": {
+            "description": "TotalSteps is the total number of training steps/iterations.",
+            "type": "integer",
+            "format": "int64"
+          },
+          "trainingMetrics": {
+            "description": "TrainingMetrics contains structured training metrics.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainingMetrics"
+              }
+            ]
+          }
+        }
+      },
       "trainer.v1alpha1.RuntimeRef": {
         "description": "RuntimeRef represents the reference to the existing training runtime.",
         "type": "object",
@@ -14301,6 +14364,14 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
+          },
+          "progressionStatus": {
+            "description": "ProgressionStatus tracks the training progression from rank 0 node.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.ProgressionStatus"
+              }
+            ]
           }
         }
       },
@@ -14366,6 +14437,33 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.TrainingMetrics": {
+        "description": "TrainingMetrics represents structured training metrics.",
+        "type": "object",
+        "properties": {
+          "accuracy": {
+            "description": "Accuracy represents the current model accuracy.",
+            "type": "string"
+          },
+          "checkpointsStored": {
+            "description": "CheckpointsStored represents the number of checkpoints stored.",
+            "type": "integer",
+            "format": "int64"
+          },
+          "latestCheckpointPath": {
+            "description": "LatestCheckpointPath represents the path to the latest checkpoint file.",
+            "type": "string"
+          },
+          "learningRate": {
+            "description": "LearningRate represents the current learning rate.",
+            "type": "string"
+          },
+          "loss": {
+            "description": "Loss represents the current training loss.",
+            "type": "string"
           }
         }
       },
