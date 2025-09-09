@@ -52,7 +52,8 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 			Spec: jobsetv1alpha2.JobSetSpec{
 				ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
 					{
-						Name: constants.DatasetInitializer,
+						Name:      constants.DatasetInitializer,
+						GroupName: "default",
 						Template: batchv1.JobTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
@@ -85,7 +86,8 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 						},
 					},
 					{
-						Name: constants.ModelInitializer,
+						Name:      constants.ModelInitializer,
+						GroupName: "default",
 						Template: batchv1.JobTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
@@ -118,7 +120,8 @@ func MakeJobSetWrapper(namespace, name string) *JobSetWrapper {
 						},
 					},
 					{
-						Name: constants.Node,
+						Name:      constants.Node,
+						GroupName: "default",
 						Template: batchv1.JobTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
 								Labels: map[string]string{
@@ -205,7 +208,8 @@ func (j *JobSetWrapper) LauncherReplica() *JobSetWrapper {
 			j.Spec.ReplicatedJobs = append(j.Spec.ReplicatedJobs, jobsetv1alpha2.ReplicatedJob{})
 			copy(j.Spec.ReplicatedJobs[i+1:], j.Spec.ReplicatedJobs[i:])
 			j.Spec.ReplicatedJobs[i] = jobsetv1alpha2.ReplicatedJob{
-				Name: constants.Launcher,
+				Name:      constants.Launcher,
+				GroupName: "default",
 				Template: batchv1.JobTemplateSpec{
 					Spec: batchv1.JobSpec{
 						Template: corev1.PodTemplateSpec{
@@ -710,7 +714,8 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 					Spec: jobsetv1alpha2.JobSetSpec{
 						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
 							{
-								Name: constants.DatasetInitializer,
+								Name:      constants.DatasetInitializer,
+								GroupName: "default",
 								Template: batchv1.JobTemplateSpec{
 									ObjectMeta: metav1.ObjectMeta{
 										Labels: map[string]string{
@@ -743,7 +748,8 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 								},
 							},
 							{
-								Name: constants.ModelInitializer,
+								Name:      constants.ModelInitializer,
+								GroupName: "default",
 								Template: batchv1.JobTemplateSpec{
 									ObjectMeta: metav1.ObjectMeta{
 										Labels: map[string]string{
@@ -776,7 +782,8 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 								},
 							},
 							{
-								Name: constants.Node,
+								Name:      constants.Node,
+								GroupName: "default",
 								Template: batchv1.JobTemplateSpec{
 									ObjectMeta: metav1.ObjectMeta{
 										Labels: map[string]string{
@@ -876,7 +883,8 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 					Spec: jobsetv1alpha2.JobSetSpec{
 						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
 							{
-								Name: constants.DatasetInitializer,
+								Name:      constants.DatasetInitializer,
+								GroupName: "default",
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
 										Template: corev1.PodTemplateSpec{
@@ -904,7 +912,8 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 								},
 							},
 							{
-								Name: constants.ModelInitializer,
+								Name:      constants.ModelInitializer,
+								GroupName: "default",
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
 										Template: corev1.PodTemplateSpec{
@@ -932,7 +941,8 @@ func MakeClusterTrainingRuntimeWrapper(name string) *ClusterTrainingRuntimeWrapp
 								},
 							},
 							{
-								Name: constants.Node,
+								Name:      constants.Node,
+								GroupName: "default",
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
 										Template: corev1.PodTemplateSpec{
@@ -1018,7 +1028,8 @@ func (s *TrainingRuntimeSpecWrapper) LauncherReplica() *TrainingRuntimeSpecWrapp
 			s.Template.Spec.ReplicatedJobs = append(s.Template.Spec.ReplicatedJobs, jobsetv1alpha2.ReplicatedJob{})
 			copy(s.Template.Spec.ReplicatedJobs[i+1:], s.Template.Spec.ReplicatedJobs[i:])
 			s.Template.Spec.ReplicatedJobs[i] = jobsetv1alpha2.ReplicatedJob{
-				Name: constants.Launcher,
+				Name:      constants.Launcher,
+				GroupName: "default",
 				Template: batchv1.JobTemplateSpec{
 					Spec: batchv1.JobSpec{
 						Template: corev1.PodTemplateSpec{

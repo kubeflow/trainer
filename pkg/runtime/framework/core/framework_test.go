@@ -544,6 +544,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 						WithReplicatedJobs(
 							jobsetv1alpha2ac.ReplicatedJob().
 								WithName(constants.DatasetInitializer).
+								WithGroupName("default").
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithLabels(map[string]string{
 										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
@@ -572,6 +573,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 								),
 							jobsetv1alpha2ac.ReplicatedJob().
 								WithName(constants.ModelInitializer).
+								WithGroupName("default").
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithLabels(map[string]string{
 										constants.LabelTrainJobAncestor: constants.ModelInitializer,
@@ -600,6 +602,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 								),
 							jobsetv1alpha2ac.ReplicatedJob().
 								WithName(constants.Node).
+								WithGroupName("default").
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithLabels(map[string]string{
 										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
@@ -662,6 +665,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							jobsetv1alpha2ac.ReplicatedJob().
 								WithReplicas(1).
 								WithName(constants.DatasetInitializer).
+								WithGroupName("default").
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithLabels(map[string]string{
 										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
@@ -694,6 +698,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							jobsetv1alpha2ac.ReplicatedJob().
 								WithReplicas(1).
 								WithName(constants.ModelInitializer).
+								WithGroupName("default").
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithLabels(map[string]string{
 										constants.LabelTrainJobAncestor: constants.ModelInitializer,
@@ -725,6 +730,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 								),
 							jobsetv1alpha2ac.ReplicatedJob().
 								WithName(constants.Node).
+								WithGroupName("default").
 								WithReplicas(1).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithLabels(map[string]string{
