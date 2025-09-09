@@ -34,9 +34,6 @@ spec:
                       persistentVolumeClaim:
                         claimName: torchtune-llama3.2-1b
         - name: model-initializer
-          dependsOn:
-            - name: dataset-initializer
-              status: Complete
           template:
             metadata:
               labels:
@@ -59,6 +56,8 @@ spec:
                         claimName: torchtune-llama3.2-1b
         - name: node
           dependsOn:
+            - name: dataset-initializer
+              status: Complete
             - name: model-initializer
               status: Complete
           template:
