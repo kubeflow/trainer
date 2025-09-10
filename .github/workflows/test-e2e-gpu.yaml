@@ -4,6 +4,10 @@ on:
   pull_request_target:
     types: [opened, reopened, synchronize, labeled]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   gpu-e2e-test:
     name: GPU E2E Test
