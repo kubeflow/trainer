@@ -77,7 +77,7 @@ jobs:
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_alpaca-trainjob-yaml.ipynb TIMEOUT=900
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }} 
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
       - name: Upload Artifacts to GitHub
         if: always()
