@@ -1,7 +1,7 @@
 name: GPU E2E Test
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, reopened, synchronize, labeled]
 
 permissions:
@@ -13,9 +13,12 @@ jobs:
     name: GPU E2E Test
     runs-on: oracle-vm-16cpu-a10gpu-240gb
 
+    # Maintainers have to approve the use of secrets
+    environment: gpu-tests
+
     env:
       GOPATH: ${{ github.workspace }}/go
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
     defaults:
       run:
         working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
@@ -23,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kubernetes-version: ["1.34.0"]
+        kubernetes-version: ["1.33.1"]
 
     steps:
       - name: Check GPU label
@@ -34,7 +37,7 @@ jobs:
             echo "skip=true" >> $GITHUB_OUTPUT
             exit 0
           else
-            echo "Label found. Running GPU tests."
+            echo "Label found. Requesting environment approval to run GPU tests."
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
@@ -73,6 +76,8 @@ jobs:
         run: |
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_alpaca-trainjob-yaml.ipynb TIMEOUT=900
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }} 
 
       - name: Upload Artifacts to GitHub
         if: always()
