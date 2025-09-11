@@ -24,6 +24,15 @@ const (
 	// trainer.kubeflow.org/trainjob-ancestor-step: trainer              - trainJob.spec.trainer
 	LabelTrainJobAncestor string = "trainer.kubeflow.org/trainjob-ancestor-step"
 
+	// LabelSupport indicates support status for a runtime, e.g. "deprecated".
+	LabelSupport string = "trainer.kubeflow.org/support"
+
+	// SupportDeprecated indicates the runtime is deprecated when used with LabelSupport.
+	SupportDeprecated string = "deprecated"
+
+	// RuntimeDeprecationPolicyURL is the URL to the runtime deprecation policy documentation.
+	RuntimeDeprecationPolicyURL string = "https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy"
+
 	// DatasetInitializer is the name of the Job, volume mount, container, and label value for the dataset initializer.
 	DatasetInitializer string = "dataset-initializer"
 
