@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
@@ -37,6 +38,7 @@ func NewClientBuilder(addToSchemes ...func(s *runtime.Scheme) error) *fake.Clien
 	utilruntime.Must(trainer.AddToScheme(scm))
 	utilruntime.Must(jobsetv1alpha2.AddToScheme(scm))
 	utilruntime.Must(schedulerpluginsv1alpha1.AddToScheme(scm))
+	utilruntime.Must(volcanov1beta1.AddToScheme(scm))
 	for i := range addToSchemes {
 		utilruntime.Must(addToSchemes[i](scm))
 	}

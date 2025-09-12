@@ -51,6 +51,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -72,6 +73,7 @@ func TestNew(t *testing.T) {
 				registry: fwkplugins.NewRegistry(),
 				plugins: map[string]framework.Plugin{
 					coscheduling.Name: &coscheduling.CoScheduling{},
+					volcano.Name:      &volcano.Volcano{},
 					mpi.Name:          &mpi.MPI{},
 					plainml.Name:      &plainml.PlainML{},
 					torch.Name:        &torch.Torch{},
@@ -84,6 +86,7 @@ func TestNew(t *testing.T) {
 				},
 				enforcePodGroupPolicyPlugins: []framework.EnforcePodGroupPolicyPlugin{
 					&coscheduling.CoScheduling{},
+					&volcano.Volcano{},
 				},
 				customValidationPlugins: []framework.CustomValidationPlugin{
 					&mpi.MPI{},
@@ -92,6 +95,7 @@ func TestNew(t *testing.T) {
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
 					&coscheduling.CoScheduling{},
+					&volcano.Volcano{},
 					&jobset.JobSet{},
 					&mpi.MPI{},
 				},
@@ -100,6 +104,7 @@ func TestNew(t *testing.T) {
 				},
 				componentBuilderPlugins: []framework.ComponentBuilderPlugin{
 					&coscheduling.CoScheduling{},
+					&volcano.Volcano{},
 					&jobset.JobSet{},
 					&mpi.MPI{},
 				},
@@ -126,7 +131,9 @@ func TestNew(t *testing.T) {
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(Framework{}),
 		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
+		cmpopts.IgnoreUnexported(volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
 		cmpopts.IgnoreFields(coscheduling.CoScheduling{}, "client"),
+		cmpopts.IgnoreFields(volcano.Volcano{}, "client"),
 		cmpopts.IgnoreFields(jobset.JobSet{}, "client"),
 		cmpopts.IgnoreTypes(apiruntime.Scheme{}, meta.DefaultRESTMapper{}, fwkplugins.Registry{}),
 		cmpopts.SortMaps(func(a, b string) bool { return a < b }),
@@ -849,8 +856,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{
 					PodLabels: map[string]string{schedulerpluginsv1alpha1.PodGroupLabel: "test-job"},
-				},
-			},
+				}},
 			wantObjs: []apiruntime.Object{
 				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
 					SchedulingTimeout(300).
@@ -931,6 +937,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 			registry: fwkplugins.NewRegistry(),
 			wantPlugins: []framework.WatchExtensionPlugin{
 				&coscheduling.CoScheduling{},
+				&volcano.Volcano{},
 				&jobset.JobSet{},
 				&mpi.MPI{},
 			},
@@ -941,7 +948,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortSlices(func(a, b framework.Plugin) bool { return a.Name() < b.Name() }),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, jobset.JobSet{}, mpi.MPI{}),
+		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, jobset.JobSet{}, mpi.MPI{}),
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

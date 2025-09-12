@@ -111,6 +111,15 @@ scheduler-plugins-crd: ## Copy the CRDs from the Scheduler Plugins repository to
 	mkdir -p $(EXTERNAL_CRDS_DIR)/scheduler-plugins/
 	cp -f $(SCHEDULER_PLUGINS_ROOT)/manifests/coscheduling/* $(EXTERNAL_CRDS_DIR)/scheduler-plugins
 
+VOLCANO_APIS_ROOT = $(shell go list -m -f "{{.Dir}}" volcano.sh/apis)
+VOLCANO_VERSION = $(shell basename $(VOLCANO_APIS_ROOT) | cut -d'@' -f2)
+VOLCANO_CRD_URL = https://raw.githubusercontent.com/volcano-sh/volcano/$(VOLCANO_VERSION)/config/crd/volcano/bases/scheduling.volcano.sh_podgroups.yaml
+
+.PHONY: volcano-crd
+volcano-crd: ## Copy the CRDs from Volcano repository to the manifests/external-crds directory.
+	mkdir -p $(EXTERNAL_CRDS_DIR)/volcano/
+	curl -sSL $(VOLCANO_CRD_URL) -o $(EXTERNAL_CRDS_DIR)/volcano/scheduling.volcano.sh_podgroups.yaml
+
 # Instructions for code generation.
 .PHONY: manifests
 manifests: controller-gen ## Generate manifests.
@@ -155,7 +164,7 @@ test: ## Run Go unit test.
 	go test $(shell go list ./... | grep -Ev '/(test|cmd|hack|pkg/apis|pkg/client|pkg/util/testing)') -coverprofile cover.out
 
 .PHONY: test-integration
-test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd ## Run Go integration test.
+test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd volcano-crd ## Run Go integration test.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(K8S_VERSION) -p path)" $(GINKGO) -v ./test/integration/...
 
 .PHONY: test-python
