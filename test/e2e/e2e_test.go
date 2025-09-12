@@ -9,6 +9,7 @@ import (
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	"github.com/kubeflow/trainer/v2/test/util"
 )
@@ -16,7 +17,6 @@ import (
 const (
 	torchRuntime     = "torch-distributed"
 	deepSpeedRuntime = "deepspeed-distributed"
-	mlxRuntime       = "mlx-distributed"
 )
 
 var _ = ginkgo.Describe("TrainJob e2e", func() {
@@ -57,8 +57,26 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 			})
 
-			// Wait for TrainJob to be in Succeeded status.
-			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
+			// Wait for jobs to become active
+			ginkgo.By("Wait for TrainJob jobs to become active", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
+						{
+							Name:      constants.Node,
+							Ready:     0,
+							Succeeded: 0,
+							Failed:    0,
+							Active:    1,
+							Suspended: 0,
+						},
+					}, util.SortJobsStatus))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
+			// Wait for TrainJob to be in Succeeded status with all jobs succeeded.
+			ginkgo.By("Wait for TrainJob to be in Succeeded status with all jobs succeeded", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
@@ -70,6 +88,16 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 							Message: jobsetconsts.AllJobsCompletedMessage,
 						},
 					}, util.IgnoreConditions))
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
+						{
+							Name:      constants.Node,
+							Ready:     0,
+							Succeeded: 1,
+							Failed:    0,
+							Active:    0,
+							Suspended: 0,
+						},
+					}, util.SortJobsStatus))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 		})
@@ -87,6 +115,32 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 			})
 
+			// Wait for jobs to become active
+			ginkgo.By("Wait for TrainJob jobs to become active", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
+						{
+							Name:      constants.Launcher,
+							Ready:     0,
+							Succeeded: 0,
+							Failed:    0,
+							Active:    1,
+							Suspended: 0,
+						},
+						{
+							Name:      constants.Node,
+							Ready:     0,
+							Succeeded: 0,
+							Failed:    0,
+							Active:    1,
+							Suspended: 0,
+						},
+					}, util.SortJobsStatus))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
 			// Wait for TrainJob to be in Succeeded status.
 			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
@@ -100,6 +154,24 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 							Message: jobsetconsts.AllJobsCompletedMessage,
 						},
 					}, util.IgnoreConditions))
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
+						{
+							Name:      constants.Launcher,
+							Ready:     0,
+							Succeeded: 1,
+							Failed:    0,
+							Active:    0,
+							Suspended: 0,
+						},
+						{
+							Name:      constants.Node,
+							Ready:     0,
+							Succeeded: 0,
+							Failed:    0,
+							Active:    0,
+							Suspended: 0,
+						},
+					}, util.SortJobsStatus))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 		})
