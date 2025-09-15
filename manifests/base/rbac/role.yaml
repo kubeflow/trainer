@@ -63,16 +63,6 @@ rules:
   - watch
 - apiGroups:
   - scheduling.volcano.sh
-  resources:
-  - podgroups
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - scheduling.x-k8s.io
   resources:
   - podgroups
