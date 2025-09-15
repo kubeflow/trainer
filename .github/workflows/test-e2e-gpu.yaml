@@ -9,76 +9,68 @@ permissions:
   pull-requests: read
 
 jobs:
-  gpu-e2e-test:
+  check-label:
+    name: Check GPU Label
+    runs-on: ubuntu-latest
+    outputs:
+      run_gpu: ${{ steps.set-output.outputs.run_gpu }}
+    steps:
+      - id: set-output
+        run: |
+          LABELS="${{ join(github.event.pull_request.labels.*.name, ' ') }}"
+          if [[ "$LABELS" == *"ok-to-test-gpu-runner"* ]]; then
+            echo "run_gpu=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_gpu=false" >> $GITHUB_OUTPUT
+
+  gpu-e2e:
     name: GPU E2E Test
+    needs: check-label
+    if: needs.check-label.outputs.run_gpu == 'true'
     runs-on: oracle-vm-16cpu-a10gpu-240gb
-    environment: ${{ steps.check-label.outputs.skip == 'false' && 'gpu-tests' || null }}
+    environment: gpu-tests
     env:
       GOPATH: ${{ github.workspace }}/go
-
     defaults:
       run:
         working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
-
     strategy:
       fail-fast: false
       matrix:
         kubernetes-version: ["1.33.1"]
-
     steps:
-      - name: Check GPU label
-        id: check-label
-        run: |
-          LABELS="${{ join(github.event.pull_request.labels.*.name, ' ') }}"
-          if [[ "$LABELS" != *"ok-to-test-gpu-runner"* ]]; then
-            echo "✅ GPU E2E tests skipped (label not present)."
-            echo "skip=true" >> $GITHUB_OUTPUT
-            exit 0
-          else
-            echo "Label found. Requesting environment approval to run GPU tests."
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Check out code
-        if: steps.check-label.outputs.skip == 'false'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
       - name: Setup Go
-        if: steps.check-label.outputs.skip == 'false'
         uses: actions/setup-go@v5
         with:
           go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
 
       - name: Setup Python
-        if: steps.check-label.outputs.skip == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: 3.11
 
       - name: Install dependencies
-        if: steps.check-label.outputs.skip == 'false'
         run: |
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
           pip install git+https://github.com/kubeflow/sdk.git@main
 
       - name: Setup cluster with GPU support
-        if: steps.check-label.outputs.skip == 'false'
-        run: |
-          make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
+        run: make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
 
       - name: Run e2e test on GPU cluster
-        if: steps.check-label.outputs.skip == 'false'
         run: |
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_alpaca-trainjob-yaml.ipynb TIMEOUT=900
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
-      - name: Upload Artifacts to GitHub
-        if: always()
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.kubernetes-version }}
