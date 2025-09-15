@@ -12,10 +12,7 @@ jobs:
   gpu-e2e-test:
     name: GPU E2E Test
     runs-on: oracle-vm-16cpu-a10gpu-240gb
-
-    # Maintainers have to approve the use of secrets
-    environment: gpu-tests
-
+    environment: ${{ steps.check-label.outputs.skip == 'false' && 'gpu-tests' || null }}
     env:
       GOPATH: ${{ github.workspace }}/go
 
@@ -32,8 +29,9 @@ jobs:
       - name: Check GPU label
         id: check-label
         run: |
-          if [[ "${{ join(github.event.pull_request.labels.*.name, ',') }}" != *"ok-to-test-gpu-runner"* ]]; then
-            echo "✅ Skipping GPU E2E tests (label not present)."
+          LABELS="${{ join(github.event.pull_request.labels.*.name, ' ') }}"
+          if [[ "$LABELS" != *"ok-to-test-gpu-runner"* ]]; then
+            echo "✅ GPU E2E tests skipped (label not present)."
             echo "skip=true" >> $GITHUB_OUTPUT
             exit 0
           else
@@ -66,7 +64,7 @@ jobs:
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
           pip install git+https://github.com/kubeflow/sdk.git@main
 
-      - name: Setup cluster with GPU support using nvidia/kind
+      - name: Setup cluster with GPU support
         if: steps.check-label.outputs.skip == 'false'
         run: |
           make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
