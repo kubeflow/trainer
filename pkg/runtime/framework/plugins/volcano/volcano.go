@@ -89,7 +89,7 @@ func (v *Volcano) EnforcePodGroupPolicy(info *runtime.Info, trainJob *trainer.Tr
 }
 
 func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
-	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || info.RuntimePolicy.PodGroupPolicy.Volcano == nil {
+	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || info.RuntimePolicy.PodGroupPolicy.Volcano == nil || trainJob == nil {
 		return nil, nil
 	}
 
