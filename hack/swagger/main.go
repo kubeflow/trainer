@@ -68,7 +68,6 @@ func main() {
 			}
 			defs[swaggify(defName)] = val.Schema
 		}
-		// TODO
 	}
 	swagger := spec.Swagger{
 		SwaggerProps: spec.SwaggerProps{
