@@ -23,8 +23,8 @@ import (
 )
 
 var (
-	TrainingRuntimeContainerRuntimeClassKey        = ".volcano.trainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
-	ClusterTrainingRuntimeContainerRuntimeClassKey = ".volcano.clusterTrainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
+	TrainingRuntimeContainerRuntimeClassKey        = ".trainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
+	ClusterTrainingRuntimeContainerRuntimeClassKey = ".clusterTrainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
 )
 
 func IndexTrainingRuntimeContainerRuntimeClass(obj client.Object) []string {
