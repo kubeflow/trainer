@@ -1,0 +1,34 @@
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: torch-distributed-speech-recognition
+  labels:
+    trainer.kubeflow.org/framework: torch
+spec:
+  mlPolicy:
+    numNodes: 1
+    torch:
+      numProcPerNode: auto
+  template:
+    spec:
+      replicatedJobs:
+        - name: node
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      imagePullPolicy: IfNotPresent
+                      image: speech-recognition-image:0.1
+                      volumeMounts:
+                        - name: training-data
+                          mountPath: /data
+                  volumes:
+                    - name: training-data
+                      hostPath:
+                        path: /data
+                        type: Directory
