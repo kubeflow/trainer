@@ -452,8 +452,8 @@ class LoraConfig:
     lora_attn_modules: Optional[List[str]] = None
     lora_rank: Optional[int] = None
     lora_alpha: Optional[int] = None
-    lora_dropout: optional[float] = None
-    quantize_base: optional[bool] = None
+    lora_dropout: Optional[float] = None
+    quantize_base: Optional[bool] = None
     use_dora: Optional[bool] = None
 
 ```
