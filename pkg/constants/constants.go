@@ -146,6 +146,18 @@ const (
 	// TorchTuneFullFinetuneMultiNodesConfigSuffix is the config suffix for the multi node distributed full finetune.
 	TorchTuneFullFinetuneMultiNodesConfigSuffix string = "_full_multinode"
 
+	// TorchTuneLoRAFinetuneSingleDevice Recipe is the recipe for the single device LoRA finetune.
+	TorchTuneLoRAFinetuneSingleDevice string = "lora_finetune_single_device"
+
+	// TorchTuneLoRAFinetuneSingleDeviceConfigSuffix is the config suffix for the single device LoRA finetune.
+	TorchTuneLoRAFinetuneSingleDeviceConfigSuffix string = "_lora_single_device"
+
+	// TorchTuneLoRAFinetuneDistributed Recipe is the recipe for the distributed LoRA finetune.
+	TorchTuneLoRAFinetuneDistributed string = "lora_finetune_distributed"
+
+	// TorchTuneLoRAFinetuneDistributedConfigSuffix is the config suffix for the distributed LoRA finetune.
+	TorchTuneLoRAFinetuneDistributedConfigSuffix string = "_lora"
+
 	// TorchTuneModelOutputDir is the config item name for the model output directory.
 	TorchTuneModelOutputDir string = "output_dir"
 
