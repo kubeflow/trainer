@@ -158,6 +158,9 @@ const (
 	// TorchTuneLoRAFinetuneDistributedConfigSuffix is the config suffix for the distributed LoRA finetune.
 	TorchTuneLoRAFinetuneDistributedConfigSuffix string = "_lora"
 
+	// TorchTuneTrainerUseLoRA is the flag for the PEFT method in torchtune.
+	TorchTuneTrainerUseLoRA string = "--trainer-use-lora"
+
 	// TorchTuneModelOutputDir is the config item name for the model output directory.
 	TorchTuneModelOutputDir string = "output_dir"
 
@@ -203,4 +206,7 @@ var (
 
 	// TorchTuneImmutableConfigs is the set of immutable configs for the TorchTune Trainer.
 	TorchTuneImmutableConfigs = sets.New(TorchTuneModelOutputDir, TorchTuneTokenizerPath, TorchTuneCheckpointDir, TorchTuneTokenizerMergeFile)
+
+	// TorchTuneFilteredArgs is the set of args that will be filtered out from the user provided args.
+	TorchTuneFilteredArgs = sets.New(TorchTuneTrainerUseLoRA)
 )
