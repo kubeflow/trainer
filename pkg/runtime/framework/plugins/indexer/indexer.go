@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volcano
+package indexer
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,8 +23,10 @@ import (
 )
 
 var (
-	TrainingRuntimeContainerRuntimeClassKey        = ".volcano.trainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
-	ClusterTrainingRuntimeContainerRuntimeClassKey = ".volcano.clusterTrainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
+	TrainingRuntimeContainerRuntimeClassKey               = ".trainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
+	ClusterTrainingRuntimeContainerRuntimeClassKey        = ".clusterTrainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
+	VolcanoTrainingRuntimeContainerRuntimeClassKey        = ".volcano.trainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
+	VolcanoClusterTrainingRuntimeContainerRuntimeClassKey = ".volcano.clusterTrainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
 )
 
 func IndexTrainingRuntimeContainerRuntimeClass(obj client.Object) []string {

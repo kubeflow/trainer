@@ -47,6 +47,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	index "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/indexer"
 	runtimeindexer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 )
 
@@ -73,12 +74,12 @@ const Name = "CoScheduling"
 // +kubebuilder:rbac:groups="",resources=limitranges,verbs=get;list;watch
 
 func New(ctx context.Context, client client.Client, indexer client.FieldIndexer) (framework.Plugin, error) {
-	if err := indexer.IndexField(ctx, &trainer.TrainingRuntime{}, TrainingRuntimeContainerRuntimeClassKey,
-		IndexTrainingRuntimeContainerRuntimeClass); err != nil {
+	if err := indexer.IndexField(ctx, &trainer.TrainingRuntime{}, index.TrainingRuntimeContainerRuntimeClassKey,
+		index.IndexTrainingRuntimeContainerRuntimeClass); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer, err)
 	}
-	if err := indexer.IndexField(ctx, &trainer.ClusterTrainingRuntime{}, ClusterTrainingRuntimeContainerRuntimeClassKey,
-		IndexClusterTrainingRuntimeContainerRuntimeClass); err != nil {
+	if err := indexer.IndexField(ctx, &trainer.ClusterTrainingRuntime{}, index.ClusterTrainingRuntimeContainerRuntimeClassKey,
+		index.IndexClusterTrainingRuntimeContainerRuntimeClass); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrorCanNotSetupClusterTrainingRuntimeRuntimeClassIndexer, err)
 	}
 	return &CoScheduling{
@@ -187,11 +188,11 @@ func (h *PodGroupRuntimeClassHandler) Generic(context.Context, event.TypedGeneri
 
 func (h *PodGroupRuntimeClassHandler) queueSuspendedTrainJobs(ctx context.Context, runtimeClass *nodev1.RuntimeClass, q workqueue.TypedRateLimitingInterface[reconcile.Request]) error {
 	var trainingRuntimes trainer.TrainingRuntimeList
-	if err := h.client.List(ctx, &trainingRuntimes, client.MatchingFields{TrainingRuntimeContainerRuntimeClassKey: runtimeClass.Name}); err != nil {
+	if err := h.client.List(ctx, &trainingRuntimes, client.MatchingFields{index.TrainingRuntimeContainerRuntimeClassKey: runtimeClass.Name}); err != nil {
 		return err
 	}
 	var clusterTrainingRuntimes trainer.ClusterTrainingRuntimeList
-	if err := h.client.List(ctx, &clusterTrainingRuntimes, client.MatchingFields{ClusterTrainingRuntimeContainerRuntimeClassKey: runtimeClass.Name}); err != nil {
+	if err := h.client.List(ctx, &clusterTrainingRuntimes, client.MatchingFields{index.ClusterTrainingRuntimeContainerRuntimeClassKey: runtimeClass.Name}); err != nil {
 		return err
 	}
 

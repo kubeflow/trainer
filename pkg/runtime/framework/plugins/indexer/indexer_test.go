@@ -1,4 +1,4 @@
-package coscheduling
+package indexer
 
 import (
 	"testing"

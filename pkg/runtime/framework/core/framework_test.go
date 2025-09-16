@@ -46,6 +46,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
+	index "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/indexer"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
@@ -145,17 +146,17 @@ func TestNew(t *testing.T) {
 			t.Cleanup(cancel)
 
 			if tc.emptyCoSchedulingIndexerTrainingRuntimeContainerRuntimeClassKey {
-				originTrainingRuntimeRuntimeKey := coscheduling.TrainingRuntimeContainerRuntimeClassKey
-				coscheduling.TrainingRuntimeContainerRuntimeClassKey = ""
+				originTrainingRuntimeRuntimeKey := index.TrainingRuntimeContainerRuntimeClassKey
+				index.TrainingRuntimeContainerRuntimeClassKey = ""
 				t.Cleanup(func() {
-					coscheduling.TrainingRuntimeContainerRuntimeClassKey = originTrainingRuntimeRuntimeKey
+					index.TrainingRuntimeContainerRuntimeClassKey = originTrainingRuntimeRuntimeKey
 				})
 			}
 			if tc.emptyCoSchedulingIndexerClusterTrainingRuntimeContainerRuntimeClassKey {
-				originClusterTrainingRuntimeKey := coscheduling.ClusterTrainingRuntimeContainerRuntimeClassKey
-				coscheduling.ClusterTrainingRuntimeContainerRuntimeClassKey = ""
+				originClusterTrainingRuntimeKey := index.ClusterTrainingRuntimeContainerRuntimeClassKey
+				index.ClusterTrainingRuntimeContainerRuntimeClassKey = ""
 				t.Cleanup(func() {
-					coscheduling.ClusterTrainingRuntimeContainerRuntimeClassKey = originClusterTrainingRuntimeKey
+					index.ClusterTrainingRuntimeContainerRuntimeClassKey = originClusterTrainingRuntimeKey
 				})
 			}
 			clientBuilder := testingutil.NewClientBuilder()

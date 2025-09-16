@@ -34,6 +34,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	index "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/indexer"
 	runtimeindexer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 )
 
@@ -60,13 +61,13 @@ func TestNewVolcano(t *testing.T) {
 			},
 			expectErr: "",
 			expectCalledSet: map[string]bool{
-				TrainingRuntimeContainerRuntimeClassKey:        true,
-				ClusterTrainingRuntimeContainerRuntimeClassKey: true,
+				index.VolcanoTrainingRuntimeContainerRuntimeClassKey:        true,
+				index.VolcanoClusterTrainingRuntimeContainerRuntimeClassKey: true,
 			},
 		},
 		"training runtime indexer fails": {
 			indexerFunc: func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
-				if field == TrainingRuntimeContainerRuntimeClassKey {
+				if field == index.VolcanoTrainingRuntimeContainerRuntimeClassKey {
 					return fmt.Errorf("test error")
 				}
 				return nil
@@ -75,7 +76,7 @@ func TestNewVolcano(t *testing.T) {
 		},
 		"cluster training runtime indexer fails": {
 			indexerFunc: func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
-				if field == ClusterTrainingRuntimeContainerRuntimeClassKey {
+				if field == index.VolcanoClusterTrainingRuntimeContainerRuntimeClassKey {
 					return fmt.Errorf("test error")
 				}
 				return nil
@@ -495,11 +496,11 @@ func TestPodGroupRuntimeClassHandler_AllEvents(t *testing.T) {
 	cli := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(trainJob, tr).
-		WithIndex(&trainer.TrainingRuntime{}, TrainingRuntimeContainerRuntimeClassKey,
+		WithIndex(&trainer.TrainingRuntime{}, index.VolcanoTrainingRuntimeContainerRuntimeClassKey,
 			func(obj client.Object) []string {
 				return []string{"test-class"}
 			}).
-		WithIndex(&trainer.ClusterTrainingRuntime{}, ClusterTrainingRuntimeContainerRuntimeClassKey,
+		WithIndex(&trainer.ClusterTrainingRuntime{}, index.VolcanoClusterTrainingRuntimeContainerRuntimeClassKey,
 			func(obj client.Object) []string {
 				return []string{"test-class"}
 			}).
@@ -528,11 +529,11 @@ func TestPodGroupRuntimeClassHandler_AllEvents(t *testing.T) {
 	cli2 := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(trainJob, cr).
-		WithIndex(&trainer.TrainingRuntime{}, TrainingRuntimeContainerRuntimeClassKey,
+		WithIndex(&trainer.TrainingRuntime{}, index.VolcanoTrainingRuntimeContainerRuntimeClassKey,
 			func(obj client.Object) []string {
 				return []string{"test-class"}
 			}).
-		WithIndex(&trainer.ClusterTrainingRuntime{}, ClusterTrainingRuntimeContainerRuntimeClassKey,
+		WithIndex(&trainer.ClusterTrainingRuntime{}, index.VolcanoClusterTrainingRuntimeContainerRuntimeClassKey,
 			func(obj client.Object) []string {
 				return []string{"test-class"}
 			}).
