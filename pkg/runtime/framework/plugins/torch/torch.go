@@ -246,17 +246,29 @@ func calculateNumProcPerNode(
 
 // getRecipeAndConfig returns the recipe and config file name based on the number of nodes,
 // number of processes per node, model name, and command line arguments.
-func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, model string, _ []string) (string, string) {
+func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, model string, args []string) (string, string) {
 	recipe := constants.TorchTuneFullFinetuneDistributed
 	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
 	if numNodes == 1 && numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 {
-		recipe = constants.TorchTuneFullFinetuneSingleDevice
-		suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
+		if isUseLoraFinetune(args) {
+			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
+			suffix = constants.TorchTuneLoRAFinetuneSingleDeviceConfigSuffix
+		} else {
+			recipe = constants.TorchTuneFullFinetuneSingleDevice
+			suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
+		}
+	} else if numNodes == 1 && isUseLoraFinetune(args) {
+		recipe = constants.TorchTuneLoRAFinetuneDistributed
+		suffix = constants.TorchTuneLoRAFinetuneDistributedConfigSuffix
 	} else if numNodes > 1 {
 		suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
 	}
 
 	return recipe, fmt.Sprintf("%s%s", model, suffix)
+}
+
+func isUseLoraFinetune(args []string) bool {
+	return false
 }
 
 // extractOverridesFromRuntime extracts overrides from the TorchTune Trainer Node.
