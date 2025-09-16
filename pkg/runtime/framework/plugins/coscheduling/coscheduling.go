@@ -93,7 +93,7 @@ func (c *CoScheduling) Name() string {
 }
 
 func (c *CoScheduling) EnforcePodGroupPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
-	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || trainJob == nil || info.RuntimePolicy.PodGroupPolicy.Coscheduling == nil {
+	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || info.RuntimePolicy.PodGroupPolicy.Coscheduling == nil || trainJob == nil {
 		return nil
 	}
 
