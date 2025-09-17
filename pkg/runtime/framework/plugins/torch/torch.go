@@ -198,7 +198,8 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			// Rendezvous backend is only enabled for multi-nodes or multi-devices training.
 			var newCommand []string
 			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
-			if numNodes > 1 || !(numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1) {
+			gpuQ, ok := trainJob.Spec.Trainer.ResourcesPerNode.Limits["nvidia.com/gpu"]
+			if numNodes > 1 || !(numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1) && !(ok && gpuQ.Value() == 1) {
 				newCommand = append(newCommand,
 					fmt.Sprintf("%s=%s-%s-0-0.%s:%d",
 						constants.TorchTuneArgRdzvEndpoint,
@@ -251,7 +252,8 @@ func calculateNumProcPerNode(
 func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, resourcePerNode corev1.ResourceList, model string, args []string) (string, string) {
 	recipe := constants.TorchTuneFullFinetuneDistributed
 	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
-	if numNodes == 1 && numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 {
+	gpuQ, ok := resourcePerNode["nvidia.com/gpu"]
+	if numNodes == 1 && (numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 || ok && gpuQ.Value() == 1) {
 		if isUseLoraFinetune(args) {
 			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
 			suffix = constants.TorchTuneLoRAFinetuneSingleDeviceConfigSuffix
@@ -266,14 +268,8 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, resou
 		recipe = constants.TorchTuneLoRAFinetuneDistributed
 		suffix = constants.TorchTuneLoRAFinetuneDistributedConfigSuffix
 	} else if numNodes == 1 && isUseQLoraFinetune(args) {
-		// In most cases, QLoRA finetuning only supports single GPU training.
-		if gpuQ, ok := resourcePerNode["nvidia.com/gpu"]; ok && gpuQ.Value() == 1 {
-			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
-			suffix = constants.TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix
-		} else {
-			recipe = constants.TorchTuneLoRAFinetuneDistributed
-			suffix = constants.TorchTuneQLoRAFinetuneDistributedConfigSuffix
-		}
+		recipe = constants.TorchTuneLoRAFinetuneDistributed
+		suffix = constants.TorchTuneQLoRAFinetuneDistributedConfigSuffix
 	} else if numNodes > 1 {
 		suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
 	}
