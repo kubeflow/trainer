@@ -1138,7 +1138,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							[]string{
 								"dataset.data_dir=/workspace/dataset/data",
 								"model.apply_lora_to_mlp=True",
-								"model.lora_attn_modules=\"[q_proj,k_proj,v_proj,output_proj]\"",
+								"model.lora_attn_modules=[q_proj,k_proj,v_proj,output_proj]",
 								"--trainer-use-lora",
 								"dataset=torchtune.datasets.instruct_dataset",
 								"dataset.source=parquet",
@@ -1176,7 +1176,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						[]string{
 							"dataset.data_dir=/workspace/dataset/data",
 							"model.apply_lora_to_mlp=True",
-							"model.lora_attn_modules=\"[q_proj,k_proj,v_proj,output_proj]\"",
+							"model.lora_attn_modules=[q_proj,k_proj,v_proj,output_proj]",
 							"dataset=torchtune.datasets.instruct_dataset",
 							"dataset.source=parquet",
 						},
@@ -1281,7 +1281,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							[]string{
 								"dataset.data_dir=/workspace/dataset/data",
 								"model.apply_lora_to_mlp=True",
-								"model.lora_attn_modules=\"[q_proj,k_proj,v_proj,output_proj]\"",
+								"model.lora_attn_modules=[q_proj,k_proj,v_proj,output_proj]",
 								"--trainer-use-qlora",
 								"dataset=torchtune.datasets.instruct_dataset",
 								"dataset.source=parquet",
@@ -1318,7 +1318,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						[]string{
 							"dataset.data_dir=/workspace/dataset/data",
 							"model.apply_lora_to_mlp=True",
-							"model.lora_attn_modules=\"[q_proj,k_proj,v_proj,output_proj]\"",
+							"model.lora_attn_modules=[q_proj,k_proj,v_proj,output_proj]",
 							"dataset=torchtune.datasets.instruct_dataset",
 							"dataset.source=parquet",
 						},

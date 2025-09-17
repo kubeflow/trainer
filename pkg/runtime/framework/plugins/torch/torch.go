@@ -254,7 +254,6 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, resou
 	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
 	gpuQ, ok := resourcePerNode["nvidia.com/gpu"]
 	if numNodes == 1 && (numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 || ok && gpuQ.Value() == 1) {
-		fmt.Printf("model: %s, numProcPerNode: %v, gpuQ: %v, args: %v\n", model, numProcPerNode, gpuQ.Value(), args)
 		if isUseLoraFinetune(args) {
 			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
 			suffix = constants.TorchTuneLoRAFinetuneSingleDeviceConfigSuffix
