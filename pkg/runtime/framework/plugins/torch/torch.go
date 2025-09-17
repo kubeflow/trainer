@@ -198,7 +198,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			// Rendezvous backend is only enabled for multi-nodes or multi-devices training.
 			var newCommand []string
 			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
-			gpuQ, ok := trainJob.Spec.Trainer.ResourcesPerNode.Limits["nvidia.com/gpu"]
+			gpuQ, ok := trainJob.Spec.Trainer.ResourcesPerNode.Requests["nvidia.com/gpu"]
 			if numNodes > 1 || !(numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1) && !(ok && gpuQ.Value() == 1) {
 				newCommand = append(newCommand,
 					fmt.Sprintf("%s=%s-%s-0-0.%s:%d",
@@ -212,7 +212,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			recipe, config := getRecipeAndConfig(
 				numNodes,
 				numProcPerNode,
-				trainJob.Spec.Trainer.ResourcesPerNode.Limits,
+				trainJob.Spec.Trainer.ResourcesPerNode.Requests,
 				getModelFromRuntimeRef(trainJob.Spec.RuntimeRef.Name),
 				trainJob.Spec.Trainer.Args,
 			)
@@ -254,6 +254,7 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, resou
 	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
 	gpuQ, ok := resourcePerNode["nvidia.com/gpu"]
 	if numNodes == 1 && (numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 || ok && gpuQ.Value() == 1) {
+		fmt.Printf("model: %s, numProcPerNode: %v, gpuQ: %v, args: %v\n", model, numProcPerNode, gpuQ.Value(), args)
 		if isUseLoraFinetune(args) {
 			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
 			suffix = constants.TorchTuneLoRAFinetuneSingleDeviceConfigSuffix
