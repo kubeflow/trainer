@@ -198,7 +198,8 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			// Rendezvous backend is only enabled for multi-nodes or multi-devices training.
 			var newCommand []string
 			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
-			if numNodes > 1 || !(numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1) {
+			gpuQ, ok := trainJob.Spec.Trainer.ResourcesPerNode.Requests["nvidia.com/gpu"]
+			if numNodes > 1 || !(numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1) && !(ok && gpuQ.Value() == 1) {
 				newCommand = append(newCommand,
 					fmt.Sprintf("%s=%s-%s-0-0.%s:%d",
 						constants.TorchTuneArgRdzvEndpoint,
@@ -211,6 +212,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			recipe, config := getRecipeAndConfig(
 				numNodes,
 				numProcPerNode,
+				trainJob.Spec.Trainer.ResourcesPerNode.Requests,
 				getModelFromRuntimeRef(trainJob.Spec.RuntimeRef.Name),
 				trainJob.Spec.Trainer.Args,
 			)
@@ -220,6 +222,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			newCommand = append(newCommand, extractOverridesFromRuntime(info)...)
 
 			trainJob.Spec.Trainer.Command = append(trainJob.Spec.Trainer.Command, newCommand...)
+			trainJob.Spec.Trainer.Args = removeFilteredArgs(trainJob.Spec.Trainer.Args)
 		}
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
@@ -245,18 +248,66 @@ func calculateNumProcPerNode(
 }
 
 // getRecipeAndConfig returns the recipe and config file name based on the number of nodes,
-// number of processes per node, model name, and command line arguments.
-func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, model string, _ []string) (string, string) {
+// number of processes per node, resource per node, model name, and command line arguments.
+func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, resourcePerNode corev1.ResourceList, model string, args []string) (string, string) {
 	recipe := constants.TorchTuneFullFinetuneDistributed
 	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
-	if numNodes == 1 && numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 {
-		recipe = constants.TorchTuneFullFinetuneSingleDevice
-		suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
+	gpuQ, ok := resourcePerNode["nvidia.com/gpu"]
+	if numNodes == 1 && (numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 || ok && gpuQ.Value() == 1) {
+		if isUseLoraFinetune(args) {
+			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
+			suffix = constants.TorchTuneLoRAFinetuneSingleDeviceConfigSuffix
+		} else if isUseQLoraFinetune(args) {
+			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
+			suffix = constants.TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix
+		} else {
+			recipe = constants.TorchTuneFullFinetuneSingleDevice
+			suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
+		}
+	} else if numNodes == 1 && isUseLoraFinetune(args) {
+		recipe = constants.TorchTuneLoRAFinetuneDistributed
+		suffix = constants.TorchTuneLoRAFinetuneDistributedConfigSuffix
+	} else if numNodes == 1 && isUseQLoraFinetune(args) {
+		recipe = constants.TorchTuneLoRAFinetuneDistributed
+		suffix = constants.TorchTuneQLoRAFinetuneDistributedConfigSuffix
 	} else if numNodes > 1 {
 		suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
 	}
 
 	return recipe, fmt.Sprintf("%s%s", model, suffix)
+}
+
+// isUseLoraFinetune checks if the --trainer-use-lora flag is present in the command line arguments.
+// It returns true if the flag is found, otherwise false.
+func isUseLoraFinetune(args []string) bool {
+	for _, arg := range args {
+		if arg == constants.TorchTuneTrainerUseLoRA {
+			return true
+		}
+	}
+	return false
+}
+
+// isUseQLoraFinetune checks if the --trainer-use-qlora flag is present in the command line arguments.
+// It returns true if the flag is found, otherwise false.
+func isUseQLoraFinetune(args []string) bool {
+	for _, arg := range args {
+		if arg == constants.TorchTuneTrainerUseQLoRA {
+			return true
+		}
+	}
+	return false
+}
+
+// removeFilteredArgs removes the filtered args from the provided args slice.
+func removeFilteredArgs(args []string) []string {
+	filteredArgs := []string{}
+	for _, arg := range args {
+		if !constants.TorchTuneFilteredArgs.Has(arg) {
+			filteredArgs = append(filteredArgs, arg)
+		}
+	}
+	return filteredArgs
 }
 
 // extractOverridesFromRuntime extracts overrides from the TorchTune Trainer Node.

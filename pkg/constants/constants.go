@@ -146,6 +146,30 @@ const (
 	// TorchTuneFullFinetuneMultiNodesConfigSuffix is the config suffix for the multi node distributed full finetune.
 	TorchTuneFullFinetuneMultiNodesConfigSuffix string = "_full_multinode"
 
+	// TorchTuneLoRAFinetuneSingleDevice Recipe is the recipe for the single device LoRA finetune.
+	TorchTuneLoRAFinetuneSingleDevice string = "lora_finetune_single_device"
+
+	// TorchTuneLoRAFinetuneSingleDeviceConfigSuffix is the config suffix for the single device LoRA finetune.
+	TorchTuneLoRAFinetuneSingleDeviceConfigSuffix string = "_lora_single_device"
+
+	// TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix is the config suffix for the single device QLoRA finetune.
+	TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix string = "_qlora_single_device"
+
+	// TorchTuneLoRAFinetuneDistributed Recipe is the recipe for the distributed LoRA finetune.
+	TorchTuneLoRAFinetuneDistributed string = "lora_finetune_distributed"
+
+	// TorchTuneLoRAFinetuneDistributedConfigSuffix is the config suffix for the distributed LoRA finetune.
+	TorchTuneLoRAFinetuneDistributedConfigSuffix string = "_lora"
+
+	// TorchTuneQLoRAFinetuneDistributedConfigSuffix is the config suffix for the distributed QLoRA finetune.
+	TorchTuneQLoRAFinetuneDistributedConfigSuffix string = "_qlora"
+
+	// TorchTuneTrainerUseLoRA is the flag for the LoRA/DoRA method in torchtune.
+	TorchTuneTrainerUseLoRA string = "--trainer-use-lora"
+
+	// TorchTuneTrainerUseQLoRA is the flag for the QLoRA method in torchtune.
+	TorchTuneTrainerUseQLoRA string = "--trainer-use-qlora"
+
 	// TorchTuneModelOutputDir is the config item name for the model output directory.
 	TorchTuneModelOutputDir string = "output_dir"
 
@@ -185,4 +209,7 @@ var (
 
 	// TorchTuneImmutableConfigs is the set of immutable configs for the TorchTune Trainer.
 	TorchTuneImmutableConfigs = sets.New(TorchTuneModelOutputDir, TorchTuneTokenizerPath, TorchTuneCheckpointDir)
+
+	// TorchTuneFilteredArgs is the set of args that will be filtered out from the user provided args.
+	TorchTuneFilteredArgs = sets.New(TorchTuneTrainerUseLoRA, TorchTuneTrainerUseQLoRA)
 )
