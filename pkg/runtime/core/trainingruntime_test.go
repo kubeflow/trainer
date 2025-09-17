@@ -1292,7 +1292,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								"dataset.source=parquet",
 							},
 							resRequests,
-							).
+						).
 						NumNodes(1).
 						NumProcPerNode(intstr.FromString("auto")).
 						ResourcesPerNode(corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")}).
