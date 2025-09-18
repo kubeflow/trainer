@@ -1,7 +1,7 @@
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
-  name: torchtune-llama3.2-3b
+  name: torchtune-qwen3-1.7b
   labels:
     trainer.kubeflow.org/framework: torchtune
 spec:
@@ -32,7 +32,7 @@ spec:
                   volumes:
                     - name: initializer
                       persistentVolumeClaim:
-                        claimName: torchtune-llama3.2-3b
+                        claimName: torchtune-qwen3-1.7b
         - name: model-initializer
           template:
             metadata:
@@ -46,14 +46,14 @@ spec:
                       image: ghcr.io/kubeflow/trainer/model-initializer
                       env:
                         - name: STORAGE_URI
-                          value: hf://meta-llama/Llama-3.2-3B-Instruct
+                          value: hf://Qwen/Qwen3-1.7B
                       volumeMounts:
                         - name: initializer
                           mountPath: /workspace
                   volumes:
                     - name: initializer
                       persistentVolumeClaim:
-                        claimName: torchtune-llama3.2-3b
+                        claimName: torchtune-qwen3-1.7b
         - name: node
           dependsOn:
             - name: dataset-initializer
@@ -76,12 +76,13 @@ spec:
                         - --rdzv_endpoint=localhost:29500
                         - full_finetune_distributed
                         - --config
-                        - llama3_2/3B_full
+                        - qwen3/1.7B_full
                         - dataset=torchtune.datasets.instruct_dataset
                         - dataset.source=parquet
                         - dataset.data_dir=/workspace/dataset/data
                         - output_dir=/workspace/output
-                        - tokenizer.path=/workspace/model/original/tokenizer.model
+                        - tokenizer.path=/workspace/model/vocab.json
+                        - tokenizer.merges_file=/workspace/model/merges.txt
                         - checkpointer.checkpoint_dir=/workspace/model
                       resources:
                         limits:
@@ -92,4 +93,4 @@ spec:
                   volumes:
                     - name: initializer
                       persistentVolumeClaim:
-                        claimName: torchtune-llama3.2-3b
+                        claimName: torchtune-qwen3-1.7b
