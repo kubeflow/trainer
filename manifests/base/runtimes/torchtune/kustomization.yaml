@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - llama3_2/llama3_2_1B.yaml
   - llama3_2/llama3_2_3B.yaml
+  - qwen3/qwen3_1.7B.yaml
