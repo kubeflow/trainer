@@ -148,32 +148,12 @@ type JAXMLPolicySource struct {}
 
 ## Test Plan
 
-The testing strategy will focus on validating functionality, usability, and integration of the proposed `TrainingRuntime` mechanism for distributed training workloads. It includes the following components:
+The testing strategy focuses on validating functionality and integration of the `TrainingRuntime` mechanism.
 
-### End-to-End (E2E) Tests
-
-* **Environment**: Deploy workloads in lightweight local Kubernetes clusters using tools like `kind` or `minikube`.
-* **Workloads**: Run simple distributed training examples such as MNIST **JAX**.
-* **Validation Goals**:
-
-  * Ensure correct creation of `JobSet` resources.
-  * Validate successful job execution and error handling paths.
-  * Confirm compatibility with `TrainingRuntime` configurations.
-
-### Working Examples
-
-* Provide clear, runnable examples:
-
-  * **Kubeflow SDK and notebook examples** that demonstrate creating and running training jobs using the new interface.
-* These examples will serve as both test cases and documentation to support user onboarding.
-
-### Unit and Integration Tests
-
-* For any controller or plugin logic introduced:
-
-  * Write targeted **unit tests** in Go to validate business logic and failure scenarios.
-  * Use mocks/fakes where needed to simulate cluster conditions and resource state.
-* Ensure **controller reconciliation logic** is tested thoroughly.
+* **Environment**: Run workloads in a lightweight Kubernetes cluster in **CI actions** (e.g., using `kind` or `minikube`).
+* **Workloads**: Execute simple distributed training examples such as MNIST **JAX**.
+* **Validation Goals**: Ensure correct creation of `JobSet` resources, successful job execution, and compatibility with `TrainingRuntime` configurations.
+* **Working Examples**: Provide runnable **notebook examples** demonstrating how to create and run training jobs. These notebooks double as test cases and user documentation.
 
 ## Future Work
 
