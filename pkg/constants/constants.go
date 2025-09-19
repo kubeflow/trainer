@@ -152,6 +152,9 @@ const (
 	// TorchTuneTokenizerPath is the config item name for the tokenizer path.
 	TorchTuneTokenizerPath string = "tokenizer.path"
 
+	// TorchTuneTokenizerMergeFile is the config item name for the tokenizer merge file.
+	TorchTuneTokenizerMergeFile string = "tokenizer.merge_file"
+
 	// TorchTuneCheckpointerDir is the config item name for the checkpointer directory.
 	TorchTuneCheckpointDir string = "checkpointer.checkpoint_dir"
 )
@@ -184,5 +187,5 @@ var (
 	TorchTuneEntrypoint = []string{"tune", "run"}
 
 	// TorchTuneImmutableConfigs is the set of immutable configs for the TorchTune Trainer.
-	TorchTuneImmutableConfigs = sets.New(TorchTuneModelOutputDir, TorchTuneTokenizerPath, TorchTuneCheckpointDir)
+	TorchTuneImmutableConfigs = sets.New(TorchTuneModelOutputDir, TorchTuneTokenizerPath, TorchTuneCheckpointDir, TorchTuneTokenizerMergeFile)
 )
