@@ -1,7 +1,7 @@
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
-  name: torchtune-qwen3-1.7b
+  name: torchtune-qwen2-1.5b
   labels:
     trainer.kubeflow.org/framework: torchtune
 spec:
@@ -32,7 +32,7 @@ spec:
                   volumes:
                     - name: initializer
                       persistentVolumeClaim:
-                        claimName: torchtune-qwen3-1.7b
+                        claimName: torchtune-qwen2-1.5b
         - name: model-initializer
           template:
             metadata:
@@ -46,14 +46,14 @@ spec:
                       image: ghcr.io/kubeflow/trainer/model-initializer
                       env:
                         - name: STORAGE_URI
-                          value: hf://Qwen/Qwen3-1.7B
+                          value: hf://Qwen/Qwen2-1.5B-Instruct
                       volumeMounts:
                         - name: initializer
                           mountPath: /workspace
                   volumes:
                     - name: initializer
                       persistentVolumeClaim:
-                        claimName: torchtune-qwen3-1.7b
+                        claimName: torchtune-qwen2-1.5b
         - name: node
           dependsOn:
             - name: dataset-initializer
@@ -76,7 +76,7 @@ spec:
                         - --rdzv_endpoint=localhost:29500
                         - full_finetune_distributed
                         - --config
-                        - qwen3/1.7B_full
+                        - qwen2/1.5B_full
                         - dataset=torchtune.datasets.instruct_dataset
                         - dataset.source=parquet
                         - dataset.data_dir=/workspace/dataset/data
@@ -86,11 +86,11 @@ spec:
                         - checkpointer.checkpoint_dir=/workspace/model
                       resources:
                         limits:
-                          nvidia.com/gpu: 2
+                          nvidia.com/gpu: 1
                       volumeMounts:
                         - mountPath: /workspace
                           name: initializer
                   volumes:
                     - name: initializer
                       persistentVolumeClaim:
-                        claimName: torchtune-qwen3-1.7b
+                        claimName: torchtune-qwen2-1.5b
