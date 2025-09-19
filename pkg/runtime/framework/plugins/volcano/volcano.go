@@ -104,10 +104,10 @@ func (v *Volcano) EnforcePodGroupPolicy(info *runtime.Info, trainJob *trainer.Tr
 	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || trainJob == nil || info.RuntimePolicy.PodGroupPolicy.Volcano == nil {
 		return nil
 	}
-	if info.Scheduler.PodLabels == nil {
-		info.Scheduler.PodLabels = map[string]string{}
+	if info.Annotations == nil {
+		info.Annotations = map[string]string{}
 	}
-	info.Scheduler.PodLabels[volcanov1beta1.KubeGroupNameAnnotationKey] = trainJob.Name
+	info.Annotations[volcanov1beta1.KubeGroupNameAnnotationKey] = trainJob.Name
 	return nil
 }
 
