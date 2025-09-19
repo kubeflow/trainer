@@ -39,8 +39,6 @@ Finally with this design, Platform Admins can define standardized training runti
 2. Enable distributed training or objective computation using the new Runtime API
 3. Support prototyping and training of large JAX-based LLMs within Kubeflow Trainer
 
----
-
 ### Goals
 
 - Implement ClusterTrainingRuntime for JAX, supporting distributed training with JAX (e.g. multi-controller JAX)
@@ -173,8 +171,6 @@ The testing strategy will focus on validating functionality, usability, and inte
   * Write targeted **unit tests** in Go to validate business logic and failure scenarios.
   * Use mocks/fakes where needed to simulate cluster conditions and resource state.
 * Ensure **controller reconciliation logic** is tested thoroughly.
-
----
 
 ## Future Work
 
