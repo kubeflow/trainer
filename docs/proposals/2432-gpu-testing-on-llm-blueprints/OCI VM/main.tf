@@ -125,6 +125,7 @@ resource "oci_core_instance" "gpu_vm" {
   source_details {
     source_type = "image"
     source_id   = data.oci_core_images.ubuntu_image.images[0].id
+    boot_volume_size_in_gbs = 512
   }
 
   metadata = {
