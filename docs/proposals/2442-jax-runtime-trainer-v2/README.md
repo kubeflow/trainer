@@ -132,7 +132,7 @@ The number of **JAX hosts** is configured using the `numNodes` field in the **ML
 
 #### JAXMLPolicySource
 
- `JAXMLPolicySource` allows detailed configuration of JAX distributed initialization, backend, devices, and precision.
+`JAXMLPolicySource` configures JAX distributed initialization, backend, devices, and precision.
 
 ```golang
 type MLPolicySource struct {
@@ -145,6 +145,16 @@ type MLPolicySource struct {
 ```golang
 type JAXMLPolicySource struct {}
 ```
+
+This implementation supports `NCCL`, `libtpu`, and `Gloo` (default) backends. The plugin enables JAX distributed training but does not accept user parameters. To run distributed training with the default Gloo backend, the plugin automatically sets required environment variables across pods, including:
+
+| Env Variable          | Purpose                            |
+| --------------------- | ---------------------------------- |
+| `COORDINATOR_ADDRESS` | Address of the coordinator process |
+| `NUM_PROCESSES`       | Total number of JAX processes      |
+| `PROCESS_ID`          | Unique ID of each process          |
+
+The plugin handles distributed initialization internally, allowing users to launch JAX training jobs without manual backend or process configuration while keeping the implementation extendable for future backend options.
 
 ## Test Plan
 
