@@ -117,13 +117,13 @@ This section explains the architecture and flow of executing a distributed JAX t
 
 | **Actor / Component**   | **Action**                                | **Details**                                                                                                                     |
 | ----------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Platform Admin          | Prepares the **Cluster Training Runtime** | Defines container image, entrypoint, framework (e.g., JAX), and resource needs. Setup reusable for training jobs.               |
-| System                  | Retrieves the **Training Runtime Spec**   | Fetched automatically when a user requests a training job to determine execution details.                                       |
-| AI Practitioner         | Creates the **Training Job**              | Uses Kubeflow Python SDK or `kubectl`. Provides training function (e.g., `jax_train_mnist`), arguments, and node configuration. |
-| Runtime | Creates and Submits a **JobSet**          | Training job spec is translated into a JobSet (group of coordinated jobs).                                                      |
-| JobSet Controller | Launches **Distributed Jobs**             | JobSet spawns multiple Kubernetes Jobs, each pod runs a JAX training process instance.                                          |
+| Platform Admin          | Prepares the Cluster Training Runtime | Defines container image, entrypoint, framework (e.g., JAX), and resource needs. Setup reusable for training jobs.               |
+| System                  | Retrieves the Training Runtime Spec   | Fetched automatically when a user requests a training job to determine execution details.                                       |
+| AI Practitioner         | Creates the Training Job              | Uses Kubeflow Python SDK or `kubectl`. Provides training function (e.g., `jax_train_mnist`), arguments, and node configuration. |
+| Runtime | Creates and Submits a JobSet          | Training job spec is translated into a JobSet (group of coordinated jobs).                                                      |
+| JobSet Controller | Launches Distributed Jobs             | JobSet spawns multiple Kubernetes Jobs, each pod runs a JAX training process instance.                                          |
 | Headless Service        | Connects Pods for Communication           | Enables direct pod-to-pod communication for gradient sharing and coordination.                                                  |
-| Cluster (Pods)    | Executes **Distributed Training**         | Each pod runs JAX+Python code, collaborating to complete training across available hardware.                                    |
+| Cluster (Pods)    | Executes Distributed Training         | Each pod runs JAX+Python code, collaborating to complete training across available hardware.                                    |
 
 
 ### Defining Distributed JAX with MLPolicy
@@ -146,15 +146,15 @@ type MLPolicySource struct {
 type JAXMLPolicySource struct {}
 ```
 
-This implementation supports `NCCL`, `libtpu`, and `Gloo` (default) backends. The plugin enables JAX distributed training but does not accept user parameters. To run distributed training with the default Gloo backend, the plugin automatically sets required environment variables across pods, including:
+#### JAX Distributed System
 
-| Env Variable          | Purpose                            |
-| --------------------- | ---------------------------------- |
-| `COORDINATOR_ADDRESS` | Address of the coordinator process |
-| `NUM_PROCESSES`       | Total number of JAX processes      |
-| `PROCESS_ID`          | Unique ID of each process          |
+The plugin enables JAX distributed training and handles distributed initialization internally, allowing seamless execution of training jobs with multiple backend configurations for multi-GPU and Cloud TPU.
 
-The plugin handles distributed initialization internally, allowing users to launch JAX training jobs without manual backend or process configuration while keeping the implementation extendable for future backend options.
+| Backend | Parameters | Notes                                                                                                             |
+| ------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| NCCL    | None                               | No additional configuration needed.                                                                               |
+| LibTPU  | None                               | No additional configuration needed.                                                                               |
+| Gloo    | None                               | Environment variables (`COORDINATOR_ADDRESS`, `NUM_PROCESSES`, `PROCESS_ID`) are automatically set by the policy. |
 
 ## Test Plan
 
@@ -163,7 +163,7 @@ The testing strategy focuses on validating functionality and integration of the 
 * **Environment**: Run workloads in a lightweight Kubernetes cluster in **CI actions** (e.g., using `kind` or `minikube`).
 * **Workloads**: Execute simple distributed training examples such as MNIST **JAX**.
 * **Validation Goals**: Ensure correct creation of `JobSet` resources, successful job execution, and compatibility with `TrainingRuntime` configurations.
-* **Working Examples**: Provide runnable **notebook examples** demonstrating how to create and run training jobs. These notebooks double as test cases and user documentation.
+* **Working Examples**: Provide runnable notebook examples demonstrating how to create and run training jobs. These notebooks double as test cases and user documentation.
 * **Unit Tests**: Add unit tests for `JAXMLPolicySource` to validate correct backend selection, environment variable setup, and distributed initialization logic.
 
 ## Future Work
