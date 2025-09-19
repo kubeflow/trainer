@@ -120,10 +120,10 @@ This section explains the architecture and flow of executing a distributed JAX t
 | Platform Admin          | Prepares the **Cluster Training Runtime** | Defines container image, entrypoint, framework (e.g., JAX), and resource needs. Setup reusable for training jobs.               |
 | System                  | Retrieves the **Training Runtime Spec**   | Fetched automatically when a user requests a training job to determine execution details.                                       |
 | AI Practitioner         | Creates the **Training Job**              | Uses Kubeflow Python SDK or `kubectl`. Provides training function (e.g., `jax_train_mnist`), arguments, and node configuration. |
-| Runtime + Controller    | Creates and Submits a **JobSet**          | Training job spec is translated into a JobSet (group of coordinated jobs).                                                      |
-| JobSet Controller / K8s | Launches **Distributed Jobs**             | JobSet spawns multiple Kubernetes Jobs, each pod runs a JAX training process instance.                                          |
+| Runtime | Creates and Submits a **JobSet**          | Training job spec is translated into a JobSet (group of coordinated jobs).                                                      |
+| JobSet Controller | Launches **Distributed Jobs**             | JobSet spawns multiple Kubernetes Jobs, each pod runs a JAX training process instance.                                          |
 | Headless Service        | Connects Pods for Communication           | Enables direct pod-to-pod communication for gradient sharing and coordination.                                                  |
-| Cluster (Pods + JAX)    | Executes **Distributed Training**         | Each pod runs JAX+Python code, collaborating to complete training across available hardware.                                    |
+| Cluster (Pods)    | Executes **Distributed Training**         | Each pod runs JAX+Python code, collaborating to complete training across available hardware.                                    |
 
 
 ### Defining Distributed JAX with MLPolicy
