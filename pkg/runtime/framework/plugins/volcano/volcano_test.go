@@ -161,7 +161,7 @@ type errorClient struct {
 	errNotFound bool
 }
 
-func (e *errorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+func (e *errorClient) Get(_ context.Context, key client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
 	if !e.errNotFound {
 		return apierrors.NewNotFound(corev1.Resource("podgroups"), key.Name)
 	}
@@ -567,4 +567,52 @@ func TestPodGroupLimitRangeHandler_AllEvents(t *testing.T) {
 	lr := &corev1.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default"}}
 
 	runHandlerTest(t, cli, &PodGroupLimitRangeHandler{}, lr)
+}
+
+func TestValidate(t *testing.T) {
+	v := &Volcano{}
+
+	baseInfo := &runtime.Info{
+		Annotations: map[string]string{},
+		RuntimePolicy: runtime.RuntimePolicy{
+			PodGroupPolicy: &trainer.PodGroupPolicy{
+				PodGroupPolicySource: trainer.PodGroupPolicySource{
+					Volcano: &trainer.VolcanoPodGroupPolicySource{},
+				},
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		annotations map[string]string
+		wantErr     bool
+	}{
+		"queue annotation missing": {
+			annotations: map[string]string{},
+			wantErr:     false,
+		},
+		"queue annotation empty": {
+			annotations: map[string]string{
+				volcanov1beta1.QueueNameAnnotationKey: "",
+			},
+			wantErr: true,
+		},
+		"queue annotation valid": {
+			annotations: map[string]string{
+				volcanov1beta1.QueueNameAnnotationKey: "default",
+			},
+			wantErr: false,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			info := *baseInfo
+			info.Annotations = tt.annotations
+			_, errs := v.Validate(context.Background(), &info, nil, &trainer.TrainJob{})
+			if (len(errs) > 0) != tt.wantErr {
+				t.Errorf("expected error: %v, got: %v", tt.wantErr, errs)
+			}
+		})
+	}
 }

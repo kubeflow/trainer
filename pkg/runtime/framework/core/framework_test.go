@@ -93,6 +93,7 @@ func TestNew(t *testing.T) {
 					&mpi.MPI{},
 					&torch.Torch{},
 					&jobset.JobSet{},
+					&volcano.Volcano{},
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
 					&coscheduling.CoScheduling{},
@@ -131,8 +132,7 @@ func TestNew(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(Framework{}),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
-		cmpopts.IgnoreUnexported(volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
+		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
 		cmpopts.IgnoreFields(coscheduling.CoScheduling{}, "client"),
 		cmpopts.IgnoreFields(volcano.Volcano{}, "client"),
 		cmpopts.IgnoreFields(jobset.JobSet{}, "client"),

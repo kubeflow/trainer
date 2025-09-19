@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -25,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 	volcanov1beta1ac "volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
@@ -76,6 +78,26 @@ func New(ctx context.Context, client client.Client, indexer client.FieldIndexer)
 
 func (v *Volcano) Name() string {
 	return Name
+}
+
+func (v *Volcano) Validate(_ context.Context, info *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	var allErrs field.ErrorList
+
+	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || info.RuntimePolicy.PodGroupPolicy.Volcano == nil || newObj == nil {
+		return nil, allErrs
+	}
+
+	specPath := field.NewPath("spec")
+
+	// Validate queue (must not be empty if explicitly set)
+	if queue, ok := info.Annotations[volcanov1beta1.QueueNameAnnotationKey]; ok {
+		if queue == "" {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("annotations").Key(volcanov1beta1.QueueNameAnnotationKey),
+				queue, "Volcano queue name must not be empty"))
+		}
+	}
+
+	return nil, allErrs
 }
 
 func (v *Volcano) EnforcePodGroupPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
