@@ -162,3 +162,4 @@ While it is possible to **configure a specific communication backend** (e.g., NC
 ## Implementation History
 
 - 2025-05-28: Initial KEP draft created.
+- 2025-09-19: Update design detail section and add future work
