@@ -164,6 +164,7 @@ The testing strategy focuses on validating functionality and integration of the 
 * **Workloads**: Execute simple distributed training examples such as MNIST **JAX**.
 * **Validation Goals**: Ensure correct creation of `JobSet` resources, successful job execution, and compatibility with `TrainingRuntime` configurations.
 * **Working Examples**: Provide runnable **notebook examples** demonstrating how to create and run training jobs. These notebooks double as test cases and user documentation.
+* **Unit Tests**: Add unit tests for `JAXMLPolicySource` to validate correct backend selection, environment variable setup, and distributed initialization logic.
 
 ## Future Work
 
