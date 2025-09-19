@@ -167,7 +167,7 @@ The testing strategy focuses on validating functionality and integration of the 
 
 ## Future Work
 
-While it is possible to **configure a specific communication backend** (e.g., NCCL, MPI, Gloo) for the runtime, we have **deferred this decision** to simplify the current implementation. By default, **JAX uses Gloo** as the communication backend. The design ensures the system remains **extensible**, allowing backend selection and integration to be added in response to future feedback without major changes.
+While it is possible to configure a specific communication backend (e.g., NCCL, MPI, Gloo) for the runtime by a parameter in `JAXMLPolicy`, we have deferred this decision to simplify the current implementation. By default, JAX uses `Gloo` as the communication backend. The design ensures the system remains extensible, allowing backend selection and integration to be added in response to future feedback without major changes.
 
 ## Implementation History
 
