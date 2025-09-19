@@ -12,10 +12,6 @@
     - [Key Concepts in JAX Distributed Training](#key-concepts-in-jax-distributed-training)
     - [JAX Training Workflow](#jax-training-workflow-flow)
     - [Defining JAX Processes with MLPolicy](#defining-jax-processes-with-mlpolicy)
-    - [Communication Backend](#communication-backend)
-        - [OpenMPI](#openmpi)
-        - [Gloo](#gloo)
-        - [NCCL](#nccl)
 - [Test Plan](#test-plan)
     - [End-to-End (E2E) Tests](#end-to-end-e2e-tests)
     - [Working Examples](#working-examples)
@@ -137,7 +133,7 @@ The number of **JAX hosts** is configured using the `numNodes` field in the **ML
 
 #### JAXMLPolicySource
 
- JAXMLPolicySource allows detailed configuration of JAX distributed initialization, backend, devices, and precision.
+ `JAXMLPolicySource` allows detailed configuration of JAX distributed initialization, backend, devices, and precision.
 
 ```golang
 type MLPolicySource struct {
@@ -146,260 +142,7 @@ type MLPolicySource struct {
   JAX *JAXMLPolicySource `json:"jax,omitempty"`
 }
 
-type JAXMLPolicySource struct {
-
-  // Backend for JAX distributed communication.
-  // +kubebuilder:default="nccl"  
-  // +kubebuilder:validation:Enum=nccl;gloo;mpi
-  TargetBackend *string `json:"targetBackend,omitempty"`
-
-  // Platforms is comma-separated list of platform names
-  // specifying which platforms jax should initialize
-  // +kubebuilder:default="gpu,tpu,cpu"
-  Platforms *string `json:"platform,omitempty"`
-
-  // Whether to disable JAX compilation optimizations.  
-  // +kubebuilder:default=false
-  DisableJIT *bool `json:"disableJIT,omitempty"`
-
-  // Check for and raise errors on NaNs
-  // +kubebuilder:default=false
-  DebugNaNs *bool `json:"debugNaNs,omitempty"`
-
-  // Set default precision for matrix multiplication
-  // +kubebuilder:validation:Enum=default;high;highest;bfloat16;tensorfloat32;float32;
-  // ANY_F8_ANY_F8_F32;ANY_F8_ANY_F8_F32_FAST_ACCUM;ANY_F8_ANY_F8_ANY;
-  // ANY_F8_ANY_F8_ANY_FAST_ACCUM;F16_F16_F16;F16_F16_F32;BF16_BF16_BF16;
-  // BF16_BF16_F32;BF16_BF16_F32_X3;BF16_BF16_F32_X6;BF16_BF16_F32_X9;
-  // TF32_TF32_F32;TF32_TF32_F32_X3;F32_F32_F32;F64_F64_F64
-  DefaultMatMulPrecision *string `json:"defaultMatmulPrecision,omitempty"`
-
-  // Additional specific configurations.  
-  // +listType=map  
-  // +listMapKey=name  
-  ExtraEnv []corev1.EnvVar `json:"extraEnv,omitempty"`
-
-  // Distributed contains explicit args used when calling jax.distributed.initialize().
-  // This should be provided when not relying on automatic cluster detection (Slurm, MPI launcher, Cloud TPU, etc).
-  Distributed *DistributedConfig `json:"distributed,omitempty"`
-}
-
-type DistributedConfig struct {
-  // CoordinatorAddress is the address (host:port) of the coordinator process.
-  // +kubebuilder:validation:Required
-  CoordinatorAddress string `json:"coordinatorAddress"`
-
-  // NumProcesses is the total number of processes across all hosts.
-  // +kubebuilder:validation:Minimum=1
-  // +kubebuilder:validation:Required
-  NumProcesses int `json:"numProcesses"`
-
-  // ProcessID is the unique integer id for this process (0..NumProcesses-1).
-  // +kubebuilder:validation:Minimum=0
-  // +kubebuilder:validation:Required
-  ProcessID int `json:"processID"`
-
-  // LocalDeviceIDs lists local device indexes assigned to this process (e.g. [0,1]).
-  // +kubebuilder:validation:MinItems=1
-  // +kubebuilder:validation:Required
-  LocalDeviceIDs []int `json:"localDeviceIDs"`
-
-  // ClusterDetectionMethod (optional) — a hint for automatic detection strategies
-  // (e.g., "slurm", "openmpi", "tpu", "env", "none"). If unset and not using an
-  // automatic launcher, Distributed must be provided with the required fields above.
-  ClusterDetectionMethod *string `json:"clusterDetectionMethod,omitempty"`
-}
-```
-
-### Communication Backend
-
-#### OpenMPI
-
-**Pros:**
-
-* Compatible with existing MPI runtime in Kubeflow Trainer v2, making deployment easier.
-* Leverage `mpi4jax` for HPC application
-
-**Cons:**
-
-* Typically requires more complex environment setup compared to simpler backends like Gloo.
-
-**ClusterTrainingRuntime Design**
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: jax-distributed
-spec:
-  mlPolicy:
-    numNodes: 1
-    mpi:
-      numProcPerNode: 1
-      mpiImplementation: OpenMPI
-      sshAuthMountPath: /home/mpiuser/.ssh
-      runLauncherAsNode: true
-  template:
-    spec:
-      network:
-        publishNotReadyAddresses: true
-      successPolicy:
-        operator: All
-        targetReplicatedJobs:
-          - launcher
-      replicatedJobs:
-        - name: launcher
-          template:
-            metadata:
-              labels:
-                trainer.kubeflow.org/trainjob-ancestor-step: trainer
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: node
-                      image: ghcr.io/kubeflow/trainer/jax-runtime
-                      securityContext:
-                        runAsUser: 1000
-                      command:
-                        - mpirun
-                        - -n
-                        - "1"
-                        - bash
-                        - -c
-                        - |
-                          echo "JAX Distributed Runtime"
-
-                          echo "--------------------------------------"
-                          set -e
-                          mpirun --version
-                          python --version
-                          pip list
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: node
-                      image: ghcr.io/kubeflow/trainer/jax-runtime
-                      securityContext:
-                        runAsUser: 1000
-                      command:
-                        - /usr/sbin/sshd
-                      args:
-                        - -De
-                        - -f
-                        - /home/mpiuser/.sshd_config
-                      readinessProbe:
-                        tcpSocket:
-                          port: 2222
-                        initialDelaySeconds: 5
-```
-
-
-#### Gloo
-
-**Pros:**
-
-* Lightweight and simple to use.
-* Compatible with the Trainer v1
-
-**Cons:**
-
-* Significantly slower than OpenMPI (10–20×) for distributed JAX training on CPUs and GPUs.
-* Less optimized for multi-node scaling and lacks native support for high-speed interconnects like InfiniBand.
-
-**ClusterTrainingRuntime Design**
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: jax-distributed
-spec:
-  mlPolicy:
-    numNodes: 4
-    jax:
-      backend: gloo
-  template:
-    spec:
-      replicatedJobs:
-        - name: process
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: node
-                      image: ghcr.io/kubeflow/trainer/jax-runtime
-                      securityContext:
-                        runAsUser: 1000
-                      command:
-                        - bash
-                        - -c
-                        - |
-                          echo "JAX Distributed Runtime"
-                          echo "--------------------------------------"
-                          set -e
-                          python --version
-                          pip list | grep jax
-```
-
-#### NCCL
-
-**Pros**
-* Minimal setup; JAX/XLA usually auto-configures it.
-* Optimized GPU collectives (all-reduce, etc.) that leverage NVLink/PCIe topology.
-* Can use GPUDirect (incl. RDMA) for fast inter-node transfers when fabric supports it.
-
-**Cons**
-* Performance drops on CPU-only or host-staged gradients; MPI often faster there.
-* High latency for many small messages; can trail tuned OpenMPI runs (env-dependent, sometimes 10–20× in CPU-centric tests).
-* Debug tooling limited; transport or fabric misconfig can silently degrade throughput.
-
-
-**ClusterTrainingRuntime Design**
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: jax-distributed
-spec:
-  mlPolicy:
-    numNodes: 4
-    jax:
-      backend: nccl
-      envs:
-        - name: NCCL_DEBUG
-          value: "WARN"
-        - name: NCCL_IB_DISABLE
-          value: "1"
-        - name: NCCL_SOCKET_IFNAME
-          value: "eth0"
-  template:
-    spec:
-      replicatedJobs:
-        - name: process
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: node
-                      image: ghcr.io/kubeflow/trainer/jax-runtime
-                      securityContext:
-                        runAsUser: 1000
-                      command:
-                        - bash
-                        - -c
-                        - |
-                          echo "JAX Distributed Runtime with NCCL"
-                          echo "--------------------------------------"
-                          set -e
-                          python --version
-                          pip list | grep jax
+type JAXMLPolicySource struct {}
 ```
 
 ## Test Plan
@@ -430,6 +173,12 @@ The testing strategy will focus on validating functionality, usability, and inte
   * Write targeted **unit tests** in Go to validate business logic and failure scenarios.
   * Use mocks/fakes where needed to simulate cluster conditions and resource state.
 * Ensure **controller reconciliation logic** is tested thoroughly.
+
+---
+
+## Future Work
+
+While it is possible to **configure a specific communication backend** (e.g., NCCL, MPI, Gloo) for the runtime, we have **deferred this decision** to simplify the current implementation. By default, **JAX uses Gloo** as the communication backend. The design ensures the system remains **extensible**, allowing backend selection and integration to be added in response to future feedback without major changes.
 
 ## Implementation History
 
