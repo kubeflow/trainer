@@ -153,7 +153,7 @@ const (
 	TorchTuneTokenizerPath string = "tokenizer.path"
 
 	// TorchTuneTokenizerMergeFile is the config item name for the tokenizer merge file.
-	TorchTuneTokenizerMergeFile string = "tokenizer.merge_file"
+	TorchTuneTokenizerMergeFile string = "tokenizer.merges_file"
 
 	// TorchTuneCheckpointerDir is the config item name for the checkpointer directory.
 	TorchTuneCheckpointDir string = "checkpointer.checkpoint_dir"
