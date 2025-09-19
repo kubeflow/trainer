@@ -98,12 +98,8 @@ func TestCoScheduling(t *testing.T) {
 						Obj()).
 				Obj(),
 			wantInfo: &runtime.Info{
-				Scheduler: &runtime.Scheduler{
-					PodLabels: map[string]string{
-						"scheduling.x-k8s.io/pod-group": "trainJob",
-					},
-				},
-				Labels: map[string]string{"key": "value"},
+				Scheduler: &runtime.Scheduler{},
+				Labels:    map[string]string{"key": "value"},
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{},
 				},
