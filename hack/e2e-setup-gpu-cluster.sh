@@ -131,7 +131,7 @@ cat <<EOF >"${E2E_RUNTIMES_DIR}/kustomization.yaml"
   apiVersion: kustomize.config.k8s.io/v1beta1
   kind: Kustomization
   resources:
-    - ../../../manifests/overlays/runtimes
+  - ../../../manifests/overlays/runtimes
   images:
   - name: "${DATASET_INITIALIZER_CI_IMAGE_NAME}"
     newTag: "${DATASET_INITIALIZER_CI_IMAGE_TAG}"
