@@ -31,23 +31,24 @@ NAMESPACE="kubeflow-system"
 TIMEOUT="5m"
 
 # Kubeflow Trainer images.
-# TODO (andreyvelich): Support initializers images.
 CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-manager"
-CONTROLLER_MANAGER_CI_IMAGE_TAG="test"
-CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
+CI_IMAGE_TAG="test"
+CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 echo "Build Kubeflow Trainer images"
 docker build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
 
 # Kubeflow Trainer initializer images.
 DATASET_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/dataset-initializer"
-DATASET_INITIALIZER_CI_IMAGE_TAG="test"
-DATASET_INITIALIZER_CI_IMAGE="${DATASET_INITIALIZER_CI_IMAGE_NAME}:${DATASET_INITIALIZER_CI_IMAGE_TAG}"
+DATASET_INITIALIZER_CI_IMAGE="${DATASET_INITIALIZER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 docker build . -f cmd/initializers/dataset/Dockerfile -t ${DATASET_INITIALIZER_CI_IMAGE}
 
 MODEL_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/model-initializer"
-MODEL_INITIALIZER_CI_IMAGE_TAG="test"
-MODEL_INITIALIZER_CI_IMAGE="${MODEL_INITIALIZER_CI_IMAGE_NAME}:${MODEL_INITIALIZER_CI_IMAGE_TAG}"
+MODEL_INITIALIZER_CI_IMAGE="${MODEL_INITIALIZER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 docker build . -f cmd/initializers/model/Dockerfile -t ${MODEL_INITIALIZER_CI_IMAGE}
+
+TRAINER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/torchtune-trainer"
+TRAINER_CI_IMAGE="${TRAINER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+docker build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_CI_IMAGE}
 
 # Set up Docker to use NVIDIA runtime.
 sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enabled
@@ -99,7 +100,7 @@ cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
   - ../../../manifests/overlays/manager
   images:
   - name: "${CONTROLLER_MANAGER_CI_IMAGE_NAME}"
-    newTag: "${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
+    newTag: "${CI_IMAGE_TAG}"
 EOF
 
 kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
@@ -134,9 +135,11 @@ cat <<EOF >"${E2E_RUNTIMES_DIR}/kustomization.yaml"
   - ../../../manifests/overlays/runtimes
   images:
   - name: "${DATASET_INITIALIZER_CI_IMAGE_NAME}"
-    newTag: "${DATASET_INITIALIZER_CI_IMAGE_TAG}"
+    newTag: "${CI_IMAGE_TAG}"
   - name: "${MODEL_INITIALIZER_CI_IMAGE_NAME}"
-    newTag: "${MODEL_INITIALIZER_CI_IMAGE_TAG}"
+    newTag: "${CI_IMAGE_TAG}"
+  - name: "${TRAINER_CI_IMAGE_NAME}"
+    newTag: "${CI_IMAGE_TAG}"
 EOF
 
 # TODO (andreyvelich): Currently, we print manager logs due to flaky test.
