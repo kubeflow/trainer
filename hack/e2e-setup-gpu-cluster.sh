@@ -88,6 +88,7 @@ kind load docker-image "${CONTROLLER_MANAGER_CI_IMAGE}" --name "${GPU_CLUSTER_NA
 echo "Load Kubeflow Trainer initializers images"
 kind load docker-image "${DATASET_INITIALIZER_CI_IMAGE}" --name "${GPU_CLUSTER_NAME}"
 kind load docker-image "${MODEL_INITIALIZER_CI_IMAGE}" --name "${GPU_CLUSTER_NAME}"
+kind load docker-image "${TRAINER_CI_IMAGE}" --name "${GPU_CLUSTER_NAME}"
 
 # Deploy Kubeflow Trainer control plane
 echo "Deploy Kubeflow Trainer control plane"
