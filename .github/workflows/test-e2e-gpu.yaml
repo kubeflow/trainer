@@ -13,9 +13,6 @@ jobs:
     name: GPU E2E Test
     runs-on: oracle-vm-16cpu-a10gpu-240gb
 
-    # Maintainers have to approve the use of secrets
-    environment: gpu-tests
-
     env:
       GOPATH: ${{ github.workspace }}/go
 
@@ -75,9 +72,7 @@ jobs:
         if: steps.check-label.outputs.skip == 'false'
         run: |
           mkdir -p artifacts/notebooks
-          make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_alpaca-trainjob-yaml.ipynb TIMEOUT=900
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/qwen2_5/qwen2.5-1.5B-with-alpaca.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_qwen2_5_with_alpaca-trainjob-yaml.ipynb TIMEOUT=900
 
       - name: Upload Artifacts to GitHub
         if: always()

@@ -36,7 +36,18 @@ CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-ma
 CONTROLLER_MANAGER_CI_IMAGE_TAG="test"
 CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
 echo "Build Kubeflow Trainer images"
-sudo docker build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
+docker build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
+
+# Kubeflow Trainer initializer images.
+DATASET_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/dataset-initializer"
+DATASET_INITIALIZER_CI_IMAGE_TAG="test"
+DATASET_INITIALIZER_CI_IMAGE="${DATASET_INITIALIZER_CI_IMAGE_NAME}:${DATASET_INITIALIZER_CI_IMAGE_TAG}"
+docker build . -f cmd/initializers/dataset/Dockerfile -t ${DATASET_INITIALIZER_CI_IMAGE}
+
+MODEL_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/model-initializer"
+MODEL_INITIALIZER_CI_IMAGE_TAG="test"
+MODEL_INITIALIZER_CI_IMAGE="${MODEL_INITIALIZER_CI_IMAGE_NAME}:${MODEL_INITIALIZER_CI_IMAGE_TAG}"
+docker build . -f cmd/initializers/model/Dockerfile -t ${MODEL_INITIALIZER_CI_IMAGE}
 
 # Set up Docker to use NVIDIA runtime.
 sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enabled
@@ -73,6 +84,10 @@ kubectl get nodes -o=custom-columns=NAME:.metadata.name,GPU:.status.allocatable.
 echo "Load Kubeflow Trainer images"
 kind load docker-image "${CONTROLLER_MANAGER_CI_IMAGE}" --name "${GPU_CLUSTER_NAME}"
 
+echo "Load Kubeflow Trainer initializers images"
+kind load docker-image "${DATASET_INITIALIZER_CI_IMAGE}" --name "${GPU_CLUSTER_NAME}"
+kind load docker-image "${MODEL_INITIALIZER_CI_IMAGE}" --name "${GPU_CLUSTER_NAME}"
+
 # Deploy Kubeflow Trainer control plane
 echo "Deploy Kubeflow Trainer control plane"
 E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
@@ -108,9 +123,25 @@ print_cluster_info() {
   kubectl describe pod -n ${NAMESPACE}
 }
 
+# Deploy Kubeflow Trainer Runtimes
+echo "Deploy Kubeflow Trainer Runtimes"
+E2E_RUNTIMES_DIR="artifacts/e2e/runtimes"
+mkdir -p "${E2E_RUNTIMES_DIR}"
+cat <<EOF >"${E2E_RUNTIMES_DIR}/kustomization.yaml"
+  apiVersion: kustomize.config.k8s.io/v1beta1
+  kind: Kustomization
+  resources:
+    - ../../../manifests/overlays/runtimes
+  images:
+  - name: "${DATASET_INITIALIZER_CI_IMAGE_NAME}"
+    newTag: "${DATASET_INITIALIZER_CI_IMAGE_TAG}"
+  - name: "${MODEL_INITIALIZER_CI_IMAGE_NAME}"
+    newTag: "${MODEL_INITIALIZER_CI_IMAGE_TAG}"
+EOF
+
 # TODO (andreyvelich): Currently, we print manager logs due to flaky test.
 echo "Deploy Kubeflow Trainer runtimes"
-kubectl apply --server-side -k manifests/overlays/runtimes || (
+kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
   kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
     print_cluster_info &&
     exit 1
