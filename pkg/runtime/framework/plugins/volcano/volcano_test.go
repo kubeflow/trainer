@@ -10,6 +10,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -17,6 +18,8 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
@@ -570,22 +573,14 @@ func TestPodGroupLimitRangeHandler_AllEvents(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	v := &Volcano{}
-
-	baseInfo := &runtime.Info{
-		Annotations: map[string]string{},
-		RuntimePolicy: runtime.RuntimePolicy{
-			PodGroupPolicy: &trainer.PodGroupPolicy{
-				PodGroupPolicySource: trainer.PodGroupPolicySource{
-					Volcano: &trainer.VolcanoPodGroupPolicySource{},
-				},
-			},
-		},
-	}
+	scheme := apiruntime.NewScheme()
+	_ = schedulingv1.AddToScheme(scheme)
 
 	tests := map[string]struct {
-		annotations map[string]string
-		wantErr     bool
+		annotations       map[string]string
+		priorityClassName *string
+		existingPriority  *schedulingv1.PriorityClass
+		wantErr           bool
 	}{
 		"queue annotation missing": {
 			annotations: map[string]string{},
@@ -603,13 +598,60 @@ func TestValidate(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		"priorityClassName is system-cluster-critical": {
+			priorityClassName: ptr.To("system-cluster-critical"),
+			wantErr:           false,
+		},
+		"priorityClassName does not exist": {
+			priorityClassName: ptr.To("non-existent"),
+			wantErr:           true,
+		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			info := *baseInfo
-			info.Annotations = tt.annotations
-			_, errs := v.Validate(context.Background(), &info, nil, &trainer.TrainJob{})
+			var objs []client.Object
+			if tt.existingPriority != nil {
+				objs = append(objs, tt.existingPriority)
+			}
+
+			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+			v := &Volcano{client: c}
+
+			info := &runtime.Info{
+				Annotations: tt.annotations,
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+			}
+
+			if tt.priorityClassName != nil {
+				jobSetSpec := jobsetv1alpha2ac.JobSetSpec().
+					WithReplicatedJobs(
+						jobsetv1alpha2ac.ReplicatedJob().
+							WithTemplate(
+								batchv1ac.JobTemplateSpec().
+									WithSpec(
+										batchv1ac.JobSpec().
+											WithTemplate(
+												corev1ac.PodTemplateSpec().
+													WithSpec(
+														corev1ac.PodSpec().
+															WithPriorityClassName(*tt.priorityClassName),
+													),
+											),
+									),
+							),
+					)
+				info.TemplateSpec = runtime.TemplateSpec{
+					ObjApply: jobSetSpec,
+				}
+			}
+			_, errs := v.Validate(context.Background(), info, nil, &trainer.TrainJob{})
 			if (len(errs) > 0) != tt.wantErr {
 				t.Errorf("expected error: %v, got: %v", tt.wantErr, errs)
 			}

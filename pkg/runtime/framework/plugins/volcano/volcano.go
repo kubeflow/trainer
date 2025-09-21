@@ -9,10 +9,12 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/util/workqueue"
@@ -80,7 +82,7 @@ func (v *Volcano) Name() string {
 	return Name
 }
 
-func (v *Volcano) Validate(_ context.Context, info *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (v *Volcano) Validate(ctx context.Context, info *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 
 	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || info.RuntimePolicy.PodGroupPolicy.Volcano == nil || newObj == nil {
@@ -94,6 +96,29 @@ func (v *Volcano) Validate(_ context.Context, info *runtime.Info, _, newObj *tra
 		if queue == "" {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("annotations").Key(volcanov1beta1.QueueNameAnnotationKey),
 				queue, "Volcano queue name must not be empty"))
+		}
+	}
+
+	// Validate priorityClassName from the Pod template
+	jobSetSpec, ok := runtime.TemplateSpecApply[v1alpha2.JobSetSpecApplyConfiguration](info)
+	if ok && jobSetSpec != nil {
+		for _, rj := range jobSetSpec.ReplicatedJobs {
+			if rj.Template != nil && rj.Template.Spec != nil && rj.Template.Spec.Template != nil && rj.Template.Spec.Template.Spec != nil {
+				priorityClassName := rj.Template.Spec.Template.Spec.PriorityClassName
+				if priorityClassName != nil {
+					pcName := *priorityClassName
+					// Skip two special keywords which indicate the highest priorities
+					if pcName == "system-cluster-critical" || pcName == "system-node-critical" {
+						return nil, allErrs
+					}
+					// Any other name must be defined by creating a PriorityClass object with that name.
+					var pc schedulingv1.PriorityClass
+					if err := v.client.Get(ctx, types.NamespacedName{Name: pcName}, &pc); err != nil {
+						allErrs = append(allErrs, field.Invalid(specPath.Child("templateSpec").Child("priorityClassName"),
+							pcName, fmt.Sprintf("PriorityClass %q doesn't exist: %v", pcName, err)))
+					}
+				}
+			}
 		}
 	}
 
