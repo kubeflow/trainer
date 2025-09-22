@@ -163,6 +163,13 @@ func (b *Builder) PodLabels(labels map[string]string) *Builder {
 	return b
 }
 
+func (b *Builder) PodAnnotations(annotations map[string]string) *Builder {
+	for i := range b.Spec.ReplicatedJobs {
+		b.Spec.ReplicatedJobs[i].Template.Spec.Template.WithAnnotations(annotations)
+	}
+	return b
+}
+
 func (b *Builder) Suspend(suspend *bool) *Builder {
 	b.Spec.Suspend = suspend
 	return b

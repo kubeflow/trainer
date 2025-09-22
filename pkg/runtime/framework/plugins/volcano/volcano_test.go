@@ -146,7 +146,7 @@ func TestEnforcePodGroupPolicy(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	got := info.Annotations[volcanov1beta1.KubeGroupNameAnnotationKey]
+	got := info.Scheduler.PodAnnotations[volcanov1beta1.KubeGroupNameAnnotationKey]
 	want := jobName
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("unexpected PodLabel (-want +got):\n%s", diff)
