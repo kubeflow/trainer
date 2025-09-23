@@ -465,7 +465,7 @@ func (j *JobSetWrapper) PodAnnotation(key, value string) *JobSetWrapper {
 }
 
 func (j *JobSetWrapper) PodPriorityClassName(value string) *JobSetWrapper {
-	for i, _ := range j.Spec.ReplicatedJobs {
+	for i := range j.Spec.ReplicatedJobs {
 		j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.PriorityClassName = value
 	}
 	return j
