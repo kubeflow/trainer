@@ -37,6 +37,7 @@ type Runtime interface {
 	// https://github.com/kubernetes/kubernetes/pull/129313 becomes available
 
 	NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]any, error)
+	RuntimeInfo(trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy) (*Info, error)
 	TerminalCondition(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error)
 	EventHandlerRegistrars() []ReconcilerBuilder
 	ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList)

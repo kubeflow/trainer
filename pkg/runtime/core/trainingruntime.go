@@ -85,13 +85,21 @@ func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.Trai
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errorNotFoundSpecifiedTrainingRuntime, err)
 	}
-	return r.buildObjects(ctx, trainJob, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy)
+	info, err := r.RuntimeInfo(trainJob, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy)
+	if err != nil {
+		return nil, err
+	}
+	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
 }
 
-func (r *TrainingRuntime) buildObjects(
-	ctx context.Context, trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
-) ([]any, error) {
+func (r *TrainingRuntime) RuntimeInfo(
+	trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
+) (*runtime.Info, error) {
 
+	jobSetTemplateSpec, ok := runtimeTemplateSpec.(trainer.JobSetTemplateSpec)
+	if !ok {
+		return nil, fmt.Errorf("unsupported runtimeTemplateSpec")
+	}
 	info, err := r.newRuntimeInfo(trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy)
 	if err != nil {
 		return nil, err
@@ -108,7 +116,7 @@ func (r *TrainingRuntime) buildObjects(
 		return nil, err
 	}
 
-	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
+	return info, nil
 }
 
 func (r *TrainingRuntime) newRuntimeInfo(
