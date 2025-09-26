@@ -44,10 +44,10 @@ const (
 type ClusterTrainingRuntime struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// Standard object's metadata.
+	// metadata of the ClusterTrainingRuntime.
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Specification of the desired ClusterTrainingRuntime.
+	// spec of the ClusterTrainingRuntime.
 	Spec TrainingRuntimeSpec `json:"spec,omitempty"`
 }
 
@@ -78,10 +78,10 @@ type ClusterTrainingRuntimeList struct {
 type TrainingRuntime struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// Standard object's metadata.
+	// metadata of the TrainingRuntime.
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Specification of the desired TrainingRuntime.
+	// spec of the TrainingRuntime.
 	Spec TrainingRuntimeSpec `json:"spec,omitempty"`
 }
 
@@ -102,23 +102,23 @@ type TrainingRuntimeList struct {
 
 // TrainingRuntimeSpec represents a specification of the desired training runtime.
 type TrainingRuntimeSpec struct {
-	// Configuration for the model training with ML-specific parameters.
+	// mlPolicy provides the ML-specific parameters for the model training.
 	MLPolicy *MLPolicy `json:"mlPolicy,omitempty"`
 
-	// Configuration for the PodGroup to enable gang-scheduling via supported plugins.
+	// podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via supported plugins.
 	PodGroupPolicy *PodGroupPolicy `json:"podGroupPolicy,omitempty"`
 
-	// JobSet template which will be used by TrainJob.
+	// template for the JobSet which will be used by TrainJob.
 	Template JobSetTemplateSpec `json:"template"`
 }
 
 // JobSetTemplateSpec represents a template of the desired JobSet.
 type JobSetTemplateSpec struct {
-	// Metadata for custom JobSet's labels and annotations.
+	// metadata for custom JobSet's labels and annotations.
 	// JobSet name and namespace is equal to the TrainJob's name and namespace.
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Specification of the desired JobSet which will be created from TrainJob.
+	// spec of the desired JobSet which will be created from TrainJob.
 	Spec jobsetv1alpha2.JobSetSpec `json:"spec,omitempty"`
 }
 
@@ -131,7 +131,7 @@ type PodGroupPolicy struct {
 // PodGroupPolicySource represents supported plugins for gang-scheduling.
 // Only one of its members may be specified.
 type PodGroupPolicySource struct {
-	// Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.
+	// coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.
 	Coscheduling *CoschedulingPodGroupPolicySource `json:"coscheduling,omitempty"`
 
 	// TODO (andreyvelich): Add support for Volcano gang-scheduler.
@@ -140,18 +140,18 @@ type PodGroupPolicySource struct {
 // CoschedulingPodGroupPolicySource represents configuration for coscheduling plugin.
 // The number of min members in the PodGroupSpec is always equal to the number of nodes.
 type CoschedulingPodGroupPolicySource struct {
-	// Time threshold to schedule PodGroup for gang-scheduling.
+	// scheduleTimeoutSeconds is the maximum duration to schedule PodGroup for gang-scheduling.
 	// If the scheduling timeout is equal to 0, the default value is used.
 	// Defaults to 60 seconds.
 	// +kubebuilder:default=60
 	ScheduleTimeoutSeconds *int32 `json:"scheduleTimeoutSeconds,omitempty"`
 }
 
-// MLPolicy represents configuration for the model trining with ML-specific parameters.
+// MLPolicy represents configuration for the model training with ML-specific parameters.
 // +kubebuilder:validation:XValidation:rule="!(has(self.numNodes) && (has(self.torch) && has(self.torch.elasticPolicy)))", message="numNodes should not be set if torch.elasticPolicy is configured"
 // +kubebuilder:validation:XValidation:rule="!(has(self.torch) && has(self.mpi))", message="Only one of the policy can be configured"
 type MLPolicy struct {
-	// Number of training nodes.
+	// numNodes is the number of training nodes.
 	// Defaults to 1.
 	NumNodes *int32 `json:"numNodes,omitempty"`
 
@@ -163,16 +163,16 @@ type MLPolicy struct {
 // MLPolicySource represents the runtime-specific configuration for various technologies.
 // One of the following specs can be set.
 type MLPolicySource struct {
-	// Configuration for the PyTorch runtime.
+	// torch defines the configuration for the PyTorch runtime.
 	Torch *TorchMLPolicySource `json:"torch,omitempty"`
 
-	// Configuration for the MPI Runtime.
+	// mpi defines the configuration for the MPI Runtime.
 	MPI *MPIMLPolicySource `json:"mpi,omitempty"`
 }
 
 // TorchMLPolicySource represents a PyTorch runtime configuration.
 type TorchMLPolicySource struct {
-	// Number of processes per node.
+	// numProcPerNode is the number of processes per node.
 	// This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI.
 	// Supported values: `auto`, `cpu`, `gpu`, or int value.
 	// Defaults to `auto`.
@@ -180,7 +180,7 @@ type TorchMLPolicySource struct {
 	// +kubebuilder:validation:XValidation:rule="self > 0 || self in ['auto', 'cpu', 'gpu']", message="NumProcPerNode must be equal to auto, cpu, gpu, or int value"
 	NumProcPerNode *intstr.IntOrString `json:"numProcPerNode,omitempty"`
 
-	// Elastic policy for the PyTorch training.
+	// elasticPolicy defines the Elastic policy for the PyTorch training.
 	ElasticPolicy *TorchElasticPolicy `json:"elasticPolicy,omitempty"`
 }
 
@@ -189,44 +189,46 @@ type TorchMLPolicySource struct {
 // is used to configure the `torchrun` CLI argument: `--nnodes=minNodes:maxNodes`.
 // Only `c10d` backend is supported for the Rendezvous communication.
 type TorchElasticPolicy struct {
-	// How many times the training job can be restarted.
+	// maxRestarts defines how many times the training job can be restarted.
 	// This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and
 	// the `.spec.failurePolicy.maxRestarts` parameter of the training Job.
 	MaxRestarts *int32 `json:"maxRestarts,omitempty"`
 
-	// Lower limit for the number of nodes to which training job can scale down.
+	// minNodes is the lower limit for the number of nodes to which training job can scale down.
 	MinNodes *int32 `json:"minNodes,omitempty"`
 
-	// Upper limit for the number of nodes to which training job can scale up.
+	// maxNodes is the upper limit for the number of nodes to which training job can scale up.
 	MaxNodes *int32 `json:"maxNodes,omitempty"`
 
-	// Specification which are used to calculate the desired number of nodes. See the individual
+	// metrics which are used to calculate the desired number of nodes. See the individual
 	// metric source types for more information about how each type of metric must respond.
 	// The HPA will be created to perform auto-scaling.
 	// +listType=atomic
+	// +kubebuilder:validation:MaxItems=10
 	Metrics []autoscalingv2.MetricSpec `json:"metrics,omitempty"`
 }
 
 // MPIMLPolicySource represents a MPI runtime configuration.
 type MPIMLPolicySource struct {
-	// Number of processes per node.
+	// numProcPerNode is the number of processes per node.
 	// This value is equal to the number of slots for each node in the hostfile.
 	// Defaults to 1.
 	// +kubebuilder:default=1
 	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
 
-	// Implementation name for the MPI to create the appropriate hostfile.
+	// mpiImplementation is the name of the MPI implementation to create the appropriate hostfile.
 	// Defaults to OpenMPI.
 	// +kubebuilder:default=OpenMPI
 	// +kubebuilder:validation:Enum=OpenMPI
 	MPIImplementation *MPIImplementation `json:"mpiImplementation,omitempty"`
 
-	// Directory where SSH keys are mounted.
+	// sshAuthMountPath is the directory where SSH keys are mounted.
 	// Defaults to /root/.ssh.
 	// +kubebuilder:default=/root/.ssh
+	// +kubebuilder:validation:MaxLength=256
 	SSHAuthMountPath *string `json:"sshAuthMountPath,omitempty"`
 
-	// Whether to run training process on the launcher Job.
+	// runLauncherAsNode defines whether to run training process on the launcher Job.
 	// Defaults to false.
 	// +kubebuilder:default=false
 	RunLauncherAsNode *bool `json:"runLauncherAsNode,omitempty"`
