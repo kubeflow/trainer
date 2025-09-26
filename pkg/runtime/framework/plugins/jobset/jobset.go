@@ -303,11 +303,11 @@ func (j *JobSet) Status(ctx context.Context, trainJob *trainer.TrainJob) (*train
 	for _, status := range jobSet.Status.ReplicatedJobsStatus {
 		statuses = append(statuses, trainer.JobStatus{
 			Name:      status.Name,
-			Ready:     status.Ready,
-			Succeeded: status.Succeeded,
-			Failed:    status.Failed,
-			Active:    status.Active,
-			Suspended: status.Suspended,
+			Ready:     &status.Ready,
+			Succeeded: &status.Succeeded,
+			Failed:    &status.Failed,
+			Active:    &status.Active,
+			Suspended: &status.Suspended,
 		})
 	}
 	status.JobsStatus = statuses

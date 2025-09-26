@@ -5,6 +5,7 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
@@ -65,11 +66,11 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
 						{
 							Name:      constants.Node,
-							Ready:     0,
-							Succeeded: 0,
-							Failed:    0,
-							Active:    1,
-							Suspended: 0,
+							Ready:     ptr.To(int32(0)),
+							Succeeded: ptr.To(int32(0)),
+							Failed:    ptr.To(int32(0)),
+							Active:    ptr.To(int32(1)),
+							Suspended: ptr.To(int32(0)),
 						},
 					}, util.SortJobsStatus))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
@@ -91,11 +92,11 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
 						{
 							Name:      constants.Node,
-							Ready:     0,
-							Succeeded: 1,
-							Failed:    0,
-							Active:    0,
-							Suspended: 0,
+							Ready:     ptr.To(int32(0)),
+							Succeeded: ptr.To(int32(1)),
+							Failed:    ptr.To(int32(0)),
+							Active:    ptr.To(int32(0)),
+							Suspended: ptr.To(int32(0)),
 						},
 					}, util.SortJobsStatus))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
@@ -123,19 +124,19 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
 						{
 							Name:      constants.Launcher,
-							Ready:     0,
-							Succeeded: 0,
-							Failed:    0,
-							Active:    1,
-							Suspended: 0,
+							Ready:     ptr.To(int32(0)),
+							Succeeded: ptr.To(int32(0)),
+							Failed:    ptr.To(int32(0)),
+							Active:    ptr.To(int32(1)),
+							Suspended: ptr.To(int32(0)),
 						},
 						{
 							Name:      constants.Node,
-							Ready:     0,
-							Succeeded: 0,
-							Failed:    0,
-							Active:    1,
-							Suspended: 0,
+							Ready:     ptr.To(int32(0)),
+							Succeeded: ptr.To(int32(0)),
+							Failed:    ptr.To(int32(0)),
+							Active:    ptr.To(int32(1)),
+							Suspended: ptr.To(int32(0)),
 						},
 					}, util.SortJobsStatus))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
@@ -157,19 +158,19 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
 						{
 							Name:      constants.Launcher,
-							Ready:     0,
-							Succeeded: 1,
-							Failed:    0,
-							Active:    0,
-							Suspended: 0,
+							Ready:     ptr.To(int32(0)),
+							Succeeded: ptr.To(int32(1)),
+							Failed:    ptr.To(int32(0)),
+							Active:    ptr.To(int32(0)),
+							Suspended: ptr.To(int32(0)),
 						},
 						{
 							Name:      constants.Node,
-							Ready:     0,
-							Succeeded: 0,
-							Failed:    0,
-							Active:    0,
-							Suspended: 0,
+							Ready:     ptr.To(int32(0)),
+							Succeeded: ptr.To(int32(0)),
+							Failed:    ptr.To(int32(0)),
+							Active:    ptr.To(int32(0)),
+							Suspended: ptr.To(int32(0)),
 						},
 					}, util.SortJobsStatus))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())

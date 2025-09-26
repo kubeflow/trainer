@@ -190,7 +190,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 						WithName(constants.MPIHostfileVolumeName).
 						WithMountPath(constants.MPIHostfileDir),
 				)
-				switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
+				switch info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
 				case trainer.MPIImplementationOpenMPI:
 					apply.UpsertEnvVars(
 						&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Env,
@@ -304,7 +304,7 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 		if !isNode(runLauncherAsNode, ps) {
 			continue
 		}
-		switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
+		switch info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
 		case trainer.MPIImplementationOpenMPI:
 			for e := range ps.Endpoints {
 				hostFile.WriteString(fmt.Sprintf("%s slots=%d\n", e, slots))

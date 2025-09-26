@@ -110,7 +110,7 @@ func TestMPI(t *testing.T) {
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), nil).
 						Obj(),
 				},
 				Scheduler: &runtime.Scheduler{
@@ -196,7 +196,7 @@ func TestMPI(t *testing.T) {
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), nil).
 						Obj(),
 				},
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
@@ -246,7 +246,7 @@ trainJob-node-1-1.trainJob slots=1
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), nil).
 						Obj(),
 				},
 				Scheduler: &runtime.Scheduler{
@@ -332,7 +332,7 @@ trainJob-node-1-1.trainJob slots=1
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](2), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), nil).
+						MPIPolicy(ptr.To[int32](2), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), nil).
 						Obj(),
 				},
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
@@ -362,7 +362,7 @@ trainJob-node-1-1.trainJob slots=1
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -404,7 +404,7 @@ trainJob-node-1-1.trainJob slots=1
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -550,7 +550,7 @@ trainJob-node-1-0.trainJob slots=1
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
@@ -602,7 +602,7 @@ trainJob-node-1-0.trainJob slots=1
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
@@ -633,7 +633,7 @@ trainJob-node-1-0.trainJob slots=1
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
@@ -685,7 +685,7 @@ trainJob-node-1-0.trainJob slots=1
 				},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(true)).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(true)).
 						Obj(),
 				},
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
@@ -771,7 +771,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, nil).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, nil, nil).
 						Obj(),
 					).
 					Obj()),
@@ -794,7 +794,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, nil).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, nil, nil).
 						Obj(),
 					).
 					Obj(),
@@ -811,7 +811,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(true)).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, nil, ptr.To(true)).
 						Obj(),
 					).
 					Obj(),
@@ -826,7 +826,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(true)).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, nil, ptr.To(true)).
 						Obj(),
 					).
 					Obj(),
@@ -844,7 +844,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(true)).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, nil, ptr.To(true)).
 						Obj(),
 					).
 					Obj(),
@@ -862,7 +862,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), nil, ptr.To(true)).
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, nil, ptr.To(true)).
 						Obj(),
 					).
 					Obj(),
