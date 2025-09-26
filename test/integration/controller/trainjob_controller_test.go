@@ -714,7 +714,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 								testingutil.MakeMLPolicyWrapper().
 									WithNumNodes(1).
 									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-										MPIPolicy(ptr.To[int32](8), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+										MPIPolicy(ptr.To[int32](8), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
 										Obj(),
 									).
 									Obj(),
