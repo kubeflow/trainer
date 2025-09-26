@@ -40,6 +40,7 @@ KIND ?= $(LOCALBIN)/kind
 HELM ?= $(LOCALBIN)/helm
 HELM_DOCS ?= $(LOCALBIN)/helm-docs
 YQ ?= $(LOCALBIN)/yq
+GOLANGCI_LINT_KAL ?= $(LOCALBIN)/golangci-lint-kube-api-linter
 
 ##@ General
 
@@ -80,6 +81,10 @@ kind: ## Download Kind binary if required.
 .PHONY: helm
 helm: ## Download helm locally if required.
 	GOBIN=$(LOCALBIN) go install helm.sh/helm/v3/cmd/helm@$(HELM_VERSION)
+
+.PHONY: golangci-lint-kal
+golangci-lint-kal: ## Build golangci-lint-kal from custom configuration.
+	cd $(PROJECT_DIR)/hack; $(GOLANGCI_LINT) custom; mv bin/golangci-lint-kube-api-linter $(LOCALBIN)/
 
 .PHONY: helm-unittest-plugin
 helm-unittest-plugin: helm ## Download helm unittest plugin locally if required.
@@ -150,13 +155,14 @@ vet: ## Run go vet against the code.
 	go vet ./...
 
 GOLANGCI_LINT=$(shell which golangci-lint)
-.PHONY: golangci-lint
+.PHONY: golangci-lint golangci-lint-kal
 golangci-lint: ## Run golangci-lint to verify Go files.
 ifeq ($(GOLANGCI_LINT),)
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.64.8
 	$(info golangci-lint has been installed)
 endif
 	golangci-lint run --timeout 5m --go 1.24 ./...
+	$(GOLANGCI_LINT_KAL) run -v --config $(PROJECT_DIR)/.golangci-kal.yml
 
 # Instructions to run tests.
 .PHONY: test
