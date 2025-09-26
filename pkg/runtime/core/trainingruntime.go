@@ -250,6 +250,10 @@ func (r *TrainingRuntime) TerminalCondition(ctx context.Context, trainJob *train
 	return r.framework.RunTerminalConditionPlugins(ctx, trainJob)
 }
 
+func (r *TrainingRuntime) JobsStatus(ctx context.Context, trainJob *trainer.TrainJob) ([]trainer.JobStatus, error) {
+	return r.framework.RunJobsStatusPlugins(ctx, trainJob)
+}
+
 func (r *TrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 	var builders []runtime.ReconcilerBuilder
 	for _, ex := range r.framework.WatchExtensionPlugins() {
