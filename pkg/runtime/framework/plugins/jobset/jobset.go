@@ -275,6 +275,7 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		Initializer(trainJob).
 		Trainer(info, trainJob).
 		PodLabels(info.Scheduler.PodLabels).
+		PodAnnotations(info.Scheduler.PodAnnotations).
 		Suspend(trainJob.Spec.Suspend).
 		Build().
 		WithOwnerReferences(metav1ac.OwnerReference().
