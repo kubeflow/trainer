@@ -453,6 +453,34 @@ func (j *JobSetWrapper) PodLabel(key, value string) *JobSetWrapper {
 	return j
 }
 
+func (j *JobSetWrapper) PodLabelForJobs(key, value string, rJobNames ...string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if !slices.Contains(rJobNames, rJob.Name) {
+			continue
+		}
+
+		if rJob.Template.Spec.Template.Labels == nil {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Labels = make(map[string]string, 1)
+		}
+		j.Spec.ReplicatedJobs[i].Template.Spec.Template.Labels[key] = value
+	}
+	return j
+}
+
+func (j *JobSetWrapper) PodAnnotationForJobs(key, value string, rJobNames ...string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if !slices.Contains(rJobNames, rJob.Name) {
+			continue
+		}
+
+		if rJob.Template.Spec.Template.Annotations == nil {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Annotations = make(map[string]string, 1)
+		}
+		j.Spec.ReplicatedJobs[i].Template.Spec.Template.Annotations[key] = value
+	}
+	return j
+}
+
 func (j *JobSetWrapper) Label(key, value string) *JobSetWrapper {
 	if j.ObjectMeta.Labels == nil {
 		j.ObjectMeta.Labels = make(map[string]string, 1)
@@ -559,8 +587,8 @@ func (t *TrainJobWrapper) Trainer(trainer *trainer.Trainer) *TrainJobWrapper {
 	return t
 }
 
-func (t *TrainJobWrapper) PodSpecOverrides(podSpecOverrides []trainer.PodSpecOverride) *TrainJobWrapper {
-	t.Spec.PodSpecOverrides = podSpecOverrides
+func (t *TrainJobWrapper) PodTemplateOverrides(podTemplateOverrides []trainer.PodTemplateOverride) *TrainJobWrapper {
+	t.Spec.PodTemplateOverrides = podTemplateOverrides
 	return t
 }
 

@@ -547,7 +547,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 
-			ginkgo.It("Should succeed to create TrainJob with PodSpecOverrides", func() {
+			ginkgo.It("Should succeed to create TrainJob with PodTemplateOverrides", func() {
 				ginkgo.By("Creating Torch TrainingRuntime and TrainJob")
 				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
 					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
@@ -556,21 +556,23 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 							Env([]corev1.EnvVar{{Name: "TRAIN_JOB", Value: "value"}}...).
 							Obj()).
-					PodSpecOverrides([]trainer.PodSpecOverride{
+					PodTemplateOverrides([]trainer.PodTemplateOverride{
 						{
-							TargetJobs:         []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
-							ServiceAccountName: ptr.To("override-sa"),
-							InitContainers: []trainer.ContainerOverride{
-								{
-									Name: "override-init-container",
-									Env: []corev1.EnvVar{
-										{
-											Name:  "INIT_ENV",
-											Value: "override_init",
-										},
-										{
-											Name:  "NEW_VALUE",
-											Value: "from_overrides",
+							TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
+							Spec: &trainer.PodTemplateSpecOverride{
+								ServiceAccountName: ptr.To("override-sa"),
+								InitContainers: []trainer.ContainerOverride{
+									{
+										Name: "override-init-container",
+										Env: []corev1.EnvVar{
+											{
+												Name:  "INIT_ENV",
+												Value: "override_init",
+											},
+											{
+												Name:  "NEW_VALUE",
+												Value: "from_overrides",
+											},
 										},
 									},
 								},

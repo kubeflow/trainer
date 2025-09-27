@@ -19,14 +19,14 @@ package v1alpha1
 // TrainJobSpecApplyConfiguration represents a declarative configuration of the TrainJobSpec type for use
 // with apply.
 type TrainJobSpecApplyConfiguration struct {
-	RuntimeRef       *RuntimeRefApplyConfiguration       `json:"runtimeRef,omitempty"`
-	Initializer      *InitializerApplyConfiguration      `json:"initializer,omitempty"`
-	Trainer          *TrainerApplyConfiguration          `json:"trainer,omitempty"`
-	Labels           map[string]string                   `json:"labels,omitempty"`
-	Annotations      map[string]string                   `json:"annotations,omitempty"`
-	PodSpecOverrides []PodSpecOverrideApplyConfiguration `json:"podSpecOverrides,omitempty"`
-	Suspend          *bool                               `json:"suspend,omitempty"`
-	ManagedBy        *string                             `json:"managedBy,omitempty"`
+	RuntimeRef           *RuntimeRefApplyConfiguration           `json:"runtimeRef,omitempty"`
+	Initializer          *InitializerApplyConfiguration          `json:"initializer,omitempty"`
+	Trainer              *TrainerApplyConfiguration              `json:"trainer,omitempty"`
+	Labels               map[string]string                       `json:"labels,omitempty"`
+	Annotations          map[string]string                       `json:"annotations,omitempty"`
+	PodTemplateOverrides []PodTemplateOverrideApplyConfiguration `json:"podTemplateOverrides,omitempty"`
+	Suspend              *bool                                   `json:"suspend,omitempty"`
+	ManagedBy            *string                                 `json:"managedBy,omitempty"`
 }
 
 // TrainJobSpecApplyConfiguration constructs a declarative configuration of the TrainJobSpec type for use with
@@ -87,15 +87,15 @@ func (b *TrainJobSpecApplyConfiguration) WithAnnotations(entries map[string]stri
 	return b
 }
 
-// WithPodSpecOverrides adds the given value to the PodSpecOverrides field in the declarative configuration
+// WithPodTemplateOverrides adds the given value to the PodTemplateOverrides field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the PodSpecOverrides field.
-func (b *TrainJobSpecApplyConfiguration) WithPodSpecOverrides(values ...*PodSpecOverrideApplyConfiguration) *TrainJobSpecApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the PodTemplateOverrides field.
+func (b *TrainJobSpecApplyConfiguration) WithPodTemplateOverrides(values ...*PodTemplateOverrideApplyConfiguration) *TrainJobSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
-			panic("nil value passed to WithPodSpecOverrides")
+			panic("nil value passed to WithPodTemplateOverrides")
 		}
-		b.PodSpecOverrides = append(b.PodSpecOverrides, *values[i])
+		b.PodTemplateOverrides = append(b.PodTemplateOverrides, *values[i])
 	}
 	return b
 }
