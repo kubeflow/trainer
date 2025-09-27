@@ -1,0 +1,4 @@
+# XGBoost and data handling libraries
+xgboost==2.1.0
+scikit-learn==1.6.0
+pandas==2.3.0
