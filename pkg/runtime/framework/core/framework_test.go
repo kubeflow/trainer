@@ -47,13 +47,13 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
-	index "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/indexer"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
+	index "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 

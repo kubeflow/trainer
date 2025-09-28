@@ -29,7 +29,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
-	index "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/indexer"
+	index "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 )
 
 var errorTooManyTerminalConditionPlugin = errors.New("too many TerminalCondition plugins are registered")

@@ -35,7 +35,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
-	index "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/indexer"
+	index "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 	runtimeindexer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 )
 
