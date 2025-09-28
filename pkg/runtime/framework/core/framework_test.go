@@ -121,14 +121,14 @@ func TestNew(t *testing.T) {
 				coscheduling.Name: coscheduling.New,
 			},
 			emptyCoSchedulingIndexerTrainingRuntimeContainerRuntimeClassKey: true,
-			wantError: coscheduling.ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer,
+			wantError: index.ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer,
 		},
 		"indexer key for clusterTrainingRuntime and runtimeClass is an empty": {
 			registry: fwkplugins.Registry{
 				coscheduling.Name: coscheduling.New,
 			},
 			emptyCoSchedulingIndexerClusterTrainingRuntimeContainerRuntimeClassKey: true,
-			wantError: coscheduling.ErrorCanNotSetupClusterTrainingRuntimeRuntimeClassIndexer,
+			wantError: index.ErrorCanNotSetupClusterTrainingRuntimeRuntimeClassIndexer,
 		},
 	}
 	cmpOpts := []cmp.Option{

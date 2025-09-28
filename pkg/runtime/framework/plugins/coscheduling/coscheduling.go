@@ -18,8 +18,6 @@ package coscheduling
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"slices"
 
 	"github.com/go-logr/logr"
@@ -62,26 +60,13 @@ var _ framework.EnforcePodGroupPolicyPlugin = (*CoScheduling)(nil)
 var _ framework.WatchExtensionPlugin = (*CoScheduling)(nil)
 var _ framework.ComponentBuilderPlugin = (*CoScheduling)(nil)
 
-var (
-	ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer        = errors.New("setting index on runtimeClass for TrainingRuntime")
-	ErrorCanNotSetupClusterTrainingRuntimeRuntimeClassIndexer = errors.New("setting index on runtimeClass for ClusterTrainingRuntime")
-)
-
 const Name = "CoScheduling"
 
 // +kubebuilder:rbac:groups=scheduling.x-k8s.io,resources=podgroups,verbs=create;get;list;watch;update;patch
 // +kubebuilder:rbac:groups=node.k8s.io,resources=runtimeclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=limitranges,verbs=get;list;watch
 
-func New(ctx context.Context, client client.Client, indexer client.FieldIndexer) (framework.Plugin, error) {
-	if err := indexer.IndexField(ctx, &trainer.TrainingRuntime{}, index.TrainingRuntimeContainerRuntimeClassKey,
-		index.IndexTrainingRuntimeContainerRuntimeClass); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer, err)
-	}
-	if err := indexer.IndexField(ctx, &trainer.ClusterTrainingRuntime{}, index.ClusterTrainingRuntimeContainerRuntimeClassKey,
-		index.IndexClusterTrainingRuntimeContainerRuntimeClass); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrorCanNotSetupClusterTrainingRuntimeRuntimeClassIndexer, err)
-	}
+func New(_ context.Context, client client.Client, _ client.FieldIndexer) (framework.Plugin, error) {
 	return &CoScheduling{
 		client:     client,
 		restMapper: client.RESTMapper(),

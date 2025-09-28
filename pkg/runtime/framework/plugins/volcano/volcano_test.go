@@ -41,79 +41,6 @@ import (
 	runtimeindexer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 )
 
-type FieldIndexerFunc func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error
-
-func (f FieldIndexerFunc) IndexField(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
-	return f(ctx, obj, field, fn)
-}
-
-func TestNewVolcano(t *testing.T) {
-	scheme := apiruntime.NewScheme()
-	if err := trainer.AddToScheme(scheme); err != nil {
-		t.Fatalf("failed to add trainer scheme: %v", err)
-	}
-
-	cases := map[string]struct {
-		indexerFunc     FieldIndexerFunc
-		expectErr       string
-		expectCalledSet map[string]bool
-	}{
-		"successfully registers all indexers": {
-			indexerFunc: func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
-				return nil
-			},
-			expectErr: "",
-			expectCalledSet: map[string]bool{
-				index.VolcanoTrainingRuntimeContainerRuntimeClassKey:        true,
-				index.VolcanoClusterTrainingRuntimeContainerRuntimeClassKey: true,
-			},
-		},
-		"training runtime indexer fails": {
-			indexerFunc: func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
-				if field == index.VolcanoTrainingRuntimeContainerRuntimeClassKey {
-					return fmt.Errorf("test error")
-				}
-				return nil
-			},
-			expectErr: "setting index on runtimeClass for TrainingRuntime: test error",
-		},
-		"cluster training runtime indexer fails": {
-			indexerFunc: func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
-				if field == index.VolcanoClusterTrainingRuntimeContainerRuntimeClassKey {
-					return fmt.Errorf("test error")
-				}
-				return nil
-			},
-			expectErr: "setting index on runtimeClass for ClusterTrainingRuntime: test error",
-		},
-	}
-
-	for name, tc := range cases {
-		called := map[string]bool{}
-		wrappedIndexer := FieldIndexerFunc(func(ctx context.Context, obj client.Object, field string, fn client.IndexerFunc) error {
-			called[field] = true
-			return tc.indexerFunc(ctx, obj, field, fn)
-		})
-
-		_, err := New(context.Background(), fake.NewClientBuilder().WithScheme(scheme).Build(), wrappedIndexer)
-
-		gotErrStr := ""
-		if err != nil {
-			gotErrStr = err.Error()
-		}
-
-		if diff := cmp.Diff(tc.expectErr, gotErrStr); diff != "" {
-			t.Errorf("%s: unexpected error (-want +got):\n%s", name, diff)
-		}
-
-		if tc.expectCalledSet != nil {
-			if diff := cmp.Diff(tc.expectCalledSet, called); diff != "" {
-				t.Errorf("%s: indexer calls mismatch (-want +got):\n%s", name, diff)
-			}
-		}
-	}
-}
-
 func TestName(t *testing.T) {
 	v := &Volcano{}
 	expectedName := "Volcano"
@@ -499,11 +426,11 @@ func TestPodGroupRuntimeClassHandler_AllEvents(t *testing.T) {
 	cli := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(trainJob, tr).
-		WithIndex(&trainer.TrainingRuntime{}, index.VolcanoTrainingRuntimeContainerRuntimeClassKey,
+		WithIndex(&trainer.TrainingRuntime{}, index.TrainingRuntimeContainerRuntimeClassKey,
 			func(obj client.Object) []string {
 				return []string{"test-class"}
 			}).
-		WithIndex(&trainer.ClusterTrainingRuntime{}, index.VolcanoClusterTrainingRuntimeContainerRuntimeClassKey,
+		WithIndex(&trainer.ClusterTrainingRuntime{}, index.ClusterTrainingRuntimeContainerRuntimeClassKey,
 			func(obj client.Object) []string {
 				return []string{"test-class"}
 			}).
@@ -532,11 +459,11 @@ func TestPodGroupRuntimeClassHandler_AllEvents(t *testing.T) {
 	cli2 := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(trainJob, cr).
-		WithIndex(&trainer.TrainingRuntime{}, index.VolcanoTrainingRuntimeContainerRuntimeClassKey,
+		WithIndex(&trainer.TrainingRuntime{}, index.TrainingRuntimeContainerRuntimeClassKey,
 			func(obj client.Object) []string {
 				return []string{"test-class"}
 			}).
-		WithIndex(&trainer.ClusterTrainingRuntime{}, index.VolcanoClusterTrainingRuntimeContainerRuntimeClassKey,
+		WithIndex(&trainer.ClusterTrainingRuntime{}, index.ClusterTrainingRuntimeContainerRuntimeClassKey,
 			func(obj client.Object) []string {
 				return []string{"test-class"}
 			}).

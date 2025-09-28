@@ -2,7 +2,6 @@ package volcano
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -51,26 +50,13 @@ var _ framework.EnforcePodGroupPolicyPlugin = (*Volcano)(nil)
 var _ framework.ComponentBuilderPlugin = (*Volcano)(nil)
 var _ framework.WatchExtensionPlugin = (*Volcano)(nil)
 
-var (
-	ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer        = errors.New("setting index on runtimeClass for TrainingRuntime")
-	ErrorCanNotSetupClusterTrainingRuntimeRuntimeClassIndexer = errors.New("setting index on runtimeClass for ClusterTrainingRuntime")
-)
-
 const Name = "Volcano"
 
 // +kubebuilder:rbac:groups=scheduling.volcano.sh,resources=podgroups,verbs=create;get;list;watch;update;patch
 // +kubebuilder:rbac:groups=node.k8s.io,resources=runtimeclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=limitranges,verbs=get;list;watch
 
-func New(ctx context.Context, client client.Client, indexer client.FieldIndexer) (framework.Plugin, error) {
-	if err := indexer.IndexField(ctx, &trainer.TrainingRuntime{}, index.VolcanoTrainingRuntimeContainerRuntimeClassKey,
-		index.IndexTrainingRuntimeContainerRuntimeClass); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer, err)
-	}
-	if err := indexer.IndexField(ctx, &trainer.ClusterTrainingRuntime{}, index.VolcanoClusterTrainingRuntimeContainerRuntimeClassKey,
-		index.IndexClusterTrainingRuntimeContainerRuntimeClass); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrorCanNotSetupClusterTrainingRuntimeRuntimeClassIndexer, err)
-	}
+func New(_ context.Context, client client.Client, _ client.FieldIndexer) (framework.Plugin, error) {
 	return &Volcano{
 		client:     client,
 		restMapper: client.RESTMapper(),
@@ -244,11 +230,11 @@ func (h *PodGroupRuntimeClassHandler) Generic(context.Context, event.TypedGeneri
 
 func (h *PodGroupRuntimeClassHandler) queueSuspendedTrainJobs(ctx context.Context, runtimeClass *nodev1.RuntimeClass, q workqueue.TypedRateLimitingInterface[reconcile.Request]) error {
 	var trainingRuntimes trainer.TrainingRuntimeList
-	if err := h.client.List(ctx, &trainingRuntimes, client.MatchingFields{index.VolcanoTrainingRuntimeContainerRuntimeClassKey: runtimeClass.Name}); err != nil {
+	if err := h.client.List(ctx, &trainingRuntimes, client.MatchingFields{index.TrainingRuntimeContainerRuntimeClassKey: runtimeClass.Name}); err != nil {
 		return err
 	}
 	var clusterTrainingRuntimes trainer.ClusterTrainingRuntimeList
-	if err := h.client.List(ctx, &clusterTrainingRuntimes, client.MatchingFields{index.VolcanoClusterTrainingRuntimeContainerRuntimeClassKey: runtimeClass.Name}); err != nil {
+	if err := h.client.List(ctx, &clusterTrainingRuntimes, client.MatchingFields{index.ClusterTrainingRuntimeContainerRuntimeClassKey: runtimeClass.Name}); err != nil {
 		return err
 	}
 

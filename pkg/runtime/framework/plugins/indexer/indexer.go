@@ -17,16 +17,18 @@ limitations under the License.
 package indexer
 
 import (
+	"errors"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
 
 var (
-	TrainingRuntimeContainerRuntimeClassKey               = ".trainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
-	ClusterTrainingRuntimeContainerRuntimeClassKey        = ".clusterTrainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
-	VolcanoTrainingRuntimeContainerRuntimeClassKey        = ".volcano.trainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
-	VolcanoClusterTrainingRuntimeContainerRuntimeClassKey = ".volcano.clusterTrainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
+	TrainingRuntimeContainerRuntimeClassKey                   = ".trainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
+	ClusterTrainingRuntimeContainerRuntimeClassKey            = ".clusterTrainingRuntimeSpec.jobSetTemplateSpec.replicatedJobs.podTemplateSpec.runtimeClassName"
+	ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer        = errors.New("setting index on runtimeClass for TrainingRuntime")
+	ErrorCanNotSetupClusterTrainingRuntimeRuntimeClassIndexer = errors.New("setting index on runtimeClass for ClusterTrainingRuntime")
 )
 
 func IndexTrainingRuntimeContainerRuntimeClass(obj client.Object) []string {
