@@ -15,7 +15,7 @@
 - [release-2.0] feat(runtimes): Add Framework Label to the Runtimes (#2761) ([#2851](https://github.com/kubeflow/trainer/pull/2851) by [@astefanutti](https://github.com/astefanutti))
 - [release-2.0] fix(examples): Update the argument for Runtime framework (#2766) ([#2850](https://github.com/kubeflow/trainer/pull/2850) by [@astefanutti](https://github.com/astefanutti))
 - [release-2.0] fix: update kubeflow sdk reference (#2780) ([#2847](https://github.com/kubeflow/trainer/pull/2847) by [@astefanutti](https://github.com/astefanutti))
-- [release-2.0] fix(api): Fix license path for Kubeflow Trainer Python API ([#2772](https://github.com/kubeflow/trainer/pull/2772) by [@andreyvelich](https://github.com/))
+- [release-2.0] fix(api): Fix license path for Kubeflow Trainer Python API ([#2772](https://github.com/kubeflow/trainer/pull/2772) by [@andreyvelich](https://github.com/andreyvelich))
 
 [Full Changelog](https://github.com/kubeflow/trainer/compare/v2.0.0...v2.0.1)
 
