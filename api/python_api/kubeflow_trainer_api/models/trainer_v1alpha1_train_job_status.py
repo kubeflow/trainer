@@ -28,8 +28,8 @@ class TrainerV1alpha1TrainJobStatus(BaseModel):
     """
     TrainJobStatus represents the current status of TrainJob.
     """ # noqa: E501
-    conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = Field(default=None, description="Conditions for the TrainJob.")
-    jobs_status: Optional[List[TrainerV1alpha1JobStatus]] = Field(default=None, description="JobsStatus tracks the child Jobs in TrainJob.", alias="jobsStatus")
+    conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = Field(default=None, description="conditions for the TrainJob.")
+    jobs_status: Optional[List[TrainerV1alpha1JobStatus]] = Field(default=None, description="jobsStatus tracks the child Jobs in TrainJob.", alias="jobsStatus")
     __properties: ClassVar[List[str]] = ["conditions", "jobsStatus"]
 
     model_config = ConfigDict(

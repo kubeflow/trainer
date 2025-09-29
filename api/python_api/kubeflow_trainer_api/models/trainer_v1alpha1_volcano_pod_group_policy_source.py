@@ -27,7 +27,7 @@ class TrainerV1alpha1VolcanoPodGroupPolicySource(BaseModel):
     """
     VolcanoPodGroupPolicySource represents configuration for the Volcano gang-scheduler.
     """ # noqa: E501
-    network_topology: Optional[SchedulingV1beta1NetworkTopologySpec] = Field(default=None, description="NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.", alias="networkTopology")
+    network_topology: Optional[SchedulingV1beta1NetworkTopologySpec] = Field(default=None, description="networkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.", alias="networkTopology")
     __properties: ClassVar[List[str]] = ["networkTopology"]
 
     model_config = ConfigDict(

@@ -29,13 +29,13 @@ class TrainerV1alpha1Trainer(BaseModel):
     """
     Trainer represents the desired configuration for the training job. The Trainer spec will override the runtime template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: trainer`
     """ # noqa: E501
-    args: Optional[List[StrictStr]] = Field(default=None, description="Arguments to the entrypoint for the training container.")
-    command: Optional[List[StrictStr]] = Field(default=None, description="Entrypoint commands for the training container.")
-    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="List of environment variables to set in the training container. These values will be merged with the TrainingRuntime's trainer environments.")
-    image: Optional[StrictStr] = Field(default=None, description="Docker image for the training container.")
-    num_nodes: Optional[StrictInt] = Field(default=None, description="Number of training nodes.", alias="numNodes")
-    num_proc_per_node: Optional[IoK8sApimachineryPkgUtilIntstrIntOrString] = Field(default=None, description="Number of processes/workers/slots on every training node. For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set. For the MPI runtime only int value can be set.", alias="numProcPerNode")
-    resources_per_node: Optional[IoK8sApiCoreV1ResourceRequirements] = Field(default=None, description="Compute resources for each training node.", alias="resourcesPerNode")
+    args: Optional[List[StrictStr]] = Field(default=None, description="args for the entrypoint for the training container.")
+    command: Optional[List[StrictStr]] = Field(default=None, description="command for the entrypoint of the training container.")
+    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="env is the list of environment variables to set in the training container. These values will be merged with the TrainingRuntime's trainer environments.")
+    image: Optional[StrictStr] = Field(default=None, description="image is the container image for the training container.")
+    num_nodes: Optional[StrictInt] = Field(default=None, description="numNodes is the number of training nodes.", alias="numNodes")
+    num_proc_per_node: Optional[IoK8sApimachineryPkgUtilIntstrIntOrString] = Field(default=None, description="numProcPerNode is the number of processes/workers/slots on every training node. For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set. For the MPI runtime only int value can be set.", alias="numProcPerNode")
+    resources_per_node: Optional[IoK8sApiCoreV1ResourceRequirements] = Field(default=None, description="resourcesPerNode defines the compute resources for each training node.", alias="resourcesPerNode")
     __properties: ClassVar[List[str]] = ["args", "command", "env", "image", "numNodes", "numProcPerNode", "resourcesPerNode"]
 
     model_config = ConfigDict(

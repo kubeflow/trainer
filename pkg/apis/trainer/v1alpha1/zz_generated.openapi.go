@@ -934,7 +934,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodGroupPolicy(ref common.ReferenceCallbac
 					},
 					"volcano": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Volcano plugin for gang-scheduling.",
+							Description: "volcano plugin for gang-scheduling.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.VolcanoPodGroupPolicySource"),
 						},
 					},
@@ -961,7 +961,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodGroupPolicySource(ref common.ReferenceC
 					},
 					"volcano": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Volcano plugin for gang-scheduling.",
+							Description: "volcano plugin for gang-scheduling.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.VolcanoPodGroupPolicySource"),
 						},
 					},
@@ -1029,7 +1029,6 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateOverrideTargetJob(ref common.Re
 					"name": {
 						SchemaProps: spec.SchemaProps{
 							Description: "name is the target training job name for which the PodTemplateSpec is overridden.",
-							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1834,7 +1833,7 @@ func schema_pkg_apis_trainer_v1alpha1_VolcanoPodGroupPolicySource(ref common.Ref
 				Properties: map[string]spec.Schema{
 					"networkTopology": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.",
+							Description: "networkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.",
 							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec"),
 						},
 					},

@@ -33,6 +33,7 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
     """
     PodSpecOverride represents the custom overrides that will be applied for the TrainJob's resources.
     """ # noqa: E501
+<<<<<<< HEAD
     affinity: Optional[IoK8sApiCoreV1Affinity] = Field(default=None, description="Override for the Pod's affinity.")
     annotations: Optional[Dict[str, StrictStr]] = Field(default=None, description="Override for the Pod's annotations. These values will be merged with the TrainingRuntime's Pod annotations.")
     containers: Optional[List[TrainerV1alpha1ContainerOverride]] = Field(default=None, description="Overrides for the containers in the target job templates.")
@@ -46,6 +47,19 @@ class TrainerV1alpha1PodSpecOverride(BaseModel):
     tolerations: Optional[List[IoK8sApiCoreV1Toleration]] = Field(default=None, description="Override for the Pod's tolerations.")
     volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="Overrides for the Pod volume configurations.")
     __properties: ClassVar[List[str]] = ["affinity", "annotations", "containers", "imagePullSecrets", "initContainers", "labels", "nodeSelector", "schedulingGates", "serviceAccountName", "targetJobs", "tolerations", "volumes"]
+=======
+    affinity: Optional[IoK8sApiCoreV1Affinity] = Field(default=None, description="affinity overrides for the Pod's affinity.")
+    containers: Optional[List[TrainerV1alpha1ContainerOverride]] = Field(default=None, description="containers overrides for the containers in the target job templates.")
+    image_pull_secrets: Optional[List[IoK8sApiCoreV1LocalObjectReference]] = Field(default=None, description="imagePullSecrets overrides the image pull secrets for the Pods in the target job templates.", alias="imagePullSecrets")
+    init_containers: Optional[List[TrainerV1alpha1ContainerOverride]] = Field(default=None, description="initContainers overrides the init container in the target job templates.", alias="initContainers")
+    node_selector: Optional[Dict[str, StrictStr]] = Field(default=None, description="nodeSelector overrides the node selector to place Pod on the specific node.", alias="nodeSelector")
+    scheduling_gates: Optional[List[IoK8sApiCoreV1PodSchedulingGate]] = Field(default=None, description="schedulingGates overrides the scheduling gates of the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/", alias="schedulingGates")
+    service_account_name: Optional[StrictStr] = Field(default=None, description="serviceAccountName overrides the service account.", alias="serviceAccountName")
+    target_jobs: List[TrainerV1alpha1PodSpecOverrideTargetJob] = Field(description="targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.", alias="targetJobs")
+    tolerations: Optional[List[IoK8sApiCoreV1Toleration]] = Field(default=None, description="tolerations overrides the Pod's tolerations.")
+    volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="volumes overrides the Pod's volumes.")
+    __properties: ClassVar[List[str]] = ["affinity", "containers", "imagePullSecrets", "initContainers", "nodeSelector", "schedulingGates", "serviceAccountName", "targetJobs", "tolerations", "volumes"]
+>>>>>>> 18eabf4d (Generate)
 
     model_config = ConfigDict(
         populate_by_name=True,

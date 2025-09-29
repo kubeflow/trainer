@@ -28,8 +28,8 @@ class TrainerV1alpha1MLPolicySource(BaseModel):
     """
     MLPolicySource represents the runtime-specific configuration for various technologies. One of the following specs can be set.
     """ # noqa: E501
-    mpi: Optional[TrainerV1alpha1MPIMLPolicySource] = Field(default=None, description="Configuration for the MPI Runtime.")
-    torch: Optional[TrainerV1alpha1TorchMLPolicySource] = Field(default=None, description="Configuration for the PyTorch runtime.")
+    mpi: Optional[TrainerV1alpha1MPIMLPolicySource] = Field(default=None, description="mpi defines the configuration for the MPI Runtime.")
+    torch: Optional[TrainerV1alpha1TorchMLPolicySource] = Field(default=None, description="torch defines the configuration for the PyTorch runtime.")
     __properties: ClassVar[List[str]] = ["mpi", "torch"]
 
     model_config = ConfigDict(

@@ -26,7 +26,7 @@ class TrainerV1alpha1PodTemplateOverrideTargetJob(BaseModel):
     """
     TrainerV1alpha1PodTemplateOverrideTargetJob
     """ # noqa: E501
-    name: StrictStr = Field(description="Name is the target training job name for which the PodSpec is overridden.")
+    name: StrictStr = Field(description="name is the target training job name for which the PodTemplateSpec is overridden.")
     __properties: ClassVar[List[str]] = ["name"]
 
     model_config = ConfigDict(
@@ -80,7 +80,7 @@ class TrainerV1alpha1PodTemplateOverrideTargetJob(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "name": obj.get("name") if obj.get("name") is not None else ''
+            "name": obj.get("name")
         })
         return _obj
 
