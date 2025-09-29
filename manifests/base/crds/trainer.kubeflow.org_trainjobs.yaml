@@ -4046,7 +4046,7 @@ spec:
                   command:
                     description: command for the entrypoint of the training container.
                     items:
-                      maxLength: 256
+                      maxLength: 8196
                       type: string
                     maxItems: 64
                     type: array
@@ -4210,7 +4210,7 @@ spec:
                       required:
                       - name
                       type: object
-                    maxItems: 356
+                    maxItems: 256
                     type: array
                     x-kubernetes-list-map-keys:
                     - name

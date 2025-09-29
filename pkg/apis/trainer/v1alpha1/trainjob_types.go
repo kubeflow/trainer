@@ -242,7 +242,7 @@ type Trainer struct {
 
 	// command for the entrypoint of the training container.
 	// +listType=atomic
-	// +kubebuilder:validation:items:MaxLength=256
+	// +kubebuilder:validation:items:MaxLength=8196
 	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	Command []string `json:"command,omitempty"`
@@ -258,7 +258,7 @@ type Trainer struct {
 	// These values will be merged with the TrainingRuntime's trainer environments.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=356
+	// +kubebuilder:validation:MaxItems=256
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
