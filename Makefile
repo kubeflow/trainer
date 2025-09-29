@@ -155,8 +155,8 @@ vet: ## Run go vet against the code.
 	go vet ./...
 
 GOLANGCI_LINT=$(shell which golangci-lint)
-.PHONY: golangci-lint golangci-lint-kal
-golangci-lint: ## Run golangci-lint to verify Go files.
+.PHONY: golangci-lint
+golangci-lint: golangci-lint-kal ## Run golangci-lint to verify Go files.
 ifeq ($(GOLANGCI_LINT),)
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.64.8
 	$(info golangci-lint has been installed)
