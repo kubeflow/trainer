@@ -98,6 +98,7 @@ cherry pick your changes from the `master` branch and submit a PR.
    rm -rf dist
    python -m build
    twine upload dist/*
+   cd ../..
    ```
 
 ### Release Kubeflow Trainer images
@@ -114,7 +115,7 @@ cherry pick your changes from the `master` branch and submit a PR.
    - For the RC tag run the following:
 
    ```sh
-   git add manifests
+   git add .
    git commit -s -m "Kubeflow Trainer Official Release vX.Y.Z-rc.N"
    git tag vX.Y.Z-rc.N
    git push upstream release-X.Y --tags
@@ -123,11 +124,13 @@ cherry pick your changes from the `master` branch and submit a PR.
    - For the official release run the following:
 
    ```sh
-   git add manifests
+   git add .
    git commit -s -m "Kubeflow Trainer Official Release vX.Y.Z"
    git tag vX.Y.Z
    git push upstream release-X.Y --tags
    ```
+
+For example, check [this release commit](https://github.com/kubeflow/trainer/commit/332ad3939a000ecf837a37ecb1a56e3b0494562c).
 
 ### Verify the image publish
 
