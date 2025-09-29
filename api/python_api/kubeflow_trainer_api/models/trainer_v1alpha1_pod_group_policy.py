@@ -27,7 +27,7 @@ class TrainerV1alpha1PodGroupPolicy(BaseModel):
     """
     PodGroupPolicy represents a PodGroup configuration for gang-scheduling.
     """ # noqa: E501
-    coscheduling: Optional[TrainerV1alpha1CoschedulingPodGroupPolicySource] = Field(default=None, description="Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.")
+    coscheduling: Optional[TrainerV1alpha1CoschedulingPodGroupPolicySource] = Field(default=None, description="coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.")
     __properties: ClassVar[List[str]] = ["coscheduling"]
 
     model_config = ConfigDict(

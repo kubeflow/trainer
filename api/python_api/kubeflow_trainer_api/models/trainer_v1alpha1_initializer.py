@@ -28,8 +28,8 @@ class TrainerV1alpha1Initializer(BaseModel):
     """
     Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.
     """ # noqa: E501
-    dataset: Optional[TrainerV1alpha1DatasetInitializer] = Field(default=None, description="Configuration of the dataset initialization and pre-processing.")
-    model: Optional[TrainerV1alpha1ModelInitializer] = Field(default=None, description="Configuration of the pre-trained model initialization")
+    dataset: Optional[TrainerV1alpha1DatasetInitializer] = Field(default=None, description="dataset defines the configuration for the dataset initialization and pre-processing.")
+    model: Optional[TrainerV1alpha1ModelInitializer] = Field(default=None, description="model defines the configuration for the pre-trained model initialization")
     __properties: ClassVar[List[str]] = ["dataset", "model"]
 
     model_config = ConfigDict(

@@ -28,8 +28,8 @@ class TrainerV1alpha1TorchMLPolicySource(BaseModel):
     """
     TorchMLPolicySource represents a PyTorch runtime configuration.
     """ # noqa: E501
-    elastic_policy: Optional[TrainerV1alpha1TorchElasticPolicy] = Field(default=None, description="Elastic policy for the PyTorch training.", alias="elasticPolicy")
-    num_proc_per_node: Optional[IoK8sApimachineryPkgUtilIntstrIntOrString] = Field(default=None, description="Number of processes per node. This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI. Supported values: `auto`, `cpu`, `gpu`, or int value. Defaults to `auto`.", alias="numProcPerNode")
+    elastic_policy: Optional[TrainerV1alpha1TorchElasticPolicy] = Field(default=None, description="elasticPolicy defines the Elastic policy for the PyTorch training.", alias="elasticPolicy")
+    num_proc_per_node: Optional[IoK8sApimachineryPkgUtilIntstrIntOrString] = Field(default=None, description="numProcPerNode is the number of processes per node. This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI. Supported values: `auto`, `cpu`, `gpu`, or int value. Defaults to `auto`.", alias="numProcPerNode")
     __properties: ClassVar[List[str]] = ["elasticPolicy", "numProcPerNode"]
 
     model_config = ConfigDict(
