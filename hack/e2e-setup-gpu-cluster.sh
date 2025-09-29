@@ -21,8 +21,16 @@ set -o nounset
 set -o pipefail
 set -x
 
+# Source container runtime utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/scripts/container-runtime.sh"
+source "${SCRIPT_DIR}/scripts/load-image-to-kind.sh"
+
+# Setup container runtime
+setup_container_runtime
+
 # Configure variables.
-KIND=${KIND:-./bin/kind}
+KIND=${KIND:-nvkind}
 K8S_VERSION=${K8S_VERSION:-1.32.0}
 GPU_OPERATOR_VERSION="v25.3.2"
 KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
@@ -35,20 +43,20 @@ CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-ma
 CI_IMAGE_TAG="test"
 CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 echo "Build Kubeflow Trainer images"
-docker build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
+${CONTAINER_RUNTIME} build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
 
 # Kubeflow Trainer initializer images.
 DATASET_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/dataset-initializer"
 DATASET_INITIALIZER_CI_IMAGE="${DATASET_INITIALIZER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
-docker build . -f cmd/initializers/dataset/Dockerfile -t ${DATASET_INITIALIZER_CI_IMAGE}
+${CONTAINER_RUNTIME} build . -f cmd/initializers/dataset/Dockerfile -t ${DATASET_INITIALIZER_CI_IMAGE}
 
 MODEL_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/model-initializer"
 MODEL_INITIALIZER_CI_IMAGE="${MODEL_INITIALIZER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
-docker build . -f cmd/initializers/model/Dockerfile -t ${MODEL_INITIALIZER_CI_IMAGE}
+${CONTAINER_RUNTIME} build . -f cmd/initializers/model/Dockerfile -t ${MODEL_INITIALIZER_CI_IMAGE}
 
 TRAINER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/torchtune-trainer"
 TRAINER_CI_IMAGE="${TRAINER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
-docker build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_CI_IMAGE}
+${CONTAINER_RUNTIME} build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_CI_IMAGE}
 
 # Set up Docker to use NVIDIA runtime.
 sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enabled
@@ -56,8 +64,8 @@ sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true
 sudo systemctl restart docker
 
 # Create a Kind cluster with GPU support.
-nvkind cluster create --name ${GPU_CLUSTER_NAME} --image "${KIND_NODE_VERSION}"
-nvkind cluster print-gpus
+${KIND} cluster create --name ${GPU_CLUSTER_NAME} --image "${KIND_NODE_VERSION}"
+${KIND} cluster print-gpus
 
 # Install gpu-operator to make sure we can run GPU workloads.
 echo "Install NVIDIA GPU Operator"
@@ -83,12 +91,12 @@ kubectl get nodes -o=custom-columns=NAME:.metadata.name,GPU:.status.allocatable.
 
 # Load Kubeflow Trainer images
 echo "Load Kubeflow Trainer images"
-kind load docker-image "${CONTROLLER_MANAGER_CI_IMAGE}" --name "${GPU_CLUSTER_NAME}"
+load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
 
 echo "Load Kubeflow Trainer initializers images"
-kind load docker-image "${DATASET_INITIALIZER_CI_IMAGE}" --name "${GPU_CLUSTER_NAME}"
-kind load docker-image "${MODEL_INITIALIZER_CI_IMAGE}" --name "${GPU_CLUSTER_NAME}"
-kind load docker-image "${TRAINER_CI_IMAGE}" --name "${GPU_CLUSTER_NAME}"
+load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
+load_image_to_kind "${MODEL_INITIALIZER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
+load_image_to_kind "${TRAINER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
 
 # Deploy Kubeflow Trainer control plane
 echo "Deploy Kubeflow Trainer control plane"
@@ -153,7 +161,7 @@ kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
 
 # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
 TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
-docker pull ${TORCH_RUNTIME_IMAGE}
-kind load docker-image ${TORCH_RUNTIME_IMAGE} --name ${GPU_CLUSTER_NAME}
+${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
+load_image_to_kind ${TORCH_RUNTIME_IMAGE} ${GPU_CLUSTER_NAME}
 
 print_cluster_info
