@@ -14,6 +14,9 @@
 
 Latest News 🔥
 
+- [2025/09] Kubeflow SDK v0.1 is officially released with support for CustomTrainer,
+  BuiltinTrainer, and local PyTorch execution. Check out
+  [the GitHub release notes](https://github.com/kubeflow/sdk/releases/tag/0.1.0).
 - [2025/07] PyTorch on Kubernetes: Kubeflow Trainer Joins the PyTorch Ecosystem. Find the
   announcement in [the PyTorch blog post](https://pytorch.org/blog/pytorch-on-kubernetes-kubeflow-trainer-joins-the-pytorch-ecosystem/).
 - [2025/07] Kubeflow Trainer v2.0 has been officially released. Check out
