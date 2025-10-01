@@ -79,6 +79,7 @@ rules:
   - list
   - watch
 - apiGroups:
+  - scheduling.volcano.sh
   - scheduling.x-k8s.io
   resources:
   - podgroups
