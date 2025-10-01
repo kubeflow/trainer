@@ -99,6 +99,9 @@ var _ = ginkgo.Describe("TrainingRuntime controller", ginkgo.Ordered, func() {
 		ginkgo.It("TrainingRuntime can be deleted once referenced TrainJob is deleted", func() {
 			ginkgo.By("Creating a TrainingRuntime and TrainJob")
 			gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
 			ginkgo.By("Checking if the TrainingRuntime obtains finalizers")

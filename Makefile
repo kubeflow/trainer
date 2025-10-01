@@ -18,9 +18,9 @@ TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
 LOCALBIN ?= $(PROJECT_DIR)/bin
 
 # Tool versions
-K8S_VERSION ?= 1.33.0
+K8S_VERSION ?= 1.34.0
 GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
-ENVTEST_VERSION ?= release-0.21
+ENVTEST_VERSION ?= release-0.22
 CONTROLLER_GEN_VERSION ?= v0.18.0
 KIND_VERSION ?= $(shell go list -m -f '{{.Version}}' sigs.k8s.io/kind)
 HELM_VERSION ?= v3.15.3
@@ -177,6 +177,10 @@ test-python-integration: ## Run Python integration test.
 .PHONY: test-e2e-setup-cluster
 test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.
 	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
+
+.PHONY: test-e2e-setup-gpu-cluster
+test-e2e-setup-gpu-cluster: kind ## Setup Kind cluster for GPU e2e test.
+	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-gpu-cluster.sh
 
 .PHONY: test-e2e
 test-e2e: ginkgo ## Run Go e2e test.

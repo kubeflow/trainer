@@ -1,5 +1,24 @@
 # Changelog
 
+# [v2.0.1](https://github.com/kubeflow/trainer/tree/v2.0.1) (2025-09-29)
+
+## New Features
+
+- [release-2.0] feat: Add a public function to create runtime info objects ([#2846](https://github.com/kubeflow/trainer/pull/2846) by [@kaisoz](https://github.com/kaisoz))
+
+## Bug Fixes
+
+- [release-2.0] fix(runtimes): Set numProcPerNode: 1 in DeepSpeed Runtime ([#2863](https://github.com/kubeflow/trainer/pull/2863) by [@andreyvelich](https://github.com/andreyvelich))
+- [release-2.0] fix(ci): Add latest image tag only for the master branch ([#2862](https://github.com/kubeflow/trainer/pull/2862) by [@andreyvelich](https://github.com/andreyvelich))
+- [release-2.0] fix: update examples to reflect func_args now being unpacked (#2815) ([#2853](https://github.com/kubeflow/trainer/pull/2853) by [@astefanutti](https://github.com/astefanutti))
+- [release-2.0] fix(examples): Update get_job_logs() API in examples (#2813) ([#2852](https://github.com/kubeflow/trainer/pull/2852) by [@astefanutti](https://github.com/astefanutti))
+- [release-2.0] feat(runtimes): Add Framework Label to the Runtimes (#2761) ([#2851](https://github.com/kubeflow/trainer/pull/2851) by [@astefanutti](https://github.com/astefanutti))
+- [release-2.0] fix(examples): Update the argument for Runtime framework (#2766) ([#2850](https://github.com/kubeflow/trainer/pull/2850) by [@astefanutti](https://github.com/astefanutti))
+- [release-2.0] fix: update kubeflow sdk reference (#2780) ([#2847](https://github.com/kubeflow/trainer/pull/2847) by [@astefanutti](https://github.com/astefanutti))
+- [release-2.0] fix(api): Fix license path for Kubeflow Trainer Python API ([#2772](https://github.com/kubeflow/trainer/pull/2772) by [@andreyvelich](https://github.com/andreyvelich))
+
+[Full Changelog](https://github.com/kubeflow/trainer/compare/v2.0.0...v2.0.1)
+
 # [v2.0.0](https://github.com/kubeflow/trainer/tree/v2.0.0) (2025-07-17)
 
 This is the major release of the Kubeflow Trainer 2.0 project.

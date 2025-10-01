@@ -1,0 +1,93 @@
+name: GPU E2E Test
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  gpu-e2e-test:
+    name: GPU E2E Test
+    runs-on: oracle-vm-16cpu-a10gpu-240gb
+
+    env:
+      GOPATH: ${{ github.workspace }}/go
+
+    defaults:
+      run:
+        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+
+    strategy:
+      fail-fast: false
+      matrix:
+        kubernetes-version: ["1.33.1"]
+
+    steps:
+      - name: Check GPU label
+        id: check-label
+        run: |
+          if [[ "${{ join(github.event.pull_request.labels.*.name, ',') }}" != *"ok-to-test-gpu-runner"* ]]; then
+            echo "✅ Skipping GPU E2E tests (label not present)."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "Label found. Requesting environment approval to run GPU tests."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check out code
+        if: steps.check-label.outputs.skip == 'false'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+
+      - name: Setup Go
+        if: steps.check-label.outputs.skip == 'false'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
+
+      - name: Setup Python
+        if: steps.check-label.outputs.skip == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        if: steps.check-label.outputs.skip == 'false'
+        run: |
+          pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
+          pip install git+https://github.com/kubeflow/sdk.git@main
+
+      - name: Setup cluster with GPU support using nvidia/kind
+        if: steps.check-label.outputs.skip == 'false'
+        run: |
+          make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
+
+      - name: Run e2e test on GPU cluster
+        if: steps.check-label.outputs.skip == 'false'
+        run: |
+          mkdir -p artifacts/notebooks
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/qwen2_5/qwen2.5-1.5B-with-alpaca.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_qwen2_5_with_alpaca-trainjob-yaml.ipynb TIMEOUT=900
+
+      - name: Upload Artifacts to GitHub
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.kubernetes-version }}
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
+          retention-days: 1
+
+  delete-kind-cluster:
+    name: Delete kind Cluster
+    runs-on: oracle-vm-16cpu-a10gpu-240gb
+    needs: [gpu-e2e-test]
+    if: always()
+    steps:
+      - name: Delete any existing kind cluster
+        run: |
+          sudo kind delete cluster --name kind-gpu && echo "kind cluster has been deleted" || echo "kind cluster doesn't exist"

@@ -782,6 +782,9 @@ type PodSpecOverride struct {
 	// Override for the node selector to place Pod on the specific mode.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
+	// Override for the Pod's affinity.
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
 	// Override for the Pod's tolerations.
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
@@ -793,6 +796,12 @@ type PodSpecOverride struct {
 
 	// Overrides for the containers in the desired job templates.
 	Containers []ContainerOverride `json:"containers,omitempty"`
+
+	// SchedulingGates overrides the scheduling gates of the Pods in the target job templates.
+	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
+
+	// ImagePullSecrets overrides the image pull secrets for the Pods in the target job templates.
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 // ContainerOverride represents parameters that can be overridden using PodSpecOverrides.

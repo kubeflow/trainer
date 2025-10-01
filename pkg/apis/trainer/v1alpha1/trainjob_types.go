@@ -34,6 +34,8 @@ const (
 // +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.conditions[-1:].type`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:validation:XValidation:rule="self.metadata.name.matches('^[a-z]([-a-z0-9]*[a-z0-9])?$')", message="metadata.name must match RFC 1035 DNS label format"
+// +kubebuilder:validation:XValidation:rule="size(self.metadata.name) <= 63", message="metadata.name must be no more than 63 characters"
 
 // TrainJob represents configuration of a training job.
 type TrainJob struct {
@@ -242,6 +244,9 @@ type PodSpecOverride struct {
 	// Override for the node selector to place Pod on the specific node.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
+	// Override for the Pod's affinity.
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
 	// Override for the Pod's tolerations.
 	// +listType=atomic
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
@@ -266,6 +271,11 @@ type PodSpecOverride struct {
 	// +listType=map
 	// +listMapKey=name
 	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
+
+	// ImagePullSecrets overrides the image pull secrets for the Pods in the target job templates.
+	// +listType=map
+	// +listMapKey=name
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 type PodSpecOverrideTargetJob struct {

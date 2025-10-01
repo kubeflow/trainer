@@ -1,15 +1,11 @@
 FROM mpioperator/base:v0.6.0 AS mpi
 FROM nvidia/cuda:12.8.1-devel-ubuntu22.04
 
-# Disable interactive dialog from apt.
-ENV DEBIAN_FRONTEND noninteractive
-
-# Install libraries required for OpenMPI to work.
-RUN apt-get update && apt install -y --no-install-recommends \
-    cmake g++ gcc \
-    wget vim \
-    openssh-client openssh-server libcap2-bin \
-    libopenmpi-dev openmpi-bin
+# Install libraries required for OpenMPI to work. Image installs OpenMPI 5.0.7
+RUN apt update && apt install -y --no-install-recommends \
+    openssh-server openssh-client libcap2-bin \
+    g++ libopenmpi-dev \
+    python3-dev pip && rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python && rm -rf /var/lib/apt/lists/*
 
 # Add capability to run sshd as non-root.
 RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/sbin/sshd
@@ -24,10 +20,7 @@ COPY --from=mpi /etc/ssh/ssh_config /etc/ssh/ssh_config
 COPY --from=mpi /etc/ssh/sshd_config /etc/ssh/sshd_config
 COPY --from=mpi /home/mpiuser/.sshd_config /home/mpiuser/.sshd_config
 
-# Install the required Python packages.
-RUN apt install -y python3-dev pip && rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python
-
-ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/mpi/lib:/usr/local/mpi/lib64:${LD_LIBRARY_PATH}
+# Set home directory for mpiuser.
 ENV HOME=/home/mpiuser
 ENV PATH=$HOME/.local/bin:$PATH
 

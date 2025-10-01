@@ -129,6 +129,7 @@ func TestReconcile_ClusterTrainingRuntimeReconciler(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantClTrainingRuntime, &gotClRuntime,
 				cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion"),
+				cmpopts.IgnoreFields(metav1.TypeMeta{}, "Kind", "APIVersion"),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected ClusterTrainingRuntime: (-want, +got): \n%s", diff)
 			}

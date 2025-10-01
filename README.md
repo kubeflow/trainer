@@ -5,6 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubeflow/trainer)](https://goreportcard.com/report/github.com/kubeflow/trainer)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10435/badge)](https://www.bestpractices.dev/projects/10435)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kubeflow/trainer)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fkubeflow%2Ftrainer.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fkubeflow%2Ftrainer?ref=badge_shield)
 
 <h1 align="center">
     <img src="./docs/images/trainer-logo.svg" alt="logo" width="200">
@@ -13,6 +14,9 @@
 
 Latest News 🔥
 
+- [2025/09] Kubeflow SDK v0.1 is officially released with support for CustomTrainer,
+  BuiltinTrainer, and local PyTorch execution. Check out
+  [the GitHub release notes](https://github.com/kubeflow/sdk/releases/tag/0.1.0).
 - [2025/07] PyTorch on Kubernetes: Kubeflow Trainer Joins the PyTorch Ecosystem. Find the
   announcement in [the PyTorch blog post](https://pytorch.org/blog/pytorch-on-kubernetes-kubeflow-trainer-joins-the-pytorch-ecosystem/).
 - [2025/07] Kubeflow Trainer v2.0 has been officially released. Check out

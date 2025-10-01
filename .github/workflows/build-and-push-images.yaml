@@ -4,9 +4,9 @@ on:
   push:
     branches:
       - master
-      - 'release-*'
+      - "release-*"
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
 
 jobs:
@@ -34,9 +34,10 @@ jobs:
           - component-name: deepspeed-runtime
             dockerfile: cmd/runtimes/deepspeed/Dockerfile
             platforms: linux/amd64,linux/arm64
+          # TODO (andreyvelich): mlx[cuda] doesn't support arm at the moment: https://github.com/ml-explore/mlx/issues/2469
           - component-name: mlx-runtime
             dockerfile: cmd/runtimes/mlx/Dockerfile
-            platforms: linux/arm64
+            platforms: linux/amd64
           - component-name: torchtune-trainer
             dockerfile: cmd/trainers/torchtune/Dockerfile
             platforms: linux/amd64,linux/arm64

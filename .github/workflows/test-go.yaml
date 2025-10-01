@@ -8,6 +8,7 @@ jobs:
   generate:
     name: Generate
     runs-on: ubuntu-latest
+    if: ${{ github.repository == 'kubeflow/trainer' }}
     env:
       GOPATH: ${{ github.workspace }}/go
     defaults:
@@ -47,6 +48,7 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    if: ${{ github.repository == 'kubeflow/trainer' }}
     env:
       GOPATH: ${{ github.workspace }}/go
     defaults:
