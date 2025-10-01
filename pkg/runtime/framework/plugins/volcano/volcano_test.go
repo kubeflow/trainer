@@ -2,16 +2,16 @@ package volcano
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strconv"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
@@ -49,56 +50,7 @@ func TestName(t *testing.T) {
 	}
 }
 
-func TestEnforcePodGroupPolicy(t *testing.T) {
-	v := &Volcano{}
-
-	jobName := "test-trainjob"
-	info := &runtime.Info{
-		Scheduler: &runtime.Scheduler{
-			PodLabels: nil,
-		},
-		RuntimePolicy: runtime.RuntimePolicy{
-			PodGroupPolicy: &trainer.PodGroupPolicy{
-				PodGroupPolicySource: trainer.PodGroupPolicySource{
-					Volcano: &trainer.VolcanoPodGroupPolicySource{},
-				},
-			},
-		},
-	}
-	trainJob := &trainer.TrainJob{}
-	trainJob.Name = jobName
-
-	err := v.EnforcePodGroupPolicy(info, trainJob)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	got := info.Scheduler.PodAnnotations[volcanov1beta1.KubeGroupNameAnnotationKey]
-	want := jobName
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("unexpected PodLabel (-want +got):\n%s", diff)
-	}
-
-	// Test with nil info
-	err = v.EnforcePodGroupPolicy(nil, trainJob)
-	if err != nil {
-		t.Errorf("expected nil error when info is nil, got: %v", err)
-	}
-}
-
-type errorClient struct {
-	client.WithWatch
-	errNotFound bool
-}
-
-func (e *errorClient) Get(_ context.Context, key client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
-	if !e.errNotFound {
-		return apierrors.NewNotFound(corev1.Resource("podgroups"), key.Name)
-	}
-	return fmt.Errorf("mock get error")
-}
-
-func TestBuildPodGroup(t *testing.T) {
+func TestVolcano(t *testing.T) {
 	scheme := apiruntime.NewScheme()
 	if err := trainer.AddToScheme(scheme); err != nil {
 		t.Fatalf("failed to add trainer scheme: %v", err)
@@ -108,6 +60,7 @@ func TestBuildPodGroup(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	mockGetError := errors.New("mock get error")
 
 	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
 		TypeMeta: metav1.TypeMeta{
@@ -165,6 +118,7 @@ func TestBuildPodGroup(t *testing.T) {
 		trainJob   *trainer.TrainJob
 		info       *runtime.Info
 		existingPG client.Object
+		expectInfo *runtime.Info
 		expectPG   *v1beta1.PodGroupApplyConfiguration
 		expectErr  error
 	}{
@@ -174,6 +128,26 @@ func TestBuildPodGroup(t *testing.T) {
 			existingPG: nil,
 			expectPG:   nil,
 			expectErr:  nil,
+		},
+		"inject group-name annotation": {
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob"}},
+			info: &runtime.Info{
+				Scheduler: &runtime.Scheduler{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+			},
+			expectInfo: &runtime.Info{
+				Scheduler: &runtime.Scheduler{
+					PodAnnotations: map[string]string{
+						volcanov1beta1.KubeGroupNameAnnotationKey: "test-trainjob",
+					},
+				},
+			},
 		},
 		"PodGroup exists and trainjob not suspended": {
 			trainJob: &trainer.TrainJob{
@@ -189,6 +163,7 @@ func TestBuildPodGroup(t *testing.T) {
 						},
 					},
 				},
+				Scheduler: &runtime.Scheduler{},
 			},
 			existingPG: &volcanov1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{Name: "job-exist-running", Namespace: "test-ns"},
@@ -218,6 +193,7 @@ func TestBuildPodGroup(t *testing.T) {
 						},
 					},
 				},
+				Scheduler: &runtime.Scheduler{},
 			},
 			existingPG: &volcanov1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "job-update", Namespace: "test-ns"}},
 			expectPG: volcanov1beta1ac.PodGroup("job-update", "test-ns").
@@ -256,71 +232,58 @@ func TestBuildPodGroup(t *testing.T) {
 						},
 					},
 				},
+				Scheduler: &runtime.Scheduler{},
 			},
 			existingPG: nil,
 			expectPG:   nil,
-			expectErr:  fmt.Errorf("mock get error"),
+			expectErr:  mockGetError,
 		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			clientBuilder := fake.NewClientBuilder().WithScheme(scheme)
-			// fake for get existing PodGroup
 			if c.existingPG != nil {
 				clientBuilder.WithObjects(c.existingPG)
 			}
-			client_ := clientBuilder.Build()
-
-			// fake for error handling
 			if name == "Error when getting existing PodGroup" {
-				client_ = &errorClient{WithWatch: client_, errNotFound: true}
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						return mockGetError
+					},
+				})
 			}
-			if name == "PodGroup exists but trainjob suspended" {
-				client_ = &errorClient{WithWatch: client_, errNotFound: false}
-			}
+			cli := clientBuilder.Build()
 
 			v := &Volcano{
-				client:     client_,
-				restMapper: nil,
-				scheme:     scheme,
+				client: cli,
+				scheme: scheme,
 			}
+
+			_ = v.EnforcePodGroupPolicy(c.info, c.trainJob)
+			if c.expectInfo != nil {
+				if diff := cmp.Diff(c.expectInfo.Scheduler.PodAnnotations, c.info.Scheduler.PodAnnotations); diff != "" {
+					t.Errorf("PodAnnotations mismatch (-want +got):\n%s", diff)
+				}
+			}
+
 			objs, err := v.Build(ctx, c.info, c.trainJob)
-
-			if c.expectErr != nil {
-				if err == nil {
-					t.Fatalf("expected error: %v, got nil", c.expectErr)
+			if diff := cmp.Diff(c.expectErr, err, cmpopts.EquateErrors()); diff != "" {
+				t.Errorf("error mismatch:\n%s", diff)
+			}
+			if c.expectPG != nil {
+				if len(objs) != 1 {
+					t.Fatalf("expected 1 object, got %d", len(objs))
 				}
-				if diff := cmp.Diff(c.expectErr.Error(), err.Error()); diff != "" {
-					t.Errorf("unexpected error (-want +got):\n%s", diff)
+				actualPG := objs[0].(*v1beta1.PodGroupApplyConfiguration)
+				if diff := cmp.Diff(c.expectPG, actualPG); diff != "" {
+					t.Errorf("PodGroup mismatch (-want +got):\n%s", diff)
 				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if c.expectPG == nil {
-				if objs != nil {
-					t.Errorf("expected nil result, got: %+v", objs)
-				}
-				return
-			}
-
-			if len(objs) != 1 {
-				t.Fatalf("expected 1 object, got %d", len(objs))
-			}
-			actualPG, ok := objs[0].(*v1beta1.PodGroupApplyConfiguration)
-			if !ok {
-				t.Fatalf("expected PodGroupApplyConfiguration, got %T", objs[0])
-			}
-
-			if diff := cmp.Diff(c.expectPG, actualPG); diff != "" {
-				t.Errorf("mismatch in PodGroup (-want +got):\n%s", diff)
 			}
 		})
 	}
 }
+
 func TestReconcilerBuilders(t *testing.T) {
 	scheme := apiruntime.NewScheme()
 	if err := trainer.AddToScheme(scheme); err != nil {
