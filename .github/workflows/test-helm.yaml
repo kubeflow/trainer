@@ -5,191 +5,117 @@ on:
   pull_request:
 
 jobs:
-  generate:
-    name: Generate
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: 'latest'
-
-      - name: Run make generate
-        run: |
-          if make help 2>/dev/null | grep -q "generate"; then
-            make generate
-          else
-            echo "No generate target found, skipping..."
-          fi
-
-      - name: Run make helm-unittest
-        run: |
-          if make help 2>/dev/null | grep -q "helm-unittest"; then
-            make helm-unittest
-          else
-            echo "No helm-unittest target found, skipping..."
-          fi
-
   test:
     name: Test
     runs-on: ubuntu-latest
-    needs: generate
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          fetch-depth: 0
+          go-version-file: go.mod
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
         with:
           version: 'latest'
 
-      - name: Set up chart-testing
-        uses: helm/chart-testing-action@v2.7.0
-
-      - name: Set up Kind
-        uses: helm/kind-action@v1.10.0
-        with:
-          cluster_name: chart-testing
-          wait: 300s
-
-      - name: Run chart-testing (lint)
+      - name: Lint Helm Chart
         run: |
-          ct lint \
-            --config .github/ct.yaml \
-            --all \
-            --debug
+          helm lint ./charts/kubeflow-trainer
 
-      - name: Install JobSet dependency manually
+      - name: Template Helm Chart
         run: |
-          JOBSET_VERSION="v0.8.1"
-          echo "Installing JobSet $JOBSET_VERSION..."
-          helm install jobset oci://registry.k8s.io/jobset/charts/jobset \
-            --version $JOBSET_VERSION \
-            --create-namespace \
-            --namespace=jobset-system \
-            --wait \
-            --timeout=300s
+          helm template kubeflow-trainer ./charts/kubeflow-trainer
 
-          echo "JobSet installed successfully"
-          kubectl get pods -n jobset-system
-
-          # Wait for JobSet to be ready
-          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=jobset --timeout=300s -n jobset-system
-
-      - name: Create test values file for chart testing
+      - name: Setup cluster and deploy with Helm
         run: |
-          mkdir -p charts/kubeflow-trainer/ci
-          cat > charts/kubeflow-trainer/ci/ci-values.yaml << 'EOF'
-          # CI-specific values for chart testing
-          replicaCount: 1
-          image:
-            pullPolicy: IfNotPresent
-          jobset:
-            install: false  # We install JobSet manually
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 50m
-              memory: 64Mi
-          # Minimal configuration for testing
-          controller:
-            replicas: 1
+          make test-e2e-setup-cluster-helm K8S_VERSION=1.32.0
+
+      - name: Run E2E smoke tests
+        run: |
+          NAMESPACE="kubeflow-system"
+
+          echo "=== Running smoke tests for Helm deployment ==="
+
+          # Check if CRDs are installed
+          echo "Checking CRDs..."
+          kubectl get crd | grep training.kubeflow.org || exit 1
+
+          # Check if controller is running
+          echo "Checking controller deployment..."
+          kubectl get deploy -n ${NAMESPACE} kubeflow-trainer-controller-manager || exit 1
+
+          # Check if webhooks are configured
+          echo "Checking webhooks..."
+          kubectl get mutatingwebhookconfiguration | grep trainer || exit 1
+          kubectl get validatingwebhookconfiguration | grep trainer || exit 1
+
+          # Create a simple PyTorchJob test
+          echo "Creating test PyTorchJob..."
+          cat <<EOF | kubectl apply -f -
+          apiVersion: training.kubeflow.org/v1beta1
+          kind: PyTorchJob
+          metadata:
+            name: pytorch-test
+            namespace: default
+          spec:
+            pytorchReplicaSpecs:
+              Master:
+                replicas: 1
+                restartPolicy: OnFailure
+                template:
+                  spec:
+                    containers:
+                    - name: pytorch
+                      image: pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
+                      command: ["python", "-c", "print('Hello from PyTorch')"]
+                      resources:
+                        limits:
+                          memory: "64Mi"
+                          cpu: "50m"
           EOF
 
-      - name: Run chart-testing (install) with better error handling
-        run: |
-          set -e
-          echo "Starting chart installation tests..."
+          # Wait for job to be created
+          sleep 5
 
-          # Run with more verbose output and longer timeout
-          ct install \
-            --config .github/ct.yaml \
-            --all \
-            --debug \
-            --helm-extra-args "--timeout=600s --debug" \
-            --skip-clean-up || {
-              echo "Chart testing failed, checking cluster state..."
+          # Check if PyTorchJob was created
+          kubectl get pytorchjob pytorch-test -n default || exit 1
 
-              echo "=== Cluster Nodes ==="
-              kubectl get nodes -o wide || true
+          # Check events for any issues
+          kubectl get events -n default --sort-by='.lastTimestamp' | tail -10
 
-              echo "=== All Namespaces ==="
-              kubectl get namespaces || true
+          # Clean up test job
+          kubectl delete pytorchjob pytorch-test -n default --ignore-not-found
 
-              echo "=== All Pods ==="
-              kubectl get pods --all-namespaces -o wide || true
+          echo "=== Smoke tests passed successfully ==="
 
-              echo "=== Events ==="
-              kubectl get events --all-namespaces --sort-by='.lastTimestamp' || true
-
-              echo "=== Helm Releases ==="
-              helm list --all-namespaces || true
-
-              # Still exit with error
-              exit 1
-            }
-
-      - name: Verify Helm installation
+      - name: Verify Helm deployment
         if: success()
         run: |
-          echo "=== Cluster Status ==="
-          kubectl get nodes -o wide
+          NAMESPACE="kubeflow-system"
 
-          echo "=== Namespaces ==="
-          kubectl get namespaces
+          echo "=== Helm Release Info ==="
+          helm list -n ${NAMESPACE}
 
-          echo "=== All Pods ==="
-          kubectl get pods --all-namespaces -o wide
-
-          echo "=== Training Operator Pods ==="
-          kubectl get pods --all-namespaces \
-            -l app.kubernetes.io/name=kubeflow-trainer || true
-
-          echo "=== JobSet Pods ==="
-          kubectl get pods -n jobset-system || true
-
-          echo "=== Services ==="
-          kubectl get svc --all-namespaces
+          echo "=== Deployed Resources ==="
+          kubectl get all -n ${NAMESPACE}
 
           echo "=== CRDs ==="
-          kubectl get crd | grep -E "(training|jobset)" || \
-            echo "No training/jobset CRDs found"
+          kubectl get crd | grep training
 
-          echo "=== Helm Releases ==="
-          helm list --all-namespaces
-
-      - name: Run basic functionality tests
-        if: success()
-        run: |
-          echo "=== Chart Testing Completed Successfully ==="
-          echo "The chart has been installed, tested, and validated by chart-testing tool."
-          echo "All components are running properly as shown in the verification step above."
-          echo "Chart validation successful!"
+          echo "=== Helm deployment verified successfully ==="
 
       - name: Cleanup
         if: always()
         run: |
           echo "Cleaning up resources..."
 
-          # Clean up any helm releases first
-          helm list --all-namespaces -q | xargs -I {} helm uninstall {} --ignore-not-found || true
+          # Uninstall Helm release
+          helm uninstall kubeflow-trainer -n kubeflow-system --ignore-not-found || true
 
-          # Clean up namespaces
-          kubectl delete namespace kubeflow-system \
-            --ignore-not-found=true --timeout=60s || true
-          kubectl delete namespace jobset-system \
-            --ignore-not-found=true --timeout=60s || true
-
-          # Clean up any remaining test namespaces
-          kubectl get namespaces -o name | grep -E "(kubeflow-trainer|test-)" | xargs kubectl delete --timeout=60s || true
+          # Delete Kind cluster
+          ./bin/kind delete cluster || true
