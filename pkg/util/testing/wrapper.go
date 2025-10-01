@@ -1314,15 +1314,14 @@ func (p *VolcanoPodGroupWrapper) NetworkTopology(mode volcanov1beta1.NetworkTopo
 }
 
 func (p *VolcanoPodGroupWrapper) ControllerReference(gvk schema.GroupVersionKind, name, uid string) *VolcanoPodGroupWrapper {
-	p.PodGroup.OwnerReferences = []metav1.OwnerReference{
-		*metav1.NewControllerRef(&trainer.TrainJob{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: p.Namespace,
-				Name:      name,
-				UID:       types.UID(uid),
-			},
-		}, gvk),
-	}
+	owner := *metav1.NewControllerRef(&trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: p.Namespace,
+			Name:      name,
+			UID:       types.UID(uid),
+		},
+	}, gvk)
+	p.PodGroup.OwnerReferences = append(p.PodGroup.OwnerReferences, owner)
 	return p
 }
 
