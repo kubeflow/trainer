@@ -42,9 +42,7 @@ func main() {
 		oAPIDefs[k] = v
 	}
 
-	volcanoWhitelist := map[string]bool{
-		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec": true,
-	}
+	volcanoAllowAPIs := sets.New("volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec")
 
 	for defName, val := range oAPIDefs {
 		// Exclude InternalEvent from the OpenAPI spec since it requires runtime.Object dependency.
