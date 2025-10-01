@@ -49,10 +49,8 @@ func main() {
 		if defName != "k8s.io/apimachinery/pkg/apis/meta/v1.InternalEvent" {
 
 			// If it's from volcano, apply whitelist
-			if strings.HasPrefix(defName, "volcano.sh/apis/") {
-				if !volcanoWhitelist[defName] {
-					continue
-				}
+			if strings.HasPrefix(defName, "volcano.sh/apis/") && !volcanoAllowAPIs.Has(defName) {
+				continue
 			}
 
 			// OpenAPI generator incorrectly creates models if enum doesn't have default value.
