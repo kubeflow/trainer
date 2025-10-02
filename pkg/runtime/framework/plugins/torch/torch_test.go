@@ -1636,14 +1636,14 @@ func TestValidate(t *testing.T) {
 				).
 				RuntimeRef(
 					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
-					"torchtune-llama3.2-7b",
+					"torchtune-llama3.2-3b",
 				).
 				Obj(),
 			wantError: field.ErrorList{
 				field.Invalid(
 					field.NewPath("spec").Child("trainer").Child("numNodes"),
 					int32(2),
-					fmt.Sprintf("must be 1 for %v model", "llama3_2/7B"),
+					fmt.Sprintf("must be 1 for %v model", "llama3_2/3B"),
 				),
 			},
 		},
