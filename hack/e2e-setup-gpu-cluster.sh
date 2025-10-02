@@ -30,7 +30,7 @@ source "${SCRIPT_DIR}/scripts/load-image-to-kind.sh"
 setup_container_runtime
 
 # Configure variables.
-KIND=${KIND:-nvkind}
+KIND=${KIND:-kind}
 K8S_VERSION=${K8S_VERSION:-1.32.0}
 GPU_OPERATOR_VERSION="v25.3.2"
 KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
@@ -64,8 +64,8 @@ sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true
 sudo systemctl restart docker
 
 # Create a Kind cluster with GPU support.
-${KIND} cluster create --name ${GPU_CLUSTER_NAME} --image "${KIND_NODE_VERSION}"
-${KIND} cluster print-gpus
+nvkind cluster create --name ${GPU_CLUSTER_NAME} --image "${KIND_NODE_VERSION}"
+nvkind cluster print-gpus
 
 # Install gpu-operator to make sure we can run GPU workloads.
 echo "Install NVIDIA GPU Operator"
