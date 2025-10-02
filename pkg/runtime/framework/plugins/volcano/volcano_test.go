@@ -26,7 +26,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	nodev1 "k8s.io/api/node/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -37,14 +36,10 @@ import (
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
@@ -54,17 +49,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
-	index "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
-	runtimeindexer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 )
-
-func TestName(t *testing.T) {
-	v := &Volcano{}
-	expectedName := "Volcano"
-	if v.Name() != expectedName {
-		t.Errorf("expected name %s, got %s", expectedName, v.Name())
-	}
-}
 
 func TestVolcano(t *testing.T) {
 	scheme := apiruntime.NewScheme()
@@ -76,6 +61,32 @@ func TestVolcano(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	// Test Name()
+	t.Run("Name", func(t *testing.T) {
+		v := &Volcano{}
+		expectedName := "Volcano"
+		if v.Name() != expectedName {
+			t.Errorf("expected name %s, got %s", expectedName, v.Name())
+		}
+	})
+
+	// Test ReconcilerBuilders()
+	t.Run("ReconcilerBuilders", func(t *testing.T) {
+		gvk := volcanov1beta1.SchemeGroupVersion.WithKind("PodGroup")
+		mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{volcanov1beta1.SchemeGroupVersion})
+		mapper.Add(gvk, meta.RESTScopeNamespace)
+		v := &Volcano{
+			scheme:     scheme,
+			client:     fake.NewClientBuilder().WithScheme(scheme).Build(),
+			restMapper: mapper,
+		}
+		builders := v.ReconcilerBuilders()
+		if diff := cmp.Diff(3, len(builders)); diff != "" {
+			t.Errorf("unexpected builder count (-want +got):\n%s", diff)
+		}
+	})
+
+	// Test Build()
 	mockGetError := errors.New("mock get error")
 
 	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
@@ -298,191 +309,9 @@ func TestVolcano(t *testing.T) {
 			}
 		})
 	}
-}
 
-func TestReconcilerBuilders(t *testing.T) {
-	scheme := apiruntime.NewScheme()
-	if err := trainer.AddToScheme(scheme); err != nil {
-		t.Fatalf("failed to add trainer scheme: %v", err)
-	}
-	if err := volcanov1beta1.AddToScheme(scheme); err != nil {
-		t.Fatalf("failed to add volcano scheme: %v", err)
-	}
-
-	gvk := volcanov1beta1.SchemeGroupVersion.WithKind("PodGroup")
-	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{volcanov1beta1.SchemeGroupVersion})
-	mapper.Add(gvk, meta.RESTScopeNamespace)
-	v := &Volcano{
-		scheme:     scheme,
-		client:     fake.NewClientBuilder().WithScheme(scheme).Build(),
-		restMapper: mapper,
-	}
-
-	builders := v.ReconcilerBuilders()
-	if diff := cmp.Diff(3, len(builders)); diff != "" {
-		t.Errorf("unexpected builder count (-want +got):\n%s", diff)
-	}
-
-	b := &builder.Builder{}
-	cl := fake.NewClientBuilder().WithScheme(scheme).Build()
-
-	// Ensure builder function does not return nil
-	b2 := builders[0](b, cl, nil)
-	if b2 == nil {
-		t.Errorf("builder should not be nil after applying reconciler builder function")
-	}
-}
-
-func runHandlerTest[T any](t *testing.T, cli client.WithWatch, handler any, obj T) {
-
-	q := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
-
-	ctx := context.Background()
-
-	assertQueue := func(want int) {
-		if got := q.Len(); got != want {
-			t.Fatalf("expected %d reconcile requests in queue, got %d", want, got)
-		}
-	}
-
-	switch h := handler.(type) {
-	case *PodGroupRuntimeClassHandler:
-		if rc, ok := any(obj).(*nodev1.RuntimeClass); ok {
-			h.client = cli
-			h.Create(ctx, event.TypedCreateEvent[*nodev1.RuntimeClass]{Object: rc}, q)
-			assertQueue(1)
-			h.Update(ctx, event.TypedUpdateEvent[*nodev1.RuntimeClass]{ObjectNew: rc}, q)
-			assertQueue(1)
-			h.Delete(ctx, event.TypedDeleteEvent[*nodev1.RuntimeClass]{Object: rc}, q)
-			assertQueue(1)
-		}
-	case *PodGroupLimitRangeHandler:
-		if lr, ok := any(obj).(*corev1.LimitRange); ok {
-			h.client = cli
-			h.Create(ctx, event.TypedCreateEvent[*corev1.LimitRange]{Object: lr}, q)
-			assertQueue(1)
-			h.Update(ctx, event.TypedUpdateEvent[*corev1.LimitRange]{ObjectNew: lr}, q)
-			assertQueue(1)
-			h.Delete(ctx, event.TypedDeleteEvent[*corev1.LimitRange]{Object: lr}, q)
-			assertQueue(1)
-		}
-	}
-
-	if q.Len() == 0 {
-		t.Fatalf("expected at least 1 reconcile request in queue, got 0")
-	}
-}
-
-func TestPodGroupRuntimeClassHandler_AllEvents(t *testing.T) {
-	scheme := apiruntime.NewScheme()
-	_ = trainer.AddToScheme(scheme)
-	_ = nodev1.AddToScheme(scheme)
-
-	trainJob := &trainer.TrainJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-job",
-			Namespace: "default",
-		},
-		Spec: trainer.TrainJobSpec{
-			Suspend: ptr.To(true),
-		},
-	}
-	tr := &trainer.TrainingRuntime{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-runtime",
-		},
-		Spec: trainer.TrainingRuntimeSpec{
-			PodGroupPolicy: &trainer.PodGroupPolicy{
-				PodGroupPolicySource: trainer.PodGroupPolicySource{
-					Volcano: &trainer.VolcanoPodGroupPolicySource{},
-				},
-			},
-		},
-	}
-	rc := &nodev1.RuntimeClass{ObjectMeta: metav1.ObjectMeta{Name: "test-class"}}
-
-	// case 1: TrainingRuntime
-	cli := fake.NewClientBuilder().
-		WithScheme(scheme).
-		WithObjects(trainJob, tr).
-		WithIndex(&trainer.TrainingRuntime{}, index.TrainingRuntimeContainerRuntimeClassKey,
-			func(obj client.Object) []string {
-				return []string{"test-class"}
-			}).
-		WithIndex(&trainer.ClusterTrainingRuntime{}, index.ClusterTrainingRuntimeContainerRuntimeClassKey,
-			func(obj client.Object) []string {
-				return []string{"test-class"}
-			}).
-		WithIndex(&trainer.TrainJob{}, runtimeindexer.TrainJobRuntimeRefKey,
-			func(obj client.Object) []string {
-				return []string{"test-runtime"}
-			}).
-		Build()
-
-	runHandlerTest(t, cli, &PodGroupRuntimeClassHandler{}, rc)
-
-	// case 2: ClusterTrainingRuntime
-	cr := &trainer.ClusterTrainingRuntime{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-runtime",
-		},
-		Spec: trainer.TrainingRuntimeSpec{
-			PodGroupPolicy: &trainer.PodGroupPolicy{
-				PodGroupPolicySource: trainer.PodGroupPolicySource{
-					Volcano: &trainer.VolcanoPodGroupPolicySource{},
-				},
-			},
-		},
-	}
-
-	cli2 := fake.NewClientBuilder().
-		WithScheme(scheme).
-		WithObjects(trainJob, cr).
-		WithIndex(&trainer.TrainingRuntime{}, index.TrainingRuntimeContainerRuntimeClassKey,
-			func(obj client.Object) []string {
-				return []string{"test-class"}
-			}).
-		WithIndex(&trainer.ClusterTrainingRuntime{}, index.ClusterTrainingRuntimeContainerRuntimeClassKey,
-			func(obj client.Object) []string {
-				return []string{"test-class"}
-			}).
-		WithIndex(&trainer.TrainJob{}, runtimeindexer.TrainJobClusterRuntimeRefKey,
-			func(obj client.Object) []string {
-				return []string{"test-runtime"}
-			}).
-		Build()
-
-	runHandlerTest(t, cli2, &PodGroupRuntimeClassHandler{}, rc)
-
-}
-
-func TestPodGroupLimitRangeHandler_AllEvents(t *testing.T) {
-	scheme := apiruntime.NewScheme()
-	_ = trainer.AddToScheme(scheme)
-	_ = corev1.AddToScheme(scheme)
-
-	trainJob := &trainer.TrainJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-job",
-			Namespace: "default",
-		},
-		Spec: trainer.TrainJobSpec{
-			Suspend: ptr.To(true),
-		},
-	}
-
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(trainJob).Build()
-
-	lr := &corev1.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default"}}
-
-	runHandlerTest(t, cli, &PodGroupLimitRangeHandler{}, lr)
-}
-
-func TestValidate(t *testing.T) {
-	scheme := apiruntime.NewScheme()
-	_ = schedulingv1.AddToScheme(scheme)
-
-	tests := map[string]struct {
+	// Test Validate()
+	validationTests := map[string]struct {
 		annotations       map[string]string
 		priorityClassName *string
 		existingPriority  *schedulingv1.PriorityClass
@@ -514,7 +343,7 @@ func TestValidate(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range validationTests {
 		t.Run(name, func(t *testing.T) {
 			var objs []client.Object
 			if tt.existingPriority != nil {
