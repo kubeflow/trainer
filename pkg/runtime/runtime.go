@@ -30,11 +30,6 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
 
-var (
-	defaultPodSetsSyncer = func(*Info) {}
-	syncPodSets          = defaultPodSetsSyncer
-)
-
 type Info struct {
 	// Labels and Annotations to add to the RuntimeJobTemplate.
 	Labels      map[string]string
@@ -46,6 +41,9 @@ type Info struct {
 	// TemplateSpec is TrainingRuntime Template object.
 	// ObjApply podSpecs and this PodSets should be kept in sync by info.SyncPodSetsToTemplateSpec().
 	TemplateSpec TemplateSpec
+	// syncPodSets is the function to sync PodSets to TemplateSpec.
+	// This is stored per-instance to avoid data races when RuntimeInfo is called concurrently.
+	syncPodSets func(*Info)
 }
 
 type RuntimePolicy struct {
@@ -96,6 +94,7 @@ type InfoOptions struct {
 	annotations   map[string]string
 	runtimePolicy RuntimePolicy
 	templateSpec  TemplateSpec
+	syncPodSets   func(*Info)
 }
 
 type InfoOption func(options *InfoOptions)
@@ -171,7 +170,7 @@ func toPodSetContainer(containerApply ...corev1ac.ContainerApplyConfiguration) i
 
 func WithPodSetSyncer(syncer func(*Info)) InfoOption {
 	return func(o *InfoOptions) {
-		syncPodSets = syncer
+		o.syncPodSets = syncer
 	}
 }
 
@@ -189,6 +188,11 @@ func NewInfo(opts ...InfoOption) *Info {
 			PodLabels: make(map[string]string),
 		},
 		TemplateSpec: options.templateSpec,
+		syncPodSets:  options.syncPodSets,
+	}
+	// Set default no-op syncer if none provided
+	if info.syncPodSets == nil {
+		info.syncPodSets = func(*Info) {}
 	}
 	if options.labels != nil {
 		info.Labels = options.labels
@@ -200,7 +204,7 @@ func NewInfo(opts ...InfoOption) *Info {
 }
 
 func (i *Info) SyncPodSetsToTemplateSpec() {
-	syncPodSets(i)
+	i.syncPodSets(i)
 }
 
 func TemplateSpecApply[A any](info *Info) (*A, bool) {
