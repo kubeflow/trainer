@@ -164,11 +164,14 @@ const (
 	// TorchTuneQLoRAFinetuneDistributedConfigSuffix is the config suffix for the distributed QLoRA finetune.
 	TorchTuneQLoRAFinetuneDistributedConfigSuffix string = "_qlora"
 
-	// TorchTuneTrainerUseLoRA is the flag for the LoRA/DoRA method in torchtune.
-	TorchTuneTrainerUseLoRA string = "--trainer-use-lora"
+	// TorchTuneLoraAttnModules is the config item name for the LoRA attention modules.
+	TorchTuneLoraAttnModules string = "model.lora_attn_modules"
 
-	// TorchTuneTrainerUseQLoRA is the flag for the QLoRA method in torchtune.
-	TorchTuneTrainerUseQLoRA string = "--trainer-use-qlora"
+	// TorchTuneQuantizeBase is the config item name for the quantization base.
+	TorchTuneQuantizeBase string = "model.quantize_base"
+
+	// TorchTuneUseDora is the config item name for using DoRA.
+	TorchTuneUseDora string = "model.use_dora"
 
 	// TorchTuneModelOutputDir is the config item name for the model output directory.
 	TorchTuneModelOutputDir string = "output_dir"
@@ -215,7 +218,4 @@ var (
 
 	// TorchTuneImmutableConfigs is the set of immutable configs for the TorchTune Trainer.
 	TorchTuneImmutableConfigs = sets.New(TorchTuneModelOutputDir, TorchTuneTokenizerPath, TorchTuneCheckpointDir, TorchTuneTokenizerMergeFile)
-
-	// TorchTuneFilteredArgs is the set of args that will be filtered out from the user provided args.
-	TorchTuneFilteredArgs = sets.New(TorchTuneTrainerUseLoRA, TorchTuneTrainerUseQLoRA)
 )

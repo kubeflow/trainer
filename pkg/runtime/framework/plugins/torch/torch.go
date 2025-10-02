@@ -326,22 +326,22 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, resou
 	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
 	gpuQ, ok := getGPUCountPerNode(resourcePerNode)
 	if numNodes == 1 && (numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 || ok && gpuQ == 1) {
-		if isUseLoraFinetune(args) {
-			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
-			suffix = constants.TorchTuneLoRAFinetuneSingleDeviceConfigSuffix
-		} else if isUseQLoraFinetune(args) {
+		if isUseQLoraFinetune(args) {
 			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
 			suffix = constants.TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix
+		} else if isLoraConfigEnabled(args) {
+			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
+			suffix = constants.TorchTuneLoRAFinetuneSingleDeviceConfigSuffix
 		} else {
 			recipe = constants.TorchTuneFullFinetuneSingleDevice
 			suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
 		}
-	} else if numNodes == 1 && isUseLoraFinetune(args) {
-		recipe = constants.TorchTuneLoRAFinetuneDistributed
-		suffix = constants.TorchTuneLoRAFinetuneDistributedConfigSuffix
 	} else if numNodes == 1 && isUseQLoraFinetune(args) {
 		recipe = constants.TorchTuneLoRAFinetuneDistributed
 		suffix = constants.TorchTuneQLoRAFinetuneDistributedConfigSuffix
+	} else if numNodes == 1 && isLoraConfigEnabled(args) {
+		recipe = constants.TorchTuneLoRAFinetuneDistributed
+		suffix = constants.TorchTuneLoRAFinetuneDistributedConfigSuffix
 	} else if numNodes > 1 {
 		suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
 	}
@@ -359,33 +359,38 @@ func getGPUCountPerNode(resourcePerNode corev1.ResourceList) (int, bool) {
 	return 0, false
 }
 
-// isUseLoraFinetune checks if the --trainer-use-lora flag is present in the command line arguments.
-// It returns true if the flag is found, otherwise false.
-func isUseLoraFinetune(args []string) bool {
+// isLoraConfigEnabled checks if we enables LoraConfig.
+func isLoraConfigEnabled(args []string) bool {
 	for _, arg := range args {
-		if arg == constants.TorchTuneTrainerUseLoRA {
+		if strings.Contains(arg, constants.TorchTuneLoraAttnModules) {
 			return true
 		}
 	}
 	return false
 }
 
-// isUseQLoraFinetune checks if the --trainer-use-qlora flag is present in the command line arguments.
-// It returns true if the flag is found, otherwise false.
+// isUseQLora checks if we use QLoRA fine-tuning.
 func isUseQLoraFinetune(args []string) bool {
+	quantizeBaseEnabled, useDoraEnabled := false, false
 	for _, arg := range args {
-		if arg == constants.TorchTuneTrainerUseQLoRA {
-			return true
+		if strings.Contains(arg, constants.TorchTuneQuantizeBase) {
+			quantizeBaseEnabled = true
+		}
+		if strings.Contains(arg, constants.TorchTuneUseDora) {
+			useDoraEnabled = true
 		}
 	}
-	return false
+	return quantizeBaseEnabled && !useDoraEnabled
 }
 
 // removeFilteredArgs removes the filtered args from the provided args slice.
 func removeFilteredArgs(args []string) []string {
+	if !isUseQLoraFinetune(args) {
+		return args
+	}
 	filteredArgs := []string{}
 	for _, arg := range args {
-		if !constants.TorchTuneFilteredArgs.Has(arg) {
+		if !strings.Contains(arg, constants.TorchTuneQuantizeBase) {
 			filteredArgs = append(filteredArgs, arg)
 		}
 	}
