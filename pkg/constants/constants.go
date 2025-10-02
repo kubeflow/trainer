@@ -187,8 +187,8 @@ const (
 	// TORCHTUNE_MODEL_LLAMA3_2_1B is the model name for the Llama3.2 1B Instruct model.
 	TORCHTUNE_MODEL_LLAMA3_2_1B = "llama3_2/1B"
 
-	// TORCHTUNE_MODEL_LLAMA3_2_7B is the model name for the Llama3.2 7B Instruct model.
-	TORCHTUNE_MODEL_LLAMA3_2_7B = "llama3_2/7B"
+	// TORCHTUNE_MODEL_LLAMA3_2_3B is the model name for the Llama3.2 3B Instruct model.
+	TORCHTUNE_MODEL_LLAMA3_2_3B = "llama3_2/3B"
 
 	// TORCHTUNE_MODEL_LLAMA3_3_70B is the model name for the Llama3.3 70B Instruct model.
 	TORCHTUNE_MODEL_LLAMA3_3_70B = "llama3_3/70B"
@@ -208,7 +208,7 @@ var (
 	ResourceInUseFinalizer = fmt.Sprintf("%s/resource-in-use", trainer.GroupVersion.Group)
 
 	// TorchTuneSupportedPretrainedModels supported pretrained models for TorchTune Trainer.
-	TorchTuneSupportedPretrainedModels = sets.New(TORCHTUNE_MODEL_LLAMA3_2_1B, TORCHTUNE_MODEL_LLAMA3_2_7B, TORCHTUNE_MODEL_LLAMA3_3_70B, TORCHTUNE_MODEL_QWEN2_5_1_5B)
+	TorchTuneSupportedPretrainedModels = sets.New(TORCHTUNE_MODEL_LLAMA3_2_1B, TORCHTUNE_MODEL_LLAMA3_2_3B, TORCHTUNE_MODEL_LLAMA3_3_70B, TORCHTUNE_MODEL_QWEN2_5_1_5B)
 
 	// TorchTuneEntrypoint is the entrypoint for the torchtune.
 	TorchTuneEntrypoint = []string{"tune", "run"}

@@ -100,6 +100,30 @@ func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj
 			if numNodes > 1 && model != constants.TORCHTUNE_MODEL_LLAMA3_3_70B {
 				allErrs = append(allErrs, field.Invalid(numNodesRefPath, numNodes, fmt.Sprintf("must be 1 for %v model", model)))
 			}
+
+			numProcPerNodeRefPath := specPath.Child("trainer").Child("numProcPerNode")
+			numProcPerNode := *newObj.Spec.Trainer.NumProcPerNode
+			_, config := getRecipeAndConfig(
+				numNodes,
+				numProcPerNode,
+				newObj.Spec.Trainer.ResourcesPerNode.Requests,
+				getModelFromRuntimeRef(newObj.Spec.RuntimeRef.Name),
+				newObj.Spec.Trainer.Args,
+			)
+			if strings.Contains(config, constants.TorchTuneQLoRAFinetuneDistributedConfigSuffix) {
+				if model == constants.TORCHTUNE_MODEL_QWEN2_5_1_5B {
+					allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("QLoRA is not supported for %v model", model)))
+				}
+				resourcePerNodeRefPath := specPath.Child("trainer").Child("resourcesPerNode")
+				if !strings.Contains(config, constants.TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix) &&
+					(model == constants.TORCHTUNE_MODEL_LLAMA3_2_1B || model == constants.TORCHTUNE_MODEL_LLAMA3_2_3B) {
+					allErrs = append(
+						allErrs,
+						field.Invalid(numProcPerNodeRefPath, numProcPerNode, fmt.Sprintf("must be auto or 1 for %v model when using QLoRA", model)),
+						field.Invalid(resourcePerNodeRefPath, newObj.Spec.Trainer.ResourcesPerNode, fmt.Sprintf("must have gpu resource with value 1 for %v model when using QLoRA", model)),
+					)
+				}
+			}
 		}
 	}
 
@@ -122,6 +146,8 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
 		numProcPerNode = ptr.Deref(trainJob.Spec.Trainer.NumProcPerNode, intstr.FromString("auto"))
 	}
+
+	// Determine numProcPerNode based on the resourcesPerNode if it's explicitly set.
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
 		numProcPerNode = getNumProcPerNode(numProcPerNode, info, jobTrainer)
 	}
@@ -168,8 +194,8 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			// Rendezvous backend is only enabled for multi-nodes or multi-devices training.
 			var newCommand []string
 			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
-			gpuQ, ok := trainJob.Spec.Trainer.ResourcesPerNode.Requests["nvidia.com/gpu"]
-			if numNodes > 1 || !(numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1) && !(ok && gpuQ.Value() == 1) {
+			gpuQ, ok := getGPUCountPerNode(trainJob.Spec.Trainer.ResourcesPerNode.Requests)
+			if numNodes > 1 || !(numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1) && !(ok && gpuQ == 1) {
 				newCommand = append(newCommand,
 					fmt.Sprintf("%s=%s-%s-0-0.%s:%d",
 						constants.TorchTuneArgRdzvEndpoint,
@@ -208,7 +234,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 // - explicit number: Uses the provided value directly
 //
 // The function prioritizes resource limits over requests, and checks both user-specified resources
-// and default runtime resources. For GPU detection, it looks for resource names containing "nvidia.com/gpu".
+// and default runtime resources. For GPU detection, it looks for resource names containing "gpu".
 //
 // Parameters:
 //   - nppNode: The desired number of processes per node (can be "auto", "cpu", or numeric)
@@ -226,7 +252,7 @@ func getNumProcPerNode(nppNode intstr.IntOrString, info *runtime.Info, jobTraine
 	case "auto":
 		shouldUseCPU = func(resources corev1.ResourceList) bool {
 			for resName := range resources {
-				if strings.Contains(strings.ToLower(resName.String()), "nvidia.com/gpu") {
+				if strings.Contains(strings.ToLower(resName.String()), "gpu") {
 					return false
 				}
 			}
@@ -263,12 +289,12 @@ func getNumProcPerNode(nppNode intstr.IntOrString, info *runtime.Info, jobTraine
 				}
 			}
 			if defaultLimitsResources != nil {
-				if _, ok := (*defaultLimitsResources)["nvidia.com/gpu"]; ok {
+				if _, ok := getGPUCountPerNode(*defaultLimitsResources); ok {
 					nppNode, usedCPU = calculateNumProcPerNode(fallbackNumProcPerNode, *defaultLimitsResources, shouldUseCPU)
 				}
 			}
 			if usedCPU && defaultRequestResources != nil {
-				if _, ok := (*defaultRequestResources)["nvidia.com/gpu"]; ok {
+				if _, ok := getGPUCountPerNode(*defaultRequestResources); ok {
 					nppNode, _ = calculateNumProcPerNode(fallbackNumProcPerNode, *defaultRequestResources, shouldUseCPU)
 				}
 			}
@@ -298,8 +324,8 @@ func calculateNumProcPerNode(
 func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, resourcePerNode corev1.ResourceList, model string, args []string) (string, string) {
 	recipe := constants.TorchTuneFullFinetuneDistributed
 	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
-	gpuQ, ok := resourcePerNode["nvidia.com/gpu"]
-	if numNodes == 1 && (numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 || ok && gpuQ.Value() == 1) {
+	gpuQ, ok := getGPUCountPerNode(resourcePerNode)
+	if numNodes == 1 && (numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 || ok && gpuQ == 1) {
 		if isUseLoraFinetune(args) {
 			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
 			suffix = constants.TorchTuneLoRAFinetuneSingleDeviceConfigSuffix
@@ -321,6 +347,16 @@ func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, resou
 	}
 
 	return recipe, fmt.Sprintf("%s%s", model, suffix)
+}
+
+// getGPUCountPerNode returns the GPU count and a boolean indicating whether a GPU resource was found.
+func getGPUCountPerNode(resourcePerNode corev1.ResourceList) (int, bool) {
+	for resName, resQ := range resourcePerNode {
+		if strings.Contains(strings.ToLower(resName.String()), "gpu") {
+			return int(resQ.Value()), true
+		}
+	}
+	return 0, false
 }
 
 // isUseLoraFinetune checks if the --trainer-use-lora flag is present in the command line arguments.
