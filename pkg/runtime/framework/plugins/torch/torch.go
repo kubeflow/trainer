@@ -151,7 +151,34 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		}
 		nppNode, usedCPU := calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Limits, shouldUseCPU)
 		if !usedCPU {
-			nppNode, _ = calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Requests, shouldUseCPU)
+			nppNode, usedCPU = calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Requests, shouldUseCPU)
+		}
+		// Check default GPU resources allocated in runtime
+		if usedCPU {
+			jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+			if ok {
+				var defaultRequestResources, defaultLimitsResources *corev1.ResourceList
+				for _, rJob := range jobSetSpec.ReplicatedJobs {
+					if rJob.Name != nil && *rJob.Name == constants.Node || rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer {
+						for _, container := range rJob.Template.Spec.Template.Spec.Containers {
+							if container.Name != nil && *container.Name == constants.Node {
+								defaultLimitsResources = container.Resources.Limits
+								defaultRequestResources = container.Resources.Requests
+							}
+						}
+					}
+				}
+				if defaultLimitsResources != nil {
+					if _, ok := (*defaultLimitsResources)["nvidia.com/gpu"]; ok {
+						nppNode, usedCPU = calculateNumProcPerNode(fallbackNumProcPerNode, *defaultLimitsResources, shouldUseCPU)
+					}
+				}
+				if usedCPU && defaultRequestResources != nil {
+					if _, ok := (*defaultRequestResources)["nvidia.com/gpu"]; ok {
+						nppNode, _ = calculateNumProcPerNode(fallbackNumProcPerNode, *defaultRequestResources, shouldUseCPU)
+					}
+				}
+			}
 		}
 		numProcPerNode = nppNode
 	}
