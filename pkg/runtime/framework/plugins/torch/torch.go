@@ -122,65 +122,8 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
 		numProcPerNode = ptr.Deref(trainJob.Spec.Trainer.NumProcPerNode, intstr.FromString("auto"))
 	}
-
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
-		var (
-			shouldUseCPU           func(resources corev1.ResourceList) bool
-			fallbackNumProcPerNode intstr.IntOrString
-		)
-		switch numProcPerNode.String() {
-		case "auto":
-			shouldUseCPU = func(resources corev1.ResourceList) bool {
-				for resName := range resources {
-					if strings.Contains(strings.ToLower(resName.String()), "gpu") {
-						return false
-					}
-				}
-				return true
-			}
-			fallbackNumProcPerNode = intstr.FromString("auto")
-		case "cpu":
-			shouldUseCPU = func(resources corev1.ResourceList) bool {
-				_, ok := resources[corev1.ResourceCPU]
-				return ok
-			}
-			fallbackNumProcPerNode = intstr.FromInt32(1)
-		default:
-			shouldUseCPU = func(corev1.ResourceList) bool { return false }
-			fallbackNumProcPerNode = numProcPerNode
-		}
-		nppNode, usedCPU := calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Limits, shouldUseCPU)
-		if !usedCPU {
-			nppNode, usedCPU = calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Requests, shouldUseCPU)
-		}
-		// Check default GPU resources allocated in runtime
-		if usedCPU {
-			jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
-			if ok {
-				var defaultRequestResources, defaultLimitsResources *corev1.ResourceList
-				for _, rJob := range jobSetSpec.ReplicatedJobs {
-					if rJob.Name != nil && *rJob.Name == constants.Node || rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer {
-						for _, container := range rJob.Template.Spec.Template.Spec.Containers {
-							if container.Name != nil && *container.Name == constants.Node {
-								defaultLimitsResources = container.Resources.Limits
-								defaultRequestResources = container.Resources.Requests
-							}
-						}
-					}
-				}
-				if defaultLimitsResources != nil {
-					if _, ok := (*defaultLimitsResources)["nvidia.com/gpu"]; ok {
-						nppNode, usedCPU = calculateNumProcPerNode(fallbackNumProcPerNode, *defaultLimitsResources, shouldUseCPU)
-					}
-				}
-				if usedCPU && defaultRequestResources != nil {
-					if _, ok := (*defaultRequestResources)["nvidia.com/gpu"]; ok {
-						nppNode, _ = calculateNumProcPerNode(fallbackNumProcPerNode, *defaultRequestResources, shouldUseCPU)
-					}
-				}
-			}
-		}
-		numProcPerNode = nppNode
+		numProcPerNode = getNumProcPerNode(numProcPerNode, info, jobTrainer)
 	}
 
 	// Update envs for Info object.
@@ -256,6 +199,82 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 	info.SyncPodSetsToTemplateSpec()
 	return nil
+}
+
+// getNumProcPerNode determines the number of processes per node for PyTorch distributed training.
+// It supports three modes:
+// - "auto": Automatically detects GPU resources and uses GPU count, falls back to CPU-based calculation
+// - "cpu": Forces CPU-based calculation using available CPU resources
+// - explicit number: Uses the provided value directly
+//
+// The function prioritizes resource limits over requests, and checks both user-specified resources
+// and default runtime resources. For GPU detection, it looks for resource names containing "nvidia.com/gpu".
+//
+// Parameters:
+//   - nppNode: The desired number of processes per node (can be "auto", "cpu", or numeric)
+//   - info: Runtime Info
+//   - jobTrainer: The Trainer specification from the TrainJob
+//
+// Returns:
+//   - intstr.IntOrString: The calculated number of processes per node
+func getNumProcPerNode(nppNode intstr.IntOrString, info *runtime.Info, jobTrainer *trainer.Trainer) intstr.IntOrString {
+	var (
+		shouldUseCPU           func(resources corev1.ResourceList) bool
+		fallbackNumProcPerNode intstr.IntOrString
+	)
+	switch nppNode.String() {
+	case "auto":
+		shouldUseCPU = func(resources corev1.ResourceList) bool {
+			for resName := range resources {
+				if strings.Contains(strings.ToLower(resName.String()), "nvidia.com/gpu") {
+					return false
+				}
+			}
+			return true
+		}
+		fallbackNumProcPerNode = intstr.FromString("auto")
+	case "cpu":
+		shouldUseCPU = func(resources corev1.ResourceList) bool {
+			_, ok := resources[corev1.ResourceCPU]
+			return ok
+		}
+		fallbackNumProcPerNode = intstr.FromInt32(1)
+	default:
+		shouldUseCPU = func(corev1.ResourceList) bool { return false }
+		fallbackNumProcPerNode = nppNode
+	}
+	nppNode, usedCPU := calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Limits, shouldUseCPU)
+	if !usedCPU {
+		nppNode, usedCPU = calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Requests, shouldUseCPU)
+	}
+	// Check default GPU resources allocated in runtime
+	if usedCPU {
+		jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+		if ok {
+			var defaultRequestResources, defaultLimitsResources *corev1.ResourceList
+			for _, rJob := range jobSetSpec.ReplicatedJobs {
+				if rJob.Name != nil && *rJob.Name == constants.Node || rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer {
+					for _, container := range rJob.Template.Spec.Template.Spec.Containers {
+						if container.Name != nil && *container.Name == constants.Node {
+							defaultLimitsResources = container.Resources.Limits
+							defaultRequestResources = container.Resources.Requests
+						}
+					}
+				}
+			}
+			if defaultLimitsResources != nil {
+				if _, ok := (*defaultLimitsResources)["nvidia.com/gpu"]; ok {
+					nppNode, usedCPU = calculateNumProcPerNode(fallbackNumProcPerNode, *defaultLimitsResources, shouldUseCPU)
+				}
+			}
+			if usedCPU && defaultRequestResources != nil {
+				if _, ok := (*defaultRequestResources)["nvidia.com/gpu"]; ok {
+					nppNode, _ = calculateNumProcPerNode(fallbackNumProcPerNode, *defaultRequestResources, shouldUseCPU)
+				}
+			}
+		}
+	}
+	return nppNode
 }
 
 // calculateNumProcPerNode calculates the number of processes per node based on the provided resources.
