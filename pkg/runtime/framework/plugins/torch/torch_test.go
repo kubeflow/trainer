@@ -1664,7 +1664,10 @@ func TestValidate(t *testing.T) {
 					Container(
 						"ghcr.io/kubeflow/trainer/torchtune-trainer",
 						[]string{"tune", "run"},
-						[]string{constants.TorchTuneTrainerUseQLoRA},
+						[]string{
+							"model.lora_attn_modules=[q_proj, v_proj, output_proj]",
+							"model.quantize_base=True",
+						},
 						corev1.ResourceList{},
 					).
 					Obj(),
@@ -1699,7 +1702,10 @@ func TestValidate(t *testing.T) {
 					Container(
 						"ghcr.io/kubeflow/trainer/torchtune-trainer",
 						[]string{"tune", "run"},
-						[]string{constants.TorchTuneTrainerUseQLoRA},
+						[]string{
+							"model.lora_attn_modules=[q_proj, v_proj, output_proj]",
+							"model.quantize_base=True",
+						},
 						corev1.ResourceList{
 							"example.com/gpu": resource.MustParse("2"),
 						},
