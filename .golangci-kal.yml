@@ -19,7 +19,7 @@ linters:
               - "conflictingmarkers"
               - "duplicatemarkers" # Ensure there are no exact duplicate markers. for types and fields.
               #- "forbiddenmarkers" # Ensure that types and fields do not contain any markers that are forbidden.
-              #- "integers" # Ensure only int32 and int64 are used for integers.
+              - "integers" # Ensure only int32 and int64 are used for integers.
               - "jsontags" # Ensure every field has a json tag.
               - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items.
               #- "nobools" # Bools do not evolve over time, should use enums instead.
@@ -36,7 +36,6 @@ linters:
               - "statusoptional" # Ensure all first children within status should be optional.
               - "statussubresource" # All root objects that have a `status` field should have a status subresource.
               - "uniquemarkers" # Ensure that types and fields do not contain more than a single definition of a marker that should only be present once.
-
               - "nophase" # Phase fields are discouraged by the Kube API conventions, use conditions instead.
 
             # Linters below this line are disabled, pending conversation on how and when to enable them.
