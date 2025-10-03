@@ -100,6 +100,24 @@ func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj
 			if numNodes > 1 && model != constants.TORCHTUNE_MODEL_LLAMA3_3_70B {
 				allErrs = append(allErrs, field.Invalid(numNodesRefPath, numNodes, fmt.Sprintf("must be 1 for %v model", model)))
 			}
+
+			numProcPerNodeRefPath := specPath.Child("trainer").Child("numProcPerNode")
+			numProcPerNode := *newObj.Spec.Trainer.NumProcPerNode
+			_, config := getRecipeAndConfig(numNodes, numProcPerNode, runtimeInfo, newObj)
+			if strings.Contains(config, constants.TorchTuneQLoRAFinetuneDistributedConfigSuffix) {
+				if model == constants.TORCHTUNE_MODEL_QWEN2_5_1_5B {
+					allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("QLoRA is not supported for %v model", model)))
+				}
+				resourcePerNodeRefPath := specPath.Child("trainer").Child("resourcesPerNode")
+				if !strings.Contains(config, constants.TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix) &&
+					(model == constants.TORCHTUNE_MODEL_LLAMA3_2_1B || model == constants.TORCHTUNE_MODEL_LLAMA3_2_3B) {
+					allErrs = append(
+						allErrs,
+						field.Invalid(numProcPerNodeRefPath, numProcPerNode, fmt.Sprintf("must be auto or 1 for %v model when using QLoRA", model)),
+						field.Invalid(resourcePerNodeRefPath, newObj.Spec.Trainer.ResourcesPerNode, fmt.Sprintf("must have gpu resource with value 1 for %v model when using QLoRA", model)),
+					)
+				}
+			}
 		}
 	}
 
@@ -123,38 +141,12 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		numProcPerNode = ptr.Deref(trainJob.Spec.Trainer.NumProcPerNode, intstr.FromString("auto"))
 	}
 
+	// Determine numProcPerNode based on the resourcesPerNode.
+	resourcesPerNode := ptr.Deref(extractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
-		var (
-			shouldUseCPU           func(resources corev1.ResourceList) bool
-			fallbackNumProcPerNode intstr.IntOrString
-		)
-		switch numProcPerNode.String() {
-		case "auto":
-			shouldUseCPU = func(resources corev1.ResourceList) bool {
-				for resName := range resources {
-					if strings.Contains(strings.ToLower(resName.String()), "gpu") {
-						return false
-					}
-				}
-				return true
-			}
-			fallbackNumProcPerNode = intstr.FromString("auto")
-		case "cpu":
-			shouldUseCPU = func(resources corev1.ResourceList) bool {
-				_, ok := resources[corev1.ResourceCPU]
-				return ok
-			}
-			fallbackNumProcPerNode = intstr.FromInt32(1)
-		default:
-			shouldUseCPU = func(corev1.ResourceList) bool { return false }
-			fallbackNumProcPerNode = numProcPerNode
-		}
-		nppNode, usedCPU := calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Limits, shouldUseCPU)
-		if !usedCPU {
-			nppNode, _ = calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Requests, shouldUseCPU)
-		}
-		numProcPerNode = nppNode
+		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
 	}
+	numProcPerNode = getNumProcPerNode(numProcPerNode, resourcesPerNode)
 
 	// Update envs for Info object.
 	var trainerContainer *runtime.Container
@@ -198,7 +190,8 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			// Rendezvous backend is only enabled for multi-nodes or multi-devices training.
 			var newCommand []string
 			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
-			if numNodes > 1 || !(numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1) {
+			gpuQ, ok := getGPUCountPerNode(trainJob.Spec.Trainer.ResourcesPerNode.Requests)
+			if numNodes > 1 || !(numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1) && !(ok && gpuQ == 1) {
 				newCommand = append(newCommand,
 					fmt.Sprintf("%s=%s-%s-0-0.%s:%d",
 						constants.TorchTuneArgRdzvEndpoint,
@@ -208,12 +201,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			}
 
 			// 2. Get the recipe and config from old args and append them to newCommand.
-			recipe, config := getRecipeAndConfig(
-				numNodes,
-				numProcPerNode,
-				getModelFromRuntimeRef(trainJob.Spec.RuntimeRef.Name),
-				trainJob.Spec.Trainer.Args,
-			)
+			recipe, config := getRecipeAndConfig(numNodes, numProcPerNode, info, trainJob)
 			newCommand = append(newCommand, recipe, constants.TorchTuneArgConfig, config)
 
 			// 3. Extract output directory, tokenizer path and model mount path from (Cluster)TrainingRuntime.
@@ -226,6 +214,42 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 	info.SyncPodSetsToTemplateSpec()
 	return nil
+}
+
+func getNumProcPerNode(nppNode intstr.IntOrString, resourcesPerNode corev1.ResourceRequirements) intstr.IntOrString {
+	var (
+		shouldUseCPU           func(resources corev1.ResourceList) bool
+		fallbackNumProcPerNode intstr.IntOrString
+	)
+	switch nppNode.String() {
+	case "auto":
+		shouldUseCPU = func(resources corev1.ResourceList) bool {
+			for resName := range resources {
+				if strings.Contains(strings.ToLower(resName.String()), "gpu") {
+					return false
+				}
+			}
+			return true
+		}
+		fallbackNumProcPerNode = intstr.FromString("auto")
+	case "cpu":
+		shouldUseCPU = func(resources corev1.ResourceList) bool {
+			_, ok := resources[corev1.ResourceCPU]
+			return ok
+		}
+		fallbackNumProcPerNode = intstr.FromInt32(1)
+	default:
+		shouldUseCPU = func(corev1.ResourceList) bool { return false }
+		fallbackNumProcPerNode = nppNode
+	}
+
+	requestNppNode, requestUseGPU := calculateNumProcPerNode(fallbackNumProcPerNode, resourcesPerNode.Requests, shouldUseCPU)
+	limitNppNode, limitUseGPU := calculateNumProcPerNode(fallbackNumProcPerNode, resourcesPerNode.Limits, shouldUseCPU)
+	// If only limits is set, return limits.
+	if !requestUseGPU && limitUseGPU {
+		return limitNppNode
+	}
+	return requestNppNode
 }
 
 // calculateNumProcPerNode calculates the number of processes per node based on the provided resources.
@@ -245,18 +269,112 @@ func calculateNumProcPerNode(
 }
 
 // getRecipeAndConfig returns the recipe and config file name based on the number of nodes,
-// number of processes per node, model name, and command line arguments.
-func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, model string, _ []string) (string, string) {
+// number of processes per node, runtime information, resource per node, model name, and command line arguments.
+func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, info *runtime.Info, trainJob *trainer.TrainJob) (string, string) {
+	// Determine GPU count per node.
+	gpuQ, useGPU := getGPUCountPerNode(trainJob.Spec.Trainer.ResourcesPerNode.Requests)
+	if !useGPU {
+		gpuQ, useGPU = extractGPUCountFromRuntime(info)
+	}
+
 	recipe := constants.TorchTuneFullFinetuneDistributed
 	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
-	if numNodes == 1 && numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 {
-		recipe = constants.TorchTuneFullFinetuneSingleDevice
-		suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
+	if numNodes == 1 && (numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 || useGPU && gpuQ == 1) {
+		if isUseQLoraFinetune(trainJob.Spec.Trainer.Args) {
+			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
+			suffix = constants.TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix
+		} else if isLoraConfigEnabled(trainJob.Spec.Trainer.Args) {
+			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
+			suffix = constants.TorchTuneLoRAFinetuneSingleDeviceConfigSuffix
+		} else {
+			recipe = constants.TorchTuneFullFinetuneSingleDevice
+			suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
+		}
+	} else if numNodes == 1 && isUseQLoraFinetune(trainJob.Spec.Trainer.Args) {
+		recipe = constants.TorchTuneLoRAFinetuneDistributed
+		suffix = constants.TorchTuneQLoRAFinetuneDistributedConfigSuffix
+	} else if numNodes == 1 && isLoraConfigEnabled(trainJob.Spec.Trainer.Args) {
+		recipe = constants.TorchTuneLoRAFinetuneDistributed
+		suffix = constants.TorchTuneLoRAFinetuneDistributedConfigSuffix
 	} else if numNodes > 1 {
 		suffix = constants.TorchTuneFullFinetuneMultiNodesConfigSuffix
 	}
 
-	return recipe, fmt.Sprintf("%s%s", model, suffix)
+	return recipe, fmt.Sprintf("%s%s", getModelFromRuntimeRef(trainJob.Spec.RuntimeRef.Name), suffix)
+}
+
+// getGPUCountPerNode returns the GPU count and a boolean indicating whether a GPU resource was found.
+func getGPUCountPerNode(resourcePerNode corev1.ResourceList) (int, bool) {
+	for resName, resQ := range resourcePerNode {
+		if strings.Contains(strings.ToLower(resName.String()), "gpu") {
+			return int(resQ.Value()), true
+		}
+	}
+	return 0, false
+}
+
+// isLoraConfigEnabled checks if we enables LoraConfig.
+func isLoraConfigEnabled(args []string) bool {
+	for _, arg := range args {
+		if strings.Contains(arg, constants.TorchTuneLoraAttnModules) {
+			return true
+		}
+	}
+	return false
+}
+
+// isUseQLoraFinetune checks if QLoRA fine-tuning should be used.
+func isUseQLoraFinetune(args []string) bool {
+	hasQuantizeBase := false
+	for _, arg := range args {
+		switch {
+		case strings.Contains(arg, constants.TorchTuneUseDora):
+			// If Dora is enabled, no need to continue
+			return false
+		case strings.Contains(arg, constants.TorchTuneQuantizeBase):
+			hasQuantizeBase = true
+		}
+	}
+	return hasQuantizeBase
+}
+
+// extractResourcePerNodeFromRuntime extracts the resource per node from the TorchTune Trainer Node.
+func extractResourcePerNodeFromRuntime(info *runtime.Info) *corev1.ResourceRequirements {
+	if jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info); ok {
+		for _, rJob := range jobSetSpec.ReplicatedJobs {
+			if rJob.Name != nil && *rJob.Name == constants.Node || rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer {
+				for _, container := range rJob.Template.Spec.Template.Spec.Containers {
+					if container.Name != nil && *container.Name == constants.Node && container.Resources != nil {
+						defaultLimitResource, defaultRequestResource := corev1.ResourceList{}, corev1.ResourceList{}
+						if container.Resources.Limits != nil {
+							defaultLimitResource = *container.Resources.Limits
+						}
+						if container.Resources.Requests != nil {
+							defaultRequestResource = *container.Resources.Requests
+						}
+						return &corev1.ResourceRequirements{
+							Limits:   defaultLimitResource,
+							Requests: defaultRequestResource,
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// extractGPUCountFromRuntime extracts the GPU count from the TorchTune Trainer Node.
+func extractGPUCountFromRuntime(info *runtime.Info) (int, bool) {
+	if defaultResourcePerNode := extractResourcePerNodeFromRuntime(info); defaultResourcePerNode != nil {
+		gpuQ, useGPU := getGPUCountPerNode(defaultResourcePerNode.Requests)
+		// If requests do not have GPU, check limits.
+		if limitGPUQ, limitUseGPU := getGPUCountPerNode(defaultResourcePerNode.Limits); !useGPU && limitUseGPU {
+			gpuQ, useGPU = limitGPUQ, limitUseGPU
+		}
+		return gpuQ, useGPU
+	}
+	return 0, false
 }
 
 // extractOverridesFromRuntime extracts overrides from the TorchTune Trainer Node.

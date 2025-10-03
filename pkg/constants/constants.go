@@ -146,6 +146,33 @@ const (
 	// TorchTuneFullFinetuneMultiNodesConfigSuffix is the config suffix for the multi node distributed full finetune.
 	TorchTuneFullFinetuneMultiNodesConfigSuffix string = "_full_multinode"
 
+	// TorchTuneLoRAFinetuneSingleDevice Recipe is the recipe for the single device LoRA finetune.
+	TorchTuneLoRAFinetuneSingleDevice string = "lora_finetune_single_device"
+
+	// TorchTuneLoRAFinetuneSingleDeviceConfigSuffix is the config suffix for the single device LoRA finetune.
+	TorchTuneLoRAFinetuneSingleDeviceConfigSuffix string = "_lora_single_device"
+
+	// TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix is the config suffix for the single device QLoRA finetune.
+	TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix string = "_qlora_single_device"
+
+	// TorchTuneLoRAFinetuneDistributed Recipe is the recipe for the distributed LoRA finetune.
+	TorchTuneLoRAFinetuneDistributed string = "lora_finetune_distributed"
+
+	// TorchTuneLoRAFinetuneDistributedConfigSuffix is the config suffix for the distributed LoRA finetune.
+	TorchTuneLoRAFinetuneDistributedConfigSuffix string = "_lora"
+
+	// TorchTuneQLoRAFinetuneDistributedConfigSuffix is the config suffix for the distributed QLoRA finetune.
+	TorchTuneQLoRAFinetuneDistributedConfigSuffix string = "_qlora"
+
+	// TorchTuneLoraAttnModules is the config item name for the LoRA attention modules.
+	TorchTuneLoraAttnModules string = "model.lora_attn_modules"
+
+	// TorchTuneQuantizeBase is the config item name for the quantization base.
+	TorchTuneQuantizeBase string = "model.quantize_base"
+
+	// TorchTuneUseDora is the config item name for using DoRA.
+	TorchTuneUseDora string = "model.use_dora"
+
 	// TorchTuneModelOutputDir is the config item name for the model output directory.
 	TorchTuneModelOutputDir string = "output_dir"
 
@@ -163,8 +190,8 @@ const (
 	// TORCHTUNE_MODEL_LLAMA3_2_1B is the model name for the Llama3.2 1B Instruct model.
 	TORCHTUNE_MODEL_LLAMA3_2_1B = "llama3_2/1B"
 
-	// TORCHTUNE_MODEL_LLAMA3_2_7B is the model name for the Llama3.2 7B Instruct model.
-	TORCHTUNE_MODEL_LLAMA3_2_7B = "llama3_2/7B"
+	// TORCHTUNE_MODEL_LLAMA3_2_3B is the model name for the Llama3.2 3B Instruct model.
+	TORCHTUNE_MODEL_LLAMA3_2_3B = "llama3_2/3B"
 
 	// TORCHTUNE_MODEL_LLAMA3_3_70B is the model name for the Llama3.3 70B Instruct model.
 	TORCHTUNE_MODEL_LLAMA3_3_70B = "llama3_3/70B"
@@ -184,7 +211,7 @@ var (
 	ResourceInUseFinalizer = fmt.Sprintf("%s/resource-in-use", trainer.GroupVersion.Group)
 
 	// TorchTuneSupportedPretrainedModels supported pretrained models for TorchTune Trainer.
-	TorchTuneSupportedPretrainedModels = sets.New(TORCHTUNE_MODEL_LLAMA3_2_1B, TORCHTUNE_MODEL_LLAMA3_2_7B, TORCHTUNE_MODEL_LLAMA3_3_70B, TORCHTUNE_MODEL_QWEN2_5_1_5B)
+	TorchTuneSupportedPretrainedModels = sets.New(TORCHTUNE_MODEL_LLAMA3_2_1B, TORCHTUNE_MODEL_LLAMA3_2_3B, TORCHTUNE_MODEL_LLAMA3_3_70B, TORCHTUNE_MODEL_QWEN2_5_1_5B)
 
 	// TorchTuneEntrypoint is the entrypoint for the torchtune.
 	TorchTuneEntrypoint = []string{"tune", "run"}
