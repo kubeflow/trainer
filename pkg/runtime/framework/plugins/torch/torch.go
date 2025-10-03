@@ -142,11 +142,11 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 
 	// Determine numProcPerNode based on the resourcesPerNode.
+	resourcesPerNode := ptr.Deref(extractResourcePerNodeFromRuntime(info), corev1.ResourceList{})
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
-		numProcPerNode = getNumProcPerNode(numProcPerNode, jobTrainer.ResourcesPerNode.Requests)
-	} else if resourcesPerNode := extractResourcePerNodeFromRuntime(info); resourcesPerNode != nil {
-		numProcPerNode = getNumProcPerNode(numProcPerNode, *resourcesPerNode)
+		resourcesPerNode = jobTrainer.ResourcesPerNode.Requests
 	}
+	numProcPerNode = getNumProcPerNode(numProcPerNode, resourcesPerNode)
 
 	// Update envs for Info object.
 	var trainerContainer *runtime.Container
