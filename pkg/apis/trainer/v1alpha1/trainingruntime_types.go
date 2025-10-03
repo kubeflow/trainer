@@ -87,7 +87,7 @@ type TrainingRuntime struct {
 
 	// spec of the TrainingRuntime.
 	// +required
-	Spec TrainingRuntimeSpec `json:"spec,omitzero"`
+	Spec TrainingRuntimeSpec `json:"spec,omitempty,omitzero"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
