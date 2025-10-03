@@ -206,7 +206,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			newCommand = append(newCommand, extractOverridesFromRuntime(info)...)
 
 			trainJob.Spec.Trainer.Command = append(trainJob.Spec.Trainer.Command, newCommand...)
-			trainJob.Spec.Trainer.Args = removeFilteredArgs(trainJob.Spec.Trainer.Args)
 		}
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
@@ -355,20 +354,6 @@ func isUseQLoraFinetune(args []string) bool {
 		}
 	}
 	return hasQuantizeBase
-}
-
-// removeFilteredArgs removes the filtered args from the provided args slice.
-func removeFilteredArgs(args []string) []string {
-	if !isUseQLoraFinetune(args) {
-		return args
-	}
-	filteredArgs := []string{}
-	for _, arg := range args {
-		if !strings.Contains(arg, constants.TorchTuneQuantizeBase) {
-			filteredArgs = append(filteredArgs, arg)
-		}
-	}
-	return filteredArgs
 }
 
 // extractGPUCountFromRuntime extracts the GPU count from the TorchTune Trainer Node.
