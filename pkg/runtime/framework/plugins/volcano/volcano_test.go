@@ -309,9 +309,13 @@ func TestVolcano(t *testing.T) {
 			}
 		})
 	}
+}
 
-	// Test Validate()
-	validationTests := map[string]struct {
+func TestValidate(t *testing.T) {
+	scheme := apiruntime.NewScheme()
+	_ = schedulingv1.AddToScheme(scheme)
+
+	tests := map[string]struct {
 		annotations       map[string]string
 		priorityClassName *string
 		existingPriority  *schedulingv1.PriorityClass
@@ -343,7 +347,7 @@ func TestVolcano(t *testing.T) {
 		},
 	}
 
-	for name, tt := range validationTests {
+	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			var objs []client.Object
 			if tt.existingPriority != nil {
