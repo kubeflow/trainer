@@ -269,76 +269,78 @@ func SetObjectDefaults_TrainJob(in *TrainJob) {
 			}
 		}
 	}
-	for i := range in.Spec.PodSpecOverrides {
-		a := &in.Spec.PodSpecOverrides[i]
-		for j := range a.Volumes {
-			b := &a.Volumes[j]
-			if b.VolumeSource.ISCSI != nil {
-				if b.VolumeSource.ISCSI.ISCSIInterface == "" {
-					b.VolumeSource.ISCSI.ISCSIInterface = "default"
+	for i := range in.Spec.PodTemplateOverrides {
+		a := &in.Spec.PodTemplateOverrides[i]
+		if a.Spec != nil {
+			for j := range a.Spec.Volumes {
+				b := &a.Spec.Volumes[j]
+				if b.VolumeSource.ISCSI != nil {
+					if b.VolumeSource.ISCSI.ISCSIInterface == "" {
+						b.VolumeSource.ISCSI.ISCSIInterface = "default"
+					}
+				}
+				if b.VolumeSource.RBD != nil {
+					if b.VolumeSource.RBD.RBDPool == "" {
+						b.VolumeSource.RBD.RBDPool = "rbd"
+					}
+					if b.VolumeSource.RBD.RadosUser == "" {
+						b.VolumeSource.RBD.RadosUser = "admin"
+					}
+					if b.VolumeSource.RBD.Keyring == "" {
+						b.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+					}
+				}
+				if b.VolumeSource.AzureDisk != nil {
+					if b.VolumeSource.AzureDisk.CachingMode == nil {
+						ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+						b.VolumeSource.AzureDisk.CachingMode = &ptrVar1
+					}
+					if b.VolumeSource.AzureDisk.FSType == nil {
+						var ptrVar1 string = "ext4"
+						b.VolumeSource.AzureDisk.FSType = &ptrVar1
+					}
+					if b.VolumeSource.AzureDisk.ReadOnly == nil {
+						var ptrVar1 bool = false
+						b.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
+					}
+					if b.VolumeSource.AzureDisk.Kind == nil {
+						ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+						b.VolumeSource.AzureDisk.Kind = &ptrVar1
+					}
+				}
+				if b.VolumeSource.ScaleIO != nil {
+					if b.VolumeSource.ScaleIO.StorageMode == "" {
+						b.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+					}
+					if b.VolumeSource.ScaleIO.FSType == "" {
+						b.VolumeSource.ScaleIO.FSType = "xfs"
+					}
 				}
 			}
-			if b.VolumeSource.RBD != nil {
-				if b.VolumeSource.RBD.RBDPool == "" {
-					b.VolumeSource.RBD.RBDPool = "rbd"
-				}
-				if b.VolumeSource.RBD.RadosUser == "" {
-					b.VolumeSource.RBD.RadosUser = "admin"
-				}
-				if b.VolumeSource.RBD.Keyring == "" {
-					b.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
-				}
-			}
-			if b.VolumeSource.AzureDisk != nil {
-				if b.VolumeSource.AzureDisk.CachingMode == nil {
-					ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
-					b.VolumeSource.AzureDisk.CachingMode = &ptrVar1
-				}
-				if b.VolumeSource.AzureDisk.FSType == nil {
-					var ptrVar1 string = "ext4"
-					b.VolumeSource.AzureDisk.FSType = &ptrVar1
-				}
-				if b.VolumeSource.AzureDisk.ReadOnly == nil {
-					var ptrVar1 bool = false
-					b.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
-				}
-				if b.VolumeSource.AzureDisk.Kind == nil {
-					ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
-					b.VolumeSource.AzureDisk.Kind = &ptrVar1
-				}
-			}
-			if b.VolumeSource.ScaleIO != nil {
-				if b.VolumeSource.ScaleIO.StorageMode == "" {
-					b.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
-				}
-				if b.VolumeSource.ScaleIO.FSType == "" {
-					b.VolumeSource.ScaleIO.FSType = "xfs"
-				}
-			}
-		}
-		for j := range a.InitContainers {
-			b := &a.InitContainers[j]
-			for k := range b.Env {
-				c := &b.Env[k]
-				if c.ValueFrom != nil {
-					if c.ValueFrom.FileKeyRef != nil {
-						if c.ValueFrom.FileKeyRef.Optional == nil {
-							var ptrVar1 bool = false
-							c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+			for j := range a.Spec.InitContainers {
+				b := &a.Spec.InitContainers[j]
+				for k := range b.Env {
+					c := &b.Env[k]
+					if c.ValueFrom != nil {
+						if c.ValueFrom.FileKeyRef != nil {
+							if c.ValueFrom.FileKeyRef.Optional == nil {
+								var ptrVar1 bool = false
+								c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+							}
 						}
 					}
 				}
 			}
-		}
-		for j := range a.Containers {
-			b := &a.Containers[j]
-			for k := range b.Env {
-				c := &b.Env[k]
-				if c.ValueFrom != nil {
-					if c.ValueFrom.FileKeyRef != nil {
-						if c.ValueFrom.FileKeyRef.Optional == nil {
-							var ptrVar1 bool = false
-							c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+			for j := range a.Spec.Containers {
+				b := &a.Spec.Containers[j]
+				for k := range b.Env {
+					c := &b.Env[k]
+					if c.ValueFrom != nil {
+						if c.ValueFrom.FileKeyRef != nil {
+							if c.ValueFrom.FileKeyRef.Optional == nil {
+								var ptrVar1 bool = false
+								c.ValueFrom.FileKeyRef.Optional = &ptrVar1
+							}
 						}
 					}
 				}
