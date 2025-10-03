@@ -223,7 +223,6 @@ type TorchElasticPolicy struct {
 	// metric source types for more information about how each type of metric must respond.
 	// The HPA will be created to perform auto-scaling.
 	// +listType=atomic
-	// +kubebuilder:validation:MaxItems=10
 	// +optional
 	Metrics []autoscalingv2.MetricSpec `json:"metrics,omitempty"`
 }
@@ -247,7 +246,6 @@ type MPIMLPolicySource struct {
 	// sshAuthMountPath is the directory where SSH keys are mounted.
 	// Defaults to /root/.ssh.
 	// +kubebuilder:default=/root/.ssh
-	// +kubebuilder:validation:MaxLength=256
 	// +optional
 	SSHAuthMountPath *string `json:"sshAuthMountPath,omitempty"`
 
