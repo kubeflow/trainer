@@ -216,7 +216,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	return nil
 }
 
-
 func getNumProcPerNode(nppNode intstr.IntOrString, resourcesPerNode corev1.ResourceList) intstr.IntOrString {
 	var (
 		shouldUseCPU           func(resources corev1.ResourceList) bool
