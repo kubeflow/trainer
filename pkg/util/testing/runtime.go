@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func ToObject(s *runtime.Scheme, objects ...any) ([]runtime.Object, error) {
+func ToObject(s *runtime.Scheme, objects ...runtime.ApplyConfiguration) ([]runtime.Object, error) {
 	var objs []runtime.Object
 	for _, obj := range objects {
 		o, err := toObject(s, obj)

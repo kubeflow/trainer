@@ -20,6 +20,7 @@ import (
 	"context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -58,7 +59,7 @@ type PodNetworkPlugin interface {
 
 type ComponentBuilderPlugin interface {
 	Plugin
-	Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error)
+	Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error)
 }
 
 type TerminalConditionPlugin interface {
