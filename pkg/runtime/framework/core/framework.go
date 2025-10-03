@@ -21,6 +21,7 @@ import (
 	"errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -125,8 +126,8 @@ func (f *Framework) RunPodNetworkPlugins(info *runtime.Info, trainJob *trainer.T
 	return nil
 }
 
-func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]any, error) {
-	var objs []any
+func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
+	var objs []apiruntime.ApplyConfiguration
 	for _, plugin := range f.componentBuilderPlugins {
 		components, err := plugin.Build(ctx, info, trainJob)
 		if err != nil {

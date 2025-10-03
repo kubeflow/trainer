@@ -671,6 +671,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
 									}).
 									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
 												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
@@ -704,6 +706,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										constants.LabelTrainJobAncestor: constants.ModelInitializer,
 									}).
 									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
 												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
@@ -865,6 +869,8 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-job", "uid").
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
 					NumNodes(100).
 					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),
