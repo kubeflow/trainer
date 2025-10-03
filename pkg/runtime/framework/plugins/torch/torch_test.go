@@ -117,7 +117,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-									Value: ptr.To("auto"),
+									Value: ptr.To("1"),
 								},
 								{
 									Name: ptr.To(constants.TorchEnvNodeRank),
