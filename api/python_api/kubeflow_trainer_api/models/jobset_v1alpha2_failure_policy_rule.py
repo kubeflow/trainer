@@ -24,13 +24,14 @@ from typing_extensions import Self
 
 class JobsetV1alpha2FailurePolicyRule(BaseModel):
     """
-    FailurePolicyRule defines a FailurePolicyAction to be executed if a child job fails due to a reason listed in OnJobFailureReasons.
+    FailurePolicyRule defines a FailurePolicyAction to be executed if a child job fails due to a reason listed in OnJobFailureReasons and a message pattern listed in OnJobFailureMessagePatterns. The rule must match both the job failure reason and the job failure message. The rules are evaluated in order and the first matching rule is executed.
     """ # noqa: E501
     action: StrictStr = Field(description="The action to take if the rule is matched.")
     name: StrictStr = Field(description="The name of the failure policy rule. The name is defaulted to 'failurePolicyRuleN' where N is the index of the failure policy rule. The name must match the regular expression \"^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$\".")
-    on_job_failure_reasons: Optional[List[StrictStr]] = Field(default=None, description="The requirement on the job failure reasons. The requirement is satisfied if at least one reason matches the list. The rules are evaluated in order, and the first matching rule is executed. An empty list applies the rule to any job failure reason.", alias="onJobFailureReasons")
+    on_job_failure_message_patterns: Optional[List[StrictStr]] = Field(default=None, description="The requirement on the job failure message. The requirement is satisfied if at least one pattern (regex) matches the job failure message. An empty list matches any job failure message. The syntax of the regular expressions accepted is the same general syntax used by Perl, Python, and other languages. More precisely, it is the syntax accepted by RE2 and described at https://golang.org/s/re2syntax, except for \\C. For an overview of the syntax, see https://pkg.go.dev/regexp/syntax.", alias="onJobFailureMessagePatterns")
+    on_job_failure_reasons: Optional[List[StrictStr]] = Field(default=None, description="The requirement on the job failure reasons. The requirement is satisfied if at least one reason matches the list. An empty list matches any job failure reason.", alias="onJobFailureReasons")
     target_replicated_jobs: Optional[List[StrictStr]] = Field(default=None, description="TargetReplicatedJobs are the names of the replicated jobs the operator applies to. An empty list will apply to all replicatedJobs.", alias="targetReplicatedJobs")
-    __properties: ClassVar[List[str]] = ["action", "name", "onJobFailureReasons", "targetReplicatedJobs"]
+    __properties: ClassVar[List[str]] = ["action", "name", "onJobFailureMessagePatterns", "onJobFailureReasons", "targetReplicatedJobs"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -85,6 +86,7 @@ class JobsetV1alpha2FailurePolicyRule(BaseModel):
         _obj = cls.model_validate({
             "action": obj.get("action") if obj.get("action") is not None else '',
             "name": obj.get("name") if obj.get("name") is not None else '',
+            "onJobFailureMessagePatterns": obj.get("onJobFailureMessagePatterns"),
             "onJobFailureReasons": obj.get("onJobFailureReasons"),
             "targetReplicatedJobs": obj.get("targetReplicatedJobs")
         })
