@@ -1466,6 +1466,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							"dataset.data_dir=/workspace/dataset/data",
 							"model.apply_lora_to_mlp=True",
 							"model.lora_attn_modules=[q_proj,k_proj,v_proj,output_proj]",
+							"model.quantize_base=True",
 							"dataset=torchtune.datasets.instruct_dataset",
 							"dataset.source=parquet",
 						},
