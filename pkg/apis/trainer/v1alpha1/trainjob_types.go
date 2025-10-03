@@ -123,7 +123,6 @@ type TrainJobSpec struct {
 	// podTemplateOverrides define the PodTemplateOverrides for the training runtime.
 	// When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.
 	// +listType=atomic
-	// +kubebuilder:validation:MaxItems=20
 	// +optional
 	PodTemplateOverrides []PodTemplateOverride `json:"podTemplateOverrides,omitempty"`
 
@@ -143,7 +142,6 @@ type TrainJobSpec struct {
 	// +kubebuilder:default="trainer.kubeflow.org/trainjob-controller"
 	// +kubebuilder:validation:XValidation:rule="self in ['trainer.kubeflow.org/trainjob-controller', 'kueue.x-k8s.io/multikueue']", message="ManagedBy must be trainer.kubeflow.org/trainjob-controller or kueue.x-k8s.io/multikueue if set"
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="ManagedBy value is immutable"
-	// +kubebuilder:validation:MaxLength=256
 	// +optional
 	ManagedBy *string `json:"managedBy,omitempty"`
 }
@@ -154,21 +152,18 @@ type RuntimeRef struct {
 	// When namespaced-scoped TrainingRuntime is used, the TrainJob must have
 	// the same namespace as the deployed runtime.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=256
 	// +required
 	Name string `json:"name,omitempty"`
 
 	// apiGroup of the runtime being referenced.
 	// Defaults to `trainer.kubeflow.org`.
 	// +kubebuilder:default="trainer.kubeflow.org"
-	// +kubebuilder:validation:MaxLength=256
 	// +optional
 	APIGroup *string `json:"apiGroup,omitempty"`
 
 	// kind of the runtime being referenced.
 	// Defaults to ClusterTrainingRuntime.
 	// +kubebuilder:default="ClusterTrainingRuntime"
-	// +kubebuilder:validation:MaxLength=256
 	// +optional
 	Kind *string `json:"kind,omitempty"`
 }
@@ -190,7 +185,6 @@ type Initializer struct {
 // which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
 type DatasetInitializer struct {
 	// storageUri is the URI for the dataset provider.
-	// +kubebuilder:validation:MaxLength=2048
 	// +optional
 	StorageUri *string `json:"storageUri,omitempty"`
 
@@ -198,7 +192,6 @@ type DatasetInitializer struct {
 	// These values will be merged with the TrainingRuntime's dataset initializer environments.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=256
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
@@ -213,7 +206,6 @@ type DatasetInitializer struct {
 // which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
 type ModelInitializer struct {
 	// storageUri is the URI for the model provider.
-	// +kubebuilder:validation:MaxLength=2048
 	// +optional
 	StorageUri *string `json:"storageUri,omitempty"`
 
@@ -221,7 +213,6 @@ type ModelInitializer struct {
 	// These values will be merged with the TrainingRuntime's model initializer environments.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=256
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
@@ -236,21 +227,16 @@ type ModelInitializer struct {
 // which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: trainer`
 type Trainer struct {
 	// image is the container image for the training container.
-	// +kubebuilder:validation:MaxLength=512
 	// +optional
 	Image *string `json:"image,omitempty"`
 
 	// command for the entrypoint of the training container.
 	// +listType=atomic
-	// +kubebuilder:validation:items:MaxLength=8196
-	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	Command []string `json:"command,omitempty"`
 
 	// args for the entrypoint for the training container.
 	// +listType=atomic
-	// +kubebuilder:validation:items:MaxLength=256
-	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	Args []string `json:"args,omitempty"`
 
@@ -258,7 +244,6 @@ type Trainer struct {
 	// These values will be merged with the TrainingRuntime's trainer environments.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=256
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
@@ -282,7 +267,6 @@ type Trainer struct {
 type PodTemplateOverride struct {
 	// targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.
 	// +listType=atomic
-	// +kubebuilder:validation:MaxItems=64
 	// +required
 	TargetJobs []PodTemplateOverrideTargetJob `json:"targetJobs,omitempty"`
 
@@ -300,7 +284,6 @@ type PodTemplateOverride struct {
 type PodTemplateOverrideTargetJob struct {
 	// name is the target training job name for which the PodTemplateSpec is overridden.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=64
 	// +required
 	Name string `json:"name,omitempty"`
 }
@@ -308,7 +291,6 @@ type PodTemplateOverrideTargetJob struct {
 // PodTemplateSpecOverride represents the spec overrides for Pod template.
 type PodTemplateSpecOverride struct {
 	// serviceAccountName overrides the service account.
-	// +kubebuilder:validation:MaxLength=64
 	// +optional
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 
@@ -322,28 +304,24 @@ type PodTemplateSpecOverride struct {
 
 	// tolerations overrides the Pod's tolerations.
 	// +listType=atomic
-	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// volumes overrides the Pod's volumes.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// initContainers overrides the init container in the target job templates.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
 
 	// containers overrides for the containers in the target job templates.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	Containers []ContainerOverride `json:"containers,omitempty"`
 
@@ -351,14 +329,12 @@ type PodTemplateSpecOverride struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
 
 	// imagePullSecrets overrides the image pull secrets for the Pods in the target job templates.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
@@ -367,7 +343,6 @@ type PodTemplateSpecOverride struct {
 type ContainerOverride struct {
 	// name for the container. TrainingRuntime must have this container.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=64
 	// +required
 	Name string `json:"name,omitempty"`
 
@@ -377,14 +352,12 @@ type ContainerOverride struct {
 	// `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=256
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
 	// volumeMounts are the volumes to mount into the container's filesystem.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=64
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
@@ -397,13 +370,11 @@ type TrainJobStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=type
-	// +kubebuilder:validation:MaxItems=64
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// jobsStatus tracks the child Jobs in TrainJob.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=256
 	// +optional
 	JobsStatus []JobStatus `json:"jobsStatus,omitempty"`
 }
@@ -411,7 +382,6 @@ type TrainJobStatus struct {
 type JobStatus struct {
 	// name of the child Job.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=64
 	// +required
 	Name string `json:"name,omitempty"`
 

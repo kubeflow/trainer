@@ -76,7 +76,6 @@ spec:
                         description: |-
                           sshAuthMountPath is the directory where SSH keys are mounted.
                           Defaults to /root/.ssh.
-                        maxLength: 256
                         type: string
                     type: object
                   numNodes:
@@ -582,7 +581,6 @@ spec:
                               required:
                               - type
                               type: object
-                            maxItems: 10
                             type: array
                             x-kubernetes-list-type: atomic
                           minNodes:
