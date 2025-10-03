@@ -644,13 +644,6 @@ func (t *TrainJobTrainerWrapper) NumProcPerNode(numProcPerNode intstr.IntOrStrin
 	return t
 }
 
-func (t *TrainJobTrainerWrapper) ResourcesPerNode(resourcePerNode corev1.ResourceList) *TrainJobTrainerWrapper {
-	t.Trainer.ResourcesPerNode = &corev1.ResourceRequirements{
-		Requests: resourcePerNode,
-	}
-	return t
-}
-
 func (t *TrainJobTrainerWrapper) Container(image string, command []string, args []string, resRequests corev1.ResourceList) *TrainJobTrainerWrapper {
 	t.Trainer.Image = &image
 	t.Trainer.Command = command

@@ -1290,11 +1290,10 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								"dataset=torchtune.datasets.instruct_dataset",
 								"dataset.source=parquet",
 							},
-							resRequests,
+							corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
 						).
 						NumNodes(1).
 						NumProcPerNode(intstr.FromString("auto")).
-						ResourcesPerNode(corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")}).
 						Obj(),
 				).
 				Obj(),
@@ -1327,7 +1326,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							"dataset=torchtune.datasets.instruct_dataset",
 							"dataset.source=parquet",
 						},
-						corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")},
+						corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
 					).
 					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
 					Env(constants.Node, constants.Node,
@@ -1433,11 +1432,10 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								"dataset=torchtune.datasets.instruct_dataset",
 								"dataset.source=parquet",
 							},
-							resRequests,
+							corev1.ResourceList{"example.com/gpu": resource.MustParse("1")},
 						).
 						NumNodes(1).
 						NumProcPerNode(intstr.FromString("auto")).
-						ResourcesPerNode(corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("1")}).
 						Obj(),
 				).
 				Obj(),
@@ -1470,9 +1468,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							"dataset=torchtune.datasets.instruct_dataset",
 							"dataset.source=parquet",
 						},
-						corev1.ResourceList{
-							"nvidia.com/gpu": resource.MustParse("1"),
-						},
+						corev1.ResourceList{"example.com/gpu": resource.MustParse("1")},
 					).
 					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
 					Env(constants.Node, constants.Node,
@@ -1579,11 +1575,10 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								"dataset=torchtune.datasets.instruct_dataset",
 								"dataset.source=parquet",
 							},
-							resRequests,
+							corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
 						).
 						NumNodes(1).
 						NumProcPerNode(intstr.FromString("auto")).
-						ResourcesPerNode(corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("1")}).
 						Obj(),
 				).
 				Obj(),
@@ -1601,9 +1596,10 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						[]string{
 							"tune",
 							"run",
-							constants.TorchTuneLoRAFinetuneSingleDevice,
+							fmt.Sprintf("%s=%s", constants.TorchTuneArgRdzvEndpoint, "test-job-node-0-0.test-job:29500"),
+							constants.TorchTuneLoRAFinetuneDistributed,
 							"--config",
-							"llama3_2/1B_lora_single_device",
+							"llama3_2/1B_lora",
 							"output_dir=/workspace/output",
 							"tokenizer.path=/workspace/model/original/tokenizer.model",
 							"checkpointer.checkpoint_dir=/workspace/model",
@@ -1617,9 +1613,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							"dataset=torchtune.datasets.instruct_dataset",
 							"dataset.source=parquet",
 						},
-						corev1.ResourceList{
-							"nvidia.com/gpu": resource.MustParse("1"),
-						},
+						corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
 					).
 					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
 					Env(constants.Node, constants.Node,
