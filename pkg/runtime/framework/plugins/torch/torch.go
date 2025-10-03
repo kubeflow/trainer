@@ -261,8 +261,8 @@ func getNumProcPerNode(nppNode intstr.IntOrString, info *runtime.Info, jobTraine
 		nppNode, usedCPU = calculateNumProcPerNode(fallbackNumProcPerNode, jobTrainer.ResourcesPerNode.Requests, shouldUseCPU)
 	}
 	// Check default GPU resources allocated in runtime if GPU is not used yet.
-	if gpuQ, ok := extractGPUCountFromRuntime(info); usedCPU && ok {
-		nppNode = intstr.FromInt(gpuQ)
+	if _, ok := extractGPUCountFromRuntime(info); usedCPU && ok {
+		nppNode = fallbackNumProcPerNode
 	}
 	return nppNode
 }
