@@ -369,18 +369,19 @@ func isLoraConfigEnabled(args []string) bool {
 	return false
 }
 
-// isUseQLora checks if we use QLoRA fine-tuning.
+// isUseQLoraFinetune checks if QLoRA fine-tuning should be used.
 func isUseQLoraFinetune(args []string) bool {
-	quantizeBaseEnabled, useDoraEnabled := false, false
+	hasQuantizeBase := false
 	for _, arg := range args {
-		if strings.Contains(arg, constants.TorchTuneQuantizeBase) {
-			quantizeBaseEnabled = true
-		}
-		if strings.Contains(arg, constants.TorchTuneUseDora) {
-			useDoraEnabled = true
+		switch {
+		case strings.Contains(arg, constants.TorchTuneUseDora):
+			// If Dora is enabled, no need to continue
+			return false
+		case strings.Contains(arg, constants.TorchTuneQuantizeBase):
+			hasQuantizeBase = true
 		}
 	}
-	return quantizeBaseEnabled && !useDoraEnabled
+	return hasQuantizeBase
 }
 
 // removeFilteredArgs removes the filtered args from the provided args slice.
