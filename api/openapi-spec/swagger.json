@@ -13529,9 +13529,6 @@
       "trainer.v1alpha1.ClusterTrainingRuntime": {
         "description": "ClusterTrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced by TrainJob that created in *any* namespace.",
         "type": "object",
-        "required": [
-          "spec"
-        ],
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13714,9 +13711,6 @@
       "trainer.v1alpha1.JobSetTemplateSpec": {
         "description": "JobSetTemplateSpec represents a template of the desired JobSet.",
         "type": "object",
-        "required": [
-          "spec"
-        ],
         "properties": {
           "metadata": {
             "description": "metadata for custom JobSet's labels and annotations. JobSet name and namespace is equal to the TrainJob's name and namespace.",
@@ -14178,9 +14172,6 @@
       "trainer.v1alpha1.TrainJob": {
         "description": "TrainJob represents configuration of a training job.",
         "type": "object",
-        "required": [
-          "spec"
-        ],
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -14434,9 +14425,6 @@
       "trainer.v1alpha1.TrainingRuntime": {
         "description": "TrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a namespaced-scoped and can be referenced by TrainJob that created in the *same* namespace as the TrainingRuntime.",
         "type": "object",
-        "required": [
-          "spec"
-        ],
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -14507,9 +14495,6 @@
       "trainer.v1alpha1.TrainingRuntimeSpec": {
         "description": "TrainingRuntimeSpec represents a specification of the desired training runtime.",
         "type": "object",
-        "required": [
-          "template"
-        ],
         "properties": {
           "mlPolicy": {
             "description": "mlPolicy provides the ML-specific parameters for the model training.",

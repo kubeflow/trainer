@@ -46,7 +46,7 @@ type TrainJob struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec of the TrainJob.
-	// +required
+	// +optional
 	Spec TrainJobSpec `json:"spec,omitzero"`
 
 	// status of TrainJob.

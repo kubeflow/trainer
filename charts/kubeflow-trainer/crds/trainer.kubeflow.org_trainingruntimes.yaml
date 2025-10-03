@@ -41,6 +41,7 @@ spec:
             type: object
           spec:
             description: spec of the TrainingRuntime.
+            minProperties: 1
             properties:
               mlPolicy:
                 description: mlPolicy provides the ML-specific parameters for the
@@ -654,6 +655,7 @@ spec:
                 type: object
               template:
                 description: template for the JobSet which will be used by TrainJob.
+                minProperties: 1
                 properties:
                   metadata:
                     description: |-
@@ -10441,14 +10443,8 @@ spec:
                     - message: StartupPolicy and DependsOn APIs are mutually exclusive
                       rule: '!(has(self.startupPolicy) && self.startupPolicy.startupPolicyOrder
                         == ''InOrder'' && self.replicatedJobs.exists(x, has(x.dependsOn)))'
-                required:
-                - spec
                 type: object
-            required:
-            - template
             type: object
-        required:
-        - spec
         type: object
     served: true
     storage: true

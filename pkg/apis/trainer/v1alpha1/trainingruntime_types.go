@@ -50,7 +50,7 @@ type ClusterTrainingRuntime struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec of the ClusterTrainingRuntime.
-	// +required
+	// +optional
 	Spec TrainingRuntimeSpec `json:"spec,omitzero"`
 }
 
@@ -86,7 +86,7 @@ type TrainingRuntime struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec of the TrainingRuntime.
-	// +required
+	// +optional
 	Spec TrainingRuntimeSpec `json:"spec,omitempty,omitzero"`
 }
 
@@ -106,6 +106,7 @@ type TrainingRuntimeList struct {
 }
 
 // TrainingRuntimeSpec represents a specification of the desired training runtime.
+// +kubebuilder:validation:MinProperties=1
 type TrainingRuntimeSpec struct {
 	// mlPolicy provides the ML-specific parameters for the model training.
 	// +optional
@@ -116,11 +117,12 @@ type TrainingRuntimeSpec struct {
 	PodGroupPolicy *PodGroupPolicy `json:"podGroupPolicy,omitempty"`
 
 	// template for the JobSet which will be used by TrainJob.
-	// +required
+	// +optional
 	Template JobSetTemplateSpec `json:"template,omitzero"`
 }
 
 // JobSetTemplateSpec represents a template of the desired JobSet.
+// +kubebuilder:validation:MinProperties=1
 type JobSetTemplateSpec struct {
 	// metadata for custom JobSet's labels and annotations.
 	// JobSet name and namespace is equal to the TrainJob's name and namespace.
@@ -128,7 +130,7 @@ type JobSetTemplateSpec struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec of the desired JobSet which will be created from TrainJob.
-	// +required
+	// +optional
 	Spec jobsetv1alpha2.JobSetSpec `json:"spec,omitempty"`
 }
 
