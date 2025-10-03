@@ -4327,8 +4327,6 @@ spec:
                 - name
                 x-kubernetes-list-type: map
             type: object
-        required:
-        - spec
         type: object
         x-kubernetes-validations:
         - message: metadata.name must match RFC 1035 DNS label format

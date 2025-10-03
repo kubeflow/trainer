@@ -441,7 +441,6 @@ func schema_pkg_apis_trainer_v1alpha1_ClusterTrainingRuntime(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -686,7 +685,6 @@ func schema_pkg_apis_trainer_v1alpha1_JobSetTemplateSpec(ref common.ReferenceCal
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -1316,7 +1314,6 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJob(ref common.ReferenceCallback) com
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -1673,7 +1670,6 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntime(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -1759,7 +1755,6 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"template"},
 			},
 		},
 		Dependencies: []string{

@@ -31,7 +31,7 @@ class TrainerV1alpha1TrainingRuntimeSpec(BaseModel):
     """ # noqa: E501
     ml_policy: Optional[TrainerV1alpha1MLPolicy] = Field(default=None, description="mlPolicy provides the ML-specific parameters for the model training.", alias="mlPolicy")
     pod_group_policy: Optional[TrainerV1alpha1PodGroupPolicy] = Field(default=None, description="podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via supported plugins.", alias="podGroupPolicy")
-    template: TrainerV1alpha1JobSetTemplateSpec = Field(description="template for the JobSet which will be used by TrainJob.")
+    template: Optional[TrainerV1alpha1JobSetTemplateSpec] = Field(default=None, description="template for the JobSet which will be used by TrainJob.")
     __properties: ClassVar[List[str]] = ["mlPolicy", "podGroupPolicy", "template"]
 
     model_config = ConfigDict(
