@@ -28,16 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -147,43 +143,14 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
-	log := ctrl.LoggerFrom(ctx)
-
 	objects, err := runtime.NewObjects(ctx, trainJob)
 	if err != nil {
 		return err
 	}
 	for _, object := range objects {
-		// TODO (astefanutti): Remove conversion to unstructured when the runtime.ApplyConfiguration
-		//  interface becomes available and first-class SSA method is added to the controller-runtime
-		// client. See https://github.com/kubernetes/kubernetes/pull/129313
-		var obj client.Object
-		if o, ok := object.(client.Object); ok {
-			return fmt.Errorf("unsupported type client.Object for component: %v", o)
-		}
-
-		u, err := apiruntime.DefaultUnstructuredConverter.ToUnstructured(object)
-		if err != nil {
+		if err := r.client.Apply(ctx, object, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
 			return err
 		}
-		obj = &unstructured.Unstructured{Object: u}
-
-		//nolint:staticcheck
-		if err := r.client.Patch(ctx, obj, client.Apply, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
-			return err
-		}
-
-		var gvk schema.GroupVersionKind
-		if gvk, err = apiutil.GVKForObject(obj.DeepCopyObject(), r.client.Scheme()); err != nil {
-			return err
-		}
-		logKeysAndValues := []any{
-			"groupVersionKind", gvk.String(),
-			"namespace", obj.GetNamespace(),
-			"name", obj.GetName(),
-		}
-
-		log.V(5).Info("Succeeded to update object", logKeysAndValues...)
 	}
 	return nil
 }
