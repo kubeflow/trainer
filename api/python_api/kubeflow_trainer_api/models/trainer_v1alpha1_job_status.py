@@ -18,7 +18,7 @@ import re  # noqa: F401
 import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -31,7 +31,7 @@ class TrainerV1alpha1JobStatus(BaseModel):
     name: StrictStr = Field(description="name of the child Job.")
     ready: StrictInt = Field(description="ready is the number of child Jobs where the number of ready pods and completed pods is greater than or equal to the total expected pod count for the child Job.")
     succeeded: StrictInt = Field(description="succeeded is the number of successfully completed child Jobs.")
-    suspended: Optional[StrictInt] = Field(default=None, description="suspended is the number of child Jobs which are in a suspended state.")
+    suspended: StrictInt = Field(description="suspended is the number of child Jobs which are in a suspended state.")
     __properties: ClassVar[List[str]] = ["active", "failed", "name", "ready", "succeeded", "suspended"]
 
     model_config = ConfigDict(

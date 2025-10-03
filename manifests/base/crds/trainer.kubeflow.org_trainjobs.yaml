@@ -4375,6 +4375,7 @@ spec:
                   - name
                   - ready
                   - succeeded
+                  - suspended
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:

@@ -409,7 +409,7 @@ type JobStatus struct {
 
 	// suspended is the number of child Jobs which are in a suspended state.
 	// +kubebuilder:validation:Minimum=0
-	// +optional
+	// +required
 	Suspended *int32 `json:"suspended,omitempty"`
 }
 

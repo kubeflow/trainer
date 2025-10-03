@@ -13739,7 +13739,8 @@
           "ready",
           "succeeded",
           "failed",
-          "active"
+          "active",
+          "suspended"
         ],
         "properties": {
           "active": {

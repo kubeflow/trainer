@@ -759,7 +759,7 @@ func schema_pkg_apis_trainer_v1alpha1_JobStatus(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"name", "ready", "succeeded", "failed", "active"},
+				Required: []string{"name", "ready", "succeeded", "failed", "active", "suspended"},
 			},
 		},
 	}
