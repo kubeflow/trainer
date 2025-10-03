@@ -863,7 +863,7 @@ trainJob-node-1-0.trainJob slots=1
 			); len(diff) != 0 {
 				t.Errorf("Unexpected info from EnforceMLPolicy (-want, +got): %s", diff)
 			}
-			var objs []any
+			var objs []apiruntime.ApplyConfiguration
 			objs, err = p.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
 			if diff := gocmp.Diff(tc.wantBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)

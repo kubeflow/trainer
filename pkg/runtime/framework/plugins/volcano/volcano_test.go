@@ -378,7 +378,7 @@ func TestVolcano(t *testing.T) {
 			}
 
 			// Test Build
-			var objs []any
+			var objs []apiruntime.ApplyConfiguration
 			objs, err = plugin.(framework.ComponentBuilderPlugin).Build(ctx, c.info, c.trainJob)
 			if diff := gocmp.Diff(c.expectBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
