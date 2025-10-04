@@ -38,6 +38,7 @@ import (
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
@@ -51,6 +52,8 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
+	index "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -72,6 +75,7 @@ func TestNew(t *testing.T) {
 				registry: fwkplugins.NewRegistry(),
 				plugins: map[string]framework.Plugin{
 					coscheduling.Name: &coscheduling.CoScheduling{},
+					volcano.Name:      &volcano.Volcano{},
 					mpi.Name:          &mpi.MPI{},
 					plainml.Name:      &plainml.PlainML{},
 					torch.Name:        &torch.Torch{},
@@ -84,14 +88,17 @@ func TestNew(t *testing.T) {
 				},
 				enforcePodGroupPolicyPlugins: []framework.EnforcePodGroupPolicyPlugin{
 					&coscheduling.CoScheduling{},
+					&volcano.Volcano{},
 				},
 				customValidationPlugins: []framework.CustomValidationPlugin{
 					&mpi.MPI{},
 					&torch.Torch{},
 					&jobset.JobSet{},
+					&volcano.Volcano{},
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
 					&coscheduling.CoScheduling{},
+					&volcano.Volcano{},
 					&jobset.JobSet{},
 					&mpi.MPI{},
 				},
@@ -100,6 +107,7 @@ func TestNew(t *testing.T) {
 				},
 				componentBuilderPlugins: []framework.ComponentBuilderPlugin{
 					&coscheduling.CoScheduling{},
+					&volcano.Volcano{},
 					&jobset.JobSet{},
 					&mpi.MPI{},
 				},
@@ -113,20 +121,21 @@ func TestNew(t *testing.T) {
 				coscheduling.Name: coscheduling.New,
 			},
 			emptyCoSchedulingIndexerTrainingRuntimeContainerRuntimeClassKey: true,
-			wantError: coscheduling.ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer,
+			wantError: index.ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer,
 		},
 		"indexer key for clusterTrainingRuntime and runtimeClass is an empty": {
 			registry: fwkplugins.Registry{
 				coscheduling.Name: coscheduling.New,
 			},
 			emptyCoSchedulingIndexerClusterTrainingRuntimeContainerRuntimeClassKey: true,
-			wantError: coscheduling.ErrorCanNotSetupClusterTrainingRuntimeRuntimeClassIndexer,
+			wantError: index.ErrorCanNotSetupClusterTrainingRuntimeRuntimeClassIndexer,
 		},
 	}
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(Framework{}),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
+		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
 		cmpopts.IgnoreFields(coscheduling.CoScheduling{}, "client"),
+		cmpopts.IgnoreFields(volcano.Volcano{}, "client"),
 		cmpopts.IgnoreFields(jobset.JobSet{}, "client"),
 		cmpopts.IgnoreTypes(apiruntime.Scheme{}, meta.DefaultRESTMapper{}, fwkplugins.Registry{}),
 		cmpopts.SortMaps(func(a, b string) bool { return a < b }),
@@ -138,17 +147,17 @@ func TestNew(t *testing.T) {
 			t.Cleanup(cancel)
 
 			if tc.emptyCoSchedulingIndexerTrainingRuntimeContainerRuntimeClassKey {
-				originTrainingRuntimeRuntimeKey := coscheduling.TrainingRuntimeContainerRuntimeClassKey
-				coscheduling.TrainingRuntimeContainerRuntimeClassKey = ""
+				originTrainingRuntimeRuntimeKey := index.TrainingRuntimeContainerRuntimeClassKey
+				index.TrainingRuntimeContainerRuntimeClassKey = ""
 				t.Cleanup(func() {
-					coscheduling.TrainingRuntimeContainerRuntimeClassKey = originTrainingRuntimeRuntimeKey
+					index.TrainingRuntimeContainerRuntimeClassKey = originTrainingRuntimeRuntimeKey
 				})
 			}
 			if tc.emptyCoSchedulingIndexerClusterTrainingRuntimeContainerRuntimeClassKey {
-				originClusterTrainingRuntimeKey := coscheduling.ClusterTrainingRuntimeContainerRuntimeClassKey
-				coscheduling.ClusterTrainingRuntimeContainerRuntimeClassKey = ""
+				originClusterTrainingRuntimeKey := index.ClusterTrainingRuntimeContainerRuntimeClassKey
+				index.ClusterTrainingRuntimeContainerRuntimeClassKey = ""
 				t.Cleanup(func() {
-					coscheduling.ClusterTrainingRuntimeContainerRuntimeClassKey = originClusterTrainingRuntimeKey
+					index.ClusterTrainingRuntimeContainerRuntimeClassKey = originClusterTrainingRuntimeKey
 				})
 			}
 			clientBuilder := testingutil.NewClientBuilder()
@@ -367,6 +376,34 @@ func TestRunEnforcePodGroupPolicyPlugins(t *testing.T) {
 				},
 			},
 		},
+		"volcano plugin is applied to runtime.Info": {
+			registry: fwkplugins.NewRegistry(),
+			runtimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{},
+			},
+			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-volcano-job", Namespace: metav1.NamespaceDefault}},
+			wantRuntimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{
+					PodAnnotations: map[string]string{
+						volcanov1beta1.KubeGroupNameAnnotationKey: "test-volcano-job",
+					},
+				},
+			},
+		},
 		"an empty registry": {
 			trainJob:        &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: metav1.NamespaceDefault}},
 			runtimeInfo:     &runtime.Info{},
@@ -454,7 +491,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 		wantObjs        []apiruntime.Object
 		wantError       error
 	}{
-		"succeeded to build PodGroup and JobSet with NumNodes from TrainJob": {
+		"succeeded to build PodGroup and JobSet with NumNodes from TrainJob with coscheduling plugin": {
 			registry: fwkplugins.NewRegistry(),
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
 				Obj(),
@@ -849,8 +886,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{
 					PodLabels: map[string]string{schedulerpluginsv1alpha1.PodGroupLabel: "test-job"},
-				},
-			},
+				}},
 			wantObjs: []apiruntime.Object{
 				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
 					SchedulingTimeout(300).
@@ -864,6 +900,448 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-job", "uid").
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					NumNodes(100).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					}).
+					Obj(),
+			},
+		},
+		"succeeded to build PodGroup and JobSet with NumNodes from TrainJob with volcano plugin": {
+			registry: fwkplugins.NewRegistry(),
+			runtimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{
+								NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
+									Mode:               "soft",
+									HighestTierAllowed: ptr.To[int](2),
+								},
+							},
+						},
+					},
+				},
+				Annotations: map[string]string{
+					volcanov1beta1.QueueNameAnnotationKey: "q1",
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.DatasetInitializer,
+							Ancestor: ptr.To(constants.DatasetInitializer),
+							Count:    ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
+							Containers: []runtime.Container{
+								{
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().
+											WithName(jobsetplgconsts.VolumeNameInitializer).
+											WithMountPath(constants.DatasetMountPath),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+						{
+							Name:     constants.ModelInitializer,
+							Ancestor: ptr.To(constants.ModelInitializer),
+							Count:    ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
+							Containers: []runtime.Container{
+								{
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().
+											WithName(jobsetplgconsts.VolumeNameInitializer).
+											WithMountPath(constants.ModelMountPath),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
+							Containers: []runtime.Container{{
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().
+										WithName(jobsetplgconsts.VolumeNameInitializer).
+										WithMountPath(constants.DatasetMountPath),
+									*corev1ac.VolumeMount().
+										WithName(jobsetplgconsts.VolumeNameInitializer).
+										WithMountPath(constants.ModelMountPath),
+								},
+							}},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.DatasetInitializer).
+								WithGroupName("default").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-node-critical").
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.ModelInitializer).
+								WithGroupName("default").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.ModelInitializer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-node-critical").
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.ModelInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithGroupName("default").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-node-critical").
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+				Scheduler: &runtime.Scheduler{PodAnnotations: make(map[string]string)},
+			},
+
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-volcano-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						NumNodes(100).
+						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("4Gi"),
+						}).
+						Obj(),
+				).
+				Obj(),
+			wantRuntimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{
+								NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
+									Mode:               "soft",
+									HighestTierAllowed: ptr.To[int](2),
+								},
+							},
+						},
+					},
+				},
+				Annotations: map[string]string{
+					volcanov1beta1.QueueNameAnnotationKey: "q1",
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.DatasetInitializer,
+							Ancestor: ptr.To(constants.DatasetInitializer),
+							Count:    ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
+							Containers: []runtime.Container{
+								{
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().
+											WithName(jobsetplgconsts.VolumeNameInitializer).
+											WithMountPath(constants.DatasetMountPath),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+						{
+							Name:     constants.ModelInitializer,
+							Ancestor: ptr.To(constants.ModelInitializer),
+							Count:    ptr.To[int32](1),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
+							Containers: []runtime.Container{
+								{
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().
+											WithName(jobsetplgconsts.VolumeNameInitializer).
+											WithMountPath(constants.ModelMountPath),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](100),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
+							Containers: []runtime.Container{{
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().
+										WithName(jobsetplgconsts.VolumeNameInitializer).
+										WithMountPath(constants.DatasetMountPath),
+									*corev1ac.VolumeMount().
+										WithName(jobsetplgconsts.VolumeNameInitializer).
+										WithMountPath(constants.ModelMountPath),
+								},
+							}},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.DatasetInitializer).
+								WithGroupName("default").
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithAnnotations(map[string]string{
+												volcanov1beta1.KubeGroupNameAnnotationKey: "test-volcano-job",
+											}).
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-node-critical").
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.ModelInitializer).
+								WithGroupName("default").
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.ModelInitializer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithAnnotations(map[string]string{
+												volcanov1beta1.KubeGroupNameAnnotationKey: "test-volcano-job",
+											}).
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-node-critical").
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.ModelInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithGroupName("default").
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(100).
+										WithCompletions(100).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithAnnotations(map[string]string{
+												volcanov1beta1.KubeGroupNameAnnotationKey: "test-volcano-job",
+											}).
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-node-critical").
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithName(constants.Node).
+														WithImage("test:trainjob").
+														WithCommand("trainjob").
+														WithArgs("trainjob").
+														WithResources(corev1ac.ResourceRequirements().
+															WithRequests(corev1.ResourceList{
+																corev1.ResourceCPU:    resource.MustParse("1"),
+																corev1.ResourceMemory: resource.MustParse("4Gi"),
+															})).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+				Scheduler: &runtime.Scheduler{PodAnnotations: map[string]string{
+					volcanov1beta1.KubeGroupNameAnnotationKey: "test-volcano-job",
+				},
+				},
+			},
+			wantObjs: []apiruntime.Object{
+				testingutil.MakeVolcanoPodGroup(metav1.NamespaceDefault, "test-volcano-job").
+					MinMember(102). // 102 replicas = 100 Trainer nodes + 2 Initializer.
+					MinResources(&corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("102"), // 1 CPU and 4Gi per replica.
+						corev1.ResourceMemory: resource.MustParse("408Gi"),
+					}).
+					Queue("q1").
+					PriorityClassName("system-node-critical").
+					NetworkTopology("soft", 2).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-volcano-job", "uid").
+					Obj(),
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-volcano-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-volcano-job", "uid").
+					Annotation(volcanov1beta1.QueueNameAnnotationKey, "q1").
+					PodAnnotation(volcanov1beta1.KubeGroupNameAnnotationKey, "test-volcano-job").
+					PodPriorityClassName("system-node-critical").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					NumNodes(100).
 					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
@@ -931,6 +1409,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 			registry: fwkplugins.NewRegistry(),
 			wantPlugins: []framework.WatchExtensionPlugin{
 				&coscheduling.CoScheduling{},
+				&volcano.Volcano{},
 				&jobset.JobSet{},
 				&mpi.MPI{},
 			},
@@ -941,7 +1420,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortSlices(func(a, b framework.Plugin) bool { return a.Name() < b.Name() }),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, jobset.JobSet{}, mpi.MPI{}),
+		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, jobset.JobSet{}, mpi.MPI{}),
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

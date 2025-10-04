@@ -47,6 +47,7 @@ externals=(
   "k8s.io/api/core/v1.Volume:k8s.io/client-go/applyconfigurations/core/v1"
   "k8s.io/api/core/v1.VolumeMount:k8s.io/client-go/applyconfigurations/core/v1"
   "k8s.io/api/autoscaling/v2.MetricSpec:k8s.io/client-go/applyconfigurations/autoscaling/v2"
+  "volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec:volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
 )
 
 apply_config_externals="${externals[0]}"
@@ -81,6 +82,7 @@ EXTRA_PACKAGES=(
   k8s.io/api/autoscaling/v2
   k8s.io/api/batch/v1
   sigs.k8s.io/jobset/api/jobset/v1alpha2
+  volcano.sh/apis/pkg/apis/scheduling/v1beta1
 )
 
 go run ${OPENAPI_PKG}/cmd/openapi-gen \

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/common"
 	builderutil "k8s.io/kube-openapi/pkg/openapiconv"
@@ -42,9 +43,17 @@ func main() {
 		oAPIDefs[k] = v
 	}
 
+	volcanoAllowAPIs := sets.New("volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec")
+
 	for defName, val := range oAPIDefs {
 		// Exclude InternalEvent from the OpenAPI spec since it requires runtime.Object dependency.
 		if defName != "k8s.io/apimachinery/pkg/apis/meta/v1.InternalEvent" {
+
+			// If it's from volcano, apply allowlist
+			if strings.HasPrefix(defName, "volcano.sh/apis/") && !volcanoAllowAPIs.Has(defName) {
+				continue
+			}
+
 			// OpenAPI generator incorrectly creates models if enum doesn't have default value.
 			// Therefore, we remove the default value when it is equal to ""
 			// Kubernetes OpenAPI spec doesn't have enums: https://github.com/kubernetes/kubernetes/issues/109177
@@ -82,6 +91,7 @@ func main() {
 func swaggify(name string) string {
 	name = strings.Replace(name, "github.com/kubeflow/trainer/v2/pkg/apis/", "", -1)
 	name = strings.Replace(name, "sigs.k8s.io/jobset/api/", "", -1)
+	name = strings.Replace(name, "volcano.sh/apis/pkg/apis/", "", -1)
 	name = strings.Replace(name, "k8s.io", "io.k8s", -1)
 	name = strings.Replace(name, "/", ".", -1)
 	return name

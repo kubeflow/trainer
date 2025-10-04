@@ -13512,6 +13512,20 @@
           }
         }
       },
+      "scheduling.v1beta1.NetworkTopologySpec": {
+        "type": "object",
+        "properties": {
+          "highestTierAllowed": {
+            "description": "HighestTierAllowed specifies the highest tier that a job allowed to cross when scheduling.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "mode": {
+            "description": "Mode specifies the mode of the network topology constrain.",
+            "type": "string"
+          }
+        }
+      },
       "trainer.v1alpha1.ClusterTrainingRuntime": {
         "description": "ClusterTrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced by TrainJob that created in *any* namespace.",
         "type": "object",
@@ -13884,6 +13898,14 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.CoschedulingPodGroupPolicySource"
               }
             ]
+          },
+          "volcano": {
+            "description": "Volcano plugin for gang-scheduling.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.VolcanoPodGroupPolicySource"
+              }
+            ]
           }
         }
       },
@@ -13896,6 +13918,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.CoschedulingPodGroupPolicySource"
+              }
+            ]
+          },
+          "volcano": {
+            "description": "Volcano plugin for gang-scheduling.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.VolcanoPodGroupPolicySource"
               }
             ]
           }
@@ -14481,6 +14511,20 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobSetTemplateSpec"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.VolcanoPodGroupPolicySource": {
+        "description": "VolcanoPodGroupPolicySource represents configuration for the Volcano gang-scheduler.",
+        "type": "object",
+        "properties": {
+          "networkTopology": {
+            "description": "NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/scheduling.v1beta1.NetworkTopologySpec"
               }
             ]
           }

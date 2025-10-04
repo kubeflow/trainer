@@ -29,6 +29,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
+	index "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 )
 
 var errorTooManyTerminalConditionPlugin = errors.New("too many TerminalCondition plugins are registered")
@@ -50,6 +51,9 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 		registry: r,
 	}
 	plugins := make(map[string]framework.Plugin, len(r))
+	if err := f.SetupRuntimeClassIndexer(ctx, indexer); err != nil {
+		return nil, err
+	}
 
 	for name, factory := range r {
 		plugin, err := factory(ctx, c, indexer)
@@ -150,4 +154,18 @@ func (f *Framework) RunTerminalConditionPlugins(ctx context.Context, trainJob *t
 
 func (f *Framework) WatchExtensionPlugins() []framework.WatchExtensionPlugin {
 	return f.watchExtensionPlugins
+}
+
+func (f *Framework) SetupRuntimeClassIndexer(ctx context.Context, indexer client.FieldIndexer) error {
+	if err := indexer.IndexField(ctx, &trainer.TrainingRuntime{},
+		index.TrainingRuntimeContainerRuntimeClassKey,
+		index.IndexTrainingRuntimeContainerRuntimeClass); err != nil {
+		return index.ErrorCanNotSetupTrainingRuntimeRuntimeClassIndexer
+	}
+	if err := indexer.IndexField(ctx, &trainer.ClusterTrainingRuntime{},
+		index.ClusterTrainingRuntimeContainerRuntimeClassKey,
+		index.IndexClusterTrainingRuntimeContainerRuntimeClass); err != nil {
+		return index.ErrorCanNotSetupClusterTrainingRuntimeRuntimeClassIndexer
+	}
+	return nil
 }

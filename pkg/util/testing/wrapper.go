@@ -28,6 +28,7 @@ import (
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
+	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -449,6 +450,23 @@ func (j *JobSetWrapper) PodLabel(key, value string) *JobSetWrapper {
 			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Labels = make(map[string]string, 1)
 		}
 		j.Spec.ReplicatedJobs[i].Template.Spec.Template.Labels[key] = value
+	}
+	return j
+}
+
+func (j *JobSetWrapper) PodAnnotation(key, value string) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Template.Spec.Template.Annotations == nil {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Annotations = make(map[string]string, 1)
+		}
+		j.Spec.ReplicatedJobs[i].Template.Spec.Template.Annotations[key] = value
+	}
+	return j
+}
+
+func (j *JobSetWrapper) PodPriorityClassName(value string) *JobSetWrapper {
+	for i := range j.Spec.ReplicatedJobs {
+		j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.PriorityClassName = value
 	}
 	return j
 }
@@ -1245,6 +1263,69 @@ func (p *SchedulerPluginsPodGroupWrapper) ControllerReference(gvk schema.GroupVe
 }
 
 func (p *SchedulerPluginsPodGroupWrapper) Obj() *schedulerpluginsv1alpha1.PodGroup {
+	return &p.PodGroup
+}
+
+type VolcanoPodGroupWrapper struct {
+	volcanov1beta1.PodGroup
+}
+
+func MakeVolcanoPodGroup(namespace, name string) *VolcanoPodGroupWrapper {
+	return &VolcanoPodGroupWrapper{
+		PodGroup: volcanov1beta1.PodGroup{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: volcanov1beta1.SchemeGroupVersion.String(),
+				Kind:       "PodGroup",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+			},
+		},
+	}
+}
+
+func (p *VolcanoPodGroupWrapper) MinMember(members int32) *VolcanoPodGroupWrapper {
+	p.PodGroup.Spec.MinMember = members
+	return p
+}
+
+func (p *VolcanoPodGroupWrapper) MinResources(resources *corev1.ResourceList) *VolcanoPodGroupWrapper {
+	p.PodGroup.Spec.MinResources = resources
+	return p
+}
+
+func (p *VolcanoPodGroupWrapper) Queue(queue string) *VolcanoPodGroupWrapper {
+	p.PodGroup.Spec.Queue = queue
+	return p
+}
+
+func (p *VolcanoPodGroupWrapper) PriorityClassName(pc string) *VolcanoPodGroupWrapper {
+	p.PodGroup.Spec.PriorityClassName = pc
+	return p
+}
+
+func (p *VolcanoPodGroupWrapper) NetworkTopology(mode volcanov1beta1.NetworkTopologyMode, highestTier int) *VolcanoPodGroupWrapper {
+	p.PodGroup.Spec.NetworkTopology = &volcanov1beta1.NetworkTopologySpec{
+		Mode:               mode,
+		HighestTierAllowed: &highestTier,
+	}
+	return p
+}
+
+func (p *VolcanoPodGroupWrapper) ControllerReference(gvk schema.GroupVersionKind, name, uid string) *VolcanoPodGroupWrapper {
+	owner := *metav1.NewControllerRef(&trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: p.Namespace,
+			Name:      name,
+			UID:       types.UID(uid),
+		},
+	}, gvk)
+	p.PodGroup.OwnerReferences = append(p.PodGroup.OwnerReferences, owner)
+	return p
+}
+
+func (p *VolcanoPodGroupWrapper) Obj() *volcanov1beta1.PodGroup {
 	return &p.PodGroup
 }
 

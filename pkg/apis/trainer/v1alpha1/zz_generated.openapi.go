@@ -57,6 +57,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntime":                  schema_pkg_apis_trainer_v1alpha1_TrainingRuntime(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeList":              schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeList(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeSpec":              schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.VolcanoPodGroupPolicySource":      schema_pkg_apis_trainer_v1alpha1_VolcanoPodGroupPolicySource(ref),
 		"k8s.io/api/autoscaling/v2.ContainerResourceMetricSource":                                   schema_k8sio_api_autoscaling_v2_ContainerResourceMetricSource(ref),
 		"k8s.io/api/autoscaling/v2.ContainerResourceMetricStatus":                                   schema_k8sio_api_autoscaling_v2_ContainerResourceMetricStatus(ref),
 		"k8s.io/api/autoscaling/v2.CrossVersionObjectReference":                                     schema_k8sio_api_autoscaling_v2_CrossVersionObjectReference(ref),
@@ -402,6 +403,22 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"sigs.k8s.io/jobset/api/jobset/v1alpha2.ReplicatedJobStatus":                                schema_jobset_api_jobset_v1alpha2_ReplicatedJobStatus(ref),
 		"sigs.k8s.io/jobset/api/jobset/v1alpha2.StartupPolicy":                                      schema_jobset_api_jobset_v1alpha2_StartupPolicy(ref),
 		"sigs.k8s.io/jobset/api/jobset/v1alpha2.SuccessPolicy":                                      schema_jobset_api_jobset_v1alpha2_SuccessPolicy(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.Affinity":                                      schema_pkg_apis_scheduling_v1beta1_Affinity(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.Cluster":                                       schema_pkg_apis_scheduling_v1beta1_Cluster(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.Guarantee":                                     schema_pkg_apis_scheduling_v1beta1_Guarantee(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec":                           schema_pkg_apis_scheduling_v1beta1_NetworkTopologySpec(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.NodeGroupAffinity":                             schema_pkg_apis_scheduling_v1beta1_NodeGroupAffinity(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.NodeGroupAntiAffinity":                         schema_pkg_apis_scheduling_v1beta1_NodeGroupAntiAffinity(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroup":                                      schema_pkg_apis_scheduling_v1beta1_PodGroup(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroupCondition":                             schema_pkg_apis_scheduling_v1beta1_PodGroupCondition(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroupList":                                  schema_pkg_apis_scheduling_v1beta1_PodGroupList(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroupSpec":                                  schema_pkg_apis_scheduling_v1beta1_PodGroupSpec(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroupStatus":                                schema_pkg_apis_scheduling_v1beta1_PodGroupStatus(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.Queue":                                         schema_pkg_apis_scheduling_v1beta1_Queue(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.QueueList":                                     schema_pkg_apis_scheduling_v1beta1_QueueList(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.QueueSpec":                                     schema_pkg_apis_scheduling_v1beta1_QueueSpec(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.QueueStatus":                                   schema_pkg_apis_scheduling_v1beta1_QueueStatus(ref),
+		"volcano.sh/apis/pkg/apis/scheduling/v1beta1.Reservation":                                   schema_pkg_apis_scheduling_v1beta1_Reservation(ref),
 	}
 }
 
@@ -919,11 +936,17 @@ func schema_pkg_apis_trainer_v1alpha1_PodGroupPolicy(ref common.ReferenceCallbac
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource"),
 						},
 					},
+					"volcano": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Volcano plugin for gang-scheduling.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.VolcanoPodGroupPolicySource"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.VolcanoPodGroupPolicySource"},
 	}
 }
 
@@ -940,11 +963,17 @@ func schema_pkg_apis_trainer_v1alpha1_PodGroupPolicySource(ref common.ReferenceC
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource"),
 						},
 					},
+					"volcano": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Volcano plugin for gang-scheduling.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.VolcanoPodGroupPolicySource"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.VolcanoPodGroupPolicySource"},
 	}
 }
 
@@ -1771,6 +1800,27 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCa
 		},
 		Dependencies: []string{
 			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicy", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicy"},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_VolcanoPodGroupPolicySource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "VolcanoPodGroupPolicySource represents configuration for the Volcano gang-scheduler.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"networkTopology": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.",
+							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec"},
 	}
 }
 
@@ -20786,5 +20836,817 @@ func schema_jobset_api_jobset_v1alpha2_SuccessPolicy(ref common.ReferenceCallbac
 				Required: []string{"operator"},
 			},
 		},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_Affinity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Affinity is a group of affinity scheduling rules.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nodeGroupAffinity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Describes nodegroup affinity scheduling rules for the queue(e.g. putting pods of the queue in the nodes of the nodegroup)",
+							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.NodeGroupAffinity"),
+						},
+					},
+					"nodeGroupAntiAffinity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Describes nodegroup anti-affinity scheduling rules for the queue(e.g. avoid putting pods of the queue in the nodes of the nodegroup).",
+							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.NodeGroupAntiAffinity"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"volcano.sh/apis/pkg/apis/scheduling/v1beta1.NodeGroupAffinity", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.NodeGroupAntiAffinity"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_Cluster(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CluterSpec represents the template of Cluster",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"weight": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"capacity": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_Guarantee(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Guarantee represents configuration of queue resource reservation",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The amount of cluster resource reserved for queue. Just set either `percentage` or `resource`",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_NetworkTopologySpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"mode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Mode specifies the mode of the network topology constrain.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"highestTierAllowed": {
+						SchemaProps: spec.SchemaProps{
+							Description: "HighestTierAllowed specifies the highest tier that a job allowed to cross when scheduling.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_NodeGroupAffinity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"requiredDuringSchedulingIgnoredDuringExecution": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"preferredDuringSchedulingIgnoredDuringExecution": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_NodeGroupAntiAffinity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"requiredDuringSchedulingIgnoredDuringExecution": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"preferredDuringSchedulingIgnoredDuringExecution": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_PodGroup(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroup is a collection of Pod; used for batch workload.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specification of the desired behavior of the pod group. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroupSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status represents the current information about a pod group. This data may not be up to date.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroupStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroupSpec", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroupStatus"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_PodGroupCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupCondition contains details for the current state of this pod group.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type is the type of the condition",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is the status of the condition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"transitionID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The ID of condition transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Last time the phase transitioned from another to current phase.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Unique, one-word, CamelCase reason for the phase's last transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Human-readable message indicating details about last transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_PodGroupList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupList is a collection of pod groups.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "items is the list of PodGroup",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroup"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroup"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_PodGroupSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupSpec represents the template of a pod group.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minMember": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MinMember defines the minimal number of members/tasks to run the pod group; if there's not enough resources to start all tasks, the scheduler will not start anyone.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"minTaskMember": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MinTaskMember defines the minimal number of pods to run each task in the pod group; if there's not enough resources to start each task, the scheduler will not start anyone.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: 0,
+										Type:    []string{"integer"},
+										Format:  "int32",
+									},
+								},
+							},
+						},
+					},
+					"queue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Queue defines the queue to allocate resource for PodGroup; if queue does not exist, the PodGroup will not be scheduled. Defaults to `default` Queue with the lowest weight.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priorityClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, indicates the PodGroup's priority. \"system-node-critical\" and \"system-cluster-critical\" are two special keywords which indicate the highest priorities with the former being the highest priority. Any other name must be defined by creating a PriorityClass object with that name. If not specified, the PodGroup priority will be default or zero if there is no default.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"minResources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MinResources defines the minimal resource of members/tasks to run the pod group; if there's not enough resources to start all tasks, the scheduler will not start anyone.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+					"networkTopology": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.",
+							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_PodGroupStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupStatus represents the current state of a pod group.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"phase": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Current phase of PodGroup.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"conditions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The conditions of PodGroup.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroupCondition"),
+									},
+								},
+							},
+						},
+					},
+					"running": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of actively running pods.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"succeeded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of pods which reached phase Succeeded.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"failed": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of pods which reached phase Failed.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"volcano.sh/apis/pkg/apis/scheduling/v1beta1.PodGroupCondition"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_Queue(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Queue is a queue of PodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specification of the desired behavior of the queue. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.QueueSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The status of queue.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.QueueStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.QueueSpec", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.QueueStatus"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_QueueList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "QueueList is a collection of queues.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "items is the list of PodGroup",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.Queue"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.Queue"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_QueueSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "QueueSpec represents the template of Queue.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"weight": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"capability": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+					"reclaimable": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Reclaimable indicate whether the queue can be reclaimed by other queue",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"extendClusters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "extendCluster indicate the jobs in this Queue will be dispatched to these clusters.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.Cluster"),
+									},
+								},
+							},
+						},
+					},
+					"guarantee": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Guarantee indicate configuration about resource reservation",
+							Default:     map[string]interface{}{},
+							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.Guarantee"),
+						},
+					},
+					"affinity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the pod owned by the queue will be scheduled with constraint",
+							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.Affinity"),
+						},
+					},
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type define the type of queue",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"parent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Parent define the parent of queue",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"deserved": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The amount of resources configured by the user. This part of resource can be shared with other queues and reclaimed back.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Priority define the priority of queue. Higher values are prioritized for scheduling and considered later during reclamation.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.Affinity", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.Cluster", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.Guarantee"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_QueueStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "QueueStatus represents the status of Queue.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"state": {
+						SchemaProps: spec.SchemaProps{
+							Description: "State is state of queue",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"unknown": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of 'Unknown' PodGroup in this queue.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"pending": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of 'Pending' PodGroup in this queue.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"running": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of 'Running' PodGroup in this queue.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"inqueue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of `Inqueue` PodGroup in this queue.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"completed": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The number of `Completed` PodGroup in this queue.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"reservation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Reservation is the profile of resource reservation for queue",
+							Default:     map[string]interface{}{},
+							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.Reservation"),
+						},
+					},
+					"allocated": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Allocated is allocated resources in queue",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity", "volcano.sh/apis/pkg/apis/scheduling/v1beta1.Reservation"},
+	}
+}
+
+func schema_pkg_apis_scheduling_v1beta1_Reservation(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Reservation represents current condition about resource reservation",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nodes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Nodes are Locked nodes for queue",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Resource is a list of total idle resource in locked nodes.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
