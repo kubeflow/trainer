@@ -1,0 +1,878 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fashion-mnist-storage
+  labels:
+    app.kubernetes.io/name: "fashion-mnist-demo"
+    app.kubernetes.io/component: "storage"
+    purpose: "checkpoint-storage"
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: nfs-csi # Change this to the storage class with RWX permission
+  volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fashion-mnist-script
+data:
+  train_fashion_mnist.py: |
+    #!/usr/bin/env python3
+    """
+    Fashion-MNIST PyTorch training script with progression tracking and checkpointing.
+    """
+    
+    import json
+    import os
+    import time
+    from typing import Optional
+    from pathlib import Path
+    import glob
+
+    import torch
+    import torch.distributed as dist
+    import torch.nn.functional as F
+    from torch import nn
+    from torch.utils.data import DataLoader, DistributedSampler
+    from torchvision import datasets, transforms
+
+    class ProgressionTracker:
+        """Helper class to track and write training progression."""
+
+        def __init__(
+            self,
+            total_epochs: int,
+            steps_per_epoch: int,
+            status_file_path: Optional[str] = None,
+            update_interval: int = 30,
+            start_epoch: int = 1,
+            training_start_time: float = None,
+        ):
+            """
+            Initialize progression tracker.
+
+            Args:
+                total_epochs: Total number of training epochs
+                steps_per_epoch: Number of steps per epoch
+                status_file_path: Path where progression status will be written.
+                                If None, uses TRAINJOB_PROGRESSION_FILE_PATH env var or default.
+                update_interval: Minimum seconds between status updates
+                start_epoch: Starting epoch (for resumed training)
+                training_start_time: Original training start time (for resumed training)
+            """
+            self.total_epochs = total_epochs
+            self.steps_per_epoch = steps_per_epoch
+            self.total_steps = total_epochs * steps_per_epoch
+            self.start_epoch = start_epoch
+            self.status_file_path = status_file_path or os.getenv(
+                "TRAINJOB_PROGRESSION_FILE_PATH", "/tmp/training_progression.json"
+            )
+            self.update_interval = update_interval
+            # Use provided training start time or current time for new training
+            self.training_start_time = training_start_time if training_start_time is not None else time.time()
+            self.last_update_time = 0
+            self.current_epoch = start_epoch - 1  # Will be updated to start_epoch on first epoch
+            self.current_step = 0
+            self.metrics = {}
+            self.epoch_start_time = None
+
+        def update_step(
+            self,
+            epoch: int,
+            step: int,
+            loss: float = None,
+            learning_rate: float = None,
+            checkpoint_dir: str = None,
+            **kwargs,
+        ):
+            """Update current step and optionally write status."""
+            # Track cumulative progress across entire training lifecycle
+            # epoch is the absolute epoch number (1-based)
+            # step is the current batch within the epoch (0-based)
+            self.current_epoch = epoch
+            self.current_step = (epoch - 1) * self.steps_per_epoch + step + 1
+
+            # Separate optional structured training metrics and custom generic metrics
+            training_metrics = {}
+            generic_metrics = {}
+
+            # Core training metrics
+            if loss is not None:
+                training_metrics["loss"] = str(loss)
+            if learning_rate is not None:
+                training_metrics["learning_rate"] = str(learning_rate)
+
+            # Add checkpoint information if available
+            if checkpoint_dir and os.path.exists(checkpoint_dir):
+                try:
+                    checkpoints = [f for f in os.listdir(checkpoint_dir) if f.startswith('checkpoint-') or f.startswith('epoch-')]
+                    if checkpoints:
+                        training_metrics["checkpoints_stored"] = len(checkpoints)
+                        # Find latest checkpoint by highest number
+                        def get_checkpoint_number(checkpoint_name):
+                            try:
+                                # Handle both checkpoint-N and epoch-N formats
+                                if 'checkpoint-' in checkpoint_name:
+                                    return int(checkpoint_name.split('-')[1].split('.')[0])
+                                elif 'epoch-' in checkpoint_name:
+                                    return int(checkpoint_name.split('-')[1].split('.')[0])
+                                else:
+                                    return -1
+                            except (IndexError, ValueError):
+                                return -1
+                        
+                        latest_checkpoint_name = max(checkpoints, key=get_checkpoint_number)
+                        latest_checkpoint = os.path.join(checkpoint_dir, latest_checkpoint_name)
+                        training_metrics["latest_checkpoint_path"] = latest_checkpoint
+                except (OSError, ValueError):
+                    pass
+
+            # Process additional metrics
+            for key, value in kwargs.items():
+                str_value = str(value)
+                
+                # Map to structured TrainingMetrics fields
+                if key in ['accuracy', 'train_accuracy']:
+                    training_metrics["accuracy"] = str_value
+                else:
+                    # Everything else goes to generic metrics
+                    generic_metrics[key] = str_value
+
+            # Store metrics for status writing
+            self.training_metrics = training_metrics
+            self.generic_metrics = generic_metrics
+
+            # Write status
+            current_time = time.time()
+            if current_time - self.last_update_time >= self.update_interval:
+                message = f"Training step {self.current_step}/{self.total_steps}"
+                self.write_status(message)
+                self.last_update_time = current_time
+
+        def start_epoch_timer(self):
+            """Start timing for the current epoch."""
+            self.epoch_start_time = time.time()
+
+        def update_epoch(self, epoch: int, checkpoint_dir: str = None, **metrics):
+            """Update current epoch and write status."""
+            self.current_epoch = epoch
+            
+            # Calculate epoch timing
+            current_time = time.time()
+            epoch_duration = None
+            if self.epoch_start_time:
+                epoch_duration = current_time - self.epoch_start_time
+
+            # Separate structured training metrics and generic metrics
+            training_metrics = {}
+            generic_metrics = {}
+
+            # Process epoch metrics
+            for key, value in metrics.items():
+                str_value = str(value)
+                
+                # Map to structured TrainingMetrics fields
+                if key in ['loss', 'avg_loss', 'train_loss']:
+                    training_metrics["loss"] = str_value
+                elif key in ['accuracy', 'train_accuracy']:
+                    training_metrics["accuracy"] = str_value
+                else:
+                    # Everything else goes to generic metrics
+                    generic_metrics[key] = str_value
+
+            # Add checkpoint information if available
+            if checkpoint_dir and os.path.exists(checkpoint_dir):
+                try:
+                    checkpoints = [f for f in os.listdir(checkpoint_dir) if f.startswith('checkpoint-') or f.startswith('epoch-')]
+                    if checkpoints:
+                        training_metrics["checkpoints_stored"] = len(checkpoints)
+                        # Find latest checkpoint by highest number
+                        def get_checkpoint_number(checkpoint_name):
+                            try:
+                                if 'checkpoint-' in checkpoint_name:
+                                    return int(checkpoint_name.split('-')[1].split('.')[0])
+                                elif 'epoch-' in checkpoint_name:
+                                    return int(checkpoint_name.split('-')[1].split('.')[0])
+                                else:
+                                    return -1
+                            except (IndexError, ValueError):
+                                return -1
+                        
+                        latest_checkpoint_name = max(checkpoints, key=get_checkpoint_number)
+                        latest_checkpoint = os.path.join(checkpoint_dir, latest_checkpoint_name)
+                        training_metrics["latest_checkpoint_path"] = latest_checkpoint
+                except (OSError, ValueError):
+                    pass
+
+            # Store metrics for status writing
+            self.training_metrics = training_metrics
+            self.generic_metrics = generic_metrics
+
+            epoch_num = epoch + 1
+            total_epochs = self.total_epochs
+            message = f"Completed epoch {epoch_num}/{total_epochs}"
+            self.write_status(message)
+
+        def write_status(self, message: str = "Training in progress"):
+            """Write current training status to file."""
+            try:
+                current_time = time.time()
+                
+                # Calculate training progress and timing
+                elapsed_training_time = current_time - self.training_start_time
+                completed_epochs = max(0, self.current_epoch - self.start_epoch + 1)
+                remaining_epochs = max(0, self.total_epochs - self.current_epoch)
+                
+                # Basic status data
+                status_data = {
+                    "message": message,
+                    "timestamp": int(current_time),
+                    "training_start_time": int(self.training_start_time),
+                    "current_step": self.current_step,
+                    "total_steps": self.total_steps,
+                    "current_epoch": self.current_epoch,
+                    "total_epochs": self.total_epochs,
+                    "elapsed_training_time_seconds": int(elapsed_training_time),
+                    "elapsed_training_time_formatted": self._format_duration(elapsed_training_time),
+                }
+                
+                # Calculate percentage based on epochs
+                if self.total_epochs > 0:
+                    epoch_percentage = (self.current_epoch / self.total_epochs) * 100
+                    status_data["percentage_complete"] = f"{epoch_percentage:.2f}"
+                    
+                    # Calculate ETA based on completed epochs
+                    if completed_epochs > 0 and remaining_epochs > 0:
+                        avg_time_per_epoch = elapsed_training_time / completed_epochs
+                        eta_seconds = int(remaining_epochs * avg_time_per_epoch)
+                        status_data["estimated_time_remaining_seconds"] = eta_seconds
+                        status_data["estimated_time_remaining_formatted"] = self._format_duration(eta_seconds)
+                        
+                        # Estimated completion time
+                        estimated_completion = current_time + eta_seconds
+                        status_data["estimated_completion_time"] = int(estimated_completion)
+                    else:
+                        status_data["estimated_time_remaining_formatted"] = "calculating..."
+                
+                # Add structured training metrics if any
+                if hasattr(self, 'training_metrics') and self.training_metrics:
+                    status_data["training_metrics"] = self.training_metrics
+                
+                # Add generic metrics if any
+                if hasattr(self, 'generic_metrics') and self.generic_metrics:
+                    # Add timing information to metrics section (which appears in progressionStatus)
+                    metrics_with_timing = dict(self.generic_metrics)
+                    metrics_with_timing.update({
+                        "elapsed_training_time_seconds": str(int(elapsed_training_time)),
+                        "elapsed_training_time_formatted": self._format_duration(elapsed_training_time),
+                        "training_start_time": str(int(self.training_start_time)),
+                    })
+                    
+                    # Add ETA if available
+                    if completed_epochs > 0 and remaining_epochs > 0:
+                        avg_time_per_epoch = elapsed_training_time / completed_epochs
+                        eta_seconds = int(remaining_epochs * avg_time_per_epoch)
+                        metrics_with_timing.update({
+                            "estimated_time_remaining_seconds": str(eta_seconds),
+                            "estimated_time_remaining_formatted": self._format_duration(eta_seconds),
+                        })
+                    
+                    status_data["metrics"] = metrics_with_timing
+                else:
+                    # Create metrics section with timing info even if no other metrics
+                    timing_metrics = {
+                        "elapsed_training_time_seconds": str(int(elapsed_training_time)),
+                        "elapsed_training_time_formatted": self._format_duration(elapsed_training_time),
+                        "training_start_time": str(int(self.training_start_time)),
+                    }
+                    
+                    # Add ETA if available
+                    if completed_epochs > 0 and remaining_epochs > 0:
+                        avg_time_per_epoch = elapsed_training_time / completed_epochs
+                        eta_seconds = int(remaining_epochs * avg_time_per_epoch)
+                        timing_metrics.update({
+                            "estimated_time_remaining_seconds": str(eta_seconds),
+                            "estimated_time_remaining_formatted": self._format_duration(eta_seconds),
+                        })
+                    
+                    status_data["metrics"] = timing_metrics
+
+                # Write to file atomically
+                temp_file = f"{self.status_file_path}.tmp"
+                with open(temp_file, "w") as f:
+                    json.dump(status_data, f, indent=2)
+                os.rename(temp_file, self.status_file_path)
+
+            except Exception as e:
+                print(f"Failed to write progression status: {e}")
+
+        def _format_duration(self, seconds: float) -> str:
+            """Format duration in seconds to NmNwNdNhNmNs format (month-week-days-hours-minutes-seconds)."""
+            seconds = int(seconds)
+            
+            # Calculate time units
+            months, remainder = divmod(seconds, 2592000)  # 30 days * 24 hours * 60 minutes * 60 seconds
+            weeks, remainder = divmod(remainder, 604800)   # 7 days * 24 hours * 60 minutes * 60 seconds
+            days, remainder = divmod(remainder, 86400)     # 24 hours * 60 minutes * 60 seconds
+            hours, remainder = divmod(remainder, 3600)     # 60 minutes * 60 seconds
+            minutes, seconds = divmod(remainder, 60)
+            
+            parts = []
+            if months > 0:
+                parts.append(f"{months}m")
+            if weeks > 0:
+                parts.append(f"{weeks}w")
+            if days > 0:
+                parts.append(f"{days}d")
+            if hours > 0:
+                parts.append(f"{hours}h")
+            if minutes > 0:
+                parts.append(f"{minutes}m")
+            if seconds > 0 or not parts:
+                parts.append(f"{seconds}s")
+            
+            return "".join(parts)
+
+    # Define the PyTorch CNN model to be trained
+    class Net(nn.Module):
+        def __init__(self):
+            super(Net, self).__init__()
+            self.conv1 = nn.Conv2d(1, 20, 5, 1)
+            self.conv2 = nn.Conv2d(20, 50, 5, 1)
+            self.fc1 = nn.Linear(4 * 4 * 50, 500)
+            self.fc2 = nn.Linear(500, 10)
+
+        def forward(self, x):
+            x = F.relu(self.conv1(x))
+            x = F.max_pool2d(x, 2, 2)
+            x = F.relu(self.conv2(x))
+            x = F.max_pool2d(x, 2, 2)
+            x = x.view(-1, 4 * 4 * 50)
+            x = F.relu(self.fc1(x))
+            x = self.fc2(x)
+            return F.log_softmax(x, dim=1)
+
+    def setup_distributed():
+        """Setup distributed training - torchrun provides environment variables."""
+        # Get basic info from torchrun environment variables
+        local_rank = int(os.environ.get('LOCAL_RANK', 0))
+        global_rank = int(os.environ.get('RANK', 0))
+        world_size = int(os.environ.get('WORLD_SIZE', 1))
+        
+        print(f"[Rank {global_rank}/{world_size}] [Local {local_rank}] Starting distributed training")
+        
+        # Set device for CUDA if available
+        if torch.cuda.is_available():
+            torch.cuda.set_device(local_rank)
+            device_name = torch.cuda.get_device_name(local_rank)
+            print(f"[Rank {global_rank}] Using GPU {local_rank}: {device_name}")
+            device = "cuda"
+            backend = "nccl"
+        else:
+            print(f"[Rank {global_rank}] Using CPU")
+            device = "cpu"
+            backend = "gloo"
+        
+        # Initialize distributed process group if world_size > 1
+        if world_size > 1:
+            try:
+                if not dist.is_initialized():
+                    dist.init_process_group(backend=backend)
+                    print(f"[Rank {global_rank}] Distributed process group initialized with {backend}")
+                dist.barrier()
+                print(f"[Rank {global_rank}] All processes synchronized")
+            except Exception as e:
+                print(f"[Rank {global_rank}] Failed to initialize distributed: {e}")
+                world_size = 1  # Fall back to single process
+        else:
+            print(f"[Rank {global_rank}] Single process training")
+        
+        return local_rank, global_rank, world_size, device
+
+    def load_checkpoint(checkpoint_dir, model, optimizer, device):
+        """Load the latest checkpoint if available."""
+        if not os.path.exists(checkpoint_dir):
+            return 0, 0.0, None  # start_epoch, best_accuracy, training_start_time
+        
+        checkpoints = glob.glob(os.path.join(checkpoint_dir, "checkpoint_epoch_*.pth"))
+        if not checkpoints:
+            return 0, 0.0, None
+        
+        # Get the latest checkpoint
+        latest_checkpoint = max(checkpoints, key=lambda x: int(x.split('_')[-1].split('.')[0]))
+        
+        try:
+            print(f"Loading checkpoint: {latest_checkpoint}")
+            checkpoint = torch.load(latest_checkpoint, map_location=device)
+            
+            model.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            start_epoch = checkpoint['epoch'] + 1
+            best_accuracy = checkpoint.get('best_accuracy', 0.0)
+            
+            # Restore timing information
+            training_start_time = checkpoint.get('training_start_time', None)
+            if training_start_time:
+                elapsed_time = checkpoint.get('elapsed_training_time', 0)
+                checkpoint_save_time = checkpoint.get('checkpoint_save_time', time.time())
+                print(f"Resumed from epoch {checkpoint['epoch']}, best accuracy: {best_accuracy:.4f}")
+                print(f"Previous training time: {elapsed_time:.1f}s, checkpoint saved at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(checkpoint_save_time))}")
+            else:
+                print(f"Resumed from epoch {checkpoint['epoch']}, best accuracy: {best_accuracy:.4f} (no timing data)")
+            
+            return start_epoch, best_accuracy, training_start_time
+        except Exception as e:
+            print(f"Failed to load checkpoint: {e}")
+            return 0, 0.0, None
+
+    def save_checkpoint(checkpoint_dir, epoch, model, optimizer, accuracy, is_best=False, training_start_time=None):
+        """Save model checkpoint."""
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'best_accuracy': accuracy,
+        }
+        
+        # Add timing information to checkpoint
+        if training_start_time is not None:
+            checkpoint['training_start_time'] = training_start_time
+            checkpoint['checkpoint_save_time'] = time.time()
+            elapsed_time = time.time() - training_start_time
+            checkpoint['elapsed_training_time'] = elapsed_time
+        
+        checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch}.pth")
+        torch.save(checkpoint, checkpoint_path)
+        
+        if is_best:
+            best_path = os.path.join(checkpoint_dir, "best_model.pth")
+            torch.save(checkpoint, best_path)
+        
+        print(f"Checkpoint saved: {checkpoint_path}")
+
+    def train_fashion_mnist():
+        try:
+            # Setup distributed training
+            local_rank, global_rank, world_size, device_type = setup_distributed()
+            print(f"[Rank {global_rank}] Successfully initialized distributed training")
+
+            # Create the model and load it into the device.
+            if device_type == "cuda" and torch.cuda.is_available():
+                device = torch.device(f"{device_type}:{local_rank}")
+            else:
+                device = torch.device("cpu")
+            
+            # Create model and wrap with DDP only if distributed
+            net = Net().to(device)
+            if world_size > 1:
+                model = nn.parallel.DistributedDataParallel(net)
+            else:
+                model = net
+            optimizer = torch.optim.SGD(model.parameters(), lr=float(os.getenv('LEARNING_RATE', '0.1')), momentum=0.9)
+            
+            # Setup checkpointing
+            checkpoint_dir = os.getenv('CHECKPOINT_DIR', '/workspace/checkpoints')
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            
+            # Load checkpoint if available (only on rank 0)
+            start_epoch, best_accuracy, training_start_time = 0, 0.0, None
+            
+            if global_rank == 0:
+                start_epoch, best_accuracy, training_start_time = load_checkpoint(checkpoint_dir, model, optimizer, device)
+            
+            # Broadcast start_epoch and best_accuracy to all ranks (if distributed)
+            if world_size > 1:
+                # Broadcast start_epoch
+                start_epoch_tensor = torch.tensor(start_epoch, device=device)
+                dist.broadcast(start_epoch_tensor, src=0)
+                start_epoch = int(start_epoch_tensor.item())
+                
+                # Broadcast best_accuracy
+                best_accuracy_tensor = torch.tensor(best_accuracy, device=device)
+                dist.broadcast(best_accuracy_tensor, src=0)
+                best_accuracy = float(best_accuracy_tensor.item())
+            
+            # All ranks show resume/start status with local rank visibility
+            if start_epoch > 0:
+                print(f"[Node {os.getenv('PET_NODE_RANK', 0)}] [Rank {global_rank}/{world_size}] [Local {local_rank}] ===== RESUMING TRAINING =====")
+                print(f"[Node {os.getenv('PET_NODE_RANK', 0)}] [Rank {global_rank}/{world_size}] [Local {local_rank}] Resuming from epoch: {start_epoch}/{os.getenv('NUM_EPOCHS', 5)}")
+                print(f"[Node {os.getenv('PET_NODE_RANK', 0)}] [Rank {global_rank}/{world_size}] [Local {local_rank}] Best accuracy so far: {best_accuracy:.4f}")
+                print(f"[Node {os.getenv('PET_NODE_RANK', 0)}] [Rank {global_rank}/{world_size}] [Local {local_rank}] =============================")
+            else:
+                start_epoch = 1  # Start from epoch 1 for new training
+                print(f"[Node {os.getenv('PET_NODE_RANK', 0)}] [Rank {global_rank}/{world_size}] [Local {local_rank}] ===== STARTING NEW TRAINING =====")
+                print(f"[Node {os.getenv('PET_NODE_RANK', 0)}] [Rank {global_rank}/{world_size}] [Local {local_rank}] Total epochs planned: {os.getenv('NUM_EPOCHS', 5)}")
+                print(f"[Node {os.getenv('PET_NODE_RANK', 0)}] [Rank {global_rank}/{world_size}] [Local {local_rank}] ==================================")
+
+            # Download FashionMNIST dataset only on local_rank=0 process.
+            if local_rank == 0:
+                dataset = datasets.FashionMNIST(
+                    "./data",
+                    train=True,
+                    download=True,
+                    transform=transforms.Compose([transforms.ToTensor()]),
+                )
+            if world_size > 1:
+                dist.barrier()
+            dataset = datasets.FashionMNIST(
+                "./data",
+                train=True,
+                download=False,
+                transform=transforms.Compose([transforms.ToTensor()]),
+            )
+
+            # Shard the dataset across workers (only if distributed).
+            if world_size > 1:
+                train_loader = DataLoader(
+                    dataset,
+                    batch_size=int(os.getenv('BATCH_SIZE', '100')),
+                    sampler=DistributedSampler(dataset)
+                )
+            else:
+                train_loader = DataLoader(
+                    dataset,
+                    batch_size=int(os.getenv('BATCH_SIZE', '100')),
+                    shuffle=True
+                )
+
+            # Get num_epochs for all ranks
+            num_epochs = int(os.getenv('NUM_EPOCHS', '5'))
+            
+            # Initialize progression tracker (only on rank 0)
+            tracker = None
+            if world_size == 1 or global_rank == 0:
+                steps_per_epoch = len(train_loader)
+                
+                # Calculate total epochs for entire training plan
+                total_epochs_planned = start_epoch + num_epochs - 1
+                
+                tracker = ProgressionTracker(
+                    total_epochs=num_epochs, 
+                    steps_per_epoch=steps_per_epoch,
+                    update_interval=int(os.getenv('PROGRESSION_UPDATE_INTERVAL', '10')),
+                    start_epoch=start_epoch,
+                    training_start_time=training_start_time
+                )
+                
+                # Initialize tracker with cumulative progress across entire training lifecycle
+                if start_epoch > 1:
+                    # Set progress based on completed epochs (cumulative)
+                    completed_epochs = start_epoch - 1
+                    tracker.current_epoch = completed_epochs
+                    tracker.current_step = completed_epochs * steps_per_epoch
+                    tracker.write_status(f"Training resumed from epoch {start_epoch}")
+                else:
+                    tracker.current_epoch = 0
+                    tracker.current_step = 0
+                    tracker.write_status("Training started")
+
+            if world_size > 1:
+                dist.barrier()
+            
+            # Log training start for each rank with full visibility
+            rank_info = f"[Node {os.getenv('PET_NODE_RANK', 0)}] [Rank {global_rank}/{world_size}] [Local {local_rank}]"
+            print(f"{rank_info} Starting training loop from epoch {start_epoch} to epoch {num_epochs} (total {num_epochs} epochs)")
+            print(f"{rank_info} Dataset size: {len(train_loader.dataset)}, Batches per epoch: {len(train_loader)}")
+            
+            # Training loop with progression tracking and checkpointing
+            for epoch in range(start_epoch, num_epochs + 1):
+                # Start epoch timer
+                if tracker:
+                    tracker.start_epoch_timer()
+                
+                model.train()
+                epoch_loss = 0.0
+                num_batches = 0
+
+                # Iterate over mini-batches from the training set
+                for batch_idx, (inputs, labels) in enumerate(train_loader):
+                    # Copy the data to the GPU device if available
+                    inputs, labels = inputs.to(device), labels.to(device)
+                    
+                    # Forward pass
+                    outputs = model(inputs)
+                    loss = F.nll_loss(outputs, labels)
+                    
+                    # Backward pass
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+                    # Track metrics for epoch average
+                    epoch_loss += loss.item()
+                    num_batches += 1
+
+                    # Update progression (only on rank 0)
+                    if tracker and batch_idx % 10 == 0:
+                        current_lr = optimizer.param_groups[0]["lr"]
+                        
+                        # Calculate samples per second
+                        current_time = time.time()
+                        elapsed_time = current_time - tracker.training_start_time
+                        total_samples_processed = (epoch - start_epoch) * len(train_loader) * int(os.getenv('BATCH_SIZE', '100')) + batch_idx * int(os.getenv('BATCH_SIZE', '100'))
+                        samples_per_second = total_samples_processed / elapsed_time if elapsed_time > 0 else 0
+                        
+                        # Calculate accuracy (simple approximation)
+                        with torch.no_grad():
+                            _, predicted = torch.max(outputs.data, 1)
+                            correct = (predicted == labels).sum().item()
+                            accuracy = correct / labels.size(0)
+                        
+                        # Use absolute epoch for cumulative progress
+                        tracker.update_step(
+                            epoch=epoch,
+                            step=batch_idx,
+                            loss=loss.item(),
+                            learning_rate=current_lr,
+                            checkpoint_dir=checkpoint_dir,
+                            accuracy=accuracy,
+                            world_size=world_size,
+                            local_rank=local_rank,
+                            train_samples_per_second=f"{samples_per_second:.2f}",
+                            train_runtime=f"{elapsed_time:.1f}",
+                            grad_norm=f"{torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0):.4f}"
+                        )
+
+                    if batch_idx % 10 == 0:
+                        rank_info = f"[Node {os.getenv('PET_NODE_RANK', 0)}] [Rank {global_rank}/{world_size}] [Local {local_rank}]"
+                        print(
+                            "{} Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
+                                rank_info,
+                                epoch,
+                                batch_idx * len(inputs),
+                                len(train_loader.dataset),
+                                100.0 * batch_idx / len(train_loader),
+                                loss.item(),
+                            )
+                        )
+
+                # Calculate epoch accuracy and update progression (only on rank 0)
+                epoch_accuracy = 0.0  # Default value
+                if global_rank == 0:
+                    avg_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
+                    
+                    # Calculate epoch accuracy (simple approximation)
+                    model.eval()
+                    correct = 0
+                    total = 0
+                    with torch.no_grad():
+                        for data, target in train_loader:
+                            data, target = data.to(device), target.to(device)
+                            outputs = model(data)
+                            _, predicted = torch.max(outputs.data, 1)
+                            total += target.size(0)
+                            correct += (predicted == target).sum().item()
+                    
+                    epoch_accuracy = correct / total if total > 0 else 0.0
+                    
+                    # Update progression tracker
+                    if tracker:
+                        tracker.update_epoch(
+                            epoch=epoch,
+                            checkpoint_dir=checkpoint_dir,
+                            avg_loss=avg_loss,
+                            accuracy=epoch_accuracy,
+                            total_batches=num_batches,
+                            total_samples=total
+                        )
+                    
+                    # Save checkpoint at the end of each epoch
+                    is_best = epoch_accuracy > best_accuracy
+                    if is_best:
+                        best_accuracy = epoch_accuracy
+                    save_checkpoint(checkpoint_dir, epoch, model, optimizer, epoch_accuracy, is_best, tracker.training_start_time if tracker else None)
+                    
+                if world_size > 1:
+                    dist.barrier()
+
+            # Wait for the distributed training to complete
+            if world_size > 1:
+                dist.barrier()
+            
+            # Calculate and display total training time
+            if world_size == 1 or global_rank == 0:
+                if tracker:
+                    total_training_time = time.time() - tracker.training_start_time
+                    formatted_total_time = tracker._format_duration(total_training_time)
+                    
+                    # Write final completion status with total time
+                    tracker.current_step = tracker.total_steps  # Ensure 100% completion
+                    tracker.write_status(f"Training completed - Total time: {formatted_total_time}")
+                    
+                    # Print comprehensive training summary
+                    print("\n" + "="*60)
+                    print("🎉 TRAINING COMPLETED SUCCESSFULLY! 🎉")
+                    print("="*60)
+                    print(f"📊 Total Training Time: {formatted_total_time}")
+                    print(f"📈 Epochs Completed: {num_epochs}")
+                    print(f"🎯 Final Best Accuracy: {best_accuracy:.4f}")
+                    print(f"💾 Checkpoints Saved: {checkpoint_dir}")
+                    if start_epoch > 1:
+                        print(f"🔄 Training was resumed from epoch {start_epoch-1}")
+                    print("="*60)
+                    
+                    # Buffer time to ensure controller captures 100% completion
+                    print("Waiting for progression status to be captured...")
+                    time.sleep(30)  # Buffer time to update the progression status to 100%
+            
+            # Let all ranks print completion with full visibility
+            rank_info = f"[Node {os.getenv('PET_NODE_RANK', 0)}] [Rank {global_rank}/{world_size}] [Local {local_rank}]"
+            print(f"{rank_info} Training is finished")
+
+            # Finally clean up PyTorch distributed
+            if world_size > 1:
+                dist.destroy_process_group()
+                
+        except Exception as e:
+            rank_info = f"[Rank {global_rank if 'global_rank' in locals() else 'Unknown'}]"
+            print(f"{rank_info} ERROR: Training failed with exception: {e}")
+            import traceback
+            print(f"{rank_info} Full traceback:")
+            traceback.print_exc()
+            raise
+
+    if __name__ == "__main__":
+        train_fashion_mnist()
+
+---
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainingRuntime
+metadata:
+  name: pytorch-cpu-runtime
+  labels:
+    trainer.kubeflow.org/framework: pytorch
+    project: fashion-mnist-demo
+spec:
+  mlPolicy:
+    numNodes: 1
+    torch:
+      numProcPerNode: 2
+  template:
+    spec:
+      replicatedJobs:
+        # Training Node for PyTorch Fashion-MNIST
+        - name: node
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
+                      volumeMounts:
+                        - name: shared-workspace
+                          mountPath: /workspace
+                        - name: training-script
+                          mountPath: /workspace/train_fashion_mnist.py
+                          subPath: train_fashion_mnist.py
+                      env:
+                        # Python configuration
+                        - name: PYTHONUNBUFFERED
+                          value: "1"
+                        
+                        # Distributed training configuration
+                        - name: NCCL_DEBUG
+                          value: "INFO"
+                        - name: NCCL_SOCKET_IFNAME
+                          value: "eth0"
+                        - name: NCCL_IB_DISABLE
+                          value: "1"
+                        - name: NCCL_P2P_DISABLE
+                          value: "1"
+                        
+                        # Progression tracking
+                        - name: TRAINJOB_PROGRESSION_FILE_PATH
+                          value: "/tmp/training_progression.json"
+                        
+                        # Checkpoint configuration
+                        - name: CHECKPOINT_DIR
+                          value: "/workspace/checkpoints"
+                      
+                      command: ["bash", "-c"]
+                      args:
+                        - |
+                          # Use torchrun for multi-process distributed training
+                          torchrun \
+                            --nnodes=${PET_NNODES:-1} \
+                            --nproc-per-node=${PET_NPROC_PER_NODE:-1} \
+                            --node-rank=${PET_NODE_RANK:-0} \
+                            --master-addr=${PET_MASTER_ADDR:-localhost} \
+                            --master-port=${PET_MASTER_PORT:-29500} \
+                            /workspace/train_fashion_mnist.py
+                      
+                      resources:
+                        requests:
+                          cpu: "1"
+                          memory: "2Gi"
+                        limits:
+                          cpu: "2"
+                          memory: "4Gi"
+                          # Uncomment if GPU nodes available:
+                          # nvidia.com/gpu: 1
+                  
+                  volumes:
+                    - name: shared-workspace
+                      persistentVolumeClaim:
+                        claimName: fashion-mnist-storage
+                    - name: training-script
+                      configMap:
+                        name: fashion-mnist-script
+                        defaultMode: 0755
+
+---
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: mnist-demo
+  labels:
+    kueue.x-k8s.io/queue-name: test-lq
+    app.kubernetes.io/name: "fashion-mnist-demo"
+    app.kubernetes.io/component: "training"
+    experiment: "pytorch-distributed-training"
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: TrainingRuntime
+    name: pytorch-cpu-runtime
+
+  # PyTorch Distributed Training Configuration
+  trainer:
+    numNodes: 1
+    resourcesPerNode:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    
+    # Training hyperparameters
+    env:
+      # Training configuration
+      - name: LEARNING_RATE
+        value: "0.01"
+      - name: BATCH_SIZE
+        value: "64"
+      - name: NUM_EPOCHS
+        value: "5"
+      
+      # Progression tracking configuration
+      - name: PROGRESSION_UPDATE_INTERVAL
+        value: "10"  # Update every 10 seconds
+      
+      # Checkpoint configuration
+      - name: CHECKPOINT_DIR
+        value: "/workspace/checkpoints"
+
+  managedBy: trainer.kubeflow.org/trainjob-controller
+  suspend: false

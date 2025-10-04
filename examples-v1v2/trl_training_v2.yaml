@@ -1,0 +1,802 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-storage-v2
+  labels:
+    app.kubernetes.io/name: "trl-demo-v2"
+    app.kubernetes.io/component: "storage"
+    purpose: "checkpoint-storage"
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: nfs-csi
+  volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trl-training-script-v2
+data:
+  trl-training.py: |
+    #!/usr/bin/env python3
+    """Enhanced TRL training script with distributed coordination and robust checkpointing."""
+
+    import os
+    import json
+    import time
+    import sys
+    import signal
+    import torch
+    import torch.distributed as dist
+    from pathlib import Path
+    from typing import Optional
+    from datetime import timedelta
+    from datasets import load_dataset, load_from_disk
+    from transformers import (
+        set_seed, 
+        TrainerCallback, 
+        TrainerState, 
+        TrainerControl
+    )
+    
+    # Fix for PyTorch weights_only loading issue with numpy objects
+    try:
+        import numpy as np
+        torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray])
+    except (ImportError, AttributeError):
+        pass
+    
+    _original_torch_load = torch.load
+    def patched_torch_load(f, map_location=None, pickle_module=None, weights_only=None, **kwargs):
+        try:
+            # Auto-detect device and set appropriate map_location if not specified
+            if map_location is None:
+                if torch.cuda.is_available():
+                    # If CUDA is available, map to current device
+                    local_rank = int(os.environ.get('LOCAL_RANK', 0))
+                    map_location = f'cuda:{local_rank}'
+                else:
+                    # If no CUDA, map to CPU
+                    map_location = 'cpu'
+            
+            return _original_torch_load(f, map_location=map_location, pickle_module=pickle_module, weights_only=weights_only, **kwargs)
+        except Exception as e:
+            if "weights_only" in str(e) and weights_only is True:
+                print(f"[Warning] Falling back to weights_only=False for checkpoint loading: {e}")
+                return _original_torch_load(f, map_location=map_location, pickle_module=pickle_module, weights_only=False, **kwargs)
+            elif "don't know how to restore data location" in str(e):
+                print(f"[Warning] Device mismatch in checkpoint, forcing CPU mapping: {e}")
+                return _original_torch_load(f, map_location='cpu', pickle_module=pickle_module, weights_only=False, **kwargs)
+            raise
+    torch.load = patched_torch_load
+
+    try:
+        from transformers.trainer_utils import get_last_checkpoint
+    except ImportError:
+        # Fallback for older transformers versions
+        def get_last_checkpoint(output_dir):
+            import os
+            import re
+            if not os.path.exists(output_dir):
+                return None
+            checkpoints = [f for f in os.listdir(output_dir) if f.startswith('checkpoint-')]
+            if not checkpoints:
+                return None
+            # Sort by checkpoint number
+            def get_checkpoint_number(name):
+                match = re.search(r'checkpoint-(\d+)', name)
+                return int(match.group(1)) if match else -1
+            latest_checkpoint = max(checkpoints, key=get_checkpoint_number)
+            return os.path.join(output_dir, latest_checkpoint)
+    
+    from trl import ModelConfig, ScriptArguments, SFTConfig, SFTTrainer, TrlParser, get_peft_config
+
+    def setup_distributed():
+        """Simple distributed setup - torchrun handles most of the work."""
+        # Get basic info from torchrun environment variables
+        local_rank = int(os.environ.get('LOCAL_RANK', 0))
+        global_rank = int(os.environ.get('RANK', 0))
+        world_size = int(os.environ.get('WORLD_SIZE', 1))
+        
+        print(f"[Rank {global_rank}/{world_size}] [Local {local_rank}] Starting distributed training")
+        
+        # Set device for CUDA if available
+        if torch.cuda.is_available():
+            torch.cuda.set_device(local_rank)
+            device_name = torch.cuda.get_device_name(local_rank)
+            print(f"[Rank {global_rank}] Using GPU {local_rank}: {device_name}")
+        else:
+            print(f"[Rank {global_rank}] Using CPU")
+        
+        return local_rank, global_rank, world_size
+
+    class PreemptionHandler:
+        """Handle graceful shutdown on preemption signals."""
+        
+        def __init__(self, trainer=None, progression_callback=None):
+            self.trainer = trainer
+            self.progression_callback = progression_callback
+            self.shutdown_requested = False
+            
+            # Register signal handlers
+            signal.signal(signal.SIGTERM, self._handle_shutdown)
+            signal.signal(signal.SIGINT, self._handle_shutdown)
+            
+        def _handle_shutdown(self, signum, frame):
+            """Handle shutdown signal by saving progress and exiting gracefully."""
+            print(f"[Preemption] Signal {signum} received, saving progress...")
+            self.shutdown_requested = True
+            
+            if self.progression_callback and self.progression_callback.global_rank == 0:
+                try:
+                    # Write preemption status
+                    current_time = time.time()
+                    status = {
+                        "message": "Training preempted - progress saved",
+                        "timestamp": int(current_time),
+                        "start_time": int(self.progression_callback.start_time),
+                        "current_step": getattr(self.trainer.state, 'global_step', 0) if self.trainer else 0,
+                        "total_steps": getattr(self.trainer.state, 'max_steps', 0) if self.trainer else 0,
+                        "percentage_complete": "preempted",
+                        "estimated_time_remaining": "unknown",
+                        "training_metrics": {"status": "preempted"}
+                    }
+                    
+                    temp_file = f"{self.progression_callback.status_file}.tmp"
+                    with open(temp_file, 'w') as f:
+                        json.dump(status, f, indent=2)
+                    os.rename(temp_file, self.progression_callback.status_file)
+                    
+                except Exception as e:
+                    print(f"[Preemption] Failed to save status: {e}")
+            
+            # Force save checkpoint if trainer is available
+            if self.trainer and hasattr(self.trainer, 'save_model'):
+                try:
+                    self.trainer.save_model()
+                    if hasattr(self.trainer, 'save_state'):
+                        self.trainer.save_state()
+                    print(f"[Preemption] Emergency checkpoint saved")
+                except Exception as e:
+                    print(f"[Preemption] Failed to save checkpoint: {e}")
+            
+            # Buffer time to ensure controller captures final status
+            print(f"[Preemption] Waiting for status capture...")
+            time.sleep(30)
+            
+            print(f"[Preemption] Shutdown complete")
+            sys.exit(0)
+
+    class EnhancedProgressionCallback(TrainerCallback):
+        """Enhanced callback for distributed training progress tracking with checkpoint monitoring."""
+        
+        def __init__(self, global_rank: int = 0, resume_from_step: int = 0, training_start_time: Optional[float] = None, checkpoint_dir: str = "/workspace/checkpoints"):
+            self.status_file = os.getenv("TRAINJOB_PROGRESSION_FILE_PATH", "/tmp/training_progression.json")
+            self.global_rank = global_rank
+            self.last_update_time = time.time()
+            self.update_interval = int(os.getenv('PROGRESSION_UPDATE_INTERVAL', '30'))  # Configurable update interval
+            self.resume_from_step = resume_from_step
+            self.checkpoint_dir = checkpoint_dir
+            self.training_metrics = {}
+            self.generic_metrics = {}
+            
+            # Handle training start time for resumed training
+            if training_start_time:
+                self.start_time = training_start_time
+            else:
+                current_time = time.time()
+                if resume_from_step > 0:
+                    # Estimate original start time based on completed steps (assume 2 seconds per step)
+                    estimated_elapsed = resume_from_step * 2.0
+                    self.start_time = current_time - estimated_elapsed
+                else:
+                    self.start_time = current_time
+            
+        def on_log(self, args, state: TrainerState, control: TrainerControl, **kwargs):
+            """Write progress on each log event with rank-aware logging."""
+            # All ranks log their progress for visibility
+            node_rank = int(os.environ.get('PET_NODE_RANK', 0))
+            local_rank = int(os.environ.get('LOCAL_RANK', 0))
+            world_size = int(os.environ.get('WORLD_SIZE', 1))
+            
+            # Log from all ranks for distributed training visibility
+            if state.log_history and len(state.log_history) > 0:
+                latest = state.log_history[-1]
+                loss = latest.get('train_loss', latest.get('loss', 0.0))
+                lr = latest.get('learning_rate', 0.0)
+                print(f"[Node {node_rank}] [Rank {self.global_rank}/{world_size}] [Local {local_rank}] Step {state.global_step}/{state.max_steps} - Loss: {loss:.4f}, LR: {lr:.6f}")
+            
+            # Only rank 0 writes progress file
+            if self.global_rank != 0:
+                return
+                
+            current_time = time.time()
+            if current_time - self.last_update_time < self.update_interval:
+                return  # Throttle updates
+                
+            try:
+                # Calculate progress
+                progress = (state.global_step / state.max_steps * 100) if state.max_steps > 0 else 0
+                elapsed = current_time - self.start_time
+                
+                # Simple ETA calculation
+                if state.global_step > 0 and elapsed > 0:
+                    time_per_step = elapsed / state.global_step
+                    remaining_steps = state.max_steps - state.global_step
+                    eta_seconds = int(remaining_steps * time_per_step)
+                    eta_formatted = self._format_eta(eta_seconds)
+                else:
+                    eta_formatted = "calculating..."
+                
+                # Get latest metrics from state
+                training_metrics = {}
+                if state.log_history:
+                    latest = state.log_history[-1]
+                    training_metrics["loss"] = f"{latest.get('train_loss', latest.get('loss', 0.0)):.4f}"
+                    training_metrics["learning_rate"] = f"{latest.get('learning_rate', 0.0):.6f}"
+                
+                # Monitor checkpoint directory
+                self._update_checkpoint_info(training_metrics)
+                
+                # Build status
+                status = {
+                    "message": f"Training step {state.global_step}/{state.max_steps}",
+                    "timestamp": int(current_time),
+                    "start_time": int(self.start_time),
+                    "current_step": state.global_step,
+                    "total_steps": state.max_steps,
+                    "current_epoch": int(state.epoch) if state.epoch else 1,
+                    "total_epochs": int(state.num_train_epochs) if state.num_train_epochs else 1,
+                    "percentage_complete": f"{progress:.2f}",
+                    "estimated_time_remaining": eta_formatted,
+                    "training_metrics": training_metrics
+                }
+                
+                # Atomic write
+                temp_file = f"{self.status_file}.tmp"
+                with open(temp_file, 'w') as f:
+                    json.dump(status, f, indent=2)
+                os.rename(temp_file, self.status_file)
+                self.last_update_time = current_time
+                
+            except Exception as e:
+                print(f"Failed to write progress: {e}")
+        
+        def _format_eta(self, eta_seconds: int) -> str:
+            """Format ETA seconds into human readable format."""
+            days, hours, minutes, seconds = (
+                eta_seconds // 86400, 
+                (eta_seconds % 86400) // 3600,
+                (eta_seconds % 3600) // 60, 
+                eta_seconds % 60
+            )
+            eta_formatted = ""
+            if days > 0: eta_formatted += f"{days}d"
+            if hours > 0: eta_formatted += f"{hours}h"
+            if minutes > 0: eta_formatted += f"{minutes}m"
+            if seconds > 0 or eta_formatted == "": eta_formatted += f"{seconds}s"
+            return eta_formatted
+        
+        def _update_checkpoint_info(self, training_metrics: dict):
+            """Update checkpoint information in training metrics."""
+            try:
+                if os.path.exists(self.checkpoint_dir):
+                    checkpoints = [f for f in os.listdir(self.checkpoint_dir) if f.startswith('checkpoint-')]
+                    if checkpoints:
+                        training_metrics["checkpoints_stored"] = str(len(checkpoints))
+                        
+                        # Find latest checkpoint by highest number
+                        def get_checkpoint_number(checkpoint_name):
+                            try:
+                                return int(checkpoint_name.split('-')[1])
+                            except (IndexError, ValueError):
+                                return -1
+                        
+                        latest_checkpoint_name = max(checkpoints, key=get_checkpoint_number)
+                        latest_checkpoint_path = os.path.join(self.checkpoint_dir, latest_checkpoint_name)
+                        training_metrics["latest_checkpoint_path"] = latest_checkpoint_path
+            except (OSError, ValueError) as e:
+                print(f"Warning: Failed to update checkpoint info: {e}")
+        
+        def on_save(self, args, state, control, **kwargs):
+            """Save training start time to checkpoint for accurate resume progress tracking."""
+            if self.global_rank == 0:
+                try:
+                    # Save training start time to a separate file to avoid interfering with trainer_state.json
+                    checkpoint_dir = args.output_dir
+                    latest_checkpoint = f"checkpoint-{state.global_step}"
+                    checkpoint_path = os.path.join(checkpoint_dir, latest_checkpoint)
+                    
+                    if os.path.exists(checkpoint_path):
+                        # Save to a separate file to avoid conflicts with transformers
+                        training_info_path = os.path.join(checkpoint_path, 'training_info.json')
+                        training_info = {
+                            'training_start_time': self.start_time,
+                            'resume_from_step': self.resume_from_step
+                        }
+                        
+                        with open(training_info_path, 'w') as f:
+                            json.dump(training_info, f, indent=2)
+                        
+                        print(f"[Rank {self.global_rank}] Saved training info to checkpoint")
+                except Exception as e:
+                    print(f"Failed to save training info to checkpoint: {e}")
+        
+        def on_train_end(self, args, state, control, **kwargs):
+            """Mark training as completed."""
+            if self.global_rank == 0:
+                try:
+                    status = {
+                        "message": "Training completed successfully",
+                        "timestamp": int(time.time()),
+                        "start_time": int(self.start_time),
+                        "current_step": state.max_steps,
+                        "total_steps": state.max_steps,
+                        "current_epoch": int(state.num_train_epochs),
+                        "total_epochs": int(state.num_train_epochs),
+                        "percentage_complete": "100.00",
+                        "estimated_time_remaining": "0s"
+                    }
+                    
+                    temp_file = f"{self.status_file}.tmp"
+                    with open(temp_file, 'w') as f:
+                        json.dump(status, f, indent=2)
+                    os.rename(temp_file, self.status_file)
+                    
+                    print("Training completed. Waiting for progression status to be captured...")
+                    time.sleep(30)  # Buffer time to ensure controller captures completion
+                    
+                except Exception as e:
+                    print(f"Failed to write completion status: {e}")
+
+
+    def setup_args():
+        """Convert environment variables to command line arguments."""
+        if '--dataset_name' not in sys.argv:
+            # Required arguments
+            sys.argv.extend(['--dataset_name', os.getenv('DATASET_NAME', 'tatsu-lab/alpaca')])
+            sys.argv.extend(['--output_dir', '/workspace/checkpoints'])
+            
+            # Training arguments from environment
+            env_mappings = [
+                ('MODEL_NAME', '--model_name_or_path'),
+                ('LEARNING_RATE', '--learning_rate'),
+                ('BATCH_SIZE', '--per_device_train_batch_size'),
+                ('MAX_EPOCHS', '--num_train_epochs'),
+                ('SAVE_STEPS', '--save_steps'),
+                ('LOGGING_STEPS', '--logging_steps'),
+                ('GRADIENT_ACCUMULATION_STEPS', '--gradient_accumulation_steps'),
+                ('WARMUP_STEPS', '--warmup_steps'),
+                ('MAX_SEQ_LENGTH', '--max_seq_length'),
+            ]
+            
+            for env_var, arg_name in env_mappings:
+                value = os.getenv(env_var)
+                if value:
+                    sys.argv.extend([arg_name, value])
+            
+            # LoRA configuration
+            if os.getenv('LORA_R'):
+                sys.argv.extend(['--use_peft', '--lora_r', os.getenv('LORA_R')])
+                if os.getenv('LORA_ALPHA'):
+                    sys.argv.extend(['--lora_alpha', os.getenv('LORA_ALPHA')])
+                if os.getenv('LORA_DROPOUT'):
+                    sys.argv.extend(['--lora_dropout', os.getenv('LORA_DROPOUT')])
+            
+            # Let TRL/Transformers handle epoch-based training automatically
+            # This avoids confusion with step calculations in distributed training
+            print(f"Using epoch-based training: {os.getenv('MAX_EPOCHS')} epochs")
+
+
+    def load_datasets():
+        """Load training and evaluation datasets."""
+        # Try dataset initializer first
+        dataset_path = Path("/workspace/dataset")
+        if dataset_path.exists():
+            try:
+                return load_from_disk(str(dataset_path))
+            except:
+                pass
+        
+        # Load from HuggingFace
+        dataset_name = os.getenv('DATASET_NAME', 'tatsu-lab/alpaca')
+        train_split = os.getenv('DATASET_TRAIN_SPLIT', 'train[:500]')
+        test_split = os.getenv('DATASET_TEST_SPLIT', 'train[500:520]')
+        
+        train_dataset = load_dataset(dataset_name, split=train_split)
+        test_dataset = load_dataset(dataset_name, split=test_split)
+        
+        return {'train': train_dataset, 'test': test_dataset}
+
+
+    def main():
+        """Main training function for distributed GPT-2 fine-tuning with LoRA."""
+        # Setup distributed training
+        local_rank, global_rank, world_size = setup_distributed()
+        
+        print(f"[Rank {global_rank}/{world_size}] Starting TRL training")
+        
+        # Create cache directories and setup arguments
+        os.makedirs("/workspace/cache/transformers", exist_ok=True)
+        os.makedirs("/workspace/cache", exist_ok=True)
+        os.makedirs("/workspace/cache/datasets", exist_ok=True)
+        
+        setup_args()
+        parser = TrlParser((ScriptArguments, SFTConfig, ModelConfig))
+        script_args, training_args, model_config = parser.parse_args_and_config()
+        set_seed(training_args.seed)
+        
+        # Create output directory
+        checkpoint_dir = Path(training_args.output_dir)
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        
+        # Load datasets
+        datasets = load_datasets()
+        train_dataset = datasets['train']
+        eval_dataset = datasets.get('test', train_dataset)
+        print(f"[Rank {global_rank}/{world_size}] Dataset loaded - Train: {len(train_dataset)}, Eval: {len(eval_dataset)}")
+        
+        # Configure PEFT and initialize trainer
+        peft_config = get_peft_config(model_config) if model_config.use_peft else None
+        peft_status = "LoRA enabled" if peft_config else "Full fine-tuning"
+        print(f"[Rank {global_rank}/{world_size}] Model: {model_config.model_name_or_path} ({peft_status})")
+        
+        trainer = SFTTrainer(
+            model=model_config.model_name_or_path,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            peft_config=peft_config,
+            callbacks=[]
+        )
+        
+        # Print trainable parameters (main process only)
+        if trainer.accelerator.is_main_process and hasattr(trainer.model, "print_trainable_parameters"):
+            trainer.model.print_trainable_parameters()
+        
+        # Checkpoint detection and resume logic
+        checkpoint = get_last_checkpoint(training_args.output_dir)
+        resume_from_step = 0
+        training_start_time = None
+        resume_info = {}
+        
+        if checkpoint is not None:
+            try:
+                # Validate checkpoint directory structure - check for different model file formats
+                trainer_state_file = os.path.join(checkpoint, 'trainer_state.json')
+                model_files = [
+                    'pytorch_model.bin',
+                    'model.safetensors', 
+                    'adapter_model.bin',  # For LoRA/PEFT models
+                    'adapter_model.safetensors'
+                ]
+                
+                model_file_exists = any(os.path.exists(os.path.join(checkpoint, f)) for f in model_files)
+                
+                if not os.path.exists(trainer_state_file):
+                    print(f"[Rank {global_rank}/{world_size}] Missing trainer_state.json in checkpoint")
+                    checkpoint = None
+                elif not model_file_exists:
+                    print(f"[Rank {global_rank}/{world_size}] No model file found in checkpoint (checked: {model_files})")
+                    checkpoint = None
+                else:
+                    trainer_state_path = os.path.join(checkpoint, 'trainer_state.json')
+                    with open(trainer_state_path, 'r') as f:
+                        trainer_state = json.load(f)
+                        resume_from_step = int(trainer_state.get('global_step', 0))
+                        resume_info = {
+                            'global_step': resume_from_step,
+                            'epoch': trainer_state.get('epoch', 0),
+                            'total_flos': trainer_state.get('total_flos', 0),
+                            'train_batch_size': trainer_state.get('train_batch_size', training_args.per_device_train_batch_size),
+                            'learning_rate': trainer_state.get('log_history', [{}])[-1].get('learning_rate', training_args.learning_rate) if trainer_state.get('log_history') else training_args.learning_rate,
+                            'loss': trainer_state.get('log_history', [{}])[-1].get('train_loss', 'N/A') if trainer_state.get('log_history') else 'N/A'
+                        }
+                    
+                    # Load training start time if available
+                    training_info_path = os.path.join(checkpoint, 'training_info.json')
+                    if os.path.exists(training_info_path):
+                        with open(training_info_path, 'r') as f:
+                            training_info = json.load(f)
+                            training_start_time = training_info.get('training_start_time')
+                    
+                    # Calculate training progress based on epochs
+                    current_epoch = resume_info['epoch']
+                    target_epochs = training_args.num_train_epochs
+                    progress_pct = (current_epoch / target_epochs * 100) if target_epochs > 0 else 0
+                    remaining_epochs = max(0, target_epochs - current_epoch)
+                    
+                    print(f"[Rank {global_rank}/{world_size}] ===== RESUMING TRAINING =====")
+                    print(f"[Rank {global_rank}/{world_size}] Checkpoint: {checkpoint}")
+                    print(f"[Rank {global_rank}/{world_size}] Resuming from step: {resume_from_step}")
+                    print(f"[Rank {global_rank}/{world_size}] Resuming from epoch: {current_epoch:.2f}/{target_epochs} ({progress_pct:.1f}% complete)")
+                    print(f"[Rank {global_rank}/{world_size}] Last recorded loss: {resume_info['loss']}")
+                    print(f"[Rank {global_rank}/{world_size}] Last learning rate: {resume_info['learning_rate']:.6f}")
+                    print(f"[Rank {global_rank}/{world_size}] Remaining epochs: {remaining_epochs:.2f}")
+                    print(f"[Rank {global_rank}/{world_size}] =============================")
+            except Exception as e:
+                print(f"[Rank {global_rank}/{world_size}] Checkpoint load failed: {e}")
+                checkpoint = None
+        
+        if checkpoint is None:
+            print(f"[Rank {global_rank}/{world_size}] ===== STARTING NEW TRAINING =====")
+            print(f"[Rank {global_rank}/{world_size}] No checkpoint found, starting from scratch")
+            print(f"[Rank {global_rank}/{world_size}] Total steps planned: {training_args.max_steps}")
+            print(f"[Rank {global_rank}/{world_size}] Total epochs planned: {training_args.num_train_epochs}")
+            print(f"[Rank {global_rank}/{world_size}] ==================================")
+        
+        # Setup callbacks and handlers
+        progression_callback = EnhancedProgressionCallback(
+            global_rank=global_rank, 
+            resume_from_step=resume_from_step, 
+            training_start_time=training_start_time,
+            checkpoint_dir=str(checkpoint_dir)
+        )
+        trainer.add_callback(progression_callback)
+        
+        preemption_handler = PreemptionHandler(trainer=trainer, progression_callback=progression_callback)
+        
+        # Start or resume training
+        if checkpoint is not None:
+            print(f"[Rank {global_rank}/{world_size}] RESUMING training from checkpoint - Target Epochs: {training_args.num_train_epochs}, Current LR: {resume_info.get('learning_rate', training_args.learning_rate):.6f}")
+        else:
+            print(f"[Rank {global_rank}/{world_size}] STARTING new training - Epochs: {training_args.num_train_epochs}, Initial LR: {training_args.learning_rate}")
+        
+        trainer.train(resume_from_checkpoint=checkpoint)
+        
+        # Save model and cleanup
+        if trainer.accelerator.is_main_process:
+            trainer.save_model()
+            print(f"[Rank {global_rank}/{world_size}] Model saved")
+        
+        print(f"[Rank {global_rank}/{world_size}] Training completed")
+
+
+    if __name__ == "__main__":
+        main()
+
+---
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainingRuntime
+metadata:
+  name: torch-cuda-251
+  labels:
+    trainer.kubeflow.org/framework: torch
+    project: trl-demo
+spec:
+  mlPolicy:
+    numNodes: 2
+    torch:
+      numProcPerNode: auto
+  template:
+    spec:
+      replicatedJobs:
+        # Dataset Initializer
+        - name: dataset-initializer
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
+            spec:
+              template:
+                spec:
+                  restartPolicy: Never
+                  containers:
+                    - name: dataset-initializer
+                      image: ghcr.io/kubeflow/trainer/dataset-initializer:v2.0.0
+                      env:
+                        - name: STORAGE_URI
+                          value: "hf://tatsu-lab/alpaca"
+                        - name: HF_HOME
+                          value: "/workspace/cache"
+                        - name: DATASET_NAME
+                          value: "tatsu-lab/alpaca"
+                        - name: DATASET_CONFIG
+                          value: "main"
+                        - name: DATASET_SPLIT
+                          value: "train[:500]"
+                        - name: DATASET_FORMAT
+                          value: "json"
+                      resources:
+                        limits:
+                          cpu: "2"
+                          memory: "4Gi"
+                        requests:
+                          cpu: "1"
+                          memory: "2Gi"
+                      volumeMounts:
+                        - name: shared-workspace
+                          mountPath: /workspace
+                  volumes:
+                    - name: shared-workspace
+                      persistentVolumeClaim:
+                        claimName: shared-storage-v2
+
+        # Model Initializer
+        - name: model-initializer
+          dependsOn:
+            - name: dataset-initializer
+              status: Complete
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: model-initializer
+            spec:
+              template:
+                spec:
+                  restartPolicy: Never
+                  containers:
+                    - name: model-initializer
+                      image: ghcr.io/kubeflow/trainer/model-initializer:v2.0.0
+                      env:
+                        - name: STORAGE_URI
+                          value: "hf://gpt2"
+                        - name: HF_HOME
+                          value: "/workspace/cache"
+                        - name: MODEL_NAME
+                          value: "gpt2"
+                        - name: MODEL_REVISION
+                          value: "main"
+                        - name: DOWNLOAD_MODE
+                          value: "force_redownload"
+                      resources:
+                        limits:
+                          cpu: "2"
+                          memory: "4Gi"
+                        requests:
+                          cpu: "1"
+                          memory: "2Gi"
+                      volumeMounts:
+                        - name: shared-workspace
+                          mountPath: /workspace
+                  volumes:
+                    - name: shared-workspace
+                      persistentVolumeClaim:
+                        claimName: shared-storage-v2
+
+        # Training Node
+        - name: node
+          dependsOn:
+            - name: model-initializer
+              status: Complete
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: quay.io/modh/training:py311-cuda124-torch251
+                      volumeMounts:
+                        - name: shared-workspace
+                          mountPath: /workspace
+                        - name: training-script
+                          mountPath: /workspace/trl-training.py
+                          subPath: trl-training.py
+                      env:
+                        - name: PYTHONUNBUFFERED
+                          value: "1"
+                        - name: HF_HOME
+                          value: "/workspace/cache"
+                        - name: TRAINJOB_PROGRESSION_FILE_PATH
+                          value: "/tmp/training_progression.json"
+                        - name: PROGRESSION_UPDATE_INTERVAL
+                          value: "30"
+                        - name: CHECKPOINT_DIR
+                          value: "/workspace/checkpoints"
+                        
+                      command: ["bash", "-c"]
+                      args:
+                        - |
+                          if ! [ -x "$(command -v pip)" ]; then
+                              python -m ensurepip || python -m ensurepip || apt-get install python-pip
+                          fi
+                          
+                          PIP_DISABLE_PIP_VERSION_CHECK=1 python -m pip install --no-warn-script-location \
+                            --index-url https://pypi.org/simple \
+                            trl datasets
+                          
+                          # Use torchrun for multi-process distributed training
+                          torchrun \
+                            --nnodes=${PET_NNODES:-1} \
+                            --nproc-per-node=${PET_NPROC_PER_NODE:-1} \
+                            --node-rank=${PET_NODE_RANK:-0} \
+                            --master-addr=${PET_MASTER_ADDR:-localhost} \
+                            --master-port=${PET_MASTER_PORT:-29500} \
+                            /workspace/trl-training.py
+                      resources:
+                        requests:
+                          cpu: "1"
+                          memory: "2Gi"
+                        limits:
+                          cpu: "2"
+                          memory: "4Gi"
+                          # Uncomment if GPU nodes available:
+                          # nvidia.com/gpu: 1
+                  volumes:
+                    - name: shared-workspace
+                      persistentVolumeClaim:
+                        claimName: shared-storage-v2
+                    - name: training-script
+                      configMap:
+                        name: trl-training-script-v2
+
+---
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: trl-demo-v2
+  labels:
+    kueue.x-k8s.io/queue-name: test-lq
+    app.kubernetes.io/name: "trl-demo-v2"
+    app.kubernetes.io/component: "training"
+    experiment: "simplified-trl-training"
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: TrainingRuntime
+    name: torch-cuda-251
+  
+  trainer:
+    numNodes: 3
+    numProcPerNode: 2
+    resourcesPerNode:
+      requests:
+        cpu: "2"
+        memory: "4Gi"
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+    
+    # Training hyperparameters
+    env:
+      - name: LEARNING_RATE
+        value: "5e-5"
+      - name: BATCH_SIZE
+        value: "1"
+      - name: MAX_EPOCHS
+        value: "5"
+      - name: WARMUP_STEPS
+        value: "5"
+      - name: SAVE_STEPS
+        value: "5"
+      - name: LOGGING_STEPS
+        value: "2"
+      - name: GRADIENT_ACCUMULATION_STEPS
+        value: "2"
+      
+      # Model configuration
+      - name: MODEL_NAME
+        value: "gpt2"
+      - name: LORA_R
+        value: "16"
+      - name: LORA_ALPHA
+        value: "32"
+      - name: LORA_DROPOUT
+        value: "0.1"
+      - name: MAX_SEQ_LENGTH
+        value: "512"
+      
+      # Dataset configuration
+      - name: DATASET_NAME
+        value: "tatsu-lab/alpaca"
+      - name: DATASET_TRAIN_SPLIT
+        value: "train[:500]"
+      - name: DATASET_TEST_SPLIT
+        value: "train[500:520]"
+      
+      # Progression tracking configuration
+      - name: PROGRESSION_UPDATE_INTERVAL
+        value: "30"  # Update every 30 seconds
+      
+      # Checkpoint configuration
+      - name: CHECKPOINT_DIR
+        value: "/workspace/checkpoints"
+
+  managedBy: trainer.kubeflow.org/trainjob-controller

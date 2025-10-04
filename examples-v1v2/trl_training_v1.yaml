@@ -1,0 +1,416 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-storage-v1
+  labels:
+    app.kubernetes.io/name: "trl-demo-v1"
+    app.kubernetes.io/component: "storage"
+    purpose: "checkpoint-storage"
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: nfs-csi
+  volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trl-training-script-v1
+data:
+  trl-training.py: |
+    #!/usr/bin/env python3
+    """Enhanced TRL training script with distributed coordination and robust checkpointing."""
+
+    import os
+    import json
+    import time
+    import sys
+    import signal
+    import torch
+    import torch.distributed as dist
+    from pathlib import Path
+    from typing import Optional
+    from datetime import timedelta
+    from datasets import load_dataset, load_from_disk
+    from transformers import (
+        set_seed, 
+        TrainerCallback, 
+        TrainerState, 
+        TrainerControl
+    )
+    
+    # Fix for PyTorch weights_only loading issue with numpy objects
+    try:
+        import numpy as np
+        torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray])
+    except (ImportError, AttributeError):
+        pass
+    
+    _original_torch_load = torch.load
+    def patched_torch_load(f, map_location=None, pickle_module=None, weights_only=None, **kwargs):
+        try:
+            # Auto-detect device and set appropriate map_location if not specified
+            if map_location is None:
+                if torch.cuda.is_available():
+                    # If CUDA is available, map to current device
+                    local_rank = int(os.environ.get('LOCAL_RANK', 0))
+                    map_location = f'cuda:{local_rank}'
+                else:
+                    # If no CUDA, map to CPU
+                    map_location = 'cpu'
+            
+            return _original_torch_load(f, map_location=map_location, pickle_module=pickle_module, weights_only=weights_only, **kwargs)
+        except Exception as e:
+            if "weights_only" in str(e) and weights_only is True:
+                print(f"[Warning] Falling back to weights_only=False for checkpoint loading: {e}")
+                return _original_torch_load(f, map_location=map_location, pickle_module=pickle_module, weights_only=False, **kwargs)
+            elif "don't know how to restore data location" in str(e):
+                print(f"[Warning] Device mismatch in checkpoint, forcing CPU mapping: {e}")
+                return _original_torch_load(f, map_location='cpu', pickle_module=pickle_module, weights_only=False, **kwargs)
+            raise
+    torch.load = patched_torch_load
+
+    try:
+        from transformers.trainer_utils import get_last_checkpoint
+    except ImportError:
+        # Fallback for older transformers versions
+        def get_last_checkpoint(output_dir):
+            import os
+            import re
+            if not os.path.exists(output_dir):
+                return None
+            checkpoints = [f for f in os.listdir(output_dir) if f.startswith('checkpoint-')]
+            if not checkpoints:
+                return None
+            # Sort by checkpoint number
+            def get_checkpoint_number(name):
+                match = re.search(r'checkpoint-(\d+)', name)
+                return int(match.group(1)) if match else -1
+            latest_checkpoint = max(checkpoints, key=get_checkpoint_number)
+            return os.path.join(output_dir, latest_checkpoint)
+    
+    from trl import ModelConfig, ScriptArguments, SFTConfig, SFTTrainer, TrlParser, get_peft_config
+
+    def setup_distributed():
+        """Setup for PyTorchJob v1 distributed training."""
+        # PyTorchJob v1 sets these environment variables
+        master_addr = os.environ.get("MASTER_ADDR", "localhost")
+        master_port = os.environ.get("MASTER_PORT", "23456")
+        world_size = int(os.environ.get("WORLD_SIZE", "1"))
+        rank = int(os.environ.get("RANK", "0"))
+        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+        
+        print(f"Distributed setup: rank={rank}, world_size={world_size}, master_addr={master_addr}:{master_port}")
+        
+        # Initialize process group
+        dist.init_process_group(
+            backend="nccl" if torch.cuda.is_available() else "gloo",
+            init_method=f"tcp://{master_addr}:{master_port}",
+            world_size=world_size,
+            rank=rank
+        )
+        
+        if torch.cuda.is_available():
+            torch.cuda.set_device(local_rank)
+        
+        return rank, world_size, local_rank
+
+    def main():
+        """Main training function."""
+        # Setup distributed training
+        rank, world_size, local_rank = setup_distributed()
+        
+        # Set random seed for reproducibility
+        set_seed(42)
+        
+        # Get configuration from environment variables
+        model_name = os.environ.get("MODEL_NAME", "gpt2")
+        dataset_name = os.environ.get("DATASET_NAME", "tatsu-lab/alpaca")
+        learning_rate = float(os.environ.get("LEARNING_RATE", "5e-5"))
+        batch_size = int(os.environ.get("BATCH_SIZE", "1"))
+        max_epochs = int(os.environ.get("MAX_EPOCHS", "5"))
+        warmup_steps = int(os.environ.get("WARMUP_STEPS", "5"))
+        save_steps = int(os.environ.get("SAVE_STEPS", "5"))
+        logging_steps = int(os.environ.get("LOGGING_STEPS", "2"))
+        gradient_accumulation_steps = int(os.environ.get("GRADIENT_ACCUMULATION_STEPS", "2"))
+        lora_r = int(os.environ.get("LORA_R", "16"))
+        lora_alpha = int(os.environ.get("LORA_ALPHA", "32"))
+        lora_dropout = float(os.environ.get("LORA_DROPOUT", "0.1"))
+        max_seq_length = int(os.environ.get("MAX_SEQ_LENGTH", "512"))
+        checkpoint_dir = os.environ.get("CHECKPOINT_DIR", "/workspace/output")
+        
+        print(f"Training configuration:")
+        print(f"  Model: {model_name}")
+        print(f"  Dataset: {dataset_name}")
+        print(f"  Learning rate: {learning_rate}")
+        print(f"  Batch size: {batch_size}")
+        print(f"  Max epochs: {max_epochs}")
+        print(f"  LoRA r: {lora_r}")
+        print(f"  Checkpoint dir: {checkpoint_dir}")
+        
+        # Load dataset
+        print("Loading dataset...")
+        dataset = load_dataset(dataset_name, split="train[:500]")
+        
+        # Configure model and training
+        model_config = ModelConfig(
+            model_name_or_path=model_name,
+            trust_remote_code=True,
+            use_peft=True,  # Enable PEFT
+        )
+        
+        sft_config = SFTConfig(
+            output_dir=checkpoint_dir,
+            per_device_train_batch_size=batch_size,
+            per_device_eval_batch_size=batch_size,
+            num_train_epochs=max_epochs,
+            learning_rate=learning_rate,
+            warmup_steps=warmup_steps,
+            save_steps=save_steps,
+            logging_steps=logging_steps,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            max_seq_length=max_seq_length,
+            fp16=torch.cuda.is_available(),
+            dataloader_num_workers=0,
+            remove_unused_columns=False,
+        )
+        
+        # Configure LoRA using the correct method for GPT-2
+        from peft import LoraConfig
+        peft_config = LoraConfig(
+            r=lora_r,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            target_modules=["c_attn", "c_proj", "c_fc"],  # GPT-2 specific modules
+            task_type="CAUSAL_LM",
+        )
+        
+        # Initialize trainer with correct parameters
+        trainer = SFTTrainer(
+            model=model_config.model_name_or_path,
+            args=sft_config,
+            train_dataset=dataset,
+            peft_config=peft_config,
+        )
+        
+        # Start training
+        print("Starting training...")
+        trainer.train()
+        
+        # Save final model
+        if rank == 0:
+            print("Saving final model...")
+            trainer.save_model()
+        
+        # Cleanup
+        dist.destroy_process_group()
+        print("Training completed successfully!")
+
+    if __name__ == "__main__":
+        main()
+
+---
+apiVersion: "kubeflow.org/v1"
+kind: "PyTorchJob"
+metadata:
+  name: "trl-demo-v1"
+  labels:
+    app.kubernetes.io/name: "trl-demo-v1"
+    app.kubernetes.io/component: "training"
+    experiment: "simplified-trl-training"
+    kueue.x-k8s.io/queue-name: "test-lq"
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: "trl-demo-v1"
+            app.kubernetes.io/component: "master"
+        spec:
+          containers:
+          - name: pytorch
+            image: quay.io/modh/training:py311-cuda124-torch251
+            command: ["bash", "-c"]
+            args:
+            - |
+              # MODH training image has PyTorch 2.5.1 and CUDA 12.4
+              # Set PYTHONPATH to include user site-packages
+              export PYTHONPATH="$HOME/.local/lib/python3.11/site-packages:$PYTHONPATH"
+              
+              # Install ML packages with user flag to avoid permission issues
+              python -m pip install --no-warn-script-location \
+                --index-url https://pypi.org/simple \
+                datasets \
+                transformers \
+                accelerate \
+                peft \
+                trl
+              
+              # Verify installation
+              python -c "import torch; print('PyTorch version:', torch.__version__)"
+              python -c "import datasets; print('datasets version:', datasets.__version__)"
+              python -c "import transformers; print('transformers version:', transformers.__version__)"
+              python -c "import trl; print('trl version:', trl.__version__)"
+              
+              # Run training script
+              python /workspace/trl-training.py
+            env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: LEARNING_RATE
+              value: "5e-5"
+            - name: BATCH_SIZE
+              value: "1"
+            - name: MAX_EPOCHS
+              value: "5"
+            - name: WARMUP_STEPS
+              value: "5"
+            - name: SAVE_STEPS
+              value: "5"
+            - name: LOGGING_STEPS
+              value: "2"
+            - name: GRADIENT_ACCUMULATION_STEPS
+              value: "2"
+            - name: MODEL_NAME
+              value: "gpt2"
+            - name: LORA_R
+              value: "16"
+            - name: LORA_ALPHA
+              value: "32"
+            - name: LORA_DROPOUT
+              value: "0.1"
+            - name: MAX_SEQ_LENGTH
+              value: "512"
+            - name: DATASET_NAME
+              value: "tatsu-lab/alpaca"
+            - name: DATASET_TRAIN_SPLIT
+              value: "train[:500]"
+            - name: DATASET_TEST_SPLIT
+              value: "train[500:520]"
+            - name: CHECKPOINT_DIR
+              value: "/workspace/output"
+            volumeMounts:
+            - name: training-script
+              mountPath: /workspace/trl-training.py
+              subPath: trl-training.py
+            - name: shared-workspace
+              mountPath: /workspace/output
+            resources:
+              requests:
+                cpu: "2"
+                memory: "4Gi"
+              limits:
+                cpu: "4"
+                memory: "8Gi"
+                # Uncomment if GPU nodes available:
+                # nvidia.com/gpu: 1
+          volumes:
+          - name: training-script
+            configMap:
+              name: trl-training-script-v1
+              defaultMode: 0755
+          - name: shared-workspace
+            persistentVolumeClaim:
+              claimName: shared-storage-v1
+    
+    Worker:
+      replicas: 2
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: "trl-demo-v1"
+            app.kubernetes.io/component: "worker"
+        spec:
+          containers:
+          - name: pytorch
+            image: quay.io/modh/training:py311-cuda124-torch251
+            command: ["bash", "-c"]
+            args:
+            - |
+              # MODH training image has PyTorch 2.5.1 and CUDA 12.4
+              # Set PYTHONPATH to include user site-packages
+              export PYTHONPATH="$HOME/.local/lib/python3.11/site-packages:$PYTHONPATH"
+              
+              # Install ML packages with user flag to avoid permission issues
+              python -m pip install --user --no-warn-script-location \
+                --index-url https://pypi.org/simple \
+                datasets \
+                transformers \
+                accelerate \
+                peft \
+                trl
+              
+              # Verify installation
+              python -c "import torch; print('PyTorch version:', torch.__version__)"
+              python -c "import datasets; print('datasets version:', datasets.__version__)"
+              python -c "import transformers; print('transformers version:', transformers.__version__)"
+              python -c "import trl; print('trl version:', trl.__version__)"
+              
+              # Run training script
+              python /workspace/trl-training.py
+            env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: LEARNING_RATE
+              value: "5e-5"
+            - name: BATCH_SIZE
+              value: "1"
+            - name: MAX_EPOCHS
+              value: "5"
+            - name: WARMUP_STEPS
+              value: "5"
+            - name: SAVE_STEPS
+              value: "5"
+            - name: LOGGING_STEPS
+              value: "2"
+            - name: GRADIENT_ACCUMULATION_STEPS
+              value: "2"
+            - name: MODEL_NAME
+              value: "gpt2"
+            - name: LORA_R
+              value: "16"
+            - name: LORA_ALPHA
+              value: "32"
+            - name: LORA_DROPOUT
+              value: "0.1"
+            - name: MAX_SEQ_LENGTH
+              value: "512"
+            - name: DATASET_NAME
+              value: "tatsu-lab/alpaca"
+            - name: DATASET_TRAIN_SPLIT
+              value: "train[:500]"
+            - name: DATASET_TEST_SPLIT
+              value: "train[500:520]"
+            - name: CHECKPOINT_DIR
+              value: "/workspace/output"
+            volumeMounts:
+            - name: training-script
+              mountPath: /workspace/trl-training.py
+              subPath: trl-training.py
+            - name: shared-workspace
+              mountPath: /workspace/output
+            resources:
+              requests:
+                cpu: "2"
+                memory: "4Gi"
+              limits:
+                cpu: "4"
+                memory: "8Gi"
+                # Uncomment if GPU nodes available:
+                # nvidia.com/gpu: 1
+          volumes:
+          - name: training-script
+            configMap:
+              name: trl-training-script-v1
+              defaultMode: 0755
+          - name: shared-workspace
+            persistentVolumeClaim:
+              claimName: shared-storage-v1

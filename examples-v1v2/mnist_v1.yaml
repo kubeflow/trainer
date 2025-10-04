@@ -1,0 +1,342 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mnist-storage-v1
+  labels:
+    app.kubernetes.io/name: "mnist-demo-v1"
+    app.kubernetes.io/component: "storage"
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: nfs-csi
+  volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mnist-script-v1
+data:
+  train.py: |
+    import torch
+    import logging
+    import torch.nn as nn
+    import torch.nn.functional as F
+    import torch.distributed as dist
+
+    from torch.utils.data import DataLoader, Dataset
+    from torch.nn.parallel import DistributedDataParallel as DDP
+    from torch.utils.data.distributed import DistributedSampler
+    import torchvision.transforms as transforms
+    from torchvision.datasets import MNIST
+    import os
+
+    # Configure logger.
+    log_formatter = logging.Formatter(
+        "%(asctime)s %(levelname)-8s %(message)s", "%Y-%m-%dT%H:%M:%SZ"
+    )
+    logger = logging.getLogger(__file__)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(log_formatter)
+    logger.addHandler(console_handler)
+    logger.setLevel(logging.INFO)
+        
+    def ddp_setup(backend="nccl"):
+        """Setup for Distributed Data Parallel with specified backend."""
+        # PyTorchJob v1 sets these environment variables
+        master_addr = os.environ.get("MASTER_ADDR", "localhost")
+        master_port = os.environ.get("MASTER_PORT", "23456")
+        world_size = int(os.environ.get("WORLD_SIZE", "1"))
+        rank = int(os.environ.get("RANK", "0"))
+        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+        
+        logger.info(f"Distributed setup: rank={rank}, world_size={world_size}, master_addr={master_addr}:{master_port}")
+        
+        # If CUDA is not available, use CPU as the fallback
+        if torch.cuda.is_available() and backend=="nccl":
+            # Check GPU availability
+            num_devices = torch.cuda.device_count()
+            if local_rank >= num_devices:
+                logger.warning(f"Warning: Invalid device ordinal {local_rank}. Defaulting to device 0.")
+                local_rank = 0
+            torch.cuda.set_device(local_rank)
+        else:
+            # If no GPU is available, use Gloo backend (for CPU-only environments)
+            logger.info("No GPU available, falling back to CPU.")
+            backend="gloo"
+        
+        # Initialize process group
+        dist.init_process_group(
+            backend=backend,
+            init_method=f"tcp://{master_addr}:{master_port}",
+            world_size=world_size,
+            rank=rank
+        )
+
+    class Net(nn.Module):
+        def __init__(self):
+            super(Net, self).__init__()
+            self.conv1 = nn.Conv2d(1, 20, 5, 1)
+            self.conv2 = nn.Conv2d(20, 50, 5, 1)
+            self.fc1 = nn.Linear(4 * 4 * 50, 500)
+            self.fc2 = nn.Linear(500, 10)
+
+        def forward(self, x):
+            x = F.relu(self.conv1(x))
+            x = F.max_pool2d(x, 2, 2)
+            x = F.relu(self.conv2(x))
+            x = F.max_pool2d(x, 2, 2)
+            x = x.view(-1, 4 * 4 * 50)
+            x = F.relu(self.fc1(x))
+            x = self.fc2(x)
+            return F.log_softmax(x, dim=1)
+
+    class Trainer:
+        def __init__(
+            self,
+            model: torch.nn.Module,
+            train_data: DataLoader,
+            optimizer: torch.optim.Optimizer,
+            save_every: int,
+            snapshot_path: str,
+            backend: str,
+        ) -> None:
+            self.local_rank = int(os.environ.get("LOCAL_RANK", -1))  # Ensure fallback if LOCAL_RANK isn't set
+            self.global_rank = int(os.environ["RANK"])
+
+
+            self.model=model
+            self.train_data = train_data
+            self.optimizer = optimizer
+            self.save_every = save_every
+            self.epochs_run = 0
+            self.snapshot_path = snapshot_path
+            self.backend = backend
+
+            if os.path.exists(snapshot_path):
+                logger.info("Loading snapshot")
+                self._load_snapshot(snapshot_path)
+
+            # Move model to the appropriate device (GPU/CPU)
+            if torch.cuda.is_available() and self.backend=="nccl":
+                self.device = torch.device(f'cuda:{self.local_rank}')
+                self.model = DDP(self.model.to(self.device), device_ids=[self.local_rank])
+            else:
+                self.device=torch.device('cpu')
+                self.model = DDP(self.model.to(self.device))
+            logger.info(f"Using device: {self.device}")
+
+        def _run_batch(self, source, targets):
+            self.optimizer.zero_grad()
+            output = self.model(source)
+            loss = F.cross_entropy(output, targets)
+            loss.backward()
+            self.optimizer.step()
+
+        def _run_epoch(self, epoch, backend):
+            b_sz = len(next(iter(self.train_data))[0])
+            if torch.cuda.is_available() and backend=="nccl":
+                logger.info(f"[GPU{self.global_rank}] Epoch {epoch} | Batchsize: {b_sz} | Steps: {len(self.train_data)}")
+            else:
+                logger.info(f"[CPU{self.global_rank}] Epoch {epoch} | Batchsize: {b_sz} | Steps: {len(self.train_data)}")
+            if isinstance(self.train_data.sampler, DistributedSampler):
+                self.train_data.sampler.set_epoch(epoch)
+            for source, targets in self.train_data:
+                source = source.to(self.device)
+                targets = targets.to(self.device)
+                self._run_batch(source, targets)
+
+        def _save_snapshot(self, epoch):
+            snapshot = {
+                "MODEL_STATE": self.model.module.state_dict() if torch.cuda.is_available() else self.model.state_dict(),
+                "EPOCHS_RUN": epoch,
+            }
+            torch.save(snapshot, self.snapshot_path)
+            logger.info(f"Epoch {epoch} | Training snapshot saved at {self.snapshot_path}")
+
+        def train(self, max_epochs: int, backend: str):
+            for epoch in range(self.epochs_run, max_epochs):
+                self._run_epoch(epoch, backend)
+                if self.global_rank == 0 and epoch % self.save_every == 0:
+                    self._save_snapshot(epoch)
+
+
+    def load_train_objs(dataset_path: str,lr: float):
+        """Load dataset, model, and optimizer."""
+        train_set = MNIST(dataset_path,
+            train=True,         # Use training set, not test set
+            download=True,      # Download if not present
+            transform=transforms.Compose([transforms.ToTensor()]))
+        model = Net()
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        return train_set, model, optimizer
+
+
+    def prepare_dataloader(dataset: Dataset, batch_size: int, useGpu: bool):
+        """Prepare DataLoader with DistributedSampler."""
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            pin_memory=useGpu,
+            shuffle=False,
+            sampler=DistributedSampler(dataset)
+        )
+
+
+    def main(epochs: int, save_every: int, batch_size: int, lr: float, dataset_path: str, snapshot_path: str, backend: str):
+        ddp_setup(backend)
+        dataset, model, optimizer = load_train_objs(dataset_path, lr)
+        train_loader = prepare_dataloader(dataset, batch_size, torch.cuda.is_available() and backend=="nccl")
+        trainer = Trainer(model, train_loader, optimizer, save_every, snapshot_path, backend)
+        trainer.train(epochs, backend)
+        dist.destroy_process_group()
+
+    if __name__ == "__main__":
+        import argparse
+        parser = argparse.ArgumentParser(description="Distributed MNIST Training")
+        parser.add_argument('--epochs', type=int, required=True, help='Total epochs to train the model')
+        parser.add_argument('--save_every', type=int, required=True, help='How often to save a snapshot')
+        parser.add_argument('--batch_size', type=int, default=64, help='Input batch size on each device (default: 64)')
+        parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate (default: 1e-3)')
+        parser.add_argument('--dataset_path', type=str, default="../data", help='Path to MNIST datasets (default: ../data)')
+        parser.add_argument('--snapshot_path', type=str, default="snapshot_mnist.pt", help='Path to save snapshots (default: snapshot_mnist.pt)')
+        parser.add_argument('--backend', type=str, choices=['gloo', 'nccl'], default='nccl', help='Distributed backend type (default: nccl)')
+        args = parser.parse_args()
+
+        main(
+            epochs=args.epochs,
+            save_every=args.save_every,
+            batch_size=args.batch_size,
+            lr=args.lr,
+            dataset_path=args.dataset_path,
+            snapshot_path=args.snapshot_path,
+            backend=args.backend
+        )
+
+---
+apiVersion: "kubeflow.org/v1"
+kind: "PyTorchJob"
+metadata:
+  name: "mnist-demo-v1"
+  labels:
+    app.kubernetes.io/name: "mnist-demo-v1"
+    app.kubernetes.io/component: "training"
+    kueue.x-k8s.io/queue-name: "test-lq"
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: "mnist-demo-v1"
+            app.kubernetes.io/component: "master"
+        spec:
+          containers:
+          - name: pytorch
+            image: pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
+            command: ["python", "/workspace/train.py"]
+            args:
+            - "--epochs"
+            - "2"
+            - "--save_every"
+            - "1"
+            - "--batch_size"
+            - "64"
+            - "--lr"
+            - "1e-3"
+            - "--dataset_path"
+            - "/tmp/data"
+            - "--snapshot_path"
+            - "/tmp/checkpoints/snapshot_mnist.pt"
+            - "--backend"
+            - "gloo"
+            env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            volumeMounts:
+            - name: training-script
+              mountPath: /workspace/train.py
+              subPath: train.py
+            - name: shared-storage
+              mountPath: /tmp/checkpoints
+            - name: data-volume
+              mountPath: /tmp/data
+            resources:
+              requests:
+                cpu: "1"
+                memory: "2Gi"
+              limits:
+                cpu: "2"
+                memory: "4Gi"
+          volumes:
+          - name: training-script
+            configMap:
+              name: mnist-script-v1
+              defaultMode: 0755
+          - name: shared-storage
+            persistentVolumeClaim:
+              claimName: mnist-storage-v1
+          - name: data-volume
+            emptyDir: {}
+    
+    Worker:
+      replicas: 2
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: "mnist-demo-v1"
+            app.kubernetes.io/component: "worker"
+        spec:
+          containers:
+          - name: pytorch
+            image: pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
+            command: ["python", "/workspace/train.py"]
+            args:
+            - "--epochs"
+            - "2"
+            - "--save_every"
+            - "1"
+            - "--batch_size"
+            - "64"
+            - "--lr"
+            - "1e-3"
+            - "--dataset_path"
+            - "/tmp/data"
+            - "--snapshot_path"
+            - "/tmp/checkpoints/snapshot_mnist.pt"
+            - "--backend"
+            - "gloo"
+            env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            volumeMounts:
+            - name: training-script
+              mountPath: /workspace/train.py
+              subPath: train.py
+            - name: shared-storage
+              mountPath: /tmp/checkpoints
+            - name: data-volume
+              mountPath: /tmp/data
+            resources:
+              requests:
+                cpu: "500m"
+                memory: "1Gi"
+              limits:
+                cpu: "1"
+                memory: "2Gi"
+          volumes:
+          - name: training-script
+            configMap:
+              name: mnist-script-v1
+              defaultMode: 0755
+          - name: shared-storage
+            persistentVolumeClaim:
+              claimName: mnist-storage-v1
+          - name: data-volume
+            emptyDir: {}
