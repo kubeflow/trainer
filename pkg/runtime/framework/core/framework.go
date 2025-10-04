@@ -31,7 +31,10 @@ import (
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
 )
 
-var errorTooManyTerminalConditionPlugin = errors.New("too many TerminalCondition plugins are registered")
+var (
+	errorTooManyTerminalConditionPlugin = errors.New("too many TerminalCondition plugins are registered")
+	errorTooManyJobsStatusPlugin        = errors.New("too many JobsStatus plugins are registered")
+)
 
 type Framework struct {
 	registry                     fwkplugins.Registry
@@ -42,7 +45,8 @@ type Framework struct {
 	watchExtensionPlugins        []framework.WatchExtensionPlugin
 	podNetworkPlugins            []framework.PodNetworkPlugin
 	componentBuilderPlugins      []framework.ComponentBuilderPlugin
-	terminalConditionPlugins     []framework.TerminalConditionPlugin
+	terminalConditionPlugin      framework.TerminalConditionPlugin
+	jobsStatusPlugin             framework.JobsStatusPlugin
 }
 
 func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer client.FieldIndexer) (*Framework, error) {
@@ -76,7 +80,16 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 			f.componentBuilderPlugins = append(f.componentBuilderPlugins, p)
 		}
 		if p, ok := plugin.(framework.TerminalConditionPlugin); ok {
-			f.terminalConditionPlugins = append(f.terminalConditionPlugins, p)
+			if f.terminalConditionPlugin != nil {
+				return nil, errorTooManyTerminalConditionPlugin
+			}
+			f.terminalConditionPlugin = p
+		}
+		if p, ok := plugin.(framework.JobsStatusPlugin); ok {
+			if f.jobsStatusPlugin != nil {
+				return nil, errorTooManyJobsStatusPlugin
+			}
+			f.jobsStatusPlugin = p
 		}
 	}
 	f.plugins = plugins
@@ -138,12 +151,15 @@ func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtim
 }
 
 func (f *Framework) RunTerminalConditionPlugins(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error) {
-	// TODO (tenzen-y): Once we provide the Configuration API, we should validate which plugin should have terminalCondition execution points.
-	if len(f.terminalConditionPlugins) > 1 {
-		return nil, errorTooManyTerminalConditionPlugin
+	if f.terminalConditionPlugin != nil {
+		return f.terminalConditionPlugin.TerminalCondition(ctx, trainJob)
 	}
-	if len(f.terminalConditionPlugins) != 0 {
-		return f.terminalConditionPlugins[0].TerminalCondition(ctx, trainJob)
+	return nil, nil
+}
+
+func (f *Framework) RunJobsStatusPlugins(ctx context.Context, trainJob *trainer.TrainJob) ([]trainer.JobStatus, error) {
+	if f.jobsStatusPlugin != nil {
+		return f.jobsStatusPlugin.JobsStatus(ctx, trainJob)
 	}
 	return nil, nil
 }

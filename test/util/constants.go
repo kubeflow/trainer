@@ -22,6 +22,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
 
 const (
@@ -38,5 +40,8 @@ var (
 	}
 	IgnoreConditions = cmp.Options{
 		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime", "ObservedGeneration"),
+	}
+	SortJobsStatus = cmp.Options{
+		cmpopts.SortSlices(func(a, b trainer.JobStatus) bool { return a.Name < b.Name }),
 	}
 )

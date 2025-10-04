@@ -75,6 +75,10 @@ func (r *ClusterTrainingRuntime) TerminalCondition(ctx context.Context, trainJob
 	return r.TrainingRuntime.TerminalCondition(ctx, trainJob)
 }
 
+func (r *ClusterTrainingRuntime) JobsStatus(ctx context.Context, trainJob *trainer.TrainJob) ([]trainer.JobStatus, error) {
+	return r.TrainingRuntime.JobsStatus(ctx, trainJob)
+}
+
 func (r *ClusterTrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 	return nil
 }
