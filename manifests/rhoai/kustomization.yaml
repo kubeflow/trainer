@@ -1,0 +1,61 @@
+# RHOAI configuration for Kubeflow Training Operator (KFTO)
+
+# Adds namespace to all resources.
+namespace: opendatahub
+
+configMapGenerator:
+- name: rhoai-config
+  envs:
+    - params.env
+
+configurations:
+- params.yaml
+
+replacements:
+- source:
+    kind: ConfigMap
+    name: rhoai-config
+    version: v1
+    fieldPath: data.odh-kubeflow-trainer-controller-image
+  targets:
+  - select:
+      kind: Deployment
+      name: kubeflow-trainer-controller-manager
+    fieldPaths:
+    - spec.template.spec.containers.0.image
+
+# Labels to add to all resources and selectors.
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/name: trainer
+
+resources:
+- ../base/crds
+- ../base/manager
+- ../base/rbac
+- ../base/webhook
+# - ../third-party/jobset #uncomment if jobset should be bundled under kubeflow trainer controller manager
+- runtimes
+- kubeflow-training-roles.yaml
+- monitor.yaml
+
+secretGenerator:
+  - name: kubeflow-trainer-webhook-cert
+    options:
+      disableNameSuffixHash: true
+
+patches:
+# Mount the controller config file for loading manager configurations
+# through a ComponentConfig type
+- path: manager_config_patch.yaml
+- path: manager_metrics_patch.yaml
+- patch: |-
+    - op: remove
+      path: /spec/ports/0
+  target:
+    group: ""
+    version: v1
+    kind: Service
+    name: kubeflow-trainer-controller-manager

@@ -1,0 +1,12 @@
+# Prometheus Pod Monitor (Metrics)
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kubeflow-trainer-controller-manager-metrics-monitor
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trainer
+      app.kubernetes.io/component: controller
+  podMetricsEndpoints:
+    - port: metrics

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubeflow-trainer-controller-manager
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        image: $(image)
+        args:
+        - "--zap-log-level=2"
+        - "--webhook-secret-name=kubeflow-trainer-webhook-cert"
+        - "--webhook-service-name=kubeflow-trainer-controller-manager"
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: kubeflow-trainer-webhook-cert

@@ -1,0 +1,99 @@
+#This file has been adapted for Trainer V2 from ../overlays/kubeflow
+#Updated for trainer.kubeflow.org API group with TrainJob resources
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: training-edit
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainjobs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainjobs/status
+    verbs:
+      - get
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainingruntimes
+      - clustertrainingruntimes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainingruntimes/status
+      - clustertrainingruntimes/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: training-admin
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainjobs
+      - trainingruntimes
+      - clustertrainingruntimes
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainjobs/status
+      - trainingruntimes/status
+      - clustertrainingruntimes/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: training-view
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainjobs
+      - trainingruntimes
+      - clustertrainingruntimes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - trainer.kubeflow.org
+    resources:
+      - trainjobs/status
+      - trainingruntimes/status
+      - clustertrainingruntimes/status
+    verbs:
+      - get
