@@ -49,7 +49,7 @@ func main() {
 		// Exclude InternalEvent from the OpenAPI spec since it requires runtime.Object dependency.
 		if defName != "k8s.io/apimachinery/pkg/apis/meta/v1.InternalEvent" {
 
-			// If it's from volcano, apply whitelist
+			// If it's from volcano, apply allowlist
 			if strings.HasPrefix(defName, "volcano.sh/apis/") && !volcanoAllowAPIs.Has(defName) {
 				continue
 			}
