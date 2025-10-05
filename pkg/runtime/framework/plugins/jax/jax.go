@@ -18,6 +18,8 @@ package jax
 
 type Jax struct{}
 
+var _ framework.EnforceMLPolicyPlugin = (*Jax)(nil)
+
 const Name = "Jax"
 
 func New(context.Context, client.Client, client.FieldIndexer) (framework.Plugin, error) {
