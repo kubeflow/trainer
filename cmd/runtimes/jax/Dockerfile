@@ -49,7 +49,7 @@ WORKDIR /workspace
 
 RUN ls -l
 
-COPY version.sh .
+COPY cmd/runtimes/jax/version.sh .
 RUN chmod +x version.sh
 
 ENTRYPOINT ["/bin/bash", "-c", "version.sh && exec \"$@\"", "--"]
