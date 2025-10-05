@@ -47,8 +47,8 @@ FROM gloo-base as production
 
 WORKDIR /workspace
 
-COPY version.sh /version.sh
-RUN chmod +x /version.sh
+COPY version.sh .
+RUN chmod +x version.sh
 
-ENTRYPOINT ["/bin/bash", "-c", "/version.sh && exec \"$@\"", "--"]
+ENTRYPOINT ["/bin/bash", "-c", "version.sh && exec \"$@\"", "--"]
 CMD ["/bin/bash"]
