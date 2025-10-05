@@ -248,8 +248,10 @@ func getNumProcPerNode(nppNode intstr.IntOrString, resourcesPerNode corev1.Resou
 
 	requestNppNode, requestUseGPU := calculateNumProcPerNode(fallbackNumProcPerNode, resourcesPerNode.Requests, shouldUseCPU)
 	limitNppNode, limitUseGPU := calculateNumProcPerNode(fallbackNumProcPerNode, resourcesPerNode.Limits, shouldUseCPU)
-	// If only limits is set, return limits.
-	if !requestUseGPU && limitUseGPU {
+	// In these scenarios, we should use the NumProcPerNode calculated from Limits:
+	// 1. GPU resources are not specified in Requests but specified in Limits.
+	// 2. GPU resources are not specified in both Requests and Limits, but CPU resources are specified in Limits.
+	if !requestUseGPU && limitUseGPU || !requestUseGPU && !limitUseGPU && requestNppNode.Type == intstr.Int && limitNppNode.Type == intstr.Int && requestNppNode.IntVal < limitNppNode.IntVal {
 		return limitNppNode
 	}
 	return requestNppNode
@@ -314,7 +316,6 @@ func getNumGPUPerNode(res *corev1.ResourceRequirements) int {
 	}
 	return 0
 }
-
 
 func numGPU(resourcePerNode corev1.ResourceList) int {
 	for resName, resQ := range resourcePerNode {
