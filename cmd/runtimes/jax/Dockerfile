@@ -47,6 +47,8 @@ FROM gloo-base as production
 
 WORKDIR /workspace
 
+RUN ls -l
+
 COPY version.sh .
 RUN chmod +x version.sh
 
