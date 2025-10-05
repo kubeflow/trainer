@@ -17,77 +17,48 @@ limitations under the License.
 package volcano
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"strconv"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
-	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
-	"volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
-	volcanov1beta1ac "volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestVolcano(t *testing.T) {
-	scheme := apiruntime.NewScheme()
-	if err := trainer.AddToScheme(scheme); err != nil {
-		t.Fatalf("failed to add trainer scheme: %v", err)
+	objCmpOpts := []gocmp.Option{
+		cmpopts.SortSlices(func(a, b apiruntime.Object) int {
+			return cmp.Compare(a.GetObjectKind().GroupVersionKind().String(), b.GetObjectKind().GroupVersionKind().String())
+		}),
+		cmpopts.SortSlices(func(a, b corev1.EnvVar) int { return cmp.Compare(a.Name, b.Name) }),
+		gocmp.Comparer(utiltesting.MPISecretDataComparer),
 	}
-	if err := volcanov1beta1.AddToScheme(scheme); err != nil {
-		t.Fatalf("failed to add volcano scheme: %v", err)
-	}
 
-	ctx := context.Background()
-	// Test Name()
-	t.Run("Name", func(t *testing.T) {
-		v := &Volcano{}
-		expectedName := "Volcano"
-		if v.Name() != expectedName {
-			t.Errorf("expected name %s, got %s", expectedName, v.Name())
-		}
-	})
-
-	// Test ReconcilerBuilders()
-	t.Run("ReconcilerBuilders", func(t *testing.T) {
-		gvk := volcanov1beta1.SchemeGroupVersion.WithKind("PodGroup")
-		mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{volcanov1beta1.SchemeGroupVersion})
-		mapper.Add(gvk, meta.RESTScopeNamespace)
-		v := &Volcano{
-			scheme:     scheme,
-			client:     fake.NewClientBuilder().WithScheme(scheme).Build(),
-			restMapper: mapper,
-		}
-		builders := v.ReconcilerBuilders()
-		if diff := cmp.Diff(3, len(builders)); diff != "" {
-			t.Errorf("unexpected builder count (-want +got):\n%s", diff)
-		}
-	})
-
-	// Test Build()
-	mockGetError := errors.New("mock get error")
+	errorGetPodGroup := errors.New("error when getting existing PodGroup")
 
 	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
 		TypeMeta: metav1.TypeMeta{
@@ -115,47 +86,40 @@ func TestVolcano(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	baseInfo := func() *runtime.Info {
-		return &runtime.Info{
-			TemplateSpec: runtime.TemplateSpec{
-				ObjApply: jobSetSpecApply,
-				PodSets: []runtime.PodSet{
-					{
-						Name:  "launcher",
-						Count: ptr.To[int32](1),
-						SinglePodRequests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("300m"),
-							corev1.ResourceMemory: resource.MustParse("1Gi"),
-						},
+	createBaseInfo := &runtime.Info{
+		TemplateSpec: runtime.TemplateSpec{
+			ObjApply: jobSetSpecApply,
+			PodSets: []runtime.PodSet{
+				{
+					Name:  "launcher",
+					Count: ptr.To[int32](1),
+					SinglePodRequests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("300m"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
 					},
-					{
-						Name:  "worker",
-						Count: ptr.To[int32](4),
-						SinglePodRequests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("500m"),
-							corev1.ResourceMemory: resource.MustParse("0.5Gi"),
-						},
+				},
+				{
+					Name:  "worker",
+					Count: ptr.To[int32](4),
+					SinglePodRequests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("500m"),
+						corev1.ResourceMemory: resource.MustParse("0.5Gi"),
 					},
 				},
 			},
-		}
+		},
 	}
 
 	cases := map[string]struct {
-		trainJob   *trainer.TrainJob
-		info       *runtime.Info
-		existingPG client.Object
-		expectInfo *runtime.Info
-		expectPG   *v1beta1.PodGroupApplyConfiguration
-		expectErr  error
+		trainJob                   *trainer.TrainJob
+		info                       *runtime.Info
+		objs                       []client.Object
+		expectInfo                 *runtime.Info
+		expectObjs                 []apiruntime.Object
+		expectEnforcePodGroupError error
+		expectBuildError           error
 	}{
-		"Test nil info": {
-			trainJob:   &trainer.TrainJob{},
-			info:       nil,
-			existingPG: nil,
-			expectPG:   nil,
-			expectErr:  nil,
-		},
+		"Test nil info": {},
 		"inject group-name annotation": {
 			trainJob: &trainer.TrainJob{ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob"}},
 			info: &runtime.Info{
@@ -168,13 +132,47 @@ func TestVolcano(t *testing.T) {
 					},
 				},
 			},
+			objs: []client.Object{},
 			expectInfo: &runtime.Info{
 				Scheduler: &runtime.Scheduler{
 					PodAnnotations: map[string]string{
 						volcanov1beta1.KubeGroupNameAnnotationKey: "test-trainjob",
 					},
 				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
 			},
+			expectObjs: []apiruntime.Object{
+				&volcanov1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: volcanov1beta1.SchemeGroupVersion.String(),
+						Kind:       "PodGroup",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-trainjob",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion:         trainer.GroupVersion.String(),
+								Kind:               trainer.TrainJobKind,
+								Name:               "test-trainjob",
+								UID:                types.UID(""),
+								Controller:         ptr.To(true),
+								BlockOwnerDeletion: ptr.To(true),
+							},
+						},
+					},
+					Spec: volcanov1beta1.PodGroupSpec{
+						MinResources: &corev1.ResourceList{},
+					},
+				},
+			},
+			expectEnforcePodGroupError: nil,
+			expectBuildError:           nil,
 		},
 		"PodGroup exists and trainjob not suspended": {
 			trainJob: &trainer.TrainJob{
@@ -182,7 +180,7 @@ func TestVolcano(t *testing.T) {
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
 			},
 			info: &runtime.Info{
-				TemplateSpec: baseInfo().TemplateSpec,
+				TemplateSpec: createBaseInfo.TemplateSpec,
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -192,11 +190,29 @@ func TestVolcano(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{},
 			},
-			existingPG: &volcanov1beta1.PodGroup{
-				ObjectMeta: metav1.ObjectMeta{Name: "job-exist-running", Namespace: "test-ns"},
+			objs: []client.Object{
+				&volcanov1beta1.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: "job-exist-running", Namespace: "test-ns"},
+				},
 			},
-			expectPG:  nil,
-			expectErr: nil,
+			expectInfo: &runtime.Info{
+				TemplateSpec: createBaseInfo.TemplateSpec,
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{
+					PodAnnotations: map[string]string{
+						volcanov1beta1.KubeGroupNameAnnotationKey: "job-exist-running",
+					},
+				},
+			},
+			expectObjs:                 nil,
+			expectEnforcePodGroupError: nil,
+			expectBuildError:           nil,
 		},
 		"PodGroup exists but trainjob suspended": {
 			trainJob: &trainer.TrainJob{
@@ -204,7 +220,7 @@ func TestVolcano(t *testing.T) {
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(true)},
 			},
 			info: &runtime.Info{
-				TemplateSpec: baseInfo().TemplateSpec,
+				TemplateSpec: createBaseInfo.TemplateSpec,
 				Annotations: map[string]string{
 					"scheduling.volcano.sh/queue-name": "q1",
 				},
@@ -222,28 +238,69 @@ func TestVolcano(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{},
 			},
-			existingPG: &volcanov1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "job-update", Namespace: "test-ns"}},
-			expectPG: volcanov1beta1ac.PodGroup("job-update", "test-ns").
-				WithOwnerReferences(metav1ac.OwnerReference().
-					WithAPIVersion(trainer.GroupVersion.String()).
-					WithKind(trainer.TrainJobKind).
-					WithName("job-update").
-					WithUID(types.UID(strconv.Itoa(2))).
-					WithController(true).
-					WithBlockOwnerDeletion(true)).
-				WithSpec(volcanov1beta1ac.PodGroupSpec().
-					WithMinMember(5).
-					WithMinResources(corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("2300m"),
-						corev1.ResourceMemory: resource.MustParse("3Gi"),
-					}).
-					WithQueue("q1").
-					WithPriorityClassName("high-priority").
-					WithNetworkTopology(&volcanov1beta1ac.NetworkTopologySpecApplyConfiguration{
-						Mode:               ptr.To(volcanov1beta1.HardNetworkTopologyMode),
-						HighestTierAllowed: ptr.To(1),
-					})),
-			expectErr: nil,
+			objs: []client.Object{
+				&volcanov1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "job-update", Namespace: "test-ns"}},
+			},
+			expectInfo: &runtime.Info{
+				TemplateSpec: createBaseInfo.TemplateSpec,
+				Annotations: map[string]string{
+					"scheduling.volcano.sh/queue-name": "q1",
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{
+								NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
+									Mode:               volcanov1beta1.HardNetworkTopologyMode,
+									HighestTierAllowed: ptr.To(1),
+								},
+							},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{
+					PodAnnotations: map[string]string{
+						volcanov1beta1.KubeGroupNameAnnotationKey: "job-update",
+					},
+				},
+			},
+			expectObjs: []apiruntime.Object{
+				&volcanov1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: volcanov1beta1.SchemeGroupVersion.String(),
+						Kind:       "PodGroup",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "job-update",
+						Namespace: "test-ns",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion:         trainer.GroupVersion.String(),
+								Kind:               trainer.TrainJobKind,
+								Name:               "job-update",
+								UID:                types.UID(strconv.Itoa(2)),
+								Controller:         ptr.To(true),
+								BlockOwnerDeletion: ptr.To(true),
+							},
+						},
+					},
+					Spec: volcanov1beta1.PodGroupSpec{
+						MinMember: 5,
+						MinResources: &corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2300m"),
+							corev1.ResourceMemory: resource.MustParse("3Gi"),
+						},
+						Queue:             "q1",
+						PriorityClassName: "high-priority",
+						NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
+							Mode:               volcanov1beta1.HardNetworkTopologyMode,
+							HighestTierAllowed: ptr.To(1),
+						},
+					},
+				},
+			},
+			expectEnforcePodGroupError: nil,
+			expectBuildError:           nil,
 		},
 		"Error when getting existing PodGroup": {
 			trainJob: &trainer.TrainJob{
@@ -251,7 +308,7 @@ func TestVolcano(t *testing.T) {
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
 			},
 			info: &runtime.Info{
-				TemplateSpec: baseInfo().TemplateSpec,
+				TemplateSpec: createBaseInfo.TemplateSpec,
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -261,104 +318,9 @@ func TestVolcano(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{},
 			},
-			existingPG: nil,
-			expectPG:   nil,
-			expectErr:  mockGetError,
-		},
-	}
-
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			clientBuilder := fake.NewClientBuilder().WithScheme(scheme)
-			if c.existingPG != nil {
-				clientBuilder.WithObjects(c.existingPG)
-			}
-			if name == "Error when getting existing PodGroup" {
-				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
-					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-						return mockGetError
-					},
-				})
-			}
-			cli := clientBuilder.Build()
-
-			v := &Volcano{
-				client: cli,
-				scheme: scheme,
-			}
-
-			_ = v.EnforcePodGroupPolicy(c.info, c.trainJob)
-			if c.expectInfo != nil {
-				if diff := cmp.Diff(c.expectInfo.Scheduler.PodAnnotations, c.info.Scheduler.PodAnnotations); diff != "" {
-					t.Errorf("PodAnnotations mismatch (-want +got):\n%s", diff)
-				}
-			}
-
-			objs, err := v.Build(ctx, c.info, c.trainJob)
-			if diff := cmp.Diff(c.expectErr, err, cmpopts.EquateErrors()); diff != "" {
-				t.Errorf("error mismatch:\n%s", diff)
-			}
-			if c.expectPG != nil {
-				if len(objs) != 1 {
-					t.Fatalf("expected 1 object, got %d", len(objs))
-				}
-				actualPG := objs[0].(*v1beta1.PodGroupApplyConfiguration)
-				if diff := cmp.Diff(c.expectPG, actualPG); diff != "" {
-					t.Errorf("PodGroup mismatch (-want +got):\n%s", diff)
-				}
-			}
-		})
-	}
-}
-
-func TestValidate(t *testing.T) {
-	scheme := apiruntime.NewScheme()
-	_ = schedulingv1.AddToScheme(scheme)
-
-	tests := map[string]struct {
-		annotations       map[string]string
-		priorityClassName *string
-		existingPriority  *schedulingv1.PriorityClass
-		wantErr           bool
-	}{
-		"queue annotation missing": {
-			annotations: map[string]string{},
-			wantErr:     false,
-		},
-		"queue annotation empty": {
-			annotations: map[string]string{
-				volcanov1beta1.QueueNameAnnotationKey: "",
-			},
-			wantErr: true,
-		},
-		"queue annotation valid": {
-			annotations: map[string]string{
-				volcanov1beta1.QueueNameAnnotationKey: "default",
-			},
-			wantErr: false,
-		},
-		"priorityClassName is system-cluster-critical": {
-			priorityClassName: ptr.To("system-cluster-critical"),
-			wantErr:           false,
-		},
-		"priorityClassName does not exist": {
-			priorityClassName: ptr.To("non-existent"),
-			wantErr:           true,
-		},
-	}
-
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			var objs []client.Object
-			if tt.existingPriority != nil {
-				objs = append(objs, tt.existingPriority)
-			}
-
-			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
-			v := &Volcano{client: c}
-
-			info := &runtime.Info{
-				Annotations: tt.annotations,
+			objs: nil,
+			expectInfo: &runtime.Info{
+				TemplateSpec: createBaseInfo.TemplateSpec,
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainer.PodGroupPolicy{
 						PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -366,33 +328,298 @@ func TestValidate(t *testing.T) {
 						},
 					},
 				},
+				Scheduler: &runtime.Scheduler{
+					PodAnnotations: map[string]string{
+						volcanov1beta1.KubeGroupNameAnnotationKey: "job-error",
+					},
+				},
+			},
+			expectObjs:                 nil,
+			expectEnforcePodGroupError: nil,
+			expectBuildError:           errorGetPodGroup,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			clientBuilder := utiltesting.NewClientBuilder().WithObjects(c.objs...)
+
+			if name == "Error when getting existing PodGroup" {
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						return errorGetPodGroup
+					},
+				})
 			}
 
-			if tt.priorityClassName != nil {
-				jobSetSpec := jobsetv1alpha2ac.JobSetSpec().
-					WithReplicatedJobs(
-						jobsetv1alpha2ac.ReplicatedJob().
-							WithTemplate(
-								batchv1ac.JobTemplateSpec().
-									WithSpec(
-										batchv1ac.JobSpec().
-											WithTemplate(
-												corev1ac.PodTemplateSpec().
-													WithSpec(
-														corev1ac.PodSpec().
-															WithPriorityClassName(*tt.priorityClassName),
-													),
+			cli := clientBuilder.Build()
+			plugin, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder))
+			if err != nil {
+				t.Fatalf("Failed to create plugin: %v", err)
+			}
+
+			// Test EnforcePodGroupPolicy
+			err = plugin.(framework.EnforcePodGroupPolicyPlugin).EnforcePodGroupPolicy(c.info, c.trainJob)
+
+			if diff := gocmp.Diff(c.expectEnforcePodGroupError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from EnforcePodGroupPolicy (-want,+got):\n%s", diff)
+			}
+			if diff := gocmp.Diff(c.expectInfo, c.info,
+				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+				cmpopts.SortMaps(func(a, b int) bool { return a < b }),
+			); len(diff) != 0 {
+				t.Errorf("Unexpected info from EnforcePodGroupPolicy (-want,+got):\n%s", diff)
+			}
+
+			// Test Build
+			var objs []any
+			objs, err = plugin.(framework.ComponentBuilderPlugin).Build(ctx, c.info, c.trainJob)
+			if diff := gocmp.Diff(c.expectBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
+			}
+
+			// Convert objects and compare
+			var typedObjs []apiruntime.Object
+			typedObjs, err = utiltesting.ToObject(cli.Scheme(), objs...)
+			if err != nil {
+				t.Errorf("Failed to convert object: %v", err)
+			}
+			if diff := gocmp.Diff(c.expectObjs, typedObjs, objCmpOpts...); len(diff) != 0 {
+				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestValidate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	var cancel func()
+	ctx, cancel = context.WithCancel(ctx)
+	t.Cleanup(cancel)
+
+	createPriorityClass := func(name string) *schedulingv1.PriorityClass {
+		return &schedulingv1.PriorityClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Value: 100,
+		}
+	}
+
+	createJobSetSpecWithPriority := func(priorityClassName string) *jobsetv1alpha2ac.JobSetSpecApplyConfiguration {
+		return jobsetv1alpha2ac.JobSetSpec().
+			WithReplicatedJobs(
+				jobsetv1alpha2ac.ReplicatedJob().
+					WithTemplate(
+						batchv1ac.JobTemplateSpec().
+							WithSpec(
+								batchv1ac.JobSpec().
+									WithTemplate(
+										corev1ac.PodTemplateSpec().
+											WithSpec(
+												corev1ac.PodSpec().
+													WithPriorityClassName(priorityClassName),
 											),
 									),
 							),
-					)
-				info.TemplateSpec = runtime.TemplateSpec{
-					ObjApply: jobSetSpec,
-				}
+					),
+			)
+	}
+
+	cases := map[string]struct {
+		info         *runtime.Info
+		trainJob     *trainer.TrainJob
+		objs         []client.Object
+		wantErrors   bool
+		wantWarnings bool
+	}{
+		"queue annotation missing": {
+			info: &runtime.Info{
+				Annotations: map[string]string{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+			},
+			trainJob:     &trainer.TrainJob{},
+			objs:         []client.Object{},
+			wantErrors:   false,
+			wantWarnings: false,
+		},
+		"queue annotation empty": {
+			info: &runtime.Info{
+				Annotations: map[string]string{
+					volcanov1beta1.QueueNameAnnotationKey: "",
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+			},
+			trainJob:     &trainer.TrainJob{},
+			objs:         []client.Object{},
+			wantErrors:   true,
+			wantWarnings: false,
+		},
+		"queue annotation valid": {
+			info: &runtime.Info{
+				Annotations: map[string]string{
+					volcanov1beta1.QueueNameAnnotationKey: "default",
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+			},
+			trainJob:     &trainer.TrainJob{},
+			objs:         []client.Object{},
+			wantErrors:   false,
+			wantWarnings: false,
+		},
+		"priorityClassName is system-cluster-critical": {
+			info: &runtime.Info{
+				Annotations: map[string]string{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: createJobSetSpecWithPriority("system-cluster-critical"),
+				},
+			},
+			trainJob:     &trainer.TrainJob{},
+			objs:         []client.Object{},
+			wantErrors:   false,
+			wantWarnings: false,
+		},
+		"priorityClassName is system-node-critical": {
+			info: &runtime.Info{
+				Annotations: map[string]string{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: createJobSetSpecWithPriority("system-node-critical"),
+				},
+			},
+			trainJob:     &trainer.TrainJob{},
+			objs:         []client.Object{},
+			wantErrors:   false,
+			wantWarnings: false,
+		},
+		"priorityClassName exists": {
+			info: &runtime.Info{
+				Annotations: map[string]string{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: createJobSetSpecWithPriority("existing-priority"),
+				},
+			},
+			trainJob:     &trainer.TrainJob{},
+			objs:         []client.Object{createPriorityClass("existing-priority")},
+			wantErrors:   false,
+			wantWarnings: false,
+		},
+		"priorityClassName does not exist": {
+			info: &runtime.Info{
+				Annotations: map[string]string{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: createJobSetSpecWithPriority("non-existent"),
+				},
+			},
+			trainJob:     &trainer.TrainJob{},
+			objs:         []client.Object{},
+			wantErrors:   true,
+			wantWarnings: false,
+		},
+		"no volcano policy": {
+			info: &runtime.Info{
+				Annotations: map[string]string{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: nil,
+						},
+					},
+				},
+			},
+			trainJob:     &trainer.TrainJob{},
+			objs:         []client.Object{},
+			wantErrors:   false,
+			wantWarnings: false,
+		},
+		"nil info": {
+			info:         nil,
+			trainJob:     &trainer.TrainJob{},
+			objs:         []client.Object{},
+			wantErrors:   false,
+			wantWarnings: false,
+		},
+		"nil trainJob": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+			},
+			trainJob:     nil,
+			objs:         []client.Object{},
+			wantErrors:   false,
+			wantWarnings: false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			clientBuilder := utiltesting.NewClientBuilder().WithObjects(tc.objs...)
+			cli := clientBuilder.Build()
+			v := &Volcano{client: cli}
+
+			warnings, errs := v.Validate(ctx, tc.info, nil, tc.trainJob)
+
+			if (len(errs) > 0) != tc.wantErrors {
+				t.Errorf("Unexpected errors from Validate (-wantErrors %v, +got %d errors): %v", tc.wantErrors, len(errs), errs)
 			}
-			_, errs := v.Validate(context.Background(), info, nil, &trainer.TrainJob{})
-			if (len(errs) > 0) != tt.wantErr {
-				t.Errorf("expected error: %v, got: %v", tt.wantErr, errs)
+
+			if (len(warnings) > 0) != tc.wantWarnings {
+				t.Errorf("Unexpected warnings from Validate (-wantWarnings %v, +got %d warnings): %v", tc.wantWarnings, len(warnings), warnings)
 			}
 		})
 	}
