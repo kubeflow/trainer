@@ -16,44 +16,15 @@ limitations under the License.
 
 package jax
 
-import (
-	"context"
+type Jax struct{}
 
-	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/v2/pkg/runtime"
-	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
-)
-
-type JAX struct{}
-
-var _ framework.EnforceMLPolicyPlugin = (*JAX)(nil)
-var _ framework.CustomValidationPlugin = (*JAX)(nil)
-
-const Name = "JAX"
+const Name = "Jax"
 
 func New(context.Context, client.Client, client.FieldIndexer) (framework.Plugin, error) {
-	return &JAX{}, nil
+	return &Jax{}, nil
 }
 
-func (t *JAX) Name() string {
+func (t *Torch) Name() string {
 	return Name
 }
 
-func (t *JAX) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
-	var allErrs field.ErrorList
-	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
-		return nil, allErrs
-	}
-
-	// specPath := field.NewPath("spec")
-
-	return nil, allErrs
-}
-
-func (t *JAX) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
-	return nil
-}

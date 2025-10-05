@@ -1,4 +1,4 @@
-FROM ghcr.io/nvidia/jax:jax-2025-10-01 as gpu-base
+FROM ghcr.io/nvidia/jax:jax as gpu-base
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
@@ -47,10 +47,8 @@ FROM gloo-base as production
 
 WORKDIR /workspace
 
-RUN ls -l
+COPY version.sh /version.sh
+RUN chmod +x /version.sh
 
-COPY cmd/runtimes/jax/version.sh .
-RUN chmod +x version.sh
-
-ENTRYPOINT ["/bin/bash", "-c", "version.sh && exec \"$@\"", "--"]
+ENTRYPOINT ["/bin/bash", "-c", "/version.sh && exec \"$@\"", "--"]
 CMD ["/bin/bash"]
