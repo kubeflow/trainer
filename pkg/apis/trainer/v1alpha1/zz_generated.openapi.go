@@ -36,6 +36,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource": schema_pkg_apis_trainer_v1alpha1_CoschedulingPodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.DatasetInitializer":               schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Initializer":                      schema_pkg_apis_trainer_v1alpha1_Initializer(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource":                schema_pkg_apis_trainer_v1alpha1_JAXMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec":               schema_pkg_apis_trainer_v1alpha1_JobSetTemplateSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobStatus":                        schema_pkg_apis_trainer_v1alpha1_JobStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicy":                         schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref),
@@ -681,6 +682,17 @@ func schema_pkg_apis_trainer_v1alpha1_Initializer(ref common.ReferenceCallback) 
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_JAXMLPolicySource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JAXMLPolicySource represents a jax runtime configuration.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_JobSetTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -791,11 +803,17 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref common.ReferenceCallback) com
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource"),
 						},
 					},
+					"jax": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Configuration for the JAX Runtime.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
 	}
 }
 
@@ -818,11 +836,17 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicySource(ref common.ReferenceCallbac
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource"),
 						},
 					},
+					"jax": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Configuration for the JAX Runtime.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
 	}
 }
 
