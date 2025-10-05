@@ -32,12 +32,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
@@ -397,229 +399,128 @@ func TestVolcano(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	var cancel func()
-	ctx, cancel = context.WithCancel(ctx)
-	t.Cleanup(cancel)
-
-	createPriorityClass := func(name string) *schedulingv1.PriorityClass {
-		return &schedulingv1.PriorityClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
-			Value: 100,
-		}
-	}
-
-	createJobSetSpecWithPriority := func(priorityClassName string) *jobsetv1alpha2ac.JobSetSpecApplyConfiguration {
-		return jobsetv1alpha2ac.JobSetSpec().
-			WithReplicatedJobs(
-				jobsetv1alpha2ac.ReplicatedJob().
-					WithTemplate(
-						batchv1ac.JobTemplateSpec().
-							WithSpec(
-								batchv1ac.JobSpec().
-									WithTemplate(
-										corev1ac.PodTemplateSpec().
-											WithSpec(
-												corev1ac.PodSpec().
-													WithPriorityClassName(priorityClassName),
-											),
-									),
-							),
-					),
-			)
-	}
-
 	cases := map[string]struct {
 		info         *runtime.Info
-		trainJob     *trainer.TrainJob
+		oldObj       *trainer.TrainJob
+		newObj       *trainer.TrainJob
 		objs         []client.Object
-		wantErrors   bool
-		wantWarnings bool
+		wantError    field.ErrorList
+		wantWarnings admission.Warnings
 	}{
-		"queue annotation missing": {
-			info: &runtime.Info{
-				Annotations: map[string]string{},
-				RuntimePolicy: runtime.RuntimePolicy{
-					PodGroupPolicy: &trainer.PodGroupPolicy{
-						PodGroupPolicySource: trainer.PodGroupPolicySource{
-							Volcano: &trainer.VolcanoPodGroupPolicySource{},
-						},
-					},
-				},
-			},
-			trainJob:     &trainer.TrainJob{},
-			objs:         []client.Object{},
-			wantErrors:   false,
-			wantWarnings: false,
+		"no action when info is nil": {},
+		"no action when Volcano policy not enabled": {
+			info: runtime.NewInfo(),
+			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
 		},
-		"queue annotation empty": {
-			info: &runtime.Info{
-				Annotations: map[string]string{
+		"queue annotation is empty": {
+			info: runtime.NewInfo(
+				runtime.WithPodGroupPolicy(&trainer.PodGroupPolicy{
+					PodGroupPolicySource: trainer.PodGroupPolicySource{
+						Volcano: &trainer.VolcanoPodGroupPolicySource{},
+					},
+				}),
+				runtime.WithAnnotations(map[string]string{
 					volcanov1beta1.QueueNameAnnotationKey: "",
-				},
-				RuntimePolicy: runtime.RuntimePolicy{
-					PodGroupPolicy: &trainer.PodGroupPolicy{
-						PodGroupPolicySource: trainer.PodGroupPolicySource{
-							Volcano: &trainer.VolcanoPodGroupPolicySource{},
-						},
-					},
-				},
+				}),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("annotations").Key(volcanov1beta1.QueueNameAnnotationKey),
+					"",
+					"Volcano queue name must not be empty",
+				),
 			},
-			trainJob:     &trainer.TrainJob{},
-			objs:         []client.Object{},
-			wantErrors:   true,
-			wantWarnings: false,
-		},
-		"queue annotation valid": {
-			info: &runtime.Info{
-				Annotations: map[string]string{
-					volcanov1beta1.QueueNameAnnotationKey: "default",
-				},
-				RuntimePolicy: runtime.RuntimePolicy{
-					PodGroupPolicy: &trainer.PodGroupPolicy{
-						PodGroupPolicySource: trainer.PodGroupPolicySource{
-							Volcano: &trainer.VolcanoPodGroupPolicySource{},
-						},
-					},
-				},
-			},
-			trainJob:     &trainer.TrainJob{},
-			objs:         []client.Object{},
-			wantErrors:   false,
-			wantWarnings: false,
-		},
-		"priorityClassName is system-cluster-critical": {
-			info: &runtime.Info{
-				Annotations: map[string]string{},
-				RuntimePolicy: runtime.RuntimePolicy{
-					PodGroupPolicy: &trainer.PodGroupPolicy{
-						PodGroupPolicySource: trainer.PodGroupPolicySource{
-							Volcano: &trainer.VolcanoPodGroupPolicySource{},
-						},
-					},
-				},
-				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: createJobSetSpecWithPriority("system-cluster-critical"),
-				},
-			},
-			trainJob:     &trainer.TrainJob{},
-			objs:         []client.Object{},
-			wantErrors:   false,
-			wantWarnings: false,
-		},
-		"priorityClassName is system-node-critical": {
-			info: &runtime.Info{
-				Annotations: map[string]string{},
-				RuntimePolicy: runtime.RuntimePolicy{
-					PodGroupPolicy: &trainer.PodGroupPolicy{
-						PodGroupPolicySource: trainer.PodGroupPolicySource{
-							Volcano: &trainer.VolcanoPodGroupPolicySource{},
-						},
-					},
-				},
-				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: createJobSetSpecWithPriority("system-node-critical"),
-				},
-			},
-			trainJob:     &trainer.TrainJob{},
-			objs:         []client.Object{},
-			wantErrors:   false,
-			wantWarnings: false,
-		},
-		"priorityClassName exists": {
-			info: &runtime.Info{
-				Annotations: map[string]string{},
-				RuntimePolicy: runtime.RuntimePolicy{
-					PodGroupPolicy: &trainer.PodGroupPolicy{
-						PodGroupPolicySource: trainer.PodGroupPolicySource{
-							Volcano: &trainer.VolcanoPodGroupPolicySource{},
-						},
-					},
-				},
-				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: createJobSetSpecWithPriority("existing-priority"),
-				},
-			},
-			trainJob:     &trainer.TrainJob{},
-			objs:         []client.Object{createPriorityClass("existing-priority")},
-			wantErrors:   false,
-			wantWarnings: false,
 		},
 		"priorityClassName does not exist": {
-			info: &runtime.Info{
-				Annotations: map[string]string{},
-				RuntimePolicy: runtime.RuntimePolicy{
-					PodGroupPolicy: &trainer.PodGroupPolicy{
-						PodGroupPolicySource: trainer.PodGroupPolicySource{
-							Volcano: &trainer.VolcanoPodGroupPolicySource{},
-						},
+			info: runtime.NewInfo(
+				runtime.WithPodGroupPolicy(&trainer.PodGroupPolicy{
+					PodGroupPolicySource: trainer.PodGroupPolicySource{
+						Volcano: &trainer.VolcanoPodGroupPolicySource{},
 					},
-				},
-				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: createJobSetSpecWithPriority("non-existent"),
+				}),
+				runtime.WithTemplateSpecObjApply(
+					jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(jobsetv1alpha2ac.ReplicatedJob().
+							WithTemplate(batchv1ac.JobTemplateSpec().
+								WithSpec(batchv1ac.JobSpec().
+									WithTemplate(corev1ac.PodTemplateSpec().
+										WithSpec(corev1ac.PodSpec().
+											WithPriorityClassName("non-existent"),
+										),
+									),
+								),
+							),
+						),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("templateSpec").Child("priorityClassName"),
+					"non-existent",
+					`PriorityClass "non-existent" doesn't exist: priorityclasses.scheduling.k8s.io "non-existent" not found`,
+				),
+			},
+		},
+		"priorityClassName exists": {
+			info: runtime.NewInfo(
+				runtime.WithPodGroupPolicy(&trainer.PodGroupPolicy{
+					PodGroupPolicySource: trainer.PodGroupPolicySource{
+						Volcano: &trainer.VolcanoPodGroupPolicySource{},
+					},
+				}),
+				runtime.WithTemplateSpecObjApply(runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(jobsetv1alpha2ac.ReplicatedJob().
+							WithTemplate(batchv1ac.JobTemplateSpec().
+								WithSpec(batchv1ac.JobSpec().
+									WithTemplate(corev1ac.PodTemplateSpec().
+										WithSpec(corev1ac.PodSpec().
+											WithPriorityClassName("existing-priority"),
+										),
+									),
+								),
+							),
+						),
+				}),
+			),
+			objs: []client.Object{
+				&schedulingv1.PriorityClass{
+					ObjectMeta: metav1.ObjectMeta{Name: "existing-priority"},
+					Value:      100,
 				},
 			},
-			trainJob:     &trainer.TrainJob{},
-			objs:         []client.Object{},
-			wantErrors:   true,
-			wantWarnings: false,
-		},
-		"no volcano policy": {
-			info: &runtime.Info{
-				Annotations: map[string]string{},
-				RuntimePolicy: runtime.RuntimePolicy{
-					PodGroupPolicy: &trainer.PodGroupPolicy{
-						PodGroupPolicySource: trainer.PodGroupPolicySource{
-							Volcano: nil,
-						},
-					},
-				},
-			},
-			trainJob:     &trainer.TrainJob{},
-			objs:         []client.Object{},
-			wantErrors:   false,
-			wantWarnings: false,
-		},
-		"nil info": {
-			info:         nil,
-			trainJob:     &trainer.TrainJob{},
-			objs:         []client.Object{},
-			wantErrors:   false,
-			wantWarnings: false,
-		},
-		"nil trainJob": {
-			info: &runtime.Info{
-				RuntimePolicy: runtime.RuntimePolicy{
-					PodGroupPolicy: &trainer.PodGroupPolicy{
-						PodGroupPolicySource: trainer.PodGroupPolicySource{
-							Volcano: &trainer.VolcanoPodGroupPolicySource{},
-						},
-					},
-				},
-			},
-			trainJob:     nil,
-			objs:         []client.Object{},
-			wantErrors:   false,
-			wantWarnings: false,
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
 			clientBuilder := utiltesting.NewClientBuilder().WithObjects(tc.objs...)
 			cli := clientBuilder.Build()
-			v := &Volcano{client: cli}
 
-			warnings, errs := v.Validate(ctx, tc.info, nil, tc.trainJob)
-
-			if (len(errs) > 0) != tc.wantErrors {
-				t.Errorf("Unexpected errors from Validate (-wantErrors %v, +got %d errors): %v", tc.wantErrors, len(errs), errs)
+			v, err := New(ctx, cli, nil)
+			if err != nil {
+				t.Fatalf("failed to init Volcano plugin: %v", err)
 			}
 
-			if (len(warnings) > 0) != tc.wantWarnings {
-				t.Errorf("Unexpected warnings from Validate (-wantWarnings %v, +got %d warnings): %v", tc.wantWarnings, len(warnings), warnings)
+			warnings, errs := v.(framework.CustomValidationPlugin).Validate(ctx, tc.info, tc.oldObj, tc.newObj)
+
+			if diff := gocmp.Diff(tc.wantError, errs); diff != "" {
+				t.Errorf("Unexpected Validate errors (-want,+got):\n%s", diff)
+			}
+
+			if diff := gocmp.Diff(tc.wantWarnings, warnings); diff != "" {
+				t.Errorf("Unexpected Validate warnings (-want,+got):\n%s", diff)
 			}
 		})
 	}
