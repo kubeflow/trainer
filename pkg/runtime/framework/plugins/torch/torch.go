@@ -124,7 +124,6 @@ func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj
 			}
 		}
 	}
-
 	return nil, allErrs
 }
 
@@ -402,7 +401,6 @@ func extractOverridesFromRuntime(info *runtime.Info) []string {
 			}
 		}
 	}
-
 	return overrides
 }
 
@@ -411,6 +409,5 @@ func getModelFromRuntimeRef(runtimeRefName string) string {
 	if len(fields) != 3 {
 		return ""
 	}
-
 	return fmt.Sprintf("%s/%s", strings.ReplaceAll(fields[1], ".", "_"), strings.ToUpper(fields[2]))
 }
