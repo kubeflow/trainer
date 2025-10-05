@@ -3,5 +3,6 @@ kind: Kustomization
 resources:
   - deepspeed_distributed.yaml
   - mlx_distributed.yaml
+  - jax_distributed.yaml
   - torch_distributed.yaml
   - torchtune
