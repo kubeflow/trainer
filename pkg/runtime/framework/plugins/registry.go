@@ -27,6 +27,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
 )
 
@@ -40,5 +41,6 @@ func NewRegistry() Registry {
 		plainml.Name:      plainml.New,
 		torch.Name:        torch.New,
 		jobset.Name:       jobset.New,
+		jax.Name:		   jax.New,
 	}
 }

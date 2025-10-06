@@ -46,6 +46,9 @@ spec:
                 description: Configuration for the model training with ML-specific
                   parameters.
                 properties:
+                  jax:
+                    description: Configuration for the JAX Runtime.
+                    type: object
                   mpi:
                     description: Configuration for the MPI Runtime.
                     properties:

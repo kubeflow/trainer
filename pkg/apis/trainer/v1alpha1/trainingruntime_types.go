@@ -177,6 +177,9 @@ type MLPolicySource struct {
 
 	// Configuration for the MPI Runtime.
 	MPI *MPIMLPolicySource `json:"mpi,omitempty"`
+
+	// Configuration for the JAX Runtime.
+	JAX *JAXMLPolicySource `json:"jax,omitempty"`
 }
 
 // TorchMLPolicySource represents a PyTorch runtime configuration.
@@ -215,6 +218,9 @@ type TorchElasticPolicy struct {
 	// +listType=atomic
 	Metrics []autoscalingv2.MetricSpec `json:"metrics,omitempty"`
 }
+
+// JAXMLPolicySource represents a jax runtime configuration.
+type JAXMLPolicySource struct {}
 
 // MPIMLPolicySource represents a MPI runtime configuration.
 type MPIMLPolicySource struct {

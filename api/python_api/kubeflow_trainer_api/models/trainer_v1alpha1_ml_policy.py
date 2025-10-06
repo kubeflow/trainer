@@ -28,10 +28,11 @@ class TrainerV1alpha1MLPolicy(BaseModel):
     """
     MLPolicy represents configuration for the model trining with ML-specific parameters.
     """ # noqa: E501
+    jax: Optional[Dict[str, Any]] = Field(default=None, description="Configuration for the JAX Runtime.")
     mpi: Optional[TrainerV1alpha1MPIMLPolicySource] = Field(default=None, description="Configuration for the MPI Runtime.")
     num_nodes: Optional[StrictInt] = Field(default=None, description="Number of training nodes. Defaults to 1.", alias="numNodes")
     torch: Optional[TrainerV1alpha1TorchMLPolicySource] = Field(default=None, description="Configuration for the PyTorch runtime.")
-    __properties: ClassVar[List[str]] = ["mpi", "numNodes", "torch"]
+    __properties: ClassVar[List[str]] = ["jax", "mpi", "numNodes", "torch"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -90,6 +91,7 @@ class TrainerV1alpha1MLPolicy(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
+            "jax": obj.get("jax"),
             "mpi": TrainerV1alpha1MPIMLPolicySource.from_dict(obj["mpi"]) if obj.get("mpi") is not None else None,
             "numNodes": obj.get("numNodes"),
             "torch": TrainerV1alpha1TorchMLPolicySource.from_dict(obj["torch"]) if obj.get("torch") is not None else None
