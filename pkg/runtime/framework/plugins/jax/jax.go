@@ -19,6 +19,7 @@ package jax
 type Jax struct{}
 
 var _ framework.EnforceMLPolicyPlugin = (*Jax)(nil)
+var _ framework.CustomValidationPlugin = (*Jax)(nil)
 
 const Name = "Jax"
 
@@ -30,3 +31,11 @@ func (t *Torch) Name() string {
 	return Name
 }
 
+func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	var allErrs field.ErrorList
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
+		return nil, allErrs
+	}
+
+	specPath := field.NewPath("spec")
+}
