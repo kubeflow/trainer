@@ -634,6 +634,81 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Obj(),
 			},
 		},
+		"succeeded to build JobSet with TrainJob's PodSpecOverrides containing duplicate TargetJobs": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				PodSpecOverrides([]trainer.PodSpecOverride{
+					{
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
+						NodeSelector: map[string]string{
+							"node.kubernetes.io/instance-type": "p5.48xlarge",
+						},
+					},
+					{
+						TargetJobs:         []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
+						ServiceAccountName: ptr.To("test-sa"),
+					},
+				}).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					NodeSelector(constants.Node,
+						map[string]string{
+							"node.kubernetes.io/instance-type": "p5.48xlarge",
+						}).
+					ServiceAccountName(constants.Node, "test-sa").
+					Obj(),
+			},
+		},
+		"succeeded to build JobSet with TrainJob's PodSpecOverrides targeting the same job with different values": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				PodSpecOverrides([]trainer.PodSpecOverride{
+					{
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
+						NodeSelector: map[string]string{
+							"node.kubernetes.io/instance-type": "p5.48xlarge",
+						},
+					},
+					{
+						TargetJobs: []trainer.PodSpecOverrideTargetJob{{Name: constants.Node}},
+						NodeSelector: map[string]string{
+							"node.kubernetes.io/instance-type": "p5en.48xlarge",
+						},
+					},
+				}).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					NodeSelector(constants.Node,
+						map[string]string{
+							"node.kubernetes.io/instance-type": "p5en.48xlarge",
+						}).
+					Obj(),
+			},
+		},
 		"succeeded to build JobSet with dataset and model initializer from the TrainJob.": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).

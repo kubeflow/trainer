@@ -14272,7 +14272,7 @@
             "type": "string"
           },
           "podSpecOverrides": {
-            "description": "Custom overrides for the training runtime.",
+            "description": "Custom overrides for the training runtime. When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.",
             "type": "array",
             "items": {
               "default": {},

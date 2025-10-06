@@ -121,16 +121,7 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	allErrs = append(allErrs, j.checkPodSpecOverridesImmutability(ctx, oldObj, newObj)...)
 
 	// TODO (andreyvelich): Validate Volumes, VolumeMounts, and Tolerations.
-	targetJobNames := sets.New[string]()
 	for _, podSpecOverride := range newObj.Spec.PodSpecOverrides {
-		// Validate that there are no duplicate target job names within the same PodSpecOverride
-		for _, targetJob := range podSpecOverride.TargetJobs {
-			if targetJobNames.Has(targetJob.Name) {
-				allErrs = append(allErrs, field.Duplicate(podSpecOverridePath, targetJob.Name))
-			}
-			targetJobNames.Insert(targetJob.Name)
-		}
-
 		for _, targetJob := range podSpecOverride.TargetJobs {
 			containers, ok := rJobContainerNames[targetJob.Name]
 			if !ok {

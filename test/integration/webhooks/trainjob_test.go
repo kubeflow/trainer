@@ -351,9 +351,9 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						Obj()
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("Should fail in creating trainJob with podSpecOverrides have duplicated targetJob",
+			ginkgo.Entry("Should succeed to create trainJob with podSpecOverrides containing duplicate targetJob",
 				func() *trainer.TrainJob {
-					return testingutil.MakeTrainJobWrapper(ns.Name, "invalid-pod-spec-overrides").
+					return testingutil.MakeTrainJobWrapper(ns.Name, "duplicated-podspecoverrides-target-jobs").
 						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
 						PodSpecOverrides([]trainer.PodSpecOverride{
 							{
@@ -367,7 +367,7 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						}).
 						Obj()
 				},
-				testingutil.BeForbiddenError()),
+				gomega.Succeed()),
 		)
 		ginkgo.DescribeTable("Defaulting TrainJob on creation", func(trainJob func() *trainer.TrainJob, wantTrainJob func() *trainer.TrainJob) {
 			created := trainJob()

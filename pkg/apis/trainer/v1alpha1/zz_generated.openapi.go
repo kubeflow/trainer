@@ -1475,7 +1475,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Custom overrides for the training runtime.",
+							Description: "Custom overrides for the training runtime. When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

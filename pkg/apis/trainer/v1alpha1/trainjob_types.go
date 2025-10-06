@@ -113,6 +113,7 @@ type TrainJobSpec struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Custom overrides for the training runtime.
+	// When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.
 	// +listType=atomic
 	PodSpecOverrides []PodSpecOverride `json:"podSpecOverrides,omitempty"`
 

@@ -454,7 +454,9 @@ spec:
                 - message: ManagedBy value is immutable
                   rule: self == oldSelf
               podSpecOverrides:
-                description: Custom overrides for the training runtime.
+                description: |-
+                  Custom overrides for the training runtime.
+                  When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.
                 items:
                   description: PodSpecOverride represents the custom overrides that
                     will be applied for the TrainJob's resources.
