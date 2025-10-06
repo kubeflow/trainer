@@ -46,4 +46,8 @@ func (t *Jax) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *
 	}
 
 	specPath := field.NewPath("spec")
+
+	return ni, allErrs
 }
+
+func (t *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {}
