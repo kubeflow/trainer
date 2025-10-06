@@ -86,6 +86,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.34.0 // indirect
+	k8s.io/component-base v0.34.1 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
