@@ -57,7 +57,6 @@ func TestVolcano(t *testing.T) {
 			return cmp.Compare(a.GetObjectKind().GroupVersionKind().String(), b.GetObjectKind().GroupVersionKind().String())
 		}),
 		cmpopts.SortSlices(func(a, b corev1.EnvVar) int { return cmp.Compare(a.Name, b.Name) }),
-		gocmp.Comparer(utiltesting.MPISecretDataComparer),
 	}
 
 	errorGetPodGroup := errors.New("error when getting existing PodGroup")
