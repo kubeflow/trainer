@@ -17,6 +17,21 @@ limitations under the License.
 package jax
 
 import (
+	"context"
+	"fmt"
+	"slices"
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
+
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -47,7 +62,7 @@ func (t *Jax) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *
 
 	specPath := field.NewPath("spec")
 
-	return ni, allErrs
+	return nil, allErrs
 }
 
 func (t *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {}
