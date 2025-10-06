@@ -16,6 +16,14 @@ limitations under the License.
 
 package jax
 
+import (
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/apply"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+)
+
 type Jax struct{}
 
 var _ framework.EnforceMLPolicyPlugin = (*Jax)(nil)
@@ -27,11 +35,11 @@ func New(context.Context, client.Client, client.FieldIndexer) (framework.Plugin,
 	return &Jax{}, nil
 }
 
-func (t *Torch) Name() string {
+func (t *Jax) Name() string {
 	return Name
 }
 
-func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (t *Jax) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
 		return nil, allErrs
