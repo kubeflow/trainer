@@ -20,6 +20,7 @@ import (
 	"context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -32,11 +33,7 @@ import (
 type ReconcilerBuilder func(*builder.Builder, client.Client, cache.Cache) *builder.Builder
 
 type Runtime interface {
-
-	// TODO (astefanutti): Change the return type from []any to []runtime.ApplyConfiguration when
-	// https://github.com/kubernetes/kubernetes/pull/129313 becomes available
-
-	NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]any, error)
+	NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]runtime.ApplyConfiguration, error)
 	RuntimeInfo(trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy) (*Info, error)
 	TerminalCondition(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error)
 	EventHandlerRegistrars() []ReconcilerBuilder

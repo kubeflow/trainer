@@ -569,7 +569,7 @@ func TestCoScheduling(t *testing.T) {
 				t.Errorf("Unexpected info from EnforcePodGroupPolicy (-want,+got):\n%s", diff)
 			}
 
-			var objs []any
+			var objs []apiruntime.ApplyConfiguration
 			objs, err = plugin.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
 			if diff := gocmp.Diff(tc.wantBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)

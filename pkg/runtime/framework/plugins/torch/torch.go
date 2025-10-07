@@ -224,7 +224,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
 	}
-	info.SyncPodSetsToTemplateSpec()
+
 	return nil
 }
 
