@@ -22,6 +22,7 @@ import (
 )
 
 // +k8s:defaulter-gen=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 
 // Configuration is the Schema for the Kubeflow Trainer controller manager configuration.

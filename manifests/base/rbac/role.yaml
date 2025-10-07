@@ -96,3 +96,12 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - list
+  - update
