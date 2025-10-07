@@ -43,6 +43,15 @@ rules:
   - update
   - watch
 - apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - list
+  - update
+- apiGroups:
   - jobset.x-k8s.io
   resources:
   - jobsets
@@ -95,13 +104,4 @@ rules:
   verbs:
   - get
   - patch
-  - update
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - create
-  - get
-  - list
   - update
