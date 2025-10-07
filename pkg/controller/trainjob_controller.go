@@ -134,12 +134,9 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	setSuspendedCondition(&trainJob)
-	if terminalCondErr := setTerminalCondition(ctx, runtime, &trainJob); terminalCondErr != nil {
-		err = errors.Join(err, terminalCondErr)
-	}
 
-	if jobsStatusErr := setJobsStatus(ctx, runtime, &trainJob); jobsStatusErr != nil {
-		err = errors.Join(err, jobsStatusErr)
+	if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
+		err = errors.Join(err, statusErr)
 	}
 
 	if !equality.Semantic.DeepEqual(&trainJob.Status, originStatus) {
@@ -256,23 +253,14 @@ func removeFailedCondition(trainJob *trainer.TrainJob) {
 	meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobFailed)
 }
 
-func setTerminalCondition(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
-	terminalCond, err := runtime.TerminalCondition(ctx, trainJob)
+func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
+	status, err := runtime.TrainJobStatus(ctx, trainJob)
 	if err != nil {
 		return err
 	}
-	if terminalCond != nil {
-		meta.SetStatusCondition(&trainJob.Status.Conditions, *terminalCond)
+	if status != nil {
+		trainJob.Status = *status
 	}
-	return nil
-}
-
-func setJobsStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
-	statuses, err := runtime.JobsStatus(ctx, trainJob)
-	if err != nil {
-		return err
-	}
-	trainJob.Status.JobsStatus = statuses
 	return nil
 }
 

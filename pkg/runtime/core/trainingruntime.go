@@ -246,12 +246,8 @@ func syncPodSets(info *runtime.Info) {
 	}
 }
 
-func (r *TrainingRuntime) TerminalCondition(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error) {
-	return r.framework.RunTerminalConditionPlugins(ctx, trainJob)
-}
-
-func (r *TrainingRuntime) JobsStatus(ctx context.Context, trainJob *trainer.TrainJob) ([]trainer.JobStatus, error) {
-	return r.framework.RunJobsStatusPlugins(ctx, trainJob)
+func (r *TrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
+	return r.framework.RunTrainJobStatusPlugin(ctx, trainJob)
 }
 
 func (r *TrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {

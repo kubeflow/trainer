@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -32,10 +31,7 @@ import (
 	index "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 )
 
-var (
-	errorTooManyTerminalConditionPlugin = errors.New("too many TerminalCondition plugins are registered")
-	errorTooManyJobsStatusPlugin        = errors.New("too many JobsStatus plugins are registered")
-)
+var errorTooManyTrainJobStatusPlugin = errors.New("too many TrainJobStatus plugins are registered")
 
 type Framework struct {
 	registry                     fwkplugins.Registry
@@ -46,8 +42,7 @@ type Framework struct {
 	watchExtensionPlugins        []framework.WatchExtensionPlugin
 	podNetworkPlugins            []framework.PodNetworkPlugin
 	componentBuilderPlugins      []framework.ComponentBuilderPlugin
-	terminalConditionPlugin      framework.TerminalConditionPlugin
-	jobsStatusPlugin             framework.JobsStatusPlugin
+	trainJobStatusPlugin         framework.TrainJobStatusPlugin
 }
 
 func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer client.FieldIndexer) (*Framework, error) {
@@ -83,17 +78,11 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 		if p, ok := plugin.(framework.ComponentBuilderPlugin); ok {
 			f.componentBuilderPlugins = append(f.componentBuilderPlugins, p)
 		}
-		if p, ok := plugin.(framework.TerminalConditionPlugin); ok {
-			if f.terminalConditionPlugin != nil {
-				return nil, errorTooManyTerminalConditionPlugin
+		if p, ok := plugin.(framework.TrainJobStatusPlugin); ok {
+			if f.trainJobStatusPlugin != nil {
+				return nil, errorTooManyTrainJobStatusPlugin
 			}
-			f.terminalConditionPlugin = p
-		}
-		if p, ok := plugin.(framework.JobsStatusPlugin); ok {
-			if f.jobsStatusPlugin != nil {
-				return nil, errorTooManyJobsStatusPlugin
-			}
-			f.jobsStatusPlugin = p
+			f.trainJobStatusPlugin = p
 		}
 	}
 	f.plugins = plugins
@@ -154,16 +143,9 @@ func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtim
 	return objs, nil
 }
 
-func (f *Framework) RunTerminalConditionPlugins(ctx context.Context, trainJob *trainer.TrainJob) (*metav1.Condition, error) {
-	if f.terminalConditionPlugin != nil {
-		return f.terminalConditionPlugin.TerminalCondition(ctx, trainJob)
-	}
-	return nil, nil
-}
-
-func (f *Framework) RunJobsStatusPlugins(ctx context.Context, trainJob *trainer.TrainJob) ([]trainer.JobStatus, error) {
-	if f.jobsStatusPlugin != nil {
-		return f.jobsStatusPlugin.JobsStatus(ctx, trainJob)
+func (f *Framework) RunTrainJobStatusPlugin(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
+	if f.trainJobStatusPlugin != nil {
+		return f.trainJobStatusPlugin.Status(ctx, trainJob)
 	}
 	return nil, nil
 }
