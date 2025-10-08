@@ -322,7 +322,7 @@ type TrainJobSpec struct {
 
 	// Custom overrides for the training runtime.
 	// +listType=atomic
-	PodSpecOverrides []PodSpecOverride `json:"podSpecOverrides,omitempty"`
+	PodTemplateOverrides []PodTemplateOverride `json:"podTemplateOverrides,omitempty"`
 
 	// Whether the controller should suspend the running TrainJob.
 	// Defaults to false.
@@ -433,7 +433,7 @@ This table explains the rationale for each `TrainJob` parameter:
    </td>
   </tr>
   <tr>
-   <td><code>PodSpecOverrides</code>
+   <td><code>PodTemplateOverrides</code>
    </td>
    <td>Custom overrides that are specific to the <code>TrainJob</code> and need to be applied to the
     <code>TrainJob</code> resources. For example, the user identity. Usually, it is managed by
@@ -760,9 +760,9 @@ replicatedJobs:
                     value: AutoModelForCausalLM
 ```
 
-### The PodSpecOverride APIs
+### The PodTemplateOverride APIs
 
-The `PodSpecOverride` represents overrides for the `TrainingRuntime` when `TrainJob` is created.
+The `PodTemplateOverride` represents overrides for the `TrainingRuntime` when `TrainJob` is created.
 These parameters can include the user's identity or PVC.
 
 Usually, these parameters should not be configured by the user and should be attached during the
@@ -771,11 +771,28 @@ orchestration (e.g. using Kubernetes admission webhooks or custom clients).
 In the future, we can add more parameters if we find use-cases when it is required.
 
 ```golang
-type PodSpecOverride struct {
-	// TargetJobs are the names of the Jobs the override applies to.
-	// An empty list will apply to all Jobs.
-	TargetJobs []string `json:"targetJobs,omitempty"`
+// PodTemplateOverride represents the custom overrides that will be applied for the TrainJob's resources.
+type PodTemplateOverride struct {
+	// TargetJobs are the training job replicas in the training runtime template to apply the overrides.
+	// +listType=atomic
+	TargetJobs []PodTemplateOverrideTargetJob `json:"targetJobs"`
 
+	// Override for the Pod template metadata.
+	// These values will be merged with the TrainingRuntime's Pod template metadata.
+	Metadata *metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Override for the Pod template spec.
+	// These values will be merged with the TrainingRuntime's Pod template spec.
+	Spec *PodTemplateSpecOverride `json:"spec,omitempty"`
+}
+
+type PodTemplateOverrideTargetJob struct {
+	// Name is the target training job name for which the PodSpec is overridden.
+	Name string `json:"name"`
+}
+
+// PodTemplateSpecOverride represents the spec overrides for Pod template.
+type PodTemplateSpecOverride struct {
 	// Override for the service account.
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 
@@ -804,7 +821,7 @@ type PodSpecOverride struct {
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
-// ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
+// ContainerOverride represents parameters that can be overridden using PodTemplateOverrides.
 type ContainerOverride struct {
 	// Name for the container. TrainingRuntime must have this container.
 	Name string `json:"name"`
@@ -825,7 +842,7 @@ The webhook will validate that TargetJob and Container name exist in the Runtime
 The overrides will be applied during the build phase of [Pipelines Framework](#pipeline-framework)
 in the `ComponentBuilder` plugin.
 
-The PodSpecOverrides will override values of TrainJob and Runtime Job template,
+The PodTemplateOverrides will override values of TrainJob and Runtime Job template,
 since it should contain the final value for the underlying Job.
 
 #### Example of TrainJob with Overrides
@@ -844,24 +861,27 @@ spec:
     name: pytorch-distributed-gpu
   trainer:
     image: docker.io/custom-training
-  podSpecOverrides:
-    - targetJob: node
-      initContainers:
-        - name: fetch-identity
-          env:
-            - name: USER_ID
-              value: 123
-        - name: trainer
-          volumeMounts:
-            - name: user-123-volume
-              mountPath: /workspace
-      volumes:
-        - name: user-123-volume
-          persistentVolumeClaim:
-            claimName: user-123-volume
+  podTemplateOverrides:
+    - targetJobs:
+        - name: node
+      spec:
+        initContainers:
+          - name: fetch-identity
+            env:
+              - name: USER_ID
+                value: "123"
+        containers:
+          - name: trainer
+            volumeMounts:
+              - name: user-123-volume
+                mountPath: /workspace
+        volumes:
+          - name: user-123-volume
+            persistentVolumeClaim:
+              claimName: user-123-volume
 ```
 
-Users can also define multiple PodSpecOverrides for every ReplicatedJob:
+Users can also define multiple PodTemplateOverrides for every ReplicatedJob:
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v2alpha1
@@ -874,19 +894,23 @@ spec:
     name: pytorch-distributed-gpu
   trainer:
     image: docker.io/custom-training
-  podSpecOverrides:
-    - targetJob: dataset-initializer
-      initContainers:
-        - name: fetch-identity
-          env:
-            - name: USER_ID
-              value: 123
-    - targetJob: node
-      initContainers:
-        - name: fetch-identity
-          env:
-            - name: USER_ID
-              value: 123
+  podTemplateOverrides:
+    - targetJobs:
+        - name: dataset-initializer
+      spec:
+        initContainers:
+          - name: fetch-identity
+            env:
+              - name: USER_ID
+                value: "123"
+    - targetJobs:
+        - name: node
+      spec:
+        initContainers:
+          - name: fetch-identity
+            env:
+              - name: USER_ID
+                value: "123"
 ```
 
 ### State Transition
@@ -1815,6 +1839,7 @@ spec:
 
 - 2024-07-16 Creation date
 - 2025-03-15 Updated the initializer APIs
+- 2025-10-09 Added PodTemplateOverrides to TrainJob V2 API
 
 ## Alternatives
 
