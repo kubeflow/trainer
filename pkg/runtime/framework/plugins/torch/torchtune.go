@@ -32,7 +32,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
-func validateTorchTune(runtimeInfo *runtime.Info,  newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func validateTorchTune(runtimeInfo *runtime.Info, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	specPath := field.NewPath("spec")
 
