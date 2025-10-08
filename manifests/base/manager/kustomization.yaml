@@ -3,7 +3,7 @@ resources:
 
 # ConfigMap generator for controller manager configuration
 configMapGenerator:
-  - name: manager-config
+  - name: kubeflow-trainer-config
     files:
       - controller_manager_config.yaml
 

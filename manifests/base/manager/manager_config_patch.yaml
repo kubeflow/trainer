@@ -11,11 +11,11 @@ spec:
         - --config=/controller_manager_config.yaml
         - --zap-log-level=2
         volumeMounts:
-        - name: manager-config
+        - name: kubeflow-trainer-config
           mountPath: /controller_manager_config.yaml
           subPath: controller_manager_config.yaml
           readOnly: true
       volumes:
-      - name: manager-config
+      - name: kubeflow-trainer-config
         configMap:
-          name: manager-config
+          name: kubeflow-trainer-config

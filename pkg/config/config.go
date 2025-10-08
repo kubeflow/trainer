@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubeflow Authors.
+Copyright 2025 The Kubeflow Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -46,37 +45,6 @@ func fromFile(path string, scheme *runtime.Scheme, cfg *configapi.Configuration)
 	}
 
 	return nil
-}
-
-// validate validates the configuration.
-func validate(cfg *configapi.Configuration) field.ErrorList {
-	var allErrs field.ErrorList
-
-	// Validate webhook port
-	if cfg.Webhook.Port != nil && (*cfg.Webhook.Port < 1 || *cfg.Webhook.Port > 65535) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("webhook", "port"), *cfg.Webhook.Port, "must be between 1 and 65535"))
-	}
-
-	// Validate client connection QPS and Burst
-	if cfg.ClientConnection != nil {
-		if cfg.ClientConnection.QPS != nil && *cfg.ClientConnection.QPS < 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("clientConnection", "qps"), *cfg.ClientConnection.QPS, "must be greater than or equal to 0"))
-		}
-		if cfg.ClientConnection.Burst != nil && *cfg.ClientConnection.Burst < 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("clientConnection", "burst"), *cfg.ClientConnection.Burst, "must be greater than or equal to 0"))
-		}
-	}
-
-	// Validate GroupKindConcurrency values
-	if cfg.Controller != nil && cfg.Controller.GroupKindConcurrency != nil {
-		for gk, concurrency := range cfg.Controller.GroupKindConcurrency {
-			if concurrency < 1 {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("controller", "groupKindConcurrency").Key(gk), concurrency, "must be greater than 0"))
-			}
-		}
-	}
-
-	return allErrs
 }
 
 // addTo applies the configuration to controller runtime Options.
@@ -169,37 +137,4 @@ func IsCertManagementEnabled(cfg *configapi.Configuration) bool {
 		return true // Enabled by default
 	}
 	return *cfg.CertManagement.Enable
-}
-
-// GetWebhookServiceName returns the webhook service name from configuration.
-func GetWebhookServiceName(cfg *configapi.Configuration) string {
-	if cfg.CertManagement != nil && cfg.CertManagement.WebhookServiceName != "" {
-		return cfg.CertManagement.WebhookServiceName
-	}
-	return "kubeflow-trainer-controller-manager"
-}
-
-// GetWebhookSecretName returns the webhook secret name from configuration.
-func GetWebhookSecretName(cfg *configapi.Configuration) string {
-	if cfg.CertManagement != nil && cfg.CertManagement.WebhookSecretName != "" {
-		return cfg.CertManagement.WebhookSecretName
-	}
-	return "kubeflow-trainer-webhook-cert"
-}
-
-// GetClientConnectionConfig returns QPS and Burst from configuration.
-func GetClientConnectionConfig(cfg *configapi.Configuration) (qps float32, burst int32) {
-	qps = float32(50)  // default
-	burst = int32(100) // default
-
-	if cfg.ClientConnection != nil {
-		if cfg.ClientConnection.QPS != nil {
-			qps = *cfg.ClientConnection.QPS
-		}
-		if cfg.ClientConnection.Burst != nil {
-			burst = *cfg.ClientConnection.Burst
-		}
-	}
-
-	return qps, burst
 }
