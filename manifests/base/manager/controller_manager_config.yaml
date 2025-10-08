@@ -18,7 +18,7 @@ webhook:
 
 # Leader election configuration
 leaderElection:
-  enable: true
+  leaderElect: true
   resourceName: trainer.kubeflow.org
   resourceNamespace: ""
   leaseDuration: 15s
