@@ -27,11 +27,11 @@ from typing_extensions import Self
 
 class TrainerV1alpha1PodTemplateOverride(BaseModel):
     """
-    PodTemplateOverride represents the custom overrides that will be applied for the TrainJob's resources.
+    PodTemplateOverride represents a custom PodTemplateSpec override that will be applied to the TrainJob's training runtime.
     """ # noqa: E501
-    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="Override for the Pod template metadata. These values will be merged with the TrainingRuntime's Pod template metadata.")
-    spec: Optional[TrainerV1alpha1PodTemplateSpecOverride] = Field(default=None, description="Override for the Pod template spec. These values will be merged with the TrainingRuntime's Pod template spec.")
-    target_jobs: List[TrainerV1alpha1PodTemplateOverrideTargetJob] = Field(description="TrainJobs is the training job replicas in the training runtime template to apply the overrides.", alias="targetJobs")
+    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="metadata overrides the Pod template metadata. These values will be merged with the TrainingRuntime's Pod template metadata.")
+    spec: Optional[TrainerV1alpha1PodTemplateSpecOverride] = Field(default=None, description="spec overrides the Pod template spec. These values will be merged with the TrainingRuntime's Pod template spec.")
+    target_jobs: List[TrainerV1alpha1PodTemplateOverrideTargetJob] = Field(description="targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.", alias="targetJobs")
     __properties: ClassVar[List[str]] = ["metadata", "spec", "targetJobs"]
 
     model_config = ConfigDict(

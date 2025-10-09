@@ -1234,7 +1234,7 @@ func (m *MLPolicySourceWrapper) TorchPolicy(numProcPerNode *intstr.IntOrString, 
 	return m
 }
 
-func (m *MLPolicySourceWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation *trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsNode *bool) *MLPolicySourceWrapper {
+func (m *MLPolicySourceWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsNode *bool) *MLPolicySourceWrapper {
 	if m.MPI == nil {
 		m.MPI = &trainer.MPIMLPolicySource{}
 	}

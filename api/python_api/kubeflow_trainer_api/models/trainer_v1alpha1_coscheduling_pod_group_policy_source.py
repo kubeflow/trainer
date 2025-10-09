@@ -26,7 +26,7 @@ class TrainerV1alpha1CoschedulingPodGroupPolicySource(BaseModel):
     """
     CoschedulingPodGroupPolicySource represents configuration for coscheduling plugin. The number of min members in the PodGroupSpec is always equal to the number of nodes.
     """ # noqa: E501
-    schedule_timeout_seconds: Optional[StrictInt] = Field(default=None, description="Time threshold to schedule PodGroup for gang-scheduling. If the scheduling timeout is equal to 0, the default value is used. Defaults to 60 seconds.", alias="scheduleTimeoutSeconds")
+    schedule_timeout_seconds: Optional[StrictInt] = Field(default=None, description="scheduleTimeoutSeconds is the maximum duration to schedule PodGroup for gang-scheduling. If the scheduling timeout is equal to 0, the default value is used. Defaults to 60 seconds.", alias="scheduleTimeoutSeconds")
     __properties: ClassVar[List[str]] = ["scheduleTimeoutSeconds"]
 
     model_config = ConfigDict(

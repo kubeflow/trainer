@@ -30,14 +30,14 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
     """
     TrainJobSpec represents specification of the desired TrainJob.
     """ # noqa: E501
-    annotations: Optional[Dict[str, StrictStr]] = Field(default=None, description="Annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
-    initializer: Optional[TrainerV1alpha1Initializer] = Field(default=None, description="Configuration of the initializer.")
-    labels: Optional[Dict[str, StrictStr]] = Field(default=None, description="Labels to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
-    managed_by: Optional[StrictStr] = Field(default=None, description="ManagedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`", alias="managedBy")
-    pod_template_overrides: Optional[List[TrainerV1alpha1PodTemplateOverride]] = Field(default=None, description="Custom overrides for the training runtime. When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.", alias="podTemplateOverrides")
-    runtime_ref: TrainerV1alpha1RuntimeRef = Field(description="Reference to the training runtime. The field is immutable.", alias="runtimeRef")
-    suspend: Optional[StrictBool] = Field(default=None, description="Whether the controller should suspend the running TrainJob. Defaults to false.")
-    trainer: Optional[TrainerV1alpha1Trainer] = Field(default=None, description="Configuration of the trainer.")
+    annotations: Optional[Dict[str, StrictStr]] = Field(default=None, description="annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
+    initializer: Optional[TrainerV1alpha1Initializer] = Field(default=None, description="initializer defines the configuration of the initializer.")
+    labels: Optional[Dict[str, StrictStr]] = Field(default=None, description="labels to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
+    managed_by: Optional[StrictStr] = Field(default=None, description="managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`", alias="managedBy")
+    pod_template_overrides: Optional[List[TrainerV1alpha1PodTemplateOverride]] = Field(default=None, description="podTemplateOverrides define the PodTemplateOverrides for the training runtime. When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.", alias="podTemplateOverrides")
+    runtime_ref: TrainerV1alpha1RuntimeRef = Field(description="runtimeRef is the reference to the training runtime. The field is immutable.", alias="runtimeRef")
+    suspend: Optional[StrictBool] = Field(default=None, description="suspend defines whether to suspend the running TrainJob. Defaults to false.")
+    trainer: Optional[TrainerV1alpha1Trainer] = Field(default=None, description="trainer defines the configuration of the trainer.")
     __properties: ClassVar[List[str]] = ["annotations", "initializer", "labels", "managedBy", "podTemplateOverrides", "runtimeRef", "suspend", "trainer"]
 
     model_config = ConfigDict(

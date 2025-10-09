@@ -40,19 +40,20 @@ spec:
           metadata:
             type: object
           spec:
-            description: Specification of the desired ClusterTrainingRuntime.
+            description: spec of the ClusterTrainingRuntime.
+            minProperties: 1
             properties:
               mlPolicy:
-                description: Configuration for the model training with ML-specific
-                  parameters.
+                description: mlPolicy provides the ML-specific parameters for the
+                  model training.
                 properties:
                   mpi:
-                    description: Configuration for the MPI Runtime.
+                    description: mpi defines the configuration for the MPI Runtime.
                     properties:
                       mpiImplementation:
                         default: OpenMPI
                         description: |-
-                          Implementation name for the MPI to create the appropriate hostfile.
+                          mpiImplementation is the name of the MPI implementation to create the appropriate hostfile.
                           Defaults to OpenMPI.
                         enum:
                         - OpenMPI
@@ -60,7 +61,7 @@ spec:
                       numProcPerNode:
                         default: 1
                         description: |-
-                          Number of processes per node.
+                          numProcPerNode is the number of processes per node.
                           This value is equal to the number of slots for each node in the hostfile.
                           Defaults to 1.
                         format: int32
@@ -68,43 +69,44 @@ spec:
                       runLauncherAsNode:
                         default: false
                         description: |-
-                          Whether to run training process on the launcher Job.
+                          runLauncherAsNode defines whether to run training process on the launcher Job.
                           Defaults to false.
                         type: boolean
                       sshAuthMountPath:
                         default: /root/.ssh
                         description: |-
-                          Directory where SSH keys are mounted.
+                          sshAuthMountPath is the directory where SSH keys are mounted.
                           Defaults to /root/.ssh.
                         type: string
                     type: object
                   numNodes:
                     description: |-
-                      Number of training nodes.
+                      numNodes is the number of training nodes.
                       Defaults to 1.
                     format: int32
                     type: integer
                   torch:
-                    description: Configuration for the PyTorch runtime.
+                    description: torch defines the configuration for the PyTorch runtime.
                     properties:
                       elasticPolicy:
-                        description: Elastic policy for the PyTorch training.
+                        description: elasticPolicy defines the Elastic policy for
+                          the PyTorch training.
                         properties:
                           maxNodes:
-                            description: Upper limit for the number of nodes to which
-                              training job can scale up.
+                            description: maxNodes is the upper limit for the number
+                              of nodes to which training job can scale up.
                             format: int32
                             type: integer
                           maxRestarts:
                             description: |-
-                              How many times the training job can be restarted.
+                              maxRestarts defines how many times the training job can be restarted.
                               This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and
                               the `.spec.failurePolicy.maxRestarts` parameter of the training Job.
                             format: int32
                             type: integer
                           metrics:
                             description: |-
-                              Specification which are used to calculate the desired number of nodes. See the individual
+                              metrics which are used to calculate the desired number of nodes. See the individual
                               metric source types for more information about how each type of metric must respond.
                               The HPA will be created to perform auto-scaling.
                             items:
@@ -583,8 +585,8 @@ spec:
                             type: array
                             x-kubernetes-list-type: atomic
                           minNodes:
-                            description: Lower limit for the number of nodes to which
-                              training job can scale down.
+                            description: minNodes is the lower limit for the number
+                              of nodes to which training job can scale down.
                             format: int32
                             type: integer
                         type: object
@@ -594,7 +596,7 @@ spec:
                         - type: string
                         default: auto
                         description: |-
-                          Number of processes per node.
+                          numProcPerNode is the number of processes per node.
                           This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI.
                           Supported values: `auto`, `cpu`, `gpu`, or int value.
                           Defaults to `auto`.
@@ -611,27 +613,27 @@ spec:
                 - message: Only one of the policy can be configured
                   rule: '!(has(self.torch) && has(self.mpi))'
               podGroupPolicy:
-                description: Configuration for the PodGroup to enable gang-scheduling
-                  via supported plugins.
+                description: podGroupPolicy defines the configuration for the PodGroup
+                  to enable gang-scheduling via supported plugins.
                 properties:
                   coscheduling:
-                    description: Coscheduling plugin from the Kubernetes scheduler-plugins
+                    description: coscheduling plugin from the Kubernetes scheduler-plugins
                       for gang-scheduling.
                     properties:
                       scheduleTimeoutSeconds:
                         default: 60
                         description: |-
-                          Time threshold to schedule PodGroup for gang-scheduling.
+                          scheduleTimeoutSeconds is the maximum duration to schedule PodGroup for gang-scheduling.
                           If the scheduling timeout is equal to 0, the default value is used.
                           Defaults to 60 seconds.
                         format: int32
                         type: integer
                     type: object
                   volcano:
-                    description: Volcano plugin for gang-scheduling.
+                    description: volcano plugin for gang-scheduling.
                     properties:
                       networkTopology:
-                        description: NetworkTopology defines the NetworkTopology config,
+                        description: networkTopology defines the NetworkTopology config,
                           this field works in conjunction with network topology feature
                           and hyperNode CRD.
                         properties:
@@ -652,11 +654,12 @@ spec:
                     type: object
                 type: object
               template:
-                description: JobSet template which will be used by TrainJob.
+                description: template for the JobSet which will be used by TrainJob.
+                minProperties: 1
                 properties:
                   metadata:
                     description: |-
-                      Metadata for custom JobSet's labels and annotations.
+                      metadata for custom JobSet's labels and annotations.
                       JobSet name and namespace is equal to the TrainJob's name and namespace.
                     properties:
                       annotations:
@@ -677,8 +680,8 @@ spec:
                         type: string
                     type: object
                   spec:
-                    description: Specification of the desired JobSet which will be
-                      created from TrainJob.
+                    description: spec of the desired JobSet which will be created
+                      from TrainJob.
                     properties:
                       coordinator:
                         description: |-
@@ -10441,8 +10444,6 @@ spec:
                       rule: '!(has(self.startupPolicy) && self.startupPolicy.startupPolicyOrder
                         == ''InOrder'' && self.replicatedJobs.exists(x, has(x.dependsOn)))'
                 type: object
-            required:
-            - template
             type: object
         type: object
     served: true

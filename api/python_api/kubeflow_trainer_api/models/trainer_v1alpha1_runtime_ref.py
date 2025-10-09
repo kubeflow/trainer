@@ -26,9 +26,9 @@ class TrainerV1alpha1RuntimeRef(BaseModel):
     """
     RuntimeRef represents the reference to the existing training runtime.
     """ # noqa: E501
-    api_group: Optional[StrictStr] = Field(default=None, description="APIGroup of the runtime being referenced. Defaults to `trainer.kubeflow.org`.", alias="apiGroup")
-    kind: Optional[StrictStr] = Field(default=None, description="Kind of the runtime being referenced. Defaults to ClusterTrainingRuntime.")
-    name: StrictStr = Field(description="Name of the runtime being referenced. When namespaced-scoped TrainingRuntime is used, the TrainJob must have the same namespace as the deployed runtime.")
+    api_group: Optional[StrictStr] = Field(default=None, description="apiGroup of the runtime being referenced. Defaults to `trainer.kubeflow.org`.", alias="apiGroup")
+    kind: Optional[StrictStr] = Field(default=None, description="kind of the runtime being referenced. Defaults to ClusterTrainingRuntime.")
+    name: StrictStr = Field(description="name of the runtime being referenced. When namespaced-scoped TrainingRuntime is used, the TrainJob must have the same namespace as the deployed runtime.")
     __properties: ClassVar[List[str]] = ["apiGroup", "kind", "name"]
 
     model_config = ConfigDict(
@@ -84,7 +84,7 @@ class TrainerV1alpha1RuntimeRef(BaseModel):
         _obj = cls.model_validate({
             "apiGroup": obj.get("apiGroup"),
             "kind": obj.get("kind"),
-            "name": obj.get("name") if obj.get("name") is not None else ''
+            "name": obj.get("name")
         })
         return _obj
 

@@ -27,10 +27,10 @@ class TrainerV1alpha1TorchElasticPolicy(BaseModel):
     """
     TorchElasticPolicy represents a configuration for the PyTorch elastic training. If this policy is set, the `.spec.numNodes` parameter must be omitted, since min and max node is used to configure the `torchrun` CLI argument: `--nnodes=minNodes:maxNodes`. Only `c10d` backend is supported for the Rendezvous communication.
     """ # noqa: E501
-    max_nodes: Optional[StrictInt] = Field(default=None, description="Upper limit for the number of nodes to which training job can scale up.", alias="maxNodes")
-    max_restarts: Optional[StrictInt] = Field(default=None, description="How many times the training job can be restarted. This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and the `.spec.failurePolicy.maxRestarts` parameter of the training Job.", alias="maxRestarts")
-    metrics: Optional[List[IoK8sApiAutoscalingV2MetricSpec]] = Field(default=None, description="Specification which are used to calculate the desired number of nodes. See the individual metric source types for more information about how each type of metric must respond. The HPA will be created to perform auto-scaling.")
-    min_nodes: Optional[StrictInt] = Field(default=None, description="Lower limit for the number of nodes to which training job can scale down.", alias="minNodes")
+    max_nodes: Optional[StrictInt] = Field(default=None, description="maxNodes is the upper limit for the number of nodes to which training job can scale up.", alias="maxNodes")
+    max_restarts: Optional[StrictInt] = Field(default=None, description="maxRestarts defines how many times the training job can be restarted. This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and the `.spec.failurePolicy.maxRestarts` parameter of the training Job.", alias="maxRestarts")
+    metrics: Optional[List[IoK8sApiAutoscalingV2MetricSpec]] = Field(default=None, description="metrics which are used to calculate the desired number of nodes. See the individual metric source types for more information about how each type of metric must respond. The HPA will be created to perform auto-scaling.")
+    min_nodes: Optional[StrictInt] = Field(default=None, description="minNodes is the lower limit for the number of nodes to which training job can scale down.", alias="minNodes")
     __properties: ClassVar[List[str]] = ["maxNodes", "maxRestarts", "metrics", "minNodes"]
 
     model_config = ConfigDict(

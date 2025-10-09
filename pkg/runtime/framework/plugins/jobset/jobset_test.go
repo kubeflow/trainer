@@ -88,7 +88,7 @@ func TestJobSet(t *testing.T) {
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), nil, nil).
+						MPIPolicy(nil, trainer.MPIImplementationOpenMPI, nil, nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -140,7 +140,7 @@ func TestJobSet(t *testing.T) {
 			wantInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(nil, ptr.To(trainer.MPIImplementationOpenMPI), nil, nil).
+						MPIPolicy(nil, trainer.MPIImplementationOpenMPI, nil, nil).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
