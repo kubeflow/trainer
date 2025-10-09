@@ -134,6 +134,7 @@ manifests: controller-gen ## Generate manifests.
 generate: go-mod-download manifests ## Generate APIs.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/config/v1alpha1/..."
 	CONTAINER_RUNTIME=$(CONTAINER_RUNTIME) hack/python-api/gen-api.sh
 
 .PHONY: go-mod-download

@@ -1,2 +1,12 @@
 resources:
   - manager.yaml
+
+# ConfigMap generator for controller manager configuration
+configMapGenerator:
+  - name: kubeflow-trainer-config
+    files:
+      - controller_manager_config.yaml
+
+# Patches to mount the config file
+patches:
+  - path: manager_config_patch.yaml

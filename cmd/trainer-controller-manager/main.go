@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"crypto/tls"
 	"errors"
 	"flag"
 	"net/http"
@@ -33,13 +32,13 @@ import (
 	ctrlpkg "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/config"
 	"github.com/kubeflow/trainer/v2/pkg/controller"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
@@ -58,6 +57,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(configapi.AddToScheme(scheme))
 	utilruntime.Must(trainer.AddToScheme(scheme))
 	utilruntime.Must(jobsetv1alpha2.AddToScheme(scheme))
 	utilruntime.Must(schedulerpluginsv1alpha1.AddToScheme(scheme))
@@ -65,84 +65,66 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	var secureMetrics bool
+	var configFile string
 	var enableHTTP2 bool
-	var webhookServerPort int
-	var webhookServiceName string
-	var webhookSecretName string
-	var tlsOpts []func(*tls.Config)
 
-	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
-		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&secureMetrics, "metrics-secure", true,
-		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
+	flag.StringVar(&configFile, "config", "",
+		"The controller will load its initial configuration from this file. "+
+			"Omit this flag to use the default configuration values. "+
+			"Command-line flags override configuration from this file.")
+	// if the enable-http2 flag is false (the default), http/2 should be disabled
+	// due to its vulnerabilities. More specifically, disabling http/2 will
+	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
+	// Rapid Reset CVEs. For more information see:
+	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
+	// - https://github.com/advisories/GHSA-4374-p667-p6c8
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 
-	// Cert generation flags
-	flag.IntVar(&webhookServerPort, "webhook-server-port", 9443, "Endpoint port for the webhook server.")
-	flag.StringVar(&webhookServiceName, "webhook-service-name", "kubeflow-trainer-controller-manager", "Name of the Service used as part of the DNSName")
-	flag.StringVar(&webhookSecretName, "webhook-secret-name", "kubeflow-trainer-webhook-cert", "Name of the Secret to store CA  and server certs")
-
-	opts := zap.Options{
+	zapOpts := zap.Options{
 		TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
 		ZapOpts:     []zaplog.Option{zaplog.AddCaller()},
 	}
-	opts.BindFlags(flag.CommandLine)
+	zapOpts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zapOpts)))
 
-	if !enableHTTP2 {
-		// if the enable-http2 flag is false (the default), http/2 should be disabled
-		// due to its vulnerabilities. More specifically, disabling http/2 will
-		// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
-		// Rapid Reset CVEs. For more information see:
-		// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
-		// - https://github.com/advisories/GHSA-4374-p667-p6c8
-		tlsOpts = append(tlsOpts, func(c *tls.Config) {
-			setupLog.Info("disabling http/2")
-			c.NextProtos = []string{"http/1.1"}
-		})
+	setupLog.Info("Loading configuration", "configFile", configFile)
+	options, cfg, err := config.Load(scheme, configFile, enableHTTP2)
+	if err != nil {
+		setupLog.Error(err, "Unable to load configuration")
+		os.Exit(1)
 	}
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		Client: client.Options{
-			Cache: &client.CacheOptions{
-				Unstructured: true,
-			},
+
+	// Set client cache options
+	options.Client = client.Options{
+		Cache: &client.CacheOptions{
+			Unstructured: true,
 		},
-		Metrics: metricsserver.Options{
-			BindAddress:   metricsAddr,
-			SecureServing: secureMetrics,
-			TLSOpts:       tlsOpts,
-		},
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Port:    webhookServerPort,
-			TLSOpts: tlsOpts,
-		}),
-		HealthProbeBindAddress: probeAddr,
-	})
+	}
+
+	setupLog.Info("Creating manager")
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
 	certsReady := make(chan struct{})
-	if err = cert.ManageCerts(mgr, cert.Config{
-		WebhookSecretName:        webhookSecretName,
-		WebhookServiceName:       webhookServiceName,
-		WebhookConfigurationName: webhookConfigurationName,
-	}, certsReady); err != nil {
-		setupLog.Error(err, "unable to set up cert rotation")
-		os.Exit(1)
+	if config.IsCertManagementEnabled(&cfg) {
+		setupLog.Info("Setting up certificate management")
+		if err = cert.ManageCerts(mgr, cert.Config{
+			WebhookSecretName:        cfg.CertManagement.WebhookSecretName,
+			WebhookServiceName:       cfg.CertManagement.WebhookServiceName,
+			WebhookConfigurationName: webhookConfigurationName,
+		}, certsReady); err != nil {
+			setupLog.Error(err, "unable to set up cert rotation")
+			os.Exit(1)
+		}
+	} else {
+		setupLog.Info("Certificate management is disabled, certificates must be provided externally")
+		close(certsReady)
 	}
 
 	ctx := ctrl.SetupSignalHandler()

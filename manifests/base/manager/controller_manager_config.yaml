@@ -1,0 +1,44 @@
+apiVersion: config.trainer.kubeflow.org/v1alpha1
+kind: Configuration
+# Health configuration
+health:
+  healthProbeBindAddress: :8081
+  readinessEndpointName: readyz
+  livenessEndpointName: healthz
+
+# Metrics configuration
+metrics:
+  bindAddress: :8443
+  secureServing: true
+
+# Webhook configuration
+webhook:
+  port: 9443
+  host: ""
+
+# Leader election configuration
+leaderElection:
+  leaderElect: true
+  resourceName: trainer.kubeflow.org
+  resourceNamespace: ""
+  leaseDuration: 15s
+  renewDeadline: 10s
+  retryPeriod: 2s
+
+# Controller configuration
+controller:
+  groupKindConcurrency:
+    TrainJob.trainer.kubeflow.org: 5
+    TrainingRuntime.trainer.kubeflow.org: 1
+    ClusterTrainingRuntime.trainer.kubeflow.org: 1
+
+# Certificate management configuration
+certManagement:
+  enable: true
+  webhookServiceName: kubeflow-trainer-controller-manager
+  webhookSecretName: kubeflow-trainer-webhook-cert
+
+# Client connection configuration
+clientConnection:
+  qps: 50
+  burst: 100

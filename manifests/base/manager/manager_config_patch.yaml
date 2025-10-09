@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubeflow-trainer-controller-manager
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        args:
+        - --config=/controller_manager_config.yaml
+        - --zap-log-level=2
+        volumeMounts:
+        - name: kubeflow-trainer-config
+          mountPath: /controller_manager_config.yaml
+          subPath: controller_manager_config.yaml
+          readOnly: true
+      volumes:
+      - name: kubeflow-trainer-config
+        configMap:
+          name: kubeflow-trainer-config
