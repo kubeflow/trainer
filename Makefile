@@ -170,7 +170,7 @@ test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd volca
 .PHONY: test-python
 test-python: ## Run Python unit test.
 	pip install pytest
-	pip install -r ./cmd/initializers/dataset/requirements.txt
+	pip install -r ./cmd/initializers/dataset/requirements-dev.txt
 
 	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/dataset
 	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/model
@@ -179,7 +179,7 @@ test-python: ## Run Python unit test.
 .PHONY: test-python-integration
 test-python-integration: ## Run Python integration test.
 	pip install pytest
-	pip install -r ./cmd/initializers/dataset/requirements.txt
+	pip install -r ./cmd/initializers/dataset/requirements-dev.txt
 
 	PYTHONPATH=$(PROJECT_DIR) pytest ./test/integration/initializers
 

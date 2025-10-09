@@ -5,6 +5,7 @@ from typing import Dict
 
 STORAGE_URI_ENV = "STORAGE_URI"
 HF_SCHEME = "hf"
+S3_SCHEME = "s3"
 
 # The default path to the users' workspace.
 # TODO (andreyvelich): Discuss how to keep this path is sync with Kubeflow SDK constants.
