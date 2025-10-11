@@ -1127,7 +1127,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							"run",
 							constants.TorchTuneFullFinetuneDistributed,
 							"--config",
-							"llama3_3/70B_full_multinode.yaml",
+							"llama3_3/70B_full_multinode",
 							"output_dir=/workspace/model/llama3_3/70B",
 							"tokenizer.path=/workspace/model/original/tokenizer.model",
 							"checkpointer.checkpoint_dir=/workspace/model",
@@ -1197,6 +1197,434 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							{
 								Name:  constants.TorchEnvNumProcPerNode,
 								Value: "3",
+							},
+							{
+								Name: constants.TorchEnvNodeRank,
+								ValueFrom: &corev1.EnvVarSource{
+									FieldRef: &corev1.ObjectFieldSelector{
+										FieldPath: constants.JobCompletionIndexFieldPath,
+									},
+								},
+							},
+						}...,
+					).
+					DependsOn(constants.Node,
+						[]jobsetv1alpha2.DependsOn{
+							{
+								Name:   constants.DatasetInitializer,
+								Status: jobsetv1alpha2.DependencyComplete,
+							},
+							{
+								Name:   constants.ModelInitializer,
+								Status: jobsetv1alpha2.DependencyComplete,
+							},
+						}...,
+					).
+					Obj(),
+			},
+		},
+		"succeeded to build Jobset with TorchTune values from the TrainJob (LoRA)": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "torchtune-llama3.2-1b").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "torchtune-llama3.2-1b").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(1).
+							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+								TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+								Obj(),
+							).
+							Obj(),
+					).
+					JobSetSpec(
+						testingutil.MakeJobSetWrapper("", "").
+							DependsOn(constants.Node,
+								[]jobsetv1alpha2.DependsOn{
+									{
+										Name:   constants.DatasetInitializer,
+										Status: jobsetv1alpha2.DependencyComplete,
+									},
+									{
+										Name:   constants.ModelInitializer,
+										Status: jobsetv1alpha2.DependencyComplete,
+									},
+								}...,
+							).
+							Obj().
+							Spec,
+					).
+					Container(
+						constants.Node,
+						constants.Node,
+						"test:runtime",
+						[]string{
+							"tune",
+							"run",
+							"--rdzv_endpoint=localhost:29500",
+							constants.TorchTuneFullFinetuneDistributed,
+							"--config",
+							"llama3_2/1B_full",
+							"dataset=torchtune.datasets.instruct_dataset",
+							"dataset.source=parquet",
+							"dataset.data_dir=/workspace/dataset/data",
+							"output_dir=/workspace/output",
+							"tokenizer.path=/workspace/model/original/tokenizer.model",
+							"checkpointer.checkpoint_dir=/workspace/model",
+						},
+						[]string{"runtime"},
+						resRequests,
+					).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "torchtune-llama3.2-1b").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container(
+							"test:trainjob",
+							[]string{"tune", "run"},
+							[]string{
+								"dataset.data_dir=/workspace/dataset/data",
+								"model.apply_lora_to_mlp=True",
+								"model.lora_attn_modules=[q_proj,k_proj,v_proj,output_proj]",
+								"dataset=torchtune.datasets.instruct_dataset",
+								"dataset.source=parquet",
+							},
+							corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
+						).
+						NumNodes(1).
+						NumProcPerNode(intstr.FromString("auto")).
+						Obj(),
+				).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+					NumNodes(1).
+					Container(
+						constants.Node,
+						constants.Node,
+						"test:trainjob",
+						[]string{
+							"tune",
+							"run",
+							fmt.Sprintf("%s=%s", constants.TorchTuneArgRdzvEndpoint, "test-job-node-0-0.test-job:29500"),
+							constants.TorchTuneLoRAFinetuneDistributed,
+							"--config",
+							"llama3_2/1B_lora",
+							"output_dir=/workspace/output",
+							"tokenizer.path=/workspace/model/original/tokenizer.model",
+							"checkpointer.checkpoint_dir=/workspace/model",
+						},
+						[]string{
+							"dataset.data_dir=/workspace/dataset/data",
+							"model.apply_lora_to_mlp=True",
+							"model.lora_attn_modules=[q_proj,k_proj,v_proj,output_proj]",
+							"dataset=torchtune.datasets.instruct_dataset",
+							"dataset.source=parquet",
+						},
+						corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
+					).
+					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
+					Env(constants.Node, constants.Node,
+						[]corev1.EnvVar{
+							{
+								Name:  constants.TorchEnvNumNodes,
+								Value: "1",
+							},
+							{
+								Name:  constants.TorchEnvNumProcPerNode,
+								Value: "auto",
+							},
+							{
+								Name: constants.TorchEnvNodeRank,
+								ValueFrom: &corev1.EnvVarSource{
+									FieldRef: &corev1.ObjectFieldSelector{
+										FieldPath: constants.JobCompletionIndexFieldPath,
+									},
+								},
+							},
+						}...,
+					).
+					DependsOn(constants.Node,
+						[]jobsetv1alpha2.DependsOn{
+							{
+								Name:   constants.DatasetInitializer,
+								Status: jobsetv1alpha2.DependencyComplete,
+							},
+							{
+								Name:   constants.ModelInitializer,
+								Status: jobsetv1alpha2.DependencyComplete,
+							},
+						}...,
+					).
+					Obj(),
+			},
+		},
+		"succeeded to build Jobset with TorchTune values from the TrainJob (QLoRA)": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "torchtune-llama3.2-1b").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "torchtune-llama3.2-1b").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(1).
+							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+								TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+								Obj(),
+							).
+							Obj(),
+					).
+					JobSetSpec(
+						testingutil.MakeJobSetWrapper("", "").
+							DependsOn(constants.Node,
+								[]jobsetv1alpha2.DependsOn{
+									{
+										Name:   constants.DatasetInitializer,
+										Status: jobsetv1alpha2.DependencyComplete,
+									},
+									{
+										Name:   constants.ModelInitializer,
+										Status: jobsetv1alpha2.DependencyComplete,
+									},
+								}...,
+							).
+							Obj().
+							Spec,
+					).
+					Container(
+						constants.Node,
+						constants.Node,
+						"test:runtime",
+						[]string{
+							"tune",
+							"run",
+							"--rdzv_endpoint=localhost:29500",
+							constants.TorchTuneFullFinetuneDistributed,
+							"--config",
+							"llama3_2/1B_full",
+							"dataset=torchtune.datasets.instruct_dataset",
+							"dataset.source=parquet",
+							"dataset.data_dir=/workspace/dataset/data",
+							"output_dir=/workspace/output",
+							"tokenizer.path=/workspace/model/original/tokenizer.model",
+							"checkpointer.checkpoint_dir=/workspace/model",
+						},
+						[]string{"runtime"},
+						resRequests,
+					).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "torchtune-llama3.2-1b").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container(
+							"test:trainjob",
+							[]string{"tune", "run"},
+							[]string{
+								"dataset.data_dir=/workspace/dataset/data",
+								"model.apply_lora_to_mlp=True",
+								"model.lora_attn_modules=[q_proj,k_proj,v_proj,output_proj]",
+								"model.quantize_base=True",
+								"dataset=torchtune.datasets.instruct_dataset",
+								"dataset.source=parquet",
+							},
+							corev1.ResourceList{"example.com/gpu": resource.MustParse("1")},
+						).
+						NumNodes(1).
+						NumProcPerNode(intstr.FromString("auto")).
+						Obj(),
+				).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+					NumNodes(1).
+					Container(
+						constants.Node,
+						constants.Node,
+						"test:trainjob",
+						[]string{
+							"tune",
+							"run",
+							constants.TorchTuneLoRAFinetuneSingleDevice,
+							"--config",
+							"llama3_2/1B_qlora_single_device",
+							"output_dir=/workspace/output",
+							"tokenizer.path=/workspace/model/original/tokenizer.model",
+							"checkpointer.checkpoint_dir=/workspace/model",
+						},
+						[]string{
+							"dataset.data_dir=/workspace/dataset/data",
+							"model.apply_lora_to_mlp=True",
+							"model.lora_attn_modules=[q_proj,k_proj,v_proj,output_proj]",
+							"model.quantize_base=True",
+							"dataset=torchtune.datasets.instruct_dataset",
+							"dataset.source=parquet",
+						},
+						corev1.ResourceList{"example.com/gpu": resource.MustParse("1")},
+					).
+					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
+					Env(constants.Node, constants.Node,
+						[]corev1.EnvVar{
+							{
+								Name:  constants.TorchEnvNumNodes,
+								Value: "1",
+							},
+							{
+								Name:  constants.TorchEnvNumProcPerNode,
+								Value: "auto",
+							},
+							{
+								Name: constants.TorchEnvNodeRank,
+								ValueFrom: &corev1.EnvVarSource{
+									FieldRef: &corev1.ObjectFieldSelector{
+										FieldPath: constants.JobCompletionIndexFieldPath,
+									},
+								},
+							},
+						}...,
+					).
+					DependsOn(constants.Node,
+						[]jobsetv1alpha2.DependsOn{
+							{
+								Name:   constants.DatasetInitializer,
+								Status: jobsetv1alpha2.DependencyComplete,
+							},
+							{
+								Name:   constants.ModelInitializer,
+								Status: jobsetv1alpha2.DependencyComplete,
+							},
+						}...,
+					).
+					Obj(),
+			},
+		},
+		"succeeded to build Jobset with TorchTune values from the TrainJob (DoRA)": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "torchtune-llama3.2-1b").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "torchtune-llama3.2-1b").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(1).
+							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+								TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+								Obj(),
+							).
+							Obj(),
+					).
+					JobSetSpec(
+						testingutil.MakeJobSetWrapper("", "").
+							DependsOn(constants.Node,
+								[]jobsetv1alpha2.DependsOn{
+									{
+										Name:   constants.DatasetInitializer,
+										Status: jobsetv1alpha2.DependencyComplete,
+									},
+									{
+										Name:   constants.ModelInitializer,
+										Status: jobsetv1alpha2.DependencyComplete,
+									},
+								}...,
+							).
+							Obj().
+							Spec,
+					).
+					Container(
+						constants.Node,
+						constants.Node,
+						"test:runtime",
+						[]string{
+							"tune",
+							"run",
+							"--rdzv_endpoint=localhost:29500",
+							constants.TorchTuneFullFinetuneDistributed,
+							"--config",
+							"llama3_2/1B_full",
+							"dataset=torchtune.datasets.instruct_dataset",
+							"dataset.source=parquet",
+							"dataset.data_dir=/workspace/dataset/data",
+							"output_dir=/workspace/output",
+							"tokenizer.path=/workspace/model/original/tokenizer.model",
+							"checkpointer.checkpoint_dir=/workspace/model",
+						},
+						[]string{"runtime"},
+						resRequests,
+					).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "torchtune-llama3.2-1b").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container(
+							"test:trainjob",
+							[]string{"tune", "run"},
+							[]string{
+								"dataset.data_dir=/workspace/dataset/data",
+								"model.apply_lora_to_mlp=True",
+								"model.lora_attn_modules=[q_proj,k_proj,v_proj,output_proj]",
+								"model.quantize_base=True",
+								"model.use_dora=True",
+								"dataset=torchtune.datasets.instruct_dataset",
+								"dataset.source=parquet",
+							},
+							corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
+						).
+						NumNodes(1).
+						NumProcPerNode(intstr.FromString("auto")).
+						Obj(),
+				).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+					NumNodes(1).
+					Container(
+						constants.Node,
+						constants.Node,
+						"test:trainjob",
+						[]string{
+							"tune",
+							"run",
+							fmt.Sprintf("%s=%s", constants.TorchTuneArgRdzvEndpoint, "test-job-node-0-0.test-job:29500"),
+							constants.TorchTuneLoRAFinetuneDistributed,
+							"--config",
+							"llama3_2/1B_lora",
+							"output_dir=/workspace/output",
+							"tokenizer.path=/workspace/model/original/tokenizer.model",
+							"checkpointer.checkpoint_dir=/workspace/model",
+						},
+						[]string{
+							"dataset.data_dir=/workspace/dataset/data",
+							"model.apply_lora_to_mlp=True",
+							"model.lora_attn_modules=[q_proj,k_proj,v_proj,output_proj]",
+							"model.quantize_base=True",
+							"model.use_dora=True",
+							"dataset=torchtune.datasets.instruct_dataset",
+							"dataset.source=parquet",
+						},
+						corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
+					).
+					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
+					Env(constants.Node, constants.Node,
+						[]corev1.EnvVar{
+							{
+								Name:  constants.TorchEnvNumNodes,
+								Value: "1",
+							},
+							{
+								Name:  constants.TorchEnvNumProcPerNode,
+								Value: "auto",
 							},
 							{
 								Name: constants.TorchEnvNodeRank,
