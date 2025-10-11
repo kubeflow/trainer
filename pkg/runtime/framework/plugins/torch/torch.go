@@ -117,7 +117,11 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
 		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
 	}
-	numProcPerNode = getNumProcPerNode(numProcPerNode, resourcesPerNode)
+	gpuQ := getNumGPUPerNode(&resourcesPerNode)
+	// If numProcPerNode is "cpu" or no GPU is set in resource, we calculate numProcPerNode based on CPU.
+	if numProcPerNode.String() == "cpu" || gpuQ == 0 {
+		numProcPerNode = getNumProcPerNodeFromCPU(numProcPerNode, resourcesPerNode)
+	}
 
 	// Update envs for Info object.
 	var trainerContainer *runtime.Container
@@ -160,7 +164,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			// 1. Add rendezvous backend arg for torchtune.
 			// Rendezvous backend is only enabled for multi-nodes or multi-devices training.
 			var newCommand []string
-			gpuQ := getNumGPUPerNode(&resourcesPerNode)
 			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
 			if numNodes > 1 || numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal > 1 || numProcPerNode.Type == intstr.String && gpuQ > 1 {
 				newCommand = append(newCommand,
@@ -187,73 +190,38 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	return nil
 }
 
-func getNumProcPerNode(nppNode intstr.IntOrString, resourcesPerNode corev1.ResourceRequirements) intstr.IntOrString {
-	var (
-		shouldUseCPU           func(resources corev1.ResourceList) bool
-		fallbackNumProcPerNode intstr.IntOrString
-	)
-	switch nppNode.String() {
-	case "auto":
-		shouldUseCPU = func(resources corev1.ResourceList) bool {
-			for resName := range resources {
-				if strings.Contains(strings.ToLower(resName.String()), "gpu") {
-					return false
-				}
-			}
-			return true
-		}
-		fallbackNumProcPerNode = intstr.FromString("auto")
-	case "cpu":
-		shouldUseCPU = func(resources corev1.ResourceList) bool {
-			_, ok := resources[corev1.ResourceCPU]
-			return ok
-		}
-		fallbackNumProcPerNode = intstr.FromInt32(1)
-	default:
-		shouldUseCPU = func(corev1.ResourceList) bool { return false }
-		fallbackNumProcPerNode = nppNode
+func getNumProcPerNodeFromCPU(nppNode intstr.IntOrString, resourcesPerNode corev1.ResourceRequirements) intstr.IntOrString {
+	if nppNode.String() == "auto" || nppNode.String() == "cpu" {
+		return intstr.FromInt(max(1, getNumCPUPerNode(&resourcesPerNode)))
 	}
-
-	requestNppNode, requestUseGPU := calculateNumProcPerNode(fallbackNumProcPerNode, resourcesPerNode.Requests, shouldUseCPU)
-	limitNppNode, limitUseGPU := calculateNumProcPerNode(fallbackNumProcPerNode, resourcesPerNode.Limits, shouldUseCPU)
-	// In these scenarios, we should use the NumProcPerNode calculated from Limits:
-	// 1. GPU resources are not specified in Requests but specified in Limits.
-	// 2. GPU resources are not specified in both Requests and Limits, but CPU resources are specified in Limits.
-	if !requestUseGPU && limitUseGPU || !requestUseGPU && !limitUseGPU && requestNppNode.Type == intstr.Int && limitNppNode.Type == intstr.Int && requestNppNode.IntVal < limitNppNode.IntVal {
-		return limitNppNode
-	}
-	return requestNppNode
+	return nppNode
 }
 
-// calculateNumProcPerNode calculates the number of processes per node based on the provided resources.
-// It returns the calculated number of processes per node and a boolean indicating whether GPU resources were used.
-func calculateNumProcPerNode(
-	fallbackNumProcPerNode intstr.IntOrString, resources corev1.ResourceList, shouldUseCPU func(resources corev1.ResourceList) bool,
-) (intstr.IntOrString, bool) {
-	var defaultCPU int32 = 1
-	if resources != nil {
-		// If CPU resource is specified and shouldUseCPU returns true, use the CPU resource value.
-		// Otherwise, return the fallback value and indicate whether GPU resources are present.
-		if shouldUseCPU(resources) {
-			cpuQ := resources[corev1.ResourceCPU]
-			return intstr.FromInt32(max(defaultCPU, int32(cpuQ.Value()))), false
-		}
-		return fallbackNumProcPerNode, numGPU(resources) > 0
+// getNumCPUPerNode calculates the number of CPU processes per node based on the provided resources.
+func getNumCPUPerNode(res *corev1.ResourceRequirements) int {
+	if res == nil {
+		return 0
 	}
-	// If resources is nil, return default CPU value.
-	return intstr.FromInt32(defaultCPU), false
+	limitCpuQ, requestCpuQ := res.Limits.Cpu(), res.Requests.Cpu()
+	if requestCpuQ == nil || requestCpuQ.IsZero() {
+		if limitCpuQ != nil {
+			return int(limitCpuQ.Value())
+		}
+		return 0
+	}
+	return int(requestCpuQ.Value())
 }
 
 // getNumGPUPerNode returns the GPU count if found.
 func getNumGPUPerNode(res *corev1.ResourceRequirements) int {
-	if res != nil {
-		gpuQ := numGPU(res.Requests)
-		if limitGpuQ := numGPU(res.Limits); gpuQ == 0 && limitGpuQ > 0 {
-			gpuQ = limitGpuQ
-		}
-		return gpuQ
+	if res == nil {
+		return 0
 	}
-	return 0
+	gpuQ := numGPU(res.Requests)
+	if limitGpuQ := numGPU(res.Limits); gpuQ == 0 && limitGpuQ > 0 {
+		gpuQ = limitGpuQ
+	}
+	return gpuQ
 }
 
 func numGPU(resourcePerNode corev1.ResourceList) int {
