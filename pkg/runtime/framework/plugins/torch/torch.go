@@ -119,8 +119,8 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 	gpuQ := getNumGPUPerNode(&resourcesPerNode)
 	// If numProcPerNode is "cpu" or no GPU is set in resource, we calculate numProcPerNode based on CPU.
-	if numProcPerNode.String() == "cpu" || gpuQ == 0 {
-		numProcPerNode = getNumProcPerNodeFromCPU(numProcPerNode, resourcesPerNode)
+	if numProcPerNode.String() == "cpu" || numProcPerNode.String() == "auto" && gpuQ == 0 {
+		numProcPerNode = intstr.FromInt(max(1, getNumCPUPerNode(&resourcesPerNode)))
 	}
 
 	// Update envs for Info object.
@@ -188,13 +188,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 	info.SyncPodSetsToTemplateSpec()
 	return nil
-}
-
-func getNumProcPerNodeFromCPU(nppNode intstr.IntOrString, resourcesPerNode corev1.ResourceRequirements) intstr.IntOrString {
-	if nppNode.String() == "auto" || nppNode.String() == "cpu" {
-		return intstr.FromInt(max(1, getNumCPUPerNode(&resourcesPerNode)))
-	}
-	return nppNode
 }
 
 // getNumCPUPerNode calculates the number of CPU processes per node based on the provided resources.
