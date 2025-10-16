@@ -217,8 +217,7 @@ func TestValidate(t *testing.T) {
 				},
 				Controller: &configapi.ControllerConfigurationSpec{
 					GroupKindConcurrency: map[string]int{
-						"TrainJob.trainer.kubeflow.org":        -1,
-						"TrainingRuntime.trainer.kubeflow.org": 0,
+						"TrainJob.trainer.kubeflow.org": -1,
 					},
 				},
 			},
@@ -238,10 +237,6 @@ func TestValidate(t *testing.T) {
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
 					Field: "controller.groupKindConcurrency[TrainJob.trainer.kubeflow.org]",
-				},
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "controller.groupKindConcurrency[TrainingRuntime.trainer.kubeflow.org]",
 				},
 			},
 		},

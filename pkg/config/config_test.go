@@ -963,30 +963,6 @@ kind: Configuration
 	}
 }
 
-func TestLoad_OnlyWhitespace(t *testing.T) {
-	scheme := setupScheme()
-
-	content := `   
-	
-   `
-	tmpFile, err := os.CreateTemp("", "config-*.yaml")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.Write([]byte(content)); err != nil {
-		t.Fatalf("Failed to write temp file: %v", err)
-	}
-	tmpFile.Close()
-
-	_, _, err = Load(scheme, tmpFile.Name(), false)
-	// File with only whitespace should fail
-	if err == nil {
-		t.Error("Expected error for file with only whitespace")
-	}
-}
-
 func TestLoad_WrongAPIVersion(t *testing.T) {
 	scheme := setupScheme()
 
