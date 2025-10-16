@@ -30,7 +30,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
-	labelutil "github.com/kubeflow/trainer/v2/pkg/util/labels"
+	trainingruntime "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
 
 var (
@@ -81,7 +81,7 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 		}
 	}
 	var warnings admission.Warnings
-	if labelutil.IsSupportDeprecated(clusterTrainingRuntime.Labels) {
+	if trainingruntime.IsSupportDeprecated(clusterTrainingRuntime.Labels) {
 		warnings = append(warnings, fmt.Sprintf(
 			"Referenced ClusterTrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
 			clusterTrainingRuntime.Name,
