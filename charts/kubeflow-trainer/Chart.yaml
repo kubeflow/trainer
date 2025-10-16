@@ -26,7 +26,7 @@ type: application
 
 dependencies:
 - name: jobset
-  repository: oci://registry.k8s.io/jobset/charts/jobset
+  repository: oci://registry.k8s.io/jobset/charts
   version: 0.10.1
   condition: jobset.install
 
