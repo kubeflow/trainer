@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -490,6 +491,629 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 		wantObjs        []apiruntime.Object
 		wantError       error
 	}{
+		"succeeded to build JobSet with container resources applied both to Launcher and Node replicatedJob": {
+			registry: fwkplugins.NewRegistry(),
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+				Obj(),
+			runtimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: testingutil.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(true)).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.DatasetInitializer,
+							Ancestor: ptr.To(constants.DatasetInitializer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().
+											WithName(jobsetplgconsts.VolumeNameInitializer).
+											WithMountPath(constants.DatasetMountPath),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+						{
+							Name:     constants.ModelInitializer,
+							Ancestor: ptr.To(constants.ModelInitializer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().
+											WithName(jobsetplgconsts.VolumeNameInitializer).
+											WithMountPath(constants.ModelMountPath),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+						{
+							Name:     constants.Launcher,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+							Endpoints: func(yield func(string) bool) {
+								yield("test-job-launcher-0-0.test-job")
+							},
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().
+										WithName(jobsetplgconsts.VolumeNameInitializer).
+										WithMountPath(constants.ModelMountPath),
+								},
+							}},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](2),
+							Endpoints: func(yield func(string) bool) {
+								yield("test-job-node-0-0.test-job")
+								yield("test-job-node-0-1.test-job")
+							},
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().
+										WithName(jobsetplgconsts.VolumeNameInitializer).
+										WithMountPath(constants.ModelMountPath),
+								},
+							}},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.DatasetInitializer).
+								WithGroupName("default").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.ModelInitializer).
+								WithGroupName("default").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.ModelInitializer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.ModelInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithGroupName("default").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithImage("test:runtime").
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithGroupName("default").
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: "invalid",
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithCommand("command:openssh").
+														WithArgs("args:openssh").
+														WithImage("test:openssh").
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+				Scheduler: &runtime.Scheduler{},
+			},
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						NumNodes(100).
+						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("4Gi"),
+						}).
+						Obj(),
+				).
+				Obj(),
+			wantRuntimeInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: testingutil.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(true)).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithReplicas(1).
+								WithName(constants.DatasetInitializer).
+								WithGroupName("default").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{}).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithReplicas(1).
+								WithName(constants.ModelInitializer).
+								WithGroupName("default").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.ModelInitializer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{}).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.ModelInitializer).
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithReplicas(1).
+								WithGroupName("default").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{}).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithResources(corev1ac.ResourceRequirements().
+															WithRequests(corev1.ResourceList{
+																corev1.ResourceCPU:    resource.MustParse("1"),
+																corev1.ResourceMemory: resource.MustParse("4Gi"),
+															})).
+														WithImage("test:trainjob").
+														WithCommand("trainjob").
+														WithArgs("trainjob").
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithGroupName("default").
+								WithReplicas(1).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithLabels(map[string]string{
+										constants.LabelTrainJobAncestor: "invalid",
+									}).
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{}).
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithArgs("args:openssh").
+														WithCommand("command:openssh").
+														WithResources(corev1ac.ResourceRequirements().
+															WithRequests(corev1.ResourceList{
+																corev1.ResourceCPU:    resource.MustParse("1"),
+																corev1.ResourceMemory: resource.MustParse("4Gi"),
+															})).
+														WithImage("test:openssh").
+														WithVolumeMounts(
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.DatasetMountPath),
+															corev1ac.VolumeMount().
+																WithName(jobsetplgconsts.VolumeNameInitializer).
+																WithMountPath(constants.ModelMountPath),
+														),
+												).
+												WithVolumes(
+													corev1ac.Volume().
+														WithName(jobsetplgconsts.VolumeNameInitializer).
+														WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+															WithClaimName(jobsetplgconsts.VolumeNameInitializer)),
+												),
+											),
+										),
+									),
+								),
+						),
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.DatasetInitializer,
+							Ancestor: ptr.To(constants.DatasetInitializer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().
+											WithName(jobsetplgconsts.VolumeNameInitializer).
+											WithMountPath(constants.DatasetMountPath),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+						{
+							Name:     constants.ModelInitializer,
+							Ancestor: ptr.To(constants.ModelInitializer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().
+											WithName(jobsetplgconsts.VolumeNameInitializer).
+											WithMountPath(constants.ModelMountPath),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+							},
+						},
+						{
+							Name:     constants.Launcher,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+							Endpoints: func(yield func(string) bool) {
+								yield("test-job-launcher-0-0.test-job")
+							},
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().
+										WithName(jobsetplgconsts.VolumeNameInitializer).
+										WithMountPath(constants.ModelMountPath),
+									*corev1ac.VolumeMount().
+										WithName(constants.MPISSHAuthVolumeName).
+										WithMountPath("/root/.ssh"),
+									*corev1ac.VolumeMount().
+										WithName(constants.MPIHostfileVolumeName).
+										WithMountPath("/etc/mpi"),
+								},
+								Env: []corev1ac.EnvVarApplyConfiguration{
+									*corev1ac.EnvVar().
+										WithName(constants.OpenMPIEnvHostFileLocation).
+										WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+									*corev1ac.EnvVar().
+										WithName(constants.OpenMPIEnvKeepFQDNHostNames).
+										WithValue("true"),
+									*corev1ac.EnvVar().
+										WithName(constants.OpenMPIEnvDefaultSlots).
+										WithValue("1"),
+									*corev1ac.EnvVar().
+										WithName(constants.OpenMPIEnvKeyRSHArgs).
+										WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
+								},
+							}},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+								*corev1ac.Volume().
+									WithName(constants.MPISSHAuthVolumeName).
+									WithSecret(corev1ac.SecretVolumeSource().
+										WithSecretName(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix)).
+										WithItems(
+											corev1ac.KeyToPath().
+												WithKey(corev1.SSHAuthPrivateKey).
+												WithPath(constants.MPISSHPrivateKeyFile),
+											corev1ac.KeyToPath().
+												WithKey(constants.MPISSHPublicKey).
+												WithPath(constants.MPISSHPublicKeyFile),
+											corev1ac.KeyToPath().
+												WithKey(constants.MPISSHPublicKey).
+												WithPath(constants.MPISSHAuthorizedKeys),
+										),
+									),
+								*corev1ac.Volume().
+									WithName(constants.MPIHostfileVolumeName).
+									WithConfigMap(corev1ac.ConfigMapVolumeSource().
+										WithName(fmt.Sprintf("test-job%s", constants.MPIHostfileConfigMapSuffix)).
+										WithItems(
+											corev1ac.KeyToPath().
+												WithKey(constants.MPIHostfileName).
+												WithPath(constants.MPIHostfileName).
+												WithMode(0444),
+										),
+									),
+							},
+						},
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](99),
+							Endpoints: func(yield func(string) bool) {
+								yield("test-job-node-0-0.test-job")
+								yield("test-job-node-0-1.test-job")
+							},
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().
+										WithName(jobsetplgconsts.VolumeNameInitializer).
+										WithMountPath(constants.ModelMountPath),
+									*corev1ac.VolumeMount().
+										WithName(constants.MPISSHAuthVolumeName).
+										WithMountPath("/root/.ssh"),
+								},
+							}},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(jobsetplgconsts.VolumeNameInitializer).
+									WithPersistentVolumeClaim(corev1ac.PersistentVolumeClaimVolumeSource().
+										WithClaimName(jobsetplgconsts.VolumeNameInitializer),
+									),
+								*corev1ac.Volume().
+									WithName(constants.MPISSHAuthVolumeName).
+									WithSecret(corev1ac.SecretVolumeSource().
+										WithSecretName(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix)).
+										WithItems(
+											corev1ac.KeyToPath().
+												WithKey(corev1.SSHAuthPrivateKey).
+												WithPath(constants.MPISSHPrivateKeyFile),
+											corev1ac.KeyToPath().
+												WithKey(constants.MPISSHPublicKey).
+												WithPath(constants.MPISSHPublicKeyFile),
+											corev1ac.KeyToPath().
+												WithKey(constants.MPISSHPublicKey).
+												WithPath(constants.MPISSHAuthorizedKeys),
+										),
+									),
+							},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{},
+			},
+			wantObjs: []apiruntime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					// This is needed to override default label in MakeJobSetWrapper() for Node rJob.
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, "invalid", constants.Node).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					// NumNodes(99).
+					LauncherReplica().
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher, constants.Node).
+					VolumeMounts(constants.Launcher, constants.Node,
+						corev1.VolumeMount{
+							Name:      jobsetplgconsts.VolumeNameInitializer,
+							MountPath: constants.DatasetMountPath,
+						},
+						corev1.VolumeMount{
+							Name:      jobsetplgconsts.VolumeNameInitializer,
+							MountPath: constants.ModelMountPath,
+						},
+					).
+					Volumes(constants.Launcher,
+						corev1.Volume{
+							Name: jobsetplgconsts.VolumeNameInitializer,
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: jobsetplgconsts.VolumeNameInitializer,
+								},
+							},
+						}).
+					Parallelism(1, constants.Launcher).
+					Completions(1, constants.Launcher).
+					ReplicatedJobLabel(constants.LabelTrainJobAncestor, "trainer", constants.Launcher).
+					Container(constants.Launcher, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					}).
+					Container(constants.Node, constants.Node, "test:openssh", []string{"command:openssh"}, []string{"args:openssh"}, corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					}).
+					Obj(),
+				testingutil.MakeSecretWrapper(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
+					WithImmutable(true).
+					WithType(corev1.SecretTypeSSHAuth).
+					WithData(map[string][]byte{
+						constants.MPISSHPublicKey: []byte("EXIST"),
+						corev1.SSHAuthPrivateKey:  []byte("EXIST"),
+					}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Obj(),
+				testingutil.MakeConfigMapWrapper(fmt.Sprintf("test-job%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
+					WithData(map[string]string{
+						constants.MPIHostfileName: `test-job-launcher-0-0.test-job slots=1
+test-job-node-0-0.test-job slots=1
+test-job-node-0-1.test-job slots=1
+`,
+					}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Obj(),
+			},
+		},
 		"succeeded to build PodGroup and JobSet with NumNodes from TrainJob with coscheduling plugin": {
 			registry: fwkplugins.NewRegistry(),
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
@@ -1356,7 +1980,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 		cmpopts.SortSlices(func(a, b apiruntime.Object) bool {
 			return a.GetObjectKind().GroupVersionKind().String() < b.GetObjectKind().GroupVersionKind().String()
 		}),
-		cmpopts.EquateEmpty(),
+		cmp.Comparer(testingutil.MPISecretDataComparer),
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -1383,7 +2007,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, testingutil.PodSetEndpointsCmpOpts); len(diff) != 0 {
 				t.Errorf("Unexpected runtime.Info (-want,+got)\n%s", diff)
 			}
 
