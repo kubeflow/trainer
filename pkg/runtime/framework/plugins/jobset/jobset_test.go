@@ -44,6 +44,8 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
+var ignoreSyncPodSets = cmpopts.IgnoreFields(runtime.Info{}, "SyncPodSets")
+
 // TODO: Add tests for all Interfaces.
 // REF: https://github.com/kubeflow/trainer/issues/2468
 
@@ -315,25 +317,25 @@ func TestJobSet(t *testing.T) {
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
 			cli := utiltesting.NewClientBuilder().Build()
-			p, err := New(ctx, cli, nil)
-			if err != nil {
-				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
-			}
-			err = p.(framework.PodNetworkPlugin).IdentifyPodNetwork(tc.info, tc.trainJob)
-			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
-				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
-			}
-			if diff := cmp.Diff(tc.wantInfo, tc.info,
-				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
-				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
-				utiltesting.PodSetEndpointsCmpOpts,
-			); len(diff) != 0 {
-				t.Errorf("Unexpected Info from IdentifyPodNetwork (-want,+got):\n%s", diff)
-			}
-		})
+		p, err := New(ctx, cli, nil)
+		if err != nil {
+			t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+		}
+		err = p.(framework.PodNetworkPlugin).IdentifyPodNetwork(tc.info, tc.trainJob)
+		if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+			t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+		}
+		if diff := cmp.Diff(tc.wantInfo, tc.info,
+			cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+			cmpopts.SortMaps(func(a, b string) bool { return a < b }),
+			utiltesting.PodSetEndpointsCmpOpts,
+			ignoreSyncPodSets,
+		); len(diff) != 0 {
+			t.Errorf("Unexpected Info from IdentifyPodNetwork (-want,+got):\n%s", diff)
+		}
+	})
 	}
 }
-
 func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info

@@ -44,6 +44,8 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
+var ignoreSyncPodSets = cmpopts.IgnoreFields(runtime.Info{}, "SyncPodSets")
+
 func TestMPI(t *testing.T) {
 	objCmpOpts := []gocmp.Option{
 		cmpopts.SortSlices(func(a, b apiruntime.Object) int {
@@ -718,11 +720,12 @@ trainJob-node-1-0.trainJob slots=1
 			if diff := gocmp.Diff(tc.wantMLPolicyError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from EnforceMLPolicy (-want, +got): %s", diff)
 			}
-			if diff := gocmp.Diff(tc.wantInfo, tc.info,
-				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
-				cmpopts.SortMaps(func(a, b int) bool { return a < b }),
-				utiltesting.PodSetEndpointsCmpOpts,
-			); len(diff) != 0 {
+		if diff := gocmp.Diff(tc.wantInfo, tc.info,
+			cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+			cmpopts.SortMaps(func(a, b int) bool { return a < b }),
+			utiltesting.PodSetEndpointsCmpOpts,
+			ignoreSyncPodSets,
+		); len(diff) != 0 {
 				t.Errorf("Unexpected info from EnforceMLPolicy (-want, +got): %s", diff)
 			}
 			var objs []any

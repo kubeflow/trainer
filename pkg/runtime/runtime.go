@@ -41,9 +41,9 @@ type Info struct {
 	// TemplateSpec is TrainingRuntime Template object.
 	// ObjApply podSpecs and this PodSets should be kept in sync by info.SyncPodSetsToTemplateSpec().
 	TemplateSpec TemplateSpec
-	// syncPodSets is the function to sync PodSets to TemplateSpec.
+	// SyncPodSets is the function to sync PodSets to TemplateSpec.
 	// This is stored per-instance to avoid data races when RuntimeInfo is called concurrently.
-	syncPodSets func(*Info)
+	SyncPodSets func(*Info)
 }
 
 type RuntimePolicy struct {
@@ -188,11 +188,11 @@ func NewInfo(opts ...InfoOption) *Info {
 			PodLabels: make(map[string]string),
 		},
 		TemplateSpec: options.templateSpec,
-		syncPodSets:  options.syncPodSets,
+		SyncPodSets:  options.syncPodSets,
 	}
 	// Set default no-op syncer if none provided
-	if info.syncPodSets == nil {
-		info.syncPodSets = func(*Info) {}
+	if info.SyncPodSets == nil {
+		info.SyncPodSets = func(*Info) {}
 	}
 	if options.labels != nil {
 		info.Labels = options.labels
@@ -204,7 +204,9 @@ func NewInfo(opts ...InfoOption) *Info {
 }
 
 func (i *Info) SyncPodSetsToTemplateSpec() {
-	i.syncPodSets(i)
+	if i.SyncPodSets != nil {
+		i.SyncPodSets(i)
+	}
 }
 
 func TemplateSpecApply[A any](info *Info) (*A, bool) {

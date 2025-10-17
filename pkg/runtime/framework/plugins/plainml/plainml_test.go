@@ -36,6 +36,8 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
+var ignoreSyncPodSets = cmpopts.IgnoreFields(runtime.Info{}, "SyncPodSets")
+
 func TestPlainML(t *testing.T) {
 	cases := map[string]struct {
 		trainJob  *trainer.TrainJob
@@ -180,10 +182,11 @@ func TestPlainML(t *testing.T) {
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from EnforceMLPolicy (-want,+got):\n%s", diff)
 			}
-			if diff := cmp.Diff(tc.wantInfo, tc.info,
-				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
-				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
-			); len(diff) != 0 {
+		if diff := cmp.Diff(tc.wantInfo, tc.info,
+			cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+			cmpopts.SortMaps(func(a, b string) bool { return a < b }),
+			ignoreSyncPodSets,
+		); len(diff) != 0 {
 				t.Errorf("Unexpected RuntimeInfo (-want,+got):\n%s", diff)
 			}
 		})
