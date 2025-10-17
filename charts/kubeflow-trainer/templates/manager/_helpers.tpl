@@ -55,3 +55,17 @@ Create the name of the manager deployment.
 {{- define "trainer.manager.service.name" -}}
 {{ include "trainer.manager.name" . }}
 {{- end -}}
+
+{{/*
+Create the name of the manager configmap.
+*/}}
+{{- define "trainer.manager.configmap.name" -}}
+{{ include "trainer.manager.name" . }}-config
+{{- end -}}
+
+{{/*
+Create the name of the manager service account.
+*/}}
+{{- define "trainer.manager.serviceAccount.name" -}}
+{{ include "trainer.manager.name" . }}
+{{- end -}}
