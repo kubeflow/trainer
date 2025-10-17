@@ -120,7 +120,7 @@ func (in *ControllerConfigurationSpec) DeepCopyInto(out *ControllerConfiguration
 	*out = *in
 	if in.GroupKindConcurrency != nil {
 		in, out := &in.GroupKindConcurrency, &out.GroupKindConcurrency
-		*out = make(map[string]int, len(*in))
+		*out = make(map[string]int32, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}
@@ -177,7 +177,12 @@ func (in *ControllerWebhook) DeepCopyInto(out *ControllerWebhook) {
 	*out = *in
 	if in.Port != nil {
 		in, out := &in.Port, &out.Port
-		*out = new(int)
+		*out = new(int32)
+		**out = **in
+	}
+	if in.Host != nil {
+		in, out := &in.Host, &out.Host
+		*out = new(string)
 		**out = **in
 	}
 }
