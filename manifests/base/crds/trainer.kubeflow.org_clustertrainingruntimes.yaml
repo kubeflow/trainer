@@ -57,6 +57,7 @@ spec:
                           Defaults to OpenMPI.
                         enum:
                         - OpenMPI
+                        - ""
                         type: string
                       numProcPerNode:
                         default: 1

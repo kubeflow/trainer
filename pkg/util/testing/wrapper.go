@@ -1239,7 +1239,7 @@ func (m *MLPolicySourceWrapper) MPIPolicy(numProcPerNode *int32, MPImplementatio
 		m.MPI = &trainer.MPIMLPolicySource{}
 	}
 	m.MPI.NumProcPerNode = numProcPerNode
-	m.MPI.MPIImplementation = MPImplementation
+	m.MPI.MPIImplementation = &MPImplementation
 	m.MPI.SSHAuthMountPath = sshAuthMountPath
 	m.MPI.RunLauncherAsNode = runLauncherAsNode
 	return m
