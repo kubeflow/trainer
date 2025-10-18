@@ -40,11 +40,7 @@ spec:
         command:
         - /manager
         args:
-        {{- if gt (.Values.manager.replicas | int) 1 }}
-        - --leader-elect=true
-        {{- end }}
-        - --webhook-service-name={{ include "trainer.webhook.service.name" . }}
-        - --webhook-secret-name={{ include "trainer.webhook.secret.name" . }}
+        - --config=/controller_manager_config.yaml
         {{- with .Values.manager.env }}
         env:
         {{- toYaml . | nindent 8 }}
@@ -56,6 +52,10 @@ spec:
         volumeMounts:
         - name: webhook-cert
           mountPath: /tmp/k8s-webhook-server/serving-certs
+          readOnly: true
+        - name: manager-config
+          mountPath: /controller_manager_config.yaml
+          subPath: controller_manager_config.yaml
           readOnly: true
         {{- with .Values.manager.volumeMounts }}
         {{- toYaml . | nindent 8 }}
@@ -91,6 +91,9 @@ spec:
         secret:
           secretName: {{ include "trainer.webhook.secret.name" . }}
           defaultMode: 420
+      - name: manager-config
+        configMap:
+          name: {{ include "trainer.manager.configmap.name" . }}
       {{- with .Values.manager.volumes }}
       {{- toYaml . | nindent 6 }}
       {{- end }}
