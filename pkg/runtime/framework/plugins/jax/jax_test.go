@@ -18,15 +18,22 @@ package jax
 
 import (
 	"context"
-	"fmt"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
+	"k8s.io/klog/v2/ktesting"
 )
 
-func TestJax(t *testing.T) {
+func TestJAX(t *testing.T) {
 	cases := map[string]struct {
 		info              *runtime.Info
-		trainJob		  *trainer.TrainJob
-		wantInfo		  *runtime.Info
+		trainJob          *trainer.TrainJob
+		wantInfo          *runtime.Info
 		wantMLPolicyError error
 	}{
 		"no action when info is nil": {},
@@ -38,7 +45,7 @@ func TestJax(t *testing.T) {
 				runtime.WithLabels(map[string]string{"key": "value"}),
 			),
 		},
-		"no action when mlPolicySource jax is null": {
+		"no action when mlPolicySource JAX is null": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().Obj(),
@@ -61,7 +68,7 @@ func TestJax(t *testing.T) {
 			cliBuilder := utiltesting.NewClientBuilder()
 			p, err := New(ctx, cliBuilder.Build(), nil)
 			if err != nil {
-				t.Fatalf("Failed to initialize Torch plugin: %v", err)
+				t.Fatalf("Failed to initialize JAX plugin: %v", err)
 			}
 
 			// Test EnforceMLPolicy
