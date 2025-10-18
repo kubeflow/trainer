@@ -29,65 +29,68 @@ import (
 type Configuration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// Webhook contains the controllers webhook configuration.
+	// webhook contains the controllers webhook configuration.
 	// +optional
-	Webhook ControllerWebhook `json:"webhook,omitempty"`
+	Webhook ControllerWebhook `json:"webhook,omitempty,omitzero"`
 
-	// LeaderElection is the LeaderElection config to be used when configuring
+	// leaderElection is the LeaderElection config to be used when configuring
 	// the manager.Manager leader election.
 	// +optional
 	LeaderElection *configv1alpha1.LeaderElectionConfiguration `json:"leaderElection,omitempty"`
 
-	// Metrics contains the controller metrics configuration.
+	// metrics contains the controller metrics configuration.
 	// +optional
-	Metrics ControllerMetrics `json:"metrics,omitempty"`
+	Metrics ControllerMetrics `json:"metrics,omitempty,omitzero"`
 
-	// Health contains the controller health configuration.
+	// health contains the controller health configuration.
 	// +optional
-	Health ControllerHealth `json:"health,omitempty"`
+	Health ControllerHealth `json:"health,omitempty,omitzero"`
 
-	// Controller contains global configuration options for controllers
+	// controller contains global configuration options for controllers
 	// registered within this manager.
 	// +optional
 	Controller *ControllerConfigurationSpec `json:"controller,omitempty"`
 
-	// CertManagement is configuration for certificate management used by the webhook server.
+	// certManagement is configuration for certificate management used by the webhook server.
 	// +optional
 	CertManagement *CertManagement `json:"certManagement,omitempty"`
 
-	// ClientConnection provides additional configuration options for Kubernetes
+	// clientConnection provides additional configuration options for Kubernetes
 	// API server client.
 	// +optional
 	ClientConnection *ClientConnection `json:"clientConnection,omitempty"`
 }
 
 // ControllerWebhook defines the webhook server for the controller.
+// +kubebuilder:validation:MinProperties=1
 type ControllerWebhook struct {
-	// Port is the port that the webhook server serves at.
+	// port is the port that the webhook server serves at.
 	// It is used to set webhook.Server.Port.
 	// Defaults to 9443.
 	// +optional
 	// +kubebuilder:default=9443
-	Port *int `json:"port,omitempty"`
+	Port *int32 `json:"port,omitempty"`
 
-	// Host is the hostname that the webhook server binds to.
+	// host is the hostname that the webhook server binds to.
 	// It is used to set webhook.Server.Host.
 	// Defaults to "" (all interfaces).
 	// +optional
-	Host string `json:"host,omitempty"`
+	Host *string `json:"host,omitempty"`
 }
 
 // ControllerMetrics defines the metrics configs.
+// +kubebuilder:validation:MinProperties=1
 type ControllerMetrics struct {
-	// BindAddress is the TCP address that the controller should bind to
+	// bindAddress is the TCP address that the controller should bind to
 	// for serving prometheus metrics.
 	// It can be set to "0" to disable the metrics serving.
 	// Defaults to ":8443".
 	// +optional
 	// +kubebuilder:default=":8443"
+	// +kubebuilder:validation:MinLength=1
 	BindAddress string `json:"bindAddress,omitempty"`
 
-	// SecureServing determines if the metrics endpoint should be served securely via HTTPS.
+	// secureServing determines if the metrics endpoint should be served securely via HTTPS.
 	// Defaults to true.
 	// +optional
 	// +kubebuilder:default=true
@@ -95,32 +98,36 @@ type ControllerMetrics struct {
 }
 
 // ControllerHealth defines the health configs.
+// +kubebuilder:validation:MinProperties=1
 type ControllerHealth struct {
-	// HealthProbeBindAddress is the TCP address that the controller should bind to
+	// healthProbeBindAddress is the TCP address that the controller should bind to
 	// for serving health probes
 	// It can be set to "0" or "" to disable serving the health probe.
 	// Defaults to ":8081".
 	// +optional
 	// +kubebuilder:default=":8081"
+	// +kubebuilder:validation:MinLength=1
 	HealthProbeBindAddress string `json:"healthProbeBindAddress,omitempty"`
 
-	// ReadinessEndpointName is the name for the readiness endpoint.
+	// readinessEndpointName is the name for the readiness endpoint.
 	// Defaults to "readyz".
 	// +optional
 	// +kubebuilder:default="readyz"
+	// +kubebuilder:validation:MinLength=1
 	ReadinessEndpointName string `json:"readinessEndpointName,omitempty"`
 
-	// LivenessEndpointName is the name for the liveness endpoint.
+	// livenessEndpointName is the name for the liveness endpoint.
 	// Defaults to "healthz".
 	// +optional
 	// +kubebuilder:default="healthz"
+	// +kubebuilder:validation:MinLength=1
 	LivenessEndpointName string `json:"livenessEndpointName,omitempty"`
 }
 
 // ControllerConfigurationSpec defines the global configuration for
 // controllers registered with the manager.
 type ControllerConfigurationSpec struct {
-	// GroupKindConcurrency is a map from a Kind to the number of concurrent reconciliation
+	// groupKindConcurrency is a map from a Kind to the number of concurrent reconciliation
 	// allowed for that controller.
 	//
 	// When a controller is registered within this manager using the builder utilities,
@@ -133,43 +140,45 @@ type ControllerConfigurationSpec struct {
 	//
 	// Defaults to empty map, which means no limits.
 	// +optional
-	GroupKindConcurrency map[string]int `json:"groupKindConcurrency,omitempty"`
+	GroupKindConcurrency map[string]int32 `json:"groupKindConcurrency,omitempty"`
 }
 
 // CertManagement holds configuration related to webhook server certificate generation.
 type CertManagement struct {
-	// Enable controls whether the cert management is enabled.
+	// enable controls whether the cert management is enabled.
 	// If disabled, certificates must be provided externally.
 	// Defaults to true.
 	// +optional
 	// +kubebuilder:default=true
 	Enable *bool `json:"enable,omitempty"`
 
-	// WebhookServiceName is the name of the Service used as part of the DNSName
+	// webhookServiceName is the name of the Service used as part of the DNSName
 	// when generating the webhook server certificate.
 	// Defaults to "kubeflow-trainer-controller-manager".
 	// +optional
 	// +kubebuilder:default="kubeflow-trainer-controller-manager"
+	// +kubebuilder:validation:MinLength=1
 	WebhookServiceName string `json:"webhookServiceName,omitempty"`
 
-	// WebhookSecretName is the name of the Secret used to store the CA and server certificates.
+	// webhookSecretName is the name of the Secret used to store the CA and server certificates.
 	// Defaults to "kubeflow-trainer-webhook-cert".
 	// +optional
 	// +kubebuilder:default="kubeflow-trainer-webhook-cert"
+	// +kubebuilder:validation:MinLength=1
 	WebhookSecretName string `json:"webhookSecretName,omitempty"`
 }
 
 // ClientConnection provides additional configuration options for Kubernetes
 // API server client.
 type ClientConnection struct {
-	// QPS controls the number of queries per second allowed before client-side throttling
+	// qps controls the number of queries per second allowed before client-side throttling
 	// connection to the API server.
 	// Defaults to 50.
 	// +optional
 	// +kubebuilder:default=50
 	QPS *float32 `json:"qps,omitempty"`
 
-	// Burst allows extra queries to accumulate when a client is not using its full QPS allocation.
+	// burst allows extra queries to accumulate when a client is not using its full QPS allocation.
 	// Defaults to 100.
 	// +optional
 	// +kubebuilder:default=100

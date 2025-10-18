@@ -5,8 +5,8 @@ edition = "2024"
 
 [dependencies]
 tracing = "0.1.41"
-tracing-subscriber = "0.3"
-tokio = "1.41.1"
+tracing-subscriber = "0.3.20"
+tokio = "1.44.2"
 datafusion = "47.0.0"
 arrow = "55.0.0"
 arrow-schema = "55.0.0"

@@ -28,8 +28,8 @@ class TrainerV1alpha1JobSetTemplateSpec(BaseModel):
     """
     JobSetTemplateSpec represents a template of the desired JobSet.
     """ # noqa: E501
-    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="Metadata for custom JobSet's labels and annotations. JobSet name and namespace is equal to the TrainJob's name and namespace.")
-    spec: Optional[JobsetV1alpha2JobSetSpec] = Field(default=None, description="Specification of the desired JobSet which will be created from TrainJob.")
+    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="metadata for custom JobSet's labels and annotations. JobSet name and namespace is equal to the TrainJob's name and namespace.")
+    spec: Optional[JobsetV1alpha2JobSetSpec] = Field(default=None, description="spec of the desired JobSet which will be created from TrainJob.")
     __properties: ClassVar[List[str]] = ["metadata", "spec"]
 
     model_config = ConfigDict(

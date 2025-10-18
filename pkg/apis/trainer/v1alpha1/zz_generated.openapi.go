@@ -446,14 +446,14 @@ func schema_pkg_apis_trainer_v1alpha1_ClusterTrainingRuntime(ref common.Referenc
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata.",
+							Description: "metadata of the ClusterTrainingRuntime.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired ClusterTrainingRuntime.",
+							Description: "spec of the ClusterTrainingRuntime.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeSpec"),
 						},
@@ -526,8 +526,7 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name for the container. TrainingRuntime must have this container.",
-							Default:     "",
+							Description: "name for the container. TrainingRuntime must have this container.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -542,7 +541,7 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. These values can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.",
+							Description: "env is the list of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. These values can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -564,7 +563,7 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Pod volumes to mount into the container's filesystem.",
+							Description: "volumeMounts are the volumes to mount into the container's filesystem.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -594,7 +593,7 @@ func schema_pkg_apis_trainer_v1alpha1_CoschedulingPodGroupPolicySource(ref commo
 				Properties: map[string]spec.Schema{
 					"scheduleTimeoutSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Time threshold to schedule PodGroup for gang-scheduling. If the scheduling timeout is equal to 0, the default value is used. Defaults to 60 seconds.",
+							Description: "scheduleTimeoutSeconds is the maximum duration to schedule PodGroup for gang-scheduling. If the scheduling timeout is equal to 0, the default value is used. Defaults to 60 seconds.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -614,7 +613,7 @@ func schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"storageUri": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Storage uri for the dataset provider.",
+							Description: "storageUri is the URI for the dataset provider.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -629,7 +628,7 @@ func schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of environment variables to set in the dataset initializer container. These values will be merged with the TrainingRuntime's dataset initializer environments.",
+							Description: "env is the list of environment variables to set in the dataset initializer container. These values will be merged with the TrainingRuntime's dataset initializer environments.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -643,7 +642,7 @@ func schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref common.ReferenceCal
 					},
 					"secretRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Reference to the secret with credentials to download dataset. Secret must be created in the TrainJob's namespace.",
+							Description: "secretRef is the reference to the secret with credentials to download dataset. Secret must be created in the TrainJob's namespace.",
 							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
 						},
 					},
@@ -664,13 +663,13 @@ func schema_pkg_apis_trainer_v1alpha1_Initializer(ref common.ReferenceCallback) 
 				Properties: map[string]spec.Schema{
 					"dataset": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration of the dataset initialization and pre-processing.",
+							Description: "dataset defines the configuration for the dataset initialization and pre-processing.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.DatasetInitializer"),
 						},
 					},
 					"model": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration of the pre-trained model initialization",
+							Description: "model defines the configuration for the pre-trained model initialization",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ModelInitializer"),
 						},
 					},
@@ -691,14 +690,14 @@ func schema_pkg_apis_trainer_v1alpha1_JobSetTemplateSpec(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Metadata for custom JobSet's labels and annotations. JobSet name and namespace is equal to the TrainJob's name and namespace.",
+							Description: "metadata for custom JobSet's labels and annotations. JobSet name and namespace is equal to the TrainJob's name and namespace.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired JobSet which will be created from TrainJob.",
+							Description: "spec of the desired JobSet which will be created from TrainJob.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("sigs.k8s.io/jobset/api/jobset/v1alpha2.JobSetSpec"),
 						},
@@ -719,48 +718,42 @@ func schema_pkg_apis_trainer_v1alpha1_JobStatus(ref common.ReferenceCallback) co
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the child Job.",
-							Default:     "",
+							Description: "name of the child Job.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"ready": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Ready is the number of child Jobs where the number of ready pods and completed pods is greater than or equal to the total expected pod count for the child Job.",
-							Default:     0,
+							Description: "ready is the number of child Jobs where the number of ready pods and completed pods is greater than or equal to the total expected pod count for the child Job.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"succeeded": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Succeeded is the number of successfully completed child Jobs.",
-							Default:     0,
+							Description: "succeeded is the number of successfully completed child Jobs.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"failed": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Failed is the number of failed child Jobs.",
-							Default:     0,
+							Description: "failed is the number of failed child Jobs.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"active": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Active is the number of child Jobs with at least 1 pod in a running or pending state which are not marked for deletion.",
-							Default:     0,
+							Description: "active is the number of child Jobs with at least 1 pod in a running or pending state which are not marked for deletion.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"suspended": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Suspended is the number of child Jobs which are in a suspended state.",
-							Default:     0,
+							Description: "suspended is the number of child Jobs which are in a suspended state.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -776,25 +769,25 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref common.ReferenceCallback) com
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "MLPolicy represents configuration for the model trining with ML-specific parameters.",
+				Description: "MLPolicy represents configuration for the model training with ML-specific parameters.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"numNodes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Number of training nodes. Defaults to 1.",
+							Description: "numNodes is the number of training nodes. Defaults to 1.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"torch": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration for the PyTorch runtime.",
+							Description: "torch defines the configuration for the PyTorch runtime.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"),
 						},
 					},
 					"mpi": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration for the MPI Runtime.",
+							Description: "mpi defines the configuration for the MPI Runtime.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource"),
 						},
 					},
@@ -815,13 +808,13 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicySource(ref common.ReferenceCallbac
 				Properties: map[string]spec.Schema{
 					"torch": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration for the PyTorch runtime.",
+							Description: "torch defines the configuration for the PyTorch runtime.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"),
 						},
 					},
 					"mpi": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration for the MPI Runtime.",
+							Description: "mpi defines the configuration for the MPI Runtime.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource"),
 						},
 					},
@@ -842,28 +835,28 @@ func schema_pkg_apis_trainer_v1alpha1_MPIMLPolicySource(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"numProcPerNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Number of processes per node. This value is equal to the number of slots for each node in the hostfile. Defaults to 1.",
+							Description: "numProcPerNode is the number of processes per node. This value is equal to the number of slots for each node in the hostfile. Defaults to 1.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"mpiImplementation": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Implementation name for the MPI to create the appropriate hostfile. Defaults to OpenMPI.",
+							Description: "mpiImplementation is the name of the MPI implementation to create the appropriate hostfile. Defaults to OpenMPI.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"sshAuthMountPath": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Directory where SSH keys are mounted. Defaults to /root/.ssh.",
+							Description: "sshAuthMountPath is the directory where SSH keys are mounted. Defaults to /root/.ssh.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"runLauncherAsNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Whether to run training process on the launcher Job. Defaults to false.",
+							Description: "runLauncherAsNode defines whether to run training process on the launcher Job. Defaults to false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -878,12 +871,12 @@ func schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref common.ReferenceCallb
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "DatasetInitializer represents the desired configuration to initialize pre-trained model. The DatasetInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
+				Description: "ModelInitializer represents the desired configuration to initialize pre-trained model. The ModelInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"storageUri": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Storage uri for the model provider.",
+							Description: "storageUri is the URI for the model provider.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -898,7 +891,7 @@ func schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref common.ReferenceCallb
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of environment variables to set in the model initializer container. These values will be merged with the TrainingRuntime's model initializer environments.",
+							Description: "env is the list of environment variables to set in the model initializer container. These values will be merged with the TrainingRuntime's model initializer environments.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -912,7 +905,7 @@ func schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref common.ReferenceCallb
 					},
 					"secretRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Reference to the secret with credentials to download model. Secret must be created in the TrainJob's namespace.",
+							Description: "secretRef is the reference to the secret with credentials to download model. Secret must be created in the TrainJob's namespace.",
 							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
 						},
 					},
@@ -933,13 +926,13 @@ func schema_pkg_apis_trainer_v1alpha1_PodGroupPolicy(ref common.ReferenceCallbac
 				Properties: map[string]spec.Schema{
 					"coscheduling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.",
+							Description: "coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource"),
 						},
 					},
 					"volcano": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Volcano plugin for gang-scheduling.",
+							Description: "volcano plugin for gang-scheduling.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.VolcanoPodGroupPolicySource"),
 						},
 					},
@@ -960,13 +953,13 @@ func schema_pkg_apis_trainer_v1alpha1_PodGroupPolicySource(ref common.ReferenceC
 				Properties: map[string]spec.Schema{
 					"coscheduling": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.",
+							Description: "coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource"),
 						},
 					},
 					"volcano": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Volcano plugin for gang-scheduling.",
+							Description: "volcano plugin for gang-scheduling.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.VolcanoPodGroupPolicySource"),
 						},
 					},
@@ -982,7 +975,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateOverride(ref common.ReferenceCa
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PodTemplateOverride represents the custom overrides that will be applied for the TrainJob's resources.",
+				Description: "PodTemplateOverride represents a custom PodTemplateSpec override that will be applied to the TrainJob's training runtime.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"targetJobs": {
@@ -992,7 +985,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateOverride(ref common.ReferenceCa
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "TrainJobs is the training job replicas in the training runtime template to apply the overrides.",
+							Description: "targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1006,13 +999,13 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateOverride(ref common.ReferenceCa
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Override for the Pod template metadata. These values will be merged with the TrainingRuntime's Pod template metadata.",
+							Description: "metadata overrides the Pod template metadata. These values will be merged with the TrainingRuntime's Pod template metadata.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Override for the Pod template spec. These values will be merged with the TrainingRuntime's Pod template spec.",
+							Description: "spec overrides the Pod template spec. These values will be merged with the TrainingRuntime's Pod template spec.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateSpecOverride"),
 						},
 					},
@@ -1033,8 +1026,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateOverrideTargetJob(ref common.Re
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is the target training job name for which the PodSpec is overridden.",
-							Default:     "",
+							Description: "name is the target training job name for which the PodTemplateSpec is overridden.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1055,14 +1047,14 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref common.Referen
 				Properties: map[string]spec.Schema{
 					"serviceAccountName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Override for the service account.",
+							Description: "serviceAccountName overrides the service account.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"nodeSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Override for the node selector to place Pod on the specific node.",
+							Description: "nodeSelector overrides the node selector to place Pod on the specific node.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -1078,7 +1070,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref common.Referen
 					},
 					"affinity": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Override for the Pod's affinity.",
+							Description: "affinity overrides for the Pod's affinity.",
 							Ref:         ref("k8s.io/api/core/v1.Affinity"),
 						},
 					},
@@ -1089,7 +1081,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref common.Referen
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Override for the Pod's tolerations.",
+							Description: "tolerations overrides the Pod's tolerations.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1111,7 +1103,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref common.Referen
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Overrides for the Pod volume configurations.",
+							Description: "volumes overrides the Pod's volumes.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1133,7 +1125,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref common.Referen
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Overrides for the init container in the target job templates.",
+							Description: "initContainers overrides the init container in the target job templates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1155,7 +1147,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref common.Referen
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Overrides for the containers in the target job templates.",
+							Description: "containers overrides for the containers in the target job templates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1177,7 +1169,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref common.Referen
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "SchedulingGates overrides the scheduling gates of the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/",
+							Description: "schedulingGates overrides the scheduling gates of the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1199,7 +1191,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref common.Referen
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "ImagePullSecrets overrides the image pull secrets for the Pods in the target job templates.",
+							Description: "imagePullSecrets overrides the image pull secrets for the Pods in the target job templates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1228,22 +1220,21 @@ func schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref common.ReferenceCallback) c
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the runtime being referenced. When namespaced-scoped TrainingRuntime is used, the TrainJob must have the same namespace as the deployed runtime.",
-							Default:     "",
+							Description: "name of the runtime being referenced. When namespaced-scoped TrainingRuntime is used, the TrainJob must have the same namespace as the deployed runtime.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"apiGroup": {
 						SchemaProps: spec.SchemaProps{
-							Description: "APIGroup of the runtime being referenced. Defaults to `trainer.kubeflow.org`.",
+							Description: "apiGroup of the runtime being referenced. Defaults to `trainer.kubeflow.org`.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind of the runtime being referenced. Defaults to ClusterTrainingRuntime.",
+							Description: "kind of the runtime being referenced. Defaults to ClusterTrainingRuntime.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1264,21 +1255,21 @@ func schema_pkg_apis_trainer_v1alpha1_TorchElasticPolicy(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"maxRestarts": {
 						SchemaProps: spec.SchemaProps{
-							Description: "How many times the training job can be restarted. This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and the `.spec.failurePolicy.maxRestarts` parameter of the training Job.",
+							Description: "maxRestarts defines how many times the training job can be restarted. This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and the `.spec.failurePolicy.maxRestarts` parameter of the training Job.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"minNodes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Lower limit for the number of nodes to which training job can scale down.",
+							Description: "minNodes is the lower limit for the number of nodes to which training job can scale down.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"maxNodes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Upper limit for the number of nodes to which training job can scale up.",
+							Description: "maxNodes is the upper limit for the number of nodes to which training job can scale up.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -1290,7 +1281,7 @@ func schema_pkg_apis_trainer_v1alpha1_TorchElasticPolicy(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification which are used to calculate the desired number of nodes. See the individual metric source types for more information about how each type of metric must respond. The HPA will be created to perform auto-scaling.",
+							Description: "metrics which are used to calculate the desired number of nodes. See the individual metric source types for more information about how each type of metric must respond. The HPA will be created to perform auto-scaling.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1319,13 +1310,13 @@ func schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"numProcPerNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Number of processes per node. This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI. Supported values: `auto`, `cpu`, `gpu`, or int value. Defaults to `auto`.",
+							Description: "numProcPerNode is the number of processes per node. This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI. Supported values: `auto`, `cpu`, `gpu`, or int value. Defaults to `auto`.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
 					"elasticPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Elastic policy for the PyTorch training.",
+							Description: "elasticPolicy defines the Elastic policy for the PyTorch training.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchElasticPolicy"),
 						},
 					},
@@ -1360,21 +1351,21 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJob(ref common.ReferenceCallback) com
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata.",
+							Description: "metadata of the TrainJob.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired TrainJob.",
+							Description: "spec of the TrainJob.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Current status of TrainJob.",
+							Description: "status of TrainJob.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobStatus"),
 						},
@@ -1447,26 +1438,26 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 				Properties: map[string]spec.Schema{
 					"runtimeRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Reference to the training runtime. The field is immutable.",
+							Description: "runtimeRef is the reference to the training runtime. The field is immutable.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef"),
 						},
 					},
 					"initializer": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration of the initializer.",
+							Description: "initializer defines the configuration of the initializer.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Initializer"),
 						},
 					},
 					"trainer": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration of the trainer.",
+							Description: "trainer defines the configuration of the trainer.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Trainer"),
 						},
 					},
 					"labels": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Labels to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.",
+							Description: "labels to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -1482,7 +1473,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 					},
 					"annotations": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.",
+							Description: "annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -1503,7 +1494,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Custom overrides for the training runtime. When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.",
+							Description: "podTemplateOverrides define the PodTemplateOverrides for the training runtime. When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1517,14 +1508,14 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 					},
 					"suspend": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Whether the controller should suspend the running TrainJob. Defaults to false.",
+							Description: "suspend defines whether to suspend the running TrainJob. Defaults to false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"managedBy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ManagedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`",
+							Description: "managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1551,13 +1542,11 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref common.ReferenceCallbac
 								"x-kubernetes-list-map-keys": []interface{}{
 									"type",
 								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "type",
-								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-list-type": "map",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Conditions for the TrainJob.",
+							Description: "conditions for the TrainJob.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1579,7 +1568,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref common.ReferenceCallbac
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "JobsStatus tracks the child Jobs in TrainJob.",
+							Description: "jobsStatus tracks the child Jobs in TrainJob.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1608,7 +1597,7 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 				Properties: map[string]spec.Schema{
 					"image": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Docker image for the training container.",
+							Description: "image is the container image for the training container.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1620,7 +1609,7 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Entrypoint commands for the training container.",
+							Description: "command for the entrypoint of the training container.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1640,7 +1629,7 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Arguments to the entrypoint for the training container.",
+							Description: "args for the entrypoint for the training container.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1663,7 +1652,7 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of environment variables to set in the training container. These values will be merged with the TrainingRuntime's trainer environments.",
+							Description: "env is the list of environment variables to set in the training container. These values will be merged with the TrainingRuntime's trainer environments.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -1677,20 +1666,20 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 					},
 					"numNodes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Number of training nodes.",
+							Description: "numNodes is the number of training nodes.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"resourcesPerNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Compute resources for each training node.",
+							Description: "resourcesPerNode defines the compute resources for each training node.",
 							Ref:         ref("k8s.io/api/core/v1.ResourceRequirements"),
 						},
 					},
 					"numProcPerNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Number of processes/workers/slots on every training node. For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set. For the MPI runtime only int value can be set.",
+							Description: "numProcPerNode is the number of processes/workers/slots on every training node. For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set. For the MPI runtime only int value can be set.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -1725,14 +1714,14 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntime(ref common.ReferenceCallba
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata.",
+							Description: "metadata of the TrainingRuntime.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired TrainingRuntime.",
+							Description: "spec of the TrainingRuntime.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeSpec"),
 						},
@@ -1805,25 +1794,24 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"mlPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration for the model training with ML-specific parameters.",
+							Description: "mlPolicy provides the ML-specific parameters for the model training.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicy"),
 						},
 					},
 					"podGroupPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration for the PodGroup to enable gang-scheduling via supported plugins.",
+							Description: "podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via supported plugins.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicy"),
 						},
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "JobSet template which will be used by TrainJob.",
+							Description: "template for the JobSet which will be used by TrainJob.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec"),
 						},
 					},
 				},
-				Required: []string{"template"},
 			},
 		},
 		Dependencies: []string{
@@ -1840,7 +1828,7 @@ func schema_pkg_apis_trainer_v1alpha1_VolcanoPodGroupPolicySource(ref common.Ref
 				Properties: map[string]spec.Schema{
 					"networkTopology": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NetworkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.",
+							Description: "networkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.",
 							Ref:         ref("volcano.sh/apis/pkg/apis/scheduling/v1beta1.NetworkTopologySpec"),
 						},
 					},

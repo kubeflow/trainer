@@ -26,11 +26,11 @@ from typing_extensions import Self
 
 class TrainerV1alpha1MLPolicy(BaseModel):
     """
-    MLPolicy represents configuration for the model trining with ML-specific parameters.
+    MLPolicy represents configuration for the model training with ML-specific parameters.
     """ # noqa: E501
-    mpi: Optional[TrainerV1alpha1MPIMLPolicySource] = Field(default=None, description="Configuration for the MPI Runtime.")
-    num_nodes: Optional[StrictInt] = Field(default=None, description="Number of training nodes. Defaults to 1.", alias="numNodes")
-    torch: Optional[TrainerV1alpha1TorchMLPolicySource] = Field(default=None, description="Configuration for the PyTorch runtime.")
+    mpi: Optional[TrainerV1alpha1MPIMLPolicySource] = Field(default=None, description="mpi defines the configuration for the MPI Runtime.")
+    num_nodes: Optional[StrictInt] = Field(default=None, description="numNodes is the number of training nodes. Defaults to 1.", alias="numNodes")
+    torch: Optional[TrainerV1alpha1TorchMLPolicySource] = Field(default=None, description="torch defines the configuration for the PyTorch runtime.")
     __properties: ClassVar[List[str]] = ["mpi", "numNodes", "torch"]
 
     model_config = ConfigDict(

@@ -1,0 +1,27 @@
+name: Unit and Integration Test - Rust
+
+on:
+  - pull_request
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    if: ${{ github.repository == 'kubeflow/trainer' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "pkg/data_cache"
+
+      - name: Run Rust unit tests
+        run: make test-rust

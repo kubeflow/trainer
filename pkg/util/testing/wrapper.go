@@ -1234,12 +1234,12 @@ func (m *MLPolicySourceWrapper) TorchPolicy(numProcPerNode *intstr.IntOrString, 
 	return m
 }
 
-func (m *MLPolicySourceWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation *trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsNode *bool) *MLPolicySourceWrapper {
+func (m *MLPolicySourceWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsNode *bool) *MLPolicySourceWrapper {
 	if m.MPI == nil {
 		m.MPI = &trainer.MPIMLPolicySource{}
 	}
 	m.MPI.NumProcPerNode = numProcPerNode
-	m.MPI.MPIImplementation = MPImplementation
+	m.MPI.MPIImplementation = &MPImplementation
 	m.MPI.SSHAuthMountPath = sshAuthMountPath
 	m.MPI.RunLauncherAsNode = runLauncherAsNode
 	return m

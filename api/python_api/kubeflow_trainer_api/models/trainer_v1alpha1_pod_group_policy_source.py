@@ -28,8 +28,8 @@ class TrainerV1alpha1PodGroupPolicySource(BaseModel):
     """
     PodGroupPolicySource represents supported plugins for gang-scheduling. Only one of its members may be specified.
     """ # noqa: E501
-    coscheduling: Optional[TrainerV1alpha1CoschedulingPodGroupPolicySource] = Field(default=None, description="Coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.")
-    volcano: Optional[TrainerV1alpha1VolcanoPodGroupPolicySource] = Field(default=None, description="Volcano plugin for gang-scheduling.")
+    coscheduling: Optional[TrainerV1alpha1CoschedulingPodGroupPolicySource] = Field(default=None, description="coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.")
+    volcano: Optional[TrainerV1alpha1VolcanoPodGroupPolicySource] = Field(default=None, description="volcano plugin for gang-scheduling.")
     __properties: ClassVar[List[str]] = ["coscheduling", "volcano"]
 
     model_config = ConfigDict(

@@ -23,7 +23,7 @@ import (
 // SetDefaults_Configuration sets default values for Configuration.
 func SetDefaults_Configuration(cfg *Configuration) {
 	if cfg.Webhook.Port == nil {
-		cfg.Webhook.Port = ptr.To(9443)
+		cfg.Webhook.Port = ptr.To(int32(9443))
 	}
 	if cfg.Metrics.BindAddress == "" {
 		cfg.Metrics.BindAddress = ":8443"

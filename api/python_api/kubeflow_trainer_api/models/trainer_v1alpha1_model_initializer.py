@@ -26,11 +26,11 @@ from typing_extensions import Self
 
 class TrainerV1alpha1ModelInitializer(BaseModel):
     """
-    DatasetInitializer represents the desired configuration to initialize pre-trained model. The DatasetInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
+    ModelInitializer represents the desired configuration to initialize pre-trained model. The ModelInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
     """ # noqa: E501
-    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="List of environment variables to set in the model initializer container. These values will be merged with the TrainingRuntime's model initializer environments.")
-    secret_ref: Optional[IoK8sApiCoreV1LocalObjectReference] = Field(default=None, description="Reference to the secret with credentials to download model. Secret must be created in the TrainJob's namespace.", alias="secretRef")
-    storage_uri: Optional[StrictStr] = Field(default=None, description="Storage uri for the model provider.", alias="storageUri")
+    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="env is the list of environment variables to set in the model initializer container. These values will be merged with the TrainingRuntime's model initializer environments.")
+    secret_ref: Optional[IoK8sApiCoreV1LocalObjectReference] = Field(default=None, description="secretRef is the reference to the secret with credentials to download model. Secret must be created in the TrainJob's namespace.", alias="secretRef")
+    storage_uri: Optional[StrictStr] = Field(default=None, description="storageUri is the URI for the model provider.", alias="storageUri")
     __properties: ClassVar[List[str]] = ["env", "secretRef", "storageUri"]
 
     model_config = ConfigDict(

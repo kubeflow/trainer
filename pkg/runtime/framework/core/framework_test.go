@@ -1453,7 +1453,14 @@ func (f fakeTrainJobStatusPlugin) Name() string { return fakeJobsStatusPluginNam
 func (f fakeTrainJobStatusPlugin) Status(context.Context, *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
 	return &trainer.TrainJobStatus{
 		JobsStatus: []trainer.JobStatus{
-			{Name: "fake-job", Ready: 1, Succeeded: 0, Failed: 0, Active: 1, Suspended: 0},
+			{
+				Name:      "fake-job",
+				Ready:     ptr.To(int32(1)),
+				Succeeded: ptr.To(int32(0)),
+				Failed:    ptr.To(int32(0)),
+				Active:    ptr.To(int32(1)),
+				Suspended: ptr.To(int32(0)),
+			},
 		},
 	}, nil
 }
@@ -1582,27 +1589,27 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 				JobsStatus: []trainer.JobStatus{
 					{
 						Name:      constants.DatasetInitializer,
-						Ready:     1,
-						Succeeded: 1,
-						Failed:    0,
-						Active:    0,
-						Suspended: 0,
+						Ready:     ptr.To(int32(1)),
+						Succeeded: ptr.To(int32(1)),
+						Failed:    ptr.To(int32(0)),
+						Active:    ptr.To(int32(0)),
+						Suspended: ptr.To(int32(0)),
 					},
 					{
 						Name:      constants.ModelInitializer,
-						Ready:     1,
-						Succeeded: 1,
-						Failed:    0,
-						Active:    0,
-						Suspended: 0,
+						Ready:     ptr.To(int32(1)),
+						Succeeded: ptr.To(int32(1)),
+						Failed:    ptr.To(int32(0)),
+						Active:    ptr.To(int32(0)),
+						Suspended: ptr.To(int32(0)),
 					},
 					{
 						Name:      constants.Node,
-						Ready:     2,
-						Succeeded: 0,
-						Failed:    0,
-						Active:    2,
-						Suspended: 0,
+						Ready:     ptr.To(int32(2)),
+						Succeeded: ptr.To(int32(0)),
+						Failed:    ptr.To(int32(0)),
+						Active:    ptr.To(int32(2)),
+						Suspended: ptr.To(int32(0)),
 					},
 				},
 			},
@@ -1627,11 +1634,11 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 				JobsStatus: []trainer.JobStatus{
 					{
 						Name:      constants.Node,
-						Ready:     0,
-						Succeeded: 0,
-						Failed:    1,
-						Active:    0,
-						Suspended: 0,
+						Ready:     ptr.To(int32(0)),
+						Succeeded: ptr.To(int32(0)),
+						Failed:    ptr.To(int32(1)),
+						Active:    ptr.To(int32(0)),
+						Suspended: ptr.To(int32(0)),
 					},
 				},
 			},

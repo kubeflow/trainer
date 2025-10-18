@@ -41,6 +41,9 @@ jobs:
           - component-name: torchtune-trainer
             dockerfile: cmd/trainers/torchtune/Dockerfile
             platforms: linux/amd64,linux/arm64
+          - component-name: data-cache
+            dockerfile: cmd/data_cache/Dockerfile
+            platforms: linux/amd64,linux/arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -67,8 +67,8 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 	// Set webhook server options
 	if cfg.Webhook.Port != nil {
 		o.WebhookServer = webhook.NewServer(webhook.Options{
-			Port:    *cfg.Webhook.Port,
-			Host:    cfg.Webhook.Host,
+			Port:    int(*cfg.Webhook.Port),
+			Host:    *cfg.Webhook.Host,
 			TLSOpts: tlsOpts,
 		})
 	}
@@ -95,7 +95,7 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 			o.Controller.GroupKindConcurrency = make(map[string]int)
 		}
 		for gk, concurrency := range cfg.Controller.GroupKindConcurrency {
-			o.Controller.GroupKindConcurrency[gk] = concurrency
+			o.Controller.GroupKindConcurrency[gk] = int(concurrency)
 		}
 	}
 }

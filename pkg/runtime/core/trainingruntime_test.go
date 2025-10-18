@@ -1662,7 +1662,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							testingutil.MakeMLPolicyWrapper().
 								WithNumNodes(1).
 								WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-									MPIPolicy(ptr.To[int32](1), ptr.To(trainer.MPIImplementationOpenMPI), ptr.To("/root/.ssh"), ptr.To(false)).
+									MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
 									Obj(),
 								).
 								Obj(),

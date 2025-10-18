@@ -28,9 +28,9 @@ class TrainerV1alpha1ContainerOverride(BaseModel):
     """
     ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
     """ # noqa: E501
-    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="List of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. These values can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.")
-    name: StrictStr = Field(description="Name for the container. TrainingRuntime must have this container.")
-    volume_mounts: Optional[List[IoK8sApiCoreV1VolumeMount]] = Field(default=None, description="Pod volumes to mount into the container's filesystem.", alias="volumeMounts")
+    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="env is the list of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. These values can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.")
+    name: StrictStr = Field(description="name for the container. TrainingRuntime must have this container.")
+    volume_mounts: Optional[List[IoK8sApiCoreV1VolumeMount]] = Field(default=None, description="volumeMounts are the volumes to mount into the container's filesystem.", alias="volumeMounts")
     __properties: ClassVar[List[str]] = ["env", "name", "volumeMounts"]
 
     model_config = ConfigDict(
@@ -99,7 +99,7 @@ class TrainerV1alpha1ContainerOverride(BaseModel):
 
         _obj = cls.model_validate({
             "env": [IoK8sApiCoreV1EnvVar.from_dict(_item) for _item in obj["env"]] if obj.get("env") is not None else None,
-            "name": obj.get("name") if obj.get("name") is not None else '',
+            "name": obj.get("name"),
             "volumeMounts": [IoK8sApiCoreV1VolumeMount.from_dict(_item) for _item in obj["volumeMounts"]] if obj.get("volumeMounts") is not None else None
         })
         return _obj

@@ -44,24 +44,25 @@ spec:
           metadata:
             type: object
           spec:
-            description: Specification of the desired TrainJob.
+            description: spec of the TrainJob.
             properties:
               annotations:
                 additionalProperties:
                   type: string
                 description: |-
-                  Annotations to apply for the derivative JobSet and Jobs.
+                  annotations to apply for the derivative JobSet and Jobs.
                   They will be merged with the TrainingRuntime values.
                 type: object
               initializer:
-                description: Configuration of the initializer.
+                description: initializer defines the configuration of the initializer.
                 properties:
                   dataset:
-                    description: Configuration of the dataset initialization and pre-processing.
+                    description: dataset defines the configuration for the dataset
+                      initialization and pre-processing.
                     properties:
                       env:
                         description: |-
-                          List of environment variables to set in the dataset initializer container.
+                          env is the list of environment variables to set in the dataset initializer container.
                           These values will be merged with the TrainingRuntime's dataset initializer environments.
                         items:
                           description: EnvVar represents an environment variable present
@@ -224,7 +225,7 @@ spec:
                         x-kubernetes-list-type: map
                       secretRef:
                         description: |-
-                          Reference to the secret with credentials to download dataset.
+                          secretRef is the reference to the secret with credentials to download dataset.
                           Secret must be created in the TrainJob's namespace.
                         properties:
                           name:
@@ -239,15 +240,16 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       storageUri:
-                        description: Storage uri for the dataset provider.
+                        description: storageUri is the URI for the dataset provider.
                         type: string
                     type: object
                   model:
-                    description: Configuration of the pre-trained model initialization
+                    description: model defines the configuration for the pre-trained
+                      model initialization
                     properties:
                       env:
                         description: |-
-                          List of environment variables to set in the model initializer container.
+                          env is the list of environment variables to set in the model initializer container.
                           These values will be merged with the TrainingRuntime's model initializer environments.
                         items:
                           description: EnvVar represents an environment variable present
@@ -410,7 +412,7 @@ spec:
                         x-kubernetes-list-type: map
                       secretRef:
                         description: |-
-                          Reference to the secret with credentials to download model.
+                          secretRef is the reference to the secret with credentials to download model.
                           Secret must be created in the TrainJob's namespace.
                         properties:
                           name:
@@ -425,7 +427,7 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       storageUri:
-                        description: Storage uri for the model provider.
+                        description: storageUri is the URI for the model provider.
                         type: string
                     type: object
                 type: object
@@ -433,13 +435,13 @@ spec:
                 additionalProperties:
                   type: string
                 description: |-
-                  Labels to apply for the derivative JobSet and Jobs.
+                  labels to apply for the derivative JobSet and Jobs.
                   They will be merged with the TrainingRuntime values.
                 type: object
               managedBy:
                 default: trainer.kubeflow.org/trainjob-controller
                 description: |-
-                  ManagedBy is used to indicate the controller or entity that manages a TrainJob.
+                  managedBy is used to indicate the controller or entity that manages a TrainJob.
                   The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or
                   `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which
                   don't have this field at all or the field value is the reserved string
@@ -455,15 +457,15 @@ spec:
                   rule: self == oldSelf
               podTemplateOverrides:
                 description: |-
-                  Custom overrides for the training runtime.
+                  podTemplateOverrides define the PodTemplateOverrides for the training runtime.
                   When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.
                 items:
-                  description: PodTemplateOverride represents the custom overrides
-                    that will be applied for the TrainJob's resources.
+                  description: PodTemplateOverride represents a custom PodTemplateSpec
+                    override that will be applied to the TrainJob's training runtime.
                   properties:
                     metadata:
                       description: |-
-                        Override for the Pod template metadata.
+                        metadata overrides the Pod template metadata.
                         These values will be merged with the TrainingRuntime's Pod template metadata.
                       properties:
                         annotations:
@@ -485,11 +487,11 @@ spec:
                       type: object
                     spec:
                       description: |-
-                        Override for the Pod template spec.
+                        spec overrides the Pod template spec.
                         These values will be merged with the TrainingRuntime's Pod template spec.
                       properties:
                         affinity:
-                          description: Override for the Pod's affinity.
+                          description: affinity overrides for the Pod's affinity.
                           properties:
                             nodeAffinity:
                               description: Describes node affinity scheduling rules
@@ -1413,15 +1415,15 @@ spec:
                               type: object
                           type: object
                         containers:
-                          description: Overrides for the containers in the target
-                            job templates.
+                          description: containers overrides for the containers in
+                            the target job templates.
                           items:
                             description: ContainerOverride represents parameters that
                               can be overridden using PodSpecOverrides.
                             properties:
                               env:
                                 description: |-
-                                  List of environment variables to set in the container.
+                                  env is the list of environment variables to set in the container.
                                   These values will be merged with the TrainingRuntime's environments.
                                   These values can't be set for container with the name: `node`, `dataset-initializer`, or
                                   `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.
@@ -1589,12 +1591,13 @@ spec:
                                 - name
                                 x-kubernetes-list-type: map
                               name:
-                                description: Name for the container. TrainingRuntime
+                                description: name for the container. TrainingRuntime
                                   must have this container.
+                                minLength: 1
                                 type: string
                               volumeMounts:
-                                description: Pod volumes to mount into the container's
-                                  filesystem.
+                                description: volumeMounts are the volumes to mount
+                                  into the container's filesystem.
                                 items:
                                   description: VolumeMount describes a mounting of
                                     a Volume within a container.
@@ -1668,7 +1671,7 @@ spec:
                           - name
                           x-kubernetes-list-type: map
                         imagePullSecrets:
-                          description: ImagePullSecrets overrides the image pull secrets
+                          description: imagePullSecrets overrides the image pull secrets
                             for the Pods in the target job templates.
                           items:
                             description: |-
@@ -1691,15 +1694,15 @@ spec:
                           - name
                           x-kubernetes-list-type: map
                         initContainers:
-                          description: Overrides for the init container in the target
-                            job templates.
+                          description: initContainers overrides the init container
+                            in the target job templates.
                           items:
                             description: ContainerOverride represents parameters that
                               can be overridden using PodSpecOverrides.
                             properties:
                               env:
                                 description: |-
-                                  List of environment variables to set in the container.
+                                  env is the list of environment variables to set in the container.
                                   These values will be merged with the TrainingRuntime's environments.
                                   These values can't be set for container with the name: `node`, `dataset-initializer`, or
                                   `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.
@@ -1867,12 +1870,13 @@ spec:
                                 - name
                                 x-kubernetes-list-type: map
                               name:
-                                description: Name for the container. TrainingRuntime
+                                description: name for the container. TrainingRuntime
                                   must have this container.
+                                minLength: 1
                                 type: string
                               volumeMounts:
-                                description: Pod volumes to mount into the container's
-                                  filesystem.
+                                description: volumeMounts are the volumes to mount
+                                  into the container's filesystem.
                                 items:
                                   description: VolumeMount describes a mounting of
                                     a Volume within a container.
@@ -1948,12 +1952,12 @@ spec:
                         nodeSelector:
                           additionalProperties:
                             type: string
-                          description: Override for the node selector to place Pod
-                            on the specific node.
+                          description: nodeSelector overrides the node selector to
+                            place Pod on the specific node.
                           type: object
                         schedulingGates:
                           description: |-
-                            SchedulingGates overrides the scheduling gates of the Pods in the target job templates.
+                            schedulingGates overrides the scheduling gates of the Pods in the target job templates.
                             More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/
                           items:
                             description: PodSchedulingGate is associated to a Pod
@@ -1972,10 +1976,10 @@ spec:
                           - name
                           x-kubernetes-list-type: map
                         serviceAccountName:
-                          description: Override for the service account.
+                          description: serviceAccountName overrides the service account.
                           type: string
                         tolerations:
-                          description: Override for the Pod's tolerations.
+                          description: tolerations overrides the Pod's tolerations.
                           items:
                             description: |-
                               The pod this Toleration is attached to tolerates any taint that matches
@@ -2015,7 +2019,7 @@ spec:
                           type: array
                           x-kubernetes-list-type: atomic
                         volumes:
-                          description: Overrides for the Pod volume configurations.
+                          description: volumes overrides the Pod's volumes.
                           items:
                             description: Volume represents a named volume in a pod
                               that may be accessed by any container in the pod.
@@ -3949,13 +3953,14 @@ spec:
                           x-kubernetes-list-type: map
                       type: object
                     targetJobs:
-                      description: TrainJobs is the training job replicas in the training
-                        runtime template to apply the overrides.
+                      description: targetJobs is the list of replicated jobs in the
+                        training runtime template to apply the overrides.
                       items:
                         properties:
                           name:
-                            description: Name is the target training job name for
-                              which the PodSpec is overridden.
+                            description: name is the target training job name for
+                              which the PodTemplateSpec is overridden.
+                            minLength: 1
                             type: string
                         required:
                         - name
@@ -3969,26 +3974,27 @@ spec:
                 x-kubernetes-list-type: atomic
               runtimeRef:
                 description: |-
-                  Reference to the training runtime.
+                  runtimeRef is the reference to the training runtime.
                   The field is immutable.
                 properties:
                   apiGroup:
                     default: trainer.kubeflow.org
                     description: |-
-                      APIGroup of the runtime being referenced.
+                      apiGroup of the runtime being referenced.
                       Defaults to `trainer.kubeflow.org`.
                     type: string
                   kind:
                     default: ClusterTrainingRuntime
                     description: |-
-                      Kind of the runtime being referenced.
+                      kind of the runtime being referenced.
                       Defaults to ClusterTrainingRuntime.
                     type: string
                   name:
                     description: |-
-                      Name of the runtime being referenced.
+                      name of the runtime being referenced.
                       When namespaced-scoped TrainingRuntime is used, the TrainJob must have
                       the same namespace as the deployed runtime.
+                    minLength: 1
                     type: string
                 required:
                 - name
@@ -3999,27 +4005,27 @@ spec:
               suspend:
                 default: false
                 description: |-
-                  Whether the controller should suspend the running TrainJob.
+                  suspend defines whether to suspend the running TrainJob.
                   Defaults to false.
                 type: boolean
               trainer:
-                description: Configuration of the trainer.
+                description: trainer defines the configuration of the trainer.
                 properties:
                   args:
-                    description: Arguments to the entrypoint for the training container.
+                    description: args for the entrypoint for the training container.
                     items:
                       type: string
                     type: array
                     x-kubernetes-list-type: atomic
                   command:
-                    description: Entrypoint commands for the training container.
+                    description: command for the entrypoint of the training container.
                     items:
                       type: string
                     type: array
                     x-kubernetes-list-type: atomic
                   env:
                     description: |-
-                      List of environment variables to set in the training container.
+                      env is the list of environment variables to set in the training container.
                       These values will be merged with the TrainingRuntime's trainer environments.
                     items:
                       description: EnvVar represents an environment variable present
@@ -4181,10 +4187,10 @@ spec:
                     - name
                     x-kubernetes-list-type: map
                   image:
-                    description: Docker image for the training container.
+                    description: image is the container image for the training container.
                     type: string
                   numNodes:
-                    description: Number of training nodes.
+                    description: numNodes is the number of training nodes.
                     format: int32
                     type: integer
                   numProcPerNode:
@@ -4192,12 +4198,13 @@ spec:
                     - type: integer
                     - type: string
                     description: |-
-                      Number of processes/workers/slots on every training node.
+                      numProcPerNode is the number of processes/workers/slots on every training node.
                       For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set.
                       For the MPI runtime only int value can be set.
                     x-kubernetes-int-or-string: true
                   resourcesPerNode:
-                    description: Compute resources for each training node.
+                    description: resourcesPerNode defines the compute resources for
+                      each training node.
                     properties:
                       claims:
                         description: |-
@@ -4260,10 +4267,11 @@ spec:
             - runtimeRef
             type: object
           status:
-            description: Current status of TrainJob.
+            description: status of TrainJob.
+            minProperties: 1
             properties:
               conditions:
-                description: Conditions for the TrainJob.
+                description: conditions for the TrainJob.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -4323,37 +4331,43 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               jobsStatus:
-                description: JobsStatus tracks the child Jobs in TrainJob.
+                description: jobsStatus tracks the child Jobs in TrainJob.
                 items:
                   properties:
                     active:
                       description: |-
-                        Active is the number of child Jobs with at least 1 pod in a running or pending state
+                        active is the number of child Jobs with at least 1 pod in a running or pending state
                         which are not marked for deletion.
                       format: int32
+                      minimum: 0
                       type: integer
                     failed:
-                      description: Failed is the number of failed child Jobs.
+                      description: failed is the number of failed child Jobs.
                       format: int32
+                      minimum: 0
                       type: integer
                     name:
-                      description: Name of the child Job.
+                      description: name of the child Job.
+                      minLength: 1
                       type: string
                     ready:
                       description: |-
-                        Ready is the number of child Jobs where the number of ready pods and completed pods
+                        ready is the number of child Jobs where the number of ready pods and completed pods
                         is greater than or equal to the total expected pod count for the child Job.
                       format: int32
+                      minimum: 0
                       type: integer
                     succeeded:
-                      description: Succeeded is the number of successfully completed
+                      description: succeeded is the number of successfully completed
                         child Jobs.
                       format: int32
+                      minimum: 0
                       type: integer
                     suspended:
-                      description: Suspended is the number of child Jobs which are
+                      description: suspended is the number of child Jobs which are
                         in a suspended state.
                       format: int32
+                      minimum: 0
                       type: integer
                   required:
                   - active

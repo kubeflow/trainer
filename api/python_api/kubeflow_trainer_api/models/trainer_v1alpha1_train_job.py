@@ -31,9 +31,9 @@ class TrainerV1alpha1TrainJob(BaseModel):
     """ # noqa: E501
     api_version: Optional[StrictStr] = Field(default=None, description="APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources", alias="apiVersion")
     kind: Optional[StrictStr] = Field(default=None, description="Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds")
-    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="Standard object's metadata.")
-    spec: Optional[TrainerV1alpha1TrainJobSpec] = Field(default=None, description="Specification of the desired TrainJob.")
-    status: Optional[TrainerV1alpha1TrainJobStatus] = Field(default=None, description="Current status of TrainJob.")
+    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="metadata of the TrainJob.")
+    spec: Optional[TrainerV1alpha1TrainJobSpec] = Field(default=None, description="spec of the TrainJob.")
+    status: Optional[TrainerV1alpha1TrainJobStatus] = Field(default=None, description="status of TrainJob.")
     __properties: ClassVar[List[str]] = ["apiVersion", "kind", "metadata", "spec", "status"]
 
     model_config = ConfigDict(
