@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
@@ -113,11 +111,11 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 
 	// Determine numProcPerNode based on the resourcesPerNode.
-	resourcesPerNode := ptr.Deref(extractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
+	resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
 		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
 	}
-	gpuQ := getNumGPUPerNode(&resourcesPerNode)
+	gpuQ := runtime.GetNumGPUPerNode(&resourcesPerNode)
 	// If numProcPerNode is "cpu" or no GPU is set in resource, we calculate numProcPerNode based on CPU.
 	if numProcPerNode.String() == "cpu" || numProcPerNode.String() == "auto" && gpuQ == 0 {
 		numProcPerNode = intstr.FromInt(max(1, getNumCPUPerNode(&resourcesPerNode)))
@@ -203,51 +201,4 @@ func getNumCPUPerNode(res *corev1.ResourceRequirements) int {
 		return 0
 	}
 	return int(requestCpuQ.Value())
-}
-
-// getNumGPUPerNode returns the GPU count if found.
-func getNumGPUPerNode(res *corev1.ResourceRequirements) int {
-	if res == nil {
-		return 0
-	}
-	gpuQ := numGPU(res.Requests)
-	if limitGpuQ := numGPU(res.Limits); gpuQ == 0 && limitGpuQ > 0 {
-		gpuQ = limitGpuQ
-	}
-	return gpuQ
-}
-
-func numGPU(resourcePerNode corev1.ResourceList) int {
-	for resName, resQ := range resourcePerNode {
-		if strings.Contains(strings.ToLower(resName.String()), "gpu") {
-			return int(resQ.Value())
-		}
-	}
-	return 0
-}
-
-// extractResourcePerNodeFromRuntime extracts the resource per node from the Trainer Node.
-func extractResourcePerNodeFromRuntime(info *runtime.Info) *corev1.ResourceRequirements {
-	if jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info); ok {
-		for _, rJob := range jobSetSpec.ReplicatedJobs {
-			if rJob.Name != nil && *rJob.Name == constants.Node || rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer {
-				for _, container := range rJob.Template.Spec.Template.Spec.Containers {
-					if container.Name != nil && *container.Name == constants.Node && container.Resources != nil {
-						res := &corev1.ResourceRequirements{
-							Limits:   corev1.ResourceList{},
-							Requests: corev1.ResourceList{},
-						}
-						if container.Resources.Limits != nil {
-							res.Limits = *container.Resources.Limits
-						}
-						if container.Resources.Requests != nil {
-							res.Requests = *container.Resources.Requests
-						}
-						return res
-					}
-				}
-			}
-		}
-	}
-	return nil
 }

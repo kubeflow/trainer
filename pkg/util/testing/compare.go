@@ -29,7 +29,12 @@ import (
 )
 
 var (
-	PodSetEndpointsCmpOpts                = cmp.Transformer("Seq", func(a iter.Seq[string]) []string { return slices.Collect(a) })
+	PodSetEndpointsCmpOpts = cmp.Transformer("Seq", func(a iter.Seq[string]) []string {
+		if a == nil {
+			return nil
+		}
+		return slices.Collect(a)
+	})
 	TrainJobUpdateReconcileRequestCmpOpts = cmp.Transformer("SeqTrainJobUpdateReconcileRequest",
 		func(req iter.Seq[types.NamespacedName]) []types.NamespacedName {
 			if req == nil {
