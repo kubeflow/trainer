@@ -39,6 +39,14 @@ const (
 	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
 )
 
+var (
+	expectedContainerNames = map[string]string{
+		constants.AncestorTrainer:    constants.Node,
+		constants.ModelInitializer:   constants.ModelInitializer,
+		constants.DatasetInitializer: constants.DatasetInitializer,
+	}
+)
+
 type TrainingRuntimeWebhook struct {
 	runtimes map[string]runtime.Runtime
 }
@@ -69,10 +77,6 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 		Child("replicatedJobs")
 	var allErrs field.ErrorList
 	for idx, rJob := range rJobs {
-		if rJob.Name == constants.Launcher && rJob.Replicas != 1 {
-			allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasErrorMsg))
-		}
-
 		if rJob.Template.Labels == nil {
 			continue
 		}
@@ -89,9 +93,7 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 			// 3. trainer - node
 			hasRequiredContainer := false
 			for _, container := range rJob.Template.Spec.Template.Spec.Containers {
-				if labelAncestor == constants.DatasetInitializer && container.Name == constants.DatasetInitializer ||
-					labelAncestor == constants.ModelInitializer && container.Name == constants.ModelInitializer ||
-					labelAncestor == constants.AncestorTrainer && container.Name == constants.Node {
+				if container.Name == expectedContainerNames[labelAncestor] {
 					hasRequiredContainer = true
 					break
 				}

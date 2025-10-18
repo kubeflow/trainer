@@ -56,8 +56,6 @@ func TestValidateReplicatedJobs(t *testing.T) {
 					"2", ""),
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"),
 					"2", ""),
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("replicas"),
-					"2", ""),
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(3).Child("replicas"),
 					"2", ""),
 			},
