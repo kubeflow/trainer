@@ -275,6 +275,26 @@ func (j *JobSetWrapper) Container(rJobName, containerName, image string, command
 	return j
 }
 
+func (j *JobSetWrapper) ReplaceContainer(rJobName, containerName, newContainerName, image string, command, args []string, res corev1.ResourceList) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			for k, container := range rJob.Template.Spec.Template.Spec.Containers {
+				if container.Name == containerName {
+					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k] = corev1.Container{
+						Name:      newContainerName,
+						Image:     image,
+						Command:   command,
+						Args:      args,
+						Resources: corev1.ResourceRequirements{Requests: res},
+					}
+					return j
+				}
+			}
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) ContainerTrainerPorts(ports []corev1.ContainerPort) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == constants.Node {
