@@ -46,7 +46,6 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
-	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 )
 
 var (
@@ -128,11 +127,11 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode = ptr.To(int32(trainJob.Spec.Trainer.NumProcPerNode.IntValue()))
 		// If numProcPerNode is set to 1 in runtime, we make it equal to number of GPUs.
 	} else if *info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode == 1 {
-		resourcesPerNode := ptr.Deref(torch.ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
+		resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
 		if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
 			resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
 		}
-		gpuQ := torch.GetNumGPUPerNode(&resourcesPerNode)
+		gpuQ := runtime.GetNumGPUPerNode(&resourcesPerNode)
 		if gpuQ > 1 {
 			info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode = ptr.To(int32(gpuQ))
 		}
