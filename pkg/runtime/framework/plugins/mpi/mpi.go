@@ -131,8 +131,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
 			resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
 		}
-		gpuQ := runtime.GetNumGPUPerNode(&resourcesPerNode)
-		if gpuQ > 1 {
+		if gpuQ := runtime.GetNumGPUPerNode(&resourcesPerNode); gpuQ > 1 {
 			info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode = ptr.To(int32(gpuQ))
 		}
 	}
