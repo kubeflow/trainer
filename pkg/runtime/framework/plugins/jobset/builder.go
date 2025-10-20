@@ -112,44 +112,15 @@ func (b *Builder) isRunLauncherAsNode(info *runtime.Info) bool {
 // Trainer updates JobSet values for the trainer Job.
 func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Builder {
 	for i, rJob := range b.Spec.ReplicatedJobs {
-		// TODO (andreyvelich): For MPI we should apply container resources to the Node ReplicatedJob also.
-		// Eventually, we should find better way to propagate resources from TrainJob to JobSet.
-		if b.isRunLauncherAsNode(info) && *rJob.Name == constants.Node {
-			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
-				if *container.Name == constants.Node {
-					if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
-						if resourcesPerNode := jobTrainer.ResourcesPerNode; resourcesPerNode != nil &&
-							(resourcesPerNode.Limits != nil || resourcesPerNode.Requests != nil) {
-							requirements := corev1ac.ResourceRequirements()
-							if limits := resourcesPerNode.Limits; limits != nil {
-								requirements.WithLimits(limits)
-							}
-							if requests := resourcesPerNode.Requests; requests != nil {
-								requirements.WithRequests(requests)
-							}
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].
-								WithResources(requirements)
-						}
-						apply.UpsertEnvVars(
-							&b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env,
-							apply.EnvVars(jobTrainer.Env...)...,
-						)
-					}
-				}
-			}
-		}
+		ancestor := ""
 		jobMetadata := rJob.Template.ObjectMetaApplyConfiguration
-		if jobMetadata == nil || jobMetadata.Labels == nil {
-			continue
+		if jobMetadata != nil && jobMetadata.Labels != nil {
+			ancestor = jobMetadata.Labels[constants.LabelTrainJobAncestor]
 		}
-		if ancestor, ok := jobMetadata.Labels[constants.LabelTrainJobAncestor]; ok && ancestor == constants.AncestorTrainer {
+		if ancestor == constants.AncestorTrainer {
 			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 			// REF: https://github.com/kubeflow/trainer/issues/2318
 			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
-			// Update the Parallelism and Completions values for the Trainer Job.
-			b.Spec.ReplicatedJobs[i].Template.Spec.Parallelism = info.FindPodSetByAncestor(constants.AncestorTrainer).Count
-			b.Spec.ReplicatedJobs[i].Template.Spec.Completions = info.FindPodSetByAncestor(constants.AncestorTrainer).Count
-
 			// Update values for the Trainer container.
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
 				if *container.Name == constants.Node {
@@ -164,6 +135,16 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 						if args := jobTrainer.Args; args != nil {
 							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Args = args
 						}
+					}
+				}
+			}
+		}
+		if ancestor == constants.AncestorTrainer || b.isRunLauncherAsNode(info) && *rJob.Name == constants.Node {
+			// TODO (andreyvelich): For MPI we should apply container resources to the Node ReplicatedJob also.
+			// Eventually, we should find better way to propagate resources from TrainJob to JobSet.
+			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
+				if *container.Name == constants.Node {
+					if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
 						if resourcesPerNode := jobTrainer.ResourcesPerNode; resourcesPerNode != nil &&
 							(resourcesPerNode.Limits != nil || resourcesPerNode.Requests != nil) {
 							requirements := corev1ac.ResourceRequirements()

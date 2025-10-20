@@ -113,8 +113,6 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
 		if node := info.FindPodSetByName(constants.Node); node != nil && node.Count != nil {
 			if ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
-				// TODO: We should implement more strong validations for the MPIRuntime with runLauncherAsNode.
-				// REF: https://github.com/kubeflow/trainer/issues/2550
 				// When runLauncherAsNode is enabled, 1 nodes should be allocated to launcher.
 				*node.Count = max(*trainJob.Spec.Trainer.NumNodes-1, 1)
 			} else {
