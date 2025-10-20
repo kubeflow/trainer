@@ -1131,6 +1131,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 			wantObjs: []apiruntime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					// This is needed to override default label in MakeJobSetWrapper() for Node rJob.
+					// TODO (andreyvelich): Refactor test wrappers to simplify this.
 					ReplicatedJobLabel(constants.LabelTrainJobAncestor, "invalid", constants.Node).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					NumNodes(99).
