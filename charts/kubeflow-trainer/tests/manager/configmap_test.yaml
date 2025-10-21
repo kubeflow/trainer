@@ -81,5 +81,3 @@ tests:
       - matchRegex:
           path: data["controller_manager_config.yaml"]
           pattern: "ClusterTrainingRuntime.trainer.kubeflow.org: 3"
-
-
