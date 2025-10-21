@@ -11,7 +11,7 @@ tests:
           of: ConfigMap
       - equal:
           path: metadata.name
-          value: kubeflow-trainer-controller-manager-config
+          value: kubeflow-trainer-config
       - matchRegex:
           path: data["controller_manager_config.yaml"]
           pattern: "apiVersion: config.trainer.kubeflow.org/v1alpha1"
@@ -52,17 +52,15 @@ tests:
           path: data["controller_manager_config.yaml"]
           pattern: "webhookSecretName: kubeflow-trainer-webhook-cert"
 
-  - it: should enable leader election when replicas > 1
-    set:
-      manager.replicas: 3
+  - it: should enable leader election by default
     asserts:
       - matchRegex:
           path: data["controller_manager_config.yaml"]
           pattern: "leaderElect: true"
 
-  - it: should disable leader election when replicas = 1
+  - it: should allow disabling leader election
     set:
-      manager.replicas: 1
+      manager.config.leaderElection.leaderElect: false
     asserts:
       - matchRegex:
           path: data["controller_manager_config.yaml"]

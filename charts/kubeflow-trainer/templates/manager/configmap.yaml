@@ -43,7 +43,7 @@ data:
 
     # Leader election configuration
     leaderElection:
-      leaderElect: {{ gt (.Values.manager.replicas | int) 1 }}
+      leaderElect: {{ .Values.manager.config.leaderElection.leaderElect | default true }}
       resourceName: {{ .Values.manager.config.leaderElection.resourceName | default "trainer.kubeflow.org" }}
       resourceNamespace: {{ .Values.manager.config.leaderElection.resourceNamespace | default "\"\"" }}
       leaseDuration: {{ .Values.manager.config.leaderElection.leaseDuration | default "15s" }}
