@@ -21,12 +21,6 @@
 - feat: qwen 2.5 1.5b runtime, example and fix gpu e2e test ([#2835](https://github.com/kubeflow/trainer/pull/2835) by [@jaiakash](https://github.com/jaiakash))
 - feat(runtimes): Support Distributed MLX on CUDA ([#2790](https://github.com/kubeflow/trainer/pull/2790) by [@andreyvelich](https://github.com/andreyvelich))
 
-### Version Upgrade
-
-- chore(operator): Upgrade JobSet to v0.10.1 ([#2875](https://github.com/kubeflow/trainer/pull/2875) by [@astefanutti](https://github.com/astefanutti))
-- chore(operator): Upgrade Kubernetes to v1.34 ([#2804](https://github.com/kubeflow/trainer/pull/2804) by [@astefanutti](https://github.com/astefanutti))
-- Upgrade Kubernetes to v1.33 ([#2756](https://github.com/kubeflow/trainer/pull/2756) by [@astefanutti](https://github.com/astefanutti))
-
 ### API Updates
 
 - feat(runtimes): add support for launcher resource allocation in MPI jobs ([#2653](https://github.com/kubeflow/trainer/pull/2653) by [@jskswamy](https://github.com/jskswamy))
@@ -38,6 +32,12 @@
 - feat: support affinity in TrainJob pod spec overrides ([#2796](https://github.com/kubeflow/trainer/pull/2796) by [@toVersus](https://github.com/toVersus))
 - feat(operator): enforce RFC 1035 validation for TrainJob name ([#2767](https://github.com/kubeflow/trainer/pull/2767) by [@juniemariam](https://github.com/juniemariam))
 - feat: Add schedulingGates to PodSpecOverrides ([#2700](https://github.com/kubeflow/trainer/pull/2700) by [@astefanutti](https://github.com/astefanutti))
+
+### Version Upgrade
+
+- chore(operator): Upgrade JobSet to v0.10.1 ([#2875](https://github.com/kubeflow/trainer/pull/2875) by [@astefanutti](https://github.com/astefanutti))
+- chore(operator): Upgrade Kubernetes to v1.34 ([#2804](https://github.com/kubeflow/trainer/pull/2804) by [@astefanutti](https://github.com/astefanutti))
+- Upgrade Kubernetes to v1.33 ([#2756](https://github.com/kubeflow/trainer/pull/2756) by [@astefanutti](https://github.com/astefanutti))
 
 ## Bug Fixes
 
