@@ -2,6 +2,14 @@
 
 # [v2.1.0-rc.0](https://github.com/kubeflow/trainer/tree/v2.1.0-rc.0) (2025-10-21)
 
+## Breaking Changes
+
+- feat(api): Replace deprecated PodSpecOverrides API with PodTemplateOverrides in TrainJob ([#2785](https://github.com/kubeflow/trainer/pull/2785) by [@xigang](https://github.com/xigang))
+- feat(operator): Replace TrainJob controller settings with the Config API ([#2879](https://github.com/kubeflow/trainer/pull/2879) by [@kapil27](https://github.com/kapil27))
+- chore(operator): Upgrade JobSet to v0.10.1 ([#2875](https://github.com/kubeflow/trainer/pull/2875) by [@astefanutti](https://github.com/astefanutti))
+- chore(operator): Upgrade Kubernetes to v1.34 ([#2804](https://github.com/kubeflow/trainer/pull/2804) by [@astefanutti](https://github.com/astefanutti))
+- Upgrade Kubernetes to v1.33 ([#2756](https://github.com/kubeflow/trainer/pull/2756) by [@astefanutti](https://github.com/astefanutti))
+
 ## New Features
 
 ### Distributed AI Data Cache
@@ -9,6 +17,11 @@
 - feat(cache): KEP-2655 - Add build pipeline and address vulnerabilities for data_cache ([#2890](https://github.com/kubeflow/trainer/pull/2890) by [@akshaychitneni](https://github.com/akshaychitneni))
 - feat(cache): KEP-2655: Adding cache initializer ([#2793](https://github.com/kubeflow/trainer/pull/2793) by [@akshaychitneni](https://github.com/akshaychitneni))
 - feat: KEP-2655: Add data cache system ([#2755](https://github.com/kubeflow/trainer/pull/2755) by [@akshaychitneni](https://github.com/akshaychitneni))
+
+### Kueue Enhancements
+
+- Support Topology Aware Scheduling for TrainJobs ([kubernetes-sigs/kueue#7249](https://github.com/kubernetes-sigs/kueue/pull/7249) by [@kaisoz](https://github.com/kaisoz))
+- fix: Allow multiple podSpec overrides to target the same TargetJob ([#2880](https://github.com/kubeflow/trainer/pull/2880) by [@kaisoz](https://github.com/kaisoz))
 
 ### Volcano Scheduler
 
@@ -24,20 +37,12 @@
 ### API Updates
 
 - feat(runtimes): add support for launcher resource allocation in MPI jobs ([#2653](https://github.com/kubeflow/trainer/pull/2653) by [@jskswamy](https://github.com/jskswamy))
-- feat(operator): add config api implementation ([#2879](https://github.com/kubeflow/trainer/pull/2879) by [@kapil27](https://github.com/kapil27))
 - feat: Add PodTemplateOverrides into TrainJob V2 API ([#2882](https://github.com/kubeflow/trainer/pull/2882) by [@xigang](https://github.com/xigang))
-- feat(api): Add PodTemplateOverrides API into TrainJob ([#2785](https://github.com/kubeflow/trainer/pull/2785) by [@xigang](https://github.com/xigang))
 - feat(api): Sync TrainJob JobsStatus from JobSet ReplicatedJobsStatus ([#2802](https://github.com/kubeflow/trainer/pull/2802) by [@astefanutti](https://github.com/astefanutti))
 - feat: support imagePullSecrets in TrainJob pod spec overrides ([#2806](https://github.com/kubeflow/trainer/pull/2806) by [@toVersus](https://github.com/toVersus))
 - feat: support affinity in TrainJob pod spec overrides ([#2796](https://github.com/kubeflow/trainer/pull/2796) by [@toVersus](https://github.com/toVersus))
 - feat(operator): enforce RFC 1035 validation for TrainJob name ([#2767](https://github.com/kubeflow/trainer/pull/2767) by [@juniemariam](https://github.com/juniemariam))
 - feat: Add schedulingGates to PodSpecOverrides ([#2700](https://github.com/kubeflow/trainer/pull/2700) by [@astefanutti](https://github.com/astefanutti))
-
-### Version Upgrade
-
-- chore(operator): Upgrade JobSet to v0.10.1 ([#2875](https://github.com/kubeflow/trainer/pull/2875) by [@astefanutti](https://github.com/astefanutti))
-- chore(operator): Upgrade Kubernetes to v1.34 ([#2804](https://github.com/kubeflow/trainer/pull/2804) by [@astefanutti](https://github.com/astefanutti))
-- Upgrade Kubernetes to v1.33 ([#2756](https://github.com/kubeflow/trainer/pull/2756) by [@astefanutti](https://github.com/astefanutti))
 
 ## Bug Fixes
 
@@ -47,7 +52,6 @@
 - fix(api): Fix lint errors for the config API ([#2896](https://github.com/kubeflow/trainer/pull/2896) by [@astefanutti](https://github.com/astefanutti))
 - fix: charts dependencies ([#2892](https://github.com/kubeflow/trainer/pull/2892) by [@ls-2018](https://github.com/ls-2018))
 - fix(runtimes): fix missing dependency in torchtune trainer image. ([#2887](https://github.com/kubeflow/trainer/pull/2887) by [@Electronic-Waste](https://github.com/Electronic-Waste))
-- fix: Allow multiple podSpec overrides to target the same TargetJob ([#2880](https://github.com/kubeflow/trainer/pull/2880) by [@kaisoz](https://github.com/kaisoz))
 - fix(ci): Add latest image tag only for the master branch ([#2854](https://github.com/kubeflow/trainer/pull/2854) by [@andreyvelich](https://github.com/andreyvelich))
 - fix: read only permission for PRs ([#2829](https://github.com/kubeflow/trainer/pull/2829) by [@jaiakash](https://github.com/jaiakash))
 - fix: read only permission for PRs ([#2827](https://github.com/kubeflow/trainer/pull/2827) by [@jaiakash](https://github.com/jaiakash))
