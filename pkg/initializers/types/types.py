@@ -60,3 +60,7 @@ class CacheDatasetInitializer:
     head_mem: str = "1Gi"
     worker_cpu: str = "2"
     worker_mem: str = "2Gi"
+    readiness_initial_delay_seconds: str = "5"
+    readiness_period_seconds: str = "10"
+    readiness_timeout_seconds: str = "5"
+    readiness_failure_threshold: str = "3"

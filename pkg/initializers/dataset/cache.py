@@ -31,6 +31,8 @@ class CacheInitializer(utils.DatasetProvider):
 
     def load_config(self):
         config_dict = utils.get_config_from_env(types.CacheDatasetInitializer)
+        # Filter out None values to allow dataclass defaults to be used
+        config_dict = {k: v for k, v in config_dict.items() if v is not None}
         self.config = types.CacheDatasetInitializer(**config_dict)
 
         # Parse schema_name and table_name from storage_uri
@@ -54,6 +56,10 @@ class CacheInitializer(utils.DatasetProvider):
         head_mem = self.config.head_mem
         worker_cpu = self.config.worker_cpu
         worker_mem = self.config.worker_mem
+        readiness_initial_delay = int(self.config.readiness_initial_delay_seconds)
+        readiness_period = int(self.config.readiness_period_seconds)
+        readiness_timeout = int(self.config.readiness_timeout_seconds)
+        readiness_failure_threshold = int(self.config.readiness_failure_threshold)
         namespace = get_namespace()
         metadata_loc = self.config.metadata_loc
         table_name = self.table_name
@@ -172,7 +178,20 @@ class CacheInitializer(utils.DatasetProvider):
                                             },
                                         },
                                         "env": env_vars,
-                                        "ports": [{"containerPort": 50051}],
+                                        "ports": [
+                                            {"containerPort": 50051, "name": "grpc"},
+                                            {"containerPort": 8080, "name": "health"},
+                                        ],
+                                        "readinessProbe": {
+                                            "httpGet": {
+                                                "path": "/ready",
+                                                "port": 8080,
+                                            },
+                                            "initialDelaySeconds": readiness_initial_delay,
+                                            "periodSeconds": readiness_period,
+                                            "timeoutSeconds": readiness_timeout,
+                                            "failureThreshold": readiness_failure_threshold,
+                                        },
                                     }
                                 ],
                             },
@@ -197,7 +216,20 @@ class CacheInitializer(utils.DatasetProvider):
                                             },
                                         },
                                         "env": env_vars,
-                                        "ports": [{"containerPort": 50051}],
+                                        "ports": [
+                                            {"containerPort": 50051, "name": "grpc"},
+                                            {"containerPort": 8080, "name": "health"},
+                                        ],
+                                        "readinessProbe": {
+                                            "httpGet": {
+                                                "path": "/ready",
+                                                "port": 8080,
+                                            },
+                                            "initialDelaySeconds": readiness_initial_delay,
+                                            "periodSeconds": readiness_period,
+                                            "timeoutSeconds": readiness_timeout,
+                                            "failureThreshold": readiness_failure_threshold,
+                                        },
                                     }
                                 ],
                             }
