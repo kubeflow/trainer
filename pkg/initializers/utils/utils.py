@@ -6,6 +6,7 @@ from typing import Dict
 STORAGE_URI_ENV = "STORAGE_URI"
 HF_SCHEME = "hf"
 CACHE_SCHEME = "cache"
+S3_SCHEME = "s3"
 
 # The default path to the users' workspace.
 # TODO (andreyvelich): Discuss how to keep this path is sync with Kubeflow SDK constants.
@@ -16,6 +17,9 @@ DATASET_PATH = os.path.join(WORKSPACE_PATH, "dataset")
 
 # The path where initializer downloads model.
 MODEL_PATH = os.path.join(WORKSPACE_PATH, "model")
+
+# File patterns to ignore during model download.
+MODEL_IGNORE_PATTERNS = ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"]
 
 
 class ModelProvider(ABC):

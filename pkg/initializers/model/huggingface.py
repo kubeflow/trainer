@@ -37,7 +37,7 @@ class HuggingFace(utils.ModelProvider):
             repo_id=model_uri,
             local_dir=utils.MODEL_PATH,
             allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt"],
-            ignore_patterns=["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
+            ignore_patterns=utils.MODEL_IGNORE_PATTERNS,
         )
 
         logging.info("Model has been downloaded")

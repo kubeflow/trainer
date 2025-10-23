@@ -27,6 +27,77 @@ import pkg.initializers.utils.utils as utils
             {"STORAGE_URI": "hf://test"},
             {"storage_uri": "hf://test", "access_token": None},
         ),
+        (
+            types.S3DatasetInitializer,
+            {
+                "STORAGE_URI": "s3://bucket/path",
+                "ENDPOINT": "https://s3.amazonaws.com",
+                "ACCESS_KEY_ID": "test_key",
+                "SECRET_ACCESS_KEY": "test_secret",
+                "REGION": "us-east-1",
+            },
+            {
+                "storage_uri": "s3://bucket/path",
+                "endpoint": "https://s3.amazonaws.com",
+                "access_key_id": "test_key",
+                "secret_access_key": "test_secret",
+                "region": "us-east-1",
+            },
+        ),
+        (
+            types.S3DatasetInitializer,
+            {"STORAGE_URI": "s3://bucket/path"},
+            {
+                "storage_uri": "s3://bucket/path",
+                "endpoint": None,
+                "access_key_id": None,
+                "secret_access_key": None,
+                "region": None,
+            },
+        ),
+        (
+            types.S3DatasetInitializer,
+            {
+                "STORAGE_URI": "s3://bucket/path",
+                "ACCESS_KEY_ID": "test_key",
+                "SECRET_ACCESS_KEY": "test_secret",
+            },
+            {
+                "storage_uri": "s3://bucket/path",
+                "endpoint": None,
+                "access_key_id": "test_key",
+                "secret_access_key": "test_secret",
+                "region": None,
+            },
+        ),
+        (
+            types.S3ModelInitializer,
+            {
+                "STORAGE_URI": "s3://bucket/path",
+                "ENDPOINT": "https://s3.amazonaws.com",
+                "ACCESS_KEY_ID": "test_key",
+                "SECRET_ACCESS_KEY": "test_secret",
+                "REGION": "us-east-1",
+            },
+            {
+                "storage_uri": "s3://bucket/path",
+                "endpoint": "https://s3.amazonaws.com",
+                "access_key_id": "test_key",
+                "secret_access_key": "test_secret",
+                "region": "us-east-1",
+            },
+        ),
+        (
+            types.S3ModelInitializer,
+            {"STORAGE_URI": "s3://bucket/path"},
+            {
+                "storage_uri": "s3://bucket/path",
+                "endpoint": None,
+                "access_key_id": None,
+                "secret_access_key": None,
+                "region": None,
+            },
+        ),
     ],
 )
 def test_get_config_from_env(mock_env_vars, config_class, env_vars, expected):
