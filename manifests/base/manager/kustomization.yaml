@@ -1,6 +1,10 @@
 resources:
   - manager.yaml
 
+# Disable hash suffix for predictable ConfigMap names
+generatorOptions:
+  disableNameSuffixHash: true
+
 # ConfigMap generator for controller manager configuration
 configMapGenerator:
   - name: kubeflow-trainer-config

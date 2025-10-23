@@ -193,6 +193,10 @@ test-python-integration: ## Run Python integration test.
 
 	PYTHONPATH=$(PROJECT_DIR) pytest ./test/integration/initializers
 
+.PHONY: test-rust
+test-rust: ## Run Rust unit test.
+	cargo test --lib --bins --manifest-path ./pkg/data_cache/Cargo.toml
+
 .PHONY: test-e2e-setup-cluster
 test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.
 	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh

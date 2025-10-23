@@ -101,6 +101,36 @@ manager:
     seccompProfile:
       type: RuntimeDefault
 
+  # -- Controller manager configuration.
+  # This configuration is used to generate the ConfigMap for the controller manager.
+  config:
+    health:
+      healthProbeBindAddress: ":8081"
+      readinessEndpointName: "readyz"
+      livenessEndpointName: "healthz"
+    metrics:
+      bindAddress: ":8443"
+      secureServing: true
+    webhook:
+      port: 9443
+      host: ""
+    leaderElection:
+      resourceName: "trainer.kubeflow.org"
+      resourceNamespace: ""
+      leaseDuration: "15s"
+      renewDeadline: "10s"
+      retryPeriod: "2s"
+    controller:
+      groupKindConcurrency:
+        trainJob: 5
+        trainingRuntime: 1
+        clusterTrainingRuntime: 1
+    certManagement:
+      enable: true
+      # webhookServiceName and webhookSecretName are auto-generated if not specified
+      webhookServiceName: ""
+      webhookSecretName: ""
+
 webhook:
   # -- Specifies how unrecognized errors are handled.
   # Available options are `Ignore` or `Fail`.

@@ -1,0 +1,83 @@
+suite: test manager configmap
+templates:
+  - manager/configmap.yaml
+release:
+  name: kubeflow-trainer
+  namespace: kubeflow-system
+tests:
+  - it: should create configmap with default values
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: kubeflow-trainer-config
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "apiVersion: config.trainer.kubeflow.org/v1alpha1"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "kind: Configuration"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "healthProbeBindAddress: :8081"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "bindAddress: :8443"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "port: 9443"
+
+  - it: should use custom webhook service and secret names from config
+    set:
+      manager:
+        config:
+          certManagement:
+            webhookServiceName: "custom-webhook-service"
+            webhookSecretName: "custom-webhook-secret"
+    asserts:
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "webhookServiceName: custom-webhook-service"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "webhookSecretName: custom-webhook-secret"
+
+  - it: should auto-generate webhook service and secret names when not provided
+    asserts:
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "webhookServiceName: kubeflow-trainer-controller-manager"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "webhookSecretName: kubeflow-trainer-webhook-cert"
+
+  - it: should enable leader election by default
+    asserts:
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "leaderElect: true"
+
+  - it: should allow disabling leader election
+    set:
+      manager.config.leaderElection.leaderElect: false
+    asserts:
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "leaderElect: false"
+
+  - it: should use custom controller concurrency values
+    set:
+      manager.config.controller.groupKindConcurrency.trainJob: 10
+      manager.config.controller.groupKindConcurrency.trainingRuntime: 5
+      manager.config.controller.groupKindConcurrency.clusterTrainingRuntime: 3
+    asserts:
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "TrainJob.trainer.kubeflow.org: 10"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "TrainingRuntime.trainer.kubeflow.org: 5"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "ClusterTrainingRuntime.trainer.kubeflow.org: 3"

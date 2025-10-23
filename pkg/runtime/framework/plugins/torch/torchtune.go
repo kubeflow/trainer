@@ -51,11 +51,11 @@ func validateTorchTune(runtimeInfo *runtime.Info, newObj *trainer.TrainJob) (adm
 
 	numProcPerNodeRefPath := specPath.Child("trainer").Child("numProcPerNode")
 	numProcPerNode := *newObj.Spec.Trainer.NumProcPerNode
-	resourcesPerNode := ptr.Deref(extractResourcePerNodeFromRuntime(runtimeInfo), corev1.ResourceRequirements{})
+	resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(runtimeInfo), corev1.ResourceRequirements{})
 	if jobTrainer := newObj.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
 		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
 	}
-	_, config := getRecipeAndConfig(numNodes, numProcPerNode, getNumGPUPerNode(&resourcesPerNode), newObj)
+	_, config := getRecipeAndConfig(numNodes, numProcPerNode, runtime.GetNumGPUPerNode(&resourcesPerNode), newObj)
 	if strings.Contains(config, constants.TorchTuneQLoRAFinetuneDistributedConfigSuffix) {
 		if model == constants.TORCHTUNE_MODEL_QWEN2_5_1_5B {
 			allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("QLoRA is not supported for %v model", model)))

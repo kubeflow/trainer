@@ -1,0 +1,64 @@
+{{- /*
+Copyright 2025 The Kubeflow authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/ -}}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "trainer.manager.configmap.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "trainer.manager.labels" . | nindent 4 }}
+data:
+  controller_manager_config.yaml: |
+    apiVersion: config.trainer.kubeflow.org/v1alpha1
+    kind: Configuration
+    # Health configuration
+    health:
+      healthProbeBindAddress: {{ .Values.manager.config.health.healthProbeBindAddress | default ":8081" }}
+      readinessEndpointName: {{ .Values.manager.config.health.readinessEndpointName | default "readyz" }}
+      livenessEndpointName: {{ .Values.manager.config.health.livenessEndpointName | default "healthz" }}
+
+    # Metrics configuration
+    metrics:
+      bindAddress: {{ .Values.manager.config.metrics.bindAddress | default ":8443" }}
+      secureServing: {{ .Values.manager.config.metrics.secureServing | default true }}
+
+    # Webhook configuration
+    webhook:
+      port: {{ .Values.manager.config.webhook.port | default 9443 }}
+      host: {{ .Values.manager.config.webhook.host | default "\"\"" }}
+
+    # Leader election configuration
+    leaderElection:
+      leaderElect: {{ .Values.manager.config.leaderElection.leaderElect | default true }}
+      resourceName: {{ .Values.manager.config.leaderElection.resourceName | default "trainer.kubeflow.org" }}
+      resourceNamespace: {{ .Values.manager.config.leaderElection.resourceNamespace | default "\"\"" }}
+      leaseDuration: {{ .Values.manager.config.leaderElection.leaseDuration | default "15s" }}
+      renewDeadline: {{ .Values.manager.config.leaderElection.renewDeadline | default "10s" }}
+      retryPeriod: {{ .Values.manager.config.leaderElection.retryPeriod | default "2s" }}
+
+    # Controller configuration
+    controller:
+      groupKindConcurrency:
+        TrainJob.trainer.kubeflow.org: {{ .Values.manager.config.controller.groupKindConcurrency.trainJob | default 5 }}
+        TrainingRuntime.trainer.kubeflow.org: {{ .Values.manager.config.controller.groupKindConcurrency.trainingRuntime | default 1 }}
+        ClusterTrainingRuntime.trainer.kubeflow.org: {{ .Values.manager.config.controller.groupKindConcurrency.clusterTrainingRuntime | default 1 }}
+
+    # Certificate management configuration
+    certManagement:
+      enable: {{ .Values.manager.config.certManagement.enable | default true }}
+      webhookServiceName: {{ if .Values.manager.config.certManagement.webhookServiceName }}{{ .Values.manager.config.certManagement.webhookServiceName }}{{ else }}{{ include "trainer.webhook.service.name" . }}{{ end }}
+      webhookSecretName: {{ if .Values.manager.config.certManagement.webhookSecretName }}{{ .Values.manager.config.certManagement.webhookSecretName }}{{ else }}{{ include "trainer.webhook.secret.name" . }}{{ end }}

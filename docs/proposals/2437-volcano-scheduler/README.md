@@ -124,7 +124,8 @@ spec:
     volcano: {}
   template:
     metadata:
-      scheduling.volcano.sh/queue-name: "high-priority-queue"
+      annotations:
+        scheduling.volcano.sh/queue-name: "high-priority-queue"
 ```
 
 

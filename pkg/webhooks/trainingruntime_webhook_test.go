@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
@@ -55,10 +56,24 @@ func TestValidateReplicatedJobs(t *testing.T) {
 					"2", ""),
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"),
 					"2", ""),
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("replicas"),
-					"2", ""),
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(3).Child("replicas"),
 					"2", ""),
+			},
+		},
+		"missing required container in replicatedJobs": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				Replicas(1, constants.Launcher, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+				ReplaceContainer(constants.DatasetInitializer, constants.DatasetInitializer, "test", "", []string{}, []string{}, corev1.ResourceList{}).
+				ReplaceContainer(constants.ModelInitializer, constants.ModelInitializer, "test", "", []string{}, []string{}, corev1.ResourceList{}).
+				ReplaceContainer(constants.Node, constants.Node, "test", "", []string{}, []string{}, corev1.ResourceList{}).
+				Obj().Spec.ReplicatedJobs,
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("template").Child("spec").Child("template").Child("spec").Child("containers"),
+					[]corev1.Container{{Name: "test"}}, ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("template").Child("spec").Child("template").Child("spec").Child("containers"),
+					[]corev1.Container{{Name: "test"}}, ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("template").Child("spec").Child("template").Child("spec").Child("containers"),
+					[]corev1.Container{{Name: "test"}}, ""),
 			},
 		},
 	}

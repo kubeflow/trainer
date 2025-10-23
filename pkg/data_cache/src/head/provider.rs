@@ -231,7 +231,7 @@ impl ExecutionPlan for DataFileTableExec {
         &self.plan_properties
     }
 
-    fn children(&self) -> Vec<&Arc<(dyn ExecutionPlan + 'static)>> {
+    fn children(&self) -> Vec<&Arc<dyn ExecutionPlan + 'static>> {
         vec![]
     }
 
