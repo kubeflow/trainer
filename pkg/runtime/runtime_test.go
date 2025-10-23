@@ -32,6 +32,10 @@ import (
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 )
 
+// IgnoreSyncPodSets is a cmp option to ignore the SyncPodSets field when comparing Info structs.
+// This field is a function pointer that can't be meaningfully compared.
+var IgnoreSyncPodSets = cmpopts.IgnoreFields(Info{}, "SyncPodSets")
+
 func TestNewInfo(t *testing.T) {
 	cases := map[string]struct {
 		infoOpts []InfoOption
@@ -431,6 +435,7 @@ func TestNewInfo(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortMaps(func(a, b string) bool { return a < b }),
+		IgnoreSyncPodSets,
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

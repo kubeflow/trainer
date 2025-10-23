@@ -59,6 +59,8 @@ import (
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
+var ignoreSyncPodSets = cmpopts.IgnoreFields(runtime.Info{}, "SyncPodSets")
+
 // TODO: We should introduce mock plugins and use plugins in this framework testing.
 // After we migrate the actual plugins to mock one for testing data,
 // we can delegate the actual plugin testing to each plugin directories, and implement detailed unit testing.
@@ -329,7 +331,7 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got): %s", diff)
 			}
-			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, cmpopts.EquateEmpty()); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, cmpopts.EquateEmpty(), ignoreSyncPodSets); len(diff) != 0 {
 				t.Errorf("Unexpected runtime.Info (-want,+got): %s", diff)
 			}
 		})
@@ -424,7 +426,7 @@ func TestRunEnforcePodGroupPolicyPlugins(t *testing.T) {
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got): %s", diff)
 			}
-			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, ignoreSyncPodSets); len(diff) != 0 {
 				t.Errorf("Unexpected runtime.Info (-want,+got): %s", diff)
 			}
 		})
@@ -2215,7 +2217,7 @@ test-job-node-0-1.test-job slots=1
 				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, testingutil.PodSetEndpointsCmpOpts); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, testingutil.PodSetEndpointsCmpOpts, ignoreSyncPodSets); len(diff) != 0 {
 				t.Errorf("Unexpected runtime.Info (-want,+got)\n%s", diff)
 			}
 
@@ -2617,7 +2619,7 @@ func TestPodNetworkPlugins(t *testing.T) {
 			if diff := cmp.Diff(tc.wantError, err); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
-			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, testingutil.PodSetEndpointsCmpOpts); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, testingutil.PodSetEndpointsCmpOpts, ignoreSyncPodSets); len(diff) != 0 {
 				t.Errorf("Unexpected runtimeInfo (-want,+got):\n%s", diff)
 			}
 		})
