@@ -18,21 +18,23 @@
 - feat(cache): KEP-2655: Adding cache initializer ([#2793](https://github.com/kubeflow/trainer/pull/2793) by [@akshaychitneni](https://github.com/akshaychitneni))
 - feat: KEP-2655: Add data cache system ([#2755](https://github.com/kubeflow/trainer/pull/2755) by [@akshaychitneni](https://github.com/akshaychitneni))
 
+### LLM Post-Training
+
+- feat(runtimes): Add LoRA/QLoRA/DoRA support in LLM Trainer V2 ([#2832](https://github.com/kubeflow/trainer/pull/2832) by [@Electronic-Waste](https://github.com/Electronic-Waste))
+- feat: Add Qwen 2.5 1.5b runtime, example and fix gpu e2e test ([#2835](https://github.com/kubeflow/trainer/pull/2835) by [@jaiakash](https://github.com/jaiakash))
+- feat(runtimes): Support Distributed MLX on CUDA ([#2790](https://github.com/kubeflow/trainer/pull/2790) by [@andreyvelich](https://github.com/andreyvelich))
+
 ### Kueue Enhancements
 
 - Support Topology Aware Scheduling for TrainJobs ([kubernetes-sigs/kueue#7249](https://github.com/kubernetes-sigs/kueue/pull/7249) by [@kaisoz](https://github.com/kaisoz))
 - fix: Allow multiple podSpec overrides to target the same TargetJob ([#2880](https://github.com/kubeflow/trainer/pull/2880) by [@kaisoz](https://github.com/kaisoz))
+- feat: support affinity in TrainJob pod spec overrides ([#2796](https://github.com/kubeflow/trainer/pull/2796) by [@toVersus](https://github.com/toVersus))
+- feat: Add schedulingGates to PodSpecOverrides ([#2700](https://github.com/kubeflow/trainer/pull/2700) by [@astefanutti](https://github.com/astefanutti))
 
 ### Volcano Scheduler
 
 - feat: KEP-2437 - PodGroup Creation for Volcano Scheduler ([#2729](https://github.com/kubeflow/trainer/pull/2729) by [@Doris-xm](https://github.com/Doris-xm))
 - feat(docs): KEP-2437-Support Volcano Scheduler in Kubeflow Trainer V2 ([#2672](https://github.com/kubeflow/trainer/pull/2672) by [@Doris-xm](https://github.com/Doris-xm))
-
-### Runtime Updates
-
-- feat(runtimes): Add LoRA/QLoRA/DoRA support in LLM Trainer V2 ([#2832](https://github.com/kubeflow/trainer/pull/2832) by [@Electronic-Waste](https://github.com/Electronic-Waste))
-- feat: qwen 2.5 1.5b runtime, example and fix gpu e2e test ([#2835](https://github.com/kubeflow/trainer/pull/2835) by [@jaiakash](https://github.com/jaiakash))
-- feat(runtimes): Support Distributed MLX on CUDA ([#2790](https://github.com/kubeflow/trainer/pull/2790) by [@andreyvelich](https://github.com/andreyvelich))
 
 ### API Updates
 
@@ -40,9 +42,7 @@
 - feat: Add PodTemplateOverrides into TrainJob V2 API ([#2882](https://github.com/kubeflow/trainer/pull/2882) by [@xigang](https://github.com/xigang))
 - feat(api): Sync TrainJob JobsStatus from JobSet ReplicatedJobsStatus ([#2802](https://github.com/kubeflow/trainer/pull/2802) by [@astefanutti](https://github.com/astefanutti))
 - feat: support imagePullSecrets in TrainJob pod spec overrides ([#2806](https://github.com/kubeflow/trainer/pull/2806) by [@toVersus](https://github.com/toVersus))
-- feat: support affinity in TrainJob pod spec overrides ([#2796](https://github.com/kubeflow/trainer/pull/2796) by [@toVersus](https://github.com/toVersus))
 - feat(operator): enforce RFC 1035 validation for TrainJob name ([#2767](https://github.com/kubeflow/trainer/pull/2767) by [@juniemariam](https://github.com/juniemariam))
-- feat: Add schedulingGates to PodSpecOverrides ([#2700](https://github.com/kubeflow/trainer/pull/2700) by [@astefanutti](https://github.com/astefanutti))
 
 ## Bug Fixes
 
