@@ -2,9 +2,7 @@ import os
 import tempfile
 from unittest.mock import MagicMock, patch
 
-import boto3
 import pytest
-from moto import mock_aws
 
 import pkg.initializers.utils.utils as utils
 from pkg.initializers.model.s3 import S3
@@ -18,16 +16,16 @@ from pkg.initializers.model.s3 import S3
             "Full config with credentials",
             {
                 "storage_uri": "s3://models/path",
-                "endpoint_url": "https://s3.amazonaws.com",
+                "endpoint": "https://s3.amazonaws.com",
                 "access_key_id": "test_access_key",
-                "access_key_secret": "test_secret_key",
+                "secret_access_key": "test_secret_key",
                 "region": "us-east-1",
             },
             {
                 "storage_uri": "s3://models/path",
-                "endpoint_url": "https://s3.amazonaws.com",
+                "endpoint": "https://s3.amazonaws.com",
                 "access_key_id": "test_access_key",
-                "access_key_secret": "test_secret_key",
+                "secret_access_key": "test_secret_key",
                 "region": "us-east-1",
             },
         ),
@@ -36,9 +34,9 @@ from pkg.initializers.model.s3 import S3
             {"storage_uri": "s3://models/path"},
             {
                 "storage_uri": "s3://models/path",
-                "endpoint_url": None,
+                "endpoint": None,
                 "access_key_id": None,
-                "access_key_secret": None,
+                "secret_access_key": None,
                 "region": None,
             },
         ),
@@ -52,13 +50,7 @@ def test_load_config(test_name, test_config, expected):
 
     with patch.object(utils, "get_config_from_env", return_value=test_config):
         s3_model_instance.load_config()
-        assert s3_model_instance.config.storage_uri == expected["storage_uri"]
-        assert s3_model_instance.config.endpoint_url == expected["endpoint_url"]
-        assert s3_model_instance.config.access_key_id == expected["access_key_id"]
-        assert (
-            s3_model_instance.config.access_key_secret == expected["access_key_secret"]
-        )
-        assert s3_model_instance.config.region == expected["region"]
+        assert s3_model_instance.config.__dict__ == expected
 
     print("Test execution completed")
 
@@ -71,9 +63,9 @@ def test_load_config(test_name, test_config, expected):
             {
                 "config": {
                     "storage_uri": "s3://models/path/subpath",
-                    "endpoint_url": "https://s3.amazonaws.com",
+                    "endpoint": "https://s3.amazonaws.com",
                     "access_key_id": "test_access_key",
-                    "access_key_secret": "test_secret_key",
+                    "secret_access_key": "test_secret_key",
                     "region": "us-east-1",
                 },
                 "expected_bucket": "models",
@@ -85,9 +77,9 @@ def test_load_config(test_name, test_config, expected):
             {
                 "config": {
                     "storage_uri": "s3://models/path",
-                    "endpoint_url": None,
+                    "endpoint": None,
                     "access_key_id": None,
-                    "access_key_secret": None,
+                    "secret_access_key": None,
                     "region": None,
                 },
                 "expected_bucket": "models",
@@ -96,36 +88,10 @@ def test_load_config(test_name, test_config, expected):
         ),
     ],
 )
-@mock_aws
 def test_download_model(test_name, test_case):
     """Test model download with different configurations"""
 
     print(f"Running test: {test_name}")
-
-    # Create a mock S3 environment
-    s3_client = boto3.client("s3")
-
-    # Create the bucket
-    bucket_name = test_case["expected_bucket"]
-    s3_client.create_bucket(Bucket=bucket_name)
-
-    # Upload test files to the mock S3 bucket
-    prefix = test_case["expected_prefix"]
-    test_files = [
-        (f"{prefix}/model.safetensors", "Model weights content"),
-        (f"{prefix}/config.json", "Model configuration"),
-        (f"{prefix}/subfolder/tokenizer.json", "Tokenizer configuration"),
-        (f"{prefix}/pytorch.model", "PyTorch model file"),
-        (f"{prefix}/ignored.txt", "This should be ignored"),
-    ]
-
-    for key, content in test_files:
-        s3_client.put_object(Bucket=bucket_name, Key=key, Body=content)
-
-    # Verify files exist in the mock S3 bucket
-    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
-    assert "Contents" in response
-    assert len(response["Contents"]) == 5
 
     # Setup the S3 model instance
     s3_model_instance = S3()
@@ -135,40 +101,32 @@ def test_download_model(test_name, test_case):
     with tempfile.TemporaryDirectory() as temp_dir:
         model_path = os.path.join(temp_dir, "model")
 
-        with patch.object(
-            s3_model_instance, "_create_s3_client", return_value=s3_client
-        ), patch.object(utils, "MODEL_PATH", model_path):
+        mock_storage = MagicMock()
 
-            # Execute download
+        with (
+            patch(
+                "pkg.initializers.utils.opendal.S3Storage", return_value=mock_storage
+            ),
+            patch.object(utils, "MODEL_PATH", model_path),
+        ):
             s3_model_instance.download_model()
 
-            # Verify only allowed file types were downloaded
-            model_safetensors_path = os.path.join(model_path, "model.safetensors")
-            config_path = os.path.join(model_path, "config.json")
-            tokenizer_path = os.path.join(model_path, "subfolder", "tokenizer.json")
-            pytorch_model_path = os.path.join(model_path, "pytorch.model")
-            ignored_file_path = os.path.join(model_path, "ignored.txt")
+            # Verify S3Storage was created with correct parameters
+            from pkg.initializers.utils.opendal import S3Storage
 
-            assert os.path.exists(
-                model_safetensors_path
-            ), f"File {model_safetensors_path} should exist"
-            assert os.path.exists(config_path), f"File {config_path} should exist"
-            assert os.path.exists(tokenizer_path), f"File {tokenizer_path} should exist"
-            assert os.path.exists(
-                pytorch_model_path
-            ), f"File {pytorch_model_path} should exist"
-            assert not os.path.exists(
-                ignored_file_path
-            ), f"File {ignored_file_path} should NOT exist"
+            S3Storage.assert_called_once_with(
+                bucket=test_case["expected_bucket"],
+                endpoint=test_case["config"]["endpoint"],
+                access_key_id=test_case["config"]["access_key_id"],
+                secret_access_key=test_case["config"]["secret_access_key"],
+                region=test_case["config"]["region"],
+            )
 
-            # Verify file contents for downloaded files
-            with open(model_safetensors_path, "r") as f:
-                assert f.read() == "Model weights content"
-            with open(config_path, "r") as f:
-                assert f.read() == "Model configuration"
-            with open(tokenizer_path, "r") as f:
-                assert f.read() == "Tokenizer configuration"
-            with open(pytorch_model_path, "r") as f:
-                assert f.read() == "PyTorch model file"
+            # Verify download was called with correct parameters
+            mock_storage.download.assert_called_once_with(
+                prefix=test_case["expected_prefix"],
+                destination_path=model_path,
+                ignore_patterns=utils.MODEL_IGNORE_PATTERNS,
+            )
 
     print("Test execution completed")

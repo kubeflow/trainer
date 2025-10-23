@@ -18,6 +18,9 @@ DATASET_PATH = os.path.join(WORKSPACE_PATH, "dataset")
 # The path where initializer downloads model.
 MODEL_PATH = os.path.join(WORKSPACE_PATH, "model")
 
+# File patterns to ignore during model download.
+MODEL_IGNORE_PATTERNS = ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"]
+
 
 class ModelProvider(ABC):
     @abstractmethod
