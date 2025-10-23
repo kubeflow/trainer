@@ -103,10 +103,11 @@ cherry pick your changes from the `master` branch and submit a PR.
 
 ### Release Kubeflow Trainer images
 
-1. Update the image tag in Kubeflow Trainer overlays:
+1. Update the image tag in Kubeflow Trainer manifests:
 
    - [manager](../../manifests/overlays/manager/kustomization.yaml)
    - [runtimes](../../manifests/overlays/runtimes/kustomization.yaml)
+   - [Helm charts](../../charts/kubeflow-trainer/values.yaml)
 
    The image tags must be equal to the release version, for example: `newTag: v2.0.0-rc.1`
 
