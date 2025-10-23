@@ -1,2 +1,0 @@
--r requirements.txt
-moto>=5.1.8
