@@ -17,14 +17,16 @@ use tracing::{error, info};
 pub struct IndexableMemTable {
     schema: SchemaRef,
     pub(crate) batches: Vec<RecordBatch>,
-    pub(crate) indices: Vec<u64>, // Starting row positions for each batch to enable range queries
+    pub(crate) start_indices: Vec<u64>, // Starting row positions for each batch
+    pub(crate) end_indices: Vec<u64>,   // Ending row positions for each batch
 }
 
 impl IndexableMemTable {
     pub fn try_new(
         schema: SchemaRef,
         partitions: Vec<Vec<RecordBatch>>,
-        indices: Vec<u64>,
+        start_indices: Vec<u64>,
+        end_indices: Vec<u64>,
     ) -> datafusion::common::Result<Self> {
         for batches in partitions.iter().flatten() {
             let batches_schema = batches.schema();
@@ -40,7 +42,8 @@ impl IndexableMemTable {
         Ok(Self {
             schema,
             batches: partitions.into_iter().flatten().collect(),
-            indices,
+            start_indices,
+            end_indices,
         })
     }
 
@@ -54,49 +57,63 @@ impl IndexableMemTable {
         let exec = t.scan(_state, None, &[], None).await?;
 
         let mut data: Vec<RecordBatch> = vec![];
-        let mut indices: Vec<u64> = vec![];
+        let mut start_indices: Vec<u64> = vec![];
+        let mut end_indices: Vec<u64> = vec![];
 
-        let mut start_index = start_index;
+        let mut current_start = start_index;
         let stream = exec.execute(0, _state.task_ctx())?;
         let _ = stream
             .map_ok(|batch| {
-                indices.push(start_index);
-                start_index += batch.num_rows() as u64;
+                let num_rows = batch.num_rows() as u64;
+                let current_end = current_start + num_rows - 1;
+
+                start_indices.push(current_start);
+                end_indices.push(current_end);
                 data.push(batch);
+
+                current_start = current_end + 1;
             })
             .collect::<Vec<_>>()
             .await;
 
         info!("Number of batches: {}", data.len());
 
-        // let mut exec = MemoryExec::try_new(&[data], Arc::clone(&schema), None)?;
-        // if let Some(cons) = constraints {
-        //     exec = exec.with_constraints(cons.clone());
-        // }
-        //
-        // if let Some(num_partitions) = output_partitions {
-        //     // TODO: handle repartioning
-        // }
-        IndexableMemTable::try_new(Arc::clone(&schema), vec![data], indices)
+        IndexableMemTable::try_new(Arc::clone(&schema), vec![data], start_indices, end_indices)
     }
 }
 
 async fn fetch_partitions(
     batches: Vec<RecordBatch>,
-    indices: &[u64],
+    start_indices: &[u64],
+    end_indices: &[u64],
     start: u64,
     end: u64,
 ) -> Vec<RecordBatch> {
-    let start_index = indices.partition_point(|&x| x < start);
-    let end_index = indices.partition_point(|&x| x <= end);
-
-    if start_index < end_index {
-        batches[start_index..end_index].to_owned()
-    } else if start_index == end_index && end_index > 0 {
-        vec![batches[end_index - 1].to_owned()]
-    } else {
-        vec![]
+    if batches.is_empty() {
+        return vec![];
     }
+
+    let n = batches.len();
+
+    // Find FIRST batch where batch_end >= start
+    let first = end_indices.partition_point(|&batch_end| batch_end < start);
+
+    // If all batches end before the query start, no overlap
+    if first >= n {
+        return vec![];
+    }
+
+    // Find LAST batch where batch_start <= end
+    let last = start_indices
+        .partition_point(|&batch_start| batch_start <= end)
+        .saturating_sub(1);
+
+    // Verify we have valid range
+    if first > last {
+        return vec![];
+    }
+
+    batches[first..=last].to_vec()
 }
 
 #[async_trait]
@@ -125,7 +142,6 @@ impl TableProvider for IndexableMemTable {
         _limit: Option<usize>,
     ) -> datafusion::common::Result<Arc<dyn ExecutionPlan>> {
         let (start, end) = if filters.len() == 1 {
-            info!("{:?}", filters[0]);
             let start = collect_literals(&filters[0]).ok_or_else(|| {
                 DataFusionError::Execution(
                     "Failed to extract start value from first filter".to_string(),
@@ -133,8 +149,6 @@ impl TableProvider for IndexableMemTable {
             })?;
             (start, start)
         } else if filters.len() == 2 {
-            info!("{:?}", filters[0]);
-            info!("{:?}", filters[1]);
             let start = collect_literals(&filters[0]).ok_or_else(|| {
                 DataFusionError::Execution(
                     "Failed to extract start value from first filter".to_string(),
@@ -149,7 +163,14 @@ impl TableProvider for IndexableMemTable {
         } else {
             return exec_err!("Incorrect filters");
         };
-        let partitions = fetch_partitions(self.batches.clone(), &self.indices, start, end).await;
+        let partitions = fetch_partitions(
+            self.batches.clone(),
+            &self.start_indices,
+            &self.end_indices,
+            start,
+            end,
+        )
+        .await;
 
         let exec =
             MemorySourceConfig::try_new_exec(&[partitions], self.schema(), projection.cloned())?;
@@ -238,7 +259,7 @@ mod tests {
     #[tokio::test]
     async fn test_partition_selection() -> Result<(), Box<dyn std::error::Error>> {
         let batches = create_test_batches()?;
-        let result = fetch_partitions(batches, &[0, 4], 0, 2).await;
+        let result = fetch_partitions(batches, &[0, 4], &[3, 7], 0, 2).await;
 
         assert_batches_eq!(
             [
@@ -259,7 +280,7 @@ mod tests {
     #[tokio::test]
     async fn test_partition_selection_single_row() -> Result<(), Box<dyn std::error::Error>> {
         let batches = create_test_batches()?;
-        let result = fetch_partitions(batches, &[0, 4], 2, 2).await;
+        let result = fetch_partitions(batches, &[0, 4], &[3, 7], 2, 2).await;
 
         assert_batches_eq!(
             [
@@ -280,9 +301,8 @@ mod tests {
     #[tokio::test]
     async fn test_partition_selection_all() -> Result<(), Box<dyn std::error::Error>> {
         let batches = create_test_batches()?;
-        let result = fetch_partitions(batches, &[0, 4], 0, 4).await;
-        // println!("{}", &result.get(0).unwrap().num_rows());
-        // println!("{}", &result.get(1).unwrap().num_rows());
+        let result = fetch_partitions(batches, &[0, 4], &[3, 7], 0, 7).await;
+
         assert_batches_eq!(
             [
                 "+----+------+",
@@ -307,7 +327,7 @@ mod tests {
     async fn test_indexable_mem_table_with_scan() -> Result<(), Box<dyn std::error::Error>> {
         let schema = create_schema();
         let rb = create_test_batches()?;
-        let mem_table = IndexableMemTable::try_new(schema, vec![rb], [0, 4].to_vec())?;
+        let mem_table = IndexableMemTable::try_new(schema, vec![rb], vec![0, 4], vec![3, 7])?;
 
         let ctx = SessionContext::new();
         ctx.register_table("test_table", Arc::new(mem_table))?;
@@ -358,6 +378,18 @@ mod tests {
             ],
             &result
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_fetch_partitions_boundary_overlap() -> Result<(), Box<dyn std::error::Error>> {
+        // This validates the fix for batches starting before query range but overlapping it
+        // Batch 0: rows 0-3, Batch 1: rows 4-7
+        // Query [2,5] should select BOTH batches (Batch 0 has 2-3, Batch 1 has 4-5)
+        let batches = create_test_batches()?;
+        let result = fetch_partitions(batches, &[0, 4], &[3, 7], 2, 5).await;
+
+        assert_eq!(result.len(), 2, "Expected both batches for boundary query");
         Ok(())
     }
 }
