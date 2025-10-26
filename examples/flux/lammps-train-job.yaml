@@ -1,0 +1,24 @@
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: lammps-flux-interactive
+spec:
+  # Reference the pre-defined runtime by name
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    name: flux-runtime
+    kind: ClusterTrainingRuntime
+  trainer:
+    numNodes: 4
+    image: ghcr.io/converged-computing/metric-lammps:latest
+    # You do not need to write "flux run, etc" here. It will be wrapped
+    command: ["lmp", "-v", "x", "2", "-v", "y", "2", "-v", "z", "2", "-in", "in.reaxc.hns", "-nocite"]
+    # Comment out the command above to make an interactive cluster! Then shell into the 0-0 pod:
+    #  # Source environment
+    #  . /mnt/flux/flux-view.sh
+    #  # Connect to the running lead broker socket
+    #  flux proxy $fluxsocket bash
+    #  # See Flux resources!
+    #  flux resource list
+    #  Run lammps!
+    #  flux run -N 4 -n 4 lmp -v x 2 -v y 2 -v z 2 -in in.reaxc.hns -nocite
