@@ -179,7 +179,7 @@ type MLPolicy struct {
 	// +optional
 	NumNodes *int32 `json:"numNodes,omitempty"`
 
-	// Configuration for the runtime-specific parameters, such as Torch or MPI.
+	// Configuration for the runtime-specific parameters, such as Torch, Flux, or MPI.
 	// Only one of its members may be specified.
 	MLPolicySource `json:",inline"`
 }
@@ -190,6 +190,10 @@ type MLPolicySource struct {
 	// torch defines the configuration for the PyTorch runtime.
 	// +optional
 	Torch *TorchMLPolicySource `json:"torch,omitempty"`
+
+	// flux defines the configuration for the Flux runtime.
+	// +optional
+	Flux *FluxMLPolicySource `json:"flux,omitempty"`
 
 	// mpi defines the configuration for the MPI Runtime.
 	// +optional
@@ -266,6 +270,14 @@ type MPIMLPolicySource struct {
 	// +kubebuilder:default=false
 	// +optional
 	RunLauncherAsNode *bool `json:"runLauncherAsNode,omitempty"`
+}
+
+// FluxMLPolicySource represents a Flux HPC runtime configuration.
+type FluxMLPolicySource struct {
+	// numProcPerNode is the number of processes per node.
+	// +kubebuilder:default=1
+	// +optional
+	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
 }
 
 // MPIImplementation represents one of the supported MPI implementations.

@@ -47,8 +47,9 @@ type Info struct {
 }
 
 type RuntimePolicy struct {
-	MLPolicySource *trainer.MLPolicySource
-	PodGroupPolicy *trainer.PodGroupPolicy
+	MLPolicySource   *trainer.MLPolicySource
+	PodGroupPolicy   *trainer.PodGroupPolicy
+	FluxPolicySource *trainer.FluxMLPolicySource
 }
 
 type TemplateSpec struct {
@@ -116,6 +117,7 @@ func WithMLPolicySource(mlPolicy *trainer.MLPolicy) InfoOption {
 	return func(o *InfoOptions) {
 		if mlPolicy != nil {
 			o.runtimePolicy.MLPolicySource = &mlPolicy.MLPolicySource
+			o.runtimePolicy.FluxPolicySource = mlPolicy.Flux
 		}
 	}
 }

@@ -51,6 +51,14 @@ func (b *MLPolicyApplyConfiguration) WithTorch(value *TorchMLPolicySourceApplyCo
 	return b
 }
 
+// WithFlux sets the Flux field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Flux field is set to the value of the last call.
+func (b *MLPolicyApplyConfiguration) WithFlux(value *FluxMLPolicySourceApplyConfiguration) *MLPolicyApplyConfiguration {
+	b.MLPolicySourceApplyConfiguration.Flux = value
+	return b
+}
+
 // WithMPI sets the MPI field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MPI field is set to the value of the last call.

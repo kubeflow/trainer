@@ -47,6 +47,16 @@ spec:
                 description: mlPolicy provides the ML-specific parameters for the
                   model training.
                 properties:
+                  flux:
+                    description: flux defines the configuration for the Flux runtime.
+                    properties:
+                      numProcPerNode:
+                        default: 1
+                        description: numProcPerNode is the number of processes per
+                          node.
+                        format: int32
+                        type: integer
+                    type: object
                   mpi:
                     description: mpi defines the configuration for the MPI Runtime.
                     properties:

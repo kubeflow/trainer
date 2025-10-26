@@ -13819,6 +13819,17 @@
           }
         }
       },
+      "trainer.v1alpha1.FluxMLPolicySource": {
+        "description": "FluxMLPolicySource represents a Flux HPC runtime configuration.",
+        "type": "object",
+        "properties": {
+          "numProcPerNode": {
+            "description": "numProcPerNode is the number of processes per node.",
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "trainer.v1alpha1.Initializer": {
         "description": "Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.",
         "type": "object",
@@ -13911,6 +13922,14 @@
         "description": "MLPolicy represents configuration for the model training with ML-specific parameters.",
         "type": "object",
         "properties": {
+          "flux": {
+            "description": "flux defines the configuration for the Flux runtime.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.FluxMLPolicySource"
+              }
+            ]
+          },
           "mpi": {
             "description": "mpi defines the configuration for the MPI Runtime.",
             "allOf": [
@@ -13938,6 +13957,14 @@
         "description": "MLPolicySource represents the runtime-specific configuration for various technologies. One of the following specs can be set.",
         "type": "object",
         "properties": {
+          "flux": {
+            "description": "flux defines the configuration for the Flux runtime.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.FluxMLPolicySource"
+              }
+            ]
+          },
           "mpi": {
             "description": "mpi defines the configuration for the MPI Runtime.",
             "allOf": [
