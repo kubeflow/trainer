@@ -35,6 +35,7 @@ class HuggingFace(utils.DatasetProvider):
             repo_id=dataset_uri,
             repo_type="dataset",
             local_dir=utils.DATASET_PATH,
+            ignore_patterns=self.config.ignore_patterns,
         )
 
         logging.info("Dataset has been downloaded")

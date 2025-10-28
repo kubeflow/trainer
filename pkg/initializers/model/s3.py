@@ -28,10 +28,11 @@ class S3(utils.ModelProvider):
             access_key_id=self.config.access_key_id,
             secret_access_key=self.config.secret_access_key,
             region=self.config.region,
+            role_arn=self.config.role_arn,
         )
 
         s3_storage.download(
             prefix=prefix,
             destination_path=utils.MODEL_PATH,
-            ignore_patterns=utils.MODEL_IGNORE_PATTERNS,
+            ignore_patterns=self.config.ignore_patterns,
         )

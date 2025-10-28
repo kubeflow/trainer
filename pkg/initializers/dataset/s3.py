@@ -28,9 +28,11 @@ class S3(utils.DatasetProvider):
             access_key_id=self.config.access_key_id,
             secret_access_key=self.config.secret_access_key,
             region=self.config.region,
+            role_arn=self.config.role_arn,
         )
 
         s3_storage.download(
             prefix=prefix,
             destination_path=utils.DATASET_PATH,
+            ignore_patterns=self.config.ignore_patterns,
         )

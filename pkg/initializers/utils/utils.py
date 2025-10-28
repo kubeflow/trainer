@@ -18,9 +18,6 @@ DATASET_PATH = os.path.join(WORKSPACE_PATH, "dataset")
 # The path where initializer downloads model.
 MODEL_PATH = os.path.join(WORKSPACE_PATH, "model")
 
-# File patterns to ignore during model download.
-MODEL_IGNORE_PATTERNS = ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"]
-
 
 class ModelProvider(ABC):
     @abstractmethod
@@ -44,9 +41,19 @@ class DatasetProvider(ABC):
 
 # Get DataClass config from the environment variables.
 # Env names must be equal to the DataClass parameters.
-def get_config_from_env(config) -> Dict[str, str]:
+def get_config_from_env(config) -> Dict:
     config_from_env = {}
+
     for field in fields(config):
-        config_from_env[field.name] = os.getenv(field.name.upper())
+        env_value = os.getenv(field.name.upper())
+
+        if field.name == "ignore_patterns":
+            config_from_env[field.name] = (
+                [item.strip() for item in env_value.split(",") if item.strip()]
+                if env_value
+                else None
+            )
+        else:
+            config_from_env[field.name] = env_value if env_value else None
 
     return config_from_env

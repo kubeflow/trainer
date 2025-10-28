@@ -16,17 +16,21 @@ from pkg.initializers.model.s3 import S3
             "Full config with credentials",
             {
                 "storage_uri": "s3://models/path",
+                "ignore_patterns": ["*.log", "*.txt"],
                 "endpoint": "https://s3.amazonaws.com",
                 "access_key_id": "test_access_key",
                 "secret_access_key": "test_secret_key",
                 "region": "us-east-1",
+                "role_arn": "arn:aws:iam::123456789012:role/TestRole",
             },
             {
                 "storage_uri": "s3://models/path",
+                "ignore_patterns": ["*.log", "*.txt"],
                 "endpoint": "https://s3.amazonaws.com",
                 "access_key_id": "test_access_key",
                 "secret_access_key": "test_secret_key",
                 "region": "us-east-1",
+                "role_arn": "arn:aws:iam::123456789012:role/TestRole",
             },
         ),
         (
@@ -34,10 +38,12 @@ from pkg.initializers.model.s3 import S3
             {"storage_uri": "s3://models/path"},
             {
                 "storage_uri": "s3://models/path",
+                "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
                 "endpoint": None,
                 "access_key_id": None,
                 "secret_access_key": None,
                 "region": None,
+                "role_arn": None,
             },
         ),
     ],
@@ -63,10 +69,12 @@ def test_load_config(test_name, test_config, expected):
             {
                 "config": {
                     "storage_uri": "s3://models/path/subpath",
+                    "ignore_patterns": None,
                     "endpoint": "https://s3.amazonaws.com",
                     "access_key_id": "test_access_key",
                     "secret_access_key": "test_secret_key",
                     "region": "us-east-1",
+                    "role_arn": "arn:aws:iam::123456789012:role/TestRole",
                 },
                 "expected_bucket": "models",
                 "expected_prefix": "path/subpath",
@@ -77,10 +85,12 @@ def test_load_config(test_name, test_config, expected):
             {
                 "config": {
                     "storage_uri": "s3://models/path",
+                    "ignore_patterns": None,
                     "endpoint": None,
                     "access_key_id": None,
                     "secret_access_key": None,
                     "region": None,
+                    "role_arn": None,
                 },
                 "expected_bucket": "models",
                 "expected_prefix": "path",
@@ -120,13 +130,14 @@ def test_download_model(test_name, test_case):
                 access_key_id=test_case["config"]["access_key_id"],
                 secret_access_key=test_case["config"]["secret_access_key"],
                 region=test_case["config"]["region"],
+                role_arn=test_case["config"]["role_arn"],
             )
 
             # Verify download was called with correct parameters
             mock_storage.download.assert_called_once_with(
                 prefix=test_case["expected_prefix"],
                 destination_path=model_path,
-                ignore_patterns=utils.MODEL_IGNORE_PATTERNS,
+                ignore_patterns=test_case["config"]["ignore_patterns"],
             )
 
     print("Test execution completed")

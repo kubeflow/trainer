@@ -13,12 +13,20 @@ from pkg.initializers.model.huggingface import HuggingFace
         (
             "Full config with token",
             {"storage_uri": "hf://model/path", "access_token": "test_token"},
-            {"storage_uri": "hf://model/path", "access_token": "test_token"},
+            {
+                "storage_uri": "hf://model/path",
+                "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
+                "access_token": "test_token",
+            },
         ),
         (
             "Minimal config without token",
             {"storage_uri": "hf://model/path"},
-            {"storage_uri": "hf://model/path", "access_token": None},
+            {
+                "storage_uri": "hf://model/path",
+                "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
+                "access_token": None,
+            },
         ),
     ],
 )
@@ -29,10 +37,7 @@ def test_load_config(test_name, test_config, expected):
     huggingface_model_instance = HuggingFace()
     with patch.object(utils, "get_config_from_env", return_value=test_config):
         huggingface_model_instance.load_config()
-        assert huggingface_model_instance.config.storage_uri == expected["storage_uri"]
-        assert (
-            huggingface_model_instance.config.access_token == expected["access_token"]
-        )
+        assert huggingface_model_instance.config.__dict__ == expected
 
     print("Test execution completed")
 
@@ -45,6 +50,7 @@ def test_load_config(test_name, test_config, expected):
             {
                 "config": {
                     "storage_uri": "hf://username/model-name",
+                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
                     "access_token": "test_token",
                 },
                 "should_login": True,
@@ -54,7 +60,11 @@ def test_load_config(test_name, test_config, expected):
         (
             "Successful download without token",
             {
-                "config": {"storage_uri": "hf://org/model-v1", "access_token": None},
+                "config": {
+                    "storage_uri": "hf://org/model-v1",
+                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
+                    "access_token": None,
+                },
                 "should_login": False,
                 "expected_repo_id": "org/model-v1",
             },
@@ -87,6 +97,6 @@ def test_download_model(test_name, test_case):
             repo_id=test_case["expected_repo_id"],
             local_dir=utils.MODEL_PATH,
             allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt"],
-            ignore_patterns=["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
+            ignore_patterns=test_case["config"]["ignore_patterns"],
         )
     print("Test execution completed")

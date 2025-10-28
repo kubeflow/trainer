@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -7,6 +7,7 @@ from typing import Optional
 @dataclass
 class HuggingFaceDatasetInitializer:
     storage_uri: str
+    ignore_patterns: Optional[list[str]] = None
     access_token: Optional[str] = None
 
 
@@ -14,16 +15,21 @@ class HuggingFaceDatasetInitializer:
 @dataclass
 class S3DatasetInitializer:
     storage_uri: str
+    ignore_patterns: Optional[list[str]] = None
     endpoint: Optional[str] = None
     access_key_id: Optional[str] = None
     secret_access_key: Optional[str] = None
     region: Optional[str] = None
+    role_arn: Optional[str] = None
 
 
 # Configuration for the HuggingFace model initializer.
 @dataclass
 class HuggingFaceModelInitializer:
     storage_uri: str
+    ignore_patterns: Optional[list[str]] = field(
+        default_factory=lambda: ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"]
+    )
     access_token: Optional[str] = None
 
 
@@ -31,10 +37,14 @@ class HuggingFaceModelInitializer:
 @dataclass
 class S3ModelInitializer:
     storage_uri: str
+    ignore_patterns: Optional[list[str]] = field(
+        default_factory=lambda: ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"]
+    )
     endpoint: Optional[str] = None
     access_key_id: Optional[str] = None
     secret_access_key: Optional[str] = None
     region: Optional[str] = None
+    role_arn: Optional[str] = None
 
 
 # Configuration for the cache dataset initializer.
