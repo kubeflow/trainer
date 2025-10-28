@@ -1,4 +1,5 @@
 use crate::config::config::{CACHE_INDEX_COLUMN, DatasetConfig, IndexPair};
+use crate::health::{HealthState, start_health_server, worker_router};
 use crate::worker::worker::DataLoader;
 use arrow::array::{ListArray, StringViewArray, UInt64Array};
 use arrow_flight::decode::FlightRecordBatchStream;
@@ -371,16 +372,38 @@ pub async fn run(
     let dataset_config =
         DatasetConfig::from_env().map_err(|e| format!("Failed to load dataset config: {}", e))?;
 
+    // Create readiness probe server
+    let health_state = HealthState::new(ctx.clone(), "memtable".to_string());
+    let health_router = worker_router(health_state);
+    let health_port = std::env::var("HEALTH_PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(8080);
+
+    // Spawn readiness server in background
+    let health_server = tokio::spawn(async move {
+        if let Err(e) = start_health_server(health_router, health_port).await {
+            tracing::error!("Readiness server error: {}", e);
+        }
+    });
+
     let service = WorkerService {
         metadata_loc: dataset_config.metadata_loc,
         table_name: dataset_config.table_name,
         schema_name: dataset_config.schema_name,
         ctx: ctx.clone(),
     };
-    tonic::transport::Server::builder()
+
+    // Run gRPC server and wait for it to complete
+    let grpc_result = tonic::transport::Server::builder()
         .add_service(FlightServiceServer::new(service))
         .serve(addr)
         .await
-        .map_err(|e| format!("Error starting worker: {}", e))?;
+        .map_err(|e| format!("Error starting worker: {}", e));
+
+    // If gRPC server exits, abort the health server
+    health_server.abort();
+
+    grpc_result?;
     Ok(())
 }

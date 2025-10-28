@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
 use tonic::{Request, Response, Status, Streaming};
+use tracing::error;
 
 /// Head node service implementing Apache Arrow Flight protocol for distributed query coordination.
 ///
@@ -270,6 +271,7 @@ impl FlightService for HeadService {
 }
 
 use crate::config::config::{CacheConfig, IndexPair};
+use crate::health::{HealthState, head_router, start_health_server};
 
 /// Represents a row range for distributed query execution.
 ///
@@ -325,7 +327,7 @@ pub async fn run(
         worker_map.insert(index.to_string(), format!("grpc://{worker_uri}"));
     }
     let mut distributor = Distributor::new(
-        ctx,
+        ctx.clone(),
         num_workers,
         Arc::new(provider),
         "memtable".to_string(),
@@ -334,12 +336,35 @@ pub async fn run(
         cache_config,
     );
     let _ = distributor.init().await;
+
+    // Create readiness probe server
+    let health_state = HealthState::new(ctx.clone(), "memtable".to_string());
+    let health_router = head_router(health_state);
+    let health_port = std::env::var("HEALTH_PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(8080);
+
+    // Spawn readiness server in background
+    let health_server = tokio::spawn(async move {
+        if let Err(e) = start_health_server(health_router, health_port).await {
+            error!("Readiness server error: {}", e);
+        }
+    });
+
     let service = HeadService { distributor };
-    tonic::transport::Server::builder()
+
+    // Run gRPC server and wait for it to complete
+    let grpc_result = tonic::transport::Server::builder()
         .add_service(FlightServiceServer::new(service))
         .serve(addr)
         .await
-        .map_err(|e| format!("Error starting server: {}", e))?;
+        .map_err(|e| format!("Error starting server: {}", e));
+
+    // If gRPC server exits, abort the health server
+    health_server.abort();
+
+    grpc_result?;
     Ok(())
 }
 
