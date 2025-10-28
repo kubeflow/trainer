@@ -13,12 +13,20 @@ from pkg.initializers.dataset.huggingface import HuggingFace
         (
             "Full config with token",
             {"storage_uri": "hf://dataset/path", "access_token": "test_token"},
-            {"storage_uri": "hf://dataset/path", "access_token": "test_token"},
+            {
+                "storage_uri": "hf://dataset/path",
+                "ignore_patterns": None,
+                "access_token": "test_token",
+            },
         ),
         (
             "Minimal config without token",
             {"storage_uri": "hf://dataset/path"},
-            {"storage_uri": "hf://dataset/path", "access_token": None},
+            {
+                "storage_uri": "hf://dataset/path",
+                "ignore_patterns": None,
+                "access_token": None,
+            },
         ),
     ],
 )
@@ -30,12 +38,7 @@ def test_load_config(test_name, test_config, expected):
 
     with patch.object(utils, "get_config_from_env", return_value=test_config):
         huggingface_dataset_instance.load_config()
-        assert (
-            huggingface_dataset_instance.config.storage_uri == expected["storage_uri"]
-        )
-        assert (
-            huggingface_dataset_instance.config.access_token == expected["access_token"]
-        )
+        assert huggingface_dataset_instance.config.__dict__ == expected
 
     print("Test execution completed")
 
@@ -48,6 +51,7 @@ def test_load_config(test_name, test_config, expected):
             {
                 "config": {
                     "storage_uri": "hf://username/dataset-name",
+                    "ignore_patterns": None,
                     "access_token": "test_token",
                 },
                 "should_login": True,
@@ -57,7 +61,11 @@ def test_load_config(test_name, test_config, expected):
         (
             "Successful download without token",
             {
-                "config": {"storage_uri": "hf://org/dataset-v1", "access_token": None},
+                "config": {
+                    "storage_uri": "hf://org/dataset-v1",
+                    "ignore_patterns": None,
+                    "access_token": None,
+                },
                 "should_login": False,
                 "expected_repo_id": "org/dataset-v1",
             },
@@ -90,5 +98,6 @@ def test_download_dataset(test_name, test_case):
             repo_id=test_case["expected_repo_id"],
             local_dir=utils.DATASET_PATH,
             repo_type="dataset",
+            ignore_patterns=test_case["config"]["ignore_patterns"],
         )
     print("Test execution completed")

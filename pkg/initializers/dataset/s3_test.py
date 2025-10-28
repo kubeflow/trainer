@@ -16,6 +16,7 @@ from pkg.initializers.dataset.s3 import S3
             "Full config with credentials",
             {
                 "storage_uri": "s3://dataset/path",
+                "role_arn": "arn:aws:iam::123456789012:role/TestRole",
                 "endpoint": "https://s3.amazonaws.com",
                 "access_key_id": "test_access_key",
                 "secret_access_key": "test_secret_key",
@@ -23,6 +24,8 @@ from pkg.initializers.dataset.s3 import S3
             },
             {
                 "storage_uri": "s3://dataset/path",
+                "ignore_patterns": None,
+                "role_arn": "arn:aws:iam::123456789012:role/TestRole",
                 "endpoint": "https://s3.amazonaws.com",
                 "access_key_id": "test_access_key",
                 "secret_access_key": "test_secret_key",
@@ -34,10 +37,12 @@ from pkg.initializers.dataset.s3 import S3
             {"storage_uri": "s3://dataset/path"},
             {
                 "storage_uri": "s3://dataset/path",
+                "ignore_patterns": None,
                 "endpoint": None,
                 "access_key_id": None,
                 "secret_access_key": None,
                 "region": None,
+                "role_arn": None,
             },
         ),
     ],
@@ -67,6 +72,8 @@ def test_load_config(test_name, test_config, expected):
                     "access_key_id": "test_access_key",
                     "secret_access_key": "test_secret_key",
                     "region": "us-east-1",
+                    "role_arn": "arn:aws:iam::123456789012:role/TestRole",
+                    "ignore_patterns": None,
                 },
                 "expected_bucket": "dataset",
                 "expected_prefix": "path/subpath",
@@ -81,6 +88,8 @@ def test_load_config(test_name, test_config, expected):
                     "access_key_id": None,
                     "secret_access_key": None,
                     "region": None,
+                    "role_arn": None,
+                    "ignore_patterns": None,
                 },
                 "expected_bucket": "dataset",
                 "expected_prefix": "path",
@@ -120,12 +129,14 @@ def test_download_dataset(test_name, test_case):
                 access_key_id=test_case["config"]["access_key_id"],
                 secret_access_key=test_case["config"]["secret_access_key"],
                 region=test_case["config"]["region"],
+                role_arn=test_case["config"]["role_arn"],
             )
 
             # Verify download was called with correct parameters
             mock_storage.download.assert_called_once_with(
                 prefix=test_case["expected_prefix"],
                 destination_path=dataset_path,
+                ignore_patterns=test_case["config"]["ignore_patterns"],
             )
 
     print("Test execution completed")

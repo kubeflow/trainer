@@ -27,6 +27,7 @@ class S3Storage(OpenDALStorage):
         access_key_id: Optional[str] = None,
         secret_access_key: Optional[str] = None,
         region: Optional[str] = None,
+        role_arn: Optional[str] = None,
     ):
         config = {
             "root": "/",
@@ -46,6 +47,9 @@ class S3Storage(OpenDALStorage):
             config["region"] = region
         else:
             config["region"] = "auto"
+
+        if role_arn:
+            config["role_arn"] = role_arn
 
         retry_layer = opendal.layers.RetryLayer(max_times=3, factor=2.0, jitter=True)
         self.op = opendal.Operator("s3", **config).layer(retry_layer)

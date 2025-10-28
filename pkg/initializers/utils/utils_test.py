@@ -9,23 +9,43 @@ import pkg.initializers.utils.utils as utils
     [
         (
             types.HuggingFaceModelInitializer,
-            {"STORAGE_URI": "hf://test", "ACCESS_TOKEN": "token"},
-            {"storage_uri": "hf://test", "access_token": "token"},
+            {
+                "STORAGE_URI": "hf://test",
+                "IGNORE_PATTERNS": "*.msgpack,*.h5",
+                "ACCESS_TOKEN": "token",
+            },
+            {
+                "storage_uri": "hf://test",
+                "ignore_patterns": ["*.msgpack", "*.h5"],
+                "access_token": "token",
+            },
         ),
         (
             types.HuggingFaceModelInitializer,
             {"STORAGE_URI": "hf://test"},
-            {"storage_uri": "hf://test", "access_token": None},
+            {
+                "storage_uri": "hf://test",
+                "ignore_patterns": None,
+                "access_token": None,
+            },
         ),
         (
             types.HuggingFaceDatasetInitializer,
-            {"STORAGE_URI": "hf://test", "ACCESS_TOKEN": "token"},
-            {"storage_uri": "hf://test", "access_token": "token"},
+            {
+                "STORAGE_URI": "hf://test",
+                "IGNORE_PATTERNS": "*.log,*.txt",
+                "ACCESS_TOKEN": "token",
+            },
+            {
+                "storage_uri": "hf://test",
+                "ignore_patterns": ["*.log", "*.txt"],
+                "access_token": "token",
+            },
         ),
         (
             types.HuggingFaceDatasetInitializer,
             {"STORAGE_URI": "hf://test"},
-            {"storage_uri": "hf://test", "access_token": None},
+            {"storage_uri": "hf://test", "ignore_patterns": None, "access_token": None},
         ),
         (
             types.S3DatasetInitializer,
@@ -35,13 +55,16 @@ import pkg.initializers.utils.utils as utils
                 "ACCESS_KEY_ID": "test_key",
                 "SECRET_ACCESS_KEY": "test_secret",
                 "REGION": "us-east-1",
+                "ROLE_ARN": "arn:aws:iam::123456789012:role/TestRole",
             },
             {
                 "storage_uri": "s3://bucket/path",
+                "ignore_patterns": None,
                 "endpoint": "https://s3.amazonaws.com",
                 "access_key_id": "test_key",
                 "secret_access_key": "test_secret",
                 "region": "us-east-1",
+                "role_arn": "arn:aws:iam::123456789012:role/TestRole",
             },
         ),
         (
@@ -49,10 +72,12 @@ import pkg.initializers.utils.utils as utils
             {"STORAGE_URI": "s3://bucket/path"},
             {
                 "storage_uri": "s3://bucket/path",
+                "ignore_patterns": None,
                 "endpoint": None,
                 "access_key_id": None,
                 "secret_access_key": None,
                 "region": None,
+                "role_arn": None,
             },
         ),
         (
@@ -64,27 +89,33 @@ import pkg.initializers.utils.utils as utils
             },
             {
                 "storage_uri": "s3://bucket/path",
+                "ignore_patterns": None,
                 "endpoint": None,
                 "access_key_id": "test_key",
                 "secret_access_key": "test_secret",
                 "region": None,
+                "role_arn": None,
             },
         ),
         (
             types.S3ModelInitializer,
             {
                 "STORAGE_URI": "s3://bucket/path",
+                "IGNORE_PATTERNS": "*.log,*.txt",
                 "ENDPOINT": "https://s3.amazonaws.com",
                 "ACCESS_KEY_ID": "test_key",
                 "SECRET_ACCESS_KEY": "test_secret",
                 "REGION": "us-east-1",
+                "ROLE_ARN": "arn:aws:iam::123456789012:role/TestRole",
             },
             {
                 "storage_uri": "s3://bucket/path",
+                "ignore_patterns": ["*.log", "*.txt"],
                 "endpoint": "https://s3.amazonaws.com",
                 "access_key_id": "test_key",
                 "secret_access_key": "test_secret",
                 "region": "us-east-1",
+                "role_arn": "arn:aws:iam::123456789012:role/TestRole",
             },
         ),
         (
@@ -92,10 +123,12 @@ import pkg.initializers.utils.utils as utils
             {"STORAGE_URI": "s3://bucket/path"},
             {
                 "storage_uri": "s3://bucket/path",
+                "ignore_patterns": None,
                 "endpoint": None,
                 "access_key_id": None,
                 "secret_access_key": None,
                 "region": None,
+                "role_arn": None,
             },
         ),
     ],
