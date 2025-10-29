@@ -41,9 +41,9 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
-var ignoreSyncPodSets = cmpopts.IgnoreFields(runtime.Info{}, "SyncPodSets")
-
 func TestTorch(t *testing.T) {
+	var ignoreSyncPodSets = cmpopts.IgnoreFields(runtime.Info{}, "SyncPodSets")
+
 	cases := map[string]struct {
 		info              *runtime.Info
 		trainJob          *trainer.TrainJob
