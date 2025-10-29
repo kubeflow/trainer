@@ -336,6 +336,7 @@ func TestJobSet(t *testing.T) {
 		})
 	}
 }
+
 func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info
