@@ -43,6 +43,9 @@ jobs:
           echo "Install Kubeflow SDK"
           pip install git+https://github.com/kubeflow/sdk.git@main
 
+          echo "Install Kubeflow SDK with Docker support for local notebooks"
+          pip install 'kubeflow[docker]'
+
       - name: Setup cluster
         run: |
           make test-e2e-setup-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
@@ -56,6 +59,8 @@ jobs:
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_mnist.ipynb TIMEOUT=900
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/question-answering/fine-tune-distilbert.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_fine-tune-distilbert.ipynb TIMEOUT=900
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/local/local-training-mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_local-training-mnist.ipynb TIMEOUT=900
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/local/local-container-mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_local-container-mnist.ipynb TIMEOUT=900
 
       # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
       - name: Upload Artifacts to GitHub
