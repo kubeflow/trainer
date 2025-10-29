@@ -37,12 +37,25 @@ if [ -z "${PAPERMILL_TIMEOUT}" ]; then
 fi
 
 print_results() {
-    kubectl get pods
-    kubectl describe pod
-    kubectl describe trainjob
-    kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
-    kubectl logs -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node,batch.kubernetes.io/job-completion-index=0 --tail -1
-    kubectl wait trainjob --for=condition=Complete --all --timeout 3s
+    # Only run kubectl commands if we're testing Kubernetes notebooks
+    if command -v kubectl &> /dev/null && kubectl cluster-info &> /dev/null; then
+        # Always show TrainJob status
+        kubectl describe trainjob
+        kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
+        kubectl wait trainjob --for=condition=Complete --all --timeout 3s
+
+        # Only check pod logs if pods exist (not for local backends)
+        if kubectl get pods -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node --no-headers 2>/dev/null | grep -q .; then
+            echo "Found training pods - showing pod details and logs"
+            kubectl get pods
+            kubectl describe pod
+            kubectl logs -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node,batch.kubernetes.io/job-completion-index=0 --tail -1
+        else
+            echo "No training pods found (local backend used - training runs outside Kubernetes)"
+        fi
+    else
+        echo "Skipping kubectl commands (not a Kubernetes test)"
+    fi
 }
 
 (papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" --execution-timeout "${PAPERMILL_TIMEOUT}" && print_results) ||
