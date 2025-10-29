@@ -1,0 +1,122 @@
+name: publish-helm-chart
+
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  CHARTS_PATH: charts
+
+jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare Helm charts matrix
+        id: set-matrix
+        run: |
+          CHARTS_PATHS=$(find ${{ env.CHARTS_PATH }} -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
+          echo "Matrix: $CHARTS_PATHS"
+          echo "matrix=$CHARTS_PATHS" >> $GITHUB_OUTPUT
+
+  build:
+    permissions:
+      contents: read
+      packages: write
+
+    needs: prepare-matrix
+    if: ${{ needs.prepare-matrix.outputs.matrix != '[]'  && needs.prepare-matrix.outputs.matrix != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chart: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Helm dependency build
+        run: helm dependency build
+        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
+
+      - name: Helm lint
+        run: helm lint
+        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
+
+      - name: Helm Template
+        run: |
+          helm template .
+        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
+
+      - name: unit tests
+        run: |
+          helm plugin install https://github.com/quintush/helm-unittest
+          helm unittest . --strict --file "tests/**/*_test.yaml"
+        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
+
+      - name: Package Helm chart
+        run: helm package . --destination .
+        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
+
+  publish:
+    permissions:
+      contents: read
+      packages: write
+
+    needs: [prepare-matrix, build]
+    if: github.ref == 'refs/heads/main' && ${{ needs.prepare-matrix.outputs.matrix != '[]'  && needs.prepare-matrix.outputs.matrix != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chart: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set Helm chart version
+        run: |
+          VERSION=$(yq -r .version ./charts/${{ matrix.chart }}/Chart.yaml)
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Helm dependency build
+        run: helm dependency build
+        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
+
+      - name: Package and push helm chart
+        run: |
+          helm package ${{ env.CHARTS_PATH }}/${{ matrix.chart }} --version ${{ env.VERSION }}
+          helm push ./${{ matrix.chart }}-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.actor }}/helm-charts
+
+  release:
+    permissions:
+      contents: write
+    needs: [prepare-matrix, build, publish]
+    if: github.ref == 'refs/heads/main' && ${{ needs.prepare-matrix.outputs.matrix != '[]'  && needs.prepare-matrix.outputs.matrix != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.7.0
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
