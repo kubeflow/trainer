@@ -560,18 +560,18 @@ func TestCoScheduling(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create plugin: %v", err)
 			}
-		err = plugin.(framework.EnforcePodGroupPolicyPlugin).EnforcePodGroupPolicy(tc.info, tc.trainJob)
-		if diff := gocmp.Diff(tc.wantPodGroupPolicyError, err, cmpopts.EquateErrors()); len(diff) != 0 {
-			t.Errorf("Unexpected error from EnforcePodGroupPolicy (-want,+got):\n%s", diff)
-		}
-		if diff := gocmp.Diff(tc.wantInfo, tc.info,
-			cmpopts.SortSlices(func(a, b string) bool { return a < b }),
-			cmpopts.SortMaps(func(a, b int) bool { return a < b }),
-			ignoreSyncPodSets,
-		); len(diff) != 0 {
-			t.Errorf("Unexpected info from EnforcePodGroupPolicy (-want,+got):\n%s", diff)
-		}
-		var objs []any
+			err = plugin.(framework.EnforcePodGroupPolicyPlugin).EnforcePodGroupPolicy(tc.info, tc.trainJob)
+			if diff := gocmp.Diff(tc.wantPodGroupPolicyError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from EnforcePodGroupPolicy (-want,+got):\n%s", diff)
+			}
+			if diff := gocmp.Diff(tc.wantInfo, tc.info,
+				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+				cmpopts.SortMaps(func(a, b int) bool { return a < b }),
+				ignoreSyncPodSets,
+			); len(diff) != 0 {
+				t.Errorf("Unexpected info from EnforcePodGroupPolicy (-want,+got):\n%s", diff)
+			}
+			var objs []any
 			objs, err = plugin.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
 			if diff := gocmp.Diff(tc.wantBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)

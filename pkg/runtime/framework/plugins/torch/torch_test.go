@@ -1394,23 +1394,24 @@ func TestTorch(t *testing.T) {
 				t.Fatalf("Failed to initialize Torch plugin: %v", err)
 			}
 
-		// Test EnforceMLPolicy
-		err = p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(tc.info, tc.trainJob)
-		if diff := cmp.Diff(tc.wantMLPolicyError, err, cmpopts.EquateErrors()); len(diff) != 0 {
-			t.Errorf("Unexpected error from EnforceMLPolicy (-want,+got):\n%s", diff)
-		}
+			// Test EnforceMLPolicy
+			err = p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(tc.info, tc.trainJob)
+			if diff := cmp.Diff(tc.wantMLPolicyError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from EnforceMLPolicy (-want,+got):\n%s", diff)
+			}
 
-		// Validate the entire info object
-		if diff := cmp.Diff(tc.wantInfo, tc.info,
-			cmpopts.SortSlices(func(a, b string) bool { return a < b }),
-			cmpopts.SortMaps(func(a, b string) bool { return a < b }),
-			ignoreSyncPodSets,
-		); len(diff) != 0 {
-			t.Errorf("Unexpected RuntimeInfo (-want,+got):\n%s", diff)
-		}
-	})
+			// Validate the entire info object
+			if diff := cmp.Diff(tc.wantInfo, tc.info,
+				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
+				ignoreSyncPodSets,
+			); len(diff) != 0 {
+				t.Errorf("Unexpected RuntimeInfo (-want,+got):\n%s", diff)
+			}
+		})
 	}
 }
+
 func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info
