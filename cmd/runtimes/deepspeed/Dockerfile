@@ -25,6 +25,7 @@ ENV HOME=/home/mpiuser
 ENV PATH=$HOME/.local/bin:$PATH
 
 COPY cmd/runtimes/deepspeed/requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install --user -r requirements.txt
 
 # Give mpiuser permission to download packages and HF models.
