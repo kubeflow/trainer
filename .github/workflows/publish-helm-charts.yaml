@@ -2,8 +2,10 @@ name: publish-helm-chart
 
 on:
   push:
+    tags:
+      - 'v*'      
   workflow_dispatch:
-
+    
 env:
   CHARTS_PATH: charts
 
