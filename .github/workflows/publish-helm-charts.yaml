@@ -47,8 +47,8 @@ jobs:
             # For tags, use the version from Chart.yaml (e.g., 2.0.0, 2.1.0)
             VERSION=$(grep '^version:' ${{ env.CHART_PATH }}/Chart.yaml | awk '{print $2}')
           else
-            # For master branch, use sha- prefix with short commit SHA (7 chars)
-            VERSION="sha-$(git rev-parse --short=7 HEAD)"
+            # For master branch, use semver prerelease format: 0.0.0-sha-xxxxxxx
+            VERSION="0.0.0-sha-$(git rev-parse --short=7 HEAD)"
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           echo "Chart version set to: ${VERSION}"
