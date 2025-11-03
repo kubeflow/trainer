@@ -107,7 +107,7 @@ cherry pick your changes from the `master` branch and submit a PR.
 
    - [manager](../../manifests/overlays/manager/kustomization.yaml)
    - [runtimes](../../manifests/overlays/runtimes/kustomization.yaml)
-   - [Helm charts](../../charts/kubeflow-trainer/values.yaml)
+   - [Helm charts](../../charts/kubeflow-trainer/Chart.yaml)
 
    The image tags must be equal to the release version, for example: `newTag: v2.0.0-rc.1`
 
