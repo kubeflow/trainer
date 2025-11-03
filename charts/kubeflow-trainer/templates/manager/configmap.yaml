@@ -34,7 +34,7 @@ data:
     # Metrics configuration
     metrics:
       bindAddress: {{ .Values.manager.config.metrics.bindAddress | default ":8443" }}
-      secureServing: {{ .Values.manager.config.metrics.secureServing | default true }}
+      secureServing: {{ .Values.manager.config.metrics.secureServing }}
 
     # Webhook configuration
     webhook:
@@ -43,7 +43,7 @@ data:
 
     # Leader election configuration
     leaderElection:
-      leaderElect: {{ .Values.manager.config.leaderElection.leaderElect | default true }}
+      leaderElect: {{ .Values.manager.config.leaderElection.leaderElect }}
       resourceName: {{ .Values.manager.config.leaderElection.resourceName | default "trainer.kubeflow.org" }}
       resourceNamespace: {{ .Values.manager.config.leaderElection.resourceNamespace | default "\"\"" }}
       leaseDuration: {{ .Values.manager.config.leaderElection.leaseDuration | default "15s" }}
@@ -59,6 +59,6 @@ data:
 
     # Certificate management configuration
     certManagement:
-      enable: {{ .Values.manager.config.certManagement.enable | default true }}
+      enable: {{ .Values.manager.config.certManagement.enable }}
       webhookServiceName: {{ if .Values.manager.config.certManagement.webhookServiceName }}{{ .Values.manager.config.certManagement.webhookServiceName }}{{ else }}{{ include "trainer.webhook.service.name" . }}{{ end }}
       webhookSecretName: {{ if .Values.manager.config.certManagement.webhookSecretName }}{{ .Values.manager.config.certManagement.webhookSecretName }}{{ else }}{{ include "trainer.webhook.secret.name" . }}{{ end }}

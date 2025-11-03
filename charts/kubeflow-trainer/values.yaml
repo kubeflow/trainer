@@ -115,6 +115,7 @@ manager:
       port: 9443
       host: ""
     leaderElection:
+      leaderElect: true
       resourceName: "trainer.kubeflow.org"
       resourceNamespace: ""
       leaseDuration: "15s"
