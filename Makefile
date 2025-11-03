@@ -230,9 +230,3 @@ helm-lint: ## Run Helm chart lint test.
 .PHONY: helm-docs
 helm-docs: helm-docs-plugin ## Generates markdown documentation for helm charts from requirements and values files.
 	$(HELM_DOCS) --sort-values-order=file
-
-.PHONY: helm-commit
-helm-commit: ## Commit the changes to the helm chart.
-	@find charts/ -mindepth 1 -maxdepth 1 -type d -exec helm dependency update {} \;
-	@find charts/ -mindepth 1 -maxdepth 1 -type d -exec helm package {} --destination {} \;
-	helm repo index charts/ --url https://kubeflow.github.io/trainer

@@ -1,89 +1,57 @@
-name: publish-helm-chart
+name: Publish Helm Charts
 
 on:
   push:
+    branches:
+      - master
     tags:
-      - 'v*'      
-  workflow_dispatch:
-    
+      - "v*"
+
 env:
-  CHARTS_PATH: charts
+  CHART_PATH: charts/kubeflow-trainer
 
 jobs:
-  prepare-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Prepare Helm charts matrix
-        id: set-matrix
-        run: |
-          CHARTS_PATHS=$(find ${{ env.CHARTS_PATH }} -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
-          echo "Matrix: $CHARTS_PATHS"
-          echo "matrix=$CHARTS_PATHS" >> $GITHUB_OUTPUT
-
-  build:
-    permissions:
-      contents: read
-      packages: write
-
-    needs: prepare-matrix
-    if: ${{ needs.prepare-matrix.outputs.matrix != '[]'  && needs.prepare-matrix.outputs.matrix != '' }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        chart: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Helm dependency build
-        run: helm dependency build
-        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
-
-      - name: Helm lint
-        run: helm lint
-        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
-
-      - name: Helm Template
-        run: |
-          helm template .
-        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
-
-      - name: unit tests
-        run: |
-          helm plugin install https://github.com/quintush/helm-unittest
-          helm unittest . --strict --file "tests/**/*_test.yaml"
-        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
-
-      - name: Package Helm chart
-        run: helm package . --destination .
-        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
-
   publish:
     permissions:
       contents: read
       packages: write
 
-    needs: [prepare-matrix, build]
-    if: github.ref == 'refs/heads/main' && ${{ needs.prepare-matrix.outputs.matrix != '[]'  && needs.prepare-matrix.outputs.matrix != '' }}
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        chart: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set appVersion
+        id: set-version
+        run: |
+          # Determine appVersion based on ref type
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # For tags, use the tag name (e.g., v2.0.0)
+            APP_VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            # For master branch, use sha- prefix with short commit SHA (7 chars)
+            APP_VERSION="sha-$(git rev-parse --short=7 HEAD)"
+          fi
+          echo "APP_VERSION=${APP_VERSION}" >> $GITHUB_ENV
+          echo "App version set to: ${APP_VERSION}"
+
+      - name: Update appVersion in Chart.yaml
+        run: |
+          sed -i -e "s/^appVersion:.*$/appVersion: ${{ env.APP_VERSION }}/" ${{ env.CHART_PATH }}/Chart.yaml
+          echo "Updated Chart.yaml with appVersion: ${{ env.APP_VERSION }}"
+
       - name: Set Helm chart version
         run: |
-          VERSION=$(yq -r .version ./charts/${{ matrix.chart }}/Chart.yaml)
+          # Determine chart version based on ref type
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # For tags, use the version from Chart.yaml (e.g., 2.0.0, 2.1.0)
+            VERSION=$(grep '^version:' ${{ env.CHART_PATH }}/Chart.yaml | awk '{print $2}')
+          else
+            # For master branch, use sha- prefix with short commit SHA (7 chars)
+            VERSION="sha-$(git rev-parse --short=7 HEAD)"
+          fi
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "Chart version set to: ${VERSION}"
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -92,33 +60,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Helm dependency build
-        run: helm dependency build
-        working-directory: ${{ env.CHARTS_PATH }}/${{ matrix.chart }}
-
-      - name: Package and push helm chart
+      - name: Build, package and push helm chart
         run: |
-          helm package ${{ env.CHARTS_PATH }}/${{ matrix.chart }} --version ${{ env.VERSION }}
-          helm push ./${{ matrix.chart }}-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.actor }}/helm-charts
-
-  release:
-    permissions:
-      contents: write
-    needs: [prepare-matrix, build, publish]
-    if: github.ref == 'refs/heads/main' && ${{ needs.prepare-matrix.outputs.matrix != '[]'  && needs.prepare-matrix.outputs.matrix != '' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git
-        run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
-
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.7.0
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          helm dependency build ${{ env.CHART_PATH }}
+          helm package ${{ env.CHART_PATH }} --version ${{ env.VERSION }}
+          helm push kubeflow-trainer-${{ env.VERSION }}.tgz oci://ghcr.io/kubeflow/charts/kubeflow-trainer

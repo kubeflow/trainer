@@ -67,7 +67,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "trainer.image" -}}
 {{- $imageRegistry := .Values.image.registry | default "docker.io" }}
 {{- $imageRepository := .Values.image.repository }}
-{{- $imageTag := .Values.image.tag | default .Chart.Version }}
+{{- $imageTag := .Values.image.tag | default .Chart.AppVersion }}
 {{- if eq $imageRegistry "docker.io" }}
 {{- printf "%s:%s" $imageRepository $imageTag }}
 {{- else }}
