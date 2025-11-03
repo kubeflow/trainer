@@ -1,5 +1,20 @@
 # Changelog
 
+# [v2.1.0-rc.1](https://github.com/kubeflow/trainer/tree/v2.1.0-rc.1) (2025-11-03)
+
+## New Features
+
+- feat(manifests): Publish Kubeflow Trainer Helm charts ([#2917](https://github.com/kubeflow/trainer/pull/2917) by [@adity1raut](https://github.com/adity1raut))
+- [release-2.1] chore(operator): Use SSA throughout runtime framework ([#2912](https://github.com/kubeflow/trainer/pull/2912) by [@astefanutti](https://github.com/astefanutti))
+- [release-2.1] feat(initializer): add s3 model and dataset initializers ([#2911](https://github.com/kubeflow/trainer/pull/2911) by [@rudeigerc](https://github.com/rudeigerc))
+
+## Bug Fixes
+
+- [release-2.1] fix(manifests): Fix boolean values defaulting in Helm charts ([#2914](https://github.com/kubeflow/trainer/pull/2914) by [@astefanutti](https://github.com/astefanutti))
+- [release-2.1] fix(runtimes): Update pip version in the MLX runtime ([#2910](https://github.com/kubeflow/trainer/pull/2910) by [@andreyvelich](https://github.com/andreyvelich))
+
+[Full Changelog](https://github.com/kubeflow/trainer/compare/v2.1.0-rc.0...v2.1.0-rc.1)
+
 # [v2.1.0-rc.0](https://github.com/kubeflow/trainer/tree/v2.1.0-rc.0) (2025-10-21)
 
 ## Breaking Changes
