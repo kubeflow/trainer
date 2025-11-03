@@ -37,7 +37,7 @@ jobs:
 
       - name: Update appVersion in Chart.yaml
         run: |
-          # Insert appVersion after the version line
+          # Insert appVersion to the Chart.yaml
           echo "appVersion: ${{ env.APP_VERSION }}" >> ${{ env.CHART_PATH }}/Chart.yaml
           echo "Updated Chart.yaml with appVersion: ${{ env.APP_VERSION }}"
 
