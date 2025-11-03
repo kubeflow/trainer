@@ -21,39 +21,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set appVersion
-        id: set-version
-        run: |
-          # Determine appVersion based on ref type
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            # For tags, use the tag name (e.g., v2.0.0)
-            APP_VERSION="${GITHUB_REF#refs/tags/}"
-          else
-            # For master branch, use sha- prefix with short commit SHA (7 chars)
-            APP_VERSION="sha-$(git rev-parse --short=7 HEAD)"
-          fi
-          echo "APP_VERSION=${APP_VERSION}" >> $GITHUB_ENV
-          echo "App version set to: ${APP_VERSION}"
-
-      - name: Update appVersion in Chart.yaml
-        run: |
-          # Insert appVersion to the Chart.yaml
-          echo "appVersion: ${{ env.APP_VERSION }}" >> ${{ env.CHART_PATH }}/Chart.yaml
-          echo "Updated Chart.yaml with appVersion: ${{ env.APP_VERSION }}"
-
-      - name: Set Helm chart version
-        run: |
-          # Determine chart version based on ref type
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            # For tags, use the version from Chart.yaml (e.g., 2.0.0, 2.1.0)
-            VERSION=$(grep '^version:' ${{ env.CHART_PATH }}/Chart.yaml | awk '{print $2}')
-          else
-            # For master branch, use semver prerelease format: 0.0.0-sha-xxxxxxx
-            VERSION="0.0.0-sha-$(git rev-parse --short=7 HEAD)"
-          fi
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "Chart version set to: ${VERSION}"
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -61,8 +28,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build, package and push helm chart
+      - name: Update appVersion in Chart.yaml
         run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            APP_VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            APP_VERSION="sha-$(git rev-parse --short=7 HEAD)"
+          fi
+
+          echo "appVersion: ${APP_VERSION}" >> ${{ env.CHART_PATH }}/Chart.yaml
+          echo "Updated Chart.yaml with appVersion: ${APP_VERSION}"
+
+      - name: Build, package, and push Helm chart
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=$(grep '^version:' ${{ env.CHART_PATH }}/Chart.yaml | awk '{print $2}')
+          else
+            VERSION="0.0.0-sha-$(git rev-parse --short=7 HEAD)"
+          fi
+          echo "Chart version set to: ${VERSION}"
+
           helm dependency build ${{ env.CHART_PATH }}
-          helm package ${{ env.CHART_PATH }} --version ${{ env.VERSION }}
-          helm push kubeflow-trainer-${{ env.VERSION }}.tgz oci://ghcr.io/kubeflow/charts
+          helm package ${{ env.CHART_PATH }} --version ${VERSION}
+          helm push kubeflow-trainer-${VERSION}.tgz oci://ghcr.io/kubeflow/charts
