@@ -72,10 +72,11 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | nameOverride | string | `""` | String to partially override release name. |
 | fullnameOverride | string | `""` | String to fully override release name. |
 | jobset.install | bool | `true` | Whether to install jobset as a dependency managed by trainer. This must be set to `false` if jobset controller/webhook has already been installed into the cluster. |
+| jobset.fullnameOverride | string | `"jobset"` | String to fully override jobset release name. |
 | commonLabels | object | `{}` | Common labels to add to the resources. |
 | image.registry | string | `"ghcr.io"` | Image registry. |
 | image.repository | string | `"kubeflow/trainer/trainer-controller-manager"` | Image repository. |
-| image.tag | string | `"latest"` | Image tag. |
+| image.tag | string | `""` | Image tag. Defaults to the chart appVersion. |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | image.pullSecrets | list | `[]` | Image pull secrets for private image registry. |
 | manager.replicas | int | `1` | Number of replicas of manager. |
@@ -89,7 +90,8 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | manager.envFrom | list | `[]` | Environment variable sources for manager containers. |
 | manager.volumeMounts | list | `[]` | Volume mounts for manager containers. |
 | manager.resources | object | `{}` | Pod resource requests and limits for manager containers. |
-| manager.securityContext | object | `{}` | Security context for manager containers. |
+| manager.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for manager containers. |
+| manager.config | object | `{"certManagement":{"enable":true,"webhookSecretName":"","webhookServiceName":""},"controller":{"groupKindConcurrency":{"clusterTrainingRuntime":1,"trainJob":5,"trainingRuntime":1}},"health":{"healthProbeBindAddress":":8081","livenessEndpointName":"healthz","readinessEndpointName":"readyz"},"leaderElection":{"leaderElect":true,"leaseDuration":"15s","renewDeadline":"10s","resourceName":"trainer.kubeflow.org","resourceNamespace":"","retryPeriod":"2s"},"metrics":{"bindAddress":":8443","secureServing":true},"webhook":{"host":"","port":9443}}` | Controller manager configuration. This configuration is used to generate the ConfigMap for the controller manager. |
 | webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
 
 ## Maintainers
