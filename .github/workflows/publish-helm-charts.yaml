@@ -64,4 +64,4 @@ jobs:
         run: |
           helm dependency build ${{ env.CHART_PATH }}
           helm package ${{ env.CHART_PATH }} --version ${{ env.VERSION }}
-          helm push kubeflow-trainer-${{ env.VERSION }}.tgz oci://ghcr.io/kubeflow/charts/kubeflow-trainer
+          helm push kubeflow-trainer-${{ env.VERSION }}.tgz oci://ghcr.io/kubeflow/charts
