@@ -37,7 +37,8 @@ jobs:
 
       - name: Update appVersion in Chart.yaml
         run: |
-          sed -i -e "s/^appVersion:.*$/appVersion: ${{ env.APP_VERSION }}/" ${{ env.CHART_PATH }}/Chart.yaml
+          # Insert appVersion after the version line
+          echo "appVersion: ${{ env.APP_VERSION }}" >> ${{ env.CHART_PATH }}/Chart.yaml
           echo "Updated Chart.yaml with appVersion: ${{ env.APP_VERSION }}"
 
       - name: Set Helm chart version
