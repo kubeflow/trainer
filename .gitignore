@@ -27,6 +27,7 @@ cover.out
 # Helm
 charts/kubeflow-trainer/charts/
 charts/kubeflow-trainer/Chart.lock
+*.tgz
 
 # data_cache
 pkg/data_cache/target

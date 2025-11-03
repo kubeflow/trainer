@@ -110,6 +110,10 @@ cherry pick your changes from the `master` branch and submit a PR.
 
    The image tags must be equal to the release version, for example: `newTag: v2.0.0-rc.1`
 
+1. Update the [Helm charts](../../charts/kubeflow-trainer/Chart.yaml) version.
+
+   Ensure that the version number does not include the `v` prefix.
+
 1. Commit your changes, tag the commit, and push it to upstream.
 
    - For the RC tag run the following:
