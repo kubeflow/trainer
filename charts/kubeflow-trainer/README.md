@@ -17,43 +17,19 @@ This chart bootstraps a [Kubernetes Trainer](https://github.com/kubeflow/trainer
 
 ## Usage
 
-### Add Helm Repo
+### Install the Helm Chart
+
+Install the released version (e.g. 2.1.0):
 
 ```bash
-helm repo add kubeflow-trainer https://kubeflow.github.io/trainer
-
-helm repo update
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version 2.1.0
 ```
 
-See [helm repo](https://helm.sh/docs/helm/helm_repo) for command documentation.
-
-### Install the chart
+Alternatively, you can install the latest version from the master branch (e.g. `bfccb7b` commit):
 
 ```bash
-helm install [RELEASE_NAME] kubeflow-trainer/kubeflow-trainer
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version 0.0.0-sha-bfccb7b
 ```
-
-For example, if you want to create a release with name `kubeflow-trainer` in the `kubeflow-system` namespace:
-
-```shell
-helm upgrade kubeflow-trainer kubeflow-trainer/kubeflow-trainer \
-    --install \
-    --namespace kubeflow-system \
-    --create-namespace
-```
-
-Note that by passing the `--create-namespace` flag to the `helm install` command, `helm` will create the release namespace if it does not exist.
-If you have already installed jobset controller/webhook, you can skip installing it by adding `--set jobset.install=false` to the command arguments.
-
-See [helm install](https://helm.sh/docs/helm/helm_install) for command documentation.
-
-### Upgrade the chart
-
-```shell
-helm upgrade [RELEASE_NAME] kubeflow-trainer/kubeflow-trainer [flags]
-```
-
-See [helm upgrade](https://helm.sh/docs/helm/helm_upgrade) for command documentation.
 
 ### Uninstall the chart
 
@@ -72,10 +48,11 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | nameOverride | string | `""` | String to partially override release name. |
 | fullnameOverride | string | `""` | String to fully override release name. |
 | jobset.install | bool | `true` | Whether to install jobset as a dependency managed by trainer. This must be set to `false` if jobset controller/webhook has already been installed into the cluster. |
+| jobset.fullnameOverride | string | `"jobset"` | String to fully override jobset release name. |
 | commonLabels | object | `{}` | Common labels to add to the resources. |
 | image.registry | string | `"ghcr.io"` | Image registry. |
 | image.repository | string | `"kubeflow/trainer/trainer-controller-manager"` | Image repository. |
-| image.tag | string | `"latest"` | Image tag. |
+| image.tag | string | `""` | Image tag. Defaults to the chart appVersion. |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | image.pullSecrets | list | `[]` | Image pull secrets for private image registry. |
 | manager.replicas | int | `1` | Number of replicas of manager. |
@@ -89,7 +66,8 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | manager.envFrom | list | `[]` | Environment variable sources for manager containers. |
 | manager.volumeMounts | list | `[]` | Volume mounts for manager containers. |
 | manager.resources | object | `{}` | Pod resource requests and limits for manager containers. |
-| manager.securityContext | object | `{}` | Security context for manager containers. |
+| manager.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for manager containers. |
+| manager.config | object | `{"certManagement":{"enable":true,"webhookSecretName":"","webhookServiceName":""},"controller":{"groupKindConcurrency":{"clusterTrainingRuntime":1,"trainJob":5,"trainingRuntime":1}},"health":{"healthProbeBindAddress":":8081","livenessEndpointName":"healthz","readinessEndpointName":"readyz"},"leaderElection":{"leaderElect":true,"leaseDuration":"15s","renewDeadline":"10s","resourceName":"trainer.kubeflow.org","resourceNamespace":"","retryPeriod":"2s"},"metrics":{"bindAddress":":8443","secureServing":true},"webhook":{"host":"","port":9443}}` | Controller manager configuration. This configuration is used to generate the ConfigMap for the controller manager. |
 | webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
 
 ## Maintainers
