@@ -1,0 +1,12 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kubeflow-trainer-cache-initializer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  name: kubeflow-trainer-cache-initializer
+  kind: ClusterRole
+subjects:
+  - kind: ServiceAccount
+    name: kubeflow-trainer-cache-initializer

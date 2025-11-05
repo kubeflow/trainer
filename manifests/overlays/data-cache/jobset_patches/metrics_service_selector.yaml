@@ -1,0 +1,10 @@
+# Update JobSet metrics service selector to use unique label
+# Required to support jobset and lws controllers in the same namespace
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jobset-controller-manager-metrics-service
+spec:
+  selector:
+    app.kubernetes.io/component: jobset-controller

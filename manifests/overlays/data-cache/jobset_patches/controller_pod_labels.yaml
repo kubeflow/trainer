@@ -1,0 +1,12 @@
+# Add unique label to JobSet controller pods to distinguish from LWS
+# Required to support jobset and lws controllers in the same namespace
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jobset-controller-manager
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: jobset-controller
