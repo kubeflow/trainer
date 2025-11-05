@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - https://github.com/kubernetes-sigs/lws//config/default?ref=v0.7.0
+
+# Transform all namespace references from lws-system to be set by parent overlay
+namespace: kubeflow-system
+
+# Add required patches.
+patches:
+  # Remove namespace from the LeaderWorkerSet release manifests.
+  - path: patches/leaderworkerset_remove_namespace.yaml
+    target:
+      group: ""
+      version: v1
+      kind: Namespace
+  # Add unique label to LWS controller pods
+  - path: patches/controller_pod_labels.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: lws-controller-manager
+  # Update LWS webhook service selector to use unique label
+  - path: patches/webhook_service_selector.yaml
+    target:
+      group: ""
+      version: v1
+      kind: Service
+      name: lws-webhook-service
+  # Update LWS metrics service selector to use unique label
+  - path: patches/metrics_service_selector.yaml
+    target:
+      group: ""
+      version: v1
+      kind: Service
+      name: lws-controller-manager-metrics-service
