@@ -1,0 +1,73 @@
+# Advanced Example 2: Kueue Integration
+#
+# This example demonstrates job scheduling with Kueue.
+# Kueue provides queue-based scheduling and resource quota management.
+#
+# Prerequisites:
+#   - Kueue must be installed in your cluster
+#   - LocalQueue and ClusterQueue must be configured
+#
+# Apply: kubectl apply -f 02-kueue-integration.yaml
+# Check: kubectl get trainjobs kueue-example
+# Queue: kubectl get localqueue training-queue
+# Clean: kubectl delete trainjob kueue-example
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: kueue-example
+  namespace: default
+  labels:
+    app: training
+    queue: training-queue
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: torch-distributed
+  
+  # Suspend the job initially - Kueue will unsuspend when resources are available
+  suspend: true
+  
+  trainer:
+    numNodes: 3
+    image: python:3.11-slim
+    command:
+      - python3
+      - -c
+      - |
+        import time
+        print("Training started via Kueue scheduler")
+        print("Simulating training workload...")
+        for i in range(10):
+            print(f"Training step {i+1}/10")
+            time.sleep(2)
+        print("Training complete!")
+    
+    # Configure resources for Kueue quota management
+    resourcesPerNode:
+      requests:
+        cpu: "2"
+        memory: "4Gi"
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+    
+    # Add Kueue queue annotation via podTemplateOverrides
+    podTemplateOverrides:
+      - targetJobs:
+          - name: node
+        metadata:
+          labels:
+            # This label tells Kueue which queue to use
+            kueue.x-k8s.io/queue-name: training-queue
+
+---
+# Example LocalQueue configuration (apply separately if needed)
+# apiVersion: kueue.x-k8s.io/v1beta1
+# kind: LocalQueue
+# metadata:
+#   name: training-queue
+#   namespace: default
+# spec:
+#   clusterQueue: cluster-queue

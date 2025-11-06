@@ -1,0 +1,67 @@
+# Advanced Example 3: Volcano Gang Scheduling
+#
+# This example demonstrates gang scheduling with Volcano scheduler.
+# Gang scheduling ensures all pods start together, preventing resource deadlocks.
+#
+# Prerequisites:
+#   - Volcano scheduler must be installed in your cluster
+#
+# Apply: kubectl apply -f 03-volcano-integration.yaml
+# Check: kubectl get trainjobs volcano-example
+# Pods:  kubectl get pods -l trainer.kubeflow.org/job-name=volcano-example
+# Group: kubectl get podgroup -l trainer.kubeflow.org/job-name=volcano-example
+# Clean: kubectl delete trainjob volcano-example
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: volcano-example
+  namespace: default
+  labels:
+    app: training
+    scheduler: volcano
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: torch-distributed
+  
+  trainer:
+    numNodes: 4
+    image: python:3.11-slim
+    command:
+      - python3
+      - -c
+      - |
+        import os
+        import time
+        rank = int(os.getenv('RANK', '0'))
+        world_size = int(os.getenv('WORLD_SIZE', '1'))
+        print(f"Node {rank}/{world_size} started via Volcano gang scheduling")
+        print(f"All {world_size} nodes are guaranteed to start together!")
+        time.sleep(5)
+        print(f"Node {rank} training complete")
+    
+    # Configure resources for gang scheduling
+    resourcesPerNode:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+    
+    # Use podTemplateOverrides to configure Volcano scheduler
+    podTemplateOverrides:
+      - targetJobs:
+          - name: node
+        metadata:
+          annotations:
+            # Volcano PodGroup annotation
+            scheduling.volcano.sh/group-name: volcano-example-podgroup
+        spec:
+          # Use Volcano scheduler
+          schedulerName: volcano
+          
+          # Priority class for scheduling
+          priorityClassName: system-node-critical
