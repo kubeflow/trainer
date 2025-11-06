@@ -40,11 +40,8 @@ jobs:
           echo "Install Papermill"
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
 
-          echo "Install Kubeflow SDK"
-          pip install git+https://github.com/kubeflow/sdk.git@main
-
-          echo "Install Kubeflow SDK with Docker support for local notebooks"
-          pip install 'kubeflow[docker]'
+          echo "Install Kubeflow SDK with Docker support for local Notebooks"
+          pip install "git+https://github.com/kubeflow/sdk.git@main#egg=kubeflow[docker]"
 
       - name: Setup cluster
         run: |
