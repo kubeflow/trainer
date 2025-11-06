@@ -1,0 +1,84 @@
+# Advanced Example 1: PodSpec Overrides
+#
+# This example demonstrates comprehensive pod customization using podTemplateOverrides.
+# It shows how to set resource limits, environment variables, annotations, and more.
+#
+# Apply: kubectl apply -f 01-podspec-overrides.yaml
+# Check: kubectl describe trainjob podspec-example
+# Logs:  kubectl logs -l trainer.kubeflow.org/job-name=podspec-example
+# Clean: kubectl delete trainjob podspec-example
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: podspec-example
+  namespace: default
+  labels:
+    app: training
+    environment: production
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: torch-distributed
+  
+  trainer:
+    numNodes: 2
+    image: python:3.11-slim
+    command:
+      - python3
+      - -c
+      - |
+        import os
+        print(f"Node running with:")
+        print(f"  CUSTOM_VAR: {os.getenv('CUSTOM_VAR')}")
+        print(f"  TRAINING_MODE: {os.getenv('TRAINING_MODE')}")
+        print(f"  Resources configured via PodTemplateOverrides")
+    
+    # Use podTemplateOverrides to customize pods
+    podTemplateOverrides:
+      - targetJobs:
+          - name: node
+        metadata:
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "8080"
+          labels:
+            team: ml-platform
+            cost-center: research
+        spec:
+          # Set resource limits and requests
+          containers:
+            - name: node
+              resources:
+                requests:
+                  cpu: "2"
+                  memory: "4Gi"
+                limits:
+                  cpu: "4"
+                  memory: "8Gi"
+              
+              # Custom environment variables
+              env:
+                - name: CUSTOM_VAR
+                  value: "custom-value"
+                - name: TRAINING_MODE
+                  value: "distributed"
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+                - name: LOG_LEVEL
+                  value: "INFO"
+          
+          # Node selector for specific node types
+          nodeSelector:
+            node-type: training
+          
+          # Tolerations for tainted nodes
+          tolerations:
+            - key: "training-workload"
+              operator: "Equal"
+              value: "true"
+              effect: "NoSchedule"
+          
+          # Service account for RBAC
+          serviceAccountName: default

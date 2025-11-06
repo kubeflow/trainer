@@ -1,0 +1,59 @@
+# Example 2: Multi-Node Distributed Training
+#
+# This example demonstrates multi-node distributed training without requiring GPUs.
+# It simulates a distributed training setup using simple shell commands.
+#
+# Apply: kubectl apply -f 02-multi-node.yaml
+# Check: kubectl get trainjobs multi-node-example
+# Logs:  kubectl logs -l trainer.kubeflow.org/job-name=multi-node-example
+# Clean: kubectl delete trainjob multi-node-example
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: multi-node-example
+  namespace: default
+  labels:
+    app: trainer-example
+    tier: basic
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: torch-distributed
+  
+  trainer:
+    # Run on 3 nodes to simulate distributed training
+    numNodes: 3
+    
+    # Use alpine for lightweight container
+    image: alpine:latest
+    
+    # Command that simulates distributed training
+    command:
+      - sh
+      - -c
+      - |
+        echo "========================================="
+        echo "Multi-Node Distributed Training Simulation"
+        echo "========================================="
+        echo "Node hostname: $(hostname)"
+        echo "Node IP: $(hostname -i)"
+        
+        # These environment variables are automatically set by Kubeflow Trainer
+        echo "Rank: ${RANK:-0}"
+        echo "World Size: ${WORLD_SIZE:-1}"
+        echo "Master Addr: ${MASTER_ADDR:-localhost}"
+        echo "Master Port: ${MASTER_PORT:-29500}"
+        echo "========================================="
+        
+        # Simulate some work
+        echo "Simulating training..."
+        for i in $(seq 1 5); do
+          echo "Epoch $i: Processing batch on rank ${RANK:-0}"
+          sleep 2
+        done
+        
+        echo "========================================="
+        echo "Training completed on rank ${RANK:-0}"
+        echo "========================================="

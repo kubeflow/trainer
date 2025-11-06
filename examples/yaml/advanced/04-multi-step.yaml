@@ -1,0 +1,86 @@
+# Advanced Example 4: Multi-Step Training with Dataset Initialization
+#
+# This example demonstrates a multi-step training pipeline with dataset initialization.
+# The dataset is downloaded first, then used for training.
+#
+# Apply: kubectl apply -f 04-multi-step.yaml
+# Check: kubectl get trainjobs multi-step-example
+# Logs:  kubectl logs -l trainer.kubeflow.org/job-name=multi-step-example -f
+# Clean: kubectl delete trainjob multi-step-example
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: multi-step-example
+  namespace: default
+  labels:
+    app: training
+    pipeline: multi-step
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: torch-distributed
+  
+  trainer:
+    numNodes: 2
+    image: python:3.11-slim
+    command:
+      - python3
+      - -c
+      - |
+        import os
+        import time
+        
+        # Check if dataset was initialized
+        dataset_path = "/workspace/dataset"
+        if os.path.exists(dataset_path):
+            print(f"Dataset found at {dataset_path}")
+            files = os.listdir(dataset_path)
+            print(f"Dataset contains {len(files)} files/directories")
+        else:
+            print(f"No dataset found at {dataset_path}")
+        
+        # Simulate training
+        print("Starting training with initialized dataset...")
+        for epoch in range(3):
+            print(f"Epoch {epoch+1}/3")
+            time.sleep(2)
+        print("Training complete!")
+    
+    # Dataset initialization configuration
+    initializer:
+      dataset:
+        # Storage URI with scheme (hf:// for HuggingFace, s3:// for S3, etc.)
+        storageUri: "hf://tatsu-lab/alpaca"
+        
+        # Environment variables for dataset initialization
+        env:
+          - name: HF_HUB_CACHE
+            value: "/workspace/dataset"
+        
+        # Optional: Reference to secret for credentials
+        secretRef:
+          name: hf-secret
+          # The secret should contain:
+          # kubectl create secret generic hf-secret --from-literal=HF_TOKEN=your_token
+    
+    # Resource configuration
+    resourcesPerNode:
+      requests:
+        cpu: "2"
+        memory: "4Gi"
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+
+---
+# Optional: Secret for HuggingFace authentication (create separately if needed)
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: hf-secret
+#   namespace: default
+# type: Opaque
+# stringData:
+#   HF_TOKEN: "your_huggingface_token_here"

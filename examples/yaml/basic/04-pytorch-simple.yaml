@@ -1,0 +1,47 @@
+# Example 4: PyTorch MNIST Training
+#
+# This example demonstrates a real PyTorch training job using the MNIST dataset.
+# It can run with or without GPUs (will use CPU if GPU not available).
+#
+# Apply: kubectl apply -f 04-pytorch-simple.yaml
+# Check: kubectl get trainjobs pytorch-mnist
+# Logs:  kubectl logs -l trainer.kubeflow.org/job-name=pytorch-mnist -f
+# Clean: kubectl delete trainjob pytorch-mnist
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: pytorch-mnist
+  namespace: default
+  labels:
+    app: pytorch-training
+    dataset: mnist
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: torch-distributed
+  
+  trainer:
+    # Single node training
+    numNodes: 1
+    
+    # Use the official Kubeflow PyTorch MNIST image
+    # This image works with or without GPUs
+    image: docker.io/kubeflowkatib/pytorch-mnist:v1beta1-45c5727
+    
+    # Training command with parameters
+    command:
+      - python3
+      - /opt/pytorch-mnist/mnist.py
+      - --epochs=1
+      - --batch-size=64
+      - --lr=0.01
+      - --log-interval=10
+    
+    # Optional: Uncomment to use GPUs if available
+    # resourcesPerNode:
+    #   requests:
+    #     nvidia.com/gpu: 1
+    #   limits:
+    #     nvidia.com/gpu: 1

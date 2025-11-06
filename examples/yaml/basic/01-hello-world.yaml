@@ -1,0 +1,47 @@
+# Example 1: Hello World TrainJob
+#
+# This is the simplest possible TrainJob that runs a single echo command.
+# No GPUs required - perfect for testing your Kubeflow Trainer installation.
+#
+# Apply: kubectl apply -f 01-hello-world.yaml
+# Check: kubectl get trainjobs hello-world
+# Logs:  kubectl logs -l trainer.kubeflow.org/job-name=hello-world
+# Clean: kubectl delete trainjob hello-world
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: hello-world
+  namespace: default
+spec:
+  # Reference the default torch-distributed runtime
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: torch-distributed
+  
+  # Training configuration
+  trainer:
+    # Single node (no distributed training)
+    numNodes: 1
+    
+    # Use a simple alpine image (no GPU needed)
+    image: alpine:latest
+    
+    # Simple command that prints hello world
+    command:
+      - sh
+      - -c
+      - |
+        echo "========================================="
+        echo "Hello from Kubeflow Trainer!"
+        echo "========================================="
+        echo "TrainJob: hello-world"
+        echo "Node: $(hostname)"
+        echo "Date: $(date)"
+        echo "========================================="
+        echo "This is a simple example to verify your"
+        echo "Kubeflow Trainer installation works."
+        echo "========================================="
+        sleep 5
+        echo "Job completed successfully!"
