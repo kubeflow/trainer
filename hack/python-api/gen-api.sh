@@ -27,7 +27,7 @@ source "${SCRIPT_DIR}/../scripts/container-runtime.sh"
 setup_container_runtime
 
 # TODO (andreyvelich): Read this data from the global VERSION file.
-API_VERSION="2.0.0"
+API_VERSION="2.1.0"
 API_OUTPUT_PATH="api/python_api"
 PKG_ROOT="${API_OUTPUT_PATH}/kubeflow_trainer_api"
 

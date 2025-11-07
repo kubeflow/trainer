@@ -1,6 +1,6 @@
 # Changelog
 
-# [v2.1.0](https://github.com/kubeflow/trainer/tree/v2.1.0) (2025-11-03)
+# [v2.1.0](https://github.com/kubeflow/trainer/tree/v2.1.0) (2025-11-07)
 
 This is Kubeflow Trainer v2.1.0 release.
 
@@ -29,7 +29,8 @@ For more information, please see [the Kubeflow Trainer docs](https://www.kubeflo
 
 ### Distributed AI Data Cache
 
-- feat(cache): KEP-2655 - Supporting readiness probes on cache nodes ([#2904](https://github.com/kubeflow/trainer/pull/2904) by [@akshaychitneni](https://github.com/akshaychitneni))
+- feat(cache): KEP-2655: Adding default runtime with cache and example ([#2928](https://github.com/kubeflow/trainer/pull/2928) by [@akshaychitneni](https://github.com/akshaychitneni))
+- feat(cache): KEP-2655 - Supporting readiness probes on cache nodes ([#2920](https://github.com/kubeflow/trainer/pull/2920) by [@akshaychitneni](https://github.com/akshaychitneni))
 - feat(cache): KEP-2655 - Add build pipeline and address vulnerabilities for data_cache ([#2890](https://github.com/kubeflow/trainer/pull/2890) by [@akshaychitneni](https://github.com/akshaychitneni))
 - feat(cache): KEP-2655: Adding cache initializer ([#2793](https://github.com/kubeflow/trainer/pull/2793) by [@akshaychitneni](https://github.com/akshaychitneni))
 - feat: KEP-2655: Add data cache system ([#2755](https://github.com/kubeflow/trainer/pull/2755) by [@akshaychitneni](https://github.com/akshaychitneni))
@@ -62,6 +63,7 @@ For more information, please see [the Kubeflow Trainer docs](https://www.kubeflo
 
 ## Bug Fixes
 
+- [release-2.1] fix(ci): Fix the Kubeflow SDK installation with Docker ([#2927](https://github.com/kubeflow/trainer/pull/2927) by [@andreyvelich](https://github.com/andreyvelich))
 - fix(manifests): Add RBAC rules for Leases in Helm Charts ([#2901](https://github.com/kubeflow/trainer/pull/2901) by [@astefanutti](https://github.com/astefanutti))
 - fix(docs): correct example usage in KEP-2437-Support-Volcano-Scheduler ([#2898](https://github.com/kubeflow/trainer/pull/2898) by [@Doris-xm](https://github.com/Doris-xm))
 - fix(api): Keep mpiImplementation field a pointer ([#2897](https://github.com/kubeflow/trainer/pull/2897) by [@astefanutti](https://github.com/astefanutti))
@@ -95,6 +97,7 @@ For more information, please see [the Kubeflow Trainer docs](https://www.kubeflo
 
 ## Misc
 
+- [release-2.1] feat: Adding local execution example notebook  ([#2924](https://github.com/kubeflow/trainer/pull/2924) by [@Fiona-Waters](https://github.com/Fiona-Waters))
 - feat(manifests): Publish Kubeflow Trainer Helm charts ([#2917](https://github.com/kubeflow/trainer/pull/2917) by [@adity1raut](https://github.com/adity1raut))
 - [release-2.1] chore(operator): Use SSA throughout runtime framework ([#2912](https://github.com/kubeflow/trainer/pull/2912) by [@astefanutti](https://github.com/astefanutti))
 - [release-2.1] feat(initializer): add s3 model and dataset initializers ([#2911](https://github.com/kubeflow/trainer/pull/2911) by [@rudeigerc](https://github.com/rudeigerc))
