@@ -144,7 +144,9 @@ registry. In case of failure, manually restart the GitHub actions.
 For example, you can see the
 [completed GitHub actions on the `v2.0.0-rc.1` release](https://github.com/kubeflow/trainer/commit/7122fc1a0f02e3d97b1da2a8eb31148e10b286c9)
 
-### Update the changelog
+### Update the Master Branch
+
+Create the PR in the master branch with the following changes:
 
 1. Update the changelog by running:
 
@@ -163,14 +165,10 @@ For example, you can see the
 
    Check this example: [v2.0.0-rc.0](https://github.com/kubeflow/trainer/blob/master/CHANGELOG.md#v200-rc0-2025-06-10)
 
-### Update Version Files
+1. Bump the `API_VERSION` in [the `gen-api.sh` file](../../hack/python-api/gen-api.sh) and the
+   `version` in [the Helm charts](../../charts/kubeflow-trainer/Chart.yaml) to the latest release.
 
-Bump the `API_VERSION` in [the `gen-api.sh` file](../../hack/python-api/gen-api.sh) and the `version`
-in [the Helm charts](../../charts/kubeflow-trainer/Chart.yaml) to the latest release in the master
-branch.
-
-Finally, submit a PR with the updated changelog and versions.
-
+Finally, submit a PR with the updated files.
 
 ### Create GitHub Release
 
