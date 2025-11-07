@@ -107,6 +107,8 @@ cherry pick your changes from the `master` branch and submit a PR.
 
    - [manager](../../manifests/overlays/manager/kustomization.yaml)
    - [runtimes](../../manifests/overlays/runtimes/kustomization.yaml)
+   - [data-cache](../../manifests/overlays/data-cache/kustomization.yaml)
+   - `CACHE_IMAGE` in [the torch-distributed-with-cache runtime](../../manifests/base/runtimes/data-cache/torch_distributed_with_cache.yaml)
 
    The image tags must be equal to the release version, for example: `newTag: v2.0.0-rc.1`
 
