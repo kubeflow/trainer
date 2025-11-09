@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 futures = "0.3.31"
 arrow-flight = "55.0.0"
-tokio = { version = "1.44.2", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.48.0", features = ["rt-multi-thread", "macros"] }
 tonic = "0.12.3"
 bytes = "1.9.0"
 bincode = "1.3"
