@@ -1,4 +1,4 @@
-FROM rust:1.85-bullseye AS builder
+FROM rust:1.91-bullseye AS builder
 
 WORKDIR /workspace
 
