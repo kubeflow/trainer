@@ -47,7 +47,7 @@ jobs:
 
       - name: Setup Go
         if: steps.check-label.outputs.skip == 'false'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
 

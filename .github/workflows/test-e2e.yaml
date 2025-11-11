@@ -26,7 +26,7 @@ jobs:
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
 
