@@ -11,6 +11,10 @@
 # Pods:  kubectl get pods -l trainer.kubeflow.org/job-name=volcano-example
 # Group: kubectl get podgroup -l trainer.kubeflow.org/job-name=volcano-example
 # Clean: kubectl delete trainjob volcano-example
+#
+# Note: This example shows the recommended PodGroupPolicy approach.
+# For advanced features like network topology-aware scheduling, see:
+# https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/volcano/
 
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainJob
@@ -25,6 +29,11 @@ spec:
     apiGroup: trainer.kubeflow.org
     kind: ClusterTrainingRuntime
     name: torch-distributed
+  
+  # Use PodGroupPolicy to enable Volcano gang scheduling
+  # The controller will automatically create the PodGroup resource
+  podGroupPolicy:
+    volcano: {}
   
   trainer:
     numNodes: 4
@@ -50,18 +59,3 @@ spec:
       limits:
         cpu: "2"
         memory: "4Gi"
-    
-    # Use podTemplateOverrides to configure Volcano scheduler
-    podTemplateOverrides:
-      - targetJobs:
-          - name: node
-        metadata:
-          annotations:
-            # Volcano PodGroup annotation
-            scheduling.volcano.sh/group-name: volcano-example-podgroup
-        spec:
-          # Use Volcano scheduler
-          schedulerName: volcano
-          
-          # Priority class for scheduling
-          priorityClassName: system-node-critical

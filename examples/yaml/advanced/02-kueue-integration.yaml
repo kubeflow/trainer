@@ -19,7 +19,8 @@ metadata:
   namespace: default
   labels:
     app: training
-    queue: training-queue
+    # This label tells Kueue which queue to use
+    kueue.x-k8s.io/queue-name: training-queue
 spec:
   runtimeRef:
     apiGroup: trainer.kubeflow.org
@@ -52,15 +53,6 @@ spec:
       limits:
         cpu: "4"
         memory: "8Gi"
-    
-    # Add Kueue queue annotation via podTemplateOverrides
-    podTemplateOverrides:
-      - targetJobs:
-          - name: node
-        metadata:
-          labels:
-            # This label tells Kueue which queue to use
-            kueue.x-k8s.io/queue-name: training-queue
 
 ---
 # Example LocalQueue configuration (apply separately if needed)
