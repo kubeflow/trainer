@@ -43,6 +43,16 @@ Demonstrates job scheduling with Kueue queue manager.
 - Kueue must be installed
 - LocalQueue and ClusterQueue configured
 
+**Key configuration:**
+For basic Kueue integration, you only need to add the queue label to the TrainJob metadata:
+```yaml
+metadata:
+  labels:
+    kueue.x-k8s.io/queue-name: training-queue
+spec:
+  suspend: true  # Kueue manages suspension
+```
+
 **Run it:**
 ```bash
 kubectl apply -f 02-kueue-integration.yaml
@@ -54,6 +64,8 @@ kubectl delete trainjob kueue-example
 - [Kueue Documentation](https://kueue.sigs.k8s.io/)
 - [Kubeflow Trainer Kueue Guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/kueue/)
 
+**Note:** For advanced Kueue features like TopologyAwareScheduling, you may need to use `podTemplateOverrides` with pod-level annotations. See the Kueue documentation for details.
+
 ### 3. Volcano Gang Scheduling (`03-volcano-integration.yaml`)
 
 Gang scheduling for multi-node training jobs.
@@ -62,10 +74,28 @@ Gang scheduling for multi-node training jobs.
 - All-or-nothing pod scheduling
 - Prevents resource deadlocks
 - Optimized for distributed training
-- PodGroup management
+- Automatic PodGroup management
 
 **Prerequisites:**
 - Volcano scheduler installed
+
+**Key configuration:**
+Use the PodGroupPolicy API for Volcano integration:
+```yaml
+spec:
+  podGroupPolicy:
+    volcano: {}  # Automatically creates PodGroup
+```
+
+For advanced features like network topology-aware scheduling:
+```yaml
+spec:
+  podGroupPolicy:
+    volcano:
+      networkTopology:
+        mode: hard
+        highestTierAllowed: 1
+```
 
 **Run it:**
 ```bash
@@ -86,14 +116,30 @@ Training pipeline with dataset initialization.
 **Features:**
 - Dataset download and preparation
 - Multi-step job execution
-- PVC for dataset storage
 - Dataset sharing across nodes
+- Support for HuggingFace, S3, and other storage providers
 
 **Use cases:**
 - Large dataset downloads
 - Data preprocessing
 - Model initialization
 - Complex training pipelines
+
+**Key configuration:**
+The initializer runs before the trainer:
+```yaml
+spec:
+  initializer:
+    dataset:
+      storageUri: "hf://tatsu-lab/alpaca"
+      env:
+        - name: HF_HUB_CACHE
+          value: "/workspace/dataset"
+      secretRef:
+        name: hf-secret
+  trainer:
+    # Training configuration
+```
 
 **Run it:**
 ```bash
