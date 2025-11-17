@@ -49,6 +49,7 @@ import (
 	volcanov1beta1ac "volcano.sh/apis/pkg/client/applyconfiguration/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
@@ -156,13 +157,22 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 
 	volcanoSpec := info.RuntimePolicy.PodGroupPolicy.Volcano
 
-	// Aggregate pod resource requests
+	// Aggregate pod resource requests, honoring TrainJob.spec.trainer.resourcesPerNode for the trainer PodSet
 	var totalMembers int32
 	totalResources := make(corev1.ResourceList)
 	for _, ps := range info.TemplateSpec.PodSets {
 		count := *ps.Count
 		totalMembers += count
-		for resName, quantity := range ps.SinglePodRequests {
+		perPod := ps.SinglePodRequests
+		if ps.Ancestor != nil && *ps.Ancestor == constants.AncestorTrainer && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
+			res := trainJob.Spec.Trainer.ResourcesPerNode
+			if res.Requests != nil && len(res.Requests) > 0 {
+				perPod = res.Requests
+			} else if res.Limits != nil && len(res.Limits) > 0 {
+				perPod = res.Limits
+			}
+		}
+		for resName, quantity := range perPod {
 			quantity.Mul(int64(count))
 			current := totalResources[resName]
 			current.Add(quantity)

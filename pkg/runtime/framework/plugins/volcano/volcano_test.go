@@ -45,10 +45,11 @@ import (
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/v2/pkg/apply"
-	"github.com/kubeflow/trainer/v2/pkg/runtime"
-	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
-	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
+"github.com/kubeflow/trainer/v2/pkg/apply"
+"github.com/kubeflow/trainer/v2/pkg/constants"
+"github.com/kubeflow/trainer/v2/pkg/runtime"
+"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestVolcano(t *testing.T) {
@@ -296,6 +297,104 @@ func TestVolcano(t *testing.T) {
 						NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
 							Mode:               volcanov1beta1.HardNetworkTopologyMode,
 							HighestTierAllowed: ptr.To(1),
+						},
+					},
+				},
+			},
+			expectEnforcePodGroupError: nil,
+			expectBuildError:           nil,
+		},
+		"minResources honors TrainJob resourcesPerNode for trainer PodSet": {
+			trainJob: &trainer.TrainJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "job-override", Namespace: "test-ns", UID: "4"},
+				Spec: trainer.TrainJobSpec{
+					Trainer: &trainer.Trainer{
+						ResourcesPerNode: &corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("2Gi"),
+							},
+						},
+					},
+					Suspend: ptr.To(true),
+				},
+			},
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     "node",
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](2),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+						},
+					},
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{},
+			},
+			objs: []client.Object{},
+			expectInfo: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     "node",
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](2),
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+						},
+					},
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{
+					PodAnnotations: map[string]string{
+						volcanov1beta1.KubeGroupNameAnnotationKey: "job-override",
+					},
+				},
+			},
+			expectObjs: []apiruntime.Object{
+				&volcanov1beta1.PodGroup{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: volcanov1beta1.SchemeGroupVersion.String(),
+						Kind:       "PodGroup",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "job-override",
+						Namespace: "test-ns",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion:         trainer.GroupVersion.String(),
+								Kind:               trainer.TrainJobKind,
+								Name:               "job-override",
+								UID:                types.UID("4"),
+								Controller:         ptr.To(true),
+								BlockOwnerDeletion: ptr.To(true),
+							},
+						},
+					},
+					Spec: volcanov1beta1.PodGroupSpec{
+						MinMember: 2,
+						MinResources: &corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2"),
+							corev1.ResourceMemory: resource.MustParse("4Gi"),
 						},
 					},
 				},
