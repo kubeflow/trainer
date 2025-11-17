@@ -121,6 +121,19 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		}
 	}
 
+	// Update PodSet resources from TrainJob.spec.trainer.resourcesPerNode
+	// For MPI, update the Node PodSet which represents the trainer nodes
+	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
+		if nodePS := info.FindPodSetByName(constants.Node); nodePS != nil {
+			res := trainJob.Spec.Trainer.ResourcesPerNode
+			if res.Requests != nil && len(res.Requests) > 0 {
+				nodePS.SinglePodRequests = res.Requests
+			} else if res.Limits != nil && len(res.Limits) > 0 {
+				nodePS.SinglePodRequests = res.Limits
+			}
+		}
+	}
+
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
 		info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode = ptr.To(int32(trainJob.Spec.Trainer.NumProcPerNode.IntValue()))
 		// If numProcPerNode is set to 1 in runtime, we make it equal to number of GPUs.
