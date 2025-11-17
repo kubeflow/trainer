@@ -55,6 +55,18 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 		}
 	}
 
+	// Update PodSet resources from TrainJob.spec.trainer.resourcesPerNode
+	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
+		if trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer); trainerPS != nil {
+			res := trainJob.Spec.Trainer.ResourcesPerNode
+			if res.Requests != nil && len(res.Requests) > 0 {
+				trainerPS.SinglePodRequests = res.Requests
+			} else if res.Limits != nil && len(res.Limits) > 0 {
+				trainerPS.SinglePodRequests = res.Limits
+			}
+		}
+	}
+
 	// Add envs from the TrainJob.
 	var trainerContainer *runtime.Container
 	if trainJob.Spec.Trainer != nil {
