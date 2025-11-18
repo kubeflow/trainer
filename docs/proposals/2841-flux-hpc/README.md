@@ -34,15 +34,25 @@ This KEP proposes a design to integrate Flux into Kubeflow Trainer by extending 
 2.  **Support Additional HPC Schedulers Immediately:** The initial implementation will focus exclusively on Flux Framework. Support for other managers can be added later under the same `hpcPolicy` API by respective parties that have interest.
 3.  **Re-implement the MPI Operator:** This proposal provides an alternative to the MPI Operator's launcher/worker model by leveraging Flux's native capabilities, rather than replicating its logic.
 
+### User Stories
+
+**Story 1** I am an HPC practitioner using Kubernetes, and I want to deploy one of my on-premises AI/ML simulations that uses MPI. I can use the Kubeflow Trainer with the HPC Policy backend and my HPC scheduler of choice to reproduce the work.
+
+**Story 2** I am an HPC practitioner using Kubernetes, and I want to use a flavor of MPI (such as PMIx) that is not supported by the current MPI plugin. I can use the HPC Policy with a workload manager backend like Flux to gain this functionality.
+
+**Story 3** As an AI/ML researcher, binding and topology is important to me. I want to use a workload manager that supports fine-grained topology within an HPC cluster with nodes deployed across Kubernetes.
+
+**Story 4** As a scientist, I want to deploy workloads that need to interact closely (e.g., under the same headless service) but have different scheduling algorithms. I can achieve this with the Flux workload manager, a choice of HPC Policy.
+
 ## Proposal
 
-The core of this proposal is to introduce a new Kubeflow Trainer plugin named `Flux`. This plugin will implement the `ComponentBuilderPlugin` interface to modify the `JobSet` specification generated for a `TrainJob`. The mechanism for creating the Flux MiniCluster is dynamic and non-intrusive to the user's container image:
+The core of this proposal is to introduce a new Kubeflow Trainer plugin named `Flux`. This plugin will implement the `ComponentBuilderPlugin` interface to modify the `JobSet` specification generated for a `TrainJob`. The mechanism for creating the Flux cluster (the set of pods mapped to physical nodes) is dynamic and non-intrusive to the user's container image:
 
 1.  **API Trigger**: The user enables the feature by defining an `hpcPolicy` in their `TrainJob` runtime specification and setting the `manager` to `"flux"`.
 2.  **Plugin Activation**: The Kubeflow Trainer controller invokes the `Flux` plugin's `Build` method.
 3.  **JobSet Modification**: The plugin modifies the `JobSet` specification before it is created:
     *   An **`initContainer`** is added to the "trainer" replicated job. This container uses a pre-built "flux-view" image containing a Spack installation of Flux.
-    * A **pod affinity** is added that enforces a soft requirement to schedule one pod per node to support Flux controlling the mapping of all node resources. An optional **node affinity** can enforce that the MiniCluster pods are only scheduled to specific nodes.
+    * A **pod affinity** is added that enforces a soft requirement to schedule one pod per node to support Flux controlling the mapping of all node resources. An optional **node affinity** can enforce that the cluster pods are only scheduled to specific nodes.
     *   A **shared memory mount** that ensures the pod can utilize all shared memory on the node (or a reasonable subset). By default most container runtimes will mount only 64M, and this can negatively impact MPI performance.
     *   **Shared `emptyDir` Volumes** are mounted into both the `initContainer` and the main application container to move the Flux install from the initContainer to the application container. The `initContainer` copies the Flux installation and necessary software from its own image into these shared volumes, and generates configuration for the cluster based on the user-preferences provided.
     *   A **ConfigMap** is generated containing two scripts: `init.sh` (for the init container) and `entrypoint.sh` (for the main container). This ConfigMap is mounted into the pods.
@@ -88,11 +98,7 @@ type HPCMLPolicySource struct {
 	// +optional
 	Manager string `json:"manager,omitempty"`
 
-	// Tasks is the number of tasks to provide to the workload manager.
-	// +optional
-	Tasks *int32 `json:"tasks,omitempty"`
-
-	// Settings provides a key-value map for manager-specific configurations.
+    // Settings provides a key-value map for manager-specific configurations.
 	// +optional
 	Settings map[string]string `json:"settings,omitempty"`
 }
@@ -145,14 +151,13 @@ metadata:
   name: lammps-flux-interactive
 spec:
   # Reference the pre-defined runtime by name
-  runtime: hpc-flux-runtime
-  train:
-    replicas: 4 # Override the number of nodes for this specific job
-    template:
-      spec:
-        containers:
-        - name: node
-          image: "ghcr.io/converged-computing/metric-lammps:latest"
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    name: hpc-flux-runtime
+    kind: ClusterTrainingRuntime
+  trainer:
+    numNodes: 4
+    image: ghcr.io/converged-computing/metric-lammps:latest
 ```
 
 ### Implementation Details
@@ -196,7 +201,7 @@ func (f *Flux) Build(ctx context.Context, info *runtime.Info, trainJob *trainera
 }
 ```
 
-This design integrates with the existing Kubeflow Trainer API, and is flexible to extension to other resource managers in that a different manager plugin can be written that receives the same API. 
+This design integrates with the existing Kubeflow Trainer API, and is flexible to extension to other resource managers in that a different manager plugin can be written that receives the same API.
 
 ### Alternative Considered
 
@@ -219,7 +224,7 @@ type MLPolicySource struct {
 }
 
 
-// FluxMLPolicySource represents a Flux-specific runtime configuration 
+// FluxMLPolicySource represents a Flux-specific runtime configuration
 // Fields must be hard-coded fields.
 type FluxMLPolicySource struct {
     // Tasks is the number of tasks for the Flux job.
