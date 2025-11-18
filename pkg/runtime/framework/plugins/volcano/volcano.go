@@ -156,8 +156,7 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 
 	volcanoSpec := info.RuntimePolicy.PodGroupPolicy.Volcano
 
-	// Aggregate pod resource requests from PodSet resources
-	// SinglePodRequests should already be updated by MLPolicy plugins (e.g., plainml) from TrainJob.spec.trainer.resourcesPerNode
+	// Aggregate pod resource requests
 	var totalMembers int32
 	totalResources := make(corev1.ResourceList)
 	for _, ps := range info.TemplateSpec.PodSets {

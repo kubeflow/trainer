@@ -59,10 +59,8 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
 		if trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer); trainerPS != nil {
 			res := trainJob.Spec.Trainer.ResourcesPerNode
-			if res.Requests != nil && len(res.Requests) > 0 {
+			if len(res.Requests) > 0 {
 				trainerPS.SinglePodRequests = res.Requests
-			} else if res.Limits != nil && len(res.Limits) > 0 {
-				trainerPS.SinglePodRequests = res.Limits
 			}
 		}
 	}
