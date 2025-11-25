@@ -40,7 +40,7 @@ jobs:
 
       - name: Check out code
         if: steps.check-label.outputs.skip == 'false'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
