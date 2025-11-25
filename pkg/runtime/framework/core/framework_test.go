@@ -1019,6 +1019,10 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							Endpoints: func(yield func(string) bool) {
 								yield("test-job-launcher-0-0.test-job")
 							},
+							SinglePodRequests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
 							Containers: []runtime.Container{{
 								Name: constants.Node,
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
