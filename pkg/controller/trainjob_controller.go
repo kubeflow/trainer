@@ -104,7 +104,7 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	var err error
 	// Keep track of the origin TrainJob status
-	originStatus := trainJob.Status.DeepCopy()
+	prevTrainJob := trainJob.DeepCopy()
 
 	// Let's clear the failed condition that could have been set previously.
 	// An external change to the TrainJob spec may transition it out of the Failed state.
@@ -136,8 +136,10 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = errors.Join(err, statusErr)
 	}
 
-	if !equality.Semantic.DeepEqual(&trainJob.Status, originStatus) {
-		return ctrl.Result{}, errors.Join(err, r.client.Status().Update(ctx, &trainJob))
+	if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
+		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
+		// for sub-resources. See: https://github.com/kubernetes-sigs/controller-runtime/issues/3183
+		return ctrl.Result{}, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
 	}
 	return ctrl.Result{}, err
 }
