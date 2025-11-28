@@ -198,7 +198,7 @@ func TestCoScheduling(t *testing.T) {
 						{
 							Name:  "node",
 							Count: ptr.To[int32](2),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("500m"),
 								corev1.ResourceMemory: resource.MustParse("1Gi"),
 							},
@@ -206,7 +206,7 @@ func TestCoScheduling(t *testing.T) {
 						{
 							Name:  "dataset-initializer",
 							Count: ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("250m"),
 								corev1.ResourceMemory: resource.MustParse("512Mi"),
 							},
@@ -241,7 +241,7 @@ func TestCoScheduling(t *testing.T) {
 						{
 							Name:  "node",
 							Count: ptr.To[int32](2),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("500m"),
 								corev1.ResourceMemory: resource.MustParse("1Gi"),
 							},
@@ -249,7 +249,7 @@ func TestCoScheduling(t *testing.T) {
 						{
 							Name:  "dataset-initializer",
 							Count: ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("250m"),
 								corev1.ResourceMemory: resource.MustParse("512Mi"),
 							},
@@ -287,7 +287,7 @@ func TestCoScheduling(t *testing.T) {
 						{
 							Name:  "node",
 							Count: ptr.To[int32](2),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("500m"),
 								corev1.ResourceMemory: resource.MustParse("1Gi"),
 							},
@@ -322,7 +322,7 @@ func TestCoScheduling(t *testing.T) {
 						{
 							Name:  "node",
 							Count: ptr.To[int32](2),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("500m"),
 								corev1.ResourceMemory: resource.MustParse("1Gi"),
 							},
@@ -451,7 +451,7 @@ func TestCoScheduling(t *testing.T) {
 						{
 							Name:  "node",
 							Count: ptr.To[int32](2),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("500m"),
 								corev1.ResourceMemory: resource.MustParse("1Gi"),
 							},
@@ -488,7 +488,7 @@ func TestCoScheduling(t *testing.T) {
 						{
 							Name:  "node",
 							Count: ptr.To[int32](2),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("500m"),
 								corev1.ResourceMemory: resource.MustParse("1Gi"),
 							},

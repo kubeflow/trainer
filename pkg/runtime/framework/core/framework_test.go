@@ -1019,7 +1019,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							Endpoints: func(yield func(string) bool) {
 								yield("test-job-launcher-0-0.test-job")
 							},
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1308,7 +1308,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.DatasetInitializer,
 							Ancestor: ptr.To(constants.DatasetInitializer),
 							Count:    ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1333,7 +1333,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.ModelInitializer,
 							Ancestor: ptr.To(constants.ModelInitializer),
 							Count:    ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1358,7 +1358,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.Node,
 							Ancestor: ptr.To(constants.AncestorTrainer),
 							Count:    ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1618,7 +1618,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.DatasetInitializer,
 							Ancestor: ptr.To(constants.DatasetInitializer),
 							Count:    ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1643,7 +1643,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.ModelInitializer,
 							Ancestor: ptr.To(constants.ModelInitializer),
 							Count:    ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1668,7 +1668,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.Node,
 							Ancestor: ptr.To(constants.AncestorTrainer),
 							Count:    ptr.To[int32](100),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1736,7 +1736,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.DatasetInitializer,
 							Ancestor: ptr.To(constants.DatasetInitializer),
 							Count:    ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1761,7 +1761,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.ModelInitializer,
 							Ancestor: ptr.To(constants.ModelInitializer),
 							Count:    ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1786,7 +1786,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.Node,
 							Ancestor: ptr.To(constants.AncestorTrainer),
 							Count:    ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1937,7 +1937,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.DatasetInitializer,
 							Ancestor: ptr.To(constants.DatasetInitializer),
 							Count:    ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1962,7 +1962,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.ModelInitializer,
 							Ancestor: ptr.To(constants.ModelInitializer),
 							Count:    ptr.To[int32](1),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},
@@ -1987,7 +1987,7 @@ test-job-node-0-1.test-job slots=1
 							Name:     constants.Node,
 							Ancestor: ptr.To(constants.AncestorTrainer),
 							Count:    ptr.To[int32](100),
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("1"),
 								corev1.ResourceMemory: resource.MustParse("4Gi"),
 							},

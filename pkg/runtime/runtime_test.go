@@ -281,7 +281,7 @@ func TestNewInfo(t *testing.T) {
 							Containers: []Container{{
 								Name: constants.DatasetInitializer,
 							}},
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU: resource.MustParse("15"),
 							},
 						},
@@ -295,7 +295,7 @@ func TestNewInfo(t *testing.T) {
 							Containers: []Container{{
 								Name: constants.ModelInitializer,
 							}},
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU: resource.MustParse("15"),
 							},
 						},
@@ -323,7 +323,7 @@ func TestNewInfo(t *testing.T) {
 							InitContainers: []Container{{
 								Name: "preparation",
 							}},
-							SinglePodRequests: corev1.ResourceList{
+							SinglePodResources: corev1.ResourceList{
 								corev1.ResourceCPU: resource.MustParse("40"),
 							},
 						},
