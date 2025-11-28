@@ -72,8 +72,8 @@ type PodSet struct {
 	Volumes        []corev1ac.VolumeApplyConfiguration
 	Endpoints      iter.Seq[string]
 	// The total PodSet requests can be calculated with
-	// SinglePodRequests x Count.
-	SinglePodRequests corev1.ResourceList
+	// SinglePodResources x Count.
+	SinglePodResources corev1.ResourceList
 }
 
 type Container struct {
@@ -143,7 +143,7 @@ func WithPodSet(
 			Ancestor:          ancestor,
 			Count:             ptr.To(max(count, 1)),
 			Volumes:           podSpecApply.Volumes,
-			SinglePodRequests: resourcehelpers.PodRequests(&corev1.Pod{Spec: typedPodSpec}, resourcehelpers.PodResourcesOptions{}),
+			SinglePodResources: resourcehelpers.PodRequests(&corev1.Pod{Spec: typedPodSpec}, resourcehelpers.PodResourcesOptions{}),
 			InitContainers:    slices.Collect(toPodSetContainer(podSpecApply.InitContainers...)),
 			Containers:        slices.Collect(toPodSetContainer(podSpecApply.Containers...)),
 		}
