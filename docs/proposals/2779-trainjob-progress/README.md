@@ -25,27 +25,18 @@ From a programmatic perspective:
 ### Goals
 
 1. **Expose real-time progress information and training metrics through the TrainJobs CR.** For example: percentage complete, estimated time remaining, current step/epoch, total steps/epochs, eval metrics.
-2. **Provide built-in progress tracking support for selected ML frameworks (e.g. transformers, pytorch-lightning) in the kubeflow sdk.** Data scientists should be able to use the kubeflow sdk to create training jobs using these frameworks, and have progress tracking automatically instrumented.
-3. **Provide a standard "protocol" for training runtimes to expose progress and training metrics.** It should be possible for custom trainer training jobs to use this contract to add progress tracking. It should be easy to enhance the kubeflow sdk with additional built-in frameworks that automatically instrument progress tracking.
+2. **Have zero dependencies.** The user should not need to install any additional components into their cluster for the feature to work. It should work "out-of-the-box". 
+3. **Optional.** Users can choose to opt in to providing progress tracking, but are not required to use this feature.
+4. **Provide built-in progress tracking support for selected ML frameworks (e.g. transformers, pytorch-lightning) in the kubeflow sdk.** Data scientists should be able to use the kubeflow sdk to create training jobs using these frameworks, and have progress tracking automatically instrumented.
+5. **Provide a standard "protocol" for training runtimes to expose progress and training metrics.** It should be possible for custom trainer training jobs to use this contract to add progress tracking. It should be easy to enhance the kubeflow sdk with additional built-in frameworks that automatically instrument progress tracking.
 
 ### Non-Goals
 
-1. **Replace tools like MLFlow or Tensorboard.** These tools can be used in addition to the proposed changes. They provide richer information about the training progress, but require additional infrastructure set up and do not easily expose their information in a format that is easy to consume via the Kubernetes api.
+1. **Store the history of how metrics changed throughout training.** This feature is not trying to replicate or replace functionality provided by tools like MLFLow and Tensorboard. These tools can be used alongside this feature to record richer information about the training process. However, unlike MLFlow and Tensorboard, this feature has zero dependencies (e.g. no additional infrastructure) and will work out "of-the-box" without additional set up.
 2. **Provide progress and metrics for dataset and model initialization.** The implementation could be easily extended for these phases of the TrainJob api, but we propose delaying this to a future iteration to limit scope.
 3. **Automatically instrument custom trainer training jobs to have progress tracking.**
 4. **Add progress tracking for the Kubeflow Trainer v1 api.** The v1 api is legacy.  This feature should only be added to the v2 api.
 5. **Integrate with Katib’s hyperparameter optimiser.** Whilst the exposed training metrics should provide a route for this integration, the integration is out of scope of this proposal.
-
-## Proposal
-
-We propose the following high level design for exposing training progress information through the TrainJob custom resource:
-
-1. Update the TrainJob `status` to include a new field `trainerStatus` to contain information about training progress and training metrics.
-2. Define a "push"-based protocol for communicating the training status from the runtime to the trainer controller manager: a "primary" pod of the training job writes trainer status to the pod log; the controller manager streams these logs and updates the trainer status on the `TrainJob` CR.
-
-The runtime pods for TrainJobs will need instrumenting to write trainer status messages to stdout and we propose making this as simple as possible for users by:
-
-3. Adding new built-in trainers to the kubeflow-sdk that automatically register training callbacks in the runtime to output trainer status messages to the logs in the correct format. Initially we propose only adding a builtin trainer for the [*Transformers* *Trainer* API](https://huggingface.co/docs/transformers/en/main_classes/trainer).
 
 ## User Stories
 
@@ -59,86 +50,122 @@ As a data scientist or ML Engineer, I want to see real-time information about my
 
 I can use standard tools, like the Kubeflow Trainer Python SDK or `kubectl get trainjob` to access progress and performance metrics about my train jobs.
 
-## Design Details
+### Story 3: Data Scientist / ML Engineer opting out of monitoring training jobs
 
-### TrainJob CRD changes
+As a data scientist or ML Engineer, I want to create a TrainJob but I do not want to have to work out how to integrate training monitoring.
 
-We propose adding a `trainerStatus` field to the TrainJob status API according to this schema:
+## Proposal
+
+We propose a **push-based** approach with the following high-level design:
+
+1. The TrainJob custom resource exposes the current training progress and metrics via a new optional field `status.trainerStatus`.
+2. The trainer control plane exposes a new http service which can receive the trainer status from the trainer runtime pods.
+3. The user instruments their trainer runtime pod(s) to periodically send the current trainer status to this endpoint which updates the status of the TrainJob.
+
+The feature is optional but available for all TrainJobs. Users opt in to the functionality by instrumenting their runtime to send requests to the new endpoint.
+
+Support for any ML training framework is enabled by instrumentation code tailored to each framework. Users can provide their own instrumentation code, though to make it easier for users to adopt the feature, we propose:
+
+4. Adding new built-in trainers to the kubeflow-sdk that automatically inject the instrumentation code for common ML frameworks. Initially we propose only adding a builtin trainer for the [*Transformers* *Trainer* API](https://huggingface.co/docs/transformers/en/main_classes/trainer).
+
+### Design Details
+
+#### TrainJob CRD changes
+
+The TrainJob API would be updated to include a new optional `status.trainerStatus` field with this schema:
 
 ```go
 type TrainJobStatus struct {
     // ... existing fields
 
-    // TrainerStatus provides a summary of the training part of the
-    // TrainJob.
+    // trainerStatus provides a summary of the status of the training 
+	// part of the TrainJob.
     // Empty if the status is unknown, e.g. the job has just started
     // or the job is not instrumented to report its status.
+    // +optional
     TrainerStatus *TrainJobTrainerStatus `json:"trainerStatus,omitempty"`
 }
 
 
 type TrainJobTrainerStatus struct {
 
-    // An estimate of how complete the TrainJob is as a percentage.
+    // progressPercentage gives an estimate of how complete the TrainJob is as a percentage.
     // The value will be between 0 and 100, or empty if unknown.
     //
     // +kubebuilder:validation:Minimum=0
     // +kubebuilder:validation:Maximum=100
+    // +optional
     ProgressPercentage *int32 `json:"progressPercentage,omitempty"`
 
-    // The estimated remaining training time in seconds before the train 
-    // job is completed.
+    // estimatedRemainingSeconds gives the estimated remaining training time in seconds
+    // before the train job is completed.
     // The value will be empty if it is unknown.
     //
     // +kubebuilder:validation:Minimum=0
+    // +optional
     EstimatedRemainingSeconds *int64 `json:"estimatedRemainingSeconds,omitempty"`
 
-    // An approximate, human-readable version of the estimated remaining
-    // training time before the train job is completed.
+    // estimatedRemainingTimeSummary gives an approximate, human-readable version of the
+    // estimated remaining training time before the train job is completed.
     // The value will be empty if it is unknown.
     // This message is intended for human audiences and its format should
     // not be relied on to be stable.
     // Consider using EstimatedRemainingSeconds instead.
+    // +optional
     EstimatedRemainingTimeSummary *string `json:"estimatedRemainingTimeSummary,omitempty"`
 
-    // The number of steps that have been completed so far.
-    // The value will be empty if it is unknown or not applicable 
+    // currentStep is the number of steps that have been completed so far.
+    // The value will be empty if it is unknown or not applicable
     // to the training algorithm.
+    // +optional
     CurrentStep *int32 `json:"currentStep,omitempty"`
 
-    // The total number of steps that have been requested.
-    // The value will be empty if it is unknown or not applicable 
+    // totalSteps is the total number of steps that have been requested.
+    // The value will be empty if it is unknown or not applicable
     // to the training algorithm.
+    // +optional
     TotalSteps *int32 `json:"totalSteps,omitempty"`
 
-    // The number of epochs that have been completed so far.
-    // The value will be empty if it is unknown or not applicable 
+    // currentEpoch is the number of epochs that have been completed so far.
+    // The value will be empty if it is unknown or not applicable
     // to the training algorithm.
+    // +optional
     CurrentEpoch *int32 `json:"currentEpoch,omitempty"`
 
-    // The total number of epochs that have been requested.
-    // The value will be empty if it is unknown or not applicable 
+    // totalEpochs is the total number of epochs that have been requested.
+    // The value will be empty if it is unknown or not applicable
     // to the training algorithm.
+    // +optional
     TotalEpochs *int32 `json:"totalEpochs,omitempty"`
 
-    // The current metrics evaluated on the training data.
+    // metrics contains the current metrics for the model.
+    // Each entry stores the metrics for a different "group" of
+    // related metrics, e.g. train and eval metrics.
+    // All groups must have a unique type.
+    //
+    // +listType=atomic
+    // +optional
+    Metrics []MetricsGroup `json:"metrics,omitempty"`
+
+    // lastUpdatedTime is the timestamp when these metrics were observed.
+    // +optional
+    LastUpdatedTime metav1.Time `json:"lastUpdatedTime,omitempty"`
+}
+
+type MetricsGroup struct {
+    // type is a label for the type of metrics contained within this group.
+    // This is an arbitrary label that group together a set of
+    // related metrics, e.g. training metrics, or evaluation metrics.
+    // +kubebuilder:validation:MinLength=1
+    // +optional
+    Type string `json:"type,omitempty"`
+
+    // values is a map of the current metrics for this group.
     // The metrics are key-values pairs, where the key is a user-defined name
     // for the metric and the value is the corresponding numeric value serialized
     // as a string.
-    //
-    // +mapType=atomic
-    TrainMetrics map[string]string `json:"trainMetrics,omitempty"`
-
-    // The current metrics evaluated on evaluation data.
-    // The metrics are key-values pairs, where the key is a user-defined name
-    // for the metric and the value is the corresponding numeric value serialized
-    // as a string.
-    //
-    // +mapType=atomic
-    EvalMetrics map[string]string `json:"evalMetrics,omitempty"`
-
-    // The timestamp when these metrics were measured.
-    LastUpdatedTime metav1.Time `json:"lastUpdatedTime"`
+    // +optional
+    Values map[string]string `json:"values,omitempty"`
 }
 ```
 
@@ -146,8 +173,10 @@ The trainerStatus field is optional as it can be unavailable, e.g. because the j
 
 All fields (apart from lastUpdatedTime) are optional meaning that a runtime need only provide information that it has available or is relevant for that training algorithm (e.g., epochs are not relevant for XGBoost models).
 
+The design deliberately does not make any changes to the `TrainJobSpec`: the control plane does not require any configuration. Users opt in to the training status by instrumenting their runtime pods to send the training status to the control plane.
+
 ```yaml
-# Sample TrainJob example with TrainerStatus status implemented
+# Sample TrainJob example with TrainerStatus implemented
 
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainJob
@@ -164,19 +193,22 @@ status:
     totalSteps: 10000                                # Out of 10000 total
     currentEpoch: 2                                  # On epoch 2
     totalEpochs: 5                                   # Of 5 epochs
-  
-    # Training metrics (serialized as strings)
-    trainMetrics:
-      loss: "0.2347"                                 # Current training loss
-      learning_rate: "0.0001"                        # Current LR
-      grad_norm: "1.234"                             # Gradient norm
-    
-    # Evaluation metrics (from validation set)
-    evalMetrics:
-      eval_loss: "0.2451"                            # Validation loss
-      eval_accuracy: "0.8912"                        # Validation accuracy
-      eval_perplexity: "1.277"                       # Model perplexity
-    
+
+    metrics:
+      # Training metrics (serialized as strings)
+      - type: train
+        values:                                      
+          loss: "0.2347"                             # Current training loss
+          learning_rate: "0.0001"                    # Current LR
+          grad_norm: "1.234"                         # Gradient norm
+
+      # Evaluation metrics (from validation set)
+      - type: eval
+        values:
+          eval_loss: "0.2451"                        # Validation loss
+          eval_accuracy: "0.8912"                    # Validation accuracy
+          eval_perplexity: "1.277"                   # Model perplexity
+
     # Timestamp of last progress update
     lastUpdatedTime: "2025-01-23T10:30:45Z"
 ```
@@ -192,62 +224,71 @@ another-example   Complete   100               50m
 
 The ETA column will be populated from the `status.trainerStatus.estimatedRemainingTimeSummary` field.
 
-### Runtime: emitting trainer status messages
+#### Control plane endpoint
 
-The "primary" training runtime pod will write trainer status messages to stdout in the following format:
+The control plane will expose a new service that provides an http endpoint where trainer pods can submit the trainer status. 
 
-* Messages will be written on a single new line.
-* Messages may be interspersed between other (i.e. non status, application) log messages, but must be on their own line.
-* The format of the messages will be a fixed tag `[trainer.kubeflow.org/v1alpha1/trainjob/trainerStatus]`, followed by whitespace, followed by a json payload containing the trainer status. E.g.
+The endpoint will be `POST: /<train-job-namespace>/TrainJob/<train-job-name>/status`, where `<train-job-namespace>` and `<train-job-name>` come from the TrainJob. 
 
+The payload will be the same as `TrainJobTrainerStatus` but will omit the `estimatedRemainingTimeSummary` field, which will be calculated by the control plane for consistency.
+
+On receiving requests to this endpoint, the control plane will validate the source of the request (see [Security considerations](#security-considerations)) and then directly update the `status.trainerStatus` field.
+
+The control plane does not need to be highly available: the runtime can retry the status update request with some delay whilst continuing the training, or skip the update entirely.
+
+#### Security considerations
+
+The control plane endpoint will be secured with TLS and token-based authentication.
+
+TLS will use the same certificate used by the webhook:
+- for each TrainJob, the control plane will copy the webhook certificate authority cert into a configmap in the train job namespace. The control plane will need to watch the source secret and synchronize any changes (e.g. CA certificate rotated).
+- the control plane will inject the `ca.crt` file into all containers of all pods of the TrainJob using a configmap volume.
+- the runtime will need to use the custom `ca.crt` file when it makes requests to the control plane.
+
+Token-based authentication using projected service account tokens will be used to validate that the train job status can only be updated by pods that belong to that train job:
+- the control plane will inject a serviceAccountToken projected volume with custom audience `trainer.kubeflow.org` into all containers of all pods of the train job.
+- the runtime will need to send this token as a bearer token in all status update requests.
+- on receiving a status update request, the control plane will authorise the token by:
+  1. validating the provided token using a TokenReview request. The audience must be `trainer.kubeflow.org`.
+  2. validating the pod is part of the train job by:
+    - getting the pod name/namespace from the `kubernetes.io` claim of the decoded jwt token
+    - looking up all the pods for the train job
+    - verifying that the source pod is in the list of pods for the train job
+
+Note that the token does _not_ have permissions for the kubernetes API server due to the custom audience. The control plane also does _not_ require the service account that the token is associated with to be granted any RBAC permissions. It only requires that the token is a valid, comes from the API server, and was issued to a pod that belongs to the TrainJob.
+
+The new endpoint must rate-limit requests and cache TokenReview responses to avoid a misconfigured TrainJob (examples: a job with many nodes which all send status updates simultaneously; a job that progresses very quickly) from triggering API server rate-limiting which may cause denial-of-service for other TrainJobs or for the reconciler itself. The rate-limiting should be keyed on the jwt subject claim (the service account name and namespace).
+
+Deliberate malicious attacks can be mitigated by validating the jwt token against the API server public key before performing the TokenReview request. Tokens that are definitely invalid would not cause any API server requests. 
+
+The below summarises the volumes the control plane will inject:
+```yaml
+# mutated PodSpec
+spec:
+  containers:
+  - name: worker
+    volumeMounts:
+    - name: kubeflow-trainer-token
+      mountPath: "/var/run/secrets/kubeflow/trainer"
+      readOnly: true
+  volumes:
+  - name: kubeflow-trainer-token
+    projected:
+      sources:
+      - serviceAccountToken:
+        audience: trainer.kubeflow.org
+        expirationSeconds: 3600
+        path: token
+      - configmap:
+        name: <train-job-name>-tls-config
+        items:
+          - key: ca.crt
+            path: ca.crt
 ```
-[trainer.kubeflow.org/v1alpha1/trainjob/trainerStatus] {"progressPercent":45,...}
-```
 
-* The tag will be used by the trainer controller manager to filter out application logs and select only the trainer status messages.
-* The tag contains the TrainJob group/version/kind so it can be versioned with the TrainJob api. The trainer controller manager could, in principle, support reading multiple different versions of the trainer status messages.
-* The schema of the json payload is as defined using the below Python dataclass. Note the schema is similar but not identical to the `TrainJobTrainerStatus` type on the CR, with minor differences for better Python compatibility, and the removal of `lastUpdatedTime` and `estimatedRemainingTimeSummary` which will be set by the controller manager.
+#### RBAC changes
 
-```py
-@dataclass.dataclass
-class TrainJobTrainerStatus:
-    progressPercentage: int | None
-    estimatedRemainingSeconds: int | None
-    currentStep: int | None
-    totalSteps: int | None
-    currentEpoch: int | None
-    totalEpochs: int | None
-    trainMetrics: dict[str, float] | None
-    evalMetrics: dict[str, float] | None
-```
-
-When using distributed training, the runtime framework is responsible for collecting all the information in the trainer status messages onto the "primary" pod.
-
-### Trainer Controller Manager: reading trainer status messages
-
-The trainer controller manager will subscribe to the pod logs stream of the "primary" pod using the `pods/logs` api with "follow=true" and "timestamps=true" (for recovery, see below). The controller will filter out messages in memory using the fixed tag to select only the trainer status updates and parse the json payload. When trainer status messages are observed, the controller manager will update the status.trainerStatus field of the TrainJob custom resource.
-
-Some additional details about the pod log streaming:
-
-* The log streaming will only be created when the TrainJob is "active", defined as by when the "primary" pod has status "Running".
-* The log streaming will be automatically terminated only when the "primary" pod is terminated. If the "primary" pod is terminated and rescheduled, the controller reconciliation loop will automatically subscribe to the logs of the new "primary" pod.
-* The streaming will execute in a separate goroutine, with a separate goroutine per active TrainJob.
-* The log stream will be filtered in memory (e.g. using bufio.Scanner). The default Scanner buffer size (64kB) should be large enough to avoid bufio.ErrTooLong errors when scanning the log output, whilst causing modest memory requirements even for large numbers of simultaneously active TrainJobs (e.g. 1000 active TrainJobs would require \~63MB of memory).
-* The status.trainerStatus.lastUpdatedTime field will be set from the timestamp of the log message. This allows the controller manager to resume from the correct location in the log stream (using PodLogOptions.SinceTime) if it is restarted whilst a TrainJob is executing.
-* If the log stream processing is interrupted (e.g. the GetLogs connection times out, or the log contains a line larger than the Scanner buffer size), the controller manager should resume the log stream from the timestamp of the last successfully read log line using (using PodLogOptions.SinceTime).
-* Updating the status.trainerStatus field should be throttled to avoid unnecessary burden on the k8s API server (e.g. if the runtime emits many trainer status messages in quick succession).
-
-The controller manager will populate `estimatedRemainingTimeSummary` by converting `estimatedRemainingSeconds` into a human-readable summary. The conversion can be lossy to improve readability. For example `estimatedRemainingSeconds=3610` (one hour and 10 seconds) may be converted to `estimatedRemainingSeconds=1 hour`.
-
-By default, the controller manager will select the first pod of the JobSet as the "primary" pod. This may be overridden by adding an annotation `trainer.kubeflow.org/trainer-status-primary-pod: true` to the  primary pod (e.g. in the TrainingRuntimeSpec template). If the "primary" pod has multiple containers, the controller manager will by default stream logs of the first container. This may be overridden by adding the annotation `trainer.kubeflow.org/trainer-status-container: <container-name>` which will cause the controller manager to stream the logs of `<container-name>`.
-
-For TrainJobs that contain multiple JobSets, by default all JobSets will be monitored using the above procedure. It’s assumed that only one of the JobSets will actually be instrumented with trainer status messages, in which case the correct status will be shown. If, however, multiple JobSets have been instrumented, the user can prevent a JobSet from being monitored adding an annotation `trainer.kubeflow.org/enable-trainer-status-monitoring: false` to the JobSet. Adding the same annotation to the overall TrainJob will disable all trainer status monitoring for that job.
-
-The scalability of the maximum number of concurrently active train jobs will need testing.
-
-### RBAC changes
-
-The controller manager will need granting clusterwide permission to read pod logs.
+The control plane service account requires these additional RBAC permissions:
 
 ```
 apiVersion: rbac.authorization.k8s.io/v1
@@ -259,14 +300,62 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - pods/log
+  - pods
   verbs:
   - get
+  - list
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
 ```
 
-### SDK Changes: instrumenting runtime
+#### Runtime instrumentation
 
-We’re proposing adding a new TransformersTrainer to the kubeflow-sdk. This will be a custom trainer with the same api as the CustomTrainer, but with the additional behaviour that it will automatically register a custom callback to output trainer status messages in the correct format.
+The trainer runtime pods can be instrumented however is required for that framework (e.g. using callbacks provided by that framework). When using distributed training, it is up to the instrumentation implementation to decide which pod(s) will send the progress messages; the control plane will accept messages from any pod that is part of the train job. 
+
+The control plane will inject the following environment variables into all containers of all pods of the training job:
+```shell
+KUBEFLOW_TRAINER_STATUS_URL=https://trainer-status.kubeflow.svc/<job-namespace>/TrainJob/<job-name>/status
+KUBEFLOW_TRAINER_STATUS_CA_CERT=/var/run/secrets/kubeflow/trainer/ca.crt
+KUBEFLOW_TRAINER_STATUS_TOKEN=/var/run/secrets/kubeflow/trainer/token
+```
+
+These environment variables simplify the runtime code for submitting status updates, e.g.:
+```python
+from urllib import request
+import os
+import ssl
+
+payload = ...
+
+url = os.environ["KUBEFLOW_TRAINER_STATUS_URL"]
+ca_file = os.environ["KUBEFLOW_TRAINER_STATUS_CA_CERT"]
+token = open(os.environ["KUBEFLOW_TRAINER_STATUS_TOKEN"]).read()
+ssl_context = ssl.create_default_context(cafile=ca_file)
+req = request.Request(url, data=payload, headers={"Authorization": f"Bearer {token}"})
+request.urlopen(req, ssl_context=ssl_context)
+```
+
+#### SDK Changes: instrumenting runtime
+
+We’re proposing adding a new TransformersTrainer to the kubeflow-sdk. This will be a custom trainer with the same api as the CustomTrainer, but with the additional behaviour that it will automatically register a custom callback that will post the training status to the control plane.
+
+```py
+@dataclass
+class TransformersTrainer:
+    func: Callable
+    func_args: Optional[dict] = None
+    packages_to_install: Optional[list[str]] = None
+    pip_index_urls: list[str] = field(
+        default_factory=lambda: list(constants.DEFAULT_PIP_INDEX_URLS)
+    )
+    num_nodes: Optional[int] = None
+    resources_per_node: Optional[dict] = None
+    env: Optional[dict[str, str]] = None
+```
 
 Similar additional trainers could also be added in the future for other ML frameworks (e.g. PytorchLightningTrainer, XGBoostTrainer).
 
@@ -280,14 +369,15 @@ def train_fn():
     trainer.train()
 
 
-from kubeflow.trainer import TrainerClient, TransformersBuiltinTrainer
+from kubeflow.trainer import TrainerClient, TransformersTrainer
 
 client = TrainerClient()
 client.train(
     runtime=client.get_runtime("transformers-distributed"),
     trainer=TransformersTrainer(
         func=train_fn,
-        ...
+        num_nodes=...,
+        resources_per_node={...},
     )
 )
 ```
@@ -297,22 +387,38 @@ The sdk will generate the TrainJob resource using the same approach currently us
 ```py
 # kubeflow/constants/constants.py
 TRANSFORMERS_BUILTIN_TRAINER_FUNC_SCRIPT = textwrap.dedent(
-    """
-        read -r -d '' SCRIPT << EOM\n
-        from transformers import TrainerCallback, trainer
-        
-        class KubeflowTrainerStatusCallback(transformers.TrainerCallback):
-            ...  # will write training status messages to stdout
+"""
+  read -r -d '' SCRIPT << EOM\n
+  import os
+  from transformers import TrainerCallback, trainer
+  from urllib import request
 
-        # add the status callback to the default trainer callbacks.
-        # this could also be achieved by monkeypatching the Trainer.__init__
-        trainer.DEFAULT_CALLBACKS.append(KubeflowTrainerStatusCallback())
-        
-        {func_code}
-        EOM
-        printf "%s" \"$SCRIPT\" > \"{func_file}\"
-        python \"{func_file}\"
-    """
+  class KubeflowTrainerStatusCallback(transformers.TrainerCallback):
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+      payload = ...  # collect the info
+      self._post_status(payload)
+
+    def _post_status(self, payload):
+      try:
+        url = os.environ["KUBEFLOW_TRAINER_STATUS_URL"]
+        ca_file = os.environ["KUBEFLOW_TRAINER_STATUS_CA_CERT"]
+        token = open(os.environ["KUBEFLOW_TRAINER_STATUS_TOKEN"]).read()
+        ssl_context = ssl.create_default_context(cafile=ca_file)
+        req = request.Request(url, data=payload, headers={"Authorization": f"Bearer {token}"})
+        request.urlopen(req, ssl_context=ssl_context, timeout=2)
+      except Exception as e:
+        print(f"[Kubeflow] Unable to send trainer status. {e}")
+
+  # add the status callback to the default trainer callbacks.
+  # this could also be achieved by monkeypatching the Trainer.__init__
+  trainer.DEFAULT_CALLBACKS.append(KubeflowTrainerStatusCallback())
+
+  {func_code}
+  EOM
+  printf "%s" \"$SCRIPT\" > \"{func_file}\"
+  python \"{func_file}\"
+"""
 )
 
 # kubeflow/utils/utils.py
@@ -344,6 +450,12 @@ Additional changes to the sdk:
 
 ```py
 @dataclass
+class MetricsGroup:
+    type: str
+    values: dict[str, float]
+
+
+@dataclass
 class TrainerStatus:
     progressPercentage: Optional[int]
     estimatedRemainingDurationSeconds: Optional[int]
@@ -352,8 +464,7 @@ class TrainerStatus:
     totalSteps: Optional[int]
     currentEpoch: Optional[int]
     totalEpochs: Optional[int]
-    trainMetrics: Optional[dict[str, float]]
-    evalMetrics: Optional[dict[str, float]]
+    metrics: Optional[list[MetricsGroup]]
     lastUpdatedTime: datetime
 
 
@@ -366,81 +477,66 @@ class TrainJob:
 * Adding a new "transformers-distributed" ClusterRuntime which will be included in the default set of cluster runtimes included in the manifests.
 * Publish new docker images for the "transformers-distributed"  runtime "ghcr.io/kubeflow/trainer/transformers-runtime". The docker image will include the transformers, accelerate and torch python packages.
 
-## Considered alternatives
+## Other considered alternatives
 
 This section describes other approaches that were evaluated and the rationale for not selecting them.
 
-### Alternatives to using pod logs to communicate status messages
+### Trainer Pods updating the TrainJob status directly
 
-We propose instrumenting the "primary" training pod so that it prints training status messages to stdout. The controller manager watches the pod logs and updates the TrainJob status when train status messages are observed. We outline below some alternative approaches.
+The trainer pods could directly interact with the API server to update the TrainJob status.
 
-#### Runtime pushes metrics to controller manager via web request
-
-The Kubeflow Trainer controller manager exposes a web API for collecting trainer status; the trainer "primary" pod makes web requests on demand pushing status messages into the controller.  
 Pros:
 
-- More scalable: less network traffic as only status messages need transferring, instead of the entire "primary" pod logs.
+- No need for new control plane service.
 
 Cons:
 
-- Operational complexity: introduces an additional service (and possibly deployment) into the KFT control plane.
-- Non-trivial amount of work to secure the service. In particular, role-based access control is required to secure the new endpoint and ensure that only a TrainJob is able to update its own status.
+- The trainer pods require privileged access to the API server. Given these pods are running arbitrary user code, this would warrant additional security sandboxing.
+- The trainer pods cannot use the default service account. The control plane would need to automatically create a service account with the required permissions for a train job, or users would need to provide a service account and ensure it has the necessary permissions.
+- The trainer runtime require a kubernetes client to be available, meaning it must either be pre-installed in the runtime or installed/injected at runtime.
 
-#### Serving trainer status messages via a webserver
+### Runtime serves trainer status on a webserver; control plane periodically scrapes the status
 
-Instrument the "primary" trainer pod to serve metrics via a small http server; the pod controller manager periodically pulls the metrics by making a web request to the "primary" pod.  
+Instrument the trainer pods to serve metrics via a small http server; the pod controller manager periodically scrapes the metrics by making a web request to a trainer pod. 
+
 Pros:
 
-- More secure. The controller manager does not need RBAC to read log messages from any pod in any namespace.
-- More scalable: removes the risk that a pod outputs lots of log messages which overwhelms the api server; as it’s pull based, it can be best-effort based and the controller manager can adapt the poll frequency.
+- No need for new control plane service.
+- Potentially more scalable: the control plane can decide when the endpoints are scraped, meaning it can be best-effort based and/or the scraping frequency can be automatically reduced when a large number of train jobs are executing.
 
 Cons:
 
-- Non-trivial amount of work to secure the HTTP endpoint, e.g. with TLS and/or auth.
-- Harder for cluster operators/platform maintainers to diagnose network misconfigurations, e.g. network policies blocking scraping.
-- Pull based: status updates may be delayed.
+- Pull based: trainer status updates may be delayed. Care must also be taken when a train job completes to allow for the "final" trainer status to be scraped before pod terminates.
+- Adds considerable extra complexity on the runtime instrumentation code. E.g. auth, tls, creating a webserver. The complexity must be handled by each ML framework.  
+- Requires additional control plane configuration. E.g. auth, tls config, port, scrape interval.
 
-#### Exposing metrics via prometheus
+### Exposing metrics via MLFlow or Prometheus
 
-The runtime is instrumented with a Prometheus client which tracks and exposes the metrics; the Prometheus server is automatically configured to scrape the primary pod; the controller manager reads the metrics from Prometheus.  
+The runtime is instrumented with an MLFlow or Prometheus client which tracks and exposes the metrics. The controller manager reads the metrics from MLFlow or Prometheus and updates the custom resource.
+
 Pros:
 
+- No need for new control plane service.
 - Uses an existing standard and framework.
 - Provides support for tracking the history of progress/metrics.
 
 Cons:
 
 - Introduces an external dependency to the deployment.
-- Prometheus is not a typical part of the data science ecosystem. Data scientists are used to other tools that achieve the same things but with more familiar APIs (e.g. MLFlow).
-- Harder for cluster operators/platform maintainers to diagnose network misconfigurations, e.g. network policies blocking scraping.
-- Pull based: status updates may be delayed.
 
-#### Controller manager reads status from a file in the "primary" pod
+### Communicating the training status through the pod logs
 
-The "primary" pod writes training status to a file in its pod; the controller manager execs into the pod to read the status from a file.  
-Pros:
-
-- More scalable: less data being streamed to the controller manager; as it’s pull based, it can be best-effort based and the controller manager can adapt the poll frequency.
-
-Cons:
-
-- Significantly less secure: the controller manager must have `pods/exec` RBAC for all pods in the entire cluster.
-
-## Alternatives to injecting code via pod command
-
-We propose injecting code for instrumenting the progress callbacks via the pod command. We also considered this alternative.
-
-### Adding progress callbacks as a library or in the Docker images
-
-Rather than using the SDK to inject code, we could distribute the code (e.g. via a PyPI package) and/or embed it directly in the prebuilt trainer runtime Docker images .
+The runtime pods write the training status to the pod logs via stdout in an agreed format; the Kubeflow Trainer controller manager subscribes to the pod logs and updates the TrainJob status when log messages are observed.
 
 Pros:
 
-- Allows for larger amounts of code to be injected.
-- More conventional, so less surprising for users/contributors trying to understand how the injection works.
+- No need for new control plane service.
+- Push based: the training status is updated immediately.
+- Simple security model: cluster RBAC can be used to restrict access to the cluster
+- Less susceptible to hard-to-diagnose network misconfigurations, e.g. network policies blocking http requests.
 
 Cons:
 
-- Harder for users to create custom Docker images. Users need to be made aware that a library needs installing in their Docker image to enable support for progress tracking. We could get around this by automatically installing the library at runtime (similar to how the kubeflow-pipelines installs the kfp package at runtime), but this adds extra complication to support air-gapped clusters which do not have access to PyPI.
-- May be harder to maintain version compatibility: the package would need to be compatible with a wide range of kubeflow-sdk versions and KFT control plane versions.
-- May be harder for users to receive bug fixes to this runtime code. If the code is distributed in the trainer runtime docker images, platform engineers managing TrainingRuntimes may not be able to upgrade the base images frequently to pick up new package versions. The proposed approach of embedding the code in the kubeflow-sdk allows data scientists to pick up bug fixes by upgrading their sdk version.
+- Less scalable: runtime pods may output a high volume of log messages that need transferring to the controller; the approach may not scale to many simultaneously running train jobs. It also may put non-trivial burden on the kubernetes API server.
+- Reconciliation is no longer stateless: the controller must keep a long-lived request open for each active train job. Resuming broken requests is non-trivial.
+- Less secure: the controller must be granted clusterwide permission to read pod logs for any pod in the cluster.
