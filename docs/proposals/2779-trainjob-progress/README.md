@@ -54,9 +54,9 @@ I can use standard tools, like the Kubeflow Trainer Python SDK or `kubectl get t
 
 As a data scientist or ML Engineer, I want to create a TrainJob but I do not want to have to work out how to integrate training monitoring.
 
-## Proposal
+## Proposal option 1: Push-based
 
-We propose a **push-based** approach with the following high-level design:
+As a first option, we propose a **push-based** approach with the following high-level design:
 
 1. The TrainJob custom resource exposes the current training progress and metrics via a new optional field `status.trainerStatus`.
 2. The trainer control plane exposes a new http service which can receive the trainer status from the trainer runtime pods.
@@ -477,6 +477,185 @@ class TrainJob:
 * Adding a new "transformers-distributed" ClusterRuntime which will be included in the default set of cluster runtimes included in the manifests.
 * Publish new docker images for the "transformers-distributed"  runtime "ghcr.io/kubeflow/trainer/transformers-runtime". The docker image will include the transformers, accelerate and torch python packages.
 
+## Proposal option 2: pull-based
+
+As a second option to consider, we propose a **pull-based** approach with the following high-level design:
+
+1. As in proposal 1, the TrainJob custom resource exposes the current training progress and metrics via a new optional field `status.trainerStatus`.
+2. The user instruments their trainer runtime pod(s) so that the current trainer status is written to a local file.
+3. The control plane injects a sidecar container into **one** of the runtime pods which has access to that local file through a shared volume. The sidecar exposes an http server that serves the training progress and metrics from the shared file.
+4. The trainer control plane periodically scrapes the http server to fetch the progress and metrics and then updates the TrainJob custom resource.
+5. When training is completed, the main container terminates but the sidecar container waits for a final scrape from the control plane before exiting. This ensures the final train status is collected.
+
+As in Proposal 1, the feature is optional but available for all TrainJobs. Users opt in to the functionality by adding configuration to their TrainJob and instrumenting their runtime to write the metrics.
+
+Also as in Proposal 1, we propose adding the same set of new customer trainers to the kubeflow-sdk to make it easier for users to instrument their runtime pods.
+
+### Design Details
+
+#### TrainJob CRD changes
+
+In addition to the changes from Proposal 1, a new optional field `spec.trainer.monitoring` to the TrainJobSpec with the following schema:
+
+```go
+type Trainer struct {
+    // ... existing fields
+	
+    // monitoring defines configuration for monitoring the progress and metrics
+    // of the trainer part of the TrainJob.
+    // If empty, monitoring is disabled.
+    // +optional
+    Monitoring *MonitoringConfig `json:"monitoring,omitempty"`
+}
+
+// MonitoringConfig represents the desired configuration to monitor the training process.
+type MonitoringConfig struct {
+    // port is the port number that the control plane will use to scrape the runtime.
+    // The runtime should be serving metrics on this port.
+    // +kubebuilder:validation:Minimum=1
+    // +kubebuilder:validation:Maximum=65535
+    // +optional
+    Port *int32 `json:"port,omitempty"`
+	
+    // intervalSeconds is the interval at which the control plane will scrape metrics from the runtime.
+    // Defaults to 30 seconds.
+    // +kubebuilder:default=30
+    // +optional
+    IntervalSeconds *int32 `json:"intervalSeconds,omitempty"`
+}
+```
+
+```yaml
+# Sample TrainJob example with TrainerSpec and TrainerStatus status implemented
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+...
+spec:
+  trainer:
+    monitoring:
+      port: 28080
+      intervalSeconds: 30
+
+status:
+  trainerStatus:
+    # Overall progress
+    progressPercentage: 45                           # 45% complete
+    estimatedRemainingSeconds: 795649                # Precise duration
+    estimatedRemainingTimeSummary: "9 days 5 hours"  # Human-readable
+
+    # Training iterations
+    currentStep: 4500                                # Completed 4500 steps
+    totalSteps: 10000                                # Out of 10000 total
+    currentEpoch: 2                                  # On epoch 2
+    totalEpochs: 5                                   # Of 5 epochs
+
+    metrics:
+      # Training metrics (serialized as strings)
+      - type: train
+        values:                                      
+          loss: "0.2347"                             # Current training loss
+          learning_rate: "0.0001"                    # Current LR
+          grad_norm: "1.234"                         # Gradient norm
+
+      # Evaluation metrics (from validation set)
+      - type: eval
+        values:
+          eval_loss: "0.2451"                        # Validation loss
+          eval_accuracy: "0.8912"                    # Validation accuracy
+          eval_perplexity: "1.277"                   # Model perplexity
+
+    # Timestamp of last progress update
+    lastUpdatedTime: "2025-01-23T10:30:45Z"
+```
+
+#### Sidecar container
+
+A lightweight http server will be injected as a [sidecar container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) into **one** of the trainer pods. Only one sidecar will be injected to simplify collecting the final status (see [collecting the final metrics](#collecting-the-final-metrics) below).
+
+The sidecar will be implemented as a lightweight http server which shares an `emptyDir` volume with all other containers in the pod. The server will read the metrics directly from the shared file when handling each request.
+
+The user must instrument their runtime code so the main runtime container(s) will periodically write the current training status to a file in the shared volume. The file must contain a single json entry payload, with schema the same as `TrainJobTrainerStatus` but omitting the `estimatedRemainingTimeSummary` field, which will be calculated by the control plane for consistency.
+
+When updating the training status, the main container must replace the file contents so the file only ever contains a single status. This replacement should be done atomically using a temporary file followed by a rename to avoid the race condition of the http server reading a partially updated file. 
+
+The control plane will inject the path where training status should be written using an environment variable:
+```shell
+KUBEFLOW_TRAINER_STATUS_FILE=/var/kubeflow/trainer/status/status.json
+```
+
+The below summarises the sidecar container and volumes the control plane will inject:
+```yaml
+# mutated PodSpec
+spec:
+  initContainers:
+  - name: trainer-metrics-server
+    image: ghcr.io/kubeflow/trainer/trainer-metrics-server
+    restartPolicy: Always  # configure as sidecar
+    volumeMounts:
+    - mountPath: /var/kubeflow/trainer/status
+      name: kubeflow-trainer-status
+      readonly: true
+  containers:
+  - name: node
+    ...
+    volumeMounts:
+      - mountPath: /var/kubeflow/trainer/status
+        name: kubeflow-trainer-status
+  volumes:
+    - name: kubeflow-trainer-status
+      emptyDir: {}
+```
+
+#### Scraping the metrics
+
+If monitoring is enabled, the control plane will:
+- inject the sidecar into **one** of the trainer pods by creating a new `ReplicatedJob` with replicas=1 when creating the JobSet. This pod will be assigned a label `kubeflow-training-monitoring-pod`.  
+- create a new service `<train-job-name>-monitoring` in the train job namespace that points to the sidecar endpoint and uses that pod label as the selector.
+
+While the train job is active, the control plane will scrape the metrics server as part of its reconciliation loop using the `<train-job-name>-monitoring` service and update the TrainJob `trainingStatus`. The reconciliation will be re-queued to automatically trigger the next scrape.
+
+By default, the control plane will assume that all pods are equivalent and will select one pod arbitrarily to instrument with the sidecar. The user can override this by annotating one of the replicated jobs with `trainer.kubeflow.org/monitoring: enabled` which will cause the control plane to select a pod from that replicated job only.
+
+#### Collecting the final metrics
+
+To ensure the final training status is collected after training has completed successfully, the sidecar will wait for the control plane to make a final scrape:
+- when training completes, the main container terminates successfully and kubelet sends sigterm to the sidecar container.
+- when the sidecar receives the signal, it waits (with timeout) for the control plane to collect the final status and then terminates.
+
+The sidecar is injected into only **one** pod so the sidecar can easily detect when the final training status has been collected allowing it to terminate more quickly.
+
+#### Security considerations
+
+Securing the http server with auth and TLS can be achieved as follows:
+- the control plane creates a secret in the train job namespace containing an API key and a self-signed certificate. The control plane could periodically rotate these secrets.
+- the secret is accessed by the sidecar container through a volume mount.
+- before scraping the sidecar container, the control plane looks up the API key and certificate authority from the secret.
+
+However, as the data exposed by the http server may not be considered particularly sensitive, it may be acceptable to expose the metrics server without auth or TLS which would avoid a lot of complexity.
+
+#### RBAC changes
+
+No RBAC changes are required.
+
+#### SDK Changes: instrumenting runtime
+
+We're proposing adding the same new `TransformersTrainer` to the kubeflow-sdk, as per Proposal 1, with the following differences:
+- an additional parameter on the `TransformersTrainer` will allow users to specify the monitoring port.
+- the `KubeflowTrainerStatusCallback` injected into the runtime code will write the metrics data to the shared file in the required format rather than making a web request.
+
+## Comparison of the two proposed approaches
+
+|                                | Pull-based (web request)                                                                                                            | Push-based (http server sidecar)                                                                                                                                                                                                             |
+|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **User experience**            | Simple user experience. No additional config, users opt-in entirely through runtime code. Easier to debug problems.                 | Harder to configure, e.g. determining which pod to inject the sidecar into. Harder to debug (e.g. sidecar logs). The wait for collecting the final metrics may be frustrating for users who are interactively experimenting with train jobs. |
+| **Security**                   | New external endpoint creates an additional threat route for the control plane, e.g. for accidental/malicious denial-of-service.    | Securing the server with TLS requires putting secrets into user namespace. The blast radius from compromised secrets is smaller.                                                                                                             |
+| **Robustness**                 | Users must ensure failed web requests are handled and do not terminate terminate the training loop.                                 | Errors are less likely to terminate the training loop.                                                                                                                                                                                       |
+| **Complexity and maintenance** | Significant complexity in the endpoint auth mechanism, but complexity is managed once in the control plane.                         | Significant complexity in ensuring the final status is scraped. This complexity needs to be handled different by each training runtime.                                                                                                      |
+| **Compatibility**              | Compatible with any k8s version.                                                                                                    | Relies on sidecar containers which is k8s 1.33+ (beta in 1.29+).                                                                                                                                                                             |
+| **Flexibility**                | Highly flexible. Can support any framework that supports runtime instrumentation (e.g. using callbacks).                            | Highly flexible. Can support any framework that supports runtime instrumentation (e.g. using callbacks).                                                                                                                                     |
+| **Scalability**                | Should be highly scalable to thousands of simultaneous train jobs. Each train job should call the endpoint relatively infrequently. | Highly scalable. The control plane can scrape the training status on best-effort.                                                                                                                                                            |
+
 ## Other considered alternatives
 
 This section describes other approaches that were evaluated and the rationale for not selecting them.
@@ -494,21 +673,6 @@ Cons:
 - The trainer pods require privileged access to the API server. Given these pods are running arbitrary user code, this would warrant additional security sandboxing.
 - The trainer pods cannot use the default service account. The control plane would need to automatically create a service account with the required permissions for a train job, or users would need to provide a service account and ensure it has the necessary permissions.
 - The trainer runtime require a kubernetes client to be available, meaning it must either be pre-installed in the runtime or installed/injected at runtime.
-
-### Runtime serves trainer status on a webserver; control plane periodically scrapes the status
-
-Instrument the trainer pods to serve metrics via a small http server; the pod controller manager periodically scrapes the metrics by making a web request to a trainer pod. 
-
-Pros:
-
-- No need for new control plane service.
-- Potentially more scalable: the control plane can decide when the endpoints are scraped, meaning it can be best-effort based and/or the scraping frequency can be automatically reduced when a large number of train jobs are executing.
-
-Cons:
-
-- Pull based: trainer status updates may be delayed. Care must also be taken when a train job completes to allow for the "final" trainer status to be scraped before pod terminates.
-- Adds considerable extra complexity on the runtime instrumentation code. E.g. auth, tls, creating a webserver. The complexity must be handled by each ML framework.  
-- Requires additional control plane configuration. E.g. auth, tls config, port, scrape interval.
 
 ### Exposing metrics via MLFlow or Prometheus
 
