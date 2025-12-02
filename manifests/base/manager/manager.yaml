@@ -31,6 +31,13 @@ spec:
                 - ALL
             seccompProfile:
               type: RuntimeDefault
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+              name: monitoring-port
+            - containerPort: 9443
+              protocol: TCP
+              name: webhook-server
           volumeMounts:
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
