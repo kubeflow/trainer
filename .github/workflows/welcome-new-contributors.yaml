@@ -1,0 +1,59 @@
+name: Welcome new contributors
+
+on:
+  pull_request_target:
+    types:
+      - opened
+  issues:
+    types:
+      - opened
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/first-interaction@v3
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          issue_message: |
+            🎉 **Welcome to the Kubeflow Trainer project!** 🎉
+
+            Thanks for opening your first issue — we're excited to have you here 🚀
+
+            **What happens next:**
+            - Our maintainers will review your issue shortly  
+            - If you'd like to work on this, check out our contribution guides below
+
+            **Contribution Resources**
+            - Trainer Contributing Guide (coming soon / placeholder)
+            - Kubeflow Contributor Guide: https://www.kubeflow.org/docs/about/contributing/
+
+            **Community**
+            - Slack: Join **#kubeflow-trainer** and **#kubeflow-ml-experience**
+            - Meetings: https://bit.ly/kf-ml-experience
+
+            Thanks for contributing to Kubeflow Trainer! 🙏
+
+          pr_message: |
+            🎉 **Welcome to the Kubeflow Trainer project!** 🎉
+
+            Thanks for submitting your first pull request — we appreciate your contribution 🚀
+
+            **Next steps:**
+            - Please ensure you have read the contribution guidelines  
+            - Our maintainers will review your PR soon!
+
+            **Contribution Resources**
+            - Trainer Contributing Guide (coming soon / placeholder)
+            - Kubeflow Contributor Guide: https://www.kubeflow.org/docs/about/contributing/
+
+            **Community**
+            - Slack: Join **#kubeflow-trainer** and **#kubeflow-ml-experience**
+            - Meetings: https://bit.ly/kf-ml-experience
+
+            Feel free to ask any questions in the PR comments!
+            Thanks again for contributing 🙏
