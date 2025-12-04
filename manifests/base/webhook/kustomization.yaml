@@ -3,10 +3,15 @@ kind: Kustomization
 resources:
   - manifests.yaml
 patches:
-  - path: patch.yaml
+  - path: validating_webhook_patch.yaml
     target:
       group: admissionregistration.k8s.io
       version: v1
       kind: ValidatingWebhookConfiguration
+  - path: mutating_webhook_patch.yaml
+    target:
+      group: admissionregistration.k8s.io
+      version: v1
+      kind: MutatingWebhookConfiguration
 configurations:
   - kustomizeconfig.yaml

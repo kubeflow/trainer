@@ -237,6 +237,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				).
 				PodTemplateOverrides([]trainer.PodTemplateOverride{
 					{
+						Manager:    ptr.To("manager-1"),
 						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.DatasetInitializer}},
 						Spec: &trainer.PodTemplateSpecOverride{
 							InitContainers: []trainer.ContainerOverride{
@@ -322,6 +323,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
+						Manager:    ptr.To("manager-2"),
 						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
 						Spec: &trainer.PodTemplateSpecOverride{
 							ServiceAccountName: ptr.To("override-sa"),
@@ -615,12 +617,14 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				).
 				PodTemplateOverrides([]trainer.PodTemplateOverride{
 					{
+						Manager:    ptr.To("manager-1"),
 						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.DatasetInitializer}},
 						Spec: &trainer.PodTemplateSpecOverride{
 							Affinity: nil,
 						},
 					},
 					{
+						Manager:    ptr.To("manager-2"),
 						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
 						Spec: &trainer.PodTemplateSpecOverride{
 							Affinity: nil,
@@ -666,6 +670,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				).
 				PodTemplateOverrides([]trainer.PodTemplateOverride{
 					{
+						Manager:    ptr.To("manager-1"),
 						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.DatasetInitializer}},
 						Metadata: &metav1.ObjectMeta{
 							Labels:      map[string]string{"k1": "v1"},
@@ -673,6 +678,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
+						Manager:    ptr.To("manager-2"),
 						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
 						Metadata: &metav1.ObjectMeta{
 							Labels:      map[string]string{"k2": "v2"},
@@ -710,6 +716,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
 				PodTemplateOverrides([]trainer.PodTemplateOverride{
 					{
+						Manager:    ptr.To("manager-1"),
 						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
 						Spec: &trainer.PodTemplateSpecOverride{
 							NodeSelector: map[string]string{
@@ -718,6 +725,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
+						Manager:    ptr.To("manager-1"),
 						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
 						Spec: &trainer.PodTemplateSpecOverride{
 							ServiceAccountName: ptr.To("test-sa"),
@@ -751,6 +759,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
 				PodTemplateOverrides([]trainer.PodTemplateOverride{
 					{
+						Manager:    ptr.To("manager-1"),
 						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
 						Spec: &trainer.PodTemplateSpecOverride{
 							NodeSelector: map[string]string{
@@ -759,6 +768,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						},
 					},
 					{
+						Manager:    ptr.To("manager-1"),
 						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
 						Spec: &trainer.PodTemplateSpecOverride{
 							NodeSelector: map[string]string{
