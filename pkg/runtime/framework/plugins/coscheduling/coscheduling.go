@@ -112,7 +112,7 @@ func (c *CoScheduling) Build(ctx context.Context, info *runtime.Info, trainJob *
 	for _, ps := range info.TemplateSpec.PodSets {
 		count := *ps.Count
 		totalMembers += count
-		for resName, quantity := range ps.SinglePodRequests {
+		for resName, quantity := range ps.SinglePodResources {
 			quantity.Mul(int64(count))
 			current := totalResources[resName]
 			current.Add(quantity)
