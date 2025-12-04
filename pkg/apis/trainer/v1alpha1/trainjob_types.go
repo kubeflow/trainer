@@ -270,6 +270,10 @@ type PodTemplateOverride struct {
 	// +required
 	TargetJobs []PodTemplateOverrideTargetJob `json:"targetJobs,omitempty"`
 
+	// manager indicates who created this PodTemplateOverride object.
+	// +optional
+	Manager string `json:"manager,omitempty"`
+
 	// metadata overrides the Pod template metadata.
 	// These values will be merged with the TrainingRuntime's Pod template metadata.
 	// +optional

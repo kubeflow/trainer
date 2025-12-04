@@ -50,3 +50,10 @@ Create the name of the validating webhook configuration.
 {{- define "trainer.webhook.validatingWebhookConfiguration.name" -}}
 validator.trainer.kubeflow.org
 {{- end -}}
+
+{{/*
+Create the name of the mutating webhook configuration.
+*/}}
+{{- define "trainer.webhook.mutatingWebhookConfiguration.name" -}}
+defaulter.trainer.kubeflow.org
+{{- end -}}
