@@ -19,8 +19,8 @@ jobs:
     steps:
       - uses: actions/first-interaction@v3
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: |
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          issue_message: |
             🎉 **Welcome to the Kubeflow Trainer!** 🎉
 
             Thanks for opening your first issue! We're happy to have you as part of our community 🚀
@@ -37,7 +37,7 @@ jobs:
             Feel free to ask questions in the comments if you need any help or clarification!
             Thanks again for contributing to Kubeflow! 🙏
 
-          pr-message: |
+          pr_message: |
             🎉 **Welcome to the Kubeflow Trainer!** 🎉
 
             Thanks for opening your first PR! We're happy to have you as part of our community 🚀
