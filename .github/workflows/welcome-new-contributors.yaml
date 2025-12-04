@@ -45,7 +45,7 @@ jobs:
             **Here's what happens next:**
 
             - If you haven't already, please check out our [Contributing Guide](https://github.com/kubeflow/trainer/blob/master/CONTRIBUTING.md) for repo-specific guidelines and the [Kubeflow Contributor Guide](https://www.kubeflow.org/docs/about/contributing/) for general community standards.
-            - Our team will review your PR soon!
+            - Our team will review your PR soon! cc @kubeflow/kubeflow-trainer-team
 
             **Join the community:**
             - **Slack**: Join our [#kubeflow-trainer](https://www.kubeflow.org/docs/about/community/#kubeflow-slack-channels) Slack channel.
