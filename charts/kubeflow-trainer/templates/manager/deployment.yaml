@@ -30,7 +30,12 @@ spec:
     metadata:
       labels:
         {{- include "trainer.manager.selectorLabels" . | nindent 8 }}
+      annotations:
+        traffic.sidecar.istio.io/excludeInboundPorts: "9443"
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: manager
         image: {{ include "trainer.image" . }}
