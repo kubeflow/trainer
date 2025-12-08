@@ -56,7 +56,7 @@ func (b *builderIndexer) IndexField(_ context.Context, obj client.Object, field 
 	if obj == nil || field == "" || extractValue == nil {
 		return fmt.Errorf("error from test indexer")
 	}
-	b.ClientBuilder = b.ClientBuilder.WithIndex(obj, field, extractValue)
+	b.ClientBuilder = b.WithIndex(obj, field, extractValue)
 	return nil
 }
 

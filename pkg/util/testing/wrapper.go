@@ -520,18 +520,18 @@ func (j *JobSetWrapper) PodPriorityClassName(value string) *JobSetWrapper {
 }
 
 func (j *JobSetWrapper) Label(key, value string) *JobSetWrapper {
-	if j.ObjectMeta.Labels == nil {
-		j.ObjectMeta.Labels = make(map[string]string, 1)
+	if j.Labels == nil {
+		j.Labels = make(map[string]string, 1)
 	}
-	j.ObjectMeta.Labels[key] = value
+	j.Labels[key] = value
 	return j
 }
 
 func (j *JobSetWrapper) Annotation(key, value string) *JobSetWrapper {
-	if j.ObjectMeta.Annotations == nil {
-		j.ObjectMeta.Annotations = make(map[string]string, 1)
+	if j.Annotations == nil {
+		j.Annotations = make(map[string]string, 1)
 	}
-	j.ObjectMeta.Annotations[key] = value
+	j.Annotations[key] = value
 	return j
 }
 
@@ -665,10 +665,10 @@ func (t *TrainJobTrainerWrapper) NumProcPerNode(numProcPerNode intstr.IntOrStrin
 }
 
 func (t *TrainJobTrainerWrapper) Container(image string, command []string, args []string, resRequests corev1.ResourceList) *TrainJobTrainerWrapper {
-	t.Trainer.Image = &image
-	t.Trainer.Command = command
-	t.Trainer.Args = args
-	t.Trainer.ResourcesPerNode = &corev1.ResourceRequirements{
+	t.Image = &image
+	t.Command = command
+	t.Args = args
+	t.ResourcesPerNode = &corev1.ResourceRequirements{
 		Requests: resRequests,
 	}
 	return t
@@ -694,12 +694,12 @@ func MakeTrainJobInitializerWrapper() *TrainJobInitializerWrapper {
 }
 
 func (t *TrainJobInitializerWrapper) DatasetInitializer(datasetInitializer *trainer.DatasetInitializer) *TrainJobInitializerWrapper {
-	t.Initializer.Dataset = datasetInitializer
+	t.Dataset = datasetInitializer
 	return t
 }
 
 func (t *TrainJobInitializerWrapper) ModelInitializer(modelInitializer *trainer.ModelInitializer) *TrainJobInitializerWrapper {
-	t.Initializer.Model = modelInitializer
+	t.Model = modelInitializer
 	return t
 }
 
@@ -901,18 +901,18 @@ func MakeTrainingRuntimeWrapper(namespace, name string) *TrainingRuntimeWrapper 
 }
 
 func (r *TrainingRuntimeWrapper) Label(key, value string) *TrainingRuntimeWrapper {
-	if r.ObjectMeta.Labels == nil {
-		r.ObjectMeta.Labels = make(map[string]string, 1)
+	if r.Labels == nil {
+		r.Labels = make(map[string]string, 1)
 	}
-	r.ObjectMeta.Labels[key] = value
+	r.Labels[key] = value
 	return r
 }
 
 func (r *TrainingRuntimeWrapper) Annotation(key, value string) *TrainingRuntimeWrapper {
-	if r.ObjectMeta.Annotations == nil {
-		r.ObjectMeta.Annotations = make(map[string]string, 1)
+	if r.Annotations == nil {
+		r.Annotations = make(map[string]string, 1)
 	}
-	r.ObjectMeta.Annotations[key] = value
+	r.Annotations[key] = value
 	return r
 }
 
@@ -1289,17 +1289,17 @@ func MakeSchedulerPluginsPodGroup(namespace, name string) *SchedulerPluginsPodGr
 }
 
 func (p *SchedulerPluginsPodGroupWrapper) MinMember(members int32) *SchedulerPluginsPodGroupWrapper {
-	p.PodGroup.Spec.MinMember = members
+	p.Spec.MinMember = members
 	return p
 }
 
 func (p *SchedulerPluginsPodGroupWrapper) MinResources(resources corev1.ResourceList) *SchedulerPluginsPodGroupWrapper {
-	p.PodGroup.Spec.MinResources = resources
+	p.Spec.MinResources = resources
 	return p
 }
 
 func (p *SchedulerPluginsPodGroupWrapper) SchedulingTimeout(timeout int32) *SchedulerPluginsPodGroupWrapper {
-	p.PodGroup.Spec.ScheduleTimeoutSeconds = &timeout
+	p.Spec.ScheduleTimeoutSeconds = &timeout
 	return p
 }
 
@@ -1339,27 +1339,27 @@ func MakeVolcanoPodGroup(namespace, name string) *VolcanoPodGroupWrapper {
 }
 
 func (p *VolcanoPodGroupWrapper) MinMember(members int32) *VolcanoPodGroupWrapper {
-	p.PodGroup.Spec.MinMember = members
+	p.Spec.MinMember = members
 	return p
 }
 
 func (p *VolcanoPodGroupWrapper) MinResources(resources *corev1.ResourceList) *VolcanoPodGroupWrapper {
-	p.PodGroup.Spec.MinResources = resources
+	p.Spec.MinResources = resources
 	return p
 }
 
 func (p *VolcanoPodGroupWrapper) Queue(queue string) *VolcanoPodGroupWrapper {
-	p.PodGroup.Spec.Queue = queue
+	p.Spec.Queue = queue
 	return p
 }
 
 func (p *VolcanoPodGroupWrapper) PriorityClassName(pc string) *VolcanoPodGroupWrapper {
-	p.PodGroup.Spec.PriorityClassName = pc
+	p.Spec.PriorityClassName = pc
 	return p
 }
 
 func (p *VolcanoPodGroupWrapper) NetworkTopology(mode volcanov1beta1.NetworkTopologyMode, highestTier int) *VolcanoPodGroupWrapper {
-	p.PodGroup.Spec.NetworkTopology = &volcanov1beta1.NetworkTopologySpec{
+	p.Spec.NetworkTopology = &volcanov1beta1.NetworkTopologySpec{
 		Mode:               mode,
 		HighestTierAllowed: &highestTier,
 	}
@@ -1374,7 +1374,7 @@ func (p *VolcanoPodGroupWrapper) ControllerReference(gvk schema.GroupVersionKind
 			UID:       types.UID(uid),
 		},
 	}, gvk)
-	p.PodGroup.OwnerReferences = append(p.PodGroup.OwnerReferences, owner)
+	p.OwnerReferences = append(p.OwnerReferences, owner)
 	return p
 }
 

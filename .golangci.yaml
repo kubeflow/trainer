@@ -1,18 +1,23 @@
 # golangci-lint configuration file
 # see: https://golangci-lint.run/usage/configuration/
 
-# Settings of specific linters
-linters-settings:
-  gci:
-    sections:
-      - standard # Standard section: captures all standard packages.
-      - default # Default section: contains all imports that could not be matched to another section type.
-      - prefix(github.com/kubeflow/trainer/v2) # Custom section: groups all imports with the specified Prefix.
-      - blank # Blank section: contains all blank imports. This section is not present unless explicitly enabled.
-      - dot # Dot section: contains all dot imports.
-    skip-generated: true # Skip generated files.
+version: "2"
 
-# Settings for enabling and disabling linters
-linters:
+run:
+  go: "1.24"
+  allow-parallel-runners: true
+
+issues:
+  max-same-issues: 0
+
+formatters:
   enable:
     - gci
+  settings:
+    gci:
+      sections:
+        - standard # Standard section: captures all standard packages.
+        - default # Default section: contains all imports that could not be matched to another section type.
+        - prefix(github.com/kubeflow/trainer) # Custom section: groups all imports with the specified Prefix.
+        - blank # Blank section: contains all blank imports. This section is not present unless explicitly enabled.
+        - dot # Dot section: contains all dot imports.

@@ -46,13 +46,11 @@ var (
 )
 
 func MPISecretDataComparer(a, b map[string][]byte) bool {
-	isKeysEqual := true
-	if (a != nil && b != nil) &&
-		((len(a[constants.MPISSHPublicKey]) > 0) != (len(b[constants.MPISSHPublicKey]) > 0) ||
-			(len(a[corev1.SSHAuthPrivateKey]) > 0) != (len(b[corev1.SSHAuthPrivateKey]) > 0)) {
-		isKeysEqual = false
-	}
-	return isKeysEqual && cmp.Equal(a, b, cmpopts.IgnoreMapEntries(func(k string, _ []byte) bool {
+	areKeysEqual := (a == nil || b != nil) ||
+		((len(a[constants.MPISSHPublicKey]) > 0) == (len(b[constants.MPISSHPublicKey]) > 0) &&
+			(len(a[corev1.SSHAuthPrivateKey]) > 0) == (len(b[corev1.SSHAuthPrivateKey]) > 0))
+
+	return areKeysEqual && cmp.Equal(a, b, cmpopts.IgnoreMapEntries(func(k string, _ []byte) bool {
 		return k == constants.MPISSHPublicKey || k == corev1.SSHAuthPrivateKey
 	}))
 }
