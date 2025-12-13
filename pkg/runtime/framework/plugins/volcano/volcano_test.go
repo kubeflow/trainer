@@ -94,7 +94,7 @@ func TestVolcano(t *testing.T) {
 				{
 					Name:  "launcher",
 					Count: ptr.To[int32](1),
-					SinglePodRequests: corev1.ResourceList{
+					SinglePodResources: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("300m"),
 						corev1.ResourceMemory: resource.MustParse("1Gi"),
 					},
@@ -102,7 +102,7 @@ func TestVolcano(t *testing.T) {
 				{
 					Name:  "worker",
 					Count: ptr.To[int32](4),
-					SinglePodRequests: corev1.ResourceList{
+					SinglePodResources: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("500m"),
 						corev1.ResourceMemory: resource.MustParse("0.5Gi"),
 					},
