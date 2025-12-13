@@ -12,7 +12,7 @@ arrow = "55.0.0"
 arrow-schema = "55.0.0"
 serde = { version = "1.0.228", features = ["derive"] }
 async-trait = "0.1.89"
-iceberg-datafusion = "0.5.0"
+iceberg-datafusion = "0.6.0"
 iceberg = "0.5.0"
 futures = "0.3.31"
 arrow-flight = "55.0.0"
