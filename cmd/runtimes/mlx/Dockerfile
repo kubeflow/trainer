@@ -1,5 +1,5 @@
 FROM mpioperator/base:v0.7.0 AS mpi
-FROM nvidia/cuda:13.0.2-devel-ubuntu22.04
+FROM nvidia/cuda:13.1.0-devel-ubuntu22.04
 
 # Install libraries required for OpenMPI to work. Image installs OpenMPI 5.0.7
 RUN apt update && apt install -y --no-install-recommends \
