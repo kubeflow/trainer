@@ -65,3 +65,8 @@ type TrainJobStatusPlugin interface {
 	Plugin
 	Status(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error)
 }
+
+type SuspendSyncPlugin interface {
+	Plugin
+	SyncSuspend(ctx context.Context, trainJob *trainer.TrainJob) error
+}

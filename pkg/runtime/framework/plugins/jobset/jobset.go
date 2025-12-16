@@ -60,11 +60,14 @@ type JobSet struct {
 	logger     logr.Logger
 }
 
-var _ framework.WatchExtensionPlugin = (*JobSet)(nil)
-var _ framework.PodNetworkPlugin = (*JobSet)(nil)
-var _ framework.ComponentBuilderPlugin = (*JobSet)(nil)
-var _ framework.TrainJobStatusPlugin = (*JobSet)(nil)
-var _ framework.CustomValidationPlugin = (*JobSet)(nil)
+var (
+	_ framework.WatchExtensionPlugin   = (*JobSet)(nil)
+	_ framework.PodNetworkPlugin       = (*JobSet)(nil)
+	_ framework.ComponentBuilderPlugin = (*JobSet)(nil)
+	_ framework.TrainJobStatusPlugin   = (*JobSet)(nil)
+	_ framework.CustomValidationPlugin = (*JobSet)(nil)
+	_ framework.SuspendSyncPlugin      = (*JobSet)(nil)
+)
 
 const Name = constants.JobSetKind
 
@@ -145,7 +148,6 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 				}
 			}
 		}
-
 	}
 
 	return nil, allErrs
@@ -239,7 +241,7 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		return nil, fmt.Errorf("runtime info or object is missing")
 	}
 
-	// Do not update the JobSet if it already exists and is not suspended
+	// Check if JobSet already exists
 	oldJobSet := &jobsetv1alpha2.JobSet{}
 	if err := j.client.Get(ctx, client.ObjectKeyFromObject(trainJob), oldJobSet); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -247,6 +249,7 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		}
 		oldJobSet = nil
 	}
+
 	if oldJobSet != nil &&
 		!ptr.Deref(trainJob.Spec.Suspend, false) &&
 		!ptr.Deref(oldJobSet.Spec.Suspend, false) {
@@ -288,12 +291,20 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 
 	// TODO (andreyvelich): Refactor the builder with wrappers for PodSpec.
 	// TODO: Once we remove deprecated runtime.Info.Trainer, we should remove JobSet Builder with DeprecatedTrainer().
-	jobSet := jobSetBuilder.
+	jobSetBuilder = jobSetBuilder.
 		Initializer(trainJob).
 		Trainer(info, trainJob).
 		PodLabels(info.Scheduler.PodLabels).
-		PodAnnotations(info.Scheduler.PodAnnotations).
-		Suspend(trainJob.Spec.Suspend).
+		PodAnnotations(info.Scheduler.PodAnnotations)
+
+	// Only set suspend on initial creation. For existing JobSets, suspend is
+	// managed separately via SyncSuspend using merge patch. SSA without this
+	// field leaves the existing suspend value unchanged (releases ownership only).
+	if oldJobSet == nil {
+		jobSetBuilder = jobSetBuilder.Suspend(trainJob.Spec.Suspend)
+	}
+
+	jobSet := jobSetBuilder.
 		Build().
 		WithOwnerReferences(metav1ac.OwnerReference().
 			WithAPIVersion(trainer.GroupVersion.String()).
@@ -336,4 +347,24 @@ func (j *JobSet) Status(ctx context.Context, trainJob *trainer.TrainJob) (*train
 	status.JobsStatus = statuses
 
 	return status, nil
+}
+
+func (j *JobSet) SyncSuspend(ctx context.Context, trainJob *trainer.TrainJob) error {
+	jobSet := &jobsetv1alpha2.JobSet{}
+	if err := j.client.Get(ctx, client.ObjectKeyFromObject(trainJob), jobSet); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	trainJobSuspend := ptr.Deref(trainJob.Spec.Suspend, false)
+	jobSetSuspend := ptr.Deref(jobSet.Spec.Suspend, false)
+
+	if trainJobSuspend != jobSetSuspend {
+		patch := client.MergeFrom(jobSet.DeepCopy())
+		jobSet.Spec.Suspend = ptr.To(trainJobSuspend)
+		if err := j.client.Patch(ctx, jobSet, patch); err != nil {
+			return fmt.Errorf("failed to patch JobSet suspend field: %w", err)
+		}
+	}
+
+	return nil
 }

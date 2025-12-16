@@ -44,6 +44,7 @@ type Framework struct {
 	podNetworkPlugins            []framework.PodNetworkPlugin
 	componentBuilderPlugins      []framework.ComponentBuilderPlugin
 	trainJobStatusPlugin         framework.TrainJobStatusPlugin
+	suspendSyncPlugins           []framework.SuspendSyncPlugin
 }
 
 func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer client.FieldIndexer) (*Framework, error) {
@@ -84,6 +85,9 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 				return nil, errorTooManyTrainJobStatusPlugin
 			}
 			f.trainJobStatusPlugin = p
+		}
+		if p, ok := plugin.(framework.SuspendSyncPlugin); ok {
+			f.suspendSyncPlugins = append(f.suspendSyncPlugins, p)
 		}
 	}
 	f.plugins = plugins
@@ -149,6 +153,15 @@ func (f *Framework) RunTrainJobStatusPlugin(ctx context.Context, trainJob *train
 		return f.trainJobStatusPlugin.Status(ctx, trainJob)
 	}
 	return nil, nil
+}
+
+func (f *Framework) RunSuspendSyncPlugins(ctx context.Context, trainJob *trainer.TrainJob) error {
+	for _, plugin := range f.suspendSyncPlugins {
+		if err := plugin.SyncSuspend(ctx, trainJob); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (f *Framework) WatchExtensionPlugins() []framework.WatchExtensionPlugin {

@@ -70,8 +70,10 @@ func WithWatchers(watchers ...TrainJobWatcher) TrainJobReconcilerOption {
 	}
 }
 
-var _ reconcile.Reconciler = (*TrainJobReconciler)(nil)
-var _ predicate.TypedPredicate[*trainer.TrainJob] = (*TrainJobReconciler)(nil)
+var (
+	_ reconcile.Reconciler                        = (*TrainJobReconciler)(nil)
+	_ predicate.TypedPredicate[*trainer.TrainJob] = (*TrainJobReconciler)(nil)
+)
 
 func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, runtimes map[string]jobruntimes.Runtime, opts ...TrainJobReconcilerOption) *TrainJobReconciler {
 	options := &TrainJobReconcilerOptions{}
@@ -145,12 +147,23 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
+	if ptr.Deref(trainJob.Spec.Suspend, false) {
+		if err := runtime.SyncSuspend(ctx, trainJob); err != nil {
+			return err
+		}
+	}
+
 	objects, err := runtime.NewObjects(ctx, trainJob)
 	if err != nil {
 		return err
 	}
 	for _, object := range objects {
 		if err := r.client.Apply(ctx, object, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
+			return err
+		}
+	}
+	if !ptr.Deref(trainJob.Spec.Suspend, false) {
+		if err := runtime.SyncSuspend(ctx, trainJob); err != nil {
 			return err
 		}
 	}

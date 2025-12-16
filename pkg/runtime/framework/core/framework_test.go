@@ -114,6 +114,9 @@ func TestNew(t *testing.T) {
 					&mpi.MPI{},
 				},
 				trainJobStatusPlugin: &jobset.JobSet{},
+				suspendSyncPlugins: []framework.SuspendSyncPlugin{
+					&jobset.JobSet{},
+				},
 			},
 		},
 		"indexer key for trainingRuntime and runtimeClass is an empty": {
