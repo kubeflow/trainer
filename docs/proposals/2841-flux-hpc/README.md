@@ -91,41 +91,17 @@ For the `FluxMLPolicySource`, we define the minimum required parameters needed f
 type FluxMLPolicySource struct {
 
     // numNodes is the number of physical nodes for the job.
-    // This is defined a level up on the Trainer
+    // This is defined a level up on the MLPolicy directly.
 
     // numProcPerNode is the number of processes per node.
     // Defaults to 1.
     // +kubebuilder:default=1
     // +optional
     NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
-
-    // Container image to use for Flux view that installs Flux
-    // This must be compatible with the application container
-    // Get the flux view container (these are choices)
-    // ghcr.io/converged-computing/flux-view-rocky:arm-9
-    // ghcr.io/converged-computing/flux-view-rocky:arn-8
-    // ghcr.io/converged-computing/flux-view-rocky:tag-9
-    // ghcr.io/converged-computing/flux-view-rocky:tag-8
-    // ghcr.io/converged-computing/flux-view-ubuntu:tag-noble
-    // ghcr.io/converged-computing/flux-view-ubuntu:tag-jammy
-    // ghcr.io/converged-computing/flux-view-ubuntu:tag-focal
-    // ghcr.io/converged-computing/flux-view-ubuntu:arm-jammy
-    // ghcr.io/converged-computing/flux-view-ubuntu:arm-focal
-    // We use an ubuntu (more recent) default since it is common
-    // +kubebuilder:default="ghcr.io/converged-computing/flux-view-ubuntu:arm-jammy"
-    Image string `json:"image,omitempty"`
-
-    // Network device for flux to use
-    // +kubebuilder:default="eth0"
-    NetworkDevice string `json:"networkDevice,omitempty"`
-
-    // Queue policy for Flux to use
-    // +kubebuilder:default="fcfs"
-    QueuePolicy string `json:"queuePolicy,omitempty"`
 }
 ```
 
-Note that we are not exposing interactive or other options that are widely used, but not required.
+Note that we are not exposing interactive or other options that are widely used, but not required. The network device for nodes will default to `eth0` and the queue policy `fcfs`. These are parameters that likely will need to be eventually exposed.
 
 **Example `ClusterTrainingRuntime`:**
 
@@ -140,19 +116,22 @@ metadata:
     trainer.kubeflow.org/framework: flux
 spec:
   mlPolicy:
-    flux:
-      numNodes: 1
+    numNodes: 1
+    flux: {}
   template:
     spec:
       replicatedJobs:
-        - name: trainer
+        - name: node
           template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
             spec:
-              completionMode: Indexed
-              completions: 1
-              parallelism: 1
               template:
                 spec:
+                  initContainers:
+                    - name: flux-bootstrap
+                      image: ghcr.io/converged-computing/flux-view-ubuntu:tag-jammy
                   containers:
                     - name: node
                       image: "placeholder-image"
@@ -180,6 +159,6 @@ spec:
 
 1.  **Controller Logic:** When reconciling a `TrainJob`, the controller fetches the referenced `TrainingRuntime` or `ClusterTrainingRuntime`. It then passes the entire `spec` of the runtime, including the `mlPolicy`, to the plugin framework via the `runtime.Info` struct.
 
-2.  **Plugin Logic:** We add components of Flux via `Build` if the user has defined a Flux policy. The design integrates with the existing Kubeflow Trainer API.
+2.  **Plugin Logic:** We add components of Flux via `Build` if the user has defined a Flux policy. Components include customization of the application and init containers along with a shared empty directory volume and `ConfigMap` for the entrypoint logic. The design integrates with the existing Kubeflow Trainer API.
 
 - 2025.10.29: KEP Creation
