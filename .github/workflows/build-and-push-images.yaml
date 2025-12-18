@@ -9,82 +9,79 @@ on:
       - "v*"
   pull_request:
 
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-publish:
-    name: Build and Publish Images
     if: github.repository == 'kubeflow/trainer'
-    runs-on: oracle-vm-16cpu-64gb-x86-64
-
-    env:
-      SHOULD_PUBLISH: ${{ github.event_name == 'push' }}
 
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - component-name: trainer-controller-manager
+        component:
+          - name: trainer-controller-manager
             dockerfile: cmd/trainer-controller-manager/Dockerfile
-            platforms: linux/amd64,linux/arm64,linux/ppc64le
-          - component-name: model-initializer
+            x86_platforms: linux/amd64,linux/ppc64le
+            arm_platforms: linux/arm64
+
+          - name: model-initializer
             dockerfile: cmd/initializers/model/Dockerfile
-            platforms: linux/amd64,linux/arm64
-          - component-name: dataset-initializer
+            x86_platforms: linux/amd64
+            arm_platforms: linux/arm64
+
+          - name: dataset-initializer
             dockerfile: cmd/initializers/dataset/Dockerfile
-            platforms: linux/amd64,linux/arm64
-          - component-name: deepspeed-runtime
+            x86_platforms: linux/amd64
+            arm_platforms: linux/arm64
+
+          - name: deepspeed-runtime
             dockerfile: cmd/runtimes/deepspeed/Dockerfile
-            platforms: linux/amd64,linux/arm64
-          # TODO (andreyvelich): mlx[cuda] doesn't support arm at the moment: https://github.com/ml-explore/mlx/issues/2469
-          - component-name: mlx-runtime
+            x86_platforms: linux/amd64
+            arm_platforms: linux/arm64
+
+          - name: mlx-runtime
             dockerfile: cmd/runtimes/mlx/Dockerfile
-            platforms: linux/amd64
-          - component-name: torchtune-trainer
+            x86_platforms: linux/amd64
+
+          - name: torchtune-trainer
             dockerfile: cmd/trainers/torchtune/Dockerfile
-            platforms: linux/amd64,linux/arm64
-          - component-name: data-cache
+            x86_platforms: linux/amd64
+            arm_platforms: linux/arm64
+
+          - name: data-cache
             dockerfile: cmd/data_cache/Dockerfile
-            platforms: linux/amd64,linux/arm64
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+            x86_platforms: linux/amd64
+            arm_platforms: linux/arm64
 
-      - name: GHCR Login
-        if: env.SHOULD_PUBLISH == 'true'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        arch:
+          - name: x86
+            runs-on: oracle-vm-16cpu-64gb-x86-64
+            platforms_key: x86_platforms
 
-      - name: Docker Hub Login
-        if: env.SHOULD_PUBLISH == 'true'
-        uses: docker/login-action@v3
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          - name: arm64
+            runs-on: oracle-16cpu-64gb-arm64
+            platforms_key: arm_platforms
 
-      - name: Publish Component ${{ matrix.component-name }}
-        if: env.SHOULD_PUBLISH == 'true'
-        id: publish
-        uses: ./.github/workflows/template-publish-image
-        with:
-          image: |
-            ghcr.io/kubeflow/trainer/${{ matrix.component-name }}
-            docker.io/kubeflow/${{ matrix.component-name }}
-          dockerfile: ${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platforms }}
-          context: ${{ matrix.context }}
-          push: true
+        exclude:
+          - component:
+              name: mlx-runtime
+            arch:
+              name: arm64
 
-      - name: Test Build For Component ${{ matrix.component-name }}
-        if: env.SHOULD_PUBLISH != 'true'
-        uses: ./.github/workflows/template-publish-image
-        with:
-          image: |
-            ghcr.io/kubeflow/trainer/${{ matrix.component-name }}
-            docker.io/kubeflow/${{ matrix.component-name }}
-          dockerfile: ${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platforms }}
-          context: ${{ matrix.context }}
-          push: false
+    uses: ./.github/workflows/template-publish-image/action.yaml
+    with:
+      component-name: ${{ matrix.component.name }}
+      dockerfile: ${{ matrix.component.dockerfile }}
+      platforms: ${{ matrix.component[matrix.arch.platforms_key] }}
+      context: .
+      runs-on: ${{ matrix.arch.runs-on }}
+
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
