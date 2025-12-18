@@ -1,97 +1,135 @@
-# Composite action to publish Kubeflow Trainer images.
+# Reusable workflow to publish Kubeflow Trainer images.
 name: Build And Publish Container Images
 description: Build Multiplatform Supporting Container Images
 
-inputs:
-  image:
-    required: true
-    description: image tag
-  dockerfile:
-    required: true
-    description: path for Dockerfile
-  platforms:
-    required: true
-    description: e.g, linux/amd64
-  context:
-    required: false
-    default: .
-    description: e.g, examples/xgboost/xgboost-dist
-  push:
-    required: true
-    description: whether to push container images or not
+on:
+  workflow_call:
+    inputs:
+      component-name:
+        required: true
+        type: string
+        description: "Name of the component to build"
+      dockerfile:
+        required: true
+        type: string
+        description: "Path to the Dockerfile"
+      platforms:
+        required: true
+        type: string
+        description: "Platforms to build for (e.g., linux/amd64,linux/arm64)"
+      context:
+        required: false
+        type: string
+        default: "."
+        description: "Build context"
+      runs-on:
+        required: true
+        type: string
+        description: "Runner label to execute on"
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
 
-runs:
-  using: composite
-  steps:
-    # This step is a Workaround to avoid the "No space left on device" error.
-    # ref: https://github.com/actions/runner-images/issues/2840
-    - name: Remove unnecessary files
-      shell: bash
-      run: |
-        echo "Disk usage before cleanup:"
-        df -hT
+jobs:
+  build-and-publish:
+    name: Build ${{ inputs.component-name }}
+    runs-on: ${{ inputs.runs-on }}
+    env:
+      SHOULD_PUBLISH: ${{ github.event_name == 'push' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
 
-        sudo rm -rf /usr/share/dotnet
-        sudo rm -rf /opt/ghc
-        sudo rm -rf /usr/local/share/boost
-        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-        sudo rm -rf /usr/local/lib/android
-        sudo rm -rf /usr/local/share/powershell
-        sudo rm -rf /usr/share/swift
+      # This step is a Workaround to avoid the "No space left on device" error.
+      # ref: https://github.com/actions/runner-images/issues/2840
+      - name: Remove unnecessary files
+        shell: bash
+        run: |
+          echo "Disk usage before cleanup:"
+          df -hT
 
-        echo "Disk usage after cleanup:"
-        df -hT
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/share/swift
 
-    - name: Prune docker images
-      shell: bash
-      run: |
-        docker image prune -a -f
-        docker system df
-        df -hT
+          echo "Disk usage after cleanup:"
+          df -hT
 
-    - name: Move docker data directory
-      shell: bash
-      run: |
-        echo "Stopping docker service ..."
-        sudo systemctl stop docker
-        DOCKER_DEFAULT_ROOT_DIR=/var/lib/docker
-        DOCKER_ROOT_DIR=/mnt/docker
-        echo "Moving ${DOCKER_DEFAULT_ROOT_DIR} -> ${DOCKER_ROOT_DIR}"
-        sudo mv ${DOCKER_DEFAULT_ROOT_DIR} ${DOCKER_ROOT_DIR}
-        echo "Creating symlink ${DOCKER_DEFAULT_ROOT_DIR} -> ${DOCKER_ROOT_DIR}"
-        sudo ln -s ${DOCKER_ROOT_DIR} ${DOCKER_DEFAULT_ROOT_DIR}
-        echo "$(sudo ls -l ${DOCKER_DEFAULT_ROOT_DIR})"
-        echo "Starting docker service ..."
-        sudo systemctl daemon-reload
-        sudo systemctl start docker
-        echo "Docker service status:"
-        sudo systemctl --no-pager -l -o short status docker
+      - name: Prune docker images
+        shell: bash
+        run: |
+          docker image prune -a -f
+          docker system df
+          df -hT
 
-    - name: Setup QEMU
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: amd64,ppc64le,arm64
+      - name: Move docker data directory
+        shell: bash
+        run: |
+          echo "Stopping docker service ..."
+          sudo systemctl stop docker
+          DOCKER_DEFAULT_ROOT_DIR=/var/lib/docker
+          DOCKER_ROOT_DIR=/mnt/docker
+          echo "Moving ${DOCKER_DEFAULT_ROOT_DIR} -> ${DOCKER_ROOT_DIR}"
+          # Check if source exists before moving
+          if [ -d "$DOCKER_DEFAULT_ROOT_DIR" ]; then
+             sudo mv ${DOCKER_DEFAULT_ROOT_DIR} ${DOCKER_ROOT_DIR}
+          else
+             echo "$DOCKER_DEFAULT_ROOT_DIR does not exist, creating $DOCKER_ROOT_DIR"
+             sudo mkdir -p ${DOCKER_ROOT_DIR}
+          fi
+          echo "Creating symlink ${DOCKER_DEFAULT_ROOT_DIR} -> ${DOCKER_ROOT_DIR}"
+          sudo ln -s ${DOCKER_ROOT_DIR} ${DOCKER_DEFAULT_ROOT_DIR}
+          echo "$(sudo ls -l ${DOCKER_DEFAULT_ROOT_DIR})"
+          echo "Starting docker service ..."
+          sudo systemctl daemon-reload
+          sudo systemctl start docker
+          echo "Docker service status:"
+          sudo systemctl --no-pager -l -o short status docker
 
-    - name: Set Up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: GHCR Login
+        if: env.SHOULD_PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Add Docker Tags
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ inputs.image }}
-        tags: |
-          type=ref,event=tag
-          type=raw,value=latest,enable={{is_default_branch}}
-          type=sha
+      - name: Docker Hub Login
+        if: env.SHOULD_PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and Push
-      uses: docker/build-push-action@v5
-      with:
-        platforms: ${{ inputs.platforms }}
-        context: ${{ inputs.context }}
-        file: ${{ inputs.dockerfile }}
-        push: ${{ inputs.push }}
-        tags: ${{ steps.meta.outputs.tags }}
-        cache-from: type=gha
-        cache-to: type=gha,ignore-error=true
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Add Docker Tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/kubeflow/trainer/${{ inputs.component-name }}
+            docker.io/kubeflow/${{ inputs.component-name }}
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          platforms: ${{ inputs.platforms }}
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          push: ${{ env.SHOULD_PUBLISH == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,ignore-error=true
