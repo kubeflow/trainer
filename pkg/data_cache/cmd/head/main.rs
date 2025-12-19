@@ -1,10 +1,10 @@
+use hickory_resolver::TokioAsyncResolver;
+use hickory_resolver::config::*;
 use std::env;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::info;
 use tracing_subscriber;
-use trust_dns_resolver::TokioAsyncResolver;
-use trust_dns_resolver::config::*;
 
 use kubeflow_data_cache::head;
 

@@ -12,6 +12,7 @@ use arrow_flight::{
     flight_service_server::FlightService,
 };
 use arrow_schema::DataType;
+use bincode::config;
 use bytes::Bytes;
 use datafusion::prelude::{SessionConfig, SessionContext};
 use futures::{Stream, StreamExt, TryStreamExt};
@@ -137,8 +138,10 @@ impl FlightService for WorkerService {
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         info!("querying worker");
         let ticket = request.into_inner();
-        let pair = bincode::deserialize::<IndexPair>(&ticket.ticket)
-            .map_err(|e| Status::internal(format!("Deserialization error: {}", e)))?;
+
+        let config = config::standard();
+        let (pair, _): (IndexPair, usize) = bincode::decode_from_slice(&ticket.ticket, config)
+            .map_err(|_e| Status::invalid_argument("Invalid ticket format"))?;
         info!("{:?}", pair);
         let df = self
             .ctx

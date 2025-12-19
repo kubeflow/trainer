@@ -7,7 +7,7 @@ use arrow_flight::{
     flight_service_server::FlightService,
 };
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
-use bincode;
+use bincode::config;
 use bytes::Bytes;
 use datafusion::prelude::SessionContext;
 use futures::Stream;
@@ -129,7 +129,7 @@ impl FlightService for HeadService {
     /// # Example Usage
     ///
     /// For a client requesting partition 0 of 4 total partitions:
-    /// ```
+    /// ```text
     /// path = ["0", "4"]
     /// // Returns flight endpoints for rows 0 to (total_rows/4 - 1)
     /// ```
@@ -179,15 +179,16 @@ impl FlightService for HeadService {
         };
         let mut endpoints = vec![];
         for uri in workers.map_err(|e| Status::internal(format!("Error getting workers: {}", e)))? {
+            let config = config::standard();
             endpoints.push(FlightEndpoint {
                 ticket: Some(Ticket::new(Bytes::from(
-                    bincode::serialize(&pair)
+                    bincode::encode_to_vec(&pair, config)
                         .map_err(|e| Status::internal(format!("Serialization error: {}", e)))?,
                 ))),
                 location: vec![Location { uri }],
                 expiration_time: None,
                 app_metadata: Bytes::from(
-                    bincode::serialize(&pair)
+                    bincode::encode_to_vec(&pair, config)
                         .map_err(|e| Status::internal(format!("Serialization error: {}", e)))?,
                 ),
             });
@@ -293,6 +294,7 @@ use crate::health::{HealthState, head_router, start_health_server};
 /// # Usage
 ///
 /// ```rust
+/// use kubeflow_data_cache::config::config::IndexPair;
 /// let range = IndexPair { start: 0, end: 999 };
 /// // Represents rows 0 through 999 (1000 rows total)
 /// ```
@@ -415,7 +417,7 @@ fn arrow_schema() -> SchemaRef {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```text
 /// // 100 rows, 4 partitions
 /// assert_eq!(get_partition_range(100, 4, 0), Some((0, 24)));   // Rows 0-24
 /// assert_eq!(get_partition_range(100, 4, 1), Some((25, 49)));  // Rows 25-49

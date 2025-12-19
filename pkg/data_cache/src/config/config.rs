@@ -1,3 +1,4 @@
+use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::sync::Arc;
@@ -7,7 +8,7 @@ use std::time::Duration;
 pub const CACHE_INDEX_COLUMN: &str = "cache_index";
 
 /// Index pair representing a start and end range
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct IndexPair {
     pub start: u64,
     pub end: u64,

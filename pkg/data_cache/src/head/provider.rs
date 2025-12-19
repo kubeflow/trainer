@@ -419,7 +419,7 @@ mod tests {
     use super::*;
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::prelude::SessionContext;
-    use iceberg::spec::{DataContentType, DataFileFormat};
+    use iceberg::spec::DataFileFormat;
 
     fn create_test_schema() -> SchemaRef {
         Arc::new(Schema::new(vec![
@@ -452,7 +452,6 @@ mod tests {
             length: record_count,
             record_count: Some(record_count),
             data_file_path: String::from(file_path),
-            data_file_content: DataContentType::Data,
             schema: create_iceberg_schema(),
             project_field_ids: vec![],
             predicate: None,
