@@ -27,7 +27,7 @@ jobs:
         component:
           - name: trainer-controller-manager
             dockerfile: cmd/trainer-controller-manager/Dockerfile
-            x86_platforms: linux/amd64,linux/ppc64le
+            x86_platforms: linux/amd64
             arm_platforms: linux/arm64
 
           - name: model-initializer
@@ -74,7 +74,7 @@ jobs:
             arch:
               name: arm64
 
-    uses: ./.github/workflows/template-publish-image/action.yaml
+    uses: ./.github/workflows/template-publish-image/publish-images.yaml
     with:
       component-name: ${{ matrix.component.name }}
       dockerfile: ${{ matrix.component.dockerfile }}
