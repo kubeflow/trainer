@@ -1325,3 +1325,143 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestSyncSuspend(t *testing.T) {
+	errClientGet := fmt.Errorf("connection refused")
+	errClientPatch := fmt.Errorf("patch failed")
+
+	cases := map[string]struct {
+		trainJob       *trainer.TrainJob
+		existingJobSet *jobsetv1alpha2.JobSet
+		clientGetErr   error
+		clientPatchErr error
+		wantError      error
+		wantSuspend    *bool
+	}{
+		"patch JobSet suspend to true when TrainJob is suspended but JobSet is not": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			existingJobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				Obj(),
+			wantSuspend: ptr.To(true),
+		},
+		"patch JobSet suspend to false when TrainJob is not suspended but JobSet is": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				Obj(),
+			existingJobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			wantSuspend: ptr.To(false),
+		},
+		"no patch when both TrainJob and JobSet are suspended": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			existingJobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			wantSuspend: ptr.To(true),
+		},
+		"no patch when both TrainJob and JobSet are not suspended": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				Obj(),
+			existingJobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				Obj(),
+			wantSuspend: ptr.To(false),
+		},
+		"patch JobSet suspend to false when TrainJob suspend is nil and JobSet is suspended": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+			existingJobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			wantSuspend: ptr.To(false),
+		},
+		"return nil when JobSet is not found": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			existingJobSet: nil,
+			wantError:      nil,
+		},
+		"return error when client Get fails": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			existingJobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				Obj(),
+			clientGetErr: errClientGet,
+			wantError:    errClientGet,
+		},
+		"return wrapped error when client Patch fails": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			existingJobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				Obj(),
+			clientPatchErr: errClientPatch,
+			wantError:      errClientPatch,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			clientBuilder := utiltesting.NewClientBuilder()
+			if tc.existingJobSet != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.existingJobSet)
+			}
+			if tc.clientGetErr != nil || tc.clientPatchErr != nil {
+				clientBuilder = clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if tc.clientGetErr != nil {
+							if _, ok := obj.(*jobsetv1alpha2.JobSet); ok {
+								return tc.clientGetErr
+							}
+						}
+						return cli.Get(ctx, key, obj, opts...)
+					},
+					Patch: func(ctx context.Context, cli client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+						if tc.clientPatchErr != nil {
+							if _, ok := obj.(*jobsetv1alpha2.JobSet); ok {
+								return tc.clientPatchErr
+							}
+						}
+						return cli.Patch(ctx, obj, patch, opts...)
+					},
+				})
+			}
+			cli := clientBuilder.Build()
+
+			p, err := New(ctx, cli, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+
+			err = p.(*JobSet).SyncSuspend(ctx, tc.trainJob)
+			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+			if tc.wantError == nil && tc.existingJobSet != nil && tc.wantSuspend != nil {
+				jobSet := &jobsetv1alpha2.JobSet{}
+				if err := cli.Get(ctx, client.ObjectKeyFromObject(tc.trainJob), jobSet); err != nil {
+					t.Fatalf("Failed to get JobSet: %v", err)
+				}
+				if diff := cmp.Diff(tc.wantSuspend, jobSet.Spec.Suspend); len(diff) != 0 {
+					t.Errorf("Unexpected JobSet suspend state (-want,+got):\n%s", diff)
+				}
+			}
+		})
+	}
+}

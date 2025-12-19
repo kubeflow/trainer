@@ -35,6 +35,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
@@ -2622,6 +2623,79 @@ func TestPodNetworkPlugins(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, testingutil.PodSetEndpointsCmpOpts); len(diff) != 0 {
 				t.Errorf("Unexpected runtimeInfo (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRunSuspendSyncPlugins(t *testing.T) {
+	errClientGet := fmt.Errorf("client error")
+
+	cases := map[string]struct {
+		registry       fwkplugins.Registry
+		trainJob       *trainer.TrainJob
+		existingJobSet *jobsetv1alpha2.JobSet
+		clientGetErr   error
+		wantError      error
+	}{
+		"success with JobSet plugin registered": {
+			registry: fwkplugins.NewRegistry(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			existingJobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				Obj(),
+			wantError: nil,
+		},
+		"no plugins run with empty registry": {
+			registry: fwkplugins.Registry{},
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			wantError: nil,
+		},
+		"error propagation when plugin returns error": {
+			registry: fwkplugins.NewRegistry(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			existingJobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				Obj(),
+			clientGetErr: errClientGet,
+			wantError:    errClientGet,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			clientBuilder := testingutil.NewClientBuilder()
+			if tc.existingJobSet != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.existingJobSet)
+			}
+			if tc.clientGetErr != nil {
+				clientBuilder = clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*jobsetv1alpha2.JobSet); ok {
+							return tc.clientGetErr
+						}
+						return cli.Get(ctx, key, obj, opts...)
+					},
+				})
+			}
+
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = fwk.RunSuspendSyncPlugins(ctx, tc.trainJob)
+			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
 		})
 	}
