@@ -21,7 +21,7 @@ require (
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/controller-runtime v0.22.4
 	sigs.k8s.io/jobset v0.10.1
-	sigs.k8s.io/kind v0.30.0
+	sigs.k8s.io/kind v0.31.0
 	sigs.k8s.io/scheduler-plugins v0.34.1-devel
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.1
 	volcano.sh/apis v1.13.1-0.20251028070205-46d20c0699e7
