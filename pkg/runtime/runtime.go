@@ -139,13 +139,13 @@ func WithPodSet(
 ) InfoOption {
 	return func(o *InfoOptions) {
 		ps := PodSet{
-			Name:              psName,
-			Ancestor:          ancestor,
-			Count:             ptr.To(max(count, 1)),
-			Volumes:           podSpecApply.Volumes,
+			Name:               psName,
+			Ancestor:           ancestor,
+			Count:              ptr.To(max(count, 1)),
+			Volumes:            podSpecApply.Volumes,
 			SinglePodResources: resourcehelpers.PodRequests(&corev1.Pod{Spec: typedPodSpec}, resourcehelpers.PodResourcesOptions{}),
-			InitContainers:    slices.Collect(toPodSetContainer(podSpecApply.InitContainers...)),
-			Containers:        slices.Collect(toPodSetContainer(podSpecApply.Containers...)),
+			InitContainers:     slices.Collect(toPodSetContainer(podSpecApply.InitContainers...)),
+			Containers:         slices.Collect(toPodSetContainer(podSpecApply.Containers...)),
 		}
 		o.templateSpec.PodSets = append(o.templateSpec.PodSets, ps)
 	}

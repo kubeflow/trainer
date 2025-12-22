@@ -102,9 +102,9 @@ func TestPlainML(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](200),
+						Name:               constants.Node,
+						Ancestor:           ptr.To(constants.AncestorTrainer),
+						Count:              ptr.To[int32](200),
 						SinglePodResources: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.Node,
@@ -149,9 +149,9 @@ func TestPlainML(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
+						Name:               constants.Node,
+						Ancestor:           ptr.To(constants.AncestorTrainer),
+						Count:              ptr.To[int32](1),
 						SinglePodResources: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.Node,
