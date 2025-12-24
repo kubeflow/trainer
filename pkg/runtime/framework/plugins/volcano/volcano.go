@@ -162,7 +162,7 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 	for _, ps := range info.TemplateSpec.PodSets {
 		count := *ps.Count
 		totalMembers += count
-		for resName, quantity := range ps.SinglePodRequests {
+		for resName, quantity := range ps.SinglePodResources {
 			quantity.Mul(int64(count))
 			current := totalResources[resName]
 			current.Add(quantity)
