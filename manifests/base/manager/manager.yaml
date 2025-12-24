@@ -23,6 +23,16 @@ spec:
       containers:
         - name: manager
           image: ghcr.io/kubeflow/trainer/trainer-controller-manager
+          ports:
+            - containerPort: 8443
+              name: metrics
+              protocol: TCP
+            - containerPort: 9443
+              name: webhook
+              protocol: TCP
+            - containerPort: 8081
+              name: health
+              protocol: TCP
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
@@ -64,7 +74,7 @@ spec:
   ports:
     - name: monitoring-port
       port: 8080
-      targetPort: 8080
+      targetPort: 8443
     - name: webhook-server
       port: 443
       protocol: TCP

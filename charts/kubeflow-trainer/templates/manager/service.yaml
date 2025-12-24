@@ -27,7 +27,7 @@ spec:
   ports:
   - name: monitoring-port
     port: 8080
-    targetPort: 8080
+    targetPort: 8443
   - name: webhook-server
     port: 443
     protocol: TCP
