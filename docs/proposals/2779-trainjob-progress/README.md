@@ -25,10 +25,11 @@ From a programmatic perspective:
 ### Goals
 
 1. **Expose real-time progress information and training metrics through the TrainJobs CR.** For example: percentage complete, estimated time remaining, current step/epoch, total steps/epochs, eval metrics.
-2. **Have zero dependencies.** The user should not need to install any additional components into their cluster for the feature to work. It should work "out-of-the-box". 
+2. **Have zero dependencies.** The user should not need to install any additional components into their cluster for the feature to work. It should work "out-of-the-box".
 3. **Optional.** Users can choose to opt in to providing progress tracking, but are not required to use this feature.
 4. **Provide built-in progress tracking support for selected ML frameworks (e.g. transformers, pytorch-lightning) in the kubeflow sdk.** Data scientists should be able to use the kubeflow sdk to create training jobs using these frameworks, and have progress tracking automatically instrumented.
-5. **Provide a standard "protocol" for training runtimes to expose progress and training metrics.** It should be possible for custom trainer training jobs to use this contract to add progress tracking. It should be easy to enhance the kubeflow sdk with additional built-in frameworks that automatically instrument progress tracking.
+5. **Introduce callbacks to third party libraries (e.g. transformers) that adds instrumentation for TrainJobs.** For Transformers this would follow similar integrations, e.g. for [MLFlow](https://github.com/huggingface/transformers/blob/v4.57.3/src/transformers/integrations/integration_utils.py#L1361).
+6. **Provide a standard "protocol" for training runtimes to expose progress and training metrics.** It should be possible for custom trainer training jobs to use this contract to add progress tracking. It should be easy to enhance the kubeflow sdk with additional built-in frameworks that automatically instrument progress tracking.
 
 ### Non-Goals
 
@@ -78,7 +79,7 @@ The TrainJob API would be updated to include a new optional `status.trainerStatu
 type TrainJobStatus struct {
     // ... existing fields
 
-    // trainerStatus provides a summary of the status of the training 
+    // trainerStatus provides a summary of the status of the training
 	// part of the TrainJob.
     // Empty if the status is unknown, e.g. the job has just started
     // or the job is not instrumented to report its status.
@@ -103,16 +104,7 @@ type TrainJobTrainerStatus struct {
     //
     // +kubebuilder:validation:Minimum=0
     // +optional
-    EstimatedRemainingSeconds *int64 `json:"estimatedRemainingSeconds,omitempty"`
-
-    // estimatedRemainingTimeSummary gives an approximate, human-readable version of the
-    // estimated remaining training time before the train job is completed.
-    // The value will be empty if it is unknown.
-    // This message is intended for human audiences and its format should
-    // not be relied on to be stable.
-    // Consider using EstimatedRemainingSeconds instead.
-    // +optional
-    EstimatedRemainingTimeSummary *string `json:"estimatedRemainingTimeSummary,omitempty"`
+    EstimatedRemainingSeconds *int32 `json:"estimatedRemainingSeconds,omitempty"`
 
     // currentStep is the number of steps that have been completed so far.
     // The value will be empty if it is unknown or not applicable
@@ -139,33 +131,26 @@ type TrainJobTrainerStatus struct {
     TotalEpochs *int32 `json:"totalEpochs,omitempty"`
 
     // metrics contains the current metrics for the model.
-    // Each entry stores the metrics for a different "group" of
-    // related metrics, e.g. train and eval metrics.
-    // All groups must have a unique type.
     //
     // +listType=atomic
     // +optional
-    Metrics []MetricsGroup `json:"metrics,omitempty"`
+    Metrics []Metric `json:"metrics,omitempty"`
 
     // lastUpdatedTime is the timestamp when these metrics were observed.
     // +optional
     LastUpdatedTime metav1.Time `json:"lastUpdatedTime,omitempty"`
 }
 
-type MetricsGroup struct {
-    // type is a label for the type of metrics contained within this group.
-    // This is an arbitrary label that group together a set of
-    // related metrics, e.g. training metrics, or evaluation metrics.
+type Metric struct {
+    // name is a user-defined label for the metric, e.g. "loss", "eval_accuracy".
     // +kubebuilder:validation:MinLength=1
-    // +optional
-    Type string `json:"type,omitempty"`
+	// +required
+    Name string `json:"name,omitempty"`
 
-    // values is a map of the current metrics for this group.
-    // The metrics are key-values pairs, where the key is a user-defined name
-    // for the metric and the value is the corresponding numeric value serialized
-    // as a string.
-    // +optional
-    Values map[string]string `json:"values,omitempty"`
+    // value is the numeric value of the metric, serialized as a string.
+	// +kubebuilder:validation:MinLength=1
+    // +required
+    Value string `json:"value,omitempty"`
 }
 ```
 
@@ -186,7 +171,6 @@ status:
     # Overall progress
     progressPercentage: 45                           # 45% complete
     estimatedRemainingSeconds: 795649                # Precise duration
-    estimatedRemainingTimeSummary: "9 days 5 hours"  # Human-readable
 
     # Training iterations
     currentStep: 4500                                # Completed 4500 steps
@@ -195,42 +179,33 @@ status:
     totalEpochs: 5                                   # Of 5 epochs
 
     metrics:
-      # Training metrics (serialized as strings)
-      - type: train
-        values:                                      
-          loss: "0.2347"                             # Current training loss
-          learning_rate: "0.0001"                    # Current LR
-          grad_norm: "1.234"                         # Gradient norm
-
-      # Evaluation metrics (from validation set)
-      - type: eval
-        values:
-          eval_loss: "0.2451"                        # Validation loss
-          eval_accuracy: "0.8912"                    # Validation accuracy
-          eval_perplexity: "1.277"                   # Model perplexity
+      - name: loss                                   # Current training loss
+        value: "0.2347"
+      - name: eval_loss                              # Current validation loss
+        value: "0.2451"
+      - name: accuracy                               # Current training accuracy
+        value: "0.9876"
 
     # Timestamp of last progress update
     lastUpdatedTime: "2025-01-23T10:30:45Z"
 ```
 
-We also propose adding the `Progress %` and `ETA` (estimated time of arrival) to the printer columns for the TrainJob custom resource:
+We also propose adding the `Progress %` to the printer columns for the TrainJob custom resource:
 
 ```
 $ kubectl get trainjob
-NAME              STATE      PROGRESS %  ETA   AGE
-an-example        Running    3           45m   13m
-another-example   Complete   100               50m
+NAME              STATE      PROGRESS %  AGE
+an-example        Running    3           13m
+another-example   Complete   100         50m
 ```
-
-The ETA column will be populated from the `status.trainerStatus.estimatedRemainingTimeSummary` field.
 
 #### Control plane endpoint
 
-The control plane will expose a new service that provides an http endpoint where trainer pods can submit the trainer status. 
+The control plane will expose a new service that provides an http endpoint where trainer pods can submit the trainer status.
 
-The endpoint will be `POST: /<train-job-namespace>/TrainJob/<train-job-name>/status`, where `<train-job-namespace>` and `<train-job-name>` come from the TrainJob. 
+The endpoint will be `POST: /<train-job-namespace>/TrainJob/<train-job-name>/status`, where `<train-job-namespace>` and `<train-job-name>` come from the TrainJob.
 
-The payload will be the same as `TrainJobTrainerStatus` but will omit the `estimatedRemainingTimeSummary` field, which will be calculated by the control plane for consistency.
+The payload will be the same as `TrainJobTrainerStatus`.
 
 On receiving requests to this endpoint, the control plane will validate the source of the request (see [Security considerations](#security-considerations)) and then directly update the `status.trainerStatus` field.
 
@@ -259,7 +234,7 @@ Note that the token does _not_ have permissions for the kubernetes API server du
 
 The new endpoint must rate-limit requests and cache TokenReview responses to avoid a misconfigured TrainJob (examples: a job with many nodes which all send status updates simultaneously; a job that progresses very quickly) from triggering API server rate-limiting which may cause denial-of-service for other TrainJobs or for the reconciler itself. The rate-limiting should be keyed on the jwt subject claim (the service account name and namespace).
 
-Deliberate malicious attacks can be mitigated by validating the jwt token against the API server public key before performing the TokenReview request. Tokens that are definitely invalid would not cause any API server requests. 
+Deliberate malicious attacks can be mitigated by validating the jwt token against the API server public key before performing the TokenReview request. Tokens that are definitely invalid would not cause any API server requests.
 
 The below summarises the volumes the control plane will inject:
 ```yaml
@@ -314,7 +289,7 @@ rules:
 
 #### Runtime instrumentation
 
-The trainer runtime pods can be instrumented however is required for that framework (e.g. using callbacks provided by that framework). When using distributed training, it is up to the instrumentation implementation to decide which pod(s) will send the progress messages; the control plane will accept messages from any pod that is part of the train job. 
+The trainer runtime pods can be instrumented however is required for that framework (e.g. using callbacks provided by that framework). When using distributed training, it is up to the instrumentation implementation to decide which pod(s) will send the progress messages; the control plane will accept messages from any pod that is part of the train job.
 
 The control plane will inject the following environment variables into all containers of all pods of the training job:
 ```shell
@@ -364,7 +339,7 @@ Example usage of the TransformersTrainer is:
 ```py
 def train_fn():
     from transformers import Trainer
-    
+
     trainer = Trainer(...)  # define the model and data...
     trainer.train()
 
@@ -450,21 +425,20 @@ Additional changes to the sdk:
 
 ```py
 @dataclass
-class MetricsGroup:
-    type: str
-    values: dict[str, float]
+class Metric:
+    name: str
+    value: float
 
 
 @dataclass
 class TrainerStatus:
     progressPercentage: Optional[int]
     estimatedRemainingDurationSeconds: Optional[int]
-    estimatedRemainingTimeSummary: Optional[str]
     currentStep: Optional[int]
     totalSteps: Optional[int]
     currentEpoch: Optional[int]
     totalEpochs: Optional[int]
-    metrics: Optional[list[MetricsGroup]]
+    metrics: Optional[list[Metric]]
     lastUpdatedTime: datetime
 
 
@@ -512,6 +486,7 @@ Users can optionally add the labels `trainer.kubeflow.org/monitoring-port: <port
 Additional details:
 - The control plane will set the sidecar `terminationMessagePath` to the location of the shared file to allow the final metrics to be collected. See [Scraping the metrics](#scraping-the-metrics).
 - The control plane will inject the sidecar in only one pod to minimise resource usage. This will be achieved by duplicating the target replicated job (after merging with PodTemplateSpecOverrides), setting the replicas to 1, injecting sidecar and volume, and updating other replicate job dependencies as necessary.
+- Resource requests for the sidecar can be configured globally via a control plane config setting (i.e. the same resource requests will be used for all TrainJobs in the cluster).
 
 The below gives an example ClusterTrainingRuntime with monitoring enabled:
 ```yaml
@@ -566,7 +541,7 @@ To ensure the final training status is collected after training has completed su
 
 #### Runtime instrumentation
 
-The user must instrument their runtime code so the main runtime container(s) will periodically write the current training status to a file in the shared volume. The file must contain a single json entry payload, with schema the same as `TrainJobTrainerStatus` but omitting the `estimatedRemainingTimeSummary` field, which will be calculated by the control plane for consistency.
+The user must instrument their runtime code so the main runtime container(s) will periodically write the current training status to a file in the shared volume. The file must contain a single json entry payload, with schema the same as `TrainJobTrainerStatus`.
 
 The control plane will inject the following environment variable into all containers of all pods of the training job:
 ```shell
