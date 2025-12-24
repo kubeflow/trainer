@@ -1,5 +1,5 @@
 # MLX libraries.
-mlx[cuda]==0.30.0
+mlx[cuda]==0.30.1
 mlx-data==0.1.0
 mlx-lm==0.30.0
 # HuggingFace libraries.
