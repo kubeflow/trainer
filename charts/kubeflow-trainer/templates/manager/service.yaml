@@ -26,8 +26,8 @@ spec:
     {{- include "trainer.manager.selectorLabels" . | nindent 4 }}
   ports:
   - name: monitoring-port
-    port: 8080
-    targetPort: 8080
+    port: 8443
+    targetPort: 8443
   - name: webhook-server
     port: 443
     protocol: TCP
