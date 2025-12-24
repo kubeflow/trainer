@@ -77,6 +77,10 @@ func (r *ClusterTrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *t
 	return r.TrainingRuntime.TrainJobStatus(ctx, trainJob)
 }
 
+func (r *ClusterTrainingRuntime) SyncSuspend(ctx context.Context, trainJob *trainer.TrainJob) error {
+	return r.TrainingRuntime.SyncSuspend(ctx, trainJob)
+}
+
 func (r *ClusterTrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 	return nil
 }
