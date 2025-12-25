@@ -224,6 +224,11 @@ func removeFailedCondition(trainJob *trainer.TrainJob) {
 }
 
 func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
+	// If runtime is not resolved (unsupported runtime), do not call into it.
+	if runtime == nil {
+		return nil
+	}
+
 	status, err := runtime.TrainJobStatus(ctx, trainJob)
 	if err != nil {
 		return err
