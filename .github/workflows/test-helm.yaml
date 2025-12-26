@@ -1,0 +1,121 @@
+---
+name: Unit and Integration Test - Helm
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'latest'
+
+      - name: Lint Helm Chart
+        run: |
+          helm lint ./charts/kubeflow-trainer
+
+      - name: Template Helm Chart
+        run: |
+          helm template kubeflow-trainer ./charts/kubeflow-trainer
+
+      - name: Setup cluster and deploy with Helm
+        run: |
+          make test-e2e-setup-cluster-helm K8S_VERSION=1.32.0
+
+      - name: Run E2E smoke tests
+        run: |
+          NAMESPACE="kubeflow-system"
+
+          echo "=== Running smoke tests for Helm deployment ==="
+
+          # Check if CRDs are installed
+          echo "Checking CRDs..."
+          kubectl get crd | grep training.kubeflow.org || exit 1
+
+          # Check if controller is running
+          echo "Checking controller deployment..."
+          kubectl get deploy -n ${NAMESPACE} kubeflow-trainer-controller-manager || exit 1
+
+          # Check if webhooks are configured
+          echo "Checking webhooks..."
+          kubectl get mutatingwebhookconfiguration | grep trainer || exit 1
+          kubectl get validatingwebhookconfiguration | grep trainer || exit 1
+
+          # Create a simple PyTorchJob test
+          echo "Creating test PyTorchJob..."
+          cat <<EOF | kubectl apply -f -
+          apiVersion: training.kubeflow.org/v1beta1
+          kind: PyTorchJob
+          metadata:
+            name: pytorch-test
+            namespace: default
+          spec:
+            pytorchReplicaSpecs:
+              Master:
+                replicas: 1
+                restartPolicy: OnFailure
+                template:
+                  spec:
+                    containers:
+                    - name: pytorch
+                      image: pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
+                      command: ["python", "-c", "print('Hello from PyTorch')"]
+                      resources:
+                        limits:
+                          memory: "64Mi"
+                          cpu: "50m"
+          EOF
+
+          # Wait for job to be created
+          sleep 5
+
+          # Check if PyTorchJob was created
+          kubectl get pytorchjob pytorch-test -n default || exit 1
+
+          # Check events for any issues
+          kubectl get events -n default --sort-by='.lastTimestamp' | tail -10
+
+          # Clean up test job
+          kubectl delete pytorchjob pytorch-test -n default --ignore-not-found
+
+          echo "=== Smoke tests passed successfully ==="
+
+      - name: Verify Helm deployment
+        if: success()
+        run: |
+          NAMESPACE="kubeflow-system"
+
+          echo "=== Helm Release Info ==="
+          helm list -n ${NAMESPACE}
+
+          echo "=== Deployed Resources ==="
+          kubectl get all -n ${NAMESPACE}
+
+          echo "=== CRDs ==="
+          kubectl get crd | grep training
+
+          echo "=== Helm deployment verified successfully ==="
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up resources..."
+
+          # Uninstall Helm release
+          helm uninstall kubeflow-trainer -n kubeflow-system --ignore-not-found || true
+
+          # Delete Kind cluster
+          ./bin/kind delete cluster || true
