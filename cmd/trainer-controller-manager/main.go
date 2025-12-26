@@ -46,7 +46,8 @@ import (
 )
 
 const (
-	webhookConfigurationName = "validator.trainer.kubeflow.org"
+	validatingWebhookConfigurationName = "validator.trainer.kubeflow.org"
+	mutatingWebhookConfigurationName   = "defaulter.trainer.kubeflow.org"
 )
 
 var (
@@ -107,9 +108,10 @@ func main() {
 	if config.IsCertManagementEnabled(&cfg) {
 		setupLog.Info("Setting up certificate management")
 		if err = cert.ManageCerts(mgr, cert.Config{
-			WebhookSecretName:        cfg.CertManagement.WebhookSecretName,
-			WebhookServiceName:       cfg.CertManagement.WebhookServiceName,
-			WebhookConfigurationName: webhookConfigurationName,
+			WebhookSecretName:                  cfg.CertManagement.WebhookSecretName,
+			WebhookServiceName:                 cfg.CertManagement.WebhookServiceName,
+			ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
+			MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
 		}, certsReady); err != nil {
 			setupLog.Error(err, "unable to set up cert rotation")
 			os.Exit(1)

@@ -1,0 +1,6 @@
+- op: replace
+  path: /webhooks/0/clientConfig/service/name
+  value: kubeflow-trainer-controller-manager
+- op: replace
+  path: /metadata/name
+  value: defaulter.trainer.kubeflow.org
