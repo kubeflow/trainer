@@ -16,12 +16,7 @@ RUN apt-get update && \
         python3-setuptools && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
-        numpy \
-        jax \
-        jaxlib \
-        "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+RUN pip install --no-cache-dir --upgrade pip
 
 FROM gpu-base as tpu-base
 
@@ -45,10 +40,4 @@ RUN pip install --no-cache-dir absl-py kubernetes
 
 FROM gloo-base as production
 
-WORKDIR /workspace
-
-COPY cmd/runtimes/jax/version.sh /version.sh
-RUN chmod +x /version.sh
-
-ENTRYPOINT ["/bin/bash", "-c", "/version.sh && exec \"$@\"", "--"]
-CMD ["/bin/bash"]
+RUN pip list
