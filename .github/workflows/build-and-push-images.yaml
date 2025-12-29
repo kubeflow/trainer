@@ -44,6 +44,9 @@ jobs:
           - component-name: data-cache
             dockerfile: cmd/data_cache/Dockerfile
             platforms: linux/amd64,linux/arm64
+          - component-name: jax-runtime
+            dockerfile: cmd/runtimes/jax/Dockerfile
+            platforms: linux/amd64,linux/arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v6
