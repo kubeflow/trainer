@@ -243,7 +243,7 @@ type TorchElasticPolicy struct {
 }
 
 // JAXMLPolicySource represents a jax runtime configuration.
-type JAXMLPolicySource struct {}
+type JAXMLPolicySource struct{}
 
 // MPIMLPolicySource represents a MPI runtime configuration.
 type MPIMLPolicySource struct {
