@@ -47,7 +47,7 @@ FROM gloo-base as production
 
 WORKDIR /workspace
 
-COPY version.sh /version.sh
+COPY cmd/runtimes/jax/version.sh /version.sh
 RUN chmod +x /version.sh
 
 ENTRYPOINT ["/bin/bash", "-c", "/version.sh && exec \"$@\"", "--"]
