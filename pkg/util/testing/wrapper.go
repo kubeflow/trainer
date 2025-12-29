@@ -1484,6 +1484,6 @@ func (s *SecretWrapper) Obj() *corev1.Secret {
 
 // JAXPolicy sets the JAX policy source
 func (w *MLPolicySourceWrapper) JAXPolicy() *MLPolicySourceWrapper {
-	w.MLPolicySource.JAX = &trainer.JAXMLPolicySource{}
+	w.JAX = &trainer.JAXMLPolicySource{}
 	return w
 }
