@@ -28,7 +28,7 @@ class TrainerV1alpha1MLPolicy(BaseModel):
     """
     MLPolicy represents configuration for the model training with ML-specific parameters.
     """ # noqa: E501
-    jax: Optional[Dict[str, Any]] = Field(default=None, description="Configuration for the JAX Runtime.")
+    jax: Optional[Dict[str, Any]] = Field(default=None, description="jax defines the configuration for the JAX Runtime")
     mpi: Optional[TrainerV1alpha1MPIMLPolicySource] = Field(default=None, description="mpi defines the configuration for the MPI Runtime.")
     num_nodes: Optional[StrictInt] = Field(default=None, description="numNodes is the number of training nodes. Defaults to 1.", alias="numNodes")
     torch: Optional[TrainerV1alpha1TorchMLPolicySource] = Field(default=None, description="torch defines the configuration for the PyTorch runtime.")

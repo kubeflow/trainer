@@ -28,7 +28,7 @@ class TrainerV1alpha1MLPolicySource(BaseModel):
     """
     MLPolicySource represents the runtime-specific configuration for various technologies. One of the following specs can be set.
     """ # noqa: E501
-    jax: Optional[Dict[str, Any]] = Field(default=None, description="Configuration for the JAX Runtime.")
+    jax: Optional[Dict[str, Any]] = Field(default=None, description="jax defines the configuration for the JAX Runtime")
     mpi: Optional[TrainerV1alpha1MPIMLPolicySource] = Field(default=None, description="mpi defines the configuration for the MPI Runtime.")
     torch: Optional[TrainerV1alpha1TorchMLPolicySource] = Field(default=None, description="torch defines the configuration for the PyTorch runtime.")
     __properties: ClassVar[List[str]] = ["jax", "mpi", "torch"]

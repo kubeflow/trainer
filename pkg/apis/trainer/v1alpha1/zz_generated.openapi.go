@@ -805,7 +805,7 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref common.ReferenceCallback) com
 					},
 					"jax": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration for the JAX Runtime.",
+							Description: "jax defines the configuration for the JAX Runtime",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource"),
 						},
 					},
@@ -838,7 +838,7 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicySource(ref common.ReferenceCallbac
 					},
 					"jax": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Configuration for the JAX Runtime.",
+							Description: "jax defines the configuration for the JAX Runtime",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource"),
 						},
 					},

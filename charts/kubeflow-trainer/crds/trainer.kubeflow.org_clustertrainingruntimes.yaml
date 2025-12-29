@@ -48,7 +48,7 @@ spec:
                   model training.
                 properties:
                   jax:
-                    description: Configuration for the JAX Runtime.
+                    description: jax defines the configuration for the JAX Runtime
                     type: object
                   mpi:
                     description: mpi defines the configuration for the MPI Runtime.

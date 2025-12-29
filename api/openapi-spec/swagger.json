@@ -13783,7 +13783,7 @@
         "type": "object",
         "properties": {
           "jax": {
-            "description": "Configuration for the JAX Runtime.",
+            "description": "jax defines the configuration for the JAX Runtime",
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.JAXMLPolicySource"
@@ -13818,7 +13818,7 @@
         "type": "object",
         "properties": {
           "jax": {
-            "description": "Configuration for the JAX Runtime.",
+            "description": "jax defines the configuration for the JAX Runtime",
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.JAXMLPolicySource"
