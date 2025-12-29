@@ -16,9 +16,27 @@ limitations under the License.
 
 package jax
 
+import (
+	"context"
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/apply"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+)
+
 type Jax struct{}
 
 var _ framework.EnforceMLPolicyPlugin = (*Jax)(nil)
+var _ framework.CustomValidationPlugin = (*Jax)(nil)
 
 const Name = "Jax"
 
@@ -26,7 +44,86 @@ func New(context.Context, client.Client, client.FieldIndexer) (framework.Plugin,
 	return &Jax{}, nil
 }
 
-func (t *Torch) Name() string {
+func (j *Jax) Name() string {
 	return Name
 }
 
+func (j *Jax) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	var allErrs field.ErrorList
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.JAX == nil {
+		return nil, allErrs
+	}
+
+	return nil, allErrs
+}
+
+func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
+	// Check if JAX MLPolicy is enabled
+	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.JAX == nil {
+		return nil
+	}
+
+	// Find the trainer PodSet
+	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	if trainerPS == nil {
+		return fmt.Errorf("trainer PodSet not found")
+	}
+
+	// Set the number of nodes (JAX processes/hosts) from TrainJob
+	if trainerPS.Count != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
+	}
+
+	// Find the trainer container
+	trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node)
+	if trainerContainer == nil {
+		return fmt.Errorf("trainer container not found")
+	}
+
+	// Apply user-specified environment variables from TrainJob
+	if trainJob.Spec.Trainer != nil && len(trainJob.Spec.Trainer.Env) > 0 {
+		apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
+	}
+
+	// Get the number of nodes for distributed setup
+	numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
+
+	// Set JAX distributed environment variables
+	apply.UpsertEnvVars(&trainerContainer.Env,
+		// Total number of JAX processes (one per node/host)
+		*corev1ac.EnvVar().
+			WithName("JAX_NUM_PROCESSES").
+			WithValue(fmt.Sprintf("%d", numNodes)),
+
+		// Process ID - derived from job completion index
+		*corev1ac.EnvVar().
+			WithName("JAX_PROCESS_ID").
+			WithValueFrom(corev1ac.EnvVarSource().
+				WithFieldRef(corev1ac.ObjectFieldSelector().
+					WithFieldPath(constants.JobCompletionIndexFieldPath))),
+
+		// Coordinator address - first pod in the headless service
+		*corev1ac.EnvVar().
+			WithName("JAX_COORDINATOR_ADDRESS").
+			WithValue(fmt.Sprintf("%s-%s-0-0.%s:%d",
+				trainJob.Name,
+				constants.Node,
+				trainJob.Name,
+				constants.JAXContainerPort)),
+
+		// Coordinator port
+		*corev1ac.EnvVar().
+			WithName("JAX_COORDINATOR_PORT").
+			WithValue(fmt.Sprintf("%d", constants.JAXContainerPort)),
+
+		// Default backend (Gloo) - can be extended in future to support NCCL/LibTPU
+		*corev1ac.EnvVar().
+			WithName("JAX_DISTRIBUTED_BACKEND").
+			WithValue(fmt.Sprintf("%s", constants.JAXDistributedBackend)),
+	)
+
+	// Add container port for the headless service (needed for pod-to-pod communication)
+	apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.JAXContainerPort))
+
+	return nil
+}
