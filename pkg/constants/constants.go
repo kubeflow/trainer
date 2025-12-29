@@ -209,6 +209,11 @@ const (
 	TORCHTUNE_MODEL_QWEN2_5_1_5B = "qwen2_5/1.5B"
 )
 
+const (
+	JAXContainerPort      = 8899
+	JAXDistributedBackend = "gloo"
+)
+
 var (
 	// JobCompletionIndexFieldPath is the field path for the Job completion index annotation.
 	JobCompletionIndexFieldPath string = fmt.Sprintf("metadata.annotations['%s']", batchv1.JobCompletionIndexAnnotation)

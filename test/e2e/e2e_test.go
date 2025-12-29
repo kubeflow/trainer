@@ -18,6 +18,7 @@ import (
 const (
 	torchRuntime     = "torch-distributed"
 	deepSpeedRuntime = "deepspeed-distributed"
+	jaxRuntime       = "jax-distributed"
 )
 
 var _ = ginkgo.Describe("TrainJob e2e", func() {
@@ -168,6 +169,64 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 							Name:      constants.Node,
 							Ready:     ptr.To(int32(0)),
 							Succeeded: ptr.To(int32(0)),
+							Failed:    ptr.To(int32(0)),
+							Active:    ptr.To(int32(0)),
+							Suspended: ptr.To(int32(0)),
+						},
+					}, util.SortJobsStatus))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+		})
+	})
+
+	ginkgo.When("Creating TrainJob to perform JAX workload", func() {
+		// Verify the `jax-distributed` ClusterTrainingRuntime.
+		ginkgo.It("should create TrainJob with JAX runtime reference", func() {
+			// Create a TrainJob.
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-jax").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), jaxRuntime).
+				Obj()
+
+			ginkgo.By("Create a TrainJob with jax-distributed runtime reference", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			// Wait for jobs to become active
+			ginkgo.By("Wait for TrainJob jobs to become active", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
+						{
+							Name:      constants.Node,
+							Ready:     ptr.To(int32(0)),
+							Succeeded: ptr.To(int32(0)),
+							Failed:    ptr.To(int32(0)),
+							Active:    ptr.To(int32(1)),
+							Suspended: ptr.To(int32(0)),
+						},
+					}, util.SortJobsStatus))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
+			// Wait for TrainJob to be in Succeeded status with all jobs succeeded.
+			ginkgo.By("Wait for TrainJob to be in Succeeded status with all jobs succeeded", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
+						{
+							Type:    trainer.TrainJobComplete,
+							Status:  metav1.ConditionTrue,
+							Reason:  jobsetconsts.AllJobsCompletedReason,
+							Message: jobsetconsts.AllJobsCompletedMessage,
+						},
+					}, util.IgnoreConditions))
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
+						{
+							Name:      constants.Node,
+							Ready:     ptr.To(int32(0)),
+							Succeeded: ptr.To(int32(1)),
 							Failed:    ptr.To(int32(0)),
 							Active:    ptr.To(int32(0)),
 							Suspended: ptr.To(int32(0)),
