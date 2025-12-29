@@ -195,7 +195,8 @@ type MLPolicySource struct {
 	// +optional
 	MPI *MPIMLPolicySource `json:"mpi,omitempty"`
 
-	// Configuration for the JAX Runtime.
+	// jax defines the configuration for the JAX Runtime
+	// +optional
 	JAX *JAXMLPolicySource `json:"jax,omitempty"`
 }
 
