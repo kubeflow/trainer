@@ -119,7 +119,7 @@ func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		// Default backend (Gloo) - can be extended in future to support NCCL/LibTPU
 		*corev1ac.EnvVar().
 			WithName("JAX_DISTRIBUTED_BACKEND").
-			WithValue(fmt.Sprintf("%s", constants.JAXDistributedBackend)),
+			WithValue(constants.JAXDistributedBackend),
 	)
 
 	// Add container port for the headless service (needed for pod-to-pod communication)
