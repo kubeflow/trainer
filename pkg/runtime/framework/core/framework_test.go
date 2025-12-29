@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -82,11 +83,13 @@ func TestNew(t *testing.T) {
 					plainml.Name:      &plainml.PlainML{},
 					torch.Name:        &torch.Torch{},
 					jobset.Name:       &jobset.JobSet{},
+					jax.Name:          &jax.Jax{},
 				},
 				enforceMLPlugins: []framework.EnforceMLPolicyPlugin{
 					&mpi.MPI{},
 					&plainml.PlainML{},
 					&torch.Torch{},
+					&jax.Jax{},
 				},
 				enforcePodGroupPolicyPlugins: []framework.EnforcePodGroupPolicyPlugin{
 					&coscheduling.CoScheduling{},
@@ -97,6 +100,7 @@ func TestNew(t *testing.T) {
 					&torch.Torch{},
 					&jobset.JobSet{},
 					&volcano.Volcano{},
+					&jax.Jax{},
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
 					&coscheduling.CoScheduling{},
