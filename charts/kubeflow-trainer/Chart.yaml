@@ -22,6 +22,8 @@ description: A Helm chart for deploying Kubeflow Trainer on Kubernetes.
 
 version: 2.1.0
 
+appVersion: v2.1.0
+
 type: application
 
 dependencies:
