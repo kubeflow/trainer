@@ -28,7 +28,3 @@ patches:
         metadata:
           annotations:
             traffic.sidecar.istio.io/excludeInboundPorts: "9443"
-        spec:
-          securityContext:
-            seccompProfile:
-              type: RuntimeDefault
