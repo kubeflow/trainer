@@ -4263,6 +4263,20 @@ spec:
                         type: object
                     type: object
                 type: object
+              ttlSecondsAfterFinished:
+                description: |-
+                  ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished
+                  execution (either Complete or Failed). If this field is set, once the TrainJob
+                  finishes, it will be deleted after ttlSecondsAfterFinished expires. If this
+                  field is unset, the TrainJob will not be automatically deleted. If set to zero,
+                  the TrainJob becomes eligible for immediate deletion after finishing.
+                  The field is immutable.
+                format: int32
+                minimum: 0
+                type: integer
+                x-kubernetes-validations:
+                - message: ttlSecondsAfterFinished is immutable
+                  rule: self == oldSelf
             required:
             - runtimeRef
             type: object

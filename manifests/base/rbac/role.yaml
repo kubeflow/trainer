@@ -87,7 +87,6 @@ rules:
   resources:
   - clustertrainingruntimes
   - trainingruntimes
-  - trainjobs
   verbs:
   - get
   - list
@@ -105,3 +104,14 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - trainer.kubeflow.org
+  resources:
+  - trainjobs
+  verbs:
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

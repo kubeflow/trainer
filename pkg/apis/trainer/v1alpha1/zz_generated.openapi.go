@@ -1520,6 +1520,13 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"ttlSecondsAfterFinished": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished execution (either Complete or Failed). If this field is set, once the TrainJob finishes, it will be deleted after ttlSecondsAfterFinished expires. If this field is unset, the TrainJob will not be automatically deleted. If set to zero, the TrainJob becomes eligible for immediate deletion after finishing. The field is immutable.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 				Required: []string{"runtimeRef"},
 			},

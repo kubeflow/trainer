@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"iter"
 	"slices"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -88,7 +89,7 @@ func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, 
 }
 
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;watch;update;patch
-// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/finalizers,verbs=get;update;patch
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=create;get;list;update
@@ -139,8 +140,16 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
 		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
 		// for sub-resources. See: https://github.com/kubernetes-sigs/controller-runtime/issues/3183
-		return ctrl.Result{}, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
+		if patchErr := r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)); patchErr != nil {
+			return ctrl.Result{}, errors.Join(err, patchErr)
+		}
 	}
+
+	// Check TTL after status is synced (job may now be finished)
+	if ttlResult, ttlErr := r.reconcileTTL(ctx, &trainJob); ttlErr != nil || ttlResult.RequeueAfter > 0 {
+		return ttlResult, errors.Join(err, ttlErr)
+	}
+
 	return ctrl.Result{}, err
 }
 
@@ -232,6 +241,80 @@ func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJo
 		trainJob.Status = *status
 	}
 	return nil
+}
+
+// trainJobFinishTime returns the time when a TrainJob finished (Complete or Failed).
+// Returns nil if the TrainJob hasn't finished yet.
+func trainJobFinishTime(trainJob *trainer.TrainJob) *metav1.Time {
+	for _, c := range trainJob.Status.Conditions {
+		if (c.Type == trainer.TrainJobComplete || c.Type == trainer.TrainJobFailed) &&
+			c.Status == metav1.ConditionTrue {
+			if c.LastTransitionTime.IsZero() {
+				return nil
+			}
+			return &c.LastTransitionTime
+		}
+	}
+	return nil
+}
+
+// needsTTLCleanup checks whether a TrainJob has finished and has a TTL set.
+func needsTTLCleanup(trainJob *trainer.TrainJob) bool {
+	return trainJob.Spec.TTLSecondsAfterFinished != nil && trainJobFinishTime(trainJob) != nil
+}
+
+// reconcileTTL handles TTL-based deletion of finished TrainJobs.
+// Returns a requeue result if the TrainJob should be requeued for future deletion.
+func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
+	// Skip if TTL not set or job not finished
+	if !needsTTLCleanup(trainJob) {
+		return ctrl.Result{}, nil
+	}
+
+	// Skip if already being deleted
+	if trainJob.DeletionTimestamp != nil {
+		return ctrl.Result{}, nil
+	}
+
+	finishTime := trainJobFinishTime(trainJob)
+	ttl := time.Duration(*trainJob.Spec.TTLSecondsAfterFinished) * time.Second
+	expireAt := finishTime.Add(ttl)
+	now := time.Now()
+
+	// Handle clock skew - if finish time is in the future, log warning
+	if finishTime.After(now) {
+		log := ctrl.LoggerFrom(ctx)
+		log.Info("Warning: TrainJob finished in the future, likely clock skew. Deferring cleanup.",
+			"finishTime", finishTime.Time, "now", now)
+	}
+
+	remaining := expireAt.Sub(now)
+
+	// TTL has expired
+	if remaining <= 0 {
+		log := ctrl.LoggerFrom(ctx)
+		log.Info("TTL expired, deleting TrainJob",
+			"ttl", ttl,
+			"finishTime", finishTime.Time,
+			"expireAt", expireAt)
+
+		// Use foreground propagation for cascading delete (matches K8s pattern)
+		policy := metav1.DeletePropagationForeground
+		opts := client.DeleteOptions{
+			PropagationPolicy: &policy,
+		}
+
+		if err := r.client.Delete(ctx, trainJob, &opts); err != nil {
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		}
+
+		r.recorder.Event(trainJob, corev1.EventTypeNormal, "TTLExpired",
+			fmt.Sprintf("TrainJob deleted after TTL of %v expired", ttl))
+		return ctrl.Result{}, nil
+	}
+
+	// TTL not expired yet, requeue at expiration time
+	return ctrl.Result{RequeueAfter: remaining}, nil
 }
 
 func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
