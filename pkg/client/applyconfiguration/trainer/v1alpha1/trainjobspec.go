@@ -28,6 +28,7 @@ type TrainJobSpecApplyConfiguration struct {
 	Suspend                 *bool                                   `json:"suspend,omitempty"`
 	ManagedBy               *string                                 `json:"managedBy,omitempty"`
 	TTLSecondsAfterFinished *int32                                  `json:"ttlSecondsAfterFinished,omitempty"`
+	ActiveDeadlineSeconds   *int64                                  `json:"activeDeadlineSeconds,omitempty"`
 }
 
 // TrainJobSpecApplyConfiguration constructs a declarative configuration of the TrainJobSpec type for use with
@@ -122,5 +123,13 @@ func (b *TrainJobSpecApplyConfiguration) WithManagedBy(value string) *TrainJobSp
 // If called multiple times, the TTLSecondsAfterFinished field is set to the value of the last call.
 func (b *TrainJobSpecApplyConfiguration) WithTTLSecondsAfterFinished(value int32) *TrainJobSpecApplyConfiguration {
 	b.TTLSecondsAfterFinished = &value
+	return b
+}
+
+// WithActiveDeadlineSeconds sets the ActiveDeadlineSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ActiveDeadlineSeconds field is set to the value of the last call.
+func (b *TrainJobSpecApplyConfiguration) WithActiveDeadlineSeconds(value int64) *TrainJobSpecApplyConfiguration {
+	b.ActiveDeadlineSeconds = &value
 	return b
 }

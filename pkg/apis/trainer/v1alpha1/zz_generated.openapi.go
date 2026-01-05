@@ -1527,6 +1527,13 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 							Format:      "int32",
 						},
 					},
+					"activeDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob creation time that the TrainJob may be active before the system tries to terminate it. Value must be a positive integer. Once reached, the TrainJob status becomes Failed with reason: DeadlineExceeded. The field is immutable.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 				Required: []string{"runtimeRef"},
 			},

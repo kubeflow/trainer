@@ -46,6 +46,19 @@ spec:
           spec:
             description: spec of the TrainJob.
             properties:
+              activeDeadlineSeconds:
+                description: |-
+                  activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob
+                  creation time that the TrainJob may be active before the system tries to terminate
+                  it. Value must be a positive integer. Once reached, the TrainJob status becomes
+                  Failed with reason: DeadlineExceeded.
+                  The field is immutable.
+                format: int64
+                minimum: 1
+                type: integer
+                x-kubernetes-validations:
+                - message: activeDeadlineSeconds is immutable
+                  rule: self == oldSelf
               annotations:
                 additionalProperties:
                   type: string

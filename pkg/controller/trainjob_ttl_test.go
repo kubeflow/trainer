@@ -228,3 +228,84 @@ func TestNeedsTTLCleanup(t *testing.T) {
 		})
 	}
 }
+
+func TestNeedsDeadlineEnforcement(t *testing.T) {
+	now := metav1.Now()
+	fiveMinutesAgo := metav1.NewTime(now.Add(-5 * time.Minute))
+
+	testCases := map[string]struct {
+		trainJob *trainer.TrainJob
+		want     bool
+	}{
+		"deadline not set - returns false": {
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					ActiveDeadlineSeconds: nil,
+				},
+				Status: trainer.TrainJobStatus{
+					Conditions: nil,
+				},
+			},
+			want: false,
+		},
+		"deadline set and job not finished - returns true": {
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					ActiveDeadlineSeconds: ptr.To(int64(3600)),
+				},
+				Status: trainer.TrainJobStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   trainer.TrainJobSuspended,
+							Status: metav1.ConditionFalse,
+						},
+					},
+				},
+			},
+			want: true,
+		},
+		"deadline set but job completed - returns false": {
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					ActiveDeadlineSeconds: ptr.To(int64(3600)),
+				},
+				Status: trainer.TrainJobStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               trainer.TrainJobComplete,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: fiveMinutesAgo,
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		"deadline set but job failed - returns false": {
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					ActiveDeadlineSeconds: ptr.To(int64(3600)),
+				},
+				Status: trainer.TrainJobStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               trainer.TrainJobFailed,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: fiveMinutesAgo,
+						},
+					},
+				},
+			},
+			want: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			got := needsDeadlineEnforcement(tc.trainJob)
+			if got != tc.want {
+				t.Errorf("needsDeadlineEnforcement() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

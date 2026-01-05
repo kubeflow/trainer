@@ -133,6 +133,15 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	setSuspendedCondition(&trainJob)
 
+	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
+		if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
+			if patchErr := r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)); patchErr != nil {
+				return ctrl.Result{}, errors.Join(deadlineErr, patchErr)
+			}
+		}
+		return deadlineResult, deadlineErr
+	}
+
 	if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
 		err = errors.Join(err, statusErr)
 	}
@@ -258,6 +267,53 @@ func trainJobFinishTime(trainJob *trainer.TrainJob) *metav1.Time {
 
 func needsTTLCleanup(trainJob *trainer.TrainJob) bool {
 	return trainJob.Spec.TTLSecondsAfterFinished != nil && trainJobFinishTime(trainJob) != nil
+}
+
+func needsDeadlineEnforcement(trainJob *trainer.TrainJob) bool {
+	if trainJob.Spec.ActiveDeadlineSeconds == nil {
+		return false
+	}
+	// Skip if already finished
+	return trainJobFinishTime(trainJob) == nil
+}
+
+func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
+	if !needsDeadlineEnforcement(trainJob) {
+		return ctrl.Result{}, nil
+	}
+
+	if trainJob.DeletionTimestamp != nil {
+		return ctrl.Result{}, nil
+	}
+
+	deadline := time.Duration(*trainJob.Spec.ActiveDeadlineSeconds) * time.Second
+	creationTime := trainJob.CreationTimestamp.Time
+	deadlineAt := creationTime.Add(deadline)
+	now := time.Now()
+
+	remaining := deadlineAt.Sub(now)
+
+	if remaining <= 0 {
+		log := ctrl.LoggerFrom(ctx)
+		log.Info("ActiveDeadlineSeconds exceeded, failing TrainJob",
+			"deadline", deadline,
+			"creationTime", creationTime,
+			"deadlineAt", deadlineAt)
+
+		meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
+			Type:    trainer.TrainJobFailed,
+			Status:  metav1.ConditionTrue,
+			Reason:  trainer.TrainJobDeadlineExceededReason,
+			Message: fmt.Sprintf("TrainJob exceeded ActiveDeadlineSeconds of %d seconds", *trainJob.Spec.ActiveDeadlineSeconds),
+		})
+
+		r.recorder.Event(trainJob, corev1.EventTypeWarning, "DeadlineExceeded",
+			fmt.Sprintf("TrainJob exceeded activeDeadlineSeconds of %v", deadline))
+
+		return ctrl.Result{}, nil
+	}
+
+	return ctrl.Result{RequeueAfter: remaining}, nil
 }
 
 func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {

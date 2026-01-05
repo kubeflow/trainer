@@ -14256,6 +14256,11 @@
           "runtimeRef"
         ],
         "properties": {
+          "activeDeadlineSeconds": {
+            "description": "activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob creation time that the TrainJob may be active before the system tries to terminate it. Value must be a positive integer. Once reached, the TrainJob status becomes Failed with reason: DeadlineExceeded. The field is immutable.",
+            "type": "integer",
+            "format": "int64"
+          },
           "annotations": {
             "description": "annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.",
             "type": "object",
