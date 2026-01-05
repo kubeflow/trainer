@@ -319,7 +319,7 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 }
 
 func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
-	
+
 	if !needsTTLCleanup(trainJob) {
 		return ctrl.Result{}, nil
 	}
@@ -337,18 +337,15 @@ func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer
 		log := ctrl.LoggerFrom(ctx)
 		log.Info("Warning: TrainJob finished in the future, likely clock skew. Deferring cleanup.",
 			"finishTime", finishTime.Time, "now", now)
+		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
 
 	remaining := expireAt.Sub(now)
 
 	if remaining <= 0 {
 		log := ctrl.LoggerFrom(ctx)
-		log.Info("TTL expired, deleting TrainJob",
-			"ttl", ttl,
-			"finishTime", finishTime.Time,
-			"expireAt", expireAt)
+		log.Info("TTL expired, deleting TrainJob", "ttl", ttl,"finishTime", finishTime.Time,"expireAt", expireAt)
 
-	
 		policy := metav1.DeletePropagationForeground
 		opts := client.DeleteOptions{
 			PropagationPolicy: &policy,

@@ -1553,8 +1553,11 @@ alpha-node-0-1.alpha slots=8
 			gomega.Eventually(func(g gomega.Gomega) {
 				gotTrainJob := &trainer.TrainJob{}
 				err := k8sClient.Get(ctx, trainJobKey, gotTrainJob)
-				g.Expect(err).Should(gomega.HaveOccurred())
-				g.Expect(client.IgnoreNotFound(err)).Should(gomega.Succeed())
+				if err != nil {
+					g.Expect(client.IgnoreNotFound(err)).Should(gomega.Succeed())
+					return
+				}
+				g.Expect(gotTrainJob.DeletionTimestamp).ShouldNot(gomega.BeNil())
 			}, 10*util.Timeout, util.Interval).Should(gomega.Succeed())
 		})
 
@@ -1598,8 +1601,11 @@ alpha-node-0-1.alpha slots=8
 			gomega.Eventually(func(g gomega.Gomega) {
 				gotTrainJob := &trainer.TrainJob{}
 				err := k8sClient.Get(ctx, trainJobKey, gotTrainJob)
-				g.Expect(err).Should(gomega.HaveOccurred())
-				g.Expect(client.IgnoreNotFound(err)).Should(gomega.Succeed())
+				if err != nil {
+					g.Expect(client.IgnoreNotFound(err)).Should(gomega.Succeed())
+					return
+				}
+				g.Expect(gotTrainJob.DeletionTimestamp).ShouldNot(gomega.BeNil())
 			}, 5*util.Timeout, util.Interval).Should(gomega.Succeed())
 		})
 	})
@@ -1636,6 +1642,11 @@ alpha-node-0-1.alpha slots=8
 			trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "no-deadline-job").
 				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "deadline-runtime").
 				Suspend(false).
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container("test:runtime", []string{"sleep"}, []string{"1h"}, resRequests).
+						Obj(),
+				).
 				Obj()
 			gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
 			trainJobKey = client.ObjectKeyFromObject(trainJob)
@@ -1662,6 +1673,11 @@ alpha-node-0-1.alpha slots=8
 				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "deadline-runtime").
 				Suspend(false).
 				ActiveDeadlineSeconds(2). // 2 second deadline
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container("test:runtime", []string{"sleep"}, []string{"1h"}, resRequests).
+						Obj(),
+				).
 				Obj()
 			gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
 			trainJobKey = client.ObjectKeyFromObject(trainJob)
