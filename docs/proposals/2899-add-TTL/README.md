@@ -1,4 +1,6 @@
-# Summary
+# KEP-2899 Add TTLSecondsAfterFinished and ActiveDeadlineSeconds to TrainJob CRD
+
+## Summary
 
 Add `TTLSecondsAfterFinished` and `ActiveDeadlineSeconds` fields to TrainJob CRD to enable automatic cleanup of finished jobs and enforce maximum runtime limits respectively, bringing TrainJob lifecycle management in check with Kubernetes Jobs and JobSets.
 
