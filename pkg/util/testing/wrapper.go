@@ -640,6 +640,11 @@ func (t *TrainJobWrapper) ManagedBy(m string) *TrainJobWrapper {
 	return t
 }
 
+func (t *TrainJobWrapper) TTLSecondsAfterFinished(ttl int32) *TrainJobWrapper {
+	t.Spec.TTLSecondsAfterFinished = &ttl
+	return t
+}
+
 func (t *TrainJobWrapper) Obj() *trainer.TrainJob {
 	return &t.TrainJob
 }

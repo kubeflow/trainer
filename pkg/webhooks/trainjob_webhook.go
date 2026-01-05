@@ -50,7 +50,6 @@ func (w *TrainJobWebhook) ValidateCreate(ctx context.Context, obj apiruntime.Obj
 	log := ctrl.LoggerFrom(ctx).WithName("trainJob-webhook")
 	log.V(5).Info("Validating create", "TrainJob", klog.KObj(trainJob))
 
-	// Validate TTL field
 	ttlWarnings := validateTTLSecondsAfterFinished(trainJob)
 
 	runtimeRefGK := runtime.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
@@ -63,7 +62,6 @@ func (w *TrainJobWebhook) ValidateCreate(ctx context.Context, obj apiruntime.Obj
 	return warnings, errors.ToAggregate()
 }
 
-// validateTTLSecondsAfterFinished validates the TTL field and returns warnings.
 func validateTTLSecondsAfterFinished(trainJob *trainer.TrainJob) admission.Warnings {
 	var warnings admission.Warnings
 
@@ -73,7 +71,6 @@ func validateTTLSecondsAfterFinished(trainJob *trainer.TrainJob) admission.Warni
 
 	ttl := *trainJob.Spec.TTLSecondsAfterFinished
 
-	// Warning: very short TTL may cause job to be deleted before user can review
 	if ttl > 0 && ttl < 60 {
 		warnings = append(warnings,
 			fmt.Sprintf("ttlSecondsAfterFinished=%d is very short; TrainJob may be deleted before you can review it", ttl))

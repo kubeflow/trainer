@@ -243,8 +243,6 @@ func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJo
 	return nil
 }
 
-// trainJobFinishTime returns the time when a TrainJob finished (Complete or Failed).
-// Returns nil if the TrainJob hasn't finished yet.
 func trainJobFinishTime(trainJob *trainer.TrainJob) *metav1.Time {
 	for _, c := range trainJob.Status.Conditions {
 		if (c.Type == trainer.TrainJobComplete || c.Type == trainer.TrainJobFailed) &&
@@ -258,20 +256,16 @@ func trainJobFinishTime(trainJob *trainer.TrainJob) *metav1.Time {
 	return nil
 }
 
-// needsTTLCleanup checks whether a TrainJob has finished and has a TTL set.
 func needsTTLCleanup(trainJob *trainer.TrainJob) bool {
 	return trainJob.Spec.TTLSecondsAfterFinished != nil && trainJobFinishTime(trainJob) != nil
 }
 
-// reconcileTTL handles TTL-based deletion of finished TrainJobs.
-// Returns a requeue result if the TrainJob should be requeued for future deletion.
 func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
-	// Skip if TTL not set or job not finished
+	
 	if !needsTTLCleanup(trainJob) {
 		return ctrl.Result{}, nil
 	}
 
-	// Skip if already being deleted
 	if trainJob.DeletionTimestamp != nil {
 		return ctrl.Result{}, nil
 	}
@@ -281,7 +275,6 @@ func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer
 	expireAt := finishTime.Add(ttl)
 	now := time.Now()
 
-	// Handle clock skew - if finish time is in the future, log warning
 	if finishTime.After(now) {
 		log := ctrl.LoggerFrom(ctx)
 		log.Info("Warning: TrainJob finished in the future, likely clock skew. Deferring cleanup.",
@@ -290,7 +283,6 @@ func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer
 
 	remaining := expireAt.Sub(now)
 
-	// TTL has expired
 	if remaining <= 0 {
 		log := ctrl.LoggerFrom(ctx)
 		log.Info("TTL expired, deleting TrainJob",
@@ -298,7 +290,7 @@ func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer
 			"finishTime", finishTime.Time,
 			"expireAt", expireAt)
 
-		// Use foreground propagation for cascading delete (matches K8s pattern)
+	
 		policy := metav1.DeletePropagationForeground
 		opts := client.DeleteOptions{
 			PropagationPolicy: &policy,
@@ -313,7 +305,6 @@ func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer
 		return ctrl.Result{}, nil
 	}
 
-	// TTL not expired yet, requeue at expiration time
 	return ctrl.Result{RequeueAfter: remaining}, nil
 }
 
