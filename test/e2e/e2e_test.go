@@ -4,6 +4,8 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -173,6 +175,77 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 							Suspended: ptr.To(int32(0)),
 						},
 					}, util.SortJobsStatus))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+		})
+	})
+
+	ginkgo.When("Managing TrainJob Lifecycle", func() {
+		ginkgo.It("should delete TrainJob after TTL expires", func() {
+			ttl := int32(5)
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-ttl-test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
+				TTLSecondsAfterFinished(ttl).
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container("test:runtime", []string{"/bin/sh", "-c"}, []string{"echo 'started'; sleep 5; echo 'done'"}, corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("256Mi"),
+						}).
+						Obj(),
+				).
+				Obj()
+
+			ginkgo.By("Create a TrainJob with TTL set", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Wait for TrainJob to succeed", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					cond := meta.FindStatusCondition(gotTrainJob.Status.Conditions, trainer.TrainJobComplete)
+					g.Expect(cond).NotTo(gomega.BeNil())
+					g.Expect(cond.Status).To(gomega.Equal(metav1.ConditionTrue))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Wait for TrainJob to be deleted", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					err := k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), &trainer.TrainJob{})
+					g.Expect(client.IgnoreNotFound(err)).Should(gomega.Succeed())
+					g.Expect(err).Should(gomega.HaveOccurred()) // Should be not found
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+		})
+
+		ginkgo.It("should fail TrainJob when ActiveDeadlineSeconds exceeded", func() {
+			deadline := int64(10)
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-deadline-test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
+				ActiveDeadlineSeconds(deadline).
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container("test:runtime", []string{"/bin/sh", "-c"}, []string{"echo 'started'; sleep 60; echo 'done'"}, corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("256Mi"),
+						}).
+						Obj(),
+				).
+				Obj()
+
+			ginkgo.By("Create a TrainJob with ActiveDeadlineSeconds set", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Wait for TrainJob to fail with DeadlineExceeded", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					cond := meta.FindStatusCondition(gotTrainJob.Status.Conditions, trainer.TrainJobFailed)
+					g.Expect(cond).NotTo(gomega.BeNil())
+					g.Expect(cond.Status).To(gomega.Equal(metav1.ConditionTrue))
+					g.Expect(cond.Reason).To(gomega.Equal(trainer.TrainJobDeadlineExceededReason))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 		})

@@ -300,6 +300,8 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 			"creationTime", creationTime,
 			"deadlineAt", deadlineAt)
 
+		deadlineExceededTotal.Inc()
+
 		meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
 			Type:    trainer.TrainJobFailed,
 			Status:  metav1.ConditionTrue,
@@ -358,6 +360,7 @@ func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer
 
 		r.recorder.Event(trainJob, corev1.EventTypeNormal, "TTLExpired",
 			fmt.Sprintf("TrainJob deleted after TTL of %v expired", ttl))
+		ttlDeletionsTotal.Inc()
 		return ctrl.Result{}, nil
 	}
 

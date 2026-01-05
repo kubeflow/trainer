@@ -1603,4 +1603,83 @@ alpha-node-0-1.alpha slots=8
 			}, 5*util.Timeout, util.Interval).Should(gomega.Succeed())
 		})
 	})
+
+	ginkgo.Context("ActiveDeadlineSeconds tests", func() {
+		var (
+			trainJob        *trainer.TrainJob
+			trainJobKey     client.ObjectKey
+			trainingRuntime *trainer.TrainingRuntime
+		)
+
+		ginkgo.BeforeEach(func() {
+			trainingRuntime = testingutil.MakeTrainingRuntimeWrapper(ns.Name, "deadline-runtime").
+				RuntimeSpec(
+					testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(ns.Name, "deadline-runtime").Spec).
+						WithMLPolicy(
+							testingutil.MakeMLPolicyWrapper().
+								WithNumNodes(1).
+								Obj(),
+						).
+						Container(constants.Node, constants.Node, "test:runtime", []string{"sleep"}, []string{"1h"}, resRequests).
+						Obj(),
+				).Obj()
+			gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).To(gomega.Succeed())
+		})
+
+		ginkgo.AfterEach(func() {
+			gomega.Expect(k8sClient.DeleteAllOf(ctx, &trainer.TrainJob{}, client.InNamespace(ns.Name))).Should(gomega.Succeed())
+			gomega.Expect(k8sClient.DeleteAllOf(ctx, &trainer.TrainingRuntime{}, client.InNamespace(ns.Name))).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("Should not fail TrainJob when deadline not set", func() {
+			ginkgo.By("Creating TrainJob without ActiveDeadlineSeconds")
+			trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "no-deadline-job").
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "deadline-runtime").
+				Suspend(false).
+				Obj()
+			gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
+			trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+			ginkgo.By("Waiting for JobSet to be created")
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(gomega.Succeed())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+			ginkgo.By("Verifying TrainJob does not have Failed condition")
+			gomega.Consistently(func(g gomega.Gomega) {
+				gotTrainJob := &trainer.TrainJob{}
+				g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+				failedCond := meta.FindStatusCondition(gotTrainJob.Status.Conditions, trainer.TrainJobFailed)
+				if failedCond != nil {
+					g.Expect(failedCond.Status).Should(gomega.Equal(metav1.ConditionFalse))
+				}
+			}, util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("Should fail TrainJob when deadline exceeded", func() {
+			ginkgo.By("Creating TrainJob with short ActiveDeadlineSeconds")
+			trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-job").
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "deadline-runtime").
+				Suspend(false).
+				ActiveDeadlineSeconds(2). // 2 second deadline
+				Obj()
+			gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
+			trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+			ginkgo.By("Waiting for JobSet to be created")
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(gomega.Succeed())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+			ginkgo.By("Verifying TrainJob is failed with DeadlineExceeded reason")
+			gomega.Eventually(func(g gomega.Gomega) {
+				gotTrainJob := &trainer.TrainJob{}
+				g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+				failedCond := meta.FindStatusCondition(gotTrainJob.Status.Conditions, trainer.TrainJobFailed)
+				g.Expect(failedCond).ShouldNot(gomega.BeNil())
+				g.Expect(failedCond.Status).Should(gomega.Equal(metav1.ConditionTrue))
+				g.Expect(failedCond.Reason).Should(gomega.Equal(trainer.TrainJobDeadlineExceededReason))
+			}, 5*util.Timeout, util.Interval).Should(gomega.Succeed())
+		})
+	})
 })
