@@ -11,14 +11,10 @@ permissions:
 jobs:
   gpu-e2e-test:
     name: GPU E2E Test
-    runs-on: oracle-vm-16cpu-a10gpu-240gb
+    runs-on: oracle-vm-gpu-a10-1
 
     env:
       GOPATH: ${{ github.workspace }}/go
-
-    defaults:
-      run:
-        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
     strategy:
       fail-fast: false
@@ -37,6 +33,11 @@ jobs:
             echo "Label found. Requesting environment approval to run GPU tests."
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Prepare GOPATH directories
+        if: steps.check-label.outputs.skip == 'false'
+        run: |
+          mkdir -p "$GOPATH/src/github.com/kubeflow"
 
       - name: Check out code
         if: steps.check-label.outputs.skip == 'false'
@@ -59,6 +60,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.check-label.outputs.skip == 'false'
+        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
         run: |
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
           pip install git+https://github.com/kubeflow/sdk.git@main
@@ -85,7 +87,7 @@ jobs:
 
   delete-kind-cluster:
     name: Delete kind Cluster
-    runs-on: oracle-vm-16cpu-a10gpu-240gb
+    runs-on: oracle-vm-gpu-a10-1
     needs: [gpu-e2e-test]
     if: always()
     steps:
