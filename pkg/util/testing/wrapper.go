@@ -645,6 +645,11 @@ func (t *TrainJobWrapper) TTLSecondsAfterFinished(ttl int32) *TrainJobWrapper {
 	return t
 }
 
+func (t *TrainJobWrapper) ActiveDeadlineSeconds(deadline int64) *TrainJobWrapper {
+	t.Spec.ActiveDeadlineSeconds = &deadline
+	return t
+}
+
 func (t *TrainJobWrapper) Obj() *trainer.TrainJob {
 	return &t.TrainJob
 }
