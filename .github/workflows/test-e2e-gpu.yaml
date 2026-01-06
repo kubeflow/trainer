@@ -22,65 +22,44 @@ jobs:
         kubernetes-version: ["1.33.1"]
 
     steps:
-      - name: Check GPU label
-        id: check-label
-        run: |
-          if [[ "${{ join(github.event.pull_request.labels.*.name, ',') }}" != *"ok-to-test-gpu-runner"* ]]; then
-            echo "✅ Skipping GPU E2E tests (label not present)."
-            echo "skip=true" >> $GITHUB_OUTPUT
-            exit 0
-          else
-            echo "Label found. Requesting environment approval to run GPU tests."
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Prepare GOPATH directories
-        if: steps.check-label.outputs.skip == 'false'
-        run: |
-          mkdir -p "$GOPATH/src/github.com/kubeflow"
-
       - name: Check out code
-        if: steps.check-label.outputs.skip == 'false'
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
       - name: Setup Go
-        if: steps.check-label.outputs.skip == 'false'
         uses: actions/setup-go@v6
         with:
           go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
 
       - name: Setup Python
-        if: steps.check-label.outputs.skip == 'false'
         uses: actions/setup-python@v6
         with:
           python-version: 3.11
 
       - name: Install dependencies
-        if: steps.check-label.outputs.skip == 'false'
         working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
         run: |
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
           pip install git+https://github.com/kubeflow/sdk.git@main
 
       - name: Setup cluster with GPU support using nvidia/kind
-        if: steps.check-label.outputs.skip == 'false'
+        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
         run: |
           make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
 
       - name: Run e2e test on GPU cluster
-        if: steps.check-label.outputs.skip == 'false'
+        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
         run: |
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/qwen2_5/qwen2.5-1.5B-with-alpaca.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_qwen2_5_with_alpaca-trainjob-yaml.ipynb TIMEOUT=900
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/jax/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_jax_mnist.ipynb PAPERMILL_PARAMS="-p num_cpu 3 -p num_gpu 1" TIMEOUT=600
 
       - name: Upload Artifacts to GitHub
-        if: always()
         uses: actions/upload-artifact@v6
         with:
+          working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
           name: ${{ matrix.kubernetes-version }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
           retention-days: 1
