@@ -1,0 +1,36 @@
+FROM ghcr.io/nvidia/jax:jax as gpu-base
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt update && apt install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        git \
+        libgoogle-glog-dev \
+        libgflags-dev \
+        libprotobuf-dev \
+        protobuf-compiler \
+        python3-dev pip && rm -f /usr/bin/python &&  \
+    ln -s /usr/bin/python3 /usr/bin/python && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --upgrade pip
+
+FROM gpu-base as tpu-base
+
+RUN pip install --no-cache-dir "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html || \
+    echo "TPU support not available" && \
+    pip install --no-cache-dir libtpu-nightly || \
+    echo "libtpu-nightly not available"
+
+FROM tpu-base as gloo-base
+
+RUN git clone https://github.com/facebookincubator/gloo.git \
+    && cd gloo \
+    && git checkout 43b7acbf372cdce14075f3526e39153b7e433b53 \
+    && mkdir build \
+    && cd build \
+    && cmake ../ \
+    && make \
+    && make install
+
+FROM gloo-base as production

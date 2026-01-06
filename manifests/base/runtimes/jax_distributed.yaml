@@ -1,0 +1,24 @@
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: jax-distributed
+  labels:
+    trainer.kubeflow.org/framework: jax
+spec:
+  mlPolicy:
+    numNodes: 1
+    jax: {}
+  template:
+    spec:
+      replicatedJobs:
+        - name: node
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: ghcr.io/kubeflow/trainer/jax-runtime

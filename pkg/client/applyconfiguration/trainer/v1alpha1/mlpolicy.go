@@ -16,6 +16,10 @@
 
 package v1alpha1
 
+import (
+	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+)
+
 // MLPolicyApplyConfiguration represents a declarative configuration of the MLPolicy type for use
 // with apply.
 type MLPolicyApplyConfiguration struct {
@@ -50,5 +54,13 @@ func (b *MLPolicyApplyConfiguration) WithTorch(value *TorchMLPolicySourceApplyCo
 // If called multiple times, the MPI field is set to the value of the last call.
 func (b *MLPolicyApplyConfiguration) WithMPI(value *MPIMLPolicySourceApplyConfiguration) *MLPolicyApplyConfiguration {
 	b.MLPolicySourceApplyConfiguration.MPI = value
+	return b
+}
+
+// WithJAX sets the JAX field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the JAX field is set to the value of the last call.
+func (b *MLPolicyApplyConfiguration) WithJAX(value trainerv1alpha1.JAXMLPolicySource) *MLPolicyApplyConfiguration {
+	b.MLPolicySourceApplyConfiguration.JAX = &value
 	return b
 }
