@@ -2,32 +2,24 @@
 
 This directory contains examples for training PyTorch models using the Kubeflow Trainer SDK.
 
-### Examples
+## Examples
 
-| Use Case | Script | Notebook |
-| :--- | :--- | :--- |
-| **Image Classification** | [train_mnist.py](image-classification/train_mnist.py) | [mnist.ipynb](image-classification/mnist.ipynb) |
+| Task | Model | Dataset | Notebook |
+| :--- | :--- | :--- | :--- |
+| Image Classification | CNN | Fashion MNIST | [mnist.ipynb](./image-classification/mnist.ipynb) |
+| Question Answering | DistilBERT | SQuAD | [fine-tune-distilbert.ipynb](./question-answering/fine-tune-distilbert.ipynb) |
 
-### Prerequisites
+## How to use
 
-To run these examples, install the Kubeflow SDK:
-```bash
-pip install -U kubeflow
-```
+1. **Install the Kubeflow SDK**:
+   ```bash
+   pip install kubeflow-trainer
+   ```
 
-### How to Run
+2. **Run the Notebooks**:
+   Open the notebooks in your favorite editor (Jupyter, VS Code, etc.) and follow the instructions to run locally or on a Kubernetes cluster.
 
-These standalone scripts are designed for automated workflows and production training. They automatically handle distributed setup and dependency installation on the cluster.
+## Resources
 
-**Submit an MNIST training job:**
-```bash
-python image-classification/train_mnist.py --nodes 1
-```
-
-**Verify locally (no Kubernetes needed):**
-You can verify the training logic on your local machine using the `--test` flag:
-```bash
-python image-classification/train_mnist.py --test
-```
-
-For interactive experimentation, you can also use the corresponding Jupyter notebooks in each subdirectory.
+- [Kubeflow Trainer Documentation](https://www.kubeflow.org/docs/components/trainer/)
+- [PyTorch Distributed Overview](https://pytorch.org/docs/stable/distributed.html)
