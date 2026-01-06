@@ -38,14 +38,14 @@ jobs:
           - component-name: mlx-runtime
             dockerfile: cmd/runtimes/mlx/Dockerfile
             platforms: linux/amd64
+          - component-name: jax-runtime
+            dockerfile: cmd/runtimes/jax/Dockerfile
+            platforms: linux/amd64,linux/arm64
           - component-name: torchtune-trainer
             dockerfile: cmd/trainers/torchtune/Dockerfile
             platforms: linux/amd64,linux/arm64
           - component-name: data-cache
             dockerfile: cmd/data_cache/Dockerfile
-            platforms: linux/amd64,linux/arm64
-          - component-name: jax-runtime
-            dockerfile: cmd/runtimes/jax/Dockerfile
             platforms: linux/amd64,linux/arm64
     steps:
       - name: Checkout
