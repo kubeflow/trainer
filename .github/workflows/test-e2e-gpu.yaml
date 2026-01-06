@@ -63,13 +63,3 @@ jobs:
           name: ${{ matrix.kubernetes-version }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
           retention-days: 1
-
-  delete-kind-cluster:
-    name: Delete kind Cluster
-    runs-on: oracle-vm-gpu-a10-1
-    needs: [gpu-e2e-test]
-    if: always()
-    steps:
-      - name: Delete any existing kind cluster
-        run: |
-          sudo kind delete cluster --name kind-gpu && echo "kind cluster has been deleted" || echo "kind cluster doesn't exist"
