@@ -109,8 +109,13 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
 		if trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer); trainerPS != nil {
 			res := trainJob.Spec.Trainer.ResourcesPerNode
-			if len(res.Requests) > 0 {
-				trainerPS.SinglePodRequests = res.Requests
+			requests := res.Requests
+			// If requests are empty, we use limits as requests.
+			if len(requests) == 0 {
+				requests = res.Limits
+			}
+			if len(requests) > 0 {
+				trainerPS.SinglePodRequests = requests
 			}
 		}
 	}
