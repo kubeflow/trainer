@@ -1,19 +1,16 @@
 FROM ghcr.io/nvidia/jax:jax as gpu-base
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN apt update && apt install -y --no-install-recommends \
         build-essential \
         cmake \
         git \
-        curl \
         libgoogle-glog-dev \
         libgflags-dev \
         libprotobuf-dev \
         protobuf-compiler \
-        python3-dev \
-        python3-pip \
-        python3-setuptools && \
+        python3-dev pip && rm -f /usr/bin/python &&  \
+    ln -s /usr/bin/python3 /usr/bin/python && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir --upgrade pip
@@ -36,8 +33,4 @@ RUN git clone https://github.com/facebookincubator/gloo.git \
     && make \
     && make install
 
-RUN pip install --no-cache-dir absl-py kubernetes
-
 FROM gloo-base as production
-
-RUN pip list
