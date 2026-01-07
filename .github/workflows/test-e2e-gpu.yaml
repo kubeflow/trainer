@@ -16,6 +16,10 @@ jobs:
     env:
       GOPATH: ${{ github.workspace }}/go
 
+    defaults:
+      run:
+        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+
     strategy:
       fail-fast: false
       matrix:
@@ -39,18 +43,15 @@ jobs:
           python-version: 3.11
 
       - name: Install dependencies
-        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
         run: |
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
           pip install git+https://github.com/kubeflow/sdk.git@main
 
       - name: Setup cluster with GPU support using nvidia/kind
-        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
         run: |
           make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
 
       - name: Run e2e test on GPU cluster
-        working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
         run: |
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/qwen2_5/qwen2.5-1.5B-with-alpaca.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_qwen2_5_with_alpaca-trainjob-yaml.ipynb TIMEOUT=900
@@ -59,7 +60,6 @@ jobs:
       - name: Upload Artifacts to GitHub
         uses: actions/upload-artifact@v6
         with:
-          working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
           name: ${{ matrix.kubernetes-version }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
           retention-days: 1
