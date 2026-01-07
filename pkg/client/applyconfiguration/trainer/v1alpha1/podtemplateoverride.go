@@ -24,6 +24,7 @@ import (
 // with apply.
 type PodTemplateOverrideApplyConfiguration struct {
 	TargetJobs []PodTemplateOverrideTargetJobApplyConfiguration `json:"targetJobs,omitempty"`
+	Manager    *string                                          `json:"manager,omitempty"`
 	Metadata   *v1.ObjectMetaApplyConfiguration                 `json:"metadata,omitempty"`
 	Spec       *PodTemplateSpecOverrideApplyConfiguration       `json:"spec,omitempty"`
 }
@@ -44,6 +45,14 @@ func (b *PodTemplateOverrideApplyConfiguration) WithTargetJobs(values ...*PodTem
 		}
 		b.TargetJobs = append(b.TargetJobs, *values[i])
 	}
+	return b
+}
+
+// WithManager sets the Manager field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Manager field is set to the value of the last call.
+func (b *PodTemplateOverrideApplyConfiguration) WithManager(value string) *PodTemplateOverrideApplyConfiguration {
+	b.Manager = &value
 	return b
 }
 

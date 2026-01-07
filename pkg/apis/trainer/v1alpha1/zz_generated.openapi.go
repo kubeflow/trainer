@@ -997,6 +997,13 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateOverride(ref common.ReferenceCa
 							},
 						},
 					},
+					"manager": {
+						SchemaProps: spec.SchemaProps{
+							Description: "manager indicates who created this PodTemplateOverride object.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Description: "metadata overrides the Pod template metadata. These values will be merged with the TrainingRuntime's Pod template metadata.",

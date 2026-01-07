@@ -22,6 +22,7 @@ import (
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -35,10 +36,37 @@ type TrainJobWebhook struct {
 }
 
 func setupWebhookForTrainJob(mgr ctrl.Manager, run map[string]runtime.Runtime) error {
+	wh := &TrainJobWebhook{
+		runtimes: run,
+	}
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&trainer.TrainJob{}).
-		WithValidator(&TrainJobWebhook{runtimes: run}).
+		WithDefaulter(wh).
+		WithValidator(wh).
 		Complete()
+}
+
+// +kubebuilder:webhook:path=/mutate-trainer-kubeflow-org-v1alpha1-trainjob,mutating=true,failurePolicy=fail,sideEffects=None,groups=trainer.kubeflow.org,resources=trainjobs,verbs=create;update,versions=v1alpha1,name=defaulter.trainjob.trainer.kubeflow.org,admissionReviewVersions=v1
+
+var _ admission.CustomDefaulter = (*TrainJobWebhook)(nil)
+
+func (w *TrainJobWebhook) Default(ctx context.Context, obj apiruntime.Object) error {
+	trainJob := obj.(*trainer.TrainJob)
+	log := ctrl.LoggerFrom(ctx).WithName("trainJob-webhook")
+	req, err := admission.RequestFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	username := req.UserInfo.Username
+	log.V(2).Info("Defaulting TrainJob", "username", username, "TrainJob", klog.KObj(trainJob))
+	for i := range trainJob.Spec.PodTemplateOverrides {
+		if trainJob.Spec.PodTemplateOverrides[i].Manager == nil {
+			trainJob.Spec.PodTemplateOverrides[i].Manager = ptr.To(username)
+		}
+	}
+
+	return nil
 }
 
 // +kubebuilder:webhook:path=/validate-trainer-kubeflow-org-v1alpha1-trainjob,mutating=false,failurePolicy=fail,sideEffects=None,groups=trainer.kubeflow.org,resources=trainjobs,verbs=create;update,versions=v1alpha1,name=validator.trainjob.trainer.kubeflow.org,admissionReviewVersions=v1
