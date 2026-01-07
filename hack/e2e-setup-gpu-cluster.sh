@@ -66,8 +66,11 @@ sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true
 sudo systemctl restart docker
 
 # Create a Kind cluster with GPU support.
-sudo nvkind cluster create --name ${GPU_CLUSTER_NAME} --image "${KIND_NODE_VERSION}"
-sudo nvkind cluster print-gpus
+sudo "$(go env GOPATH)/bin/nvkind" cluster create \
+  --name "${GPU_CLUSTER_NAME}" \
+  --image "${KIND_NODE_VERSION}"
+
+sudo "$(go env GOPATH)/bin/nvkind" cluster print-gpus
 
 # Install gpu-operator to make sure we can run GPU workloads.
 echo "Install NVIDIA GPU Operator"
