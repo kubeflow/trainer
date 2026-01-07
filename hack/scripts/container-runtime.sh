@@ -34,5 +34,9 @@ setup_container_runtime() {
   if [[ -z "${CONTAINER_RUNTIME:-}" ]]; then
     CONTAINER_RUNTIME=$(detect_container_runtime)
   fi
+
+  if [[ "${1:-}" == "sudo" ]]; then
+    CONTAINER_RUNTIME="sudo ${CONTAINER_RUNTIME}"
+  fi
   export CONTAINER_RUNTIME
 }

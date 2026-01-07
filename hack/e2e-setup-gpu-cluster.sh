@@ -27,7 +27,7 @@ source "${SCRIPT_DIR}/scripts/container-runtime.sh"
 source "${SCRIPT_DIR}/scripts/load-image-to-kind.sh"
 
 # Setup container runtime
-setup_container_runtime
+setup_container_runtime "sudo"
 
 # Configure variables.
 KIND=${KIND:-kind}
@@ -37,6 +37,13 @@ KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
 GPU_CLUSTER_NAME="kind-gpu"
 NAMESPACE="kubeflow-system"
 TIMEOUT="5m"
+
+# All as sudo
+alias docker="sudo docker"
+alias kubectl="sudo kubectl"
+alias helm="sudo helm"
+alias nvkind="sudo nvkind"
+alias kubectl="sudo kubectl"
 
 # Kubeflow Trainer images.
 CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-manager"
@@ -65,12 +72,10 @@ sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enable
 sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
 sudo systemctl restart docker
 
-# TODO ARC nvkind if not working, tmp fix
-sudo GOBIN=/usr/local/bin go install github.com/NVIDIA/nvkind/cmd/nvkind@latest
-
 # Create a Kind cluster with GPU support.
-sudo nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
-sudo nvkind cluster print-gpus
+sudo cp "$(sudo go env GOPATH)/bin/nvkind" /usr/local/bin/nvkind
+nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
+nvkind cluster print-gpus
 
 # Install gpu-operator to make sure we can run GPU workloads.
 echo "Install NVIDIA GPU Operator"
@@ -96,12 +101,12 @@ kubectl get nodes -o=custom-columns=NAME:.metadata.name,GPU:.status.allocatable.
 
 # Load Kubeflow Trainer images
 echo "Load Kubeflow Trainer images"
-load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
+load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${GPU_CLUSTER_NAME}" "sudo"
 
 echo "Load Kubeflow Trainer initializers images"
-load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
-load_image_to_kind "${MODEL_INITIALIZER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
-load_image_to_kind "${TRAINER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
+load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${GPU_CLUSTER_NAME}" "sudo"
+load_image_to_kind "${MODEL_INITIALIZER_CI_IMAGE}" "${GPU_CLUSTER_NAME}" "sudo"
+load_image_to_kind "${TRAINER_CI_IMAGE}" "${GPU_CLUSTER_NAME}" "sudo"
 
 # Deploy Kubeflow Trainer control plane
 echo "Deploy Kubeflow Trainer control plane"
@@ -167,7 +172,7 @@ kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
 # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
 TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
 ${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
-load_image_to_kind ${TORCH_RUNTIME_IMAGE} ${GPU_CLUSTER_NAME}
+load_image_to_kind ${TORCH_RUNTIME_IMAGE} ${GPU_CLUSTER_NAME} "sudo"
 
 # Pre-pull NVIDIA JAX image for JAX runtime.
 JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
