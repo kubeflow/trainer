@@ -38,13 +38,6 @@ GPU_CLUSTER_NAME="kind-gpu"
 NAMESPACE="kubeflow-system"
 TIMEOUT="5m"
 
-# All as sudo
-alias docker="sudo docker"
-alias kubectl="sudo kubectl"
-alias helm="sudo helm"
-alias nvkind="sudo nvkind"
-alias kubectl="sudo kubectl"
-
 # Kubeflow Trainer images.
 CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-manager"
 CI_IMAGE_TAG="test"
@@ -74,8 +67,8 @@ sudo systemctl restart docker
 
 # Create a Kind cluster with GPU support.
 sudo cp "$(sudo go env GOPATH)/bin/nvkind" /usr/local/bin/nvkind
-nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
-nvkind cluster print-gpus
+sudo nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
+sudo nvkind cluster print-gpus
 
 # Install gpu-operator to make sure we can run GPU workloads.
 echo "Install NVIDIA GPU Operator"

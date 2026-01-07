@@ -26,7 +26,7 @@ load_image_to_kind() {
   fi
 
   echo "Loading image ${image_name} into KinD cluster${cluster_name:+ ${cluster_name}}"
-  
+
   local kind_cmd="${KIND}"
   if [[ "${use_sudo}" == "sudo" ]]; then
     kind_cmd="sudo ${KIND}"
