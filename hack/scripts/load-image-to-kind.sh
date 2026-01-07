@@ -18,6 +18,7 @@
 load_image_to_kind() {
   local image_name="$1"
   local cluster_name="${2:-}"
+  local use_sudo="${3:-}"
   local cluster_arg=""
 
   if [[ -n "${cluster_name}" ]]; then
@@ -25,9 +26,15 @@ load_image_to_kind() {
   fi
 
   echo "Loading image ${image_name} into KinD cluster${cluster_name:+ ${cluster_name}}"
-  if [[ "${CONTAINER_RUNTIME}" == "docker" ]]; then
-    ${KIND} load docker-image "${image_name}" ${cluster_arg}
+  
+  local kind_cmd="${KIND}"
+  if [[ "${use_sudo}" == "sudo" ]]; then
+    kind_cmd="sudo ${KIND}"
+  fi
+
+  if [[ "${CONTAINER_RUNTIME}" == *"docker"* ]]; then
+    ${kind_cmd} load docker-image "${image_name}" ${cluster_arg}
   else
-    ${CONTAINER_RUNTIME} save "${image_name}" -o /dev/stdout | ${KIND} load image-archive /dev/stdin ${cluster_arg}
+    ${CONTAINER_RUNTIME} save "${image_name}" -o /dev/stdout | ${kind_cmd} load image-archive /dev/stdin ${cluster_arg}
   fi
 }
