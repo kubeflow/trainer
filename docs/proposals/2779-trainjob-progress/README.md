@@ -55,9 +55,9 @@ I can use standard tools, like the Kubeflow Trainer Python SDK or `kubectl get t
 
 As a data scientist or ML Engineer, I want to create a TrainJob but I do not want to have to work out how to integrate training monitoring.
 
-## Proposal option 1: Push-based
+## Design Details
 
-As a first option, we propose a **push-based** approach with the following high-level design:
+We propose an approach with the following high-level **push-based** design:
 
 1. The TrainJob custom resource exposes the current training progress and metrics via a new optional field `status.trainerStatus`.
 2. The trainer control plane exposes a new http service which can receive the trainer status from the trainer runtime pods.
@@ -69,9 +69,7 @@ Support for any ML training framework is enabled by instrumentation code tailore
 
 4. Adding new built-in trainers to the kubeflow-sdk that automatically inject the instrumentation code for common ML frameworks. Initially we propose only adding a builtin trainer for the [*Transformers* *Trainer* API](https://huggingface.co/docs/transformers/en/main_classes/trainer).
 
-### Design Details
-
-#### CRD changes
+### CRD changes
 
 The TrainJob API would be updated to include a new optional `status.trainerStatus` field with this schema:
 
@@ -106,30 +104,6 @@ type TrainJobTrainerStatus struct {
     // +optional
     EstimatedRemainingSeconds *int32 `json:"estimatedRemainingSeconds,omitempty"`
 
-    // currentStep is the number of steps that have been completed so far.
-    // The value will be empty if it is unknown or not applicable
-    // to the training algorithm.
-    // +optional
-    CurrentStep *int32 `json:"currentStep,omitempty"`
-
-    // totalSteps is the total number of steps that have been requested.
-    // The value will be empty if it is unknown or not applicable
-    // to the training algorithm.
-    // +optional
-    TotalSteps *int32 `json:"totalSteps,omitempty"`
-
-    // currentEpoch is the number of epochs that have been completed so far.
-    // The value will be empty if it is unknown or not applicable
-    // to the training algorithm.
-    // +optional
-    CurrentEpoch *int32 `json:"currentEpoch,omitempty"`
-
-    // totalEpochs is the total number of epochs that have been requested.
-    // The value will be empty if it is unknown or not applicable
-    // to the training algorithm.
-    // +optional
-    TotalEpochs *int32 `json:"totalEpochs,omitempty"`
-
     // metrics contains the current metrics for the model.
     //
     // +listType=atomic
@@ -147,7 +121,7 @@ type Metric struct {
 	// +required
     Name string `json:"name,omitempty"`
 
-    // value is the numeric value of the metric, serialized as a string.
+    // value of the metric. Values must be serialized as a string.
 	// +kubebuilder:validation:MinLength=1
     // +required
     Value string `json:"value,omitempty"`
@@ -172,12 +146,7 @@ status:
     progressPercentage: 45                           # 45% complete
     estimatedRemainingSeconds: 795649                # Precise duration
 
-    # Training iterations
-    currentStep: 4500                                # Completed 4500 steps
-    totalSteps: 10000                                # Out of 10000 total
-    currentEpoch: 2                                  # On epoch 2
-    totalEpochs: 5                                   # Of 5 epochs
-
+    # The most recent training metrics that were reported
     metrics:
       - name: loss                                   # Current training loss
         value: "0.2347"
@@ -185,6 +154,10 @@ status:
         value: "0.2451"
       - name: accuracy                               # Current training accuracy
         value: "0.9876"
+      - name: currentEpoch                           # Current training epoch that is being evaluated
+        value: "2"
+      - name: totalEpochs                            # The total number of epochs that may be performed
+        value: "5"
 
     # Timestamp of last progress update
     lastUpdatedTime: "2025-01-23T10:30:45Z"
@@ -199,7 +172,7 @@ an-example        Running    3           13m
 another-example   Complete   100         50m
 ```
 
-#### Control plane endpoint
+### Control plane endpoint
 
 The control plane will expose a new service that provides an http endpoint where trainer pods can submit the trainer status.
 
@@ -211,7 +184,7 @@ On receiving requests to this endpoint, the control plane will validate the sour
 
 The control plane does not need to be highly available: the runtime can retry the status update request with some delay whilst continuing the training, or skip the update entirely.
 
-#### Security considerations
+### Security considerations
 
 The control plane endpoint will be secured with TLS and token-based authentication.
 
@@ -261,7 +234,7 @@ spec:
             path: ca.crt
 ```
 
-#### RBAC changes
+### RBAC changes
 
 The control plane service account requires these additional RBAC permissions:
 
@@ -287,7 +260,7 @@ rules:
   - create
 ```
 
-#### Runtime instrumentation
+### Runtime instrumentation
 
 The trainer runtime pods can be instrumented however is required for that framework (e.g. using callbacks provided by that framework). When using distributed training, it is up to the instrumentation implementation to decide which pod(s) will send the progress messages; the control plane will accept messages from any pod that is part of the train job.
 
@@ -314,7 +287,7 @@ req = request.Request(url, data=payload, headers={"Authorization": f"Bearer {tok
 request.urlopen(req, ssl_context=ssl_context)
 ```
 
-#### SDK Changes: instrumenting runtime
+### SDK Changes: instrumenting runtime
 
 We’re proposing adding a new TransformersTrainer to the kubeflow-sdk. This will be a custom trainer with the same api as the CustomTrainer, but with the additional behaviour that it will automatically register a custom callback that will post the training status to the control plane.
 
@@ -427,17 +400,13 @@ Additional changes to the sdk:
 @dataclass
 class Metric:
     name: str
-    value: float
+    value: str
 
 
 @dataclass
 class TrainerStatus:
     progressPercentage: Optional[int]
     estimatedRemainingDurationSeconds: Optional[int]
-    currentStep: Optional[int]
-    totalSteps: Optional[int]
-    currentEpoch: Optional[int]
-    totalEpochs: Optional[int]
     metrics: Optional[list[Metric]]
     lastUpdatedTime: datetime
 
@@ -451,28 +420,32 @@ class TrainJob:
 * Adding a new "transformers-distributed" ClusterRuntime which will be included in the default set of cluster runtimes included in the manifests.
 * Publish new docker images for the "transformers-distributed"  runtime "ghcr.io/kubeflow/trainer/transformers-runtime". The docker image will include the transformers, accelerate and torch python packages.
 
-## Proposal option 2: pull-based
+## Other considered alternatives
 
-As a second option to consider, we propose a **pull-based** approach with the following high-level design:
+This section describes other approaches that were evaluated and the rationale for not selecting them.
 
-1. As in proposal 1, the TrainJob custom resource exposes the current training progress and metrics via a new optional field `status.trainerStatus`.
+### Pull-based: control plane scrapes the metrics from the
+
+We also considered in detail an alternative **pull-based** approach with the following high-level design:
+
+1. The TrainJob custom resource exposes the current training progress and metrics via a new optional field `status.trainerStatus`.
 2. The user configures their (Cluster)TrainerRuntime so that **one** of the ReplicatedJobs has annotations that enable monitoring.
 3. The user instruments their trainer runtime code so that the current trainer status is written to a local file in a specific format.
 4. The control plane injects a sidecar container into one of the runtime pods of the configured ReplicatedJob. The sidecar has access to the local file through a shared volume, and contains an http server that serves the training progress and metrics from the shared file.
 5. The trainer control plane periodically scrapes the http server to fetch the progress and metrics and then updates the TrainJob custom resource.
 6. When training is completed, the sidecar container exposes the final contents of the shared file through its termination message which is read by the control plane. This ensures the final train status is collected.
 
-As in Proposal 1, the feature is optional but available for all TrainJobs. Users opt in to the functionality by adding configuration to their TrainingRuntime and instrumenting their runtime to write the metrics.
+As in the push-based design, the feature is optional but available for all TrainJobs. Users opt in to the functionality by adding configuration to their TrainingRuntime and instrumenting their runtime to write the metrics.
 
-Also as in Proposal 1, we propose adding the same set of new customer trainers to the kubeflow-sdk to make it easier for users to instrument their runtime pods.
+Also as in push-based design, we propose adding the same set of new customer trainers to the kubeflow-sdk to make it easier for users to instrument their runtime pods.
 
-### Design Details
+#### Design Details
 
-#### CRD changes
+##### CRD changes
 
-The same changes will be made to the TrainJob as in Proposal 1.
+The same changes will be made to the TrainJob as in the [push-based design](#crd-changes).
 
-#### Sidecar container injection
+##### Sidecar container injection
 
 To enable monitoring and sidecar injection, users must add the label `trainer.kubeflow.org/trainjob-monitoring-step: trainer` to one of the replicated jobs in their (Cluster)TrainingRuntime. This will cause the control plane to:
 - inject a [sidecar container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) into **one** of the trainer pods
@@ -533,13 +506,13 @@ spec:
       emptyDir: {}
 ```
 
-#### Scraping the metrics
+##### Scraping the metrics
 
 While the train job is active, the control plane will scrape the metrics server as part of its reconciliation loop using the `<train-job-name>-trainer-monitoring` service and update the TrainJob `trainingStatus`. The reconciliation will be re-queued based on the interval in the `trainer.kubeflow.org/monitoring-interval` label which will trigger the next scrape.
 
 To ensure the final training status is collected after training has completed successfully, the control plane will configure the sidecar `terminationMessagePath` to point to the shared metrics file. When the job is terminated, the control plane will read the contents of the sidecar termination message from the Pod config.
 
-#### Runtime instrumentation
+##### Runtime instrumentation
 
 The user must instrument their runtime code so the main runtime container(s) will periodically write the current training status to a file in the shared volume. The file must contain a single json entry payload, with schema the same as `TrainJobTrainerStatus`.
 
@@ -550,7 +523,7 @@ KUBEFLOW_TRAINER_STATUS_FILE=/var/kubeflow/trainer/status/status.json
 
 When updating the training status, the main container must replace the file contents so the file only ever contains a single status. This replacement should be done atomically using a temporary file followed by a rename to avoid the race condition of the http server reading a partially updated file.
 
-#### Security considerations
+##### Security considerations
 
 Securing the http server with auth and TLS can be achieved as follows:
 - the control plane creates a secret in the train job namespace containing an API key and a self-signed certificate. The control plane could periodically rotate these secrets.
@@ -559,19 +532,19 @@ Securing the http server with auth and TLS can be achieved as follows:
 
 However, as the data exposed by the http server may not be considered particularly sensitive, it may be acceptable to expose the metrics server without auth or TLS which would avoid a lot of complexity.
 
-#### RBAC changes
+##### RBAC changes
 
 No RBAC changes are required.
 
-#### SDK Changes: instrumenting runtime
+##### SDK Changes: instrumenting runtime
 
-We're proposing adding the same new `TransformersTrainer` to the kubeflow-sdk, as per Proposal 1, with the following differences:
+We're proposing adding the same new `TransformersTrainer` to the kubeflow-sdk, as per push-based design, with the following differences:
 - an additional parameter on the `TransformersTrainer` will allow users to specify the monitoring port.
 - the `KubeflowTrainerStatusCallback` injected into the runtime code will write the metrics data to the shared file in the required format rather than making a web request.
 
-## Comparison of the two proposed approaches
+#### Comparison of the  approaches
 
-|                                | Pull-based (web request)                                                                                                                 | Push-based (http server sidecar)                                                                                                                                            | Preferred approach                                      |
+|                                | Pull-based web request (the proposed approach)                                                                                           | Push-based http server sidecar (this alternative)                                                                                                                           | Preferred approach                                      |
 |--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------|
 | **User experience**            | Simple user experience, equivalent to MLFlow. Always available and users opt-in entirely through runtime code. Easier to debug problems. | Enabling the monitoring requires configuring the (Cluster)TrainingRuntime and instrumenting the runtime code. Errors are harder to debug (users must inspect sidecar logs). | Pull-based (web request) is much simpler UX.            |
 | **Security**                   | New external endpoint creates an additional threat route for the control plane, e.g. for accidental/malicious denial-of-service.         | Securing the server with TLS requires putting secrets into user namespace. The blast radius from compromised TLS/auth secrets is small though.                              | Both approaches introduce security concerns.            |
@@ -580,10 +553,6 @@ We're proposing adding the same new `TransformersTrainer` to the kubeflow-sdk, a
 | **Compatibility**              | Compatible with any k8s version.                                                                                                         | Relies on sidecar containers which is k8s 1.33+ (beta in 1.29+).                                                                                                            | Pull-based (web request) has no compatibility problems. |
 | **Flexibility**                | Highly flexible. Can support any framework that supports runtime instrumentation (e.g. using callbacks).                                 | Highly flexible. Can support any framework that supports runtime instrumentation (e.g. using callbacks).                                                                    | Both approaches are equally flexible.                   |
 | **Scalability**                | Should be highly scalable to thousands of simultaneous train jobs assuming train jobs update the status relatively infrequently.         | Highly scalable. The control plane can scrape the training status on best-effort.                                                                                           | Both approaches should be sufficiently scalable.        |
-
-## Other considered alternatives
-
-This section describes other approaches that were evaluated and the rationale for not selecting them.
 
 ### Trainer Pods updating the TrainJob status directly
 
