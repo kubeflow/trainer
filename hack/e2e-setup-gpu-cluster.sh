@@ -65,10 +65,10 @@ sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enable
 sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
 sudo systemctl restart docker
 
-# Create a Kind cluster with GPU support.
-sudo cp "$(go env GOPATH)/bin/nvkind" /usr/local/bin/nvkind
-sudo chmod +x /usr/local/bin/nvkind
+# TODO ARC nvkind if not working, tmp fix
+sudo GOBIN=/usr/local/bin go install github.com/NVIDIA/nvkind/cmd/nvkind@latest
 
+# Create a Kind cluster with GPU support.
 sudo nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
 sudo nvkind cluster print-gpus
 
