@@ -263,3 +263,7 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
 	return r.framework.RunCustomValidationPlugins(ctx, info, old, new)
 }
+
+func (r *TrainingRuntime) SyncSuspend(ctx context.Context, trainJob *trainer.TrainJob) error {
+	return r.framework.RunSuspendSyncPlugins(ctx, trainJob)
+}
