@@ -32,7 +32,7 @@ const (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
-// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.conditions[-1:].type`
+// +kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.conditions[-1].type"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 // +kubebuilder:validation:XValidation:rule="self.metadata.name.matches('^[a-z]([-a-z0-9]*[a-z0-9])?$')", message="metadata.name must match RFC 1035 DNS label format"
 // +kubebuilder:validation:XValidation:rule="size(self.metadata.name) <= 63", message="metadata.name must be no more than 63 characters"
@@ -61,9 +61,17 @@ const (
 	// TrainJobComplete means that the TrainJob has completed its execution.
 	TrainJobComplete string = "Complete"
 
-	// TrainJobFailed means that the actual jobs have failed its execution.
+	// TrainJobFailed means that the actual jobs have failed their execution.
 	TrainJobFailed string = "Failed"
+
+	// TrainJobConditionPending means that the TrainJob is created
+	// but the underlying jobs have not started yet.
+	TrainJobConditionPending string = "Pending"
+
+	// TrainJobConditionRunning means that the underlying jobs are actively executing.
+	TrainJobConditionRunning string = "Running"
 )
+
 
 const (
 	// TrainJobSuspendedReason is the "Suspended" condition reason
