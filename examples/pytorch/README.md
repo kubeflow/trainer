@@ -4,9 +4,11 @@ This directory contains examples for training PyTorch models using the Kubeflow 
 
 ### Examples
 
-| Use Case | Script | Notebook |
-| :--- | :--- | :--- |
-| **Image Classification** | [train_mnist.py](image-classification/train_mnist.py) | [mnist.ipynb](image-classification/mnist.ipynb) |
+| Task | Model | Dataset | Notebook |
+| :--- | :--- | :--- | :--- |
+| Image Classification | CNN | Fashion MNIST | [mnist.ipynb](./image-classification/mnist.ipynb) |
+| Question Answering | DistilBERT | SQuAD | [fine-tune-distilbert.ipynb](./question-answering/fine-tune-distilbert.ipynb) |
+| Speech Recognition | Transformer | Speech Commands | [speech-recognition.ipynb](./speech-recognition/speech-recognition.ipynb) |
 
 ### Prerequisites
 
