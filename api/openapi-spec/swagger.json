@@ -13623,6 +13623,14 @@
             "description": "name for the container. TrainingRuntime must have this container.",
             "type": "string"
           },
+          "securityContext": {
+            "description": "securityContext overrides the container's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.SecurityContext"
+              }
+            ]
+          },
           "volumeMounts": {
             "description": "volumeMounts are the volumes to mount into the container's filesystem.",
             "type": "array",
@@ -14057,6 +14065,14 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
+          },
+          "securityContext": {
+            "description": "securityContext overrides the Pod's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.PodSecurityContext"
+              }
+            ]
           },
           "serviceAccountName": {
             "description": "serviceAccountName overrides the service account.",

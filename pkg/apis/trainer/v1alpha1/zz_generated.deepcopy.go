@@ -105,6 +105,11 @@ func (in *ContainerOverride) DeepCopyInto(out *ContainerOverride) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.SecurityContext != nil {
+		in, out := &in.SecurityContext, &out.SecurityContext
+		*out = new(v1.SecurityContext)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -490,6 +495,11 @@ func (in *PodTemplateSpecOverride) DeepCopyInto(out *PodTemplateSpecOverride) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.SecurityContext != nil {
+		in, out := &in.SecurityContext, &out.SecurityContext
+		*out = new(v1.PodSecurityContext)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Volumes != nil {
 		in, out := &in.Volumes, &out.Volumes

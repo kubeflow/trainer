@@ -28,6 +28,7 @@ type PodTemplateSpecOverrideApplyConfiguration struct {
 	NodeSelector       map[string]string                     `json:"nodeSelector,omitempty"`
 	Affinity           *v1.Affinity                          `json:"affinity,omitempty"`
 	Tolerations        []corev1.TolerationApplyConfiguration `json:"tolerations,omitempty"`
+	SecurityContext    *v1.PodSecurityContext                `json:"securityContext,omitempty"`
 	Volumes            []corev1.VolumeApplyConfiguration     `json:"volumes,omitempty"`
 	InitContainers     []ContainerOverrideApplyConfiguration `json:"initContainers,omitempty"`
 	Containers         []ContainerOverrideApplyConfiguration `json:"containers,omitempty"`
@@ -81,6 +82,14 @@ func (b *PodTemplateSpecOverrideApplyConfiguration) WithTolerations(values ...*c
 		}
 		b.Tolerations = append(b.Tolerations, *values[i])
 	}
+	return b
+}
+
+// WithSecurityContext sets the SecurityContext field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SecurityContext field is set to the value of the last call.
+func (b *PodTemplateSpecOverrideApplyConfiguration) WithSecurityContext(value v1.PodSecurityContext) *PodTemplateSpecOverrideApplyConfiguration {
+	b.SecurityContext = &value
 	return b
 }
 
