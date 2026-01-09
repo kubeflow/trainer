@@ -176,10 +176,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("4"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -324,10 +326,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("2"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -399,10 +403,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("3"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -474,10 +480,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("2.5"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -549,10 +557,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("0.7"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -624,10 +634,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							"example.com/gpu": resource.MustParse("2"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -699,10 +711,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("8"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -774,10 +788,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("2500m"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -849,10 +865,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("4"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -925,10 +943,13 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("6"),
+							"example.com/gpu":  resource.MustParse("2"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -1000,10 +1021,12 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("3.7"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -1085,10 +1108,14 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](4),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](4),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("8"),
+							corev1.ResourceMemory: resource.MustParse("16Gi"),
+							"example.com/gpu":     resource.MustParse("4"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
@@ -1177,10 +1204,14 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("8"),
+							corev1.ResourceMemory: resource.MustParse("16Gi"),
+							"example.com/gpu":     resource.MustParse("4"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Env: []corev1ac.EnvVarApplyConfiguration{
@@ -1261,10 +1292,14 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](1),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](1),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("8"),
+							corev1.ResourceMemory: resource.MustParse("16Gi"),
+							"example.com/gpu":     resource.MustParse("1"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Env: []corev1ac.EnvVarApplyConfiguration{
@@ -1345,10 +1380,14 @@ func TestTorch(t *testing.T) {
 				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](2),
-						SinglePodRequests: make(corev1.ResourceList),
+						Name:     constants.Node,
+						Ancestor: ptr.To(constants.AncestorTrainer),
+						Count:    ptr.To[int32](2),
+						SinglePodRequests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("8"),
+							corev1.ResourceMemory: resource.MustParse("16Gi"),
+							"example.com/gpu":     resource.MustParse("8"),
+						},
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Env: []corev1ac.EnvVarApplyConfiguration{
