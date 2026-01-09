@@ -165,7 +165,7 @@ dataCache:
     # -- Dataset initializer image tag.
     tag: latest
 
-  # -- Namespace for RoleBinding (ServiceAccount created in release namespace).
+  # -- Namespace for ServiceAccount and RoleBinding.
   targetNamespace: default
 
   serviceAccount:

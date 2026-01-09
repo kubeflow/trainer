@@ -51,7 +51,7 @@ tests:
           kind: ClusterRole
           name: custom-cache-initializer
 
-  - it: Should have correct RBAC rules
+  - it: Should have correct RBAC rules for leaderworkersets
     set:
       dataCache:
         enabled: true
@@ -59,11 +59,17 @@ tests:
       - contains:
           path: rules
           content:
-            apiGroups: ["*"]
+            apiGroups:
+              - leaderworkerset.x-k8s.io
             resources:
               - leaderworkersets
-              - services
             verbs: ["create", "get", "list", "watch"]
+
+  - it: Should have correct RBAC rules for trainjobs
+    set:
+      dataCache:
+        enabled: true
+    asserts:
       - contains:
           path: rules
           content:
