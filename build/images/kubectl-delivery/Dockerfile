@@ -1,10 +1,12 @@
 FROM alpine:3.17 AS build
 
+ARG TARGETARCH
+
 # Install kubectl.
 ENV K8S_VERSION v1.30.7
 
 RUN apk add --no-cache wget
-RUN wget -q https://dl.k8s.io/release/${K8S_VERSION}/bin/linux/amd64/kubectl
+RUN wget -q https://dl.k8s.io/release/${K8S_VERSION}/bin/linux/${TARGETARCH}/kubectl
 RUN chmod +x ./kubectl
 RUN mv ./kubectl /bin/kubectl
 
