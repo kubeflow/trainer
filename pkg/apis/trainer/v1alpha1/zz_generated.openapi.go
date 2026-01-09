@@ -35,6 +35,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ContainerOverride":                schema_pkg_apis_trainer_v1alpha1_ContainerOverride(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource": schema_pkg_apis_trainer_v1alpha1_CoschedulingPodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.DatasetInitializer":               schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.FluxMLPolicySource":               schema_pkg_apis_trainer_v1alpha1_FluxMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Initializer":                      schema_pkg_apis_trainer_v1alpha1_Initializer(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec":               schema_pkg_apis_trainer_v1alpha1_JobSetTemplateSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobStatus":                        schema_pkg_apis_trainer_v1alpha1_JobStatus(ref),
@@ -654,6 +655,27 @@ func schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref common.ReferenceCal
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_FluxMLPolicySource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "FluxMLPolicySource represents a Flux HPC runtime configuration.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"numProcPerNode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "numProcPerNode is the number of processes per node. This is defined a level up on the MLPolicy directly.",
+							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/util/intstr.IntOrString"},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_Initializer(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -785,6 +807,12 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref common.ReferenceCallback) com
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"),
 						},
 					},
+					"flux": {
+						SchemaProps: spec.SchemaProps{
+							Description: "flux policy source defines policy only for Flux",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.FluxMLPolicySource"),
+						},
+					},
 					"mpi": {
 						SchemaProps: spec.SchemaProps{
 							Description: "mpi defines the configuration for the MPI Runtime.",
@@ -795,7 +823,7 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref common.ReferenceCallback) com
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.FluxMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
 	}
 }
 
@@ -812,6 +840,12 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicySource(ref common.ReferenceCallbac
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"),
 						},
 					},
+					"flux": {
+						SchemaProps: spec.SchemaProps{
+							Description: "flux policy source defines policy only for Flux",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.FluxMLPolicySource"),
+						},
+					},
 					"mpi": {
 						SchemaProps: spec.SchemaProps{
 							Description: "mpi defines the configuration for the MPI Runtime.",
@@ -822,7 +856,7 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicySource(ref common.ReferenceCallbac
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.FluxMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
 	}
 }
 
