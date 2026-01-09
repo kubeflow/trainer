@@ -21,7 +21,7 @@ bytes = "1.11.0"
 bincode = "2.0.1"
 hickory-resolver = "0.24.2"
 axum = "0.7"
-tower = "0.4"
+tower = "0.5"
 hyper = "1.0"
 
 [dev-dependencies]
