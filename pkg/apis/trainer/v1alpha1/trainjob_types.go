@@ -77,6 +77,10 @@ const (
 	// TrainJobRuntimeNotSupportedReason is the "Failed" condition reason
 	// when the referenced TrainingRuntime is not supported.
 	TrainJobRuntimeNotSupportedReason string = "TrainingRuntimeNotSupported"
+
+	// TrainJobDeadlineExceededReason is the "Failed" condition reason
+	// when the ActiveDeadlineSeconds has been exceeded.
+	TrainJobDeadlineExceededReason string = "DeadlineExceeded"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -144,6 +148,27 @@ type TrainJobSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="ManagedBy value is immutable"
 	// +optional
 	ManagedBy *string `json:"managedBy,omitempty"`
+
+	// ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished
+	// execution (either Complete or Failed). If this field is set, once the TrainJob
+	// finishes, it will be deleted after ttlSecondsAfterFinished expires. If this
+	// field is unset, the TrainJob will not be automatically deleted. If set to zero,
+	// the TrainJob becomes eligible for immediate deletion after finishing.
+	// The field is immutable.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="ttlSecondsAfterFinished is immutable"
+	// +optional
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
+
+	// activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob
+	// creation time that the TrainJob may be active before the system tries to terminate
+	// it. Value must be a positive integer. Once reached, the TrainJob status becomes
+	// Failed with reason: DeadlineExceeded.
+	// The field is immutable.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="activeDeadlineSeconds is immutable"
+	// +optional
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 }
 
 // RuntimeRef represents the reference to the existing training runtime.
