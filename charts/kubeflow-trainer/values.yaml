@@ -136,3 +136,38 @@ webhook:
   # -- Specifies how unrecognized errors are handled.
   # Available options are `Ignore` or `Fail`.
   failurePolicy: Fail
+
+dataCache:
+  # -- Whether to install data cache resources.
+  # When enabled, creates ClusterTrainingRuntime, RBAC resources for cache initializer.
+  enabled: false
+
+  lws:
+    # -- Whether to install LeaderWorkerSet as a dependency managed by trainer.
+    # This must be set to `false` if LeaderWorkerSet controller/webhook has already been installed into the cluster.
+    install: false
+    # -- String to fully override LeaderWorkerSet release name.
+    fullnameOverride: lws
+
+  image:
+    # -- Data cache image registry.
+    registry: ghcr.io
+    # -- Data cache image repository.
+    repository: kubeflow/trainer/data-cache
+    # -- Data cache image tag.
+    tag: latest
+
+  initializerImage:
+    # -- Dataset initializer image registry.
+    registry: ghcr.io
+    # -- Dataset initializer image repository.
+    repository: kubeflow/trainer/dataset-initializer
+    # -- Dataset initializer image tag.
+    tag: latest
+
+  # -- Namespace for RoleBinding (ServiceAccount created in release namespace).
+  targetNamespace: default
+
+  serviceAccount:
+    # -- ServiceAccount name for cache initializer.
+    name: kubeflow-trainer-cache-initializer
