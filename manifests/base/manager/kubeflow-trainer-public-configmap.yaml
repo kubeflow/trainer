@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # Public ConfigMap consumed by the Trainer SDK
+  name: kubeflow-trainer-public
+data:
+  # Exposes the Trainer control-plane API version
+  kubeflow_trainer_api_version: "v0.1.0"
