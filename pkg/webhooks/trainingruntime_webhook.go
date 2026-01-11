@@ -19,7 +19,7 @@ package webhooks
 import (
 	"context"
 	"fmt"
-
+    "reflect"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -46,6 +46,7 @@ var (
 		constants.DatasetInitializer: constants.DatasetInitializer,
 	}
 )
+
 
 type TrainingRuntimeWebhook struct {
 	runtimes map[string]runtime.Runtime
@@ -110,9 +111,30 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 	return allErrs
 }
 
-func (w *TrainingRuntimeWebhook) ValidateUpdate(context.Context, apiruntime.Object, apiruntime.Object) (admission.Warnings, error) {
-	return nil, nil
+func (w *TrainingRuntimeWebhook) ValidateUpdate( ctx context.Context, old apiruntime.Object, obj apiruntime.Object) (admission.Warnings, error) {
+	
+  oldTrainingRuntime := old.(*trainer.TrainingRuntime)
+	newTrainingRuntime := obj.(*trainer.TrainingRuntime)
+
+	var allErrs field.ErrorList
+	 
+	if !reflect.DeepEqual(oldTrainingRuntime.Spec, newTrainingRuntime.Spec) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "spec field is immutable"))
+	}
+
+	if !reflect.DeepEqual(oldTrainingRuntime.ObjectMeta.Labels, newTrainingRuntime.ObjectMeta.Labels) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata", "labels"), "labels field is immutable"))
+		}
+
+	if !reflect.DeepEqual(oldTrainingRuntime.ObjectMeta.Annotations, newTrainingRuntime.ObjectMeta.Annotations) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata", "annotations"), "annotations field is immutable"))
+			}
+		
+	
+	return nil, allErrs.ToAggregate()
 }
+
+
 
 func (w *TrainingRuntimeWebhook) ValidateDelete(context.Context, apiruntime.Object) (admission.Warnings, error) {
 	return nil, nil
