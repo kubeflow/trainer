@@ -5,4 +5,4 @@ metadata:
   name: kubeflow-trainer-public
 data:
   # Exposes the Trainer control-plane API version
-  kubeflow_trainer_api_version: "v0.1.0"
+  kubeflow_trainer_api_version: "v2.1.0"
