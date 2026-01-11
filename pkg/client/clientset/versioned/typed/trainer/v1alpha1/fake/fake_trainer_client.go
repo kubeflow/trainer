@@ -26,16 +26,8 @@ type FakeTrainerV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeTrainerV1alpha1) ClusterTrainingRuntimes() v1alpha1.ClusterTrainingRuntimeInterface {
-	return newFakeClusterTrainingRuntimes(c)
-}
-
 func (c *FakeTrainerV1alpha1) TrainJobs(namespace string) v1alpha1.TrainJobInterface {
 	return newFakeTrainJobs(c, namespace)
-}
-
-func (c *FakeTrainerV1alpha1) TrainingRuntimes(namespace string) v1alpha1.TrainingRuntimeInterface {
-	return newFakeTrainingRuntimes(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

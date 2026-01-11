@@ -112,12 +112,12 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 }
 
 func (w *TrainingRuntimeWebhook) ValidateUpdate( ctx context.Context, old apiruntime.Object, obj apiruntime.Object) (admission.Warnings, error) {
-	
+
   oldTrainingRuntime := old.(*trainer.TrainingRuntime)
 	newTrainingRuntime := obj.(*trainer.TrainingRuntime)
 
 	var allErrs field.ErrorList
-	 
+
 	if !reflect.DeepEqual(oldTrainingRuntime.Spec, newTrainingRuntime.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "spec field is immutable"))
 	}
@@ -129,8 +129,8 @@ func (w *TrainingRuntimeWebhook) ValidateUpdate( ctx context.Context, old apirun
 	if !reflect.DeepEqual(oldTrainingRuntime.ObjectMeta.Annotations, newTrainingRuntime.ObjectMeta.Annotations) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata", "annotations"), "annotations field is immutable"))
 			}
-		
-	
+
+
 	return nil, allErrs.ToAggregate()
 }
 

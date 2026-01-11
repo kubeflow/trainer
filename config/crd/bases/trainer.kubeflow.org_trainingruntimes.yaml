@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.16.1
   name: trainingruntimes.trainer.kubeflow.org
 spec:
   group: trainer.kubeflow.org
@@ -658,23 +658,6 @@ spec:
                     description: |-
                       metadata for custom JobSet's labels and annotations.
                       JobSet name and namespace is equal to the TrainJob's name and namespace.
-                    properties:
-                      annotations:
-                        additionalProperties:
-                          type: string
-                        type: object
-                      finalizers:
-                        items:
-                          type: string
-                        type: array
-                      labels:
-                        additionalProperties:
-                          type: string
-                        type: object
-                      name:
-                        type: string
-                      namespace:
-                        type: string
                     type: object
                   spec:
                     description: spec of the desired JobSet which will be created
@@ -899,23 +882,6 @@ spec:
                                   description: |-
                                     Standard object's metadata of the jobs created from this template.
                                     More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-                                  properties:
-                                    annotations:
-                                      additionalProperties:
-                                        type: string
-                                      type: object
-                                    finalizers:
-                                      items:
-                                        type: string
-                                      type: array
-                                    labels:
-                                      additionalProperties:
-                                        type: string
-                                      type: object
-                                    name:
-                                      type: string
-                                    namespace:
-                                      type: string
                                   type: object
                                 spec:
                                   description: |-
@@ -1284,23 +1250,6 @@ spec:
                                           description: |-
                                             Standard object's metadata.
                                             More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-                                          properties:
-                                            annotations:
-                                              additionalProperties:
-                                                type: string
-                                              type: object
-                                            finalizers:
-                                              items:
-                                                type: string
-                                              type: array
-                                            labels:
-                                              additionalProperties:
-                                                type: string
-                                              type: object
-                                            name:
-                                              type: string
-                                            namespace:
-                                              type: string
                                           type: object
                                         spec:
                                           description: |-
@@ -8783,23 +8732,6 @@ spec:
                                                               May contain labels and annotations that will be copied into the PVC
                                                               when creating it. No other fields are allowed and will be rejected during
                                                               validation.
-                                                            properties:
-                                                              annotations:
-                                                                additionalProperties:
-                                                                  type: string
-                                                                type: object
-                                                              finalizers:
-                                                                items:
-                                                                  type: string
-                                                                type: array
-                                                              labels:
-                                                                additionalProperties:
-                                                                  type: string
-                                                                type: object
-                                                              name:
-                                                                type: string
-                                                              namespace:
-                                                                type: string
                                                             type: object
                                                           spec:
                                                             description: |-

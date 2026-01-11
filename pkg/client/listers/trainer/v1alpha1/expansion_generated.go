@@ -16,10 +16,6 @@
 
 package v1alpha1
 
-// ClusterTrainingRuntimeListerExpansion allows custom methods to be added to
-// ClusterTrainingRuntimeLister.
-type ClusterTrainingRuntimeListerExpansion interface{}
-
 // TrainJobListerExpansion allows custom methods to be added to
 // TrainJobLister.
 type TrainJobListerExpansion interface{}
@@ -27,11 +23,3 @@ type TrainJobListerExpansion interface{}
 // TrainJobNamespaceListerExpansion allows custom methods to be added to
 // TrainJobNamespaceLister.
 type TrainJobNamespaceListerExpansion interface{}
-
-// TrainingRuntimeListerExpansion allows custom methods to be added to
-// TrainingRuntimeLister.
-type TrainingRuntimeListerExpansion interface{}
-
-// TrainingRuntimeNamespaceListerExpansion allows custom methods to be added to
-// TrainingRuntimeNamespaceLister.
-type TrainingRuntimeNamespaceListerExpansion interface{}

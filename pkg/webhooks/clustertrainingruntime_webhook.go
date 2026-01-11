@@ -69,7 +69,7 @@ func (w *ClusterTrainingRuntimeWebhook) ValidateUpdate(ctx context.Context, oldO
 	oldRuntime := oldObj.(*trainer.ClusterTrainingRuntime)
     newRuntime := newObj.(*trainer.ClusterTrainingRuntime)
 
-	
+
 	log := ctrl.LoggerFrom(ctx).WithName("clustertrainingruntime-webhook")
 	log.V(5).Info("Validating update", "clusterTrainingRuntime", klog.KObj(newRuntime))
 
@@ -86,7 +86,7 @@ func (w *ClusterTrainingRuntimeWebhook) ValidateUpdate(ctx context.Context, oldO
 	if !reflect.DeepEqual(oldRuntime.ObjectMeta.Annotations, newRuntime.ObjectMeta.Annotations) {
         allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata", "annotations"), "annotations field is immutable"))
     }
-	 
+
 	 allErrs = append(allErrs, validateReplicatedJobs(newRuntime.Spec.Template.Spec.ReplicatedJobs)...)
 
 	return nil, allErrs.ToAggregate()
