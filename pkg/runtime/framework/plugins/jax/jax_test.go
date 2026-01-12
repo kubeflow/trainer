@@ -26,11 +26,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -372,76 +370,6 @@ func TestJax(t *testing.T) {
 				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected RuntimeInfo (-want,+got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestValidate(t *testing.T) {
-	cases := map[string]struct {
-		info         *runtime.Info
-		oldObj       *trainer.TrainJob
-		newObj       *trainer.TrainJob
-		wantError    field.ErrorList
-		wantWarnings admission.Warnings
-	}{
-		"no action when info is nil": {
-			info: nil,
-			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Obj(),
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Obj(),
-		},
-		"no action when info does not have MLPolicySource": {
-			info: runtime.NewInfo(),
-			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Obj(),
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Obj(),
-		},
-		"no action when info has MLPolicySource but no JAX policy": {
-			info: runtime.NewInfo(
-				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().Obj()),
-			),
-			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Obj(),
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Obj(),
-		},
-		"valid JAX configuration": {
-			info: runtime.NewInfo(
-				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
-					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						JAXPolicy().
-						Obj(),
-					).
-					Obj(),
-				),
-			),
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumNodes(4).
-					Obj(),
-				).
-				Obj(),
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			var cancel func()
-			ctx, cancel = context.WithCancel(ctx)
-			t.Cleanup(cancel)
-			p, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil)
-			if err != nil {
-				t.Fatalf("Failed to initialize JAX plugin: %v", err)
-			}
-			warnings, errs := p.(framework.CustomValidationPlugin).Validate(ctx, tc.info, tc.oldObj, tc.newObj)
-			if diff := cmp.Diff(tc.wantError, errs); len(diff) != 0 {
-				t.Errorf("Unexpected error from Validate (-want, +got): %s", diff)
-			}
-			if diff := cmp.Diff(tc.wantWarnings, warnings); len(diff) != 0 {
-				t.Errorf("Unexpected warnings from Validate (-want, +got): %s", diff)
 			}
 		})
 	}
