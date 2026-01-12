@@ -20,11 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
@@ -36,7 +34,6 @@ import (
 type Jax struct{}
 
 var _ framework.EnforceMLPolicyPlugin = (*Jax)(nil)
-var _ framework.CustomValidationPlugin = (*Jax)(nil)
 
 const Name = "Jax"
 
@@ -46,15 +43,6 @@ func New(context.Context, client.Client, client.FieldIndexer) (framework.Plugin,
 
 func (j *Jax) Name() string {
 	return Name
-}
-
-func (j *Jax) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
-	var allErrs field.ErrorList
-	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.JAX == nil {
-		return nil, allErrs
-	}
-
-	return nil, allErrs
 }
 
 func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
