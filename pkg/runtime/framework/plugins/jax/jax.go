@@ -53,10 +53,6 @@ func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 
 	// Find the trainer PodSet
 	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
-	if trainerPS == nil {
-		return fmt.Errorf("trainer PodSet not found")
-	}
-
 	// Set the number of nodes (JAX processes/hosts) from TrainJob
 	if trainerPS.Count != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
 		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
