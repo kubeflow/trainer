@@ -100,7 +100,6 @@ func TestNew(t *testing.T) {
 					&torch.Torch{},
 					&jobset.JobSet{},
 					&volcano.Volcano{},
-					&jax.Jax{},
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
 					&coscheduling.CoScheduling{},
