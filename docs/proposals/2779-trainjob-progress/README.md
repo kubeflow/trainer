@@ -27,9 +27,7 @@ From a programmatic perspective:
 1. **Expose real-time progress information and training metrics through the TrainJobs CR.** For example: percentage complete, estimated time remaining, current step/epoch, total steps/epochs, eval metrics.
 2. **Have zero dependencies.** The user should not need to install any additional components into their cluster for the feature to work. It should work "out-of-the-box".
 3. **Optional.** Users can choose to opt in to providing progress tracking, but are not required to use this feature.
-4. **Provide built-in progress tracking support for selected ML frameworks (e.g. transformers, pytorch-lightning) in the kubeflow sdk.** Data scientists should be able to use the kubeflow sdk to create training jobs using these frameworks, and have progress tracking automatically instrumented.
-5. **Introduce callbacks to third party libraries (e.g. transformers) that adds instrumentation for TrainJobs.** For Transformers this would follow similar integrations, e.g. for [MLFlow](https://github.com/huggingface/transformers/blob/v4.57.3/src/transformers/integrations/integration_utils.py#L1361).
-6. **Provide a standard "protocol" for training runtimes to expose progress and training metrics.** It should be possible for custom trainer training jobs to use this contract to add progress tracking. It should be easy to enhance the kubeflow sdk with additional built-in frameworks that automatically instrument progress tracking.
+4. **Introduce callbacks to third party libraries (e.g. transformers) so users can easily instrumentation their TrainJobs.** Data scientists should be able to use these callbacks to add progress tracking to their jobs. For Transformers this would follow similar integrations, e.g. for [MLFlow](https://github.com/huggingface/transformers/blob/v4.57.3/src/transformers/integrations/integration_utils.py#L1361).
 
 ### Non-Goals
 
@@ -64,10 +62,6 @@ We propose an approach with the following high-level **push-based** design:
 3. The user instruments their trainer runtime pod(s) to periodically send the current trainer status to this endpoint which updates the status of the TrainJob.
 
 The feature is optional but available for all TrainJobs. Users opt in to the functionality by instrumenting their runtime to send requests to the new endpoint.
-
-Support for any ML training framework is enabled by instrumentation code tailored to each framework. Users can provide their own instrumentation code, though to make it easier for users to adopt the feature, we propose:
-
-4. Adding new built-in trainers to the kubeflow-sdk that automatically inject the instrumentation code for common ML frameworks. Initially we propose only adding a builtin trainer for the [*Transformers* *Trainer* API](https://huggingface.co/docs/transformers/en/main_classes/trainer).
 
 ### CRD changes
 
@@ -262,139 +256,36 @@ rules:
 
 ### Runtime instrumentation
 
-The trainer runtime pods can be instrumented however is required for that framework (e.g. using callbacks provided by that framework). When using distributed training, it is up to the instrumentation implementation to decide which pod(s) will send the progress messages; the control plane will accept messages from any pod that is part of the train job.
+Users will need to instrument their train jobs so that they periodically send training status to the control plane. Some frameworks make this easy by letting users add "hooks" or "callbacks" to the training loop, and where possible we'll seek to add integrations to those libraries. For example, for the `Transformers` framework we'll look to add a custom `KubeflowTrainerCallback` following the [existing integrations approach](https://github.com/huggingface/transformers/blob/v4.57.0/src/transformers/integrations/integration_utils.py#L1361).
 
-The control plane will inject the following environment variables into all containers of all pods of the training job:
+To make it easier for training pods to update the training status, the control plane will inject the following environment variables into all containers of all pods of the training job:
 ```shell
 KUBEFLOW_TRAINER_STATUS_URL=https://trainer-status.kubeflow.svc/<job-namespace>/TrainJob/<job-name>/status
 KUBEFLOW_TRAINER_STATUS_CA_CERT=/var/run/secrets/kubeflow/trainer/ca.crt
 KUBEFLOW_TRAINER_STATUS_TOKEN=/var/run/secrets/kubeflow/trainer/token
 ```
 
-These environment variables simplify the runtime code for submitting status updates, e.g.:
+These environment variables make it easy for any pod to report the runtime code for submitting status updates, e.g.:
 ```python
 from urllib import request
 import os
 import ssl
 
-payload = ...
-
-url = os.environ["KUBEFLOW_TRAINER_STATUS_URL"]
-ca_file = os.environ["KUBEFLOW_TRAINER_STATUS_CA_CERT"]
-token = open(os.environ["KUBEFLOW_TRAINER_STATUS_TOKEN"]).read()
-ssl_context = ssl.create_default_context(cafile=ca_file)
-req = request.Request(url, data=payload, headers={"Authorization": f"Bearer {token}"})
-request.urlopen(req, ssl_context=ssl_context)
-```
-
-### SDK Changes: instrumenting runtime
-
-We’re proposing adding a new TransformersTrainer to the kubeflow-sdk. This will be a custom trainer with the same api as the CustomTrainer, but with the additional behaviour that it will automatically register a custom callback that will post the training status to the control plane.
-
-```py
-@dataclass
-class TransformersTrainer:
-    func: Callable
-    func_args: Optional[dict] = None
-    packages_to_install: Optional[list[str]] = None
-    pip_index_urls: list[str] = field(
-        default_factory=lambda: list(constants.DEFAULT_PIP_INDEX_URLS)
-    )
-    num_nodes: Optional[int] = None
-    resources_per_node: Optional[dict] = None
-    env: Optional[dict[str, str]] = None
-```
-
-Similar additional trainers could also be added in the future for other ML frameworks (e.g. PytorchLightningTrainer, XGBoostTrainer).
-
-Example usage of the TransformersTrainer is:
-
-```py
-def train_fn():
-    from transformers import Trainer
-
-    trainer = Trainer(...)  # define the model and data...
-    trainer.train()
-
-
-from kubeflow.trainer import TrainerClient, TransformersTrainer
-
-client = TrainerClient()
-client.train(
-    runtime=client.get_runtime("transformers-distributed"),
-    trainer=TransformersTrainer(
-        func=train_fn,
-        num_nodes=...,
-        resources_per_node={...},
-    )
-)
-```
-
-The sdk will generate the TrainJob resource using the same approach currently used by CustomTrainer (the python code is written inline in the pod `command`). A different template script will be used, however, which will inject a KubeflowTrainerStatusCallback which will emit status messages:
-
-```py
-# kubeflow/constants/constants.py
-TRANSFORMERS_BUILTIN_TRAINER_FUNC_SCRIPT = textwrap.dedent(
-"""
-  read -r -d '' SCRIPT << EOM\n
-  import os
-  from transformers import TrainerCallback, trainer
-  from urllib import request
-
-  class KubeflowTrainerStatusCallback(transformers.TrainerCallback):
-
-    def on_log(self, args, state, control, logs=None, **kwargs):
-      payload = ...  # collect the info
-      self._post_status(payload)
-
-    def _post_status(self, payload):
-      try:
+def update_training_status(payload):
+    try:
         url = os.environ["KUBEFLOW_TRAINER_STATUS_URL"]
         ca_file = os.environ["KUBEFLOW_TRAINER_STATUS_CA_CERT"]
         token = open(os.environ["KUBEFLOW_TRAINER_STATUS_TOKEN"]).read()
         ssl_context = ssl.create_default_context(cafile=ca_file)
         req = request.Request(url, data=payload, headers={"Authorization": f"Bearer {token}"})
-        request.urlopen(req, ssl_context=ssl_context, timeout=2)
-      except Exception as e:
+        request.urlopen(req, ssl_context=ssl_context)
+    except Exception as ex:
         print(f"[Kubeflow] Unable to send trainer status. {e}")
-
-  # add the status callback to the default trainer callbacks.
-  # this could also be achieved by monkeypatching the Trainer.__init__
-  trainer.DEFAULT_CALLBACKS.append(KubeflowTrainerStatusCallback())
-
-  {func_code}
-  EOM
-  printf "%s" \"$SCRIPT\" > \"{func_file}\"
-  python \"{func_file}\"
-"""
-)
-
-# kubeflow/utils/utils.py
-def get_trainer_crd_from_transformers_builtin_trainer(
-    runtime: types.Runtime,
-    trainer: types.TransformerBuiltinTrainer,
-) -> models.TrainerV1alpha1Trainer:
-    trainer_crd = models.TrainerV1alpha1Trainer()
-    ...  # as in the existing get_trainer_crd_from_custom_trainer function
-
-    trainer_crd.command =  # as in the get_trainer_crd_from_custom_trainer
-         # function, but using the TRANSFORMERS_BUILTIN_TRAINER_FUNC_SCRIPT
-         # as the template
-
-    ...  # as in the existing get_trainer_crd_from_custom_trainer function
-
-    return trainer_crd
 ```
 
-We are *not* proposing automatically instrumenting progress to the existing CustomTrainer: although this trainer can support any ML framework, it is harder to make it automatically instrument status updates for all (or at least a wide range of) frameworks. It may also be confusing for users and a bad onboarding experience if some frameworks automatically display progress, but others do not.
+### Kubeflow SDK Changes
 
-In contrast, defining separate custom trainers for each ML framework helps make the sdk more discoverable for users: they can easily see which ML frameworks are integrated with Kubeflow Trainer.
-
-We can add documentation for how users can manually instrument trainer status updates for CustomTrainers, but we could consider encouraging users to think of the existing CustomTrainer as a lower-level API. Users can still use this lower-level API, but it will not automatically provide trainer status updates.
-
-Additional changes to the sdk:
-
-* Add a new trainerStatus field to the `TrainJob` response object.
+The Kubeflow SDK will be updated to add a new trainerStatus field to the `TrainJob` response object.
 
 ```py
 @dataclass
@@ -417,9 +308,6 @@ class TrainJob:
     trainerStatus: Optional[TrainerStatus] = None
 ```
 
-* Adding a new "transformers-distributed" ClusterRuntime which will be included in the default set of cluster runtimes included in the manifests.
-* Publish new docker images for the "transformers-distributed"  runtime "ghcr.io/kubeflow/trainer/transformers-runtime". The docker image will include the transformers, accelerate and torch python packages.
-
 ## Other considered alternatives
 
 This section describes other approaches that were evaluated and the rationale for not selecting them.
@@ -436,8 +324,6 @@ We also considered in detail an alternative **pull-based** approach with the fol
 6. When training is completed, the sidecar container exposes the final contents of the shared file through its termination message which is read by the control plane. This ensures the final train status is collected.
 
 As in the push-based design, the feature is optional but available for all TrainJobs. Users opt in to the functionality by adding configuration to their TrainingRuntime and instrumenting their runtime to write the metrics.
-
-Also as in push-based design, we propose adding the same set of new customer trainers to the kubeflow-sdk to make it easier for users to instrument their runtime pods.
 
 #### Design Details
 
@@ -535,12 +421,6 @@ However, as the data exposed by the http server may not be considered particular
 ##### RBAC changes
 
 No RBAC changes are required.
-
-##### SDK Changes: instrumenting runtime
-
-We're proposing adding the same new `TransformersTrainer` to the kubeflow-sdk, as per push-based design, with the following differences:
-- an additional parameter on the `TransformersTrainer` will allow users to specify the monitoring port.
-- the `KubeflowTrainerStatusCallback` injected into the runtime code will write the metrics data to the shared file in the required format rather than making a web request.
 
 #### Comparison of the  approaches
 
