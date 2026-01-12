@@ -1,4 +1,4 @@
-FROM ghcr.io/nvidia/jax:jax as gpu-base
+FROM ghcr.io/nvidia/jax:jax-2026-01-04 as gpu-base
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt update && apt install -y --no-install-recommends \
