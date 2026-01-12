@@ -67,35 +67,6 @@ func TestJax(t *testing.T) {
 				),
 			),
 		},
-		//"trainer PodSet not found": {
-		//	info: runtime.NewInfo(
-		//		runtime.WithMLPolicySource(
-		//			utiltesting.MakeMLPolicyWrapper().
-		//				WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-		//					JAXPolicy().
-		//					Obj(),
-		//				).
-		//				Obj(),
-		//		),
-		//	),
-		//	trainJob:          utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").Obj(),
-		//	wantMLPolicyError: fmt.Errorf("trainer PodSet not found"),
-		//},
-		//"trainer container not found": {
-		//	info: runtime.NewInfo(
-		//		runtime.WithMLPolicySource(
-		//			utiltesting.MakeMLPolicyWrapper().
-		//				WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-		//					JAXPolicy().
-		//					Obj(),
-		//				).
-		//				Obj(),
-		//		),
-		//		runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec()),
-		//	),
-		//	trainJob:          utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").Obj(),
-		//	wantMLPolicyError: fmt.Errorf("trainer container not found"),
-		//},
 		"single node JAX training": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(
@@ -133,7 +104,7 @@ func TestJax(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
-								ContainerPort: ptr.To[int32](constants.JAXContainerPort),
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -150,15 +121,11 @@ func TestJax(t *testing.T) {
 								},
 								{
 									Name:  ptr.To("JAX_COORDINATOR_ADDRESS"),
-									Value: ptr.To(fmt.Sprintf("test-job-%s-0-0.test-job:%d", constants.Node, constants.JAXContainerPort)),
+									Value: ptr.To(fmt.Sprintf("test-job-%s-0-0.test-job:%d", constants.Node, constants.ContainerTrainerPort)),
 								},
 								{
 									Name:  ptr.To("JAX_COORDINATOR_PORT"),
-									Value: ptr.To(fmt.Sprintf("%d", constants.JAXContainerPort)),
-								},
-								{
-									Name:  ptr.To("JAX_DISTRIBUTED_BACKEND"),
-									Value: ptr.To("gloo"),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
 						}},
@@ -204,7 +171,7 @@ func TestJax(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
-								ContainerPort: ptr.To[int32](constants.JAXContainerPort),
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -221,15 +188,11 @@ func TestJax(t *testing.T) {
 								},
 								{
 									Name:  ptr.To("JAX_COORDINATOR_ADDRESS"),
-									Value: ptr.To(fmt.Sprintf("multi-node-job-%s-0-0.multi-node-job:%d", constants.Node, constants.JAXContainerPort)),
+									Value: ptr.To(fmt.Sprintf("multi-node-job-%s-0-0.multi-node-job:%d", constants.Node, constants.ContainerTrainerPort)),
 								},
 								{
 									Name:  ptr.To("JAX_COORDINATOR_PORT"),
-									Value: ptr.To(fmt.Sprintf("%d", constants.JAXContainerPort)),
-								},
-								{
-									Name:  ptr.To("JAX_DISTRIBUTED_BACKEND"),
-									Value: ptr.To("gloo"),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
 						}},
@@ -275,7 +238,7 @@ func TestJax(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
-								ContainerPort: ptr.To[int32](constants.JAXContainerPort),
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -292,100 +255,11 @@ func TestJax(t *testing.T) {
 								},
 								{
 									Name:  ptr.To("JAX_COORDINATOR_ADDRESS"),
-									Value: ptr.To(fmt.Sprintf("trainJob-%s-0-0.trainJob:%d", constants.Node, constants.JAXContainerPort)),
+									Value: ptr.To(fmt.Sprintf("trainJob-%s-0-0.trainJob:%d", constants.Node, constants.ContainerTrainerPort)),
 								},
 								{
 									Name:  ptr.To("JAX_COORDINATOR_PORT"),
-									Value: ptr.To(fmt.Sprintf("%d", constants.JAXContainerPort)),
-								},
-								{
-									Name:  ptr.To("JAX_DISTRIBUTED_BACKEND"),
-									Value: ptr.To("gloo"),
-								},
-							},
-						}},
-					}},
-				},
-				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
-			},
-		},
-		"JAX training with custom environment variables": {
-			info: runtime.NewInfo(
-				runtime.WithMLPolicySource(
-					utiltesting.MakeMLPolicyWrapper().
-						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							JAXPolicy().
-							Obj(),
-						).
-						Obj(),
-				),
-				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
-					WithContainers(corev1ac.Container().WithName(constants.Node)),
-				),
-			),
-			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "custom-env-job").
-				Trainer(
-					utiltesting.MakeTrainJobTrainerWrapper().
-						NumNodes(2).
-						Env(
-							[]corev1.EnvVar{
-								{Name: "CUSTOM_VAR", Value: "custom_value"},
-								{Name: "DATASET_PATH", Value: "/data"},
-							}...,
-						).
-						Obj()).
-				Obj(),
-			wantInfo: &runtime.Info{
-				Labels:      make(map[string]string),
-				Annotations: make(map[string]string),
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						JAXPolicy().
-						Obj(),
-				},
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{{
-						Name:              constants.Node,
-						Ancestor:          ptr.To(constants.AncestorTrainer),
-						Count:             ptr.To[int32](2),
-						SinglePodRequests: make(corev1.ResourceList),
-						Containers: []runtime.Container{{
-							Name: constants.Node,
-							Ports: []corev1ac.ContainerPortApplyConfiguration{{
-								ContainerPort: ptr.To[int32](constants.JAXContainerPort),
-							}},
-							Env: []corev1ac.EnvVarApplyConfiguration{
-								{
-									Name:  ptr.To("CUSTOM_VAR"),
-									Value: ptr.To("custom_value"),
-								},
-								{
-									Name:  ptr.To("DATASET_PATH"),
-									Value: ptr.To("/data"),
-								},
-								{
-									Name:  ptr.To("JAX_NUM_PROCESSES"),
-									Value: ptr.To("2"),
-								},
-								{
-									Name: ptr.To("JAX_PROCESS_ID"),
-									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
-										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
-											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
-										},
-									},
-								},
-								{
-									Name:  ptr.To("JAX_COORDINATOR_ADDRESS"),
-									Value: ptr.To(fmt.Sprintf("custom-env-job-%s-0-0.custom-env-job:%d", constants.Node, constants.JAXContainerPort)),
-								},
-								{
-									Name:  ptr.To("JAX_COORDINATOR_PORT"),
-									Value: ptr.To(fmt.Sprintf("%d", constants.JAXContainerPort)),
-								},
-								{
-									Name:  ptr.To("JAX_DISTRIBUTED_BACKEND"),
-									Value: ptr.To("gloo"),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
 						}},
@@ -442,7 +316,7 @@ func TestJax(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
-								ContainerPort: ptr.To[int32](constants.JAXContainerPort),
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
 							}},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -459,15 +333,11 @@ func TestJax(t *testing.T) {
 								},
 								{
 									Name:  ptr.To("JAX_COORDINATOR_ADDRESS"),
-									Value: ptr.To(fmt.Sprintf("gpu-job-%s-0-0.gpu-job:%d", constants.Node, constants.JAXContainerPort)),
+									Value: ptr.To(fmt.Sprintf("gpu-job-%s-0-0.gpu-job:%d", constants.Node, constants.ContainerTrainerPort)),
 								},
 								{
 									Name:  ptr.To("JAX_COORDINATOR_PORT"),
-									Value: ptr.To(fmt.Sprintf("%d", constants.JAXContainerPort)),
-								},
-								{
-									Name:  ptr.To("JAX_DISTRIBUTED_BACKEND"),
-									Value: ptr.To("gloo"),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 							},
 						}},
