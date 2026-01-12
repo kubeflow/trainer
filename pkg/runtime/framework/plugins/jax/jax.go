@@ -88,21 +88,16 @@ func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 				trainJob.Name,
 				constants.Node,
 				trainJob.Name,
-				constants.JAXContainerPort)),
+				constants.ContainerTrainerPort)),
 
 		// Coordinator port
 		*corev1ac.EnvVar().
 			WithName("JAX_COORDINATOR_PORT").
-			WithValue(fmt.Sprintf("%d", constants.JAXContainerPort)),
-
-		// Default backend (Gloo) - can be extended in future to support NCCL/LibTPU
-		*corev1ac.EnvVar().
-			WithName("JAX_DISTRIBUTED_BACKEND").
-			WithValue(constants.JAXDistributedBackend),
+			WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 	)
 
 	// Add container port for the headless service (needed for pod-to-pod communication)
-	apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.JAXContainerPort))
+	apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
 
 	return nil
 }
