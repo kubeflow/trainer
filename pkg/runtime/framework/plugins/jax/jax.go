@@ -64,11 +64,6 @@ func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		return fmt.Errorf("trainer container not found")
 	}
 
-	// Apply user-specified environment variables from TrainJob
-	if trainJob.Spec.Trainer != nil && len(trainJob.Spec.Trainer.Env) > 0 {
-		apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
-	}
-
 	// Get the number of nodes for distributed setup
 	numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
 
