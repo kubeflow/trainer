@@ -20,7 +20,7 @@ tonic = "0.12.3"
 bytes = "1.11.0"
 bincode = "2.0.1"
 hickory-resolver = "0.24.2"
-axum = "0.7"
+axum = "0.8"
 tower = "0.5"
 hyper = "1.0"
 
