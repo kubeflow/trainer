@@ -56,6 +56,8 @@ jobs:
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_mnist.ipynb TIMEOUT=900
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/question-answering/fine-tune-distilbert.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_fine-tune-distilbert.ipynb TIMEOUT=900
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/speech-recognition/speech-recognition.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_speech-recognition.ipynb TIMEOUT=900
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/audio-classification/audio-classification.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_audio-classification.ipynb TIMEOUT=900
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/local/local-training-mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_local-training-mnist.ipynb TIMEOUT=900
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/local/local-container-mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_local-container-mnist.ipynb TIMEOUT=900
 
