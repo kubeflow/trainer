@@ -67,7 +67,12 @@ sudo systemctl restart docker
 
 # Create a Kind cluster with GPU support.
 sudo cp "$(sudo go env GOPATH)/bin/nvkind" /usr/local/bin/nvkind
-sudo nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
+
+# TODO: hotfix, the cluster creation returns non zero exit code
+# umount: /proc/driver/nvidia: not mounted
+# Error: patching /proc/driver/nvidia on node 'kind-gpu-worker': running script on kind-gpu-worker: executing command: exit status 1
+# For now ignore the error
+sudo nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}" || true
 sudo nvkind cluster print-gpus
 
 # Install gpu-operator to make sure we can run GPU workloads.
