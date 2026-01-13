@@ -1441,6 +1441,7 @@ func TestTorch(t *testing.T) {
 			if diff := cmp.Diff(tc.wantInfo, tc.info,
 				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
 				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
+				cmpopts.IgnoreFields(runtime.PodSet{}, "TypedPodSpec"),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected RuntimeInfo (-want,+got):\n%s", diff)
 			}

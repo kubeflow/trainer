@@ -131,7 +131,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 				requests = res.Limits
 			}
 			if len(requests) > 0 {
-				trainerPS.SinglePodRequests = requests
+				trainerPS.RecalculateSinglePodRequestsWithOverride(constants.Node, requests)
 			}
 		}
 	}

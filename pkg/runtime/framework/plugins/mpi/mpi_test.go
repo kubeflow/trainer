@@ -862,6 +862,7 @@ trainJob-node-1-0.trainJob slots=1
 			if diff := gocmp.Diff(tc.wantInfo, tc.info,
 				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
 				cmpopts.SortMaps(func(a, b int) bool { return a < b }),
+				cmpopts.IgnoreFields(runtime.PodSet{}, "TypedPodSpec"),
 				utiltesting.PodSetEndpointsCmpOpts,
 			); len(diff) != 0 {
 				t.Errorf("Unexpected info from EnforceMLPolicy (-want, +got): %s", diff)

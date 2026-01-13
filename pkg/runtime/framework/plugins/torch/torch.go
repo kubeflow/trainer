@@ -115,7 +115,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 				requests = res.Limits
 			}
 			if len(requests) > 0 {
-				trainerPS.SinglePodRequests = requests
+				trainerPS.RecalculateSinglePodRequestsWithOverride(constants.Node, requests)
 			}
 		}
 	}
