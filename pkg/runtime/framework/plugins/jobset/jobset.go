@@ -281,7 +281,7 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 	}
 
 	// Init the JobSet apply configuration from the runtime template spec
-	jobSetBuilder := NewBuilder(jobsetv1alpha2ac.JobSet(trainJob.Name, trainJob.Namespace).
+	jobSetBuilder := ~~~(jobsetv1alpha2ac.JobSet(trainJob.Name, trainJob.Namespace).
 		WithLabels(maps.Clone(info.Labels)).
 		WithAnnotations(maps.Clone(info.Annotations)).
 		WithSpec(jobSetSpec))
