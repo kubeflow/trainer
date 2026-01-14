@@ -12,15 +12,11 @@ spec:
     listKind: ClusterTrainingRuntimeList
     plural: clustertrainingruntimes
     singular: clustertrainingruntime
-  scope: Cluster
+  scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: |-
-          ClusterTrainingRuntime represents a training runtime which can be referenced as part of
-          `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced
-          by TrainJob that created in *any* namespace.
         properties:
           apiVersion:
             description: |-
@@ -10446,6 +10442,12 @@ spec:
                         == ''InOrder'' && self.replicatedJobs.exists(x, has(x.dependsOn)))'
                 type: object
             type: object
+            x-kubernetes-validations:
+            - message: Value is immutable
+              rule: self == oldSelf
         type: object
+        x-kubernetes-validations:
+        - message: Value is immutable
+          rule: self == oldSelf
     served: true
     storage: true

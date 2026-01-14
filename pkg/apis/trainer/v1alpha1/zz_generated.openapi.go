@@ -427,8 +427,7 @@ func schema_pkg_apis_trainer_v1alpha1_ClusterTrainingRuntime(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ClusterTrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced by TrainJob that created in *any* namespace.",
-				Type:        []string{"object"},
+				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -1695,8 +1694,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntime(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "TrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a namespaced-scoped and can be referenced by TrainJob that created in the *same* namespace as the TrainingRuntime.",
-				Type:        []string{"object"},
+				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -1789,8 +1787,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCa
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "TrainingRuntimeSpec represents a specification of the desired training runtime.",
-				Type:        []string{"object"},
+				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
 					"mlPolicy": {
 						SchemaProps: spec.SchemaProps{

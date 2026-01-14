@@ -22,12 +22,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// ClusterTrainingRuntimes returns a ClusterTrainingRuntimeInformer.
-	ClusterTrainingRuntimes() ClusterTrainingRuntimeInformer
 	// TrainJobs returns a TrainJobInformer.
 	TrainJobs() TrainJobInformer
-	// TrainingRuntimes returns a TrainingRuntimeInformer.
-	TrainingRuntimes() TrainingRuntimeInformer
 }
 
 type version struct {
@@ -41,17 +37,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// ClusterTrainingRuntimes returns a ClusterTrainingRuntimeInformer.
-func (v *version) ClusterTrainingRuntimes() ClusterTrainingRuntimeInformer {
-	return &clusterTrainingRuntimeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
 // TrainJobs returns a TrainJobInformer.
 func (v *version) TrainJobs() TrainJobInformer {
 	return &trainJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// TrainingRuntimes returns a TrainingRuntimeInformer.
-func (v *version) TrainingRuntimes() TrainingRuntimeInformer {
-	return &trainingRuntimeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

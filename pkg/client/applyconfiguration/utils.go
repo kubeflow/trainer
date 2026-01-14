@@ -30,32 +30,16 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=trainer.kubeflow.org, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithKind("ClusterTrainingRuntime"):
-		return &trainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ContainerOverride"):
 		return &trainerv1alpha1.ContainerOverrideApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("CoschedulingPodGroupPolicySource"):
-		return &trainerv1alpha1.CoschedulingPodGroupPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("DatasetInitializer"):
 		return &trainerv1alpha1.DatasetInitializerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Initializer"):
 		return &trainerv1alpha1.InitializerApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("JobSetTemplateSpec"):
-		return &trainerv1alpha1.JobSetTemplateSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobStatus"):
 		return &trainerv1alpha1.JobStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("MLPolicy"):
-		return &trainerv1alpha1.MLPolicyApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("MLPolicySource"):
-		return &trainerv1alpha1.MLPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ModelInitializer"):
 		return &trainerv1alpha1.ModelInitializerApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("MPIMLPolicySource"):
-		return &trainerv1alpha1.MPIMLPolicySourceApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("PodGroupPolicy"):
-		return &trainerv1alpha1.PodGroupPolicyApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("PodGroupPolicySource"):
-		return &trainerv1alpha1.PodGroupPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("PodTemplateOverride"):
 		return &trainerv1alpha1.PodTemplateOverrideApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("PodTemplateOverrideTargetJob"):
@@ -64,24 +48,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.PodTemplateSpecOverrideApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimeRef"):
 		return &trainerv1alpha1.RuntimeRefApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("TorchElasticPolicy"):
-		return &trainerv1alpha1.TorchElasticPolicyApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("TorchMLPolicySource"):
-		return &trainerv1alpha1.TorchMLPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Trainer"):
 		return &trainerv1alpha1.TrainerApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntime"):
-		return &trainerv1alpha1.TrainingRuntimeApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntimeSpec"):
-		return &trainerv1alpha1.TrainingRuntimeSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJob"):
 		return &trainerv1alpha1.TrainJobApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobSpec"):
 		return &trainerv1alpha1.TrainJobSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobStatus"):
 		return &trainerv1alpha1.TrainJobStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("VolcanoPodGroupPolicySource"):
-		return &trainerv1alpha1.VolcanoPodGroupPolicySourceApplyConfiguration{}
 
 	}
 	return nil

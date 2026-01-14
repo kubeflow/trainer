@@ -26,9 +26,7 @@ import (
 
 type TrainerV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	ClusterTrainingRuntimesGetter
 	TrainJobsGetter
-	TrainingRuntimesGetter
 }
 
 // TrainerV1alpha1Client is used to interact with features provided by the trainer.kubeflow.org group.
@@ -36,16 +34,8 @@ type TrainerV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *TrainerV1alpha1Client) ClusterTrainingRuntimes() ClusterTrainingRuntimeInterface {
-	return newClusterTrainingRuntimes(c)
-}
-
 func (c *TrainerV1alpha1Client) TrainJobs(namespace string) TrainJobInterface {
 	return newTrainJobs(c, namespace)
-}
-
-func (c *TrainerV1alpha1Client) TrainingRuntimes(namespace string) TrainingRuntimeInterface {
-	return newTrainingRuntimes(c, namespace)
 }
 
 // NewForConfig creates a new TrainerV1alpha1Client for the given config.

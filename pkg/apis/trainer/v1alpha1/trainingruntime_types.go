@@ -42,6 +42,9 @@ const (
 // ClusterTrainingRuntime represents a training runtime which can be referenced as part of
 // `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced
 // by TrainJob that created in *any* namespace.
+
+// +kubebuilder:object:root=true
+// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="Value is immutable"
 type ClusterTrainingRuntime struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -78,6 +81,9 @@ type ClusterTrainingRuntimeList struct {
 // TrainingRuntime represents a training runtime which can be referenced as part of
 // `runtimeRef` API in TrainJob. This resource is a namespaced-scoped and can be referenced
 // by TrainJob that created in the *same* namespace as the TrainingRuntime.
+
+// +kubebuilder:object:root=true
+// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="Value is immutable"
 type TrainingRuntime struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -107,6 +113,9 @@ type TrainingRuntimeList struct {
 
 // TrainingRuntimeSpec represents a specification of the desired training runtime.
 // +kubebuilder:validation:MinProperties=1
+
+// +kubebuilder:object:root=true
+// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="Value is immutable"
 type TrainingRuntimeSpec struct {
 	// mlPolicy provides the ML-specific parameters for the model training.
 	// +optional
