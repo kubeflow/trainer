@@ -329,7 +329,7 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got): %s", diff)
 			}
-			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, cmpopts.EquateEmpty(), cmpopts.IgnoreFields(runtime.PodSet{}, "TypedPodSpec")); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantRuntimeInfo, tc.runtimeInfo, cmpopts.EquateEmpty()); len(diff) != 0 {
 				t.Errorf("Unexpected runtime.Info (-want,+got): %s", diff)
 			}
 		})

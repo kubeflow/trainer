@@ -431,7 +431,6 @@ func TestNewInfo(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortMaps(func(a, b string) bool { return a < b }),
-		cmpopts.IgnoreFields(PodSet{}, "TypedPodSpec"),
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

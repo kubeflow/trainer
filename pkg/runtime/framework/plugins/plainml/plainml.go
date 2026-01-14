@@ -65,7 +65,7 @@ func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 				requests = res.Limits
 			}
 			if len(requests) > 0 {
-				trainerPS.RecalculateSinglePodRequestsWithOverride(constants.Node, requests)
+				trainerPS.SinglePodRequests = requests
 			}
 		}
 	}

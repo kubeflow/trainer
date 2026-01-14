@@ -74,9 +74,6 @@ type PodSet struct {
 	// The total PodSet requests can be calculated with
 	// SinglePodRequests x Count.
 	SinglePodRequests corev1.ResourceList
-	// TypedPodSpec is the original PodSpec used for resource calculations.
-	// This is stored to allow recalculating SinglePodRequests when ResourcesPerNode is overridden.
-	TypedPodSpec *corev1.PodSpec
 }
 
 type Container struct {
@@ -141,7 +138,6 @@ func WithPodSet(
 	psName string, ancestor *string, count int32, typedPodSpec corev1.PodSpec, podSpecApply *corev1ac.PodSpecApplyConfiguration,
 ) InfoOption {
 	return func(o *InfoOptions) {
-		podSpecCopy := typedPodSpec.DeepCopy()
 		ps := PodSet{
 			Name:              psName,
 			Ancestor:          ancestor,
@@ -150,7 +146,6 @@ func WithPodSet(
 			SinglePodRequests: resourcehelpers.PodRequests(&corev1.Pod{Spec: typedPodSpec}, resourcehelpers.PodResourcesOptions{}),
 			InitContainers:    slices.Collect(toPodSetContainer(podSpecApply.InitContainers...)),
 			Containers:        slices.Collect(toPodSetContainer(podSpecApply.Containers...)),
-			TypedPodSpec:      podSpecCopy,
 		}
 		o.templateSpec.PodSets = append(o.templateSpec.PodSets, ps)
 	}
@@ -225,53 +220,6 @@ func (i *Info) FindPodSetByName(psName string) *PodSet {
 		return &i.TemplateSpec.PodSets[idx]
 	}
 	return nil
-}
-
-// RecalculateSinglePodRequestsWithOverride recalculates SinglePodRequests using
-// the PodRequests helper with a modified PodSpec that overrides the specified container's resources.
-// This properly accounts for InitContainers and Sidecar containers while overriding
-// only the specified container's resource requests.
-// If TypedPodSpec is nil, it falls back to directly setting the overrideRequests as SinglePodRequests.
-func (ps *PodSet) RecalculateSinglePodRequestsWithOverride(containerName string, overrideRequests corev1.ResourceList) {
-	if ps.TypedPodSpec == nil {
-		// Fallback: directly set the resources when TypedPodSpec is not available.
-		// This maintains backwards compatibility but doesn't account for InitContainers/Sidecars.
-		ps.SinglePodRequests = overrideRequests
-		return
-	}
-
-	// Create a modified copy of the PodSpec with overridden container resources
-	modifiedPodSpec := ps.TypedPodSpec.DeepCopy()
-	containerFound := false
-	for i := range modifiedPodSpec.Containers {
-		if modifiedPodSpec.Containers[i].Name == containerName {
-			// Override the container's resource requests
-			if modifiedPodSpec.Containers[i].Resources.Requests == nil {
-				modifiedPodSpec.Containers[i].Resources.Requests = make(corev1.ResourceList)
-			}
-			for k, v := range overrideRequests {
-				modifiedPodSpec.Containers[i].Resources.Requests[k] = v
-			}
-			containerFound = true
-			break
-		}
-	}
-
-	// If the container doesn't exist in the PodSpec, add it with the override resources.
-	// This handles cases where the runtime PodSpec is minimal but TrainJob specifies ResourcesPerNode.
-	if !containerFound {
-		modifiedPodSpec.Containers = append(modifiedPodSpec.Containers, corev1.Container{
-			Name: containerName,
-			Resources: corev1.ResourceRequirements{
-				Requests: overrideRequests,
-			},
-		})
-	}
-
-	ps.SinglePodRequests = resourcehelpers.PodRequests(
-		&corev1.Pod{Spec: *modifiedPodSpec},
-		resourcehelpers.PodResourcesOptions{},
-	)
 }
 
 func RuntimeRefToRuntimeRegistryKey(runtimeRef trainer.RuntimeRef) string {
