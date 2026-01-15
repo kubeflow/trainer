@@ -47,6 +47,23 @@ spec:
                 description: mlPolicy provides the ML-specific parameters for the
                   model training.
                 properties:
+                  flux:
+                    description: flux policy source defines policy only for Flux
+                    properties:
+                      numProcPerNode:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        default: auto
+                        description: |-
+                          numProcPerNode is the number of processes per node.
+                          This is defined a level up on the MLPolicy directly.
+                        x-kubernetes-int-or-string: true
+                        x-kubernetes-validations:
+                        - message: NumProcPerNode must be equal to auto, cpu, gpu,
+                            or int value
+                          rule: self > 0 || self in ['auto', 'cpu', 'gpu']
+                    type: object
                   mpi:
                     description: mpi defines the configuration for the MPI Runtime.
                     properties:
