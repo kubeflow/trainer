@@ -145,7 +145,7 @@ dataCache:
   lws:
     # -- Whether to install LeaderWorkerSet as a dependency managed by trainer.
     # This must be set to `false` if LeaderWorkerSet controller/webhook has already been installed into the cluster.
-    install: false
+    install: true
     # -- String to fully override LeaderWorkerSet release name.
     fullnameOverride: lws
 
