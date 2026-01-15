@@ -741,6 +741,16 @@ func (in *TrainJobSpec) DeepCopyInto(out *TrainJobSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.TTLSecondsAfterFinished != nil {
+		in, out := &in.TTLSecondsAfterFinished, &out.TTLSecondsAfterFinished
+		*out = new(int32)
+		**out = **in
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 
