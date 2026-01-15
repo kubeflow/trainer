@@ -2,3 +2,5 @@ resources:
   - role.yaml
   - role_binding.yaml
   - service_account.yaml
+  - public-configmap-reader-role.yaml
+  - public-configmap-reader-rolebinding.yaml
