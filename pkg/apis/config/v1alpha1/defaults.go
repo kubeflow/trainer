@@ -25,6 +25,9 @@ func SetDefaults_Configuration(cfg *Configuration) {
 	if cfg.Webhook.Port == nil {
 		cfg.Webhook.Port = ptr.To(int32(9443))
 	}
+	if cfg.Webhook.Host == nil {
+		cfg.Webhook.Host = ptr.To("")
+	}
 	if cfg.Metrics.BindAddress == "" {
 		cfg.Metrics.BindAddress = ":8443"
 	}
