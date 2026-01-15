@@ -37,4 +37,5 @@ type Runtime interface {
 	TrainJobStatus(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error)
 	EventHandlerRegistrars() []ReconcilerBuilder
 	ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList)
+	SyncSuspend(ctx context.Context, trainJob *trainer.TrainJob) error
 }
