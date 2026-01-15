@@ -463,6 +463,10 @@ spec:
                   description: PodTemplateOverride represents a custom PodTemplateSpec
                     override that will be applied to the TrainJob's training runtime.
                   properties:
+                    manager:
+                      description: manager indicates who created this PodTemplateOverride
+                        object.
+                      type: string
                     metadata:
                       description: |-
                         metadata overrides the Pod template metadata.

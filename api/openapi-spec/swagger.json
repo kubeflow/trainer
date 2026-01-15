@@ -13939,6 +13939,10 @@
           "targetJobs"
         ],
         "properties": {
+          "manager": {
+            "description": "manager indicates who created this PodTemplateOverride object.",
+            "type": "string"
+          },
           "metadata": {
             "description": "metadata overrides the Pod template metadata. These values will be merged with the TrainingRuntime's Pod template metadata.",
             "allOf": [
