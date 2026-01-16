@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This shell is used to setup GPU enabled Kind cluster for Kubeflow Trainer e2e tests.
+# This shell is used to create GPU enabled Kind cluster using nvkind.
 
 set -o errexit
 set -o nounset
