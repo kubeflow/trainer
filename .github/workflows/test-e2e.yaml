@@ -43,6 +43,30 @@ jobs:
           echo "Install Kubeflow SDK with Docker support for local Notebooks"
           pip install "kubeflow[docker] @ git+https://github.com/kubeflow/sdk.git@main"
 
+      - name: Reset Docker default runtime to runc
+        run: |
+          # Oracle VM runners have nvidia as default runtime, which fails for CPU-only containers
+          # Reset to runc to make sure local container tests are running.
+
+          sudo tee /etc/docker/daemon.json > /dev/null <<EOF
+          {
+            "default-runtime": "runc",
+            "runtimes": {
+              "runc": {
+                "path": "runc"
+              },
+              "nvidia": {
+                "path": "nvidia-container-runtime"
+              }
+            }
+          }
+          EOF
+
+          # systemctl restart docker
+          # sleep 5
+          echo "Run docker info"
+          docker info
+
       - name: Setup cluster
         run: |
           make test-e2e-setup-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
