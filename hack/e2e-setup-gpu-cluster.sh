@@ -86,6 +86,12 @@ sudo apt-get install -y \
   libnvidia-container-tools=${NVIDIA_CONTAINER_TOOLKIT_VERSION} \
   libnvidia-container1=${NVIDIA_CONTAINER_TOOLKIT_VERSION}
 
+sudo systemctl daemon-reexec
+sudo systemctl start containerd
+sudo systemctl start docker
+
+nvidia-ctk --version
+
 nvidia-smi
 
 # Set up Docker to use NVIDIA runtime.
@@ -95,7 +101,7 @@ sudo systemctl restart docker
 
 # Create a Kind cluster with GPU support.
 sudo cp "$(sudo go env GOPATH)/bin/nvkind" /usr/local/bin/nvkind
-nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}" || true
+nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
 nvkind cluster print-gpus
 
 # Install gpu-operator to make sure we can run GPU workloads.
