@@ -21,27 +21,12 @@ set -o nounset
 set -o pipefail
 set -x
 
-# Source container runtime utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/scripts/container-runtime.sh"
-source "${SCRIPT_DIR}/scripts/load-image-to-kind.sh"
-
-# Setup container runtime
-setup_container_runtime "sudo"
-
 # Configure variables.
 KIND=${KIND:-kind}
 K8S_VERSION=${K8S_VERSION:-1.32.0}
 GPU_OPERATOR_VERSION="v25.3.2"
 KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
 GPU_CLUSTER_NAME="kind-gpu"
-
-# sudo for nvkind and docker commands
-alias docker="sudo docker"
-alias kubectl="sudo kubectl"
-alias kind="sudo kind"
-alias helm="sudo helm"
-alias nvkind="sudo nvkind"
 
 echo $(lsb_release -a)
 
@@ -62,6 +47,12 @@ sudo systemctl restart docker
 NVKIND_BIN="/root/go/bin/nvkind"
 sudo "$NVKIND_BIN" cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
 sudo "$NVKIND_BIN" cluster print-gpus
+
+# Make kubeconfig available to non-root user
+mkdir -p "$HOME/.kube"
+sudo cp /root/.kube/config "$HOME/.kube/config"
+sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
+export KUBECONFIG="$HOME/.kube/config"
 
 # Install gpu-operator to make sure we can run GPU workloads.
 echo "Install NVIDIA GPU Operator"
