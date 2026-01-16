@@ -61,7 +61,9 @@ We propose an approach with the following high-level **push-based** design:
 2. The trainer control plane exposes a new http service which can receive the trainer status from the trainer runtime pods.
 3. The user instruments their trainer runtime pod(s) to periodically send the current trainer status to this endpoint which updates the status of the TrainJob.
 
-The feature is optional but available for all TrainJobs. Users opt in to the functionality by instrumenting their runtime to send requests to the new endpoint.
+Users can choose not to instrument their runtime, in which case no progress and metrics will be available on the TrainJob. The feature is therefore optional and opt-in.
+
+The feature will have an associated feature gate, defaulting to "enabled". Disabling the gate will disable the http service.
 
 ### CRD changes
 
@@ -168,15 +170,51 @@ another-example   Complete   100         50m
 
 ### Control plane endpoint
 
-The control plane will expose a new service that provides an http endpoint where trainer pods can submit the trainer status.
+If the feature gate is enabled, the control plane will expose a new http server endpoint where trainer pods can submit the trainer status. The http server will be added as a new port in the existing `kubeflow-trainer-controller-manager` service.
 
-The endpoint will be `POST: /<train-job-namespace>/TrainJob/<train-job-name>/status`, where `<train-job-namespace>` and `<train-job-name>` come from the TrainJob.
+The endpoint will be `POST: /apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status/trainerStatus`, where `{namespace}` and `{name}` are the namespace and name of the TrainJob.
 
 The payload will be the same as `TrainJobTrainerStatus`.
 
 On receiving requests to this endpoint, the control plane will validate the source of the request (see [Security considerations](#security-considerations)) and then directly update the `status.trainerStatus` field.
 
 The control plane does not need to be highly available: the runtime can retry the status update request with some delay whilst continuing the training, or skip the update entirely.
+
+An example payload is:
+```
+POST /apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status/trainerStatus HTTP/1.1
+Host: kubeflow-trainer-controller-manager.kubeflow:8082
+Authorization: Bearer {jwt}
+Content-Type: application/json
+
+{
+  "progressPercentage": 45,
+  "estimatedRemainingSeconds": 795649,
+  "metrics": [
+    {
+      "name": "loss",
+      "value": "0.2347"
+    },
+    {
+      "name": "eval_loss",
+      "value": "0.2451"
+    },
+    {
+      "name": "accuracy",
+      "value": "0.9876"
+    },
+    {
+      "name": "currentEpoch",
+      "value": "2"
+    },
+    {
+      "name": "totalEpochs",
+      "value": "5"
+    }
+  ],
+  "lastUpdatedTime": "2025-01-23T10:30:45Z"
+}
+```
 
 ### Security considerations
 
@@ -188,7 +226,7 @@ TLS will use the same certificate used by the webhook:
 - the runtime will need to use the custom `ca.crt` file when it makes requests to the control plane.
 
 Token-based authentication using projected service account tokens will be used to validate that the train job status can only be updated by pods that belong to that train job:
-- the control plane will inject a serviceAccountToken projected volume with custom audience `trainer.kubeflow.org` into all containers of all pods of the train job.
+- if the feature gate is enabled the control plane will inject a serviceAccountToken projected volume with custom audience `trainer.kubeflow.org` into all containers of all pods of the train job.
 - the runtime will need to send this token as a bearer token in all status update requests.
 - on receiving a status update request, the control plane will authorise the token by:
   1. validating the provided token using a TokenReview request. The audience must be `trainer.kubeflow.org`.
@@ -203,7 +241,7 @@ The new endpoint must rate-limit requests and cache TokenReview responses to avo
 
 Deliberate malicious attacks can be mitigated by validating the jwt token against the API server public key before performing the TokenReview request. Tokens that are definitely invalid would not cause any API server requests.
 
-The below summarises the volumes the control plane will inject:
+The below summarises the volumes the control plane will inject if the feature gate is enabled:
 ```yaml
 # mutated PodSpec
 spec:
@@ -258,9 +296,9 @@ rules:
 
 Users will need to instrument their train jobs so that they periodically send training status to the control plane. Some frameworks make this easy by letting users add "hooks" or "callbacks" to the training loop, and where possible we'll seek to add integrations to those libraries. For example, for the `Transformers` framework we'll look to add a custom `KubeflowTrainerCallback` following the [existing integrations approach](https://github.com/huggingface/transformers/blob/v4.57.0/src/transformers/integrations/integration_utils.py#L1361).
 
-To make it easier for training pods to update the training status, the control plane will inject the following environment variables into all containers of all pods of the training job:
+To make it easier for training pods to update the training status, if the feature gate is enabled the control plane will inject the following environment variables into all containers of all pods of the training job:
 ```shell
-KUBEFLOW_TRAINER_STATUS_URL=https://trainer-status.kubeflow.svc/<job-namespace>/TrainJob/<job-name>/status
+KUBEFLOW_TRAINER_STATUS_URL=https://kubeflow-trainer-controller-manager.kubeflow:8082/apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status/trainerStatus
 KUBEFLOW_TRAINER_STATUS_CA_CERT=/var/run/secrets/kubeflow/trainer/ca.crt
 KUBEFLOW_TRAINER_STATUS_TOKEN=/var/run/secrets/kubeflow/trainer/token
 ```
