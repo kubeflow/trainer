@@ -35,8 +35,6 @@ K8S_VERSION=${K8S_VERSION:-1.32.0}
 GPU_OPERATOR_VERSION="v25.3.2"
 KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
 GPU_CLUSTER_NAME="kind-gpu"
-NAMESPACE="kubeflow-system"
-TIMEOUT="5m"
 
 # sudo for nvkind and docker commands
 alias docker="sudo docker"
@@ -48,15 +46,18 @@ alias nvkind="sudo nvkind"
 uname -a
 
 # Set up Docker to use NVIDIA runtime.
-sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
-# Force legacy mode to restore /proc/driver/nvidia (nvkind expects this)
+# Configure the host NVIDIA Container Toolkit
 sudo nvidia-ctk config --set nvidia-container-runtime.mode=legacy --in-place
+sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
+
+# Re-configure the Docker runtime to ensure it uses the nvidia-container-runtime
+sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
 sudo systemctl restart docker
 
 # Create a Kind cluster with GPU support.
-sudo cp "$(sudo go env GOPATH)/bin/nvkind" /usr/local/bin/nvkind
-sudo nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
-sudo nvkind cluster print-gpus
+NVKIND_BIN="/root/go/bin/nvkind"
+sudo "$NVKIND_BIN" cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
+sudo "$NVKIND_BIN" cluster print-gpus
 
 # Install gpu-operator to make sure we can run GPU workloads.
 echo "Install NVIDIA GPU Operator"
@@ -65,10 +66,12 @@ kubectl label --overwrite ns gpu-operator pod-security.kubernetes.io/enforce=pri
 
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia && helm repo update
 
-helm install --wait --generate-name \
-  -n gpu-operator --create-namespace \
-  nvidia/gpu-operator \
-  --version="${GPU_OPERATOR_VERSION}"
+helm install gpu-operator nvidia/gpu-operator \
+  -n gpu-operator \
+  --version="${GPU_OPERATOR_VERSION}" \
+  --set driver.enabled=false \
+  --set toolkit.enabled=false \
+  --wait
 
 # Validation steps for GPU operator installation
 kubectl get ns gpu-operator
