@@ -31,24 +31,39 @@ spec:
                 - ALL
             seccompProfile:
               type: RuntimeDefault
+
+          ports:
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+            - name: metrics
+              containerPort: 8443
+              protocol: TCP
+            - name: webhook
+              containerPort: 9443
+              protocol: TCP
+
           volumeMounts:
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
               readOnly: true
+
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 8081
+              port: health
             initialDelaySeconds: 15
             periodSeconds: 20
             timeoutSeconds: 3
+
           readinessProbe:
             httpGet:
               path: /readyz
-              port: 8081
+              port: health
             initialDelaySeconds: 10
             periodSeconds: 15
             timeoutSeconds: 3
+
       serviceAccountName: kubeflow-trainer-controller-manager
       volumes:
         - name: cert
@@ -62,12 +77,12 @@ metadata:
   name: kubeflow-trainer-controller-manager
 spec:
   ports:
-    - name: monitoring-port
+    - name: metrics
       port: 8443
-      targetPort: 8443
-    - name: webhook-server
+      targetPort: metrics
+    - name: webhook
       port: 443
       protocol: TCP
-      targetPort: 9443
+      targetPort: webhook
   selector:
     app.kubernetes.io/component: manager
