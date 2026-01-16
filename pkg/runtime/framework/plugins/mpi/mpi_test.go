@@ -465,9 +465,6 @@ trainJob-node-1-1.trainJob slots=1
 							Endpoints: func(yield func(string) bool) {
 								yield("trainJob-node-1-0.trainJob")
 							},
-							SinglePodRequests: corev1.ResourceList{
-								"custom.com/gpu": resource.MustParse("5"),
-							},
 						},
 					},
 				},

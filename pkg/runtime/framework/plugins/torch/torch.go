@@ -105,21 +105,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
 	}
 
-	// Update PodSet resources from TrainJob.spec.trainer.resourcesPerNode
-	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
-		if trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer); trainerPS != nil {
-			res := trainJob.Spec.Trainer.ResourcesPerNode
-			requests := res.Requests
-			// If requests are empty, we use limits as requests.
-			if len(requests) == 0 {
-				requests = res.Limits
-			}
-			if len(requests) > 0 {
-				trainerPS.SinglePodRequests = requests
-			}
-		}
-	}
-
 	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicySource.Torch.NumProcPerNode, intstr.FromString("auto"))
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
 		numProcPerNode = ptr.Deref(trainJob.Spec.Trainer.NumProcPerNode, intstr.FromString("auto"))
