@@ -43,14 +43,18 @@ alias kind="sudo kind"
 alias helm="sudo helm"
 alias nvkind="sudo nvkind"
 
-uname -a
+echo $(lsb_release -a)
 
-# Set up Docker to use NVIDIA runtime.
-# Configure the host NVIDIA Container Toolkit
-sudo nvidia-ctk config --set nvidia-container-runtime.mode=legacy --in-place
+export TOOLKIT_VERSION=1.17.0-1
+
+sudo apt-get update
+sudo apt-get install -y --allow-downgrades \
+    nvidia-container-toolkit=${TOOLKIT_VERSION} \
+    nvidia-container-toolkit-base=${TOOLKIT_VERSION} \
+    libnvidia-container-tools=${TOOLKIT_VERSION} \
+    libnvidia-container1=${TOOLKIT_VERSION}
+
 sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
-
-# Re-configure the Docker runtime to ensure it uses the nvidia-container-runtime
 sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
 sudo systemctl restart docker
 
