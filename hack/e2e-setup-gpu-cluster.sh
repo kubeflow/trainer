@@ -58,6 +58,34 @@ TRAINER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/torchtune-trainer"
 TRAINER_CI_IMAGE="${TRAINER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 ${CONTAINER_RUNTIME} build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_CI_IMAGE}
 
+# sudo for nvkind and docker commands
+alias docker="sudo docker"
+alias kubectl="sudo kubectl"
+alias kind="sudo kind"
+alias helm="sudo helm"
+alias nvkind="sudo nvkind"
+
+# Hotfix: uninstall and reinstall nvidia-container-toolkit to fix issues with
+# https://github.com/NVIDIA/nvkind/issues/61
+sudo systemctl stop docker
+sudo systemctl stop containerd
+
+sudo apt-get remove -y \
+  nvidia-container-toolkit \
+  nvidia-container-toolkit-base \
+  libnvidia-container-tools \
+  libnvidia-container1
+
+sudo apt-get autoremove -y
+
+export NVIDIA_CONTAINER_TOOLKIT_VERSION=1.17.8-1
+
+sudo apt-get install -y \
+  nvidia-container-toolkit=${NVIDIA_CONTAINER_TOOLKIT_VERSION} \
+  nvidia-container-toolkit-base=${NVIDIA_CONTAINER_TOOLKIT_VERSION} \
+  libnvidia-container-tools=${NVIDIA_CONTAINER_TOOLKIT_VERSION} \
+  libnvidia-container1=${NVIDIA_CONTAINER_TOOLKIT_VERSION}
+
 nvidia-smi
 
 # Set up Docker to use NVIDIA runtime.
@@ -67,13 +95,8 @@ sudo systemctl restart docker
 
 # Create a Kind cluster with GPU support.
 sudo cp "$(sudo go env GOPATH)/bin/nvkind" /usr/local/bin/nvkind
-
-# TODO: hotfix, the cluster creation returns non zero exit code
-# umount: /proc/driver/nvidia: not mounted
-# Error: patching /proc/driver/nvidia on node 'kind-gpu-worker': running script on kind-gpu-worker: executing command: exit status 1
-# For now ignore the error
-sudo nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}" || true
-sudo nvkind cluster print-gpus
+nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}" || true
+nvkind cluster print-gpus
 
 # Install gpu-operator to make sure we can run GPU workloads.
 echo "Install NVIDIA GPU Operator"
