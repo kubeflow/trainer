@@ -28,17 +28,6 @@ GPU_OPERATOR_VERSION="v25.3.2"
 KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
 GPU_CLUSTER_NAME="kind-gpu"
 
-echo $(lsb_release -a)
-
-export TOOLKIT_VERSION=1.17.0-1
-
-sudo apt-get update
-sudo apt-get install -y --allow-downgrades \
-    nvidia-container-toolkit=${TOOLKIT_VERSION} \
-    nvidia-container-toolkit-base=${TOOLKIT_VERSION} \
-    libnvidia-container-tools=${TOOLKIT_VERSION} \
-    libnvidia-container1=${TOOLKIT_VERSION}
-
 sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
 sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
 sudo systemctl restart docker
@@ -58,6 +47,13 @@ export KUBECONFIG="$HOME/.kube/config"
 echo "Install NVIDIA GPU Operator"
 kubectl create ns gpu-operator
 kubectl label --overwrite ns gpu-operator pod-security.kubernetes.io/enforce=privileged
+
+# Helm home dirs for non-root user
+export HELM_CONFIG_HOME="$HOME/.config/helm"
+export HELM_CACHE_HOME="$HOME/.cache/helm"
+export HELM_DATA_HOME="$HOME/.local/share/helm"
+
+mkdir -p "$HELM_CONFIG_HOME" "$HELM_CACHE_HOME" "$HELM_DATA_HOME"
 
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia && helm repo update
 
