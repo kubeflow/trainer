@@ -101,15 +101,13 @@ sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enable
 sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
 sudo systemctl restart docker
 
-git ls-remote --heads https://github.com/jaiakash/nvkind.git
-
 # HOTFIX: Reinstall patched nvkind to fix issues with unmount
 # https://github.com/NVIDIA/nvkind/issues/61
 git clone --depth=1 \
   --branch patched-17.9-nctk-version \
   https://github.com/jaiakash/nvkind.git
 cd nvkind
-sudo make install
+sudo make
 
 # Create a Kind cluster with GPU support.
 # sudo cp "$(sudo go env GOPATH)/bin/nvkind" /usr/local/bin/nvkind
