@@ -86,23 +86,35 @@ sudo apt-get install -y \
   libnvidia-container-tools=${NVIDIA_CONTAINER_TOOLKIT_VERSION} \
   libnvidia-container1=${NVIDIA_CONTAINER_TOOLKIT_VERSION}
 
+sudo apt-mark hold \
+  nvidia-container-toolkit \
+  nvidia-container-toolkit-base \
+  libnvidia-container-tools \
+  libnvidia-container1
+
 sudo systemctl daemon-reexec
 sudo systemctl start containerd
 sudo systemctl start docker
-
-nvidia-ctk --version
-
-nvidia-smi
 
 # Set up Docker to use NVIDIA runtime.
 sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enabled
 sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
 sudo systemctl restart docker
 
+git ls-remote --heads https://github.com/jaiakash/nvkind.git
+
+# HOTFIX: Reinstall patched nvkind to fix issues with unmount
+# https://github.com/NVIDIA/nvkind/issues/61
+git clone --depth=1 \
+  --branch patched-17.9-nctk-version \
+  https://github.com/jaiakash/nvkind.git
+cd nvkind
+sudo make install
+
 # Create a Kind cluster with GPU support.
-sudo cp "$(sudo go env GOPATH)/bin/nvkind" /usr/local/bin/nvkind
-nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
-nvkind cluster print-gpus
+# sudo cp "$(sudo go env GOPATH)/bin/nvkind" /usr/local/bin/nvkind
+sudo ./nvkind nvkind cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
+sudo ./nvkind cluster print-gpus
 
 # Install gpu-operator to make sure we can run GPU workloads.
 echo "Install NVIDIA GPU Operator"
