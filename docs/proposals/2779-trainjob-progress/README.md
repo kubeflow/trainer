@@ -63,7 +63,7 @@ We propose an approach with the following high-level **push-based** design:
 
 Users can choose not to instrument their runtime, in which case no progress and metrics will be available on the TrainJob. The feature is therefore optional and opt-in.
 
-The feature will have an associated feature gate, defaulting to "enabled". Disabling the gate will disable the http service.
+The feature will have an associated feature gate `TrainJobProgress`, defaulting to "disabled". Disabling the gate will disable the http service.
 
 ### CRD changes
 
@@ -79,6 +79,10 @@ type TrainJobStatus struct {
     // or the job is not instrumented to report its status.
     // +optional
     TrainerStatus *TrainJobTrainerStatus `json:"trainerStatus,omitempty"`
+
+    // Future extension (out of scope):
+    // DataInitializerStatus *TrainJobDataInitializerStatus `json:"dataInitializerStatus,omitempty"`
+    // ModelInitializerStatus *TrainJobModelInitializerStatus `json:"modelInitializerStatus,omitempty"`
 }
 
 
@@ -130,6 +134,8 @@ All fields (apart from lastUpdatedTime) are optional meaning that a runtime need
 
 The design deliberately does not make any changes to the `TrainJobSpec`: the control plane does not require any configuration. Users opt in to the training status by instrumenting their runtime pods to send the training status to the control plane.
 
+The design may be extended in future to add equivalent progress and metric statuses for the model and data initializer components.
+
 ```yaml
 # Sample TrainJob example with TrainerStatus implemented
 
@@ -172,9 +178,25 @@ another-example   Complete   100         50m
 
 If the feature gate is enabled, the control plane will expose a new http server endpoint where trainer pods can submit the trainer status. The http server will be added as a new port in the existing `kubeflow-trainer-controller-manager` service.
 
-The endpoint will be `POST: /apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status/trainerStatus`, where `{namespace}` and `{name}` are the namespace and name of the TrainJob.
+The endpoint will be `POST: /apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status`, where `{namespace}` and `{name}` are the namespace and name of the TrainJob.
 
-The payload will be the same as `TrainJobTrainerStatus`.
+The payload for the endpoint will have the following schema:
+```go
+type ProgressStatus {
+    // trainerStatus provides a summary of the status of the training
+    // part of the TrainJob.
+    // Empty if the status is unknown, e.g. the job has just started
+    // or the job is not instrumented to report its status.
+    // +optional
+    TrainerStatus *TrainJobTrainerStatus `json:"trainerStatus,omitempty"`
+
+	// Future extension (out of scope):
+	// DataInitializerStatus *TrainJobDataInitializerStatus `json:"dataInitializerStatus,omitempty"`
+	// ModelInitializerStatus *TrainJobModelInitializerStatus `json:"modelInitializerStatus,omitempty"`
+}
+```
+
+The schema uses a nested structure for future extensibility (e.g. the same endpoint could be used to receiver progress updates from a data initializer or model initializer).
 
 On receiving requests to this endpoint, the control plane will validate the source of the request (see [Security considerations](#security-considerations)) and then directly update the `status.trainerStatus` field.
 
@@ -182,37 +204,39 @@ The control plane does not need to be highly available: the runtime can retry th
 
 An example payload is:
 ```
-POST /apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status/trainerStatus HTTP/1.1
+POST /apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status HTTP/1.1
 Host: kubeflow-trainer-controller-manager.kubeflow:8082
 Authorization: Bearer {jwt}
 Content-Type: application/json
 
 {
-  "progressPercentage": 45,
-  "estimatedRemainingSeconds": 795649,
-  "metrics": [
-    {
-      "name": "loss",
-      "value": "0.2347"
-    },
-    {
-      "name": "eval_loss",
-      "value": "0.2451"
-    },
-    {
-      "name": "accuracy",
-      "value": "0.9876"
-    },
-    {
-      "name": "currentEpoch",
-      "value": "2"
-    },
-    {
-      "name": "totalEpochs",
-      "value": "5"
-    }
-  ],
-  "lastUpdatedTime": "2025-01-23T10:30:45Z"
+  "trainerStatus": {
+    "progressPercentage": 45,
+    "estimatedRemainingSeconds": 795649,
+    "metrics": [
+      {
+        "name": "loss",
+        "value": "0.2347"
+      },
+      {
+        "name": "eval_loss",
+        "value": "0.2451"
+      },
+      {
+        "name": "accuracy",
+        "value": "0.9876"
+      },
+      {
+        "name": "currentEpoch",
+        "value": "2"
+      },
+      {
+        "name": "totalEpochs",
+        "value": "5"
+      }
+    ],
+    "lastUpdatedTime": "2025-01-23T10:30:45Z"
+  }
 }
 ```
 
@@ -298,7 +322,7 @@ Users will need to instrument their train jobs so that they periodically send tr
 
 To make it easier for training pods to update the training status, if the feature gate is enabled the control plane will inject the following environment variables into all containers of all pods of the training job:
 ```shell
-KUBEFLOW_TRAINER_STATUS_URL=https://kubeflow-trainer-controller-manager.kubeflow:8082/apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status/trainerStatus
+KUBEFLOW_TRAINER_STATUS_URL=https://kubeflow-trainer-controller-manager.kubeflow:8082/apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status
 KUBEFLOW_TRAINER_STATUS_CA_CERT=/var/run/secrets/kubeflow/trainer/ca.crt
 KUBEFLOW_TRAINER_STATUS_TOKEN=/var/run/secrets/kubeflow/trainer/token
 ```
