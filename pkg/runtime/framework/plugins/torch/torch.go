@@ -22,13 +22,18 @@ import (
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	autoscalingv2ac "k8s.io/client-go/applyconfigurations/autoscaling/v2"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
@@ -41,6 +46,7 @@ type Torch struct{}
 
 var _ framework.EnforceMLPolicyPlugin = (*Torch)(nil)
 var _ framework.CustomValidationPlugin = (*Torch)(nil)
+var _ framework.ComponentBuilderPlugin = (*Torch)(nil)
 
 const Name = "Torch"
 
@@ -50,6 +56,173 @@ func New(context.Context, client.Client, client.FieldIndexer) (framework.Plugin,
 
 func (t *Torch) Name() string {
 	return Name
+}
+
+func (t *Torch) Build(_ context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
+	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Torch == nil {
+		return nil, nil
+	}
+
+	elasticPolicy := info.RuntimePolicy.MLPolicySource.Torch.ElasticPolicy
+	if elasticPolicy == nil || len(elasticPolicy.Metrics) == 0 {
+		return nil, nil
+	}
+
+	minNodes := ptr.Deref(elasticPolicy.MinNodes, 1)
+	maxNodes := ptr.Deref(elasticPolicy.MaxNodes, 1)
+
+	metrics := make([]*autoscalingv2ac.MetricSpecApplyConfiguration, len(elasticPolicy.Metrics))
+	for i, metric := range elasticPolicy.Metrics {
+		metrics[i] = autoscalingv2ac.MetricSpec()
+		if metric.Type != "" {
+			metrics[i].WithType(metric.Type)
+		}
+		if metric.Object != nil {
+			objectMetric := autoscalingv2ac.ObjectMetricSource()
+			if metric.Object.DescribedObject.Kind != "" {
+				objectMetric.WithDescribedObject(autoscalingv2ac.CrossVersionObjectReference().
+					WithKind(metric.Object.DescribedObject.Kind).
+					WithName(metric.Object.DescribedObject.Name).
+					WithAPIVersion(metric.Object.DescribedObject.APIVersion))
+			}
+			if metric.Object.Metric.Name != "" {
+				objectMetric.WithMetric(autoscalingv2ac.MetricIdentifier().
+					WithName(metric.Object.Metric.Name).
+					WithSelector(metav1ac.LabelSelector().
+						WithMatchLabels(metric.Object.Metric.Selector.MatchLabels).
+						WithMatchExpressions(toLabelSelectorRequirementApplyConfig(metric.Object.Metric.Selector.MatchExpressions)...)))
+			}
+			if metric.Object.Target.Type != "" {
+				target := autoscalingv2ac.MetricTarget().WithType(metric.Object.Target.Type)
+				if metric.Object.Target.Value != nil {
+					target.WithValue(*metric.Object.Target.Value)
+				}
+				if metric.Object.Target.AverageValue != nil {
+					target.WithAverageValue(*metric.Object.Target.AverageValue)
+				}
+				if metric.Object.Target.AverageUtilization != nil {
+					target.WithAverageUtilization(*metric.Object.Target.AverageUtilization)
+				}
+				objectMetric.WithTarget(target)
+			}
+			metrics[i].WithObject(objectMetric)
+		}
+		if metric.Pods != nil {
+			podsMetric := autoscalingv2ac.PodsMetricSource()
+			if metric.Pods.Metric.Name != "" {
+				podsMetric.WithMetric(autoscalingv2ac.MetricIdentifier().
+					WithName(metric.Pods.Metric.Name).
+					WithSelector(metav1ac.LabelSelector().
+						WithMatchLabels(metric.Pods.Metric.Selector.MatchLabels).
+						WithMatchExpressions(toLabelSelectorRequirementApplyConfig(metric.Pods.Metric.Selector.MatchExpressions)...)))
+			}
+			if metric.Pods.Target.Type != "" {
+				target := autoscalingv2ac.MetricTarget().WithType(metric.Pods.Target.Type)
+				if metric.Pods.Target.Value != nil {
+					target.WithValue(*metric.Pods.Target.Value)
+				}
+				if metric.Pods.Target.AverageValue != nil {
+					target.WithAverageValue(*metric.Pods.Target.AverageValue)
+				}
+				if metric.Pods.Target.AverageUtilization != nil {
+					target.WithAverageUtilization(*metric.Pods.Target.AverageUtilization)
+				}
+				podsMetric.WithTarget(target)
+			}
+			metrics[i].WithPods(podsMetric)
+		}
+		if metric.Resource != nil {
+			resourceMetric := autoscalingv2ac.ResourceMetricSource()
+			if metric.Resource.Name != "" {
+				resourceMetric.WithName(metric.Resource.Name)
+			}
+			if metric.Resource.Target.Type != "" {
+				target := autoscalingv2ac.MetricTarget().WithType(metric.Resource.Target.Type)
+				if metric.Resource.Target.Value != nil {
+					target.WithValue(*metric.Resource.Target.Value)
+				}
+				if metric.Resource.Target.AverageValue != nil {
+					target.WithAverageValue(*metric.Resource.Target.AverageValue)
+				}
+				if metric.Resource.Target.AverageUtilization != nil {
+					target.WithAverageUtilization(*metric.Resource.Target.AverageUtilization)
+				}
+				resourceMetric.WithTarget(target)
+			}
+			metrics[i].WithResource(resourceMetric)
+		}
+		if metric.ContainerResource != nil {
+			containerResourceMetric := autoscalingv2ac.ContainerResourceMetricSource()
+			if metric.ContainerResource.Name != "" {
+				containerResourceMetric.WithName(metric.ContainerResource.Name)
+			}
+			if metric.ContainerResource.Container != "" {
+				containerResourceMetric.WithContainer(metric.ContainerResource.Container)
+			}
+			if metric.ContainerResource.Target.Type != "" {
+				target := autoscalingv2ac.MetricTarget().WithType(metric.ContainerResource.Target.Type)
+				if metric.ContainerResource.Target.Value != nil {
+					target.WithValue(*metric.ContainerResource.Target.Value)
+				}
+				if metric.ContainerResource.Target.AverageValue != nil {
+					target.WithAverageValue(*metric.ContainerResource.Target.AverageValue)
+				}
+				if metric.ContainerResource.Target.AverageUtilization != nil {
+					target.WithAverageUtilization(*metric.ContainerResource.Target.AverageUtilization)
+				}
+				containerResourceMetric.WithTarget(target)
+			}
+			metrics[i].WithContainerResource(containerResourceMetric)
+		}
+		if metric.External != nil {
+			externalMetric := autoscalingv2ac.ExternalMetricSource()
+			if metric.External.Metric.Name != "" {
+				externalMetric.WithMetric(autoscalingv2ac.MetricIdentifier().
+					WithName(metric.External.Metric.Name).
+					WithSelector(metav1ac.LabelSelector().
+						WithMatchLabels(metric.External.Metric.Selector.MatchLabels).
+						WithMatchExpressions(toLabelSelectorRequirementApplyConfig(metric.External.Metric.Selector.MatchExpressions)...)))
+			}
+			if metric.External.Target.Type != "" {
+				target := autoscalingv2ac.MetricTarget().WithType(metric.External.Target.Type)
+				if metric.External.Target.Value != nil {
+					target.WithValue(*metric.External.Target.Value)
+				}
+				if metric.External.Target.AverageValue != nil {
+					target.WithAverageValue(*metric.External.Target.AverageValue)
+				}
+				if metric.External.Target.AverageUtilization != nil {
+					target.WithAverageUtilization(*metric.External.Target.AverageUtilization)
+				}
+				externalMetric.WithTarget(target)
+			}
+			metrics[i].WithExternal(externalMetric)
+		}
+	}
+
+	hpa := autoscalingv2ac.HorizontalPodAutoscaler(trainJob.Name, trainJob.Namespace).
+		WithLabels(trainJob.Labels).
+		WithAnnotations(trainJob.Annotations).
+		WithSpec(autoscalingv2ac.HorizontalPodAutoscalerSpec().
+			WithScaleTargetRef(autoscalingv2ac.CrossVersionObjectReference().
+				WithKind(constants.JobSetKind).
+				WithName(trainJob.Name).
+				WithAPIVersion(jobsetv1alpha2.SchemeGroupVersion.String())).
+			WithMinReplicas(minNodes).
+			WithMaxReplicas(maxNodes).
+			WithMetrics(metrics...))
+	return []apiruntime.ApplyConfiguration{hpa}, nil
+}
+
+func toLabelSelectorRequirementApplyConfig(requirements []metav1.LabelSelectorRequirement) []*metav1ac.LabelSelectorRequirementApplyConfiguration {
+	res := make([]*metav1ac.LabelSelectorRequirementApplyConfiguration, len(requirements))
+	for i, r := range requirements {
+		res[i] = metav1ac.LabelSelectorRequirement().
+			WithKey(r.Key).
+			WithOperator(r.Operator).
+			WithValues(r.Values...)
+	}
+	return res
 }
 
 func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
@@ -101,8 +274,24 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 
 	// TrainJob contains the actual information for the Trainer.
 	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
-	if trainerPS != nil && trainerPS.Count != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
+
+	numNodes := "1"
+	if info.RuntimePolicy.MLPolicySource.Torch.ElasticPolicy != nil {
+		elasticPolicy := info.RuntimePolicy.MLPolicySource.Torch.ElasticPolicy
+		minNodes := ptr.Deref(elasticPolicy.MinNodes, 1)
+		maxNodes := ptr.Deref(elasticPolicy.MaxNodes, 1)
+		numNodes = fmt.Sprintf("%d:%d", minNodes, maxNodes)
+
+		if trainerPS != nil && trainerPS.Count != nil {
+			*trainerPS.Count = minNodes
+		}
+	} else {
+		if trainerPS != nil && trainerPS.Count != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+			*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
+		}
+		if trainerPS != nil && trainerPS.Count != nil {
+			numNodes = fmt.Sprintf("%d", *trainerPS.Count)
+		}
 	}
 
 	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicySource.Torch.NumProcPerNode, intstr.FromString("auto"))
@@ -135,7 +324,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		apply.UpsertEnvVars(&trainerContainer.Env,
 			*corev1ac.EnvVar().
 				WithName(constants.TorchEnvNumNodes).
-				WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
+				WithValue(numNodes),
 			*corev1ac.EnvVar().
 				WithName(constants.TorchEnvNumProcPerNode).
 				WithValue(numProcPerNode.String()),

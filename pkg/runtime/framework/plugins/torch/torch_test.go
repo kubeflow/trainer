@@ -23,16 +23,20 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	autoscalingv2ac "k8s.io/client-go/applyconfigurations/autoscaling/v2"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -114,6 +118,84 @@ func TestTorch(t *testing.T) {
 								{
 									Name:  ptr.To(constants.TorchEnvNumNodes),
 									Value: ptr.To("2"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
+									Value: ptr.To("1"),
+								},
+								{
+									Name: ptr.To(constants.TorchEnvNodeRank),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterAddr),
+									Value: ptr.To("trainJob-node-0-0.trainJob"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvMasterPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+								},
+							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
+		"ElasticPolicy with MinNodes and MaxNodes": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy(ptr.To(intstr.FromString("auto")), &trainer.TorchElasticPolicy{
+								MinNodes: ptr.To[int32](2),
+								MaxNodes: ptr.To[int32](4),
+							}).
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().WithName(constants.Node),
+					),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						Obj()).
+				Obj(),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy(ptr.To(intstr.FromString("auto")), &trainer.TorchElasticPolicy{
+							MinNodes: ptr.To[int32](2),
+							MaxNodes: ptr.To[int32](4),
+						}).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](2),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.TorchEnvNumNodes),
+									Value: ptr.To("2:4"),
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
@@ -1751,6 +1833,95 @@ func TestValidate(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantWarnings, warnings); len(diff) != 0 {
 				t.Errorf("Unexpected warnings from Validate (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestTorch_Build(t *testing.T) {
+	cases := map[string]struct {
+		info        *runtime.Info
+		trainJob    *trainer.TrainJob
+		wantObjects []apiruntime.ApplyConfiguration
+	}{
+		"ElasticPolicy with Metrics": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy(ptr.To(intstr.FromString("auto")), &trainer.TorchElasticPolicy{
+								MinNodes: ptr.To[int32](2),
+								MaxNodes: ptr.To[int32](4),
+								Metrics: []autoscalingv2.MetricSpec{
+									{
+										Type: autoscalingv2.ResourceMetricSourceType,
+										Resource: &autoscalingv2.ResourceMetricSource{
+											Name: corev1.ResourceCPU,
+											Target: autoscalingv2.MetricTarget{
+												Type:               autoscalingv2.UtilizationMetricType,
+												AverageUtilization: ptr.To[int32](75),
+											},
+										},
+									},
+								},
+							}).
+							Obj(),
+						).
+						Obj(),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Obj(),
+			wantObjects: []apiruntime.ApplyConfiguration{
+				autoscalingv2ac.HorizontalPodAutoscaler("trainJob", metav1.NamespaceDefault).
+					WithSpec(autoscalingv2ac.HorizontalPodAutoscalerSpec().
+						WithScaleTargetRef(autoscalingv2ac.CrossVersionObjectReference().
+							WithKind(constants.JobSetKind).
+							WithName("trainJob").
+							WithAPIVersion(jobsetv1alpha2.SchemeGroupVersion.String())).
+						WithMinReplicas(2).
+						WithMaxReplicas(4).
+						WithMetrics(autoscalingv2ac.MetricSpec().
+							WithType(autoscalingv2.ResourceMetricSourceType).
+							WithResource(autoscalingv2ac.ResourceMetricSource().
+								WithName(corev1.ResourceCPU).
+								WithTarget(autoscalingv2ac.MetricTarget().
+									WithType(autoscalingv2.UtilizationMetricType).
+									WithAverageUtilization(75)),
+							),
+						),
+					),
+			},
+		},
+		"ElasticPolicy without Metrics": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy(ptr.To(intstr.FromString("auto")), &trainer.TorchElasticPolicy{
+								MinNodes: ptr.To[int32](2),
+								MaxNodes: ptr.To[int32](4),
+							}).
+							Obj(),
+						).
+						Obj(),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Obj(),
+			wantObjects: nil,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			torchPlugin := &Torch{}
+			objects, err := torchPlugin.Build(context.Background(), tc.info, tc.trainJob)
+			if err != nil {
+				t.Errorf("Build() error = %v", err)
+			}
+			if diff := cmp.Diff(tc.wantObjects, objects); diff != "" {
+				t.Errorf("Build() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
