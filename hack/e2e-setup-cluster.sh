@@ -93,7 +93,7 @@ kubectl apply --server-side -k manifests/overlays/runtimes || (
 )
 
 # TODO (andreyvelich): We should build runtime images before adding them.
-TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
+TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
 DEEPSPEED_RUNTIME_IMAGE=ghcr.io/kubeflow/trainer/deepspeed-runtime:latest
 
 # Load Torch runtime image in KinD

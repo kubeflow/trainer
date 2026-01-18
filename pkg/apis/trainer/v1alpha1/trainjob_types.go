@@ -307,6 +307,11 @@ type PodTemplateSpecOverride struct {
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
+	// securityContext overrides the Pod's security context.
+	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
 	// volumes overrides the Pod's volumes.
 	// +listType=map
 	// +listMapKey=name
@@ -360,6 +365,11 @@ type ContainerOverride struct {
 	// +listMapKey=name
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// securityContext overrides the container's security context.
+	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 }
 
 // TrainJobStatus represents the current status of TrainJob.
