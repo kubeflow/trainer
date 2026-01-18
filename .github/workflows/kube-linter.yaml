@@ -1,0 +1,24 @@
+name: KubeLinter
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan manifests (base)
+        uses: stackrox/kube-linter-action@v1
+        with:
+          directory: manifests/base
+
+
+
+      - name: Scan charts
+        uses: stackrox/kube-linter-action@v1
+        with:
+          directory: charts
