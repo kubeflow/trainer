@@ -34,5 +34,5 @@ pkg/data_cache/target
 pkg/data_cache/test/target/
 hack/data_cache/*.log
 
-examples/pytorch/speech-recognition/data
-examples/pytorch/audio-classification/data
+# pytorch examples
+examples/pytorch/*/data

@@ -2,7 +2,7 @@
 
 This directory contains examples for training PyTorch models using the Kubeflow Trainer SDK.
 
-### Examples
+## Examples
 
 | Task | Model | Dataset | Notebook |
 | :--- | :--- | :--- | :--- |
@@ -10,34 +10,19 @@ This directory contains examples for training PyTorch models using the Kubeflow 
 | Question Answering | DistilBERT | SQuAD | [fine-tune-distilbert.ipynb](./question-answering/fine-tune-distilbert.ipynb) |
 | Speech Recognition | Transformer | Speech Commands | [speech-recognition.ipynb](./speech-recognition/speech-recognition.ipynb) |
 | Audio Classification | CNN (M5) | GTZAN | [audio-classification.ipynb](./audio-classification/audio-classification.ipynb) |
+| Fine-Tune LLM | BERT | Amazon Reviews | [fine-tune-llm-with-data-cache.ipynb](./fine-tune-llm-with-data-cache/fine-tune-llm-with-data-cache.ipynb) |
 
-### Prerequisites
+## Prerequisites
 
 To run these examples, install the Kubeflow SDK:
 ```bash
 pip install -U kubeflow
 ```
 
-## Updated Workflows
+## Workflows
 
-- **Image Classification (mnist.ipynb):** Refactored to demonstrate the official V2 DDP training workflow on the Fashion MNIST dataset.
-- **Question Answering (fine-tune-distilbert.ipynb):** Updated to demonstrate fine-tuning with Hugging Face integration, including critical fixes for offset mapping, Fast Tokenizers, and Accelerate backend requirements.
-- **Speech Recognition (speech-recognition.ipynb):** Implements spoken word classification using an Audio Transformer on the Speech Commands dataset.
-- **Audio Classification (audio-classification.ipynb):** Demonstrates general audio classification using the GTZAN music genre dataset. Uses the M5 1D CNN architecture for processing raw audio waveforms.
-
-### How to Run
-
-These standalone scripts are designed for automated workflows and production training. They automatically handle distributed setup and dependency installation on the cluster.
-
-**Submit an MNIST training job:**
-```bash
-python image-classification/train_mnist.py --nodes 1
-```
-
-**Verify locally (no Kubernetes needed):**
-You can verify the training logic on your local machine using the `--test` flag:
-```bash
-python image-classification/train_mnist.py --test
-```
-
-For interactive experimentation, you can also use the corresponding Jupyter notebooks in each subdirectory.
+- **Image Classification (mnist.ipynb):** Demonstrates distributed training on the Fashion MNIST dataset using CNNs.
+- **Question Answering (fine-tune-distilbert.ipynb):** Fine-tuning DistilBERT on the SQuAD dataset with Hugging Face integration.
+- **Speech Recognition (speech-recognition.ipynb):** Spoken word classification using an Audio Transformer on the Speech Commands dataset.
+- **Audio Classification (audio-classification.ipynb):** Music genre classification using the M5 1D CNN architecture on the GTZAN dataset.
+- **Fine-Tune LLM with Data Cache:** Demonstrates fine-tuning BERT with efficient data streaming from a distributed cache using Iceberg tables.
