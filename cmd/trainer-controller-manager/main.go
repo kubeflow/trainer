@@ -26,6 +26,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlpkg "sigs.k8s.io/controller-runtime/pkg/controller"
@@ -93,6 +94,11 @@ func main() {
 	options, cfg, err := config.Load(scheme, configFile, enableHTTP2)
 	if err != nil {
 		setupLog.Error(err, "Unable to load configuration")
+		os.Exit(1)
+	}
+
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(cfg.FeatureGates); err != nil {
+		setupLog.Error(err, "Unable to set flag gates for known features")
 		os.Exit(1)
 	}
 
