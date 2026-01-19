@@ -131,6 +131,7 @@ manager:
       # webhookServiceName and webhookSecretName are auto-generated if not specified
       webhookServiceName: ""
       webhookSecretName: ""
+    featureGates: {}
 
 webhook:
   # -- Specifies how unrecognized errors are handled.
