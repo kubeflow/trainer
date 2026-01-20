@@ -23,3 +23,12 @@ secretGenerator:
     namespace: kubeflow-system
     options:
       disableNameSuffixHash: true
+
+# Public ConfigMap for the Trainer SDK.
+configMapGenerator:
+  - name: kubeflow-trainer-public
+    behavior: replace
+    literals:
+      - kubeflow_trainer_version=v2.1.0
+    options:
+      disableNameSuffixHash: true
