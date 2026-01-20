@@ -29,6 +29,6 @@ configMapGenerator:
   - name: kubeflow-trainer-public
     behavior: replace
     literals:
-      - kubeflow_trainer_version=v2.1.0
+      - kubeflow_trainer_version=latest
     options:
       disableNameSuffixHash: true

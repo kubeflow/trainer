@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kubeflow-trainer-public-reader
+  name: kubeflow-trainer-public
 rules:
 - apiGroups:
   - ""
