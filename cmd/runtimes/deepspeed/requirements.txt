@@ -4,6 +4,6 @@ torch==2.9.1
 deepspeed==0.18.4
 mpi4py==4.1.1
 # HuggingFace libraries.
-datasets==4.4.2
+datasets==4.5.0
 transformers==4.57.6
 SentencePiece==0.2.1
