@@ -7,7 +7,7 @@ edition = "2024"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.22"
 tokio = { version = "1.48.0", features = ["full"] }
-datafusion = "47.0.0"
+datafusion = "51.0.0"
 arrow = "55.0.0"
 arrow-schema = "55.0.0"
 serde = { version = "1.0.228", features = ["derive"] }
