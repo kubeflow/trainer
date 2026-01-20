@@ -363,6 +363,15 @@ func (j *JobSetWrapper) Tolerations(rJobName string, tolerations ...corev1.Toler
 	return j
 }
 
+func (j *JobSetWrapper) PodSecurityContext(rJobName string, securityContext corev1.PodSecurityContext) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.SecurityContext = &securityContext
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) Volumes(rJobName string, v ...corev1.Volume) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {
@@ -400,6 +409,19 @@ func (j *JobSetWrapper) Env(rJobName, containerName string, envs ...corev1.EnvVa
 						j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Env,
 						envs...,
 					)
+				}
+			}
+		}
+	}
+	return j
+}
+
+func (j *JobSetWrapper) ContainerSecurityContext(rJobName, containerName string, securityContext corev1.SecurityContext) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			for k, container := range j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
+				if container.Name == containerName {
+					j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].SecurityContext = &securityContext
 				}
 			}
 		}

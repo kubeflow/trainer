@@ -160,7 +160,7 @@ kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
 )
 
 # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
-TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
+TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
 ${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
 load_image_to_kind ${TORCH_RUNTIME_IMAGE} ${GPU_CLUSTER_NAME}
 

@@ -46,6 +46,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
 var (
@@ -309,6 +310,11 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 func (j *JobSet) Status(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
 	jobSet := &jobsetv1alpha2.JobSet{}
 	if err := j.client.Get(ctx, client.ObjectKeyFromObject(trainJob), jobSet); err != nil {
+		if apierrors.IsNotFound(err) && trainjob.IsTrainJobFinished(trainJob) {
+			// The JobSet may have been automatically deleted in case its TTL duration has been set
+			// and has expired.
+			return nil, nil
+		}
 		return nil, err
 	}
 	status := trainJob.Status.DeepCopy()
