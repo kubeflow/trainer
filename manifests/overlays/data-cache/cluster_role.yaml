@@ -4,17 +4,18 @@ kind: ClusterRole
 metadata:
   name: kubeflow-trainer-cache-initializer
 rules:
-  - apiGroups: ["*"]
+  - apiGroups:
+      - leaderworkerset.x-k8s.io
     resources:
       - leaderworkersets
+    verbs: ["create", "get", "list", "watch"]
+  - apiGroups:
+      - ""
+    resources:
       - services
     verbs: ["create", "get", "list", "watch"]
-  - apiGroups: ["*"]
+  - apiGroups:
+      - ""
     resources:
       - serviceaccounts
     verbs: ["create", "delete", "get", "list", "watch"]
-  - apiGroups:
-      - trainer.kubeflow.org
-    resources:
-      - trainjobs
-    verbs: ["get", "list", "watch"]

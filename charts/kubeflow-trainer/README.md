@@ -69,17 +69,8 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | manager.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for manager containers. |
 | manager.config | object | `{"certManagement":{"enable":true,"webhookSecretName":"","webhookServiceName":""},"controller":{"groupKindConcurrency":{"clusterTrainingRuntime":1,"trainJob":5,"trainingRuntime":1}},"health":{"healthProbeBindAddress":":8081","livenessEndpointName":"healthz","readinessEndpointName":"readyz"},"leaderElection":{"leaderElect":true,"leaseDuration":"15s","renewDeadline":"10s","resourceName":"trainer.kubeflow.org","resourceNamespace":"","retryPeriod":"2s"},"metrics":{"bindAddress":":8443","secureServing":true},"webhook":{"host":"","port":9443}}` | Controller manager configuration. This configuration is used to generate the ConfigMap for the controller manager. |
 | webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
-| dataCache.enabled | bool | `false` | Whether to install data cache resources. When enabled, creates ClusterTrainingRuntime, RBAC resources for cache initializer. |
-| dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency managed by trainer. This must be set to `false` if LeaderWorkerSet controller/webhook has already been installed into the cluster. |
+| dataCache.lws.install | bool | `false` | Whether to install LeaderWorkerSet as a dependency managed by trainer. Set to `false` if LeaderWorkerSet controller/webhook has already been installed into the cluster. |
 | dataCache.lws.fullnameOverride | string | `"lws"` | String to fully override LeaderWorkerSet release name. |
-| dataCache.image.registry | string | `"ghcr.io"` | Data cache image registry. |
-| dataCache.image.repository | string | `"kubeflow/trainer/data-cache"` | Data cache image repository. |
-| dataCache.image.tag | string | `"latest"` | Data cache image tag. |
-| dataCache.initializerImage.registry | string | `"ghcr.io"` | Dataset initializer image registry. |
-| dataCache.initializerImage.repository | string | `"kubeflow/trainer/dataset-initializer"` | Dataset initializer image repository. |
-| dataCache.initializerImage.tag | string | `"latest"` | Dataset initializer image tag. |
-| dataCache.targetNamespace | string | `"default"` | Namespace for ServiceAccount and RoleBinding. |
-| dataCache.serviceAccount.name | string | `"kubeflow-trainer-cache-initializer"` | ServiceAccount name for cache initializer. |
 
 ## Maintainers
 
