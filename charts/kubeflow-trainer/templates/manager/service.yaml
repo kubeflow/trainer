@@ -25,10 +25,10 @@ spec:
   selector:
     {{- include "trainer.manager.selectorLabels" . | nindent 4 }}
   ports:
-  - name: metrics
+  - name: monitoring-port
     port: 8443
     targetPort: metrics
-  - name: webhook
+  - name: webhook-server
     port: 443
     protocol: TCP
     targetPort: webhook

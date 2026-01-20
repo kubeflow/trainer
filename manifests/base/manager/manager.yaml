@@ -77,10 +77,10 @@ metadata:
   name: kubeflow-trainer-controller-manager
 spec:
   ports:
-    - name: metrics
+    - name: monitoring-port
       port: 8443
       targetPort: metrics
-    - name: webhook
+    - name: webhook-server
       port: 443
       protocol: TCP
       targetPort: webhook
