@@ -395,14 +395,14 @@ The same changes will be made to the TrainJob as in the [push-based design](#crd
 
 ##### Sidecar container injection
 
-To enable monitoring and sidecar injection, users must add the label `trainer.kubeflow.org/trainjob-monitoring-step: trainer` to one of the replicated jobs in their (Cluster)TrainingRuntime. This will cause the control plane to:
+To enable monitoring and sidecar injection, users must add the annotation `trainer.kubeflow.org/trainjob-monitoring-step: trainer` to one of the replicated jobs in their (Cluster)TrainingRuntime. This will cause the control plane to:
 - inject a [sidecar container](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) into **one** of the trainer pods
 - inject a shared `emptyDir` volume between the sidecar and all other containers in that pod.
-- create a new service `<train-job-name>-trainer-monitoring` pointing at the sidecar http server. The control plane will add the label `trainer.kubeflow.org/trainjob-monitoring-pod: true` to the pod which will be used in the service selector.
+- create a new service `<train-job-name>-trainer-monitoring` pointing at the sidecar http server. The control plane will add the label `trainer.kubeflow.org/trainjob-monitoring-pod: <train-job-name>` to the pod which will be used in the service selector.
 
 The sidecar will contain a lightweight http server packaged as a new image published with the Kubeflow Trainer release. The server reads the current metrics directly from a file in the shared volume when handling each request.
 
-Users can optionally add the labels `trainer.kubeflow.org/monitoring-port: <port-number>` (defaults to `28080`) and `trainer.kubeflow.org/monitoring-interval: <duration>` (defaults to `30s`) to replicated job in their (Cluster)TrainingRuntime to configure the sidecar container port and scrape interval.
+Users can optionally add the annotations `trainer.kubeflow.org/monitoring-port: <port-number>` (defaults to `28080`) and `trainer.kubeflow.org/monitoring-interval: <duration>` (defaults to `30s`) to replicated job in their (Cluster)TrainingRuntime to configure the sidecar container port and scrape interval.
 
 Additional details:
 - The control plane will set the sidecar `terminationMessagePath` to the location of the shared file to allow the final metrics to be collected. See [Scraping the metrics](#scraping-the-metrics).
@@ -421,7 +421,7 @@ spec:
         - name: node
           template:
             metadata:
-              labels:
+              annotations:
                 trainer.kubeflow.org/trainjob-monitoring-step: trainer
                 trainer.kubeflow.org/trainjob-monitoring-port: 28080
                 trainer.kubeflow.org/trainjob-monitoring-interval: 30s
