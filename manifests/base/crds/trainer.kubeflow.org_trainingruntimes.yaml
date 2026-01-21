@@ -56,6 +56,9 @@ spec:
                           node.
                         format: int32
                         type: integer
+                        x-kubernetes-validations:
+                        - message: NumProcPerNode in fluxPolicy must be >= 1
+                          rule: self >= 1
                     type: object
                   mpi:
                     description: mpi defines the configuration for the MPI Runtime.
