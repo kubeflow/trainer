@@ -33,6 +33,8 @@ dependencies:
   repository: oci://registry.k8s.io/lws/charts
   version: 0.7.0
   condition: dataCache.lws.install
+  tags:
+    - dataCache
 
 keywords:
 - kubeflow trainer
