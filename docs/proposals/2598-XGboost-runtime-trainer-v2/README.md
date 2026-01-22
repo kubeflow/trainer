@@ -1,8 +1,8 @@
-# KEP-2598mn: XGBoost Runtime for Kubeflow Trainer V2
+# KEP-2598: XGBoost Runtime for Kubeflow Trainer V2
 
 <div align="center">
 
-**Status:** Draft | **Created:** 2026-01-22 |
+**Status:** Draft | **Created:** 2026-01-22
 
 </div>
 
