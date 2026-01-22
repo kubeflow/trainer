@@ -21,18 +21,18 @@ release:
   name: kubeflow-trainer
   namespace: kubeflow-trainer
 tests:
-  - it: Should not render ClusterRole when tags.dataCache is false
+  - it: Should not render ClusterRole when dataCache.enabled is false
     set:
-      tags:
-        dataCache: false
+      dataCache:
+        enabled: false
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: Should render ClusterRole when tags.dataCache is true
+  - it: Should render ClusterRole when dataCache.enabled is true
     set:
-      tags:
-        dataCache: true
+      dataCache:
+        enabled: true
     asserts:
       - hasDocuments:
           count: 1
@@ -44,8 +44,8 @@ tests:
 
   - it: Should have correct rules for leaderworkersets
     set:
-      tags:
-        dataCache: true
+      dataCache:
+        enabled: true
     asserts:
       - contains:
           path: rules
@@ -58,8 +58,8 @@ tests:
 
   - it: Should have correct rules for services
     set:
-      tags:
-        dataCache: true
+      dataCache:
+        enabled: true
     asserts:
       - contains:
           path: rules
@@ -72,8 +72,8 @@ tests:
 
   - it: Should have correct rules for serviceaccounts
     set:
-      tags:
-        dataCache: true
+      dataCache:
+        enabled: true
     asserts:
       - contains:
           path: rules

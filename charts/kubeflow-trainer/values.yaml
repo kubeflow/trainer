@@ -137,16 +137,13 @@ webhook:
   # Available options are `Ignore` or `Fail`.
   failurePolicy: Fail
 
-tags:
-  # -- Enable/disable all data cache components (LWS dependency, ClusterRole).
-  # Set to `true` to install data cache support.
-  dataCache: false
-
 dataCache:
+  # -- Enable/disable data cache support (LWS dependency, ClusterRole).
+  # Set to `true` to install data cache components.
+  enabled: false
   lws:
-    # -- Explicit override for LeaderWorkerSet installation.
-    # If not set, follows tags.dataCache value.
+    # -- Whether to install LeaderWorkerSet as a dependency.
     # Set to `false` if LeaderWorkerSet is already installed in the cluster.
-    # install: false
+    install: true
     # -- String to fully override LeaderWorkerSet release name.
     fullnameOverride: lws
