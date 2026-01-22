@@ -39,7 +39,7 @@ image:
   registry: ghcr.io
   # -- Image repository.
   repository: kubeflow/trainer/trainer-controller-manager
-  # -- Image tag. Defaults to the chart appVersion.
+  # -- Image tag. Defaults to the chart version formatted for the appropriate image tag.
   tag: ""
   # -- Image pull policy.
   pullPolicy: IfNotPresent
@@ -136,3 +136,14 @@ webhook:
   # -- Specifies how unrecognized errors are handled.
   # Available options are `Ignore` or `Fail`.
   failurePolicy: Fail
+
+dataCache:
+  # -- Enable/disable data cache support (LWS dependency, ClusterRole).
+  # Set to `true` to install data cache components.
+  enabled: false
+  lws:
+    # -- Whether to install LeaderWorkerSet as a dependency.
+    # Set to `false` if LeaderWorkerSet is already installed in the cluster.
+    install: true
+    # -- String to fully override LeaderWorkerSet release name.
+    fullnameOverride: lws

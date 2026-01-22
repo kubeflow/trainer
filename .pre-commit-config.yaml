@@ -38,4 +38,5 @@ exclude: |
     docs/images/.*|
     pkg/client/.*|
     api/python_api/kubeflow_trainer_api/models/.*|
+    VERSION
   )$

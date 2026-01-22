@@ -22,6 +22,7 @@ from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_affinity import IoK8sApiCoreV1Affinity
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_local_object_reference import IoK8sApiCoreV1LocalObjectReference
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_scheduling_gate import IoK8sApiCoreV1PodSchedulingGate
+from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_security_context import IoK8sApiCoreV1PodSecurityContext
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_toleration import IoK8sApiCoreV1Toleration
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_volume import IoK8sApiCoreV1Volume
 from kubeflow_trainer_api.models.trainer_v1alpha1_container_override import TrainerV1alpha1ContainerOverride
@@ -38,10 +39,11 @@ class TrainerV1alpha1PodTemplateSpecOverride(BaseModel):
     init_containers: Optional[List[TrainerV1alpha1ContainerOverride]] = Field(default=None, description="initContainers overrides the init container in the target job templates.", alias="initContainers")
     node_selector: Optional[Dict[str, StrictStr]] = Field(default=None, description="nodeSelector overrides the node selector to place Pod on the specific node.", alias="nodeSelector")
     scheduling_gates: Optional[List[IoK8sApiCoreV1PodSchedulingGate]] = Field(default=None, description="schedulingGates overrides the scheduling gates of the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/", alias="schedulingGates")
+    security_context: Optional[IoK8sApiCoreV1PodSecurityContext] = Field(default=None, description="securityContext overrides the Pod's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/", alias="securityContext")
     service_account_name: Optional[StrictStr] = Field(default=None, description="serviceAccountName overrides the service account.", alias="serviceAccountName")
     tolerations: Optional[List[IoK8sApiCoreV1Toleration]] = Field(default=None, description="tolerations overrides the Pod's tolerations.")
     volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="volumes overrides the Pod's volumes.")
-    __properties: ClassVar[List[str]] = ["affinity", "containers", "imagePullSecrets", "initContainers", "nodeSelector", "schedulingGates", "serviceAccountName", "tolerations", "volumes"]
+    __properties: ClassVar[List[str]] = ["affinity", "containers", "imagePullSecrets", "initContainers", "nodeSelector", "schedulingGates", "securityContext", "serviceAccountName", "tolerations", "volumes"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -113,6 +115,9 @@ class TrainerV1alpha1PodTemplateSpecOverride(BaseModel):
                 if _item_scheduling_gates:
                     _items.append(_item_scheduling_gates.to_dict())
             _dict['schedulingGates'] = _items
+        # override the default output from pydantic by calling `to_dict()` of security_context
+        if self.security_context:
+            _dict['securityContext'] = self.security_context.to_dict()
         # override the default output from pydantic by calling `to_dict()` of each item in tolerations (list)
         _items = []
         if self.tolerations:
@@ -145,6 +150,7 @@ class TrainerV1alpha1PodTemplateSpecOverride(BaseModel):
             "initContainers": [TrainerV1alpha1ContainerOverride.from_dict(_item) for _item in obj["initContainers"]] if obj.get("initContainers") is not None else None,
             "nodeSelector": obj.get("nodeSelector"),
             "schedulingGates": [IoK8sApiCoreV1PodSchedulingGate.from_dict(_item) for _item in obj["schedulingGates"]] if obj.get("schedulingGates") is not None else None,
+            "securityContext": IoK8sApiCoreV1PodSecurityContext.from_dict(obj["securityContext"]) if obj.get("securityContext") is not None else None,
             "serviceAccountName": obj.get("serviceAccountName"),
             "tolerations": [IoK8sApiCoreV1Toleration.from_dict(_item) for _item in obj["tolerations"]] if obj.get("tolerations") is not None else None,
             "volumes": [IoK8sApiCoreV1Volume.from_dict(_item) for _item in obj["volumes"]] if obj.get("volumes") is not None else None

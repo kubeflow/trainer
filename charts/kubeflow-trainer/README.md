@@ -52,7 +52,7 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | commonLabels | object | `{}` | Common labels to add to the resources. |
 | image.registry | string | `"ghcr.io"` | Image registry. |
 | image.repository | string | `"kubeflow/trainer/trainer-controller-manager"` | Image repository. |
-| image.tag | string | `""` | Image tag. Defaults to the chart appVersion. |
+| image.tag | string | `""` | Image tag. Defaults to the chart version formatted for the appropriate image tag. |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | image.pullSecrets | list | `[]` | Image pull secrets for private image registry. |
 | manager.replicas | int | `1` | Number of replicas of manager. |
@@ -69,6 +69,9 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | manager.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for manager containers. |
 | manager.config | object | `{"certManagement":{"enable":true,"webhookSecretName":"","webhookServiceName":""},"controller":{"groupKindConcurrency":{"clusterTrainingRuntime":1,"trainJob":5,"trainingRuntime":1}},"health":{"healthProbeBindAddress":":8081","livenessEndpointName":"healthz","readinessEndpointName":"readyz"},"leaderElection":{"leaderElect":true,"leaseDuration":"15s","renewDeadline":"10s","resourceName":"trainer.kubeflow.org","resourceNamespace":"","retryPeriod":"2s"},"metrics":{"bindAddress":":8443","secureServing":true},"webhook":{"host":"","port":9443}}` | Controller manager configuration. This configuration is used to generate the ConfigMap for the controller manager. |
 | webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
+| dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |
+| dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency. Set to `false` if LeaderWorkerSet is already installed in the cluster. |
+| dataCache.lws.fullnameOverride | string | `"lws"` | String to fully override LeaderWorkerSet release name. |
 
 ## Maintainers
 

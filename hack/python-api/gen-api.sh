@@ -26,13 +26,18 @@ source "${SCRIPT_DIR}/../scripts/container-runtime.sh"
 # Setup container runtime
 setup_container_runtime
 
-# TODO (andreyvelich): Read this data from the global VERSION file.
-API_VERSION="2.1.0"
+TRAINER_ROOT="$(pwd)"
+
+VERSION_FILE="${TRAINER_ROOT}/VERSION"
+if [ ! -f "${VERSION_FILE}" ]; then
+  echo "Missing VERSION file at ${VERSION_FILE}"
+  exit 1
+fi
+API_VERSION=$(sed 's/^v//' "${VERSION_FILE}")
 API_OUTPUT_PATH="api/python_api"
 PKG_ROOT="${API_OUTPUT_PATH}/kubeflow_trainer_api"
 
 OPENAPI_GENERATOR_VERSION="v7.13.0"
-TRAINER_ROOT="$(pwd)"
 SWAGGER_CODEGEN_CONF="hack/python-api/swagger_config.json"
 SWAGGER_CODEGEN_FILE="api/openapi-spec/swagger.json"
 

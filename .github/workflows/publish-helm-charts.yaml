@@ -28,17 +28,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update appVersion in Chart.yaml
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            APP_VERSION="${GITHUB_REF#refs/tags/}"
-          else
-            APP_VERSION="sha-$(git rev-parse --short=7 HEAD)"
-          fi
-
-          echo "appVersion: ${APP_VERSION}" >> ${{ env.CHART_PATH }}/Chart.yaml
-          echo "Updated Chart.yaml with appVersion: ${APP_VERSION}"
-
       - name: Build, package, and push Helm chart
         run: |
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then

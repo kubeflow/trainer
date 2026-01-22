@@ -17,15 +17,17 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // ContainerOverrideApplyConfiguration represents a declarative configuration of the ContainerOverride type for use
 // with apply.
 type ContainerOverrideApplyConfiguration struct {
-	Name         *string                            `json:"name,omitempty"`
-	Env          []v1.EnvVarApplyConfiguration      `json:"env,omitempty"`
-	VolumeMounts []v1.VolumeMountApplyConfiguration `json:"volumeMounts,omitempty"`
+	Name            *string                            `json:"name,omitempty"`
+	Env             []v1.EnvVarApplyConfiguration      `json:"env,omitempty"`
+	VolumeMounts    []v1.VolumeMountApplyConfiguration `json:"volumeMounts,omitempty"`
+	SecurityContext *corev1.SecurityContext            `json:"securityContext,omitempty"`
 }
 
 // ContainerOverrideApplyConfiguration constructs a declarative configuration of the ContainerOverride type for use with
@@ -65,5 +67,13 @@ func (b *ContainerOverrideApplyConfiguration) WithVolumeMounts(values ...*v1.Vol
 		}
 		b.VolumeMounts = append(b.VolumeMounts, *values[i])
 	}
+	return b
+}
+
+// WithSecurityContext sets the SecurityContext field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SecurityContext field is set to the value of the last call.
+func (b *ContainerOverrideApplyConfiguration) WithSecurityContext(value corev1.SecurityContext) *ContainerOverrideApplyConfiguration {
+	b.SecurityContext = &value
 	return b
 }
