@@ -24,6 +24,7 @@ spec:
         - name: manager
           image: ghcr.io/kubeflow/trainer/trainer-controller-manager
           securityContext:
+            readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             runAsNonRoot: true
             capabilities:
