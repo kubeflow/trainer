@@ -78,7 +78,7 @@ kubectl get ns gpu-operator
 kubectl get ns gpu-operator --show-labels | grep pod-security.kubernetes.io/enforce=privileged
 helm list -n gpu-operator
 kubectl get pods -n gpu-operator -o name | while read pod; do
-  kubectl wait --for=condition=Ready --timeout=300s "$pod" -n gpu-operator || echo "$pod failed to become Ready"
+  kubectl wait --for=condition=Ready --timeout=180s "$pod" -n gpu-operator || echo "$pod failed to become Ready"
 done
 kubectl get pods -n gpu-operator
 kubectl get nodes -o=custom-columns=NAME:.metadata.name,GPU:'.status.allocatable.nvidia\.com/gpu'
@@ -105,12 +105,12 @@ ${CONTAINER_RUNTIME} build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_C
 
 # Load Kubeflow Trainer images
 echo "Load Kubeflow Trainer images"
-load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${GPU_CLUSTER_NAME}" "sudo"
+load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
 
 echo "Load Kubeflow Trainer initializers images"
-load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${GPU_CLUSTER_NAME}" "sudo"
-load_image_to_kind "${MODEL_INITIALIZER_CI_IMAGE}" "${GPU_CLUSTER_NAME}" "sudo"
-load_image_to_kind "${TRAINER_CI_IMAGE}" "${GPU_CLUSTER_NAME}" "sudo"
+load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
+load_image_to_kind "${MODEL_INITIALIZER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
+load_image_to_kind "${TRAINER_CI_IMAGE}" "${GPU_CLUSTER_NAME}"
 
 # Deploy Kubeflow Trainer control plane
 echo "Deploy Kubeflow Trainer control plane"
@@ -176,7 +176,7 @@ kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
 # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
 TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
 ${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
-load_image_to_kind ${TORCH_RUNTIME_IMAGE} ${GPU_CLUSTER_NAME} "sudo"
+load_image_to_kind ${TORCH_RUNTIME_IMAGE} ${GPU_CLUSTER_NAME}
 
 # Pre-pull NVIDIA JAX image for JAX runtime.
 JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
