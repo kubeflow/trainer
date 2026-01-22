@@ -11,7 +11,9 @@ permissions:
 jobs:
   gpu-e2e-test:
     name: GPU E2E Test
-    runs-on: oracle-vm-gpu-a10-1
+    runs-on:
+      labels: oracle-vm-gpu-a10-1
+      group: GPUs
 
     env:
       GOPATH: ${{ github.workspace }}/go
@@ -47,11 +49,7 @@ jobs:
           pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
           pip install git+https://github.com/kubeflow/sdk.git@main
 
-      - name: Create GPU cluster with nvkind
-        run: |
-          make test-e2e-create-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
-
-      - name: Setup cluster
+      - name: Setup GPU cluster with nvkind
         run: |
           make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
 
@@ -62,6 +60,7 @@ jobs:
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/jax/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_jax_mnist.ipynb PAPERMILL_PARAMS="-p num_cpu 3 -p num_gpu 1" TIMEOUT=600
 
       - name: Upload Artifacts to GitHub
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.kubernetes-version }}
