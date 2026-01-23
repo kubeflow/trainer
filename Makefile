@@ -28,6 +28,7 @@ HELM_UNITTEST_VERSION ?= 0.5.1
 HELM_CHART_TESTING_VERSION ?= v3.12.0
 HELM_DOCS_VERSION ?= v1.14.2
 YQ_VERSION ?= v4.45.1
+KUBE_LINTER_VERSION ?= v0.7.1
 
 # Container runtime (docker or podman)
 CONTAINER_RUNTIME ?=
@@ -42,6 +43,7 @@ HELM_DOCS ?= $(LOCALBIN)/helm-docs
 YQ ?= $(LOCALBIN)/yq
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 GOLANGCI_LINT_KAL ?= $(LOCALBIN)/golangci-lint-kube-api-linter
+KUBE_LINTER ?= $(LOCALBIN)/kube-linter
 
 ##@ General
 
@@ -105,6 +107,15 @@ helm-docs-plugin: ## Download helm-docs plugin locally if required.
 .PHONY: yq
 yq: # Download yq locally if required.
 	GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@$(YQ_VERSION)
+
+.PHONY: kube-linter
+kube-linter: ## Download kube-linter locally if required.
+	GOBIN=$(LOCALBIN) go install golang.stackrox.io/kube-linter/cmd/kube-linter@$(KUBE_LINTER_VERSION)
+
+.PHONY: lint-manifests
+lint-manifests: kube-linter ## Run kube-linter on manifests and helm charts.
+	$(KUBE_LINTER) lint manifests/base --config .kube-linter.yaml
+	$(KUBE_LINTER) lint charts/kubeflow-trainer --config .kube-linter.yaml
 
 # Download external CRDs for Go integration testings.
 EXTERNAL_CRDS_DIR ?= $(PROJECT_DIR)/manifests/external-crds
