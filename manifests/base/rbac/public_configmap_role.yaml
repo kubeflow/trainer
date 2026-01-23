@@ -11,3 +11,5 @@ rules:
   - kubeflow-trainer-public
   verbs:
   - get
+  - list
+  - watch
