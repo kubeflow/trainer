@@ -86,6 +86,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if hasPrefix "0.0.0-" .Chart.Version -}}
 dev
 {{- else -}}
-{{ .Chart.Version }}
+{{ printf "v%s" .Chart.Version }}
 {{- end -}}
 {{- end }}
