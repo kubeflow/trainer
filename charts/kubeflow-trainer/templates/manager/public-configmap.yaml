@@ -22,4 +22,4 @@ metadata:
   labels:
     {{- include "trainer.manager.labels" . | nindent 4 }}
 data:
-  kubeflow_trainer_version: {{ .Values.trainer.version | quote }}
+  kubeflow_trainer_version: {{ include "trainer.version" . | quote }}

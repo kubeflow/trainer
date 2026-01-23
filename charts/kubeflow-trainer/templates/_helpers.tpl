@@ -81,3 +81,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s/%s:%s" $imageRegistry $imageRepository $imageTag }}
 {{- end }}
 {{- end }}
+
+{{- define "trainer.version" -}}
+{{- if hasPrefix "0.0.0-" .Chart.Version -}}
+dev
+{{- else -}}
+{{ .Chart.Version }}
+{{- end -}}
+{{- end }}
