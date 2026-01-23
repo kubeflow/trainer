@@ -28,6 +28,10 @@ import (
 
 // TODO(robert-bell): enable as part of #2779
 //const (
+//  // owner: @robert-bell
+//  // kep: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2779-trainjob-progress
+//  //
+//  // Enables TrainJob progress tracking endpoint.
 //	TrainJobProgress featuregate.Feature = "TrainJobProgress"
 //)
 
