@@ -27,7 +27,6 @@ secretGenerator:
 # Public ConfigMap for the Trainer SDK.
 configMapGenerator:
   - name: kubeflow-trainer-public
-    # behavior: create
     literals:
       - kubeflow_trainer_version=latest
     options:
