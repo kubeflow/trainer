@@ -26,15 +26,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
-// TODO(robert-bell): enable as part of #2779
-//const (
-//  // owner: @robert-bell
-//  // kep: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2779-trainjob-progress
-//  //
-//  // Enables TrainJob progress tracking endpoint.
-//	TrainJobProgress featuregate.Feature = "TrainJobProgress"
-//)
-
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultFeatureGates))
 }
@@ -45,10 +36,7 @@ func init() {
 //
 // Entries are separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
-var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	// TODO(robert-bell): enable as part of #2779
-	// TrainJobProgress: {Default: false, PreRelease: featuregate.Alpha},
-}
+var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}
 
 func SetFeatureGateDuringTest(tb testing.TB, f featuregate.Feature, value bool) {
 	featuregatetesting.SetFeatureGateDuringTest(tb, utilfeature.DefaultFeatureGate, f, value)
