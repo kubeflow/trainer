@@ -81,3 +81,32 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s/%s:%s" $imageRegistry $imageRepository $imageTag }}
 {{- end }}
 {{- end }}
+
+{{/*
+Generate the default image tag for runtimes based on chart version
+*/}}
+{{- define "trainer.defaultImageTag" -}}
+{{- if hasPrefix "0.0.0-" .Chart.Version -}}
+{{- trimPrefix "0.0.0-" .Chart.Version -}}
+{{- else -}}
+{{- printf "v%s" .Chart.Version -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Generate runtime image with registry, repository, and tag
+Usage: include "trainer.runtimeImage" (dict "registry" .Values.runtimes.deepspeedDistributed.image.registry "repository" .Values.runtimes.deepspeedDistributed.image.repository "tag" .Values.runtimes.deepspeedDistributed.image.tag "context" .)
+*/}}
+{{- define "trainer.runtimeImage" -}}
+{{- $registry := .registry | default "docker.io" }}
+{{- $repository := .repository }}
+{{- $tag := .tag -}}
+{{- if not $tag -}}
+{{- $tag = include "trainer.defaultImageTag" .context -}}
+{{- end -}}
+{{- if eq $registry "docker.io" }}
+{{- printf "%s:%s" $repository $tag }}
+{{- else }}
+{{- printf "%s/%s:%s" $registry $repository $tag }}
+{{- end }}
+{{- end }}

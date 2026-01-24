@@ -148,3 +148,48 @@ dataCache:
     install: true
     # -- String to fully override LeaderWorkerSet release name.
     fullnameOverride: lws
+
+# -- ClusterTrainingRuntimes configuration
+# These are optional runtime templates that can be deployed with the Helm chart.
+# Each runtime provides a blueprint for different ML frameworks and configurations.
+runtimes:
+  # -- PyTorch distributed training runtime (no custom images required)
+  torchDistributed:
+    # -- Enable deployment of torch-distributed runtime
+    enabled: false
+
+  # -- PyTorch distributed training with data cache support
+  torchDistributedWithCache:
+    # -- Enable deployment of torch-distributed-with-cache runtime
+    enabled: false
+    cacheImage:
+      # -- Data cache image registry
+      registry: ghcr.io
+      # -- Data cache image repository
+      repository: kubeflow/trainer/data-cache
+      # -- Data cache image tag. Defaults to chart version if empty.
+      tag: ""
+
+  # -- DeepSpeed distributed training runtime
+  deepspeedDistributed:
+    # -- Enable deployment of deepspeed-distributed runtime
+    enabled: false
+    image:
+      # -- DeepSpeed runtime image registry
+      registry: ghcr.io
+      # -- DeepSpeed runtime image repository
+      repository: kubeflow/trainer/deepspeed-runtime
+      # -- DeepSpeed runtime image tag. Defaults to chart version if empty.
+      tag: ""
+
+  # -- MLX distributed training runtime
+  mlxDistributed:
+    # -- Enable deployment of mlx-distributed runtime
+    enabled: false
+    image:
+      # -- MLX runtime image registry
+      registry: ghcr.io
+      # -- MLX runtime image repository
+      repository: kubeflow/trainer/mlx-runtime
+      # -- MLX runtime image tag. Defaults to chart version if empty.
+      tag: ""

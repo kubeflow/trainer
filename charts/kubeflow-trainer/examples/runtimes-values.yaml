@@ -1,0 +1,37 @@
+# Example values.yaml configuration for deploying ClusterTrainingRuntimes
+
+# Deploy torch-distributed runtime (no custom images needed)
+runtimes:
+  torchDistributed:
+    enabled: true
+
+  # Deploy torch-distributed with data cache support
+  torchDistributedWithCache:
+    enabled: true
+    # Images will use chart version by default (v2.1.0)
+    # To override, specify custom tags:
+    # cacheImage:
+    #   tag: "v2.0.0"
+    # initializerImage:
+    #   tag: "v2.0.0"
+
+  # Deploy DeepSpeed runtime
+  deepspeedDistributed:
+    enabled: true
+    # Override image tag if needed:
+    # image:
+    #   tag: "custom-v1.0.0"
+
+  # Deploy MLX runtime
+  mlxDistributed:
+    enabled: false
+    # Can enable and customize:
+    # enabled: true
+    # image:
+    #   registry: my-registry.io
+    #   repository: custom/mlx-runtime
+    #   tag: "v1.0.0"
+
+# Note: torch-distributed-with-cache requires data cache support
+dataCache:
+  enabled: true
