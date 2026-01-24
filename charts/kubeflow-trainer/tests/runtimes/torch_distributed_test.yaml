@@ -1,0 +1,78 @@
+#
+# Copyright 2025 The Kubeflow authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+suite: Test torch-distributed ClusterTrainingRuntime
+templates:
+  - templates/runtimes/torch-distributed.yaml
+release:
+  name: kubeflow-trainer
+  namespace: kubeflow-trainer
+tests:
+  - it: Should not render ClusterTrainingRuntime when runtimes.torchDistributed.enabled is false
+    set:
+      runtimes:
+        torchDistributed:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: Should render ClusterTrainingRuntime when runtimes.torchDistributed.enabled is true
+    set:
+      runtimes:
+        torchDistributed:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ClusterTrainingRuntime
+      - equal:
+          path: metadata.name
+          value: torch-distributed
+
+  - it: Should have correct framework label
+    set:
+      runtimes:
+        torchDistributed:
+          enabled: true
+    asserts:
+      - equal:
+          path: metadata.labels["trainer.kubeflow.org/framework"]
+          value: torch
+
+  - it: Should have correct mlPolicy configuration
+    set:
+      runtimes:
+        torchDistributed:
+          enabled: true
+    asserts:
+      - equal:
+          path: spec.mlPolicy.numNodes
+          value: 1
+      - equal:
+          path: spec.mlPolicy.torch.numProcPerNode
+          value: auto
+
+  - it: Should use correct PyTorch image
+    set:
+      runtimes:
+        torchDistributed:
+          enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.containers[0].image
+          value: pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime

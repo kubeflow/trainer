@@ -15,6 +15,9 @@ limitations under the License.
 */ -}}
 
 {{- if .Values.runtimes.torchDistributedWithCache.enabled }}
+{{- if not .Values.dataCache.enabled }}
+{{- fail "runtimes.torchDistributedWithCache.enabled requires dataCache.enabled to be true" }}
+{{- end }}
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
@@ -42,7 +45,7 @@ spec:
                 serviceAccountName: kubeflow-trainer-cache-initializer
                 containers:
                   - name: dataset-initializer
-                    image: ghcr.io/kubeflow/trainer/dataset-initializer
+                    image: {{ printf "ghcr.io/kubeflow/trainer/dataset-initializer:%s" (include "trainer.defaultImageTag" .) }}
                     env:
                       - name: CACHE_IMAGE
                         value: {{ include "trainer.runtimeImage" (dict "registry" .Values.runtimes.torchDistributedWithCache.cacheImage.registry "repository" .Values.runtimes.torchDistributedWithCache.cacheImage.repository "tag" .Values.runtimes.torchDistributedWithCache.cacheImage.tag "context" .) | quote }}
