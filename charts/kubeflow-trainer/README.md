@@ -95,44 +95,33 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| nameOverride | string | `""` | String to partially override release name. |
-| fullnameOverride | string | `""` | String to fully override release name. |
-| jobset.install | bool | `true` | Whether to install jobset as a dependency managed by trainer. This must be set to `false` if jobset controller/webhook has already been installed into the cluster. |
-| jobset.fullnameOverride | string | `"jobset"` | String to fully override jobset release name. |
 | commonLabels | object | `{}` | Common labels to add to the resources. |
+| dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |
+| dataCache.lws.fullnameOverride | string | `"lws"` | String to fully override LeaderWorkerSet release name. |
+| dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency. Set to `false` if LeaderWorkerSet is already installed in the cluster. |
+| fullnameOverride | string | `""` | String to fully override release name. |
+| image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
+| image.pullSecrets | list | `[]` | Image pull secrets for private image registry. |
 | image.registry | string | `"ghcr.io"` | Image registry. |
 | image.repository | string | `"kubeflow/trainer/trainer-controller-manager"` | Image repository. |
 | image.tag | string | `""` | Image tag. Defaults to the chart version formatted for the appropriate image tag. |
-| image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
-| image.pullSecrets | list | `[]` | Image pull secrets for private image registry. |
-| manager.replicas | int | `1` | Number of replicas of manager. |
-| manager.labels | object | `{}` | Extra labels for manager pods. |
-| manager.annotations | object | `{}` | Extra annotations for manager pods. |
-| manager.volumes | list | `[]` | Volumes for manager pods. |
-| manager.nodeSelector | object | `{}` | Node selector for manager pods. |
+| jobset.fullnameOverride | string | `"jobset"` | String to fully override jobset release name. |
+| jobset.install | bool | `true` | Whether to install jobset as a dependency managed by trainer. This must be set to `false` if jobset controller/webhook has already been installed into the cluster. |
 | manager.affinity | object | `{}` | Affinity for manager pods. |
-| manager.tolerations | list | `[]` | List of node taints to tolerate for manager pods. |
+| manager.annotations | object | `{}` | Extra annotations for manager pods. |
+| manager.config | object | `{"certManagement":{"enable":true,"webhookSecretName":"","webhookServiceName":""},"controller":{"groupKindConcurrency":{"clusterTrainingRuntime":1,"trainJob":5,"trainingRuntime":1}},"featureGates":{},"health":{"healthProbeBindAddress":":8081","livenessEndpointName":"healthz","readinessEndpointName":"readyz"},"leaderElection":{"leaderElect":true,"leaseDuration":"15s","renewDeadline":"10s","resourceName":"trainer.kubeflow.org","resourceNamespace":"","retryPeriod":"2s"},"metrics":{"bindAddress":":8443","secureServing":true},"webhook":{"host":"","port":9443}}` | Controller manager configuration. This configuration is used to generate the ConfigMap for the controller manager. |
 | manager.env | list | `[]` | Environment variables for manager containers. |
 | manager.envFrom | list | `[]` | Environment variable sources for manager containers. |
-| manager.volumeMounts | list | `[]` | Volume mounts for manager containers. |
+| manager.labels | object | `{}` | Extra labels for manager pods. |
+| manager.nodeSelector | object | `{}` | Node selector for manager pods. |
+| manager.replicas | int | `1` | Number of replicas of manager. |
 | manager.resources | object | `{}` | Pod resource requests and limits for manager containers. |
 | manager.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for manager containers. |
-| manager.config | object | `{"certManagement":{"enable":true,"webhookSecretName":"","webhookServiceName":""},"controller":{"groupKindConcurrency":{"clusterTrainingRuntime":1,"trainJob":5,"trainingRuntime":1}},"featureGates":{},"health":{"healthProbeBindAddress":":8081","livenessEndpointName":"healthz","readinessEndpointName":"readyz"},"leaderElection":{"leaderElect":true,"leaseDuration":"15s","renewDeadline":"10s","resourceName":"trainer.kubeflow.org","resourceNamespace":"","retryPeriod":"2s"},"metrics":{"bindAddress":":8443","secureServing":true},"webhook":{"host":"","port":9443}}` | Controller manager configuration. This configuration is used to generate the ConfigMap for the controller manager. |
-| webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
-| dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |
-| dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency. Set to `false` if LeaderWorkerSet is already installed in the cluster. |
-| dataCache.lws.fullnameOverride | string | `"lws"` | String to fully override LeaderWorkerSet release name. |
-| runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchDistributedWithCache":{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":false,"initializerImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/dataset-initializer","tag":""}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
-| runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training runtime (no custom images required) |
-| runtimes.torchDistributed.enabled | bool | `false` | Enable deployment of torch-distributed runtime |
-| runtimes.torchDistributedWithCache | object | `{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":false,"initializerImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/dataset-initializer","tag":""}}` | PyTorch distributed training with data cache support |
-| runtimes.torchDistributedWithCache.enabled | bool | `false` | Enable deployment of torch-distributed-with-cache runtime |
-| runtimes.torchDistributedWithCache.cacheImage.registry | string | `"ghcr.io"` | Data cache image registry |
-| runtimes.torchDistributedWithCache.cacheImage.repository | string | `"kubeflow/trainer/data-cache"` | Data cache image repository |
-| runtimes.torchDistributedWithCache.cacheImage.tag | string | `""` | Data cache image tag. Defaults to chart version if empty. |
-| runtimes.torchDistributedWithCache.initializerImage.registry | string | `"ghcr.io"` | Dataset initializer image registry |
-| runtimes.torchDistributedWithCache.initializerImage.repository | string | `"kubeflow/trainer/dataset-initializer"` | Dataset initializer image repository |
-| runtimes.torchDistributedWithCache.initializerImage.tag | string | `""` | Dataset initializer image tag. Defaults to chart version if empty. |
+| manager.tolerations | list | `[]` | List of node taints to tolerate for manager pods. |
+| manager.volumeMounts | list | `[]` | Volume mounts for manager containers. |
+| manager.volumes | list | `[]` | Volumes for manager pods. |
+| nameOverride | string | `""` | String to partially override release name. |
+| runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchDistributedWithCache":{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":false}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
 | runtimes.deepspeedDistributed | object | `{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}}` | DeepSpeed distributed training runtime |
 | runtimes.deepspeedDistributed.enabled | bool | `false` | Enable deployment of deepspeed-distributed runtime |
 | runtimes.deepspeedDistributed.image.registry | string | `"ghcr.io"` | DeepSpeed runtime image registry |
@@ -143,6 +132,14 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | runtimes.mlxDistributed.image.registry | string | `"ghcr.io"` | MLX runtime image registry |
 | runtimes.mlxDistributed.image.repository | string | `"kubeflow/trainer/mlx-runtime"` | MLX runtime image repository |
 | runtimes.mlxDistributed.image.tag | string | `""` | MLX runtime image tag. Defaults to chart version if empty. |
+| runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training runtime (no custom images required) |
+| runtimes.torchDistributed.enabled | bool | `false` | Enable deployment of torch-distributed runtime |
+| runtimes.torchDistributedWithCache | object | `{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":false}` | PyTorch distributed training with data cache support |
+| runtimes.torchDistributedWithCache.cacheImage.registry | string | `"ghcr.io"` | Data cache image registry |
+| runtimes.torchDistributedWithCache.cacheImage.repository | string | `"kubeflow/trainer/data-cache"` | Data cache image repository |
+| runtimes.torchDistributedWithCache.cacheImage.tag | string | `""` | Data cache image tag. Defaults to chart version if empty. |
+| runtimes.torchDistributedWithCache.enabled | bool | `false` | Enable deployment of torch-distributed-with-cache runtime |
+| webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
 
 ## Maintainers
 

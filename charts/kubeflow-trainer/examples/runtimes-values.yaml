@@ -8,11 +8,9 @@ runtimes:
   # Deploy torch-distributed with data cache support
   torchDistributedWithCache:
     enabled: true
-    # Images will use chart version by default (v2.1.0)
-    # To override, specify custom tags:
+    # cacheImage will use chart version by default
+    # To override, specify custom tag:
     # cacheImage:
-    #   tag: "v2.0.0"
-    # initializerImage:
     #   tag: "v2.0.0"
 
   # Deploy DeepSpeed runtime
