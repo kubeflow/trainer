@@ -53,9 +53,10 @@ runtimes:
     enabled: true
   torchDistributedWithCache:
     enabled: true
-    # Custom image tags (optional, defaults to chart version)
-    cacheImage:
-      tag: "v2.0.0"
+    dataCache:
+      enabled: true
+      cacheImage:
+        tag: "v2.0.0"
   deepspeedDistributed:
     enabled: true
   mlxDistributed:
@@ -122,14 +123,14 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |
 | dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency. Set to `false` if LeaderWorkerSet is already installed in the cluster. |
 | dataCache.lws.fullnameOverride | string | `"lws"` | String to fully override LeaderWorkerSet release name. |
-| runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchDistributedWithCache":{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":false}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
+| runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchDistributedWithCache":{"dataCache":{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":true},"enabled":false}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
 | runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training runtime (no custom images required) |
 | runtimes.torchDistributed.enabled | bool | `false` | Enable deployment of torch-distributed runtime |
-| runtimes.torchDistributedWithCache | object | `{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":false}` | PyTorch distributed training with data cache support |
+| runtimes.torchDistributedWithCache | object | `{"dataCache":{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":true},"enabled":false}` | PyTorch distributed training with data cache support |
 | runtimes.torchDistributedWithCache.enabled | bool | `false` | Enable deployment of torch-distributed-with-cache runtime |
-| runtimes.torchDistributedWithCache.cacheImage.registry | string | `"ghcr.io"` | Data cache image registry |
-| runtimes.torchDistributedWithCache.cacheImage.repository | string | `"kubeflow/trainer/data-cache"` | Data cache image repository |
-| runtimes.torchDistributedWithCache.cacheImage.tag | string | `""` | Data cache image tag. Defaults to chart version if empty. |
+| runtimes.torchDistributedWithCache.dataCache.cacheImage.registry | string | `"ghcr.io"` | Data cache image registry |
+| runtimes.torchDistributedWithCache.dataCache.cacheImage.repository | string | `"kubeflow/trainer/data-cache"` | Data cache image repository |
+| runtimes.torchDistributedWithCache.dataCache.cacheImage.tag | string | `""` | Data cache image tag. Defaults to chart version if empty. |
 | runtimes.deepspeedDistributed | object | `{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}}` | DeepSpeed distributed training runtime |
 | runtimes.deepspeedDistributed.enabled | bool | `false` | Enable deployment of deepspeed-distributed runtime |
 | runtimes.deepspeedDistributed.image.registry | string | `"ghcr.io"` | DeepSpeed runtime image registry |
