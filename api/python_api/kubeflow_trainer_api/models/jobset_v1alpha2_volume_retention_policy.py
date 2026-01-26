@@ -22,13 +22,12 @@ from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
-class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
+class JobsetV1alpha2VolumeRetentionPolicy(BaseModel):
     """
-    PodFailurePolicyOnPodConditionsPattern describes a pattern for matching an actual pod condition type.
+    volumeRetentionPolicy defines the retention policy used for PVCs created from the JobSet VolumeClaimPolicies.
     """ # noqa: E501
-    status: Optional[StrictStr] = Field(default='', description="Specifies the required Pod condition status. To match a pod condition it is required that the specified status equals the pod condition status. Defaults to True.")
-    type: StrictStr = Field(description="Specifies the required Pod condition type. To match a pod condition it is required that specified type equals the pod condition type.")
-    __properties: ClassVar[List[str]] = ["status", "type"]
+    when_deleted: Optional[StrictStr] = Field(default=None, description="whenDeleted specifies what happens to PVCs when JobSet is deleted.", alias="whenDeleted")
+    __properties: ClassVar[List[str]] = ["whenDeleted"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -48,7 +47,7 @@ class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern from a JSON string"""
+        """Create an instance of JobsetV1alpha2VolumeRetentionPolicy from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -73,7 +72,7 @@ class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern from a dict"""
+        """Create an instance of JobsetV1alpha2VolumeRetentionPolicy from a dict"""
         if obj is None:
             return None
 
@@ -81,8 +80,7 @@ class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "status": obj.get("status") if obj.get("status") is not None else '',
-            "type": obj.get("type") if obj.get("type") is not None else ''
+            "whenDeleted": obj.get("whenDeleted")
         })
         return _obj
 

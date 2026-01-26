@@ -18,7 +18,13 @@ package v1alpha1
 
 // CoschedulingPodGroupPolicySourceApplyConfiguration represents a declarative configuration of the CoschedulingPodGroupPolicySource type for use
 // with apply.
+//
+// CoschedulingPodGroupPolicySource represents configuration for coscheduling plugin.
+// The number of min members in the PodGroupSpec is always equal to the number of nodes.
 type CoschedulingPodGroupPolicySourceApplyConfiguration struct {
+	// scheduleTimeoutSeconds is the maximum duration to schedule PodGroup for gang-scheduling.
+	// If the scheduling timeout is equal to 0, the default value is used.
+	// Defaults to 60 seconds.
 	ScheduleTimeoutSeconds *int32 `json:"scheduleTimeoutSeconds,omitempty"`
 }
 

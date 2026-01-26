@@ -22,13 +22,14 @@ from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
-class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
+class IoK8sApiCoreV1WorkloadReference(BaseModel):
     """
-    PodFailurePolicyOnPodConditionsPattern describes a pattern for matching an actual pod condition type.
+    WorkloadReference identifies the Workload object and PodGroup membership that a Pod belongs to. The scheduler uses this information to apply workload-aware scheduling semantics.
     """ # noqa: E501
-    status: Optional[StrictStr] = Field(default='', description="Specifies the required Pod condition status. To match a pod condition it is required that the specified status equals the pod condition status. Defaults to True.")
-    type: StrictStr = Field(description="Specifies the required Pod condition type. To match a pod condition it is required that specified type equals the pod condition type.")
-    __properties: ClassVar[List[str]] = ["status", "type"]
+    name: StrictStr = Field(description="Name defines the name of the Workload object this Pod belongs to. Workload must be in the same namespace as the Pod. If it doesn't match any existing Workload, the Pod will remain unschedulable until a Workload object is created and observed by the kube-scheduler. It must be a DNS subdomain.")
+    pod_group: StrictStr = Field(description="PodGroup is the name of the PodGroup within the Workload that this Pod belongs to. If it doesn't match any existing PodGroup within the Workload, the Pod will remain unschedulable until the Workload object is recreated and observed by the kube-scheduler. It must be a DNS label.", alias="podGroup")
+    pod_group_replica_key: Optional[StrictStr] = Field(default=None, description="PodGroupReplicaKey specifies the replica key of the PodGroup to which this Pod belongs. It is used to distinguish pods belonging to different replicas of the same pod group. The pod group policy is applied separately to each replica. When set, it must be a DNS label.", alias="podGroupReplicaKey")
+    __properties: ClassVar[List[str]] = ["name", "podGroup", "podGroupReplicaKey"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -48,7 +49,7 @@ class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern from a JSON string"""
+        """Create an instance of IoK8sApiCoreV1WorkloadReference from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -73,7 +74,7 @@ class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern from a dict"""
+        """Create an instance of IoK8sApiCoreV1WorkloadReference from a dict"""
         if obj is None:
             return None
 
@@ -81,8 +82,9 @@ class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "status": obj.get("status") if obj.get("status") is not None else '',
-            "type": obj.get("type") if obj.get("type") is not None else ''
+            "name": obj.get("name") if obj.get("name") is not None else '',
+            "podGroup": obj.get("podGroup") if obj.get("podGroup") is not None else '',
+            "podGroupReplicaKey": obj.get("podGroupReplicaKey")
         })
         return _obj
 

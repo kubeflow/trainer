@@ -24,10 +24,16 @@ import (
 
 // ClusterTrainingRuntimeApplyConfiguration represents a declarative configuration of the ClusterTrainingRuntime type for use
 // with apply.
+//
+// ClusterTrainingRuntime represents a training runtime which can be referenced as part of
+// `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced
+// by TrainJob that created in *any* namespace.
 type ClusterTrainingRuntimeApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata of the ClusterTrainingRuntime.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *TrainingRuntimeSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec of the ClusterTrainingRuntime.
+	Spec *TrainingRuntimeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ClusterTrainingRuntime constructs a declarative configuration of the ClusterTrainingRuntime type for use with
@@ -39,6 +45,7 @@ func ClusterTrainingRuntime(name string) *ClusterTrainingRuntimeApplyConfigurati
 	b.WithAPIVersion("trainer.kubeflow.org/v1alpha1")
 	return b
 }
+
 func (b ClusterTrainingRuntimeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

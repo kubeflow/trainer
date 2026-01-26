@@ -20,55 +20,46 @@ import (
 	"context"
 	"fmt"
 
-	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
-	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	trainingruntime "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
 
-type ClusterTrainingRuntimeWebhook struct {
-	runtimes map[string]runtime.Runtime
-}
+// +kubebuilder:webhook:path=/validate-trainer-kubeflow-org-v1alpha1-clustertrainingruntime,mutating=false,failurePolicy=fail,sideEffects=None,groups=trainer.kubeflow.org,resources=clustertrainingruntimes,verbs=create;update,versions=v1alpha1,name=validator.clustertrainingruntime.trainer.kubeflow.org,admissionReviewVersions=v1
 
-func setupWebhookForClusterTrainingRuntime(mgr ctrl.Manager, run map[string]runtime.Runtime) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(&trainer.ClusterTrainingRuntime{}).
-		WithValidator(&ClusterTrainingRuntimeWebhook{runtimes: run}).
+// ClusterTrainingRuntimeValidator validates ClusterTrainingRuntimes
+type ClusterTrainingRuntimeValidator struct{}
+
+func setupWebhookForClusterTrainingRuntime(mgr ctrl.Manager) error {
+	return ctrl.NewWebhookManagedBy(mgr, &trainer.ClusterTrainingRuntime{}).
+		WithValidator(&ClusterTrainingRuntimeValidator{}).
 		Complete()
 }
 
-// +kubebuilder:webhook:path=/validate-trainer-kubeflow-org-v1alpha1-clustertrainingruntime,mutating=false,failurePolicy=fail,sideEffects=None,groups=trainer.kubeflow.org,resources=clustertrainingruntimes,verbs=create;update,versions=v1alpha1,name=validator.clustertrainingruntime.trainer.kubeflow.org,admissionReviewVersions=v1
-
-var _ webhook.CustomValidator = (*ClusterTrainingRuntimeWebhook)(nil)
-
-func (w *ClusterTrainingRuntimeWebhook) ValidateCreate(ctx context.Context, obj apiruntime.Object) (admission.Warnings, error) {
-	clTrainingRuntime := obj.(*trainer.ClusterTrainingRuntime)
+func (w *ClusterTrainingRuntimeValidator) ValidateCreate(ctx context.Context, obj *trainer.ClusterTrainingRuntime) (admission.Warnings, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("clustertrainingruntime-webhook")
-	log.V(5).Info("Validating create", "clusterTrainingRuntime", klog.KObj(clTrainingRuntime))
+	log.V(5).Info("Validating create", "clusterTrainingRuntime", klog.KObj(obj))
 	var warnings admission.Warnings
-	if trainingruntime.IsSupportDeprecated(clTrainingRuntime.Labels) {
+	if trainingruntime.IsSupportDeprecated(obj.Labels) {
 		warnings = append(warnings, fmt.Sprintf(
 			"ClusterTrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
-			clTrainingRuntime.Name,
+			obj.Name,
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
-	return warnings, validateReplicatedJobs(clTrainingRuntime.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	return warnings, validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
 }
 
-func (w *ClusterTrainingRuntimeWebhook) ValidateUpdate(ctx context.Context, oldObj apiruntime.Object, newObj apiruntime.Object) (admission.Warnings, error) {
-	clTrainingRuntimeNew := newObj.(*trainer.ClusterTrainingRuntime)
+func (w *ClusterTrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.ClusterTrainingRuntime) (admission.Warnings, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("clustertrainingruntime-webhook")
-	log.V(5).Info("Validating update", "clusterTrainingRuntime", klog.KObj(clTrainingRuntimeNew))
-	return nil, validateReplicatedJobs(clTrainingRuntimeNew.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	log.V(5).Info("Validating update", "clusterTrainingRuntime", klog.KObj(newObj))
+	return nil, validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
 }
 
-func (w *ClusterTrainingRuntimeWebhook) ValidateDelete(context.Context, apiruntime.Object) (admission.Warnings, error) {
+func (w *ClusterTrainingRuntimeValidator) ValidateDelete(ctx context.Context, obj *trainer.ClusterTrainingRuntime) (admission.Warnings, error) {
 	return nil, nil
 }

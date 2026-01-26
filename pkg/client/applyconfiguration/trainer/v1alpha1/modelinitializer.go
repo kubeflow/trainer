@@ -23,10 +23,19 @@ import (
 
 // ModelInitializerApplyConfiguration represents a declarative configuration of the ModelInitializer type for use
 // with apply.
+//
+// ModelInitializer represents the desired configuration to initialize pre-trained model.
+// The ModelInitializer spec will override the runtime Job template
+// which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
 type ModelInitializerApplyConfiguration struct {
-	StorageUri *string                       `json:"storageUri,omitempty"`
-	Env        []v1.EnvVarApplyConfiguration `json:"env,omitempty"`
-	SecretRef  *corev1.LocalObjectReference  `json:"secretRef,omitempty"`
+	// storageUri is the URI for the model provider.
+	StorageUri *string `json:"storageUri,omitempty"`
+	// env is the list of environment variables to set in the model initializer container.
+	// These values will be merged with the TrainingRuntime's model initializer environments.
+	Env []v1.EnvVarApplyConfiguration `json:"env,omitempty"`
+	// secretRef is the reference to the secret with credentials to download model.
+	// Secret must be created in the TrainJob's namespace.
+	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
 }
 
 // ModelInitializerApplyConfiguration constructs a declarative configuration of the ModelInitializer type for use with

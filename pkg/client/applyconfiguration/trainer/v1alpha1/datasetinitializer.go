@@ -23,10 +23,19 @@ import (
 
 // DatasetInitializerApplyConfiguration represents a declarative configuration of the DatasetInitializer type for use
 // with apply.
+//
+// DatasetInitializer represents the desired configuration to initialize and pre-process dataset.
+// The DatasetInitializer spec will override the runtime Job template
+// which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
 type DatasetInitializerApplyConfiguration struct {
-	StorageUri *string                       `json:"storageUri,omitempty"`
-	Env        []v1.EnvVarApplyConfiguration `json:"env,omitempty"`
-	SecretRef  *corev1.LocalObjectReference  `json:"secretRef,omitempty"`
+	// storageUri is the URI for the dataset provider.
+	StorageUri *string `json:"storageUri,omitempty"`
+	// env is the list of environment variables to set in the dataset initializer container.
+	// These values will be merged with the TrainingRuntime's dataset initializer environments.
+	Env []v1.EnvVarApplyConfiguration `json:"env,omitempty"`
+	// secretRef is the reference to the secret with credentials to download dataset.
+	// Secret must be created in the TrainJob's namespace.
+	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
 }
 
 // DatasetInitializerApplyConfiguration constructs a declarative configuration of the DatasetInitializer type for use with

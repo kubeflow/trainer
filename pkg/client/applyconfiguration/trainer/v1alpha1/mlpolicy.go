@@ -18,8 +18,14 @@ package v1alpha1
 
 // MLPolicyApplyConfiguration represents a declarative configuration of the MLPolicy type for use
 // with apply.
+//
+// MLPolicy represents configuration for the model training with ML-specific parameters.
 type MLPolicyApplyConfiguration struct {
-	NumNodes                         *int32 `json:"numNodes,omitempty"`
+	// numNodes is the number of training nodes.
+	// Defaults to 1.
+	NumNodes *int32 `json:"numNodes,omitempty"`
+	// Configuration for the runtime-specific parameters, such as Torch or MPI.
+	// Only one of its members may be specified.
 	MLPolicySourceApplyConfiguration `json:",inline"`
 }
 

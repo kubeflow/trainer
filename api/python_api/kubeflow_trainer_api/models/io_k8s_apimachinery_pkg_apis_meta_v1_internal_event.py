@@ -22,13 +22,13 @@ from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
-class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
+class IoK8sApimachineryPkgApisMetaV1InternalEvent(BaseModel):
     """
-    PodFailurePolicyOnPodConditionsPattern describes a pattern for matching an actual pod condition type.
+    InternalEvent makes watch.Event versioned
     """ # noqa: E501
-    status: Optional[StrictStr] = Field(default='', description="Specifies the required Pod condition status. To match a pod condition it is required that the specified status equals the pod condition status. Defaults to True.")
-    type: StrictStr = Field(description="Specifies the required Pod condition type. To match a pod condition it is required that specified type equals the pod condition type.")
-    __properties: ClassVar[List[str]] = ["status", "type"]
+    object: Optional[Any] = Field(description="Object is:  * If Type is Added or Modified: the new state of the object.  * If Type is Deleted: the state of the object immediately before deletion.  * If Type is Bookmark: the object (instance of a type being watched) where    only ResourceVersion field is set. On successful restart of watch from a    bookmark resourceVersion, client is guaranteed to not get repeat event    nor miss any events.  * If Type is Error: *api.Status is recommended; other types may make sense    depending on context.", alias="Object")
+    type: StrictStr = Field(alias="Type")
+    __properties: ClassVar[List[str]] = ["Object", "Type"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -48,7 +48,7 @@ class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern from a JSON string"""
+        """Create an instance of IoK8sApimachineryPkgApisMetaV1InternalEvent from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -69,11 +69,16 @@ class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # set to None if object (nullable) is None
+        # and model_fields_set contains the field
+        if self.object is None and "object" in self.model_fields_set:
+            _dict['Object'] = None
+
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern from a dict"""
+        """Create an instance of IoK8sApimachineryPkgApisMetaV1InternalEvent from a dict"""
         if obj is None:
             return None
 
@@ -81,8 +86,8 @@ class IoK8sApiBatchV1PodFailurePolicyOnPodConditionsPattern(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "status": obj.get("status") if obj.get("status") is not None else '',
-            "type": obj.get("type") if obj.get("type") is not None else ''
+            "Object": obj.get("Object"),
+            "Type": obj.get("Type") if obj.get("Type") is not None else ''
         })
         return _obj
 

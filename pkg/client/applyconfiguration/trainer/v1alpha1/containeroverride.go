@@ -23,11 +23,21 @@ import (
 
 // ContainerOverrideApplyConfiguration represents a declarative configuration of the ContainerOverride type for use
 // with apply.
+//
+// ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
 type ContainerOverrideApplyConfiguration struct {
-	Name            *string                            `json:"name,omitempty"`
-	Env             []v1.EnvVarApplyConfiguration      `json:"env,omitempty"`
-	VolumeMounts    []v1.VolumeMountApplyConfiguration `json:"volumeMounts,omitempty"`
-	SecurityContext *corev1.SecurityContext            `json:"securityContext,omitempty"`
+	// name for the container. TrainingRuntime must have this container.
+	Name *string `json:"name,omitempty"`
+	// env is the list of environment variables to set in the container.
+	// These values will be merged with the TrainingRuntime's environments.
+	// These values can't be set for container with the name: `node`, `dataset-initializer`, or
+	// `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.
+	Env []v1.EnvVarApplyConfiguration `json:"env,omitempty"`
+	// volumeMounts are the volumes to mount into the container's filesystem.
+	VolumeMounts []v1.VolumeMountApplyConfiguration `json:"volumeMounts,omitempty"`
+	// securityContext overrides the container's security context.
+	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 }
 
 // ContainerOverrideApplyConfiguration constructs a declarative configuration of the ContainerOverride type for use with

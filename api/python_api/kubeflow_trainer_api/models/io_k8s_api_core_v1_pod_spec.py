@@ -34,6 +34,7 @@ from kubeflow_trainer_api.models.io_k8s_api_core_v1_resource_requirements import
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_toleration import IoK8sApiCoreV1Toleration
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_topology_spread_constraint import IoK8sApiCoreV1TopologySpreadConstraint
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_volume import IoK8sApiCoreV1Volume
+from kubeflow_trainer_api.models.io_k8s_api_core_v1_workload_reference import IoK8sApiCoreV1WorkloadReference
 from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_api_resource_quantity import IoK8sApimachineryPkgApiResourceQuantity
 from typing import Optional, Set
 from typing_extensions import Self
@@ -67,7 +68,7 @@ class IoK8sApiCoreV1PodSpec(BaseModel):
     priority: Optional[StrictInt] = Field(default=None, description="The priority value. Various system components use this field to find the priority of the pod. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority.")
     priority_class_name: Optional[StrictStr] = Field(default=None, description="If specified, indicates the pod's priority. \"system-node-critical\" and \"system-cluster-critical\" are two special keywords which indicate the highest priorities with the former being the highest priority. Any other name must be defined by creating a PriorityClass object with that name. If not specified, the pod priority will be default or zero if there is no default.", alias="priorityClassName")
     readiness_gates: Optional[List[IoK8sApiCoreV1PodReadinessGate]] = Field(default=None, description="If specified, all readiness gates will be evaluated for pod readiness. A pod is ready when all its containers are ready AND all conditions specified in the readiness gates have status equal to \"True\" More info: https://git.k8s.io/enhancements/keps/sig-network/580-pod-readiness-gates", alias="readinessGates")
-    resource_claims: Optional[List[IoK8sApiCoreV1PodResourceClaim]] = Field(default=None, description="ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which consume them by name.  This is an alpha field and requires enabling the DynamicResourceAllocation feature gate.  This field is immutable.", alias="resourceClaims")
+    resource_claims: Optional[List[IoK8sApiCoreV1PodResourceClaim]] = Field(default=None, description="ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which consume them by name.  This is a stable field but requires that the DynamicResourceAllocation feature gate is enabled.  This field is immutable.", alias="resourceClaims")
     resources: Optional[IoK8sApiCoreV1ResourceRequirements] = Field(default=None, description="Resources is the total amount of CPU and Memory resources required by all containers in the pod. It supports specifying Requests and Limits for \"cpu\", \"memory\" and \"hugepages-\" resource names only. ResourceClaims are not supported.  This field enables fine-grained control over resource allocation for the entire pod, allowing resource sharing among containers in a pod.  This is an alpha field and requires enabling the PodLevelResources feature gate.")
     restart_policy: Optional[StrictStr] = Field(default=None, description="Restart policy for all containers within the pod. One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy  Possible enum values:  - `\"Always\"`  - `\"Never\"`  - `\"OnFailure\"`", alias="restartPolicy")
     runtime_class_name: Optional[StrictStr] = Field(default=None, description="RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class", alias="runtimeClassName")
@@ -83,7 +84,8 @@ class IoK8sApiCoreV1PodSpec(BaseModel):
     tolerations: Optional[List[IoK8sApiCoreV1Toleration]] = Field(default=None, description="If specified, the pod's tolerations.")
     topology_spread_constraints: Optional[List[IoK8sApiCoreV1TopologySpreadConstraint]] = Field(default=None, description="TopologySpreadConstraints describes how a group of pods ought to spread across topology domains. Scheduler will schedule pods in a way which abides by the constraints. All topologySpreadConstraints are ANDed.", alias="topologySpreadConstraints")
     volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="List of volumes that can be mounted by containers belonging to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes")
-    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "affinity", "automountServiceAccountToken", "containers", "dnsConfig", "dnsPolicy", "enableServiceLinks", "ephemeralContainers", "hostAliases", "hostIPC", "hostNetwork", "hostPID", "hostUsers", "hostname", "hostnameOverride", "imagePullSecrets", "initContainers", "nodeName", "nodeSelector", "os", "overhead", "preemptionPolicy", "priority", "priorityClassName", "readinessGates", "resourceClaims", "resources", "restartPolicy", "runtimeClassName", "schedulerName", "schedulingGates", "securityContext", "serviceAccount", "serviceAccountName", "setHostnameAsFQDN", "shareProcessNamespace", "subdomain", "terminationGracePeriodSeconds", "tolerations", "topologySpreadConstraints", "volumes"]
+    workload_ref: Optional[IoK8sApiCoreV1WorkloadReference] = Field(default=None, description="WorkloadRef provides a reference to the Workload object that this Pod belongs to. This field is used by the scheduler to identify the PodGroup and apply the correct group scheduling policies. The Workload object referenced by this field may not exist at the time the Pod is created. This field is immutable, but a Workload object with the same name may be recreated with different policies. Doing this during pod scheduling may result in the placement not conforming to the expected policies.", alias="workloadRef")
+    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "affinity", "automountServiceAccountToken", "containers", "dnsConfig", "dnsPolicy", "enableServiceLinks", "ephemeralContainers", "hostAliases", "hostIPC", "hostNetwork", "hostPID", "hostUsers", "hostname", "hostnameOverride", "imagePullSecrets", "initContainers", "nodeName", "nodeSelector", "os", "overhead", "preemptionPolicy", "priority", "priorityClassName", "readinessGates", "resourceClaims", "resources", "restartPolicy", "runtimeClassName", "schedulerName", "schedulingGates", "securityContext", "serviceAccount", "serviceAccountName", "setHostnameAsFQDN", "shareProcessNamespace", "subdomain", "terminationGracePeriodSeconds", "tolerations", "topologySpreadConstraints", "volumes", "workloadRef"]
 
     @field_validator('dns_policy')
     def dns_policy_validate_enum(cls, value):
@@ -253,6 +255,9 @@ class IoK8sApiCoreV1PodSpec(BaseModel):
                 if _item_volumes:
                     _items.append(_item_volumes.to_dict())
             _dict['volumes'] = _items
+        # override the default output from pydantic by calling `to_dict()` of workload_ref
+        if self.workload_ref:
+            _dict['workloadRef'] = self.workload_ref.to_dict()
         return _dict
 
     @classmethod
@@ -310,7 +315,8 @@ class IoK8sApiCoreV1PodSpec(BaseModel):
             "terminationGracePeriodSeconds": obj.get("terminationGracePeriodSeconds"),
             "tolerations": [IoK8sApiCoreV1Toleration.from_dict(_item) for _item in obj["tolerations"]] if obj.get("tolerations") is not None else None,
             "topologySpreadConstraints": [IoK8sApiCoreV1TopologySpreadConstraint.from_dict(_item) for _item in obj["topologySpreadConstraints"]] if obj.get("topologySpreadConstraints") is not None else None,
-            "volumes": [IoK8sApiCoreV1Volume.from_dict(_item) for _item in obj["volumes"]] if obj.get("volumes") is not None else None
+            "volumes": [IoK8sApiCoreV1Volume.from_dict(_item) for _item in obj["volumes"]] if obj.get("volumes") is not None else None,
+            "workloadRef": IoK8sApiCoreV1WorkloadReference.from_dict(obj["workloadRef"]) if obj.get("workloadRef") is not None else None
         })
         return _obj
 

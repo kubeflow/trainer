@@ -22,10 +22,17 @@ import (
 
 // PodTemplateOverrideApplyConfiguration represents a declarative configuration of the PodTemplateOverride type for use
 // with apply.
+//
+// PodTemplateOverride represents a custom PodTemplateSpec override that will be applied to the TrainJob's training runtime.
 type PodTemplateOverrideApplyConfiguration struct {
+	// targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.
 	TargetJobs []PodTemplateOverrideTargetJobApplyConfiguration `json:"targetJobs,omitempty"`
-	Metadata   *v1.ObjectMetaApplyConfiguration                 `json:"metadata,omitempty"`
-	Spec       *PodTemplateSpecOverrideApplyConfiguration       `json:"spec,omitempty"`
+	// metadata overrides the Pod template metadata.
+	// These values will be merged with the TrainingRuntime's Pod template metadata.
+	Metadata *v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	// spec overrides the Pod template spec.
+	// These values will be merged with the TrainingRuntime's Pod template spec.
+	Spec *PodTemplateSpecOverrideApplyConfiguration `json:"spec,omitempty"`
 }
 
 // PodTemplateOverrideApplyConfiguration constructs a declarative configuration of the PodTemplateOverride type for use with

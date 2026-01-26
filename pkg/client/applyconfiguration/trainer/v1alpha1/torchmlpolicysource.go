@@ -22,9 +22,16 @@ import (
 
 // TorchMLPolicySourceApplyConfiguration represents a declarative configuration of the TorchMLPolicySource type for use
 // with apply.
+//
+// TorchMLPolicySource represents a PyTorch runtime configuration.
 type TorchMLPolicySourceApplyConfiguration struct {
-	NumProcPerNode *intstr.IntOrString                   `json:"numProcPerNode,omitempty"`
-	ElasticPolicy  *TorchElasticPolicyApplyConfiguration `json:"elasticPolicy,omitempty"`
+	// numProcPerNode is the number of processes per node.
+	// This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI.
+	// Supported values: `auto`, `cpu`, `gpu`, or int value.
+	// Defaults to `auto`.
+	NumProcPerNode *intstr.IntOrString `json:"numProcPerNode,omitempty"`
+	// elasticPolicy defines the Elastic policy for the PyTorch training.
+	ElasticPolicy *TorchElasticPolicyApplyConfiguration `json:"elasticPolicy,omitempty"`
 }
 
 // TorchMLPolicySourceApplyConfiguration constructs a declarative configuration of the TorchMLPolicySource type for use with

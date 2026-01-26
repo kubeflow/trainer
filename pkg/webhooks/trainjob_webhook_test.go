@@ -110,7 +110,7 @@ func TestValidateCreate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			validator := &TrainJobWebhook{
+			validator := &TrainJobValidator{
 				runtimes: runtimes,
 			}
 
