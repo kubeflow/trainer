@@ -1,0 +1,97 @@
+# Example 3: Custom TrainingRuntime (Namespace-Scoped)
+#
+# This example shows how to create a namespace-scoped TrainingRuntime
+# and use it in a TrainJob. TrainingRuntime allows teams to customize
+# their training environment without affecting other namespaces.
+#
+# Apply runtime: kubectl apply -f 03-with-runtime.yaml
+# Check runtime:  kubectl get trainingruntime custom-runtime
+# Apply job:      kubectl apply -f 03-with-runtime.yaml
+# Check job:      kubectl get trainjobs custom-runtime-job
+# Logs:           kubectl logs -l trainer.kubeflow.org/job-name=custom-runtime-job
+# Clean:          kubectl delete -f 03-with-runtime.yaml
+
+---
+# First, create a custom TrainingRuntime for this namespace
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainingRuntime
+metadata:
+  name: custom-runtime
+  namespace: default
+  labels:
+    trainer.kubeflow.org/framework: torch
+    team: data-science
+spec:
+  mlPolicy:
+    numNodes: 1
+    torch:
+      numProcPerNode: auto
+  template:
+    spec:
+      replicatedJobs:
+        - name: node
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+                custom-label: my-custom-runtime
+            spec:
+              template:
+                spec:
+                  # Custom runtime with specific base image
+                  containers:
+                    - name: node
+                      image: python:3.11-slim
+                      # Default resource limits for this runtime
+                      resources:
+                        requests:
+                          cpu: "500m"
+                          memory: "512Mi"
+                        limits:
+                          cpu: "1000m"
+                          memory: "1Gi"
+
+---
+# Now create a TrainJob that uses this custom runtime
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: custom-runtime-job
+  namespace: default
+  labels:
+    app: custom-runtime-example
+spec:
+  # Reference the namespace-scoped TrainingRuntime
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: TrainingRuntime
+    name: custom-runtime
+  
+  trainer:
+    numNodes: 1
+    
+    # Override the image from the runtime
+    image: python:3.11-slim
+    
+    command:
+      - python3
+      - -c
+      - |
+        import sys
+        import os
+        import platform
+        
+        print("=" * 50)
+        print("Custom TrainingRuntime Example")
+        print("=" * 50)
+        print(f"Python version: {sys.version}")
+        print(f"Platform: {platform.platform()}")
+        print(f"Hostname: {platform.node()}")
+        print(f"Environment variables:")
+        for key in ['RANK', 'WORLD_SIZE', 'MASTER_ADDR', 'MASTER_PORT']:
+            print(f"  {key}: {os.environ.get(key, 'Not set')}")
+        print("=" * 50)
+        print("This job uses a custom TrainingRuntime!")
+        print("The runtime defines default configurations")
+        print("that can be reused across multiple TrainJobs.")
+        print("=" * 50)
