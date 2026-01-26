@@ -33,7 +33,7 @@
 
 - Code that violates existing patterns in the codebase
 - Missing error handling
-- Code that is not following [Effective Go](https://go.dev/doc/effective_go) best practices
+- Code that is not following [Effective Go](https://go.dev/doc/effective_go), [Python PEP8](https://peps.python.org/pep-0008/), or [Rust API guidelines](https://rust-lang.github.io/api-guidelines/)
 - Violating [Kubernetes API guidelines](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api_changes.md)
 
 ## Project-Specific Context

@@ -11,6 +11,7 @@ AI agents should:
 - Make atomic, minimal, and reversible changes.
 - Prefer local analysis (e.g. `make generate`, `make fmt`, `make test`, `make test-python`) before proposing commits.
 - NEVER modify configuration, CI/CD, or release automation unless explicitly requested.
+- Scan the generated code for vulnerabilities and dependency upgrades.
 - Avoid non-deterministic code or random seeds without fixtures.
 - Use `AGENTS.md` and `Makefile` as the source of truth for development commands.
 
