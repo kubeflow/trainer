@@ -1,5 +1,5 @@
 #
-# Copyright 2025 The Kubeflow authors.
+# Copyright 2026 The Kubeflow authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -162,13 +162,15 @@ runtimes:
   torchDistributedWithCache:
     # -- Enable deployment of torch-distributed-with-cache runtime
     enabled: false
-    cacheImage:
-      # -- Data cache image registry
-      registry: ghcr.io
-      # -- Data cache image repository
-      repository: kubeflow/trainer/data-cache
-      # -- Data cache image tag. Defaults to chart version if empty.
-      tag: ""
+    dataCache:
+      enabled: true
+      cacheImage:
+        # -- Data cache image registry
+        registry: ghcr.io
+        # -- Data cache image repository
+        repository: kubeflow/trainer/data-cache
+        # -- Data cache image tag. Defaults to chart version if empty.
+        tag: ""
 
   # -- DeepSpeed distributed training runtime
   deepspeedDistributed:

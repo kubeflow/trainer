@@ -1,5 +1,5 @@
 {{- /*
-Copyright 2025 The Kubeflow authors.
+Copyright 2026 The Kubeflow authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ spec:
                     image: {{ printf "ghcr.io/kubeflow/trainer/dataset-initializer:%s" (include "trainer.defaultImageTag" .) }}
                     env:
                       - name: CACHE_IMAGE
-                        value: {{ include "trainer.runtimeImage" (dict "registry" .Values.runtimes.torchDistributedWithCache.cacheImage.registry "repository" .Values.runtimes.torchDistributedWithCache.cacheImage.repository "tag" .Values.runtimes.torchDistributedWithCache.cacheImage.tag "context" .) | quote }}
+                        value: {{ include "trainer.runtimeImage" (dict "registry" .Values.runtimes.torchDistributedWithCache.dataCache.cacheImage.registry "repository" .Values.runtimes.torchDistributedWithCache.dataCache.cacheImage.repository "tag" .Values.runtimes.torchDistributedWithCache.dataCache.cacheImage.tag "context" .) | quote }}
                       - name: TRAIN_JOB_NAME
                         valueFrom:
                           fieldRef:
