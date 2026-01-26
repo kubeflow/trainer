@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -54,7 +54,7 @@ type TrainJobWatcher interface {
 type TrainJobReconciler struct {
 	log      logr.Logger
 	client   client.Client
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 	runtimes map[string]jobruntimes.Runtime
 	watchers iter.Seq[TrainJobWatcher]
 }
@@ -74,7 +74,7 @@ func WithWatchers(watchers ...TrainJobWatcher) TrainJobReconcilerOption {
 var _ reconcile.Reconciler = (*TrainJobReconciler)(nil)
 var _ predicate.TypedPredicate[*trainer.TrainJob] = (*TrainJobReconciler)(nil)
 
-func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, runtimes map[string]jobruntimes.Runtime, opts ...TrainJobReconcilerOption) *TrainJobReconciler {
+func NewTrainJobReconciler(client client.Client, recorder events.EventRecorder, runtimes map[string]jobruntimes.Runtime, opts ...TrainJobReconcilerOption) *TrainJobReconciler {
 	options := &TrainJobReconcilerOptions{}
 	for _, opt := range opts {
 		opt(options)
@@ -88,7 +88,7 @@ func NewTrainJobReconciler(client client.Client, recorder record.EventRecorder, 
 	}
 }
 
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;watch;update;patch
+// +kubebuilder:rbac:groups="events.k8s.io",resources=events,verbs=create;watch;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs/finalizers,verbs=get;update;patch
@@ -127,7 +127,7 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			if len(err.Error()) > 950 {
 				message = fmt.Sprintf("%s ...", message)
 			}
-			r.recorder.Event(&trainJob, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", message)
+			r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "TrainJobResourcesCreationFailed", message)
 		}
 	}
 

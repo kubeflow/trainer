@@ -19,15 +19,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - events
-  verbs:
-  - create
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - limitranges
   verbs:
   - get
@@ -51,6 +42,15 @@ rules:
   - get
   - list
   - update
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+  - watch
 - apiGroups:
   - jobset.x-k8s.io
   resources:
