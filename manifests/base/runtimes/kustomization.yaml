@@ -5,3 +5,4 @@ resources:
   - mlx_distributed.yaml
   - torch_distributed.yaml
   - torchtune
+  - flux
