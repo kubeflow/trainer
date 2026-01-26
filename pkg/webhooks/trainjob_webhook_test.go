@@ -22,6 +22,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	admissionv1 "k8s.io/api/admission/v1"
+	authv1 "k8s.io/api/authentication/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
@@ -120,6 +123,119 @@ func TestValidateCreate(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantError.ToAggregate(), err, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
 				t.Errorf("Unexpected error from ValidateCreate (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestDefault(t *testing.T) {
+	testCases := map[string]struct {
+		trainJob     *trainer.TrainJob
+		username     *string
+		wantTrainJob *trainer.TrainJob
+		wantError    bool
+	}{
+		"should error if the request doesn't contain the username": {
+			wantError: true,
+		},
+		"should add the request username to the new podTemplateOverrides entries": {
+			trainJob: testingutil.MakeTrainJobWrapper("default", "test-trainjob").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				PodTemplateOverrides([]trainer.PodTemplateOverride{
+					{
+						Manager: ptr.To("manager-1"),
+						Metadata: &v1.ObjectMeta{
+							Labels: map[string]string{
+								"manager": "manager-1",
+							},
+						},
+					},
+					{
+						Metadata: &v1.ObjectMeta{
+							Labels: map[string]string{
+								"manager": "not-set",
+							},
+						},
+					},
+					{
+						Manager: ptr.To("manager-2"),
+						Metadata: &v1.ObjectMeta{
+							Labels: map[string]string{
+								"manager": "manager-2",
+							},
+						},
+					},
+				}).Obj(),
+			username: ptr.To("test-user"),
+			wantTrainJob: testingutil.MakeTrainJobWrapper("default", "test-trainjob").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				PodTemplateOverrides([]trainer.PodTemplateOverride{
+					{
+						Manager: ptr.To("manager-1"),
+						Metadata: &v1.ObjectMeta{
+							Labels: map[string]string{
+								"manager": "manager-1",
+							},
+						},
+					},
+					{
+						Manager: ptr.To("test-user"),
+						Metadata: &v1.ObjectMeta{
+							Labels: map[string]string{
+								"manager": "not-set",
+							},
+						},
+					},
+					{
+						Manager: ptr.To("manager-2"),
+						Metadata: &v1.ObjectMeta{
+							Labels: map[string]string{
+								"manager": "manager-2",
+							},
+						},
+					},
+				}).Obj(),
+			wantError: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			if tc.username != nil {
+				ctx = admission.NewContextWithRequest(ctx, admission.Request{
+					AdmissionRequest: admissionv1.AdmissionRequest{
+						UserInfo: authv1.UserInfo{
+							Username: *tc.username,
+						},
+					},
+				})
+			}
+
+			clientBuilder := testingutil.NewClientBuilder()
+			runtimes, err := runtimecore.New(context.Background(), clientBuilder.Build(), testingutil.AsIndex(clientBuilder))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			defaulter := &TrainJobWebhook{
+				runtimes: runtimes,
+			}
+
+			err = defaulter.Default(ctx, tc.trainJob)
+			if tc.wantError && err == nil {
+				t.Errorf("Expected error but got nil")
+			}
+			if !tc.wantError && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+			if diff := cmp.Diff(tc.wantTrainJob, tc.trainJob); diff != "" {
+				t.Errorf("Default() mismatch (-want,+got):\n%s", diff)
 			}
 		})
 	}
