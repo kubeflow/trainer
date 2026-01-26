@@ -31,6 +31,7 @@ Before writing code, agents should:
 - Preserve existing logging and error-handling conventions
 - Understand the plugin architecture and extension framework before modifying runtime code
 - Review CRD schemas in `pkg/apis/` before changing API structures
+- Call out for any breaking changes introduced and follow the deprecation policy
 
 For additional context see [the Kubeflow Trainer docs](https://www.kubeflow.org/docs/components/trainer/overview/).
 
@@ -170,6 +171,7 @@ pre-commit run --all-files    # Run all hooks manually
 
 - **CRD schemas** (`pkg/apis/trainer/v1alpha1`): Changes require careful review
   - Adding fields: Use `+optional` marker and provide defaults
+  - ALWAYS use [the CEL validation](https://kubernetes.io/docs/reference/using-api/cel/) whenever applicable
   - Removing/renaming fields: Requires API version bump and migration plan
   - Changing field types: Breaking change, requires deprecation period
 - **Go public APIs**: Exported types, functions, interfaces
