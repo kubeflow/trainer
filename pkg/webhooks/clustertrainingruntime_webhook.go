@@ -19,6 +19,8 @@ package webhooks
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -31,6 +33,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	trainingruntime "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
+
 
 type ClusterTrainingRuntimeWebhook struct {
 	runtimes map[string]runtime.Runtime
@@ -63,10 +66,30 @@ func (w *ClusterTrainingRuntimeWebhook) ValidateCreate(ctx context.Context, obj 
 }
 
 func (w *ClusterTrainingRuntimeWebhook) ValidateUpdate(ctx context.Context, oldObj apiruntime.Object, newObj apiruntime.Object) (admission.Warnings, error) {
-	clTrainingRuntimeNew := newObj.(*trainer.ClusterTrainingRuntime)
+	oldRuntime := oldObj.(*trainer.ClusterTrainingRuntime)
+    newRuntime := newObj.(*trainer.ClusterTrainingRuntime)
+
+
 	log := ctrl.LoggerFrom(ctx).WithName("clustertrainingruntime-webhook")
-	log.V(5).Info("Validating update", "clusterTrainingRuntime", klog.KObj(clTrainingRuntimeNew))
-	return nil, validateReplicatedJobs(clTrainingRuntimeNew.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	log.V(5).Info("Validating update", "clusterTrainingRuntime", klog.KObj(newRuntime))
+
+	var allErrs field.ErrorList
+
+	if !reflect.DeepEqual(oldRuntime.Spec, newRuntime.Spec) {
+        allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "spec field is immutable"))
+    }
+
+	if !reflect.DeepEqual(oldRuntime.ObjectMeta.Labels, newRuntime.ObjectMeta.Labels) {
+        allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata", "labels"), "labels field is immutable"))
+    }
+
+	if !reflect.DeepEqual(oldRuntime.ObjectMeta.Annotations, newRuntime.ObjectMeta.Annotations) {
+        allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata", "annotations"), "annotations field is immutable"))
+    }
+
+	 allErrs = append(allErrs, validateReplicatedJobs(newRuntime.Spec.Template.Spec.ReplicatedJobs)...)
+
+	return nil, allErrs.ToAggregate()
 }
 
 func (w *ClusterTrainingRuntimeWebhook) ValidateDelete(context.Context, apiruntime.Object) (admission.Warnings, error) {

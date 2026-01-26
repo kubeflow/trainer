@@ -17,10 +17,6 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: |-
-          TrainingRuntime represents a training runtime which can be referenced as part of
-          `runtimeRef` API in TrainJob. This resource is a namespaced-scoped and can be referenced
-          by TrainJob that created in the *same* namespace as the TrainingRuntime.
         properties:
           apiVersion:
             description: |-
@@ -10446,6 +10442,12 @@ spec:
                         == ''InOrder'' && self.replicatedJobs.exists(x, has(x.dependsOn)))'
                 type: object
             type: object
+            x-kubernetes-validations:
+            - message: Value is immutable
+              rule: self == oldSelf
         type: object
+        x-kubernetes-validations:
+        - message: Value is immutable
+          rule: self == oldSelf
     served: true
     storage: true
