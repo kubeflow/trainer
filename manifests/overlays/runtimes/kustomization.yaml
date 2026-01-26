@@ -15,3 +15,5 @@ images:
     newTag: latest
   - name: ghcr.io/kubeflow/trainer/deepspeed-runtime
     newTag: latest
+  - name: ghcr.io/kubeflow/trainer/jax-runtime
+    newTag: latest
