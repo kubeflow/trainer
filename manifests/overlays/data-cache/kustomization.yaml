@@ -30,17 +30,3 @@ patches:
       - op: add
         path: /metadata/namespace
         value: default
-  # Update JobSet webhook service selector to use unique label
-  - path: jobset_patches/webhook_service_selector.yaml
-    target:
-      group: ""
-      version: v1
-      kind: Service
-      name: jobset-webhook-service
-  # Update JobSet metrics service selector to use unique label
-  - path: jobset_patches/metrics_service_selector.yaml
-    target:
-      group: ""
-      version: v1
-      kind: Service
-      name: jobset-controller-manager-metrics-service
