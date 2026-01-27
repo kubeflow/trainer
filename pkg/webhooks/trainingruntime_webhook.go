@@ -49,6 +49,8 @@ var (
 // TrainingRuntimeValidator validates TrainingRuntimes
 type TrainingRuntimeValidator struct{}
 
+var _ admission.Validator[*trainer.TrainingRuntime] = (*TrainingRuntimeValidator)(nil)
+
 func setupWebhookForTrainingRuntime(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, &trainer.TrainingRuntime{}).
 		WithValidator(&TrainingRuntimeValidator{}).

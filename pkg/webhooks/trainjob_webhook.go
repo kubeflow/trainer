@@ -35,6 +35,8 @@ type TrainJobValidator struct {
 	runtimes map[string]runtime.Runtime
 }
 
+var _ admission.Validator[*trainer.TrainJob] = (*TrainJobValidator)(nil)
+
 func setupWebhookForTrainJob(mgr ctrl.Manager, run map[string]runtime.Runtime) error {
 	return ctrl.NewWebhookManagedBy(mgr, &trainer.TrainJob{}).
 		WithValidator(&TrainJobValidator{runtimes: run}).

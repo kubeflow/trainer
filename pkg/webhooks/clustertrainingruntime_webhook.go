@@ -34,6 +34,8 @@ import (
 // ClusterTrainingRuntimeValidator validates ClusterTrainingRuntimes
 type ClusterTrainingRuntimeValidator struct{}
 
+var _ admission.Validator[*trainer.ClusterTrainingRuntime] = (*ClusterTrainingRuntimeValidator)(nil)
+
 func setupWebhookForClusterTrainingRuntime(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, &trainer.ClusterTrainingRuntime{}).
 		WithValidator(&ClusterTrainingRuntimeValidator{}).
