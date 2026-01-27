@@ -128,7 +128,7 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			if len(err.Error()) > 950 {
 				message = fmt.Sprintf("%s ...", message)
 			}
-			r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "TrainJobResourcesCreationFailed", message)
+			r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Reconciling", message)
 		}
 	}
 
