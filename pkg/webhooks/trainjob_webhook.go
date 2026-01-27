@@ -30,6 +30,7 @@ import (
 
 // +kubebuilder:webhook:path=/validate-trainer-kubeflow-org-v1alpha1-trainjob,mutating=false,failurePolicy=fail,sideEffects=None,groups=trainer.kubeflow.org,resources=trainjobs,verbs=create;update,versions=v1alpha1,name=validator.trainjob.trainer.kubeflow.org,admissionReviewVersions=v1
 
+// TrainJobValidator validates TrainJobs
 type TrainJobValidator struct {
 	runtimes map[string]runtime.Runtime
 }
