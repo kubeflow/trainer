@@ -15,17 +15,3 @@ patches:
       group: ""
       version: v1
       kind: Namespace
-  # Update LWS webhook service selector to use unique label
-  - path: patches/webhook_service_selector.yaml
-    target:
-      group: ""
-      version: v1
-      kind: Service
-      name: lws-webhook-service
-  # Update LWS metrics service selector to use unique label
-  - path: patches/metrics_service_selector.yaml
-    target:
-      group: ""
-      version: v1
-      kind: Service
-      name: lws-controller-manager-metrics-service
