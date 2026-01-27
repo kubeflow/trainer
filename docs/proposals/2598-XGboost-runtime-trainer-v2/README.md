@@ -1,11 +1,5 @@
 # KEP-2598: XGBoost Runtime for Kubeflow Trainer V2
 
-<!-- 
-Stage: Alpha
-Status: Implementable
--->
-
----
 
 ## Table of Contents
 
@@ -507,15 +501,7 @@ spec:
 ---
 
 ## Implementation History
-
-| Date | Change |
-|:-----|:-------|
-| 2026-01-22 | Initial KEP draft |
+- Initial draft: January 22nd 2026
+- Review changes Addressed: January 27th 2026
 
 ---
-
-<div align="center">
-
-**[Back to Top](#kep-xxxx-xgboost-runtime-for-kubeflow-trainer-v2)**
-
-</div>
