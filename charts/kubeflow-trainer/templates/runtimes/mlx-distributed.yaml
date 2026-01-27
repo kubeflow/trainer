@@ -49,7 +49,7 @@ spec:
                 spec:
                   containers:
                     - name: node
-                      image: {{ include "trainer.runtimeImage" (dict "registry" .Values.runtimes.mlxDistributed.image.registry "repository" .Values.runtimes.mlxDistributed.image.repository "tag" .Values.runtimes.mlxDistributed.image.tag "context" .) }}
+                      image: {{ include "trainer.runtimeImage" (list .Values.runtimes.mlxDistributed.image .) }}
                       securityContext:
                         runAsUser: 1000
         - name: node
@@ -59,7 +59,7 @@ spec:
                 spec:
                   containers:
                     - name: node
-                      image: {{ include "trainer.runtimeImage" (dict "registry" .Values.runtimes.mlxDistributed.image.registry "repository" .Values.runtimes.mlxDistributed.image.repository "tag" .Values.runtimes.mlxDistributed.image.tag "context" .) }}
+                      image: {{ include "trainer.runtimeImage" (list .Values.runtimes.mlxDistributed.image .) }}
                       securityContext:
                         runAsUser: 1000
                       command:

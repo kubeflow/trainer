@@ -153,6 +153,10 @@ dataCache:
 # These are optional runtime templates that can be deployed with the Helm chart.
 # Each runtime provides a blueprint for different ML frameworks and configurations.
 runtimes:
+  # -- Enable all default runtimes (torch, deepspeed, mlx, torchtune) when set to true.
+  # Individual runtime settings will be ignored if this is enabled.
+  defaultEnabled: false
+
   # -- PyTorch distributed training runtime (no custom images required)
   torchDistributed:
     # -- Enable deployment of torch-distributed runtime
@@ -194,4 +198,16 @@ runtimes:
       # -- MLX runtime image repository
       repository: kubeflow/trainer/mlx-runtime
       # -- MLX runtime image tag. Defaults to chart version if empty.
+      tag: ""
+
+  # -- TorchTune distributed training runtime
+  torchtuneDistributed:
+    # -- Enable deployment of torchtune-distributed runtime
+    enabled: false
+    image:
+      # -- TorchTune runtime image registry
+      registry: ghcr.io
+      # -- TorchTune runtime image repository
+      repository: kubeflow/trainer/torchtune-runtime
+      # -- TorchTune runtime image tag. Defaults to chart version if empty.
       tag: ""

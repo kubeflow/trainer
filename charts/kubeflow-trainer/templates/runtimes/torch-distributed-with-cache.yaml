@@ -48,7 +48,7 @@ spec:
                     image: {{ printf "ghcr.io/kubeflow/trainer/dataset-initializer:%s" (include "trainer.defaultImageTag" .) }}
                     env:
                       - name: CACHE_IMAGE
-                        value: {{ include "trainer.runtimeImage" (dict "registry" .Values.runtimes.torchDistributedWithCache.dataCache.cacheImage.registry "repository" .Values.runtimes.torchDistributedWithCache.dataCache.cacheImage.repository "tag" .Values.runtimes.torchDistributedWithCache.dataCache.cacheImage.tag "context" .) | quote }}
+                        value: {{ include "trainer.runtimeImage" (list .Values.runtimes.torchDistributedWithCache.dataCache.cacheImage .) | quote }}
                       - name: TRAIN_JOB_NAME
                         valueFrom:
                           fieldRef:

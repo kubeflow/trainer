@@ -100,13 +100,15 @@ Generate the default image tag for runtimes based on chart version
 {{- end }}
 
 {{/*
-Generate runtime image with registry, repository, and tag
-Usage: include "trainer.runtimeImage" (dict "registry" .Values.runtimes.deepspeedDistributed.image.registry "repository" .Values.runtimes.deepspeedDistributed.image.repository "tag" .Values.runtimes.deepspeedDistributed.image.tag "context" .)
+Generate runtime image with registry, repository, and tag from values
+Usage: include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .)
 */}}
 {{- define "trainer.runtimeImage" -}}
-{{- $registry := .registry | default "docker.io" }}
-{{- $repository := .repository }}
-{{- $tag := include "trainer.resolveImageTag" (dict "tag" .tag "context" .context) -}}
+{{- $imageConfig := index . 0 }}
+{{- $root := index . 1 }}
+{{- $registry := $imageConfig.registry | default "ghcr.io" }}
+{{- $repository := $imageConfig.repository }}
+{{- $tag := include "trainer.resolveImageTag" (dict "tag" ($imageConfig.tag) "context" $root) -}}
 {{- if eq $registry "docker.io" }}
 {{- printf "%s:%s" $repository $tag }}
 {{- else }}
