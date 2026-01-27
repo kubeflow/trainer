@@ -115,3 +115,10 @@ Usage: include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistribute
 {{- printf "%s/%s:%s" $registry $repository $tag }}
 {{- end }}
 {{- end }}
+{{- define "trainer.version" -}}
+{{- if hasPrefix "0.0.0-" .Chart.Version -}}
+dev
+{{- else -}}
+{{ printf "v%s" .Chart.Version }}
+{{- end -}}
+{{- end }}
