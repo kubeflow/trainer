@@ -1,10 +1,9 @@
 # KEP-2598: XGBoost Runtime for Kubeflow Trainer V2
 
-<div align="center">
-
-**Status:** Draft | **Created:** 2026-01-22
-
-</div>
+<!-- 
+Stage: Alpha
+Status: Implementable
+-->
 
 ---
 
@@ -44,7 +43,7 @@ XGBoost supports distributed training through **Rabit**, which requires coordina
 | Multi-node Training | Enable distributed XGBoost training using Rabit coordination |
 | MLPolicy Integration | Introduce `XGBoostMLPolicySource` to the existing MLPolicy API |
 | SDK Support | Integrate with Trainer V2 Python SDK |
-| CPU First | Support CPU-based distributed training initially |
+| Device Agnostic | Support both CPU and GPU workloads (GPU via `device="cuda"` param) |
 
 ---
 
@@ -54,8 +53,8 @@ XGBoost supports distributed training through **Rabit**, which requires coordina
 |:---------|:----------|
 | Framework CRD | Trainer V2 uses generic TrainJob |
 | MPI Support | Modern XGBoost uses Rabit |
-| GPU/NCCL | Deferred to future iteration |
 | Elastic Training | Out of scope |
+| Multi-GPU per Node | Initial version supports 1 worker per node; multi-GPU per node deferred |
 
 ---
 
@@ -92,7 +91,7 @@ flowchart LR
 The XGBoost runtime plugin:
 1. Adds `XGBoost *XGBoostMLPolicySource` to the existing `MLPolicySource` struct
 2. Injects Rabit environment variables automatically
-3. Configures rank-0 pod as the Rabit tracker
+3. Injects env vars so user code on rank-0 can start the Rabit tracker
 
 ---
 
@@ -111,14 +110,64 @@ The XGBoost runtime plugin:
 from kubeflow.trainer import TrainerClient, CustomTrainer
 
 def xgboost_train(num_rounds: int = 100, max_depth: int = 6):
-    pass
+    """
+    Distributed XGBoost training function.
+    
+    DMLC_* env vars are injected by the Trainer V2 XGBoost plugin.
+    Rank 0 must start the Rabit tracker before workers can connect.
+    """
+    import os
+    import xgboost as xgb
+    from sklearn.datasets import make_classification
+    from sklearn.model_selection import train_test_split
 
+    # Read injected environment variables
+    rank = int(os.environ["DMLC_TASK_ID"])
+    world_size = int(os.environ["DMLC_NUM_WORKER"])
+    tracker_uri = os.environ["DMLC_TRACKER_URI"]
+    tracker_port = int(os.environ["DMLC_TRACKER_PORT"])
+
+    # Rank 0 starts the Rabit tracker (required for coordination)
+    if rank == 0:
+        tracker = xgb.RabitTracker(host_ip="0.0.0.0", n_workers=world_size, port=tracker_port)
+        tracker.start(world_size)
+        print(f"Tracker started on {tracker_uri}:{tracker_port}")
+
+    # All workers initialize Rabit and connect to tracker
+    xgb.rabit.init()
+    print(f"Worker {rank}/{world_size} connected to tracker")
+
+    # Load data (in practice, each worker loads a shard)
+    X, y = make_classification(n_samples=10000, n_features=20, random_state=42 + rank)
+    X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2)
+    dtrain = xgb.DMatrix(X_train, label=y_train)
+    dvalid = xgb.DMatrix(X_valid, label=y_valid)
+
+    # Training params (for GPU: add device="cuda")
+    params = {"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.1}
+
+    # Distributed training - Rabit synchronizes gradients
+    model = xgb.train(params, dtrain, num_boost_round=num_rounds, evals=[(dvalid, "val")])
+
+    # Finalize Rabit and save model from rank 0
+    xgb.rabit.finalize()
+    if rank == 0:
+        model.save_model("/workspace/model/xgboost_model.json")
+
+
+# Submit the training job
 client = TrainerClient()
 job_id = client.train(
-    trainer=CustomTrainer(func=xgboost_train, func_args={"num_rounds": "100"}, num_nodes=4),
+    trainer=CustomTrainer(func=xgboost_train, func_args={"num_rounds": 100, "max_depth": 6}, num_nodes=4),
     runtime=next(r for r in client.list_runtimes() if r.name == "xgboost-distributed"),
 )
 ```
+
+> **Key Points:**
+> - All ranks run the same Python script (`python train.py`)
+> - Rank 0 must start `xgb.RabitTracker()` before other workers connect
+> - Environment variables are injected by the plugin; tracker startup is user responsibility
+> - For GPU training, add `device="cuda"` to params
 
 </details>
 
@@ -146,9 +195,9 @@ type XGBoostMLPolicySource struct {}
 ```
 
 > [!IMPORTANT]
-> Update the validation rule on `MLPolicy` struct (around line 175):
+> Update the existing validation rule on `MLPolicy` struct (line 175 in `trainingruntime_types.go`):
 > ```go
-> // +kubebuilder:validation:XValidation:rule="[has(self.torch), has(self.mpi), has(self.xgboost)].filter(x, x).size() <= 1", message="Only one ML policy can be configured"
+> // +kubebuilder:validation:XValidation:rule="!(has(self.torch) && has(self.mpi)) && !(has(self.torch) && has(self.xgboost)) && !(has(self.mpi) && has(self.xgboost))", message="Only one of the policy can be configured"
 > ```
 
 ---
@@ -163,6 +212,41 @@ The plugin injects XGBoost's native Rabit environment variables:
 | `DMLC_TRACKER_PORT` | Tracker port | `9091` |
 | `DMLC_TASK_ID` | Worker rank | `0`, `1`, `2`... |
 | `DMLC_NUM_WORKER` | Total worker count | `4` |
+
+**How `DMLC_NUM_WORKER` is calculated:**
+- Set to `numNodes` from TrainJob (or ClusterTrainingRuntime if not overridden)
+- 1 worker per pod (XGBoost can use multiple GPUs/CPUs within a single process)
+
+---
+
+### Parallelism Model
+
+XGBoost has two levels of parallelism:
+
+| Level | Mechanism | Controlled By |
+|:------|:----------|:--------------|
+| **Intra-node** | Multi-threading within a single process | `nthread` param in XGBoost |
+| **Inter-node** | Distributed coordination across pods | Rabit (this KEP) |
+
+**CPU Training:**
+- Each pod runs 1 XGBoost worker process
+- XGBoost uses all available CPU cores automatically (or set `nthread` to limit)
+- Example: 4 pods × 8 cores each = 4 Rabit workers, each using 8 threads
+
+**GPU Training:**
+- Set `device="cuda"` in XGBoost params
+- A single XGBoost process can utilize multiple GPUs on a node
+- Request GPUs via `resourcesPerNode.limits["nvidia.com/gpu"]`
+
+```python
+# CPU: uses all cores, or limit with nthread
+params = {"nthread": 8, "tree_method": "hist"}
+
+# GPU: single process uses all available GPUs on the node
+params = {"device": "cuda", "tree_method": "hist"}
+```
+
+> **Note:** Unlike PyTorch (which requires one process per GPU), XGBoost's single-process architecture can use multiple GPUs directly. Therefore, `numWorkerPerNode` is not needed for multi-GPU setups—simply request multiple GPUs per pod.
 
 ---
 
@@ -217,7 +301,7 @@ spec:
                 spec:
                   restartPolicy: OnFailure
                   containers:
-                    - name: trainer
+                    - name: node
                       image: ghcr.io/kubeflow/xgboost:latest
                       command: ["python", "train.py"]
 ```
@@ -260,187 +344,64 @@ pkg/
 
 ---
 
-### Files to Create
+### Plugin Implementation (Pseudo-code)
 
-<details>
-<summary><b>pkg/runtime/framework/plugins/xgboost/xgboost.go</b></summary>
+The XGBoost plugin will implement the `EnforceMLPolicyPlugin` interface:
 
-```go
-package xgboost
-
-import (
-    "context"
-    "fmt"
-
-    corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
-    "k8s.io/utils/ptr"
-    "sigs.k8s.io/controller-runtime/pkg/client"
-
-    trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
-    "github.com/kubeflow/trainer/v2/pkg/apply"
-    "github.com/kubeflow/trainer/v2/pkg/constants"
-    "github.com/kubeflow/trainer/v2/pkg/runtime"
-    "github.com/kubeflow/trainer/v2/pkg/runtime/framework"
-)
-
-// XGBoost implements the EnforceMLPolicyPlugin interface for XGBoost distributed training.
-// Scope: Injects Rabit environment variables into trainer containers.
-type XGBoost struct{}
-
-// Compile-time check: XGBoost must implement EnforceMLPolicyPlugin
-var _ framework.EnforceMLPolicyPlugin = (*XGBoost)(nil)
-
-const Name = "XGBoost"
-
-// New creates a new XGBoost plugin instance.
-// Called by the plugin registry during controller startup.
-func New(context.Context, client.Client, client.FieldIndexer) (framework.Plugin, error) {
-    return &XGBoost{}, nil
-}
-
-func (x *XGBoost) Name() string {
-    return Name
-}
-
-// EnforceMLPolicy injects XGBoost/Rabit environment variables into the trainer container.
-// This is called during the Build phase of the Trainer Pipeline Framework.
-//
-// Scope:
-//   - Skip if XGBoost MLPolicy is not configured
-//   - Override numNodes from TrainJob if specified
-//   - Inject DMLC_* environment variables for Rabit coordination
-func (x *XGBoost) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
-    // Guard: Only process if XGBoost policy is explicitly configured
-    if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.XGBoost == nil {
-        return nil
-    }
-
-    // Step 1: Allow TrainJob to override numNodes from the runtime
-    trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
-    if trainerPS != nil && trainerPS.Count != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
-        *trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
-    }
-
-    // Step 2: Find the trainer container to inject environment variables
-    var trainerContainer *runtime.Container
-    if trainJob.Spec.Trainer != nil {
-        trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node)
-        if trainerContainer != nil {
-            // Merge user-specified envs from TrainJob
-            apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
-        }
-    }
-
-    // Step 3: Inject Rabit coordination environment variables
-    if trainerContainer != nil {
-        numWorkers := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
-
-        apply.UpsertEnvVars(&trainerContainer.Env,
-            // DMLC_NUM_WORKER: Total number of workers in the distributed job
-            *corev1ac.EnvVar().
-                WithName(constants.XGBoostEnvNumWorker).
-                WithValue(fmt.Sprintf("%d", numWorkers)),
-            // DMLC_TASK_ID: Unique worker rank (0, 1, 2, ...) derived from Job completion index
-            *corev1ac.EnvVar().
-                WithName(constants.XGBoostEnvTaskID).
-                WithValueFrom(corev1ac.EnvVarSource().
-                    WithFieldRef(corev1ac.ObjectFieldSelector().
-                        WithFieldPath(constants.JobCompletionIndexFieldPath))),
-            // DMLC_TRACKER_URI: DNS address of rank-0 pod running the Rabit tracker
-            *corev1ac.EnvVar().
-                WithName(constants.XGBoostEnvTrackerURI).
-                WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
-            // DMLC_TRACKER_PORT: Port for Rabit tracker communication
-            *corev1ac.EnvVar().
-                WithName(constants.XGBoostEnvTrackerPort).
-                WithValue(fmt.Sprintf("%d", constants.XGBoostDefaultTrackerPort)),
-        )
-    }
-
-    return nil
-}
+```
+XGBoost Plugin:
+├── Implements: framework.EnforceMLPolicyPlugin
+├── Implements: framework.CustomValidationPlugin (for reserved env validation)
+│
+├── EnforceMLPolicy(info, trainJob):
+│   ├── Guard: Return early if XGBoost policy not configured
+│   ├── Override numNodes from TrainJob if specified
+│   ├── Find trainer container by ancestor label
+│   └── Inject DMLC_* environment variables:
+│       ├── DMLC_NUM_WORKER = numNodes
+│       ├── DMLC_TASK_ID = Job completion index (downward API)
+│       ├── DMLC_TRACKER_URI = <trainjob>-node-0-0.<trainjob>
+│       └── DMLC_TRACKER_PORT = 9091 (default)
+│
+└── Validate(info, oldObj, newObj):
+    └── Reject if user sets reserved DMLC_* env vars in TrainJob.spec.trainer.env
 ```
 
-</details>
+> **Note:** The plugin must validate that users don't manually set reserved `DMLC_*` environment variables, similar to how the Torch plugin validates `PET_*` variables.
 
 ---
 
 ### Files to Modify
 
-<details>
-<summary><b>pkg/constants/constants.go</b></summary>
+| File | Changes |
+|:-----|:--------|
+| `pkg/apis/trainer/v1alpha1/trainingruntime_types.go` | Add `XGBoostMLPolicySource` struct and field to `MLPolicySource` |
+| `pkg/constants/constants.go` | Add `DMLC_*` constants and `XGBoostReservedEnvNames` set |
+| `pkg/runtime/framework/plugins/registry.go` | Register XGBoost plugin |
+| `pkg/runtime/framework/plugins/plainml/plainml.go` | Add XGBoost to fallback exclusion check |
 
-```go
-// =============================================================================
-// XGBoost/Rabit Constants
-// Scope: Environment variable names for XGBoost distributed training via Rabit
-// Reference: https://xgboost.readthedocs.io/en/stable/tutorials/dask.html
-// =============================================================================
+---
 
-const (
-    // XGBoostEnvTrackerURI is the Rabit tracker address (rank-0 pod)
-    // Format: <trainjob>-node-0-0.<trainjob>
-    XGBoostEnvTrackerURI string = "DMLC_TRACKER_URI"
+### Container Image
 
-    // XGBoostEnvTrackerPort is the Rabit tracker port
-    XGBoostEnvTrackerPort string = "DMLC_TRACKER_PORT"
+The `ghcr.io/kubeflow/xgboost:latest` image should:
 
-    // XGBoostEnvTaskID is the worker rank (0, 1, 2, ...)
-    // Derived from Kubernetes Job completion index
-    XGBoostEnvTaskID string = "DMLC_TASK_ID"
+| Requirement | Details |
+|:------------|:--------|
+| Base | Python 3.9+ with XGBoost installed |
+| XGBoost Version | 2.0+ (supports `xgb.collective` API) |
+| CPU/GPU | Single image supports both; GPU via `device="cuda"` param at runtime |
+| Dependencies | `scikit-learn` for data utilities (optional) |
 
-    // XGBoostEnvNumWorker is the total worker count
-    XGBoostEnvNumWorker string = "DMLC_NUM_WORKER"
-
-    // XGBoostDefaultTrackerPort is the default Rabit tracker port
-    // TODO: Make configurable via XGBoostMLPolicySource in future iteration
-    XGBoostDefaultTrackerPort int32 = 9091
-)
-
-// XGBoostReservedEnvNames prevents users from overriding these in TrainJob.spec.trainer.env
-var XGBoostReservedEnvNames = sets.New(XGBoostEnvTrackerURI, XGBoostEnvTrackerPort, XGBoostEnvTaskID, XGBoostEnvNumWorker)
+**Dockerfile example:**
+```dockerfile
+FROM python:3.11-slim
+RUN pip install xgboost>=2.0 scikit-learn
+# For GPU support, use nvidia/cuda base and install xgboost[cuda]
+WORKDIR /workspace
 ```
 
-</details>
-
-<details>
-<summary><b>pkg/runtime/framework/plugins/registry.go</b></summary>
-
-```go
-import (
-    // Add XGBoost plugin import
-    "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/xgboost"
-)
-
-func NewRegistry() Registry {
-    return Registry{
-        // ... existing entries (coscheduling, volcano, mpi, plainml, torch, jobset) ...
-        
-        // Register XGBoost plugin - activates when mlPolicy.xgboost is set
-        xgboost.Name: xgboost.New,
-    }
-}
-```
-
-</details>
-
-<details>
-<summary><b>pkg/runtime/framework/plugins/plainml/plainml.go</b></summary>
-
-```go
-// PlainML is the fallback plugin when no specific MLPolicy is configured.
-// Scope: Skip processing if any framework-specific policy is set.
-// Update: Added XGBoost check to prevent PlainML from running when XGBoost is active.
-if info == nil ||
-    (info.RuntimePolicy.MLPolicySource != nil &&
-     (info.RuntimePolicy.MLPolicySource.Torch != nil ||
-      info.RuntimePolicy.MLPolicySource.MPI != nil ||
-      info.RuntimePolicy.MLPolicySource.XGBoost != nil)) {  // <-- Add XGBoost check
-    return nil
-}
-```
-
-</details>
+> **Note:** GPU workloads require the user to set `device="cuda"` in their XGBoost params and request GPU resources via `resourcesPerNode.limits["nvidia.com/gpu"]`.
 
 
 ---
