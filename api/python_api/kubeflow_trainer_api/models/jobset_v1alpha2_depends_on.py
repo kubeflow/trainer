@@ -26,8 +26,8 @@ class JobsetV1alpha2DependsOn(BaseModel):
     """
     DependsOn defines the dependency on the previous ReplicatedJob status.
     """ # noqa: E501
-    name: StrictStr = Field(description="Name of the previous ReplicatedJob.")
-    status: StrictStr = Field(description="Status defines the condition for the ReplicatedJob. Only Ready or Complete status can be set.")
+    name: StrictStr = Field(description="name of the previous ReplicatedJob.")
+    status: StrictStr = Field(description="status defines the condition for the ReplicatedJob. Only Ready or Complete status can be set.")
     __properties: ClassVar[List[str]] = ["name", "status"]
 
     model_config = ConfigDict(

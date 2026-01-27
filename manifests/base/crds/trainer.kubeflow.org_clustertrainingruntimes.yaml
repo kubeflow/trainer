@@ -686,7 +686,7 @@ spec:
                     properties:
                       coordinator:
                         description: |-
-                          Coordinator can be used to assign a specific pod as the coordinator for
+                          coordinator can be used to assign a specific pod as the coordinator for
                           the JobSet. If defined, an annotation will be added to all Jobs and pods with
                           coordinator pod, which contains the stable network endpoint where the
                           coordinator pod can be reached.
@@ -694,16 +694,16 @@ spec:
                         properties:
                           jobIndex:
                             description: |-
-                              JobIndex is the index of Job which contains the coordinator pod
+                              jobIndex is the index of Job which contains the coordinator pod
                               (i.e., for a ReplicatedJob with N replicas, there are Job indexes 0 to N-1).
                             type: integer
                           podIndex:
-                            description: PodIndex is the Job completion index of the
+                            description: podIndex is the Job completion index of the
                               coordinator pod.
                             type: integer
                           replicatedJob:
                             description: |-
-                              ReplicatedJob is the name of the ReplicatedJob which contains
+                              replicatedJob is the name of the ReplicatedJob which contains
                               the coordinator pod.
                             type: string
                         required:
@@ -711,29 +711,34 @@ spec:
                         type: object
                       failurePolicy:
                         description: |-
-                          FailurePolicy, if set, configures when to declare the JobSet as
+                          failurePolicy configures when to declare the JobSet as
                           failed.
                           The JobSet is always declared failed if any job in the set
                           finished with status failed.
                         properties:
                           maxRestarts:
                             description: |-
-                              MaxRestarts defines the limit on the number of JobSet restarts.
-                              A restart is achieved by recreating all active child jobs.
+                              maxRestarts defines the limit on the number of JobSet restarts.
+                              If the restart strategy "InPlaceRestart" is used, this field
+                              also defines the limit on the number of container restarts of
+                              any child container. This is required to handle the edge case
+                              in which a container keeps failing too fast to complete a JobSet
+                              restart.
                             format: int32
                             type: integer
                           restartStrategy:
                             default: Recreate
                             description: |-
-                              RestartStrategy defines the strategy to use when restarting the JobSet.
+                              restartStrategy defines the strategy to use when restarting the JobSet.
                               Defaults to Recreate.
                             enum:
                             - Recreate
                             - BlockingRecreate
+                            - InPlaceRestart
                             type: string
                           rules:
                             description: |-
-                              List of failure policy rules for this JobSet.
+                              rules is a list of failure policy rules for this JobSet.
                               For a given Job failure, the rules will be evaluated in order,
                               and only the first matching rule will be executed.
                               If no matching rule is found, the RestartJobSet action is applied.
@@ -746,7 +751,7 @@ spec:
                                 order and the first matching rule is executed.
                               properties:
                                 action:
-                                  description: The action to take if the rule is matched.
+                                  description: action to take if the rule is matched.
                                   enum:
                                   - FailJobSet
                                   - RestartJobSet
@@ -754,13 +759,14 @@ spec:
                                   type: string
                                 name:
                                   description: |-
-                                    The name of the failure policy rule.
+                                    name of the failure policy rule.
                                     The name is defaulted to 'failurePolicyRuleN' where N is the index of the failure policy rule.
                                     The name must match the regular expression "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$".
                                   type: string
                                 onJobFailureMessagePatterns:
                                   description: |-
-                                    The requirement on the job failure message. The requirement is satisfied
+                                    onJobFailureMessagePatterns is a requirement on the job failure messages.
+                                    The requirement is satisfied
                                     if at least one pattern (regex) matches the job failure message. An
                                     empty list matches any job failure message.
                                     The syntax of the regular expressions accepted is the same general
@@ -773,7 +779,8 @@ spec:
                                   type: array
                                 onJobFailureReasons:
                                   description: |-
-                                    The requirement on the job failure reasons. The requirement is satisfied
+                                    onJobFailureReasons is a list of job failures reasons.
+                                    The requirement is satisfied
                                     if at least one reason matches the list. An empty list matches any job
                                     failure reason.
                                   items:
@@ -781,7 +788,7 @@ spec:
                                   type: array
                                 targetReplicatedJobs:
                                   description: |-
-                                    TargetReplicatedJobs are the names of the replicated jobs the operator applies to.
+                                    targetReplicatedJobs are the names of the replicated jobs the operator applies to.
                                     An empty list will apply to all replicatedJobs.
                                   items:
                                     type: string
@@ -798,7 +805,7 @@ spec:
                           rule: self == oldSelf
                       managedBy:
                         description: |-
-                          ManagedBy is used to indicate the controller or entity that manages a JobSet.
+                          managedBy is used to indicate the controller or entity that manages a JobSet.
                           The built-in JobSet controller reconciles JobSets which don't have this
                           field at all or the field value is the reserved string
                           `jobset.sigs.k8s.io/jobset-controller`, but skips reconciling JobSets
@@ -811,23 +818,23 @@ spec:
                           The field is immutable.
                         type: string
                       network:
-                        description: Network defines the networking options for the
+                        description: network defines the networking options for the
                           jobset.
                         properties:
                           enableDNSHostnames:
                             description: |-
-                              EnableDNSHostnames allows pods to be reached via their hostnames.
+                              enableDNSHostnames allows pods to be reached via their hostnames.
                               Pods will be reachable using the fully qualified pod hostname:
                               <jobSet.name>-<spec.replicatedJob.name>-<job-index>-<pod-index>.<subdomain>
                             type: boolean
                           publishNotReadyAddresses:
                             description: |-
-                              Indicates if DNS records of pods should be published before the pods are ready.
+                              publishNotReadyAddresses indicates if DNS records of pods should be published before the pods are ready.
                               Defaults to True.
                             type: boolean
                           subdomain:
                             description: |-
-                              Subdomain is an explicit choice for a network subdomain name
+                              subdomain is an explicit choice for a network subdomain name
                               When set, any replicated job in the set is added to this network.
                               Defaults to <jobSet.name> if not set.
                             type: string
@@ -836,13 +843,13 @@ spec:
                         - message: Value is immutable
                           rule: self == oldSelf
                       replicatedJobs:
-                        description: ReplicatedJobs is the group of jobs that will
+                        description: replicatedJobs is the group of jobs that will
                           form the set.
                         items:
                           properties:
                             dependsOn:
                               description: |-
-                                DependsOn is an optional list that specifies the preceding ReplicatedJobs upon which
+                                dependsOn is an optional list that specifies the preceding ReplicatedJobs upon which
                                 the current ReplicatedJob depends. If specified, the ReplicatedJob will be created
                                 only after the referenced ReplicatedJobs reach their desired state.
                                 The Order of ReplicatedJobs is defined by their enumeration in the slice.
@@ -856,10 +863,10 @@ spec:
                                   previous ReplicatedJob status.
                                 properties:
                                   name:
-                                    description: Name of the previous ReplicatedJob.
+                                    description: name of the previous ReplicatedJob.
                                     type: string
                                   status:
-                                    description: Status defines the condition for
+                                    description: status defines the condition for
                                       the ReplicatedJob. Only Ready or Complete status
                                       can be set.
                                     enum:
@@ -880,23 +887,23 @@ spec:
                                 rule: self == oldSelf
                             groupName:
                               default: default
-                              description: GroupName defines the name of the group
+                              description: groupName defines the name of the group
                                 this ReplicatedJob belongs to. Defaults to "default"
                               type: string
                             name:
                               description: |-
-                                Name is the name of the entry and will be used as a suffix
+                                name is the name of the entry and will be used as a suffix
                                 for the Job name.
                               type: string
                             replicas:
                               default: 1
                               description: |-
-                                Replicas is the number of jobs that will be created from this ReplicatedJob's template.
+                                replicas is the number of jobs that will be created from this ReplicatedJob's template.
                                 Jobs names will be in the format: <jobSet.name>-<spec.replicatedJob.name>-<job-index>
                               format: int32
                               type: integer
                             template:
-                              description: Template defines the template of the Job
+                              description: template defines the template of the Job
                                 that will be created.
                               properties:
                                 metadata:
@@ -10428,12 +10435,12 @@ spec:
                         x-kubernetes-list-type: map
                       startupPolicy:
                         description: |-
-                          StartupPolicy, if set, configures in what order jobs must be started
+                          startupPolicy configures in what order jobs must be started
                           Deprecated: StartupPolicy is deprecated, please use the DependsOn API.
                         properties:
                           startupPolicyOrder:
                             description: |-
-                              StartupPolicyOrder determines the startup order of the ReplicatedJobs.
+                              startupPolicyOrder determines the startup order of the ReplicatedJobs.
                               AnyOrder means to start replicated jobs in any order.
                               InOrder means to start them as they are listed in the JobSet. A ReplicatedJob is started only
                               when all the jobs of the previous one are ready.
@@ -10449,13 +10456,13 @@ spec:
                           rule: self == oldSelf
                       successPolicy:
                         description: |-
-                          SuccessPolicy configures when to declare the JobSet as
+                          successPolicy configures when to declare the JobSet as
                           succeeded.
                           The JobSet is always declared succeeded if all jobs in the set
                           finished with status complete.
                         properties:
                           operator:
-                            description: Operator determines either All or Any of
+                            description: operator determines either All or Any of
                               the selected jobs should succeed to consider the JobSet
                               successful
                             enum:
@@ -10464,7 +10471,7 @@ spec:
                             type: string
                           targetReplicatedJobs:
                             description: |-
-                              TargetReplicatedJobs are the names of the replicated jobs the operator will apply to.
+                              targetReplicatedJobs are the names of the replicated jobs the operator will apply to.
                               A null or empty list will apply to all replicatedJobs.
                             items:
                               type: string
@@ -10477,12 +10484,12 @@ spec:
                         - message: Value is immutable
                           rule: self == oldSelf
                       suspend:
-                        description: Suspend suspends all running child Jobs when
+                        description: suspend suspends all running child Jobs when
                           set to true.
                         type: boolean
                       ttlSecondsAfterFinished:
                         description: |-
-                          TTLSecondsAfterFinished limits the lifetime of a JobSet that has finished
+                          ttlSecondsAfterFinished limits the lifetime of a JobSet that has finished
                           execution (either Complete or Failed). If this field is set,
                           TTLSecondsAfterFinished after the JobSet finishes, it is eligible to be
                           automatically deleted. When the JobSet is being deleted, its lifecycle
@@ -10492,6 +10499,504 @@ spec:
                         format: int32
                         minimum: 0
                         type: integer
+                      volumeClaimPolicies:
+                        description: |-
+                          volumeClaimPolicies is a list of policies for persistent volume claims that pods are allowed
+                          to reference. JobSet controller automatically adds the required volume claims to the
+                          pod template. Every claim in this list must have at least one matching (by name)
+                          volumeMount in one container in the template.
+                        items:
+                          description: volumeClaimPolicy defines volume claim templates
+                            and lifecycle management for shared PVCs.
+                          properties:
+                            retentionPolicy:
+                              description: |-
+                                retentionPolicy describes the lifecycle of persistent volume claims created from the template.
+                                By default, all persistent volume claims are deleted once JobSet is deleted.
+                              properties:
+                                whenDeleted:
+                                  default: Delete
+                                  description: whenDeleted specifies what happens
+                                    to PVCs when JobSet is deleted.
+                                  enum:
+                                  - Delete
+                                  - Retain
+                                  type: string
+                              type: object
+                            templates:
+                              description: |-
+                                templates is a list of shared PVC claims that ReplicatedJobs are allowed to reference.
+                                The JobSet controller is responsible for creating shared PVCs that can be mounted by
+                                multiple ReplicatedJobs. Every claim in this list must have a matching (by name)
+                                volumeMount in one container or initContainer in at least one ReplicatedJob template.
+                                ReplicatedJob template must not have volumes with the same name as defined in this template.
+                                PVC template must not have the namespace parameter.
+                                Generated PVC naming convention: <claim-name>-<jobset-name>
+                                Example: "model-cache-trainjob" (shared volume across all ReplicatedJobs).
+                              items:
+                                description: PersistentVolumeClaim is a user's request
+                                  for and claim to a persistent volume
+                                properties:
+                                  apiVersion:
+                                    description: |-
+                                      APIVersion defines the versioned schema of this representation of an object.
+                                      Servers should convert recognized schemas to the latest internal value, and
+                                      may reject unrecognized values.
+                                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+                                    type: string
+                                  kind:
+                                    description: |-
+                                      Kind is a string value representing the REST resource this object represents.
+                                      Servers may infer this from the endpoint the client submits requests to.
+                                      Cannot be updated.
+                                      In CamelCase.
+                                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                                    type: string
+                                  metadata:
+                                    description: |-
+                                      Standard object's metadata.
+                                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+                                    properties:
+                                      annotations:
+                                        additionalProperties:
+                                          type: string
+                                        type: object
+                                      finalizers:
+                                        items:
+                                          type: string
+                                        type: array
+                                      labels:
+                                        additionalProperties:
+                                          type: string
+                                        type: object
+                                      name:
+                                        type: string
+                                      namespace:
+                                        type: string
+                                    type: object
+                                  spec:
+                                    description: |-
+                                      spec defines the desired characteristics of a volume requested by a pod author.
+                                      More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
+                                    properties:
+                                      accessModes:
+                                        description: |-
+                                          accessModes contains the desired access modes the volume should have.
+                                          More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      dataSource:
+                                        description: |-
+                                          dataSource field can be used to specify either:
+                                          * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
+                                          * An existing PVC (PersistentVolumeClaim)
+                                          If the provisioner or an external controller can support the specified data source,
+                                          it will create a new volume based on the contents of the specified data source.
+                                          When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,
+                                          and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.
+                                          If the namespace is specified, then dataSourceRef will not be copied to dataSource.
+                                        properties:
+                                          apiGroup:
+                                            description: |-
+                                              APIGroup is the group for the resource being referenced.
+                                              If APIGroup is not specified, the specified Kind must be in the core API group.
+                                              For any other third-party types, APIGroup is required.
+                                            type: string
+                                          kind:
+                                            description: Kind is the type of resource
+                                              being referenced
+                                            type: string
+                                          name:
+                                            description: Name is the name of resource
+                                              being referenced
+                                            type: string
+                                        required:
+                                        - kind
+                                        - name
+                                        type: object
+                                        x-kubernetes-map-type: atomic
+                                      dataSourceRef:
+                                        description: |-
+                                          dataSourceRef specifies the object from which to populate the volume with data, if a non-empty
+                                          volume is desired. This may be any object from a non-empty API group (non
+                                          core object) or a PersistentVolumeClaim object.
+                                          When this field is specified, volume binding will only succeed if the type of
+                                          the specified object matches some installed volume populator or dynamic
+                                          provisioner.
+                                          This field will replace the functionality of the dataSource field and as such
+                                          if both fields are non-empty, they must have the same value. For backwards
+                                          compatibility, when namespace isn't specified in dataSourceRef,
+                                          both fields (dataSource and dataSourceRef) will be set to the same
+                                          value automatically if one of them is empty and the other is non-empty.
+                                          When namespace is specified in dataSourceRef,
+                                          dataSource isn't set to the same value and must be empty.
+                                          There are three important differences between dataSource and dataSourceRef:
+                                          * While dataSource only allows two specific types of objects, dataSourceRef
+                                            allows any non-core object, as well as PersistentVolumeClaim objects.
+                                          * While dataSource ignores disallowed values (dropping them), dataSourceRef
+                                            preserves all values, and generates an error if a disallowed value is
+                                            specified.
+                                          * While dataSource only allows local objects, dataSourceRef allows objects
+                                            in any namespaces.
+                                          (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
+                                          (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
+                                        properties:
+                                          apiGroup:
+                                            description: |-
+                                              APIGroup is the group for the resource being referenced.
+                                              If APIGroup is not specified, the specified Kind must be in the core API group.
+                                              For any other third-party types, APIGroup is required.
+                                            type: string
+                                          kind:
+                                            description: Kind is the type of resource
+                                              being referenced
+                                            type: string
+                                          name:
+                                            description: Name is the name of resource
+                                              being referenced
+                                            type: string
+                                          namespace:
+                                            description: |-
+                                              Namespace is the namespace of resource being referenced
+                                              Note that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details.
+                                              (Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
+                                            type: string
+                                        required:
+                                        - kind
+                                        - name
+                                        type: object
+                                      resources:
+                                        description: |-
+                                          resources represents the minimum resources the volume should have.
+                                          Users are allowed to specify resource requirements
+                                          that are lower than previous value but must still be higher than capacity recorded in the
+                                          status field of the claim.
+                                          More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
+                                        properties:
+                                          limits:
+                                            additionalProperties:
+                                              anyOf:
+                                              - type: integer
+                                              - type: string
+                                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                              x-kubernetes-int-or-string: true
+                                            description: |-
+                                              Limits describes the maximum amount of compute resources allowed.
+                                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                            type: object
+                                          requests:
+                                            additionalProperties:
+                                              anyOf:
+                                              - type: integer
+                                              - type: string
+                                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                              x-kubernetes-int-or-string: true
+                                            description: |-
+                                              Requests describes the minimum amount of compute resources required.
+                                              If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                                              otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                                            type: object
+                                        type: object
+                                      selector:
+                                        description: selector is a label query over
+                                          volumes to consider for binding.
+                                        properties:
+                                          matchExpressions:
+                                            description: matchExpressions is a list
+                                              of label selector requirements. The
+                                              requirements are ANDed.
+                                            items:
+                                              description: |-
+                                                A label selector requirement is a selector that contains values, a key, and an operator that
+                                                relates the key and values.
+                                              properties:
+                                                key:
+                                                  description: key is the label key
+                                                    that the selector applies to.
+                                                  type: string
+                                                operator:
+                                                  description: |-
+                                                    operator represents a key's relationship to a set of values.
+                                                    Valid operators are In, NotIn, Exists and DoesNotExist.
+                                                  type: string
+                                                values:
+                                                  description: |-
+                                                    values is an array of string values. If the operator is In or NotIn,
+                                                    the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                                    the values array must be empty. This array is replaced during a strategic
+                                                    merge patch.
+                                                  items:
+                                                    type: string
+                                                  type: array
+                                                  x-kubernetes-list-type: atomic
+                                              required:
+                                              - key
+                                              - operator
+                                              type: object
+                                            type: array
+                                            x-kubernetes-list-type: atomic
+                                          matchLabels:
+                                            additionalProperties:
+                                              type: string
+                                            description: |-
+                                              matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                              map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                              operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                            type: object
+                                        type: object
+                                        x-kubernetes-map-type: atomic
+                                      storageClassName:
+                                        description: |-
+                                          storageClassName is the name of the StorageClass required by the claim.
+                                          More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
+                                        type: string
+                                      volumeAttributesClassName:
+                                        description: |-
+                                          volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+                                          If specified, the CSI driver will create or update the volume with the attributes defined
+                                          in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,
+                                          it can be changed after the claim is created. An empty string or nil value indicates that no
+                                          VolumeAttributesClass will be applied to the claim. If the claim enters an Infeasible error state,
+                                          this field can be reset to its previous value (including nil) to cancel the modification.
+                                          If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
+                                          set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
+                                          exists.
+                                          More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
+                                        type: string
+                                      volumeMode:
+                                        description: |-
+                                          volumeMode defines what type of volume is required by the claim.
+                                          Value of Filesystem is implied when not included in claim spec.
+                                        type: string
+                                      volumeName:
+                                        description: volumeName is the binding reference
+                                          to the PersistentVolume backing this claim.
+                                        type: string
+                                    type: object
+                                  status:
+                                    description: |-
+                                      status represents the current information/status of a persistent volume claim.
+                                      Read-only.
+                                      More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
+                                    properties:
+                                      accessModes:
+                                        description: |-
+                                          accessModes contains the actual access modes the volume backing the PVC has.
+                                          More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                      allocatedResourceStatuses:
+                                        additionalProperties:
+                                          description: |-
+                                            When a controller receives persistentvolume claim update with ClaimResourceStatus for a resource
+                                            that it does not recognizes, then it should ignore that update and let other controllers
+                                            handle it.
+                                          type: string
+                                        description: "allocatedResourceStatuses stores
+                                          status of resource being resized for the
+                                          given PVC.\nKey names follow standard Kubernetes
+                                          label syntax. Valid values are either:\n\t*
+                                          Un-prefixed keys:\n\t\t- storage - the capacity
+                                          of the volume.\n\t* Custom resources must
+                                          use implementation-defined prefixed names
+                                          such as \"example.com/my-custom-resource\"\nApart
+                                          from above values - keys that are unprefixed
+                                          or have kubernetes.io prefix are considered\nreserved
+                                          and hence may not be used.\n\nClaimResourceStatus
+                                          can be in any of following states:\n\t-
+                                          ControllerResizeInProgress:\n\t\tState set
+                                          when resize controller starts resizing the
+                                          volume in control-plane.\n\t- ControllerResizeFailed:\n\t\tState
+                                          set when resize has failed in resize controller
+                                          with a terminal error.\n\t- NodeResizePending:\n\t\tState
+                                          set when resize controller has finished
+                                          resizing the volume but further resizing
+                                          of\n\t\tvolume is needed on the node.\n\t-
+                                          NodeResizeInProgress:\n\t\tState set when
+                                          kubelet starts resizing the volume.\n\t-
+                                          NodeResizeFailed:\n\t\tState set when resizing
+                                          has failed in kubelet with a terminal error.
+                                          Transient errors don't set\n\t\tNodeResizeFailed.\nFor
+                                          example: if expanding a PVC for more capacity
+                                          - this field can be one of the following
+                                          states:\n\t- pvc.status.allocatedResourceStatus['storage']
+                                          = \"ControllerResizeInProgress\"\n     -
+                                          pvc.status.allocatedResourceStatus['storage']
+                                          = \"ControllerResizeFailed\"\n     - pvc.status.allocatedResourceStatus['storage']
+                                          = \"NodeResizePending\"\n     - pvc.status.allocatedResourceStatus['storage']
+                                          = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage']
+                                          = \"NodeResizeFailed\"\nWhen this field
+                                          is not set, it means that no resize operation
+                                          is in progress for the given PVC.\n\nA controller
+                                          that receives PVC update with previously
+                                          unknown resourceName or ClaimResourceStatus\nshould
+                                          ignore the update for the purpose it was
+                                          designed. For example - a controller that\nonly
+                                          is responsible for resizing capacity of
+                                          the volume, should ignore PVC updates that
+                                          change other valid\nresources associated
+                                          with PVC."
+                                        type: object
+                                        x-kubernetes-map-type: granular
+                                      allocatedResources:
+                                        additionalProperties:
+                                          anyOf:
+                                          - type: integer
+                                          - type: string
+                                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                          x-kubernetes-int-or-string: true
+                                        description: "allocatedResources tracks the
+                                          resources allocated to a PVC including its
+                                          capacity.\nKey names follow standard Kubernetes
+                                          label syntax. Valid values are either:\n\t*
+                                          Un-prefixed keys:\n\t\t- storage - the capacity
+                                          of the volume.\n\t* Custom resources must
+                                          use implementation-defined prefixed names
+                                          such as \"example.com/my-custom-resource\"\nApart
+                                          from above values - keys that are unprefixed
+                                          or have kubernetes.io prefix are considered\nreserved
+                                          and hence may not be used.\n\nCapacity reported
+                                          here may be larger than the actual capacity
+                                          when a volume expansion operation\nis requested.\nFor
+                                          storage quota, the larger value from allocatedResources
+                                          and PVC.spec.resources is used.\nIf allocatedResources
+                                          is not set, PVC.spec.resources alone is
+                                          used for quota calculation.\nIf a volume
+                                          expansion capacity request is lowered, allocatedResources
+                                          is only\nlowered if there are no expansion
+                                          operations in progress and if the actual
+                                          volume capacity\nis equal or lower than
+                                          the requested capacity.\n\nA controller
+                                          that receives PVC update with previously
+                                          unknown resourceName\nshould ignore the
+                                          update for the purpose it was designed.
+                                          For example - a controller that\nonly is
+                                          responsible for resizing capacity of the
+                                          volume, should ignore PVC updates that change
+                                          other valid\nresources associated with PVC."
+                                        type: object
+                                      capacity:
+                                        additionalProperties:
+                                          anyOf:
+                                          - type: integer
+                                          - type: string
+                                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                          x-kubernetes-int-or-string: true
+                                        description: capacity represents the actual
+                                          resources of the underlying volume.
+                                        type: object
+                                      conditions:
+                                        description: |-
+                                          conditions is the current Condition of persistent volume claim. If underlying persistent volume is being
+                                          resized then the Condition will be set to 'Resizing'.
+                                        items:
+                                          description: PersistentVolumeClaimCondition
+                                            contains details about state of pvc
+                                          properties:
+                                            lastProbeTime:
+                                              description: lastProbeTime is the time
+                                                we probed the condition.
+                                              format: date-time
+                                              type: string
+                                            lastTransitionTime:
+                                              description: lastTransitionTime is the
+                                                time the condition transitioned from
+                                                one status to another.
+                                              format: date-time
+                                              type: string
+                                            message:
+                                              description: message is the human-readable
+                                                message indicating details about last
+                                                transition.
+                                              type: string
+                                            reason:
+                                              description: |-
+                                                reason is a unique, this should be a short, machine understandable string that gives the reason
+                                                for condition's last transition. If it reports "Resizing" that means the underlying
+                                                persistent volume is being resized.
+                                              type: string
+                                            status:
+                                              description: |-
+                                                Status is the status of the condition.
+                                                Can be True, False, Unknown.
+                                                More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required
+                                              type: string
+                                            type:
+                                              description: |-
+                                                Type is the type of the condition.
+                                                More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about
+                                              type: string
+                                          required:
+                                          - status
+                                          - type
+                                          type: object
+                                        type: array
+                                        x-kubernetes-list-map-keys:
+                                        - type
+                                        x-kubernetes-list-type: map
+                                      currentVolumeAttributesClassName:
+                                        description: |-
+                                          currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.
+                                          When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim
+                                        type: string
+                                      modifyVolumeStatus:
+                                        description: |-
+                                          ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
+                                          When this is unset, there is no ModifyVolume operation being attempted.
+                                        properties:
+                                          status:
+                                            description: "status is the status of
+                                              the ControllerModifyVolume operation.
+                                              It can be in any of following states:\n
+                                              - Pending\n   Pending indicates that
+                                              the PersistentVolumeClaim cannot be
+                                              modified due to unmet requirements,
+                                              such as\n   the specified VolumeAttributesClass
+                                              not existing.\n - InProgress\n   InProgress
+                                              indicates that the volume is being modified.\n
+                                              - Infeasible\n  Infeasible indicates
+                                              that the request has been rejected as
+                                              invalid by the CSI driver. To\n\t  resolve
+                                              the error, a valid VolumeAttributesClass
+                                              needs to be specified.\nNote: New statuses
+                                              can be added in the future. Consumers
+                                              should check for unknown statuses and
+                                              fail appropriately."
+                                            type: string
+                                          targetVolumeAttributesClassName:
+                                            description: targetVolumeAttributesClassName
+                                              is the name of the VolumeAttributesClass
+                                              the PVC currently being reconciled
+                                            type: string
+                                        required:
+                                        - status
+                                        type: object
+                                      phase:
+                                        description: phase represents the current
+                                          phase of PersistentVolumeClaim.
+                                        type: string
+                                    type: object
+                                type: object
+                              maxItems: 50
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          type: object
+                          x-kubernetes-validations:
+                          - message: namespace cannot be set for VolumeClaimPolicies
+                              templates
+                            rule: self.templates.all(t, !has(t.metadata.namespace)
+                              || size(t.metadata.namespace) == 0)
+                        maxItems: 50
+                        type: array
+                        x-kubernetes-list-type: atomic
+                        x-kubernetes-validations:
+                        - message: Value is immutable
+                          rule: self == oldSelf
                     type: object
                     x-kubernetes-validations:
                     - message: StartupPolicy and DependsOn APIs are mutually exclusive

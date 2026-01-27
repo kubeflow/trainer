@@ -28,12 +28,14 @@ class JobsetV1alpha2JobSetStatus(BaseModel):
     """
     JobSetStatus defines the observed state of JobSet
     """ # noqa: E501
-    conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = None
-    replicated_jobs_status: Optional[List[JobsetV1alpha2ReplicatedJobStatus]] = Field(default=None, description="ReplicatedJobsStatus track the number of JobsReady for each replicatedJob.", alias="replicatedJobsStatus")
-    restarts: Optional[StrictInt] = Field(default=0, description="Restarts tracks the number of times the JobSet has restarted (i.e. recreated in case of RecreateAll policy).")
-    restarts_count_towards_max: Optional[StrictInt] = Field(default=None, description="RestartsCountTowardsMax tracks the number of times the JobSet has restarted that counts towards the maximum allowed number of restarts.", alias="restartsCountTowardsMax")
-    terminal_state: Optional[StrictStr] = Field(default=None, description="TerminalState the state of the JobSet when it finishes execution. It can be either Completed or Failed. Otherwise, it is empty by default.", alias="terminalState")
-    __properties: ClassVar[List[str]] = ["conditions", "replicatedJobsStatus", "restarts", "restartsCountTowardsMax", "terminalState"]
+    conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = Field(default=None, description="conditions track status")
+    current_in_place_restart_attempt: Optional[StrictInt] = Field(default=None, description="currentInPlaceRestartAttempt tracks the current in-place restart attempt of the JobSet. It is read by the agent. If the in-place restart attempt of the Pod is equal to currentInPlaceRestartAttempt, the agent should lift its barrier to allow the worker container to start running.", alias="currentInPlaceRestartAttempt")
+    previous_in_place_restart_attempt: Optional[StrictInt] = Field(default=None, description="previousInPlaceRestartAttempt tracks the previous in-place restart attempt of the JobSet. It is read by the agent. If the in-place restart attempt of the Pod is smaller than or equal to previousInPlaceRestartAttempt, the agent should restart its Pod in-place.", alias="previousInPlaceRestartAttempt")
+    replicated_jobs_status: Optional[List[JobsetV1alpha2ReplicatedJobStatus]] = Field(default=None, description="replicatedJobsStatus tracks the number of JobsReady for each replicatedJob.", alias="replicatedJobsStatus")
+    restarts: Optional[StrictInt] = Field(default=0, description="restarts tracks the number of times the JobSet has restarted (i.e. recreated in case of RecreateAll policy).")
+    restarts_count_towards_max: Optional[StrictInt] = Field(default=None, description="restartsCountTowardsMax tracks the number of times the JobSet has restarted that counts towards the maximum allowed number of restarts.", alias="restartsCountTowardsMax")
+    terminal_state: Optional[StrictStr] = Field(default=None, description="terminalState tracks the state of the JobSet when it finishes execution. It can be either Completed or Failed. Otherwise, it is empty by default.", alias="terminalState")
+    __properties: ClassVar[List[str]] = ["conditions", "currentInPlaceRestartAttempt", "previousInPlaceRestartAttempt", "replicatedJobsStatus", "restarts", "restartsCountTowardsMax", "terminalState"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -101,6 +103,8 @@ class JobsetV1alpha2JobSetStatus(BaseModel):
 
         _obj = cls.model_validate({
             "conditions": [IoK8sApimachineryPkgApisMetaV1Condition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
+            "currentInPlaceRestartAttempt": obj.get("currentInPlaceRestartAttempt"),
+            "previousInPlaceRestartAttempt": obj.get("previousInPlaceRestartAttempt"),
             "replicatedJobsStatus": [JobsetV1alpha2ReplicatedJobStatus.from_dict(_item) for _item in obj["replicatedJobsStatus"]] if obj.get("replicatedJobsStatus") is not None else None,
             "restarts": obj.get("restarts") if obj.get("restarts") is not None else 0,
             "restartsCountTowardsMax": obj.get("restartsCountTowardsMax"),

@@ -26,9 +26,9 @@ class JobsetV1alpha2Coordinator(BaseModel):
     """
     Coordinator defines which pod can be marked as the coordinator for the JobSet workload.
     """ # noqa: E501
-    job_index: Optional[StrictInt] = Field(default=None, description="JobIndex is the index of Job which contains the coordinator pod (i.e., for a ReplicatedJob with N replicas, there are Job indexes 0 to N-1).", alias="jobIndex")
-    pod_index: Optional[StrictInt] = Field(default=None, description="PodIndex is the Job completion index of the coordinator pod.", alias="podIndex")
-    replicated_job: StrictStr = Field(description="ReplicatedJob is the name of the ReplicatedJob which contains the coordinator pod.", alias="replicatedJob")
+    job_index: Optional[StrictInt] = Field(default=None, description="jobIndex is the index of Job which contains the coordinator pod (i.e., for a ReplicatedJob with N replicas, there are Job indexes 0 to N-1).", alias="jobIndex")
+    pod_index: Optional[StrictInt] = Field(default=None, description="podIndex is the Job completion index of the coordinator pod.", alias="podIndex")
+    replicated_job: StrictStr = Field(description="replicatedJob is the name of the ReplicatedJob which contains the coordinator pod.", alias="replicatedJob")
     __properties: ClassVar[List[str]] = ["jobIndex", "podIndex", "replicatedJob"]
 
     model_config = ConfigDict(

@@ -25,6 +25,7 @@ from kubeflow_trainer_api.models.jobset_v1alpha2_network import JobsetV1alpha2Ne
 from kubeflow_trainer_api.models.jobset_v1alpha2_replicated_job import JobsetV1alpha2ReplicatedJob
 from kubeflow_trainer_api.models.jobset_v1alpha2_startup_policy import JobsetV1alpha2StartupPolicy
 from kubeflow_trainer_api.models.jobset_v1alpha2_success_policy import JobsetV1alpha2SuccessPolicy
+from kubeflow_trainer_api.models.jobset_v1alpha2_volume_claim_policy import JobsetV1alpha2VolumeClaimPolicy
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -32,16 +33,17 @@ class JobsetV1alpha2JobSetSpec(BaseModel):
     """
     JobSetSpec defines the desired state of JobSet
     """ # noqa: E501
-    coordinator: Optional[JobsetV1alpha2Coordinator] = Field(default=None, description="Coordinator can be used to assign a specific pod as the coordinator for the JobSet. If defined, an annotation will be added to all Jobs and pods with coordinator pod, which contains the stable network endpoint where the coordinator pod can be reached. jobset.sigs.k8s.io/coordinator=<pod hostname>.<headless service>")
-    failure_policy: Optional[JobsetV1alpha2FailurePolicy] = Field(default=None, description="FailurePolicy, if set, configures when to declare the JobSet as failed. The JobSet is always declared failed if any job in the set finished with status failed.", alias="failurePolicy")
-    managed_by: Optional[StrictStr] = Field(default=None, description="ManagedBy is used to indicate the controller or entity that manages a JobSet. The built-in JobSet controller reconciles JobSets which don't have this field at all or the field value is the reserved string `jobset.sigs.k8s.io/jobset-controller`, but skips reconciling JobSets with a custom value for this field.  The value must be a valid domain-prefixed path (e.g. acme.io/foo) - all characters before the first \"/\" must be a valid subdomain as defined by RFC 1123. All characters trailing the first \"/\" must be valid HTTP Path characters as defined by RFC 3986. The value cannot exceed 63 characters. The field is immutable.", alias="managedBy")
-    network: Optional[JobsetV1alpha2Network] = Field(default=None, description="Network defines the networking options for the jobset.")
-    replicated_jobs: Optional[List[JobsetV1alpha2ReplicatedJob]] = Field(default=None, description="ReplicatedJobs is the group of jobs that will form the set.", alias="replicatedJobs")
-    startup_policy: Optional[JobsetV1alpha2StartupPolicy] = Field(default=None, description="StartupPolicy, if set, configures in what order jobs must be started Deprecated: StartupPolicy is deprecated, please use the DependsOn API.", alias="startupPolicy")
-    success_policy: Optional[JobsetV1alpha2SuccessPolicy] = Field(default=None, description="SuccessPolicy configures when to declare the JobSet as succeeded. The JobSet is always declared succeeded if all jobs in the set finished with status complete.", alias="successPolicy")
-    suspend: Optional[StrictBool] = Field(default=None, description="Suspend suspends all running child Jobs when set to true.")
-    ttl_seconds_after_finished: Optional[StrictInt] = Field(default=None, description="TTLSecondsAfterFinished limits the lifetime of a JobSet that has finished execution (either Complete or Failed). If this field is set, TTLSecondsAfterFinished after the JobSet finishes, it is eligible to be automatically deleted. When the JobSet is being deleted, its lifecycle guarantees (e.g. finalizers) will be honored. If this field is unset, the JobSet won't be automatically deleted. If this field is set to zero, the JobSet becomes eligible to be deleted immediately after it finishes.", alias="ttlSecondsAfterFinished")
-    __properties: ClassVar[List[str]] = ["coordinator", "failurePolicy", "managedBy", "network", "replicatedJobs", "startupPolicy", "successPolicy", "suspend", "ttlSecondsAfterFinished"]
+    coordinator: Optional[JobsetV1alpha2Coordinator] = Field(default=None, description="coordinator can be used to assign a specific pod as the coordinator for the JobSet. If defined, an annotation will be added to all Jobs and pods with coordinator pod, which contains the stable network endpoint where the coordinator pod can be reached. jobset.sigs.k8s.io/coordinator=<pod hostname>.<headless service>")
+    failure_policy: Optional[JobsetV1alpha2FailurePolicy] = Field(default=None, description="failurePolicy configures when to declare the JobSet as failed. The JobSet is always declared failed if any job in the set finished with status failed.", alias="failurePolicy")
+    managed_by: Optional[StrictStr] = Field(default=None, description="managedBy is used to indicate the controller or entity that manages a JobSet. The built-in JobSet controller reconciles JobSets which don't have this field at all or the field value is the reserved string `jobset.sigs.k8s.io/jobset-controller`, but skips reconciling JobSets with a custom value for this field.  The value must be a valid domain-prefixed path (e.g. acme.io/foo) - all characters before the first \"/\" must be a valid subdomain as defined by RFC 1123. All characters trailing the first \"/\" must be valid HTTP Path characters as defined by RFC 3986. The value cannot exceed 63 characters. The field is immutable.", alias="managedBy")
+    network: Optional[JobsetV1alpha2Network] = Field(default=None, description="network defines the networking options for the jobset.")
+    replicated_jobs: Optional[List[JobsetV1alpha2ReplicatedJob]] = Field(default=None, description="replicatedJobs is the group of jobs that will form the set.", alias="replicatedJobs")
+    startup_policy: Optional[JobsetV1alpha2StartupPolicy] = Field(default=None, description="startupPolicy configures in what order jobs must be started Deprecated: StartupPolicy is deprecated, please use the DependsOn API.", alias="startupPolicy")
+    success_policy: Optional[JobsetV1alpha2SuccessPolicy] = Field(default=None, description="successPolicy configures when to declare the JobSet as succeeded. The JobSet is always declared succeeded if all jobs in the set finished with status complete.", alias="successPolicy")
+    suspend: Optional[StrictBool] = Field(default=None, description="suspend suspends all running child Jobs when set to true.")
+    ttl_seconds_after_finished: Optional[StrictInt] = Field(default=None, description="ttlSecondsAfterFinished limits the lifetime of a JobSet that has finished execution (either Complete or Failed). If this field is set, TTLSecondsAfterFinished after the JobSet finishes, it is eligible to be automatically deleted. When the JobSet is being deleted, its lifecycle guarantees (e.g. finalizers) will be honored. If this field is unset, the JobSet won't be automatically deleted. If this field is set to zero, the JobSet becomes eligible to be deleted immediately after it finishes.", alias="ttlSecondsAfterFinished")
+    volume_claim_policies: Optional[List[JobsetV1alpha2VolumeClaimPolicy]] = Field(default=None, description="volumeClaimPolicies is a list of policies for persistent volume claims that pods are allowed to reference. JobSet controller automatically adds the required volume claims to the pod template. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template.", alias="volumeClaimPolicies")
+    __properties: ClassVar[List[str]] = ["coordinator", "failurePolicy", "managedBy", "network", "replicatedJobs", "startupPolicy", "successPolicy", "suspend", "ttlSecondsAfterFinished", "volumeClaimPolicies"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -104,6 +106,13 @@ class JobsetV1alpha2JobSetSpec(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of success_policy
         if self.success_policy:
             _dict['successPolicy'] = self.success_policy.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of each item in volume_claim_policies (list)
+        _items = []
+        if self.volume_claim_policies:
+            for _item_volume_claim_policies in self.volume_claim_policies:
+                if _item_volume_claim_policies:
+                    _items.append(_item_volume_claim_policies.to_dict())
+            _dict['volumeClaimPolicies'] = _items
         return _dict
 
     @classmethod
@@ -124,7 +133,8 @@ class JobsetV1alpha2JobSetSpec(BaseModel):
             "startupPolicy": JobsetV1alpha2StartupPolicy.from_dict(obj["startupPolicy"]) if obj.get("startupPolicy") is not None else None,
             "successPolicy": JobsetV1alpha2SuccessPolicy.from_dict(obj["successPolicy"]) if obj.get("successPolicy") is not None else None,
             "suspend": obj.get("suspend"),
-            "ttlSecondsAfterFinished": obj.get("ttlSecondsAfterFinished")
+            "ttlSecondsAfterFinished": obj.get("ttlSecondsAfterFinished"),
+            "volumeClaimPolicies": [JobsetV1alpha2VolumeClaimPolicy.from_dict(_item) for _item in obj["volumeClaimPolicies"]] if obj.get("volumeClaimPolicies") is not None else None
         })
         return _obj
 
