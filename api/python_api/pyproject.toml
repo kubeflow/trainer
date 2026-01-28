@@ -37,3 +37,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 path = "kubeflow_trainer_api/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["kubeflow_trainer_api"]

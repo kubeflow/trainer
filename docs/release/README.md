@@ -1,15 +1,19 @@
-# Releasing the Kubeflow Trainer
+# Releasing Kubeflow Trainer
 
-## Prerequisite
+## Prerequisites
 
-- [Write](https://docs.github.com/en/organizations/managing-access-to-your-organizations-repositories/repository-permission-levels-for-an-organization#permission-levels-for-repositories-owned-by-an-organization)
-  permission for the Kubeflow Trainer repository.
+- Docker available locally (required by `hack/release.sh` for changelog generation with `git-cliff`).
+- `GITHUB_TOKEN` exported locally (recommended to avoid GitHub API rate limits while generating changelog):
+
+```bash
+export GITHUB_TOKEN=<token>
+```
 
 - Maintainer access to [the Kubeflow Trainer API Python modules](https://pypi.org/project/kubeflow-trainer-api/).
 
 - Create a [GitHub Token](https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token).
 
-- Install `PyGithub` to generate the [Changelog](./../../CHANGELOG.md):
+- Install `PyGithub` to generate the [Changelog](./../../CHANGELOG/README.md):
 
   ```
   pip install PyGithub>=1.55
@@ -165,7 +169,7 @@ Create the PR in the master branch with the following changes:
 
    Group PRs in the changelog into features, bug fixes, misc, etc.
 
-   Check this example: [v2.0.0-rc.0](https://github.com/kubeflow/trainer/blob/master/CHANGELOG.md#v200-rc0-2025-06-10)
+   Check this example: [v2.0.0-rc.0](https://github.com/kubeflow/trainer/blob/master/CHANGELOG/changelog-2.0.md)
 
 1. Bump the `API_VERSION` in [the `gen-api.sh` file](../../hack/python-api/gen-api.sh) and the
    `version` in [the Helm charts](../../charts/kubeflow-trainer/Chart.yaml) to the latest release.
@@ -187,9 +191,70 @@ links):
 perl -pi -e 's/\[@([^\]]+)\]\(https:\/\/github\.com\/\1\)/@\1/g' changelog.md
 ```
 
-### Announce the new release
+- If you are working from a fork, ensure upstream tags are available locally before running release:
 
-Post the announcement for the new Kubeflow Trainer RC or official release in:
+```bash
+git remote add upstream https://github.com/kubeflow/trainer.git  # if missing
+git fetch upstream --tags
+git fetch origin --tags
+```
 
-- [#kubeflow-trainer](https://www.kubeflow.org/docs/about/community/#slack-channels) Slack channel.
-- [kubeflow-discuss](https://www.kubeflow.org/docs/about/community/#kubeflow-mailing-list) mailing list.
+## Prepare a release PR
+
+Run the release target from your working branch:
+
+```bash
+make release VERSION=X.Y.Z GITHUB_TOKEN=<token>
+# or
+make release VERSION=X.Y.Z-rc.N GITHUB_TOKEN=<token>
+```
+
+`make release` exports `GITHUB_TOKEN` and invokes `hack/release.sh`. The release script will:
+
+1. Validate the version format.
+2. Verify the tag `vX.Y.Z` (or `vX.Y.Z-rc.N`) does not already exist.
+3. Update:
+   - `VERSION`
+   - image tags in `manifests/*.yaml` (`newTag` and pinned `ghcr.io/...:latest`)
+   - `charts/kubeflow-trainer/Chart.yaml` (`version`)
+   - `CHANGELOG/changelog-X.Y.md` (prepends unreleased section using `git-cliff`)
+4. Run `make generate`.
+5. Create a signed-off commit:
+
+```text
+Release vX.Y.Z
+```
+
+Push the branch and open a PR:
+
+Review `VERSION`, `api/python_api/kubeflow_trainer_api/__init__.py`, and `CHANGELOG/changelog-X.Y.md`
+to ensure correctness.
+
+- **For latest minor series**: Open a PR to `main` and get it reviewed and merged.
+- **For older minor series patch** (e.g. `2.0.1` when `main` is at `2.1.x`):
+  Checkout the `release-X.Y` branch, commit changes and then open a PR to the
+  corresponding `release-X.Y` branch.
+
+## PR validation (`check-release.yaml`)
+
+When a PR to `master` changes `VERSION`, CI validates:
+
+1. `VERSION` matches semver format.
+2. The tag does not already exist.
+3. Every `manifests` `newTag` equals `v<VERSION-without-leading-v>`.
+4. `charts/kubeflow-trainer/Chart.yaml` version equals `VERSION` without leading `v`.
+5. `api/python_api/kubeflow_trainer_api/__init__.py` `__version__` equals `VERSION` without leading `v`.
+
+## Release automation after merge (`release.yaml`)
+
+When the `VERSION` change is merged into `master`, the workflow:
+
+1. Re-validates version and manifest tags.
+2. Builds and validates Python package artifacts.
+3. Publishes the package to PyPI (`kubeflow-trainer-api`).
+4. Creates release branch `release-<version-without-v>` if it does not exist.
+5. Creates and pushes git tag `v<version-without-v>`.
+6. Creates GitHub Release using generated changelog.
+7. Dispatches:
+   - `build-and-push-images.yaml` for container image publishing
+   - `publish-helm-charts.yaml` for Helm chart publishing
