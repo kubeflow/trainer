@@ -37,17 +37,26 @@ Latest News 🔥
 
 ## Overview
 
-Kubeflow Trainer is a Kubernetes-native project designed for large language models (LLMs)
-fine-tuning and enabling scalable, distributed training of machine learning (ML) models across
-various frameworks, including PyTorch, JAX, TensorFlow, and others.
+Kubeflow Trainer is a Kubernetes-native distributed AI platform for scalable large language model
+(LLM) fine-tuning and training of AI models across a wide range of frameworks, including
+PyTorch, MLX, HuggingFace, DeepSpeed, JAX, XGBoost, and more.
 
-You can integrate other ML libraries such as [HuggingFace](https://huggingface.co),
-[DeepSpeed](https://github.com/microsoft/DeepSpeed), or [Megatron-LM](https://github.com/NVIDIA/Megatron-LM)
-with Kubeflow Trainer to run them on Kubernetes.
+Kubeflow Trainer brings MPI to Kubernetes, orchestrating multi-node, multi-GPU distributed
+jobs efficiently across high-performance computing (HPC) clusters. This enables high-throughput
+communication between processes, making it ideal for large-scale AI training that requires
+ultra-fast synchronization between GPUs nodes.
 
-Kubeflow Trainer enables you to effortlessly develop your LLMs with the
-[Kubeflow Python SDK](https://github.com/kubeflow/sdk/), and build Kubernetes-native Training
-Runtimes using Kubernetes Custom Resource APIs.
+Kubeflow Trainer seamlessly integrates with the Cloud Native AI ecosystem, including
+[Kueue](https://kueue.sigs.k8s.io/docs/tasks/run/trainjobs/) for topology-aware scheduling and
+multi-cluster job dispatching, as well as [JobSet](https://github.com/kubernetes-sigs/jobset) and
+[LeaderWorkerSet](https://github.com/kubernetes-sigs/lws) for AI workload orchestration.
+
+Kubeflow Trainer provides a distributed data cache designed to stream large-scale data with zero-copy
+transfer directly to GPU nodes. This ensures memory-efficient training jobs while maximizing
+GPU utilization.
+
+With [the Kubeflow Python SDK](https://github.com/kubeflow/sdk), AI practitioners can effortlessly
+develop and fine-tune LLMs while leveraging the Kubeflow Trainer APIs: TrainJob and Runtimes.
 
 <h1 align="center">
     <img src="./docs/images/trainer-tech-stack.drawio.svg" alt="logo" width="500">
