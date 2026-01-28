@@ -58,36 +58,52 @@ TRAINER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/torchtune-trainer"
 TRAINER_CI_IMAGE="${TRAINER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 ${CONTAINER_RUNTIME} build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_CI_IMAGE}
 
-# Set up Docker to use NVIDIA runtime.
-sudo nvidia-ctk runtime configure --runtime=docker --set-as-default --cdi.enabled
+# Configure NVIDIA runtime.
 sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
+sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
 sudo systemctl restart docker
 
 # Create a Kind cluster with GPU support.
-nvkind cluster create --name ${GPU_CLUSTER_NAME} --image "${KIND_NODE_VERSION}"
-nvkind cluster print-gpus
+NVKIND_BIN="/root/go/bin/nvkind"
+sudo "$NVKIND_BIN" cluster create --name "${GPU_CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
+sudo "$NVKIND_BIN" cluster print-gpus
+
+# Make kubeconfig available to non-root user
+mkdir -p "$HOME/.kube"
+sudo cp /root/.kube/config "$HOME/.kube/config"
+sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
+export KUBECONFIG="$HOME/.kube/config"
 
 # Install gpu-operator to make sure we can run GPU workloads.
-echo "Install NVIDIA GPU Operator"
+echo "Installing NVIDIA GPU Operator"
 kubectl create ns gpu-operator
 kubectl label --overwrite ns gpu-operator pod-security.kubernetes.io/enforce=privileged
+
+# Helm home dirs for non-root user
+export HELM_CONFIG_HOME="$HOME/.config/helm"
+export HELM_CACHE_HOME="$HOME/.cache/helm"
+export HELM_DATA_HOME="$HOME/.local/share/helm"
+
+mkdir -p "$HELM_CONFIG_HOME" "$HELM_CACHE_HOME" "$HELM_DATA_HOME"
 
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia && helm repo update
 
 helm install --wait --generate-name \
   -n gpu-operator --create-namespace \
   nvidia/gpu-operator \
-  --version="${GPU_OPERATOR_VERSION}"
+  --version="${GPU_OPERATOR_VERSION}" \
+  --set driver.enabled=false \
+  --set toolkit.enabled=false
 
 # Validation steps for GPU operator installation
 kubectl get ns gpu-operator
 kubectl get ns gpu-operator --show-labels | grep pod-security.kubernetes.io/enforce=privileged
 helm list -n gpu-operator
 kubectl get pods -n gpu-operator -o name | while read pod; do
-  kubectl wait --for=condition=Ready --timeout=300s "$pod" -n gpu-operator || echo "$pod failed to become Ready"
+  kubectl wait --for=condition=Ready --timeout=180s "$pod" -n gpu-operator || echo "$pod failed to become Ready"
 done
 kubectl get pods -n gpu-operator
-kubectl get nodes -o=custom-columns=NAME:.metadata.name,GPU:.status.allocatable.nvidia\.com/gpu
+kubectl get nodes -o=custom-columns=NAME:.metadata.name,GPU:'.status.allocatable.nvidia\.com/gpu'
 
 # Load Kubeflow Trainer images
 echo "Load Kubeflow Trainer images"
