@@ -1,0 +1,74 @@
+[remote.github]
+owner = "kubeflow"
+repo = "trainer"
+
+[changelog]
+header = """
+# Changelog
+"""
+
+body = """
+{%- if version %}
+## [{{ version }}](https://github.com/kubeflow/trainer/releases/tag/{{ version }}) ({{ timestamp | date(format="%Y-%m-%d") }})
+{%- else %}
+## [Unreleased]
+{%- endif %}
+
+{%- set group_order = ["🚀 Features", "🐛 Bug Fixes", "⚙️ Miscellaneous Tasks", "⏪ Reverts"] -%}
+
+{%- for group_name in group_order %}
+{%- set group_commits = commits | filter(attribute="group", value=group_name) -%}
+{%- if group_commits | length > 0 %}
+### {{ group_name }}
+
+{% for commit in group_commits | reverse -%}
+{%- set message = commit.message | split(pat="\n") | first | trim -%}
+{%- set parts = message | split(pat=" (#") -%}
+   {% if parts | length > 1 and parts | last | trim | split(pat=")") | length > 1 -%}
+      {%- set pr_part = parts | last | trim -%}
+      {%- set pr_number = pr_part | replace(from=")", to="") -%}
+      - {{ parts | slice(end=-1) | join(sep=" (#") }} ([#{{ pr_number }}](https://github.com/kubeflow/trainer/pull/{{ pr_number }}) by @{{ commit.remote.username }})
+   {% else -%}
+      - {{ message }} (@{{ commit.remote.username }})
+   {% endif -%}
+{% endfor %}
+
+{%- endif %}
+{%- endfor %}
+
+{%- if github -%}
+{%- set new_contributors = github.contributors | filter(attribute="is_first_time", value=true) -%}
+{%- if new_contributors | length != 0 %}
+
+### New Contributors
+{%- for contributor in new_contributors %}
+* @{{ contributor.username }} made their first contribution in \
+  [#{{ contributor.pr_number }}](https://github.com/kubeflow/trainer/pull/{{ contributor.pr_number }})
+{%- endfor %}
+{%- endif %}
+{%- endif -%}
+
+{% raw %}\n{% endraw %}
+"""
+
+trim = true
+
+footer = ""
+
+[git]
+conventional_commits = false
+filter_unconventional = false
+split_commits = false
+
+# Only stable release tags
+tag_pattern = "^v?[0-9]+\\.[0-9]+\\.[0-9]+$"
+ignore_tags = ".*-(alpha|beta|rc).*"
+
+# Manually define groups based on conventional patterns
+commit_parsers = [
+    { message = "^feat(\\(.*\\))?:", group = "🚀 Features" },
+    { message = "^fix(\\(.*\\))?:", group = "🐛 Bug Fixes" },
+    { message = "^chore(\\(.*\\))?:", group = "⚙️ Miscellaneous Tasks" },
+    { message = "^revert(\\(.*\\))?:", group = "⏪ Reverts" },
+    { message = ".*", skip = true },
+]
