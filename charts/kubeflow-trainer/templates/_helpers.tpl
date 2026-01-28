@@ -64,17 +64,23 @@ app.kubernetes.io/name: {{ include "trainer.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{/*
+Resolve the effective image tag, using a provided tag if present or
+falling back to the default image tag derived from the chart version.
+Usage: include "trainer.resolveImageTag" (dict "tag" .Values.image.tag "context" .)
+*/}}
+{{- define "trainer.resolveImageTag" -}}
+{{- if .tag }}
+{{- .tag -}}
+{{- else -}}
+{{- include "trainer.defaultImageTag" .context -}}
+{{- end -}}
+{{- end }}
+
 {{- define "trainer.image" -}}
 {{- $imageRegistry := .Values.image.registry | default "docker.io" }}
 {{- $imageRepository := .Values.image.repository }}
-{{- $imageTag := .Values.image.tag -}}
-{{- if not $imageTag -}}
-{{- if hasPrefix "0.0.0-" .Chart.Version -}}
-{{- $imageTag = trimPrefix "0.0.0-" .Chart.Version -}}
-{{- else -}}
-{{- $imageTag = printf "v%s" .Chart.Version -}}
-{{- end -}}
-{{- end -}}
+{{- $imageTag := include "trainer.resolveImageTag" (dict "tag" .Values.image.tag "context" .) -}}
 {{- if eq $imageRegistry "docker.io" }}
 {{- printf "%s:%s" $imageRepository $imageTag }}
 {{- else }}
@@ -82,6 +88,37 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end }}
 
+{{/*
+Generate the default image tag for runtimes based on chart version
+*/}}
+{{- define "trainer.defaultImageTag" -}}
+{{- if hasPrefix "0.0.0-" .Chart.Version -}}
+{{- trimPrefix "0.0.0-" .Chart.Version -}}
+{{- else -}}
+{{- printf "v%s" .Chart.Version -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Generate runtime image with registry, repository, and tag from values
+Usage: include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .)
+*/}}
+{{- define "trainer.runtimeImage" -}}
+{{- $imageConfig := index . 0 }}
+{{- $root := index . 1 }}
+{{- $registry := $imageConfig.registry | default "ghcr.io" }}
+{{- $repository := $imageConfig.repository }}
+{{- $tag := include "trainer.resolveImageTag" (dict "tag" ($imageConfig.tag) "context" $root) -}}
+{{- if eq $registry "docker.io" }}
+{{- printf "%s:%s" $repository $tag }}
+{{- else }}
+{{- printf "%s/%s:%s" $registry $repository $tag }}
+{{- end }}
+{{- end }}
+{{/*
+Return the version of the trainer.
+If the version is 0.0.0, we assume it is a development version.
+*/}}
 {{- define "trainer.version" -}}
 {{- if hasPrefix "0.0.0-" .Chart.Version -}}
 dev
