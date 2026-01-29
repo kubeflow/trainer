@@ -73,6 +73,7 @@ jobs:
         run: |
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/qwen2_5/qwen2.5-1.5B-with-alpaca.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_qwen2_5_with_alpaca-trainjob-yaml.ipynb TIMEOUT=900
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/jax/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_jax_mnist.ipynb PAPERMILL_PARAMS="-p num_cpu 3 -p num_gpu 1" TIMEOUT=600
 
       - name: Upload Artifacts to GitHub
         if: always()

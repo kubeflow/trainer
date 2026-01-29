@@ -13841,6 +13841,10 @@
           }
         }
       },
+      "trainer.v1alpha1.JAXMLPolicySource": {
+        "description": "JAXMLPolicySource represents a jax runtime configuration.",
+        "type": "object"
+      },
       "trainer.v1alpha1.JobSetTemplateSpec": {
         "description": "JobSetTemplateSpec represents a template of the desired JobSet.",
         "type": "object",
@@ -13911,6 +13915,14 @@
         "description": "MLPolicy represents configuration for the model training with ML-specific parameters.",
         "type": "object",
         "properties": {
+          "jax": {
+            "description": "jax defines the configuration for the JAX Runtime",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.JAXMLPolicySource"
+              }
+            ]
+          },
           "mpi": {
             "description": "mpi defines the configuration for the MPI Runtime.",
             "allOf": [
@@ -13938,6 +13950,14 @@
         "description": "MLPolicySource represents the runtime-specific configuration for various technologies. One of the following specs can be set.",
         "type": "object",
         "properties": {
+          "jax": {
+            "description": "jax defines the configuration for the JAX Runtime",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.JAXMLPolicySource"
+              }
+            ]
+          },
           "mpi": {
             "description": "mpi defines the configuration for the MPI Runtime.",
             "allOf": [
