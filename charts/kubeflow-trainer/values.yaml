@@ -202,12 +202,25 @@ runtimes:
 
   # -- TorchTune distributed training runtime
   torchtuneDistributed:
-    # -- Enable deployment of torchtune-distributed runtime
-    enabled: false
     image:
       # -- TorchTune runtime image registry
       registry: ghcr.io
       # -- TorchTune runtime image repository
-      repository: kubeflow/trainer/torchtune-runtime
+      repository: kubeflow/trainer/torchtune-trainer
       # -- TorchTune runtime image tag. Defaults to chart version if empty.
       tag: ""
+    
+    # -- Llama 3.2 1B model configuration
+    llama3_2_1B:
+      # -- Enable deployment of Llama 3.2 1B runtime
+      enabled: false
+
+    # -- Llama 3.2 3B model configuration
+    llama3_2_3B:
+      # -- Enable deployment of Llama 3.2 3B runtime
+      enabled: false
+
+    # -- Qwen 2.5 1.5B model configuration
+    qwen2_5_1_5B:
+      # -- Enable deployment of Qwen 2.5 1.5B runtime
+      enabled: false

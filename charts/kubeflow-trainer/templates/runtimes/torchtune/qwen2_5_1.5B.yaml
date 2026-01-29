@@ -1,0 +1,115 @@
+{{- /*
+Copyright 2026 The Kubeflow authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/ -}}
+
+{{- if or .Values.runtimes.torchtuneDistributed.qwen2_5_1_5B.enabled .Values.runtimes.defaultEnabled }}
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: torchtune-qwen2.5-1.5b
+  labels:
+    trainer.kubeflow.org/framework: torchtune
+    {{- include "trainer.labels" . | nindent 4 }}
+spec:
+  mlPolicy:
+    numNodes: 1
+    torch:
+      numProcPerNode: auto
+  template:
+    spec:
+      replicatedJobs:
+        - name: dataset-initializer
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: dataset-initializer
+                      image: ghcr.io/kubeflow/trainer/dataset-initializer
+                      env:
+                        - name: STORAGE_URI
+                          value: hf://tatsu-lab/alpaca
+                      volumeMounts:
+                        - mountPath: /workspace
+                          name: initializer
+                  volumes:
+                    - name: initializer
+                      persistentVolumeClaim:
+                        claimName: torchtune-qwen2.5-1.5b
+        - name: model-initializer
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: model-initializer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: model-initializer
+                      image: ghcr.io/kubeflow/trainer/model-initializer
+                      env:
+                        - name: STORAGE_URI
+                          value: hf://Qwen/Qwen2.5-1.5B-Instruct
+                      volumeMounts:
+                        - name: initializer
+                          mountPath: /workspace
+                  volumes:
+                    - name: initializer
+                      persistentVolumeClaim:
+                        claimName: torchtune-qwen2.5-1.5b
+        - name: node
+          dependsOn:
+            - name: dataset-initializer
+              status: Complete
+            - name: model-initializer
+              status: Complete
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: {{ include "trainer.runtimeImage" (list .Values.runtimes.torchtuneDistributed.image .) }}
+                      command:
+                        - tune
+                        - run
+                        - --rdzv_endpoint=localhost:29500
+                        - full_finetune_distributed
+                        - --config
+                        - qwen2_5/1.5B_full
+                        - dataset=torchtune.datasets.instruct_dataset
+                        - dataset.source=parquet
+                        - dataset.data_dir=/workspace/dataset/data
+                        - output_dir=/workspace/output
+                        - tokenizer.path=/workspace/model/vocab.json
+                        - tokenizer.merges_file=/workspace/model/merges.txt
+                        - checkpointer.checkpoint_dir=/workspace/model
+                      resources:
+                        limits:
+                          nvidia.com/gpu: 2
+                      volumeMounts:
+                        - mountPath: /workspace
+                          name: initializer
+                  volumes:
+                    - name: initializer
+                      persistentVolumeClaim:
+                        claimName: torchtune-qwen2.5-1.5b
+{{- end }}
