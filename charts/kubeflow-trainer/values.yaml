@@ -209,7 +209,7 @@ runtimes:
       repository: kubeflow/trainer/torchtune-trainer
       # -- TorchTune runtime image tag. Defaults to chart version if empty.
       tag: ""
-    
+
     # -- Llama 3.2 1B model configuration
     llama3_2_1B:
       # -- Enable deployment of Llama 3.2 1B runtime

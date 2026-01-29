@@ -123,7 +123,7 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |
 | dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency. Set to `false` if LeaderWorkerSet is already installed in the cluster. |
 | dataCache.lws.fullnameOverride | string | `"lws"` | String to fully override LeaderWorkerSet release name. |
-| runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"defaultEnabled":false,"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchDistributedWithCache":{"dataCache":{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":true},"enabled":false},"torchtuneDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-runtime","tag":""}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
+| runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"defaultEnabled":false,"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchDistributedWithCache":{"dataCache":{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":true},"enabled":false},"torchtuneDistributed":{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
 | runtimes.defaultEnabled | bool | `false` | Enable all default runtimes (torch, deepspeed, mlx, torchtune) when set to true. Individual runtime settings will be ignored if this is enabled. |
 | runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training runtime (no custom images required) |
 | runtimes.torchDistributed.enabled | bool | `false` | Enable deployment of torch-distributed runtime |
@@ -142,11 +142,16 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | runtimes.mlxDistributed.image.registry | string | `"ghcr.io"` | MLX runtime image registry |
 | runtimes.mlxDistributed.image.repository | string | `"kubeflow/trainer/mlx-runtime"` | MLX runtime image repository |
 | runtimes.mlxDistributed.image.tag | string | `""` | MLX runtime image tag. Defaults to chart version if empty. |
-| runtimes.torchtuneDistributed | object | `{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-runtime","tag":""}}` | TorchTune distributed training runtime |
-| runtimes.torchtuneDistributed.enabled | bool | `false` | Enable deployment of torchtune-distributed runtime |
+| runtimes.torchtuneDistributed | object | `{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}}` | TorchTune distributed training runtime |
 | runtimes.torchtuneDistributed.image.registry | string | `"ghcr.io"` | TorchTune runtime image registry |
-| runtimes.torchtuneDistributed.image.repository | string | `"kubeflow/trainer/torchtune-runtime"` | TorchTune runtime image repository |
+| runtimes.torchtuneDistributed.image.repository | string | `"kubeflow/trainer/torchtune-trainer"` | TorchTune runtime image repository |
 | runtimes.torchtuneDistributed.image.tag | string | `""` | TorchTune runtime image tag. Defaults to chart version if empty. |
+| runtimes.torchtuneDistributed.llama3_2_1B | object | `{"enabled":false}` | Llama 3.2 1B model configuration |
+| runtimes.torchtuneDistributed.llama3_2_1B.enabled | bool | `false` | Enable deployment of Llama 3.2 1B runtime |
+| runtimes.torchtuneDistributed.llama3_2_3B | object | `{"enabled":false}` | Llama 3.2 3B model configuration |
+| runtimes.torchtuneDistributed.llama3_2_3B.enabled | bool | `false` | Enable deployment of Llama 3.2 3B runtime |
+| runtimes.torchtuneDistributed.qwen2_5_1_5B | object | `{"enabled":false}` | Qwen 2.5 1.5B model configuration |
+| runtimes.torchtuneDistributed.qwen2_5_1_5B.enabled | bool | `false` | Enable deployment of Qwen 2.5 1.5B runtime |
 
 ## Maintainers
 
