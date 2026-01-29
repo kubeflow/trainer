@@ -11,6 +11,15 @@ spec:
       numProcPerNode: auto
   template:
     spec:
+      volumeClaimPolicies:
+        - templates:
+            - metadata:
+                name: initializer
+              spec:
+                accessModes: ["ReadWriteOnce"]
+                resources:
+                  requests:
+                    storage: 20Gi
       replicatedJobs:
         - name: dataset-initializer
           template:
@@ -29,10 +38,6 @@ spec:
                       volumeMounts:
                         - mountPath: /workspace
                           name: initializer
-                  volumes:
-                    - name: initializer
-                      persistentVolumeClaim:
-                        claimName: torchtune-qwen2.5-1.5b
         - name: model-initializer
           template:
             metadata:
@@ -50,10 +55,6 @@ spec:
                       volumeMounts:
                         - name: initializer
                           mountPath: /workspace
-                  volumes:
-                    - name: initializer
-                      persistentVolumeClaim:
-                        claimName: torchtune-qwen2.5-1.5b
         - name: node
           dependsOn:
             - name: dataset-initializer
@@ -90,7 +91,3 @@ spec:
                       volumeMounts:
                         - mountPath: /workspace
                           name: initializer
-                  volumes:
-                    - name: initializer
-                      persistentVolumeClaim:
-                        claimName: torchtune-qwen2.5-1.5b
