@@ -10986,11 +10986,6 @@ spec:
                               type: array
                               x-kubernetes-list-type: atomic
                           type: object
-                          x-kubernetes-validations:
-                          - message: namespace cannot be set for VolumeClaimPolicies
-                              templates
-                            rule: self.templates.all(t, !has(t.metadata.namespace)
-                              || size(t.metadata.namespace) == 0)
                         maxItems: 50
                         type: array
                         x-kubernetes-list-type: atomic
