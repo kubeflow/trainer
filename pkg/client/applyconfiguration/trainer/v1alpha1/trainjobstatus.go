@@ -29,6 +29,11 @@ type TrainJobStatusApplyConfiguration struct {
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 	// jobsStatus tracks the child Jobs in TrainJob.
 	JobsStatus []JobStatusApplyConfiguration `json:"jobsStatus,omitempty"`
+	// trainerStatus provides a summary of the status of the training
+	// part of the TrainJob.
+	// Empty if the status is unknown, e.g. the job has just started
+	// or the job is not instrumented to report its status.
+	TrainerStatus *TrainJobTrainerStatusApplyConfiguration `json:"trainerStatus,omitempty"`
 }
 
 // TrainJobStatusApplyConfiguration constructs a declarative configuration of the TrainJobStatus type for use with
@@ -60,5 +65,13 @@ func (b *TrainJobStatusApplyConfiguration) WithJobsStatus(values ...*JobStatusAp
 		}
 		b.JobsStatus = append(b.JobsStatus, *values[i])
 	}
+	return b
+}
+
+// WithTrainerStatus sets the TrainerStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TrainerStatus field is set to the value of the last call.
+func (b *TrainJobStatusApplyConfiguration) WithTrainerStatus(value *TrainJobTrainerStatusApplyConfiguration) *TrainJobStatusApplyConfiguration {
+	b.TrainerStatus = value
 	return b
 }

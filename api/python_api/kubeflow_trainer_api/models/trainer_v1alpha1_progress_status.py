@@ -19,20 +19,16 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_apis_meta_v1_condition import IoK8sApimachineryPkgApisMetaV1Condition
-from kubeflow_trainer_api.models.trainer_v1alpha1_job_status import TrainerV1alpha1JobStatus
 from kubeflow_trainer_api.models.trainer_v1alpha1_train_job_trainer_status import TrainerV1alpha1TrainJobTrainerStatus
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1TrainJobStatus(BaseModel):
+class TrainerV1alpha1ProgressStatus(BaseModel):
     """
-    TrainJobStatus represents the current status of TrainJob.
+    ProgressStatus contains the current progress and metrics for the different stages of the TrainJob.
     """ # noqa: E501
-    conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = Field(default=None, description="conditions for the TrainJob.")
-    jobs_status: Optional[List[TrainerV1alpha1JobStatus]] = Field(default=None, description="jobsStatus tracks the child Jobs in TrainJob.", alias="jobsStatus")
     trainer_status: Optional[TrainerV1alpha1TrainJobTrainerStatus] = Field(default=None, description="trainerStatus provides a summary of the status of the training part of the TrainJob. Empty if the status is unknown, e.g. the job has just started or the job is not instrumented to report its status.", alias="trainerStatus")
-    __properties: ClassVar[List[str]] = ["conditions", "jobsStatus", "trainerStatus"]
+    __properties: ClassVar[List[str]] = ["trainerStatus"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -52,7 +48,7 @@ class TrainerV1alpha1TrainJobStatus(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrainJobStatus from a JSON string"""
+        """Create an instance of TrainerV1alpha1ProgressStatus from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -73,20 +69,6 @@ class TrainerV1alpha1TrainJobStatus(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in conditions (list)
-        _items = []
-        if self.conditions:
-            for _item_conditions in self.conditions:
-                if _item_conditions:
-                    _items.append(_item_conditions.to_dict())
-            _dict['conditions'] = _items
-        # override the default output from pydantic by calling `to_dict()` of each item in jobs_status (list)
-        _items = []
-        if self.jobs_status:
-            for _item_jobs_status in self.jobs_status:
-                if _item_jobs_status:
-                    _items.append(_item_jobs_status.to_dict())
-            _dict['jobsStatus'] = _items
         # override the default output from pydantic by calling `to_dict()` of trainer_status
         if self.trainer_status:
             _dict['trainerStatus'] = self.trainer_status.to_dict()
@@ -94,7 +76,7 @@ class TrainerV1alpha1TrainJobStatus(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrainJobStatus from a dict"""
+        """Create an instance of TrainerV1alpha1ProgressStatus from a dict"""
         if obj is None:
             return None
 
@@ -102,8 +84,6 @@ class TrainerV1alpha1TrainJobStatus(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "conditions": [IoK8sApimachineryPkgApisMetaV1Condition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
-            "jobsStatus": [TrainerV1alpha1JobStatus.from_dict(_item) for _item in obj["jobsStatus"]] if obj.get("jobsStatus") is not None else None,
             "trainerStatus": TrainerV1alpha1TrainJobTrainerStatus.from_dict(obj["trainerStatus"]) if obj.get("trainerStatus") is not None else None
         })
         return _obj
