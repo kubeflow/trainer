@@ -13999,6 +13999,23 @@
           }
         }
       },
+      "trainer.v1alpha1.Metric": {
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "description": "name is a user-defined label for the metric, e.g. \"loss\", \"eval_accuracy\".",
+            "type": "string"
+          },
+          "value": {
+            "description": "value of the metric. Values must be serialized as a string.",
+            "type": "string"
+          }
+        }
+      },
       "trainer.v1alpha1.ModelInitializer": {
         "description": "ModelInitializer represents the desired configuration to initialize pre-trained model. The ModelInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
         "type": "object",
@@ -14258,6 +14275,20 @@
           }
         }
       },
+      "trainer.v1alpha1.ProgressStatus": {
+        "description": "ProgressStatus contains the current progress and metrics for the different stages of the TrainJob.",
+        "type": "object",
+        "properties": {
+          "trainerStatus": {
+            "description": "trainerStatus provides a summary of the status of the training part of the TrainJob. Empty if the status is unknown, e.g. the job has just started or the job is not instrumented to report its status.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobTrainerStatus"
+              }
+            ]
+          }
+        }
+      },
       "trainer.v1alpha1.RuntimeRef": {
         "description": "RuntimeRef represents the reference to the existing training runtime.",
         "type": "object",
@@ -14478,6 +14509,51 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
+          },
+          "trainerStatus": {
+            "description": "trainerStatus provides a summary of the status of the training part of the TrainJob. Empty if the status is unknown, e.g. the job has just started or the job is not instrumented to report its status.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobTrainerStatus"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.TrainJobTrainerStatus": {
+        "description": "TrainJobTrainerStatus represents the latest known progress and metrics of the Trainer part of the TrainJob.",
+        "type": "object",
+        "properties": {
+          "estimatedRemainingSeconds": {
+            "description": "estimatedRemainingSeconds gives the estimated remaining training time in seconds before the train job is completed. The value will be empty if it is unknown.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastUpdatedTime": {
+            "description": "lastUpdatedTime is the timestamp when these metrics were observed.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ]
+          },
+          "metrics": {
+            "description": "metrics contains the current metrics for the model.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.Metric"
+                }
+              ]
+            },
+            "x-kubernetes-list-type": "atomic"
+          },
+          "progressPercentage": {
+            "description": "progressPercentage gives an estimate of how complete the TrainJob is as a percentage. The value will be between 0 and 100, or empty if unknown.",
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

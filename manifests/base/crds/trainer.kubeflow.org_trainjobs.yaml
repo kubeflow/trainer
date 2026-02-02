@@ -5033,6 +5033,55 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              trainerStatus:
+                description: |-
+                  trainerStatus provides a summary of the status of the training
+                  part of the TrainJob.
+                  Empty if the status is unknown, e.g. the job has just started
+                  or the job is not instrumented to report its status.
+                properties:
+                  estimatedRemainingSeconds:
+                    description: |-
+                      estimatedRemainingSeconds gives the estimated remaining training time in seconds
+                      before the train job is completed.
+                      The value will be empty if it is unknown.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  lastUpdatedTime:
+                    description: lastUpdatedTime is the timestamp when these metrics
+                      were observed.
+                    format: date-time
+                    type: string
+                  metrics:
+                    description: metrics contains the current metrics for the model.
+                    items:
+                      properties:
+                        name:
+                          description: name is a user-defined label for the metric,
+                            e.g. "loss", "eval_accuracy".
+                          minLength: 1
+                          type: string
+                        value:
+                          description: value of the metric. Values must be serialized
+                            as a string.
+                          minLength: 1
+                          type: string
+                      required:
+                      - name
+                      - value
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  progressPercentage:
+                    description: |-
+                      progressPercentage gives an estimate of how complete the TrainJob is as a percentage.
+                      The value will be between 0 and 100, or empty if unknown.
+                    format: int32
+                    maximum: 100
+                    minimum: 0
+                    type: integer
+                type: object
             type: object
         type: object
         x-kubernetes-validations:

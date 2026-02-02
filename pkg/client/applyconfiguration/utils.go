@@ -44,6 +44,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.JobSetTemplateSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobStatus"):
 		return &trainerv1alpha1.JobStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Metric"):
+		return &trainerv1alpha1.MetricApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MLPolicy"):
 		return &trainerv1alpha1.MLPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MLPolicySource"):
@@ -78,6 +80,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.TrainJobSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobStatus"):
 		return &trainerv1alpha1.TrainJobStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobTrainerStatus"):
+		return &trainerv1alpha1.TrainJobTrainerStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("VolcanoPodGroupPolicySource"):
 		return &trainerv1alpha1.VolcanoPodGroupPolicySourceApplyConfiguration{}
 
