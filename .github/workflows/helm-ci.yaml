@@ -1,0 +1,28 @@
+name: Helm CI Checks
+
+on:
+  pull_request:
+    branches: [ master ]
+
+permissions:
+  contents: read
+
+jobs:
+  helm-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        run: |
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+          chmod 700 get_helm.sh
+          ./get_helm.sh
+          rm get_helm.sh
+
+      - name: Helm lint
+        run: make helm-lint
+
+      - name: Helm unit tests
+        run: make helm-unittest
