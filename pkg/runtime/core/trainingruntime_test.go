@@ -1928,3 +1928,19 @@ test-job-node-0-1.test-job slots=8
 		})
 	}
 }
+func TestTrainingRuntime_RuntimeInfo_UnsupportedTemplate(t *testing.T) {
+	rt := &TrainingRuntime{}
+
+	trainJob := &trainer.TrainJob{}
+
+	_, err := rt.RuntimeInfo(
+		trainJob,
+		"invalid-template-type", 
+		nil,
+		nil,
+	)
+
+	if err == nil {
+		t.Fatalf("expected error for unsupported runtimeTemplateSpec, got nil")
+	}
+}
