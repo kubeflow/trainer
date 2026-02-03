@@ -95,7 +95,7 @@ type TrainJobList struct {
 }
 
 // TrainJobSpec represents specification of the desired TrainJob.
-// +kubebuilder:validation:XValidation:rule="(has(oldSelf.suspend) && oldSelf.suspend) || self.podTemplateOverrides == oldSelf.podTemplateOverrides", message="podTemplateOverrides are immutable when suspend is false"
+// +kubebuilder:validation:XValidation:rule="self.suspend == true || (has(self.podTemplateOverrides) == has(oldSelf.podTemplateOverrides) && (!has(self.podTemplateOverrides) || self.podTemplateOverrides == oldSelf.podTemplateOverrides))", message="podTemplateOverrides are immutable when suspend is false"
 type TrainJobSpec struct {
 	// runtimeRef is the reference to the training runtime.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"

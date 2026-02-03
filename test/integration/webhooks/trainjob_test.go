@@ -497,7 +497,7 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 					return job
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("Should success to update podTemplateOverride when suspend is true",
+			ginkgo.Entry("Should succeed to update podTemplateOverride when suspend is true",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-trainer").
 						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").

@@ -4913,8 +4913,9 @@ spec:
             type: object
             x-kubernetes-validations:
             - message: podTemplateOverrides are immutable when suspend is false
-              rule: (has(oldSelf.suspend) && oldSelf.suspend) || self.podTemplateOverrides
-                == oldSelf.podTemplateOverrides
+              rule: self.suspend == true || (has(self.podTemplateOverrides) == has(oldSelf.podTemplateOverrides)
+                && (!has(self.podTemplateOverrides) || self.podTemplateOverrides ==
+                oldSelf.podTemplateOverrides))
           status:
             description: status of TrainJob.
             minProperties: 1
