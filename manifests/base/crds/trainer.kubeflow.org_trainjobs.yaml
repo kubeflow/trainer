@@ -1866,9 +1866,6 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                          x-kubernetes-validations:
-                          - message: field is immutable
-                            rule: self == oldSelf
                         imagePullSecrets:
                           description: imagePullSecrets overrides the image pull secrets
                             for the Pods in the target job templates.
@@ -1892,9 +1889,6 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                          x-kubernetes-validations:
-                          - message: field is immutable
-                            rule: self == oldSelf
                         initContainers:
                           description: initContainers overrides the init container
                             in the target job templates.
@@ -2345,9 +2339,6 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                          x-kubernetes-validations:
-                          - message: field is immutable
-                            rule: self == oldSelf
                         nodeSelector:
                           additionalProperties:
                             type: string
@@ -2609,15 +2600,9 @@ spec:
                                   type: string
                               type: object
                           type: object
-                          x-kubernetes-validations:
-                          - message: field is immutable
-                            rule: self == oldSelf
                         serviceAccountName:
                           description: serviceAccountName overrides the service account.
                           type: string
-                          x-kubernetes-validations:
-                          - message: field is immutable
-                            rule: self == oldSelf
                         tolerations:
                           description: tolerations overrides the Pod's tolerations.
                           items:
@@ -4610,9 +4595,6 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
-                          x-kubernetes-validations:
-                          - message: field is immutable
-                            rule: self == oldSelf
                       type: object
                     targetJobs:
                       description: targetJobs is the list of replicated jobs in the

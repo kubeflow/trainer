@@ -292,7 +292,6 @@ type PodTemplateOverrideTargetJob struct {
 // PodTemplateSpecOverride represents the spec overrides for Pod template.
 type PodTemplateSpecOverride struct {
 	// serviceAccountName overrides the service account.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 
@@ -311,28 +310,24 @@ type PodTemplateSpecOverride struct {
 
 	// securityContext overrides the Pod's security context.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 
 	// volumes overrides the Pod's volumes.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// initContainers overrides the init container in the target job templates.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
 
 	// containers overrides for the containers in the target job templates.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	Containers []ContainerOverride `json:"containers,omitempty"`
 
@@ -346,7 +341,6 @@ type PodTemplateSpecOverride struct {
 	// imagePullSecrets overrides the image pull secrets for the Pods in the target job templates.
 	// +listType=map
 	// +listMapKey=name
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
