@@ -187,8 +187,8 @@ def test_download_dataset(test_name, test_case):
 
     with patch(
         "pkg.initializers.dataset.cache.get_namespace", return_value="test-namespace"
-    ), patch("pkg.initializers.dataset.cache.config") as mock_config, patch(
-        "pkg.initializers.dataset.cache.client"
+    ), patch("kubernetes.config") as mock_config, patch(
+        "kubernetes.client"
     ) as mock_client:
 
         # Setup mocks for Kubernetes client
