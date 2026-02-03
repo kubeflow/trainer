@@ -60,6 +60,10 @@ type Configuration struct {
 	// +optional
 	ClientConnection *ClientConnection `json:"clientConnection,omitempty"`
 
+	// progressServer provides configuration options for the Progress Server.
+	// +optional
+	ProgressServer *ProgressServer `json:"progressServer,omitempty"`
+
 	// featureGates is a map of feature names to bools that allows to override the
 	// default enablement status of a feature.
 	// +optional
@@ -188,4 +192,12 @@ type ClientConnection struct {
 	// +optional
 	// +kubebuilder:default=100
 	Burst *int32 `json:"burst,omitempty"`
+}
+
+type ProgressServer struct {
+	// port is the port that the progress server serves at.
+	// Defaults to 10443.
+	// +optional
+	// +kubebuilder:default=10443
+	Port *int32 `json:"port,omitempty"`
 }

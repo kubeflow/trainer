@@ -1,0 +1,246 @@
+/*
+Copyright 2026 The Kubeflow Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package progress
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+)
+
+func newTestServer(t *testing.T, cfg *configapi.ProgressServer) *httptest.Server {
+	t.Helper()
+
+	srv, err := NewServer(cfg)
+	if err != nil {
+		t.Fatalf("NewServer() error: %v", err)
+	}
+
+	return httptest.NewServer(srv.httpServer.Handler)
+}
+
+func TestHandleProgressStatus(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	ctrl.SetLogger(logger)
+
+	validProgressStatus := trainer.ProgressStatus{
+		TrainerStatus: &trainer.TrainJobTrainerStatus{
+			ProgressPercentage:        ptr.To[int32](75),
+			EstimatedRemainingSeconds: ptr.To[int32](300),
+			Metrics: []trainer.Metric{
+				{Name: "loss", Value: "0.123"},
+				{Name: "accuracy", Value: "0.95"},
+			},
+		},
+	}
+
+	validBody, _ := json.Marshal(validProgressStatus)
+
+	cases := []struct {
+		name         string
+		url          string
+		body         string
+		wantResponse *trainer.ProgressStatus
+	}{
+		{
+			name:         "successful POST request with full progress status",
+			url:          "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			body:         string(validBody),
+			wantResponse: &validProgressStatus,
+		},
+		{
+			name:         "successful POST request with empty progress status",
+			url:          "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			body:         "{}",
+			wantResponse: &trainer.ProgressStatus{},
+		},
+		{
+			name: "successful POST request with only metrics",
+			url:  "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			body: `{
+				"trainerStatus": {
+					"metrics": [{"name": "loss", "value": "0.5"}]
+				}
+			}`,
+			wantResponse: &trainer.ProgressStatus{
+				TrainerStatus: &trainer.TrainJobTrainerStatus{
+					Metrics: []trainer.Metric{{Name: "loss", Value: "0.5"}},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)})
+			defer ts.Close()
+
+			// Make actual HTTP request
+			resp, err := http.Post(
+				ts.URL+tc.url,
+				"application/json",
+				bytes.NewReader([]byte(tc.body)))
+			if err != nil {
+				t.Fatalf("HTTP POST failed: %v", err)
+			}
+			t.Cleanup(func() { _ = resp.Body.Close() })
+
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("status = %v, want %v", resp.StatusCode, http.StatusOK)
+			}
+
+			if resp.Header.Get("Content-Type") != "application/json" {
+				t.Errorf("Content-Type = %v, want application/json", resp.Header.Get("Content-Type"))
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("Failed to read response body: %v", err)
+			}
+
+			var got trainer.ProgressStatus
+			if err := json.Unmarshal(body, &got); err != nil {
+				t.Fatalf("Failed to unmarshal response: %v", err)
+			}
+			if diff := cmp.Diff(tc.wantResponse, &got); diff != "" {
+				t.Errorf("response mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRecoveryMiddleware(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	ctrl.SetLogger(logger)
+
+	// Create a handler that panics
+	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("test panic")
+	})
+
+	// Wrap with recovery middleware
+	handler := recoveryMiddleware(logger)(panicHandler)
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	rec := httptest.NewRecorder()
+
+	// Should not panic, should return 500
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("status = %v, want %v", rec.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestServerErrorResponses(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	ctrl.SetLogger(logger)
+
+	cases := []struct {
+		name         string
+		url          string
+		body         string
+		wantResponse *metav1.Status
+	}{
+		{
+			name: "POST with invalid JSON triggers invalid payload error",
+			url:  "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			body: "{invalid json}",
+			wantResponse: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: "Invalid payload",
+				Reason:  metav1.StatusReasonInvalid,
+				Code:    http.StatusUnprocessableEntity,
+			},
+		},
+		{
+			name: "POST with malformed data triggers invalid payload error",
+			url:  "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			body: "not json at all",
+			wantResponse: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: "Invalid payload",
+				Reason:  metav1.StatusReasonInvalid,
+				Code:    http.StatusUnprocessableEntity,
+			},
+		},
+		{
+			name: "POST with oversized body triggers payload too large error",
+			url:  "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			// Generate ~1MB payload (exceeds 64kB limit)
+			body: `{"trainerStatus": {"metrics": [` + strings.Repeat(`{"name":"m","value":"0.5"},`, 40000) + `]}}`,
+			wantResponse: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: "Payload too large",
+				Reason:  metav1.StatusReasonRequestEntityTooLarge,
+				Code:    http.StatusRequestEntityTooLarge,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)})
+			defer ts.Close()
+
+			// Make actual HTTP request
+			resp, err := http.Post(
+				ts.URL+tc.url,
+				"application/json",
+				bytes.NewReader([]byte(tc.body)))
+			if err != nil {
+				t.Fatalf("HTTP POST failed: %v", err)
+			}
+			t.Cleanup(func() { _ = resp.Body.Close() })
+
+			if resp.StatusCode != int(tc.wantResponse.Code) {
+				t.Errorf("status = %v, want %v", resp.StatusCode, tc.wantResponse.Code)
+			}
+
+			if resp.Header.Get("Content-Type") != "application/json" {
+				t.Errorf("Content-Type = %v, want application/json", resp.Header.Get("Content-Type"))
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("Failed to read response body: %v", err)
+			}
+
+			var got metav1.Status
+			if err := json.Unmarshal(body, &got); err != nil {
+				t.Fatalf("Failed to unmarshal response: %v", err)
+			}
+
+			if diff := cmp.Diff(tc.wantResponse, &got); diff != "" {
+				t.Errorf("response mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

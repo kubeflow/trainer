@@ -50,5 +50,10 @@ func validate(cfg *configapi.Configuration) field.ErrorList {
 		}
 	}
 
+	// Validate progress server port
+	if cfg.ProgressServer != nil && cfg.ProgressServer.Port != nil && (*cfg.ProgressServer.Port < 1 || *cfg.ProgressServer.Port > 65535) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("progressServer", "port"), *cfg.ProgressServer.Port, "must be between 1 and 65535"))
+	}
+
 	return allErrs
 }
