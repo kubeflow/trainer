@@ -40,6 +40,8 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/config"
 	"github.com/kubeflow/trainer/v2/pkg/controller"
+	"github.com/kubeflow/trainer/v2/pkg/features"
+	"github.com/kubeflow/trainer/v2/pkg/progress"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
@@ -133,8 +135,8 @@ func main() {
 		setupLog.Error(err, "Could not initialize runtimes")
 		os.Exit(1)
 	}
-	// Set up controllers using goroutines to start the manager quickly.
-	go setupControllers(mgr, runtimes, certsReady)
+	// Set up controllers and other components using goroutines to start the manager quickly.
+	go setupManagerComponents(mgr, runtimes, &cfg, certsReady)
 
 	setupLog.Info("Starting manager")
 	if err = mgr.Start(ctx); err != nil {
@@ -143,7 +145,7 @@ func main() {
 	}
 }
 
-func setupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, certsReady <-chan struct{}) {
+func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, cfg *configapi.Configuration, certsReady <-chan struct{}) {
 	setupLog.Info("Waiting for certificate generation to complete")
 	<-certsReady
 	setupLog.Info("Certs ready")
@@ -155,6 +157,13 @@ func setupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, cer
 	if failedWebhook, err := webhooks.Setup(mgr, runtimes); err != nil {
 		setupLog.Error(err, "Could not create webhook", "webhook", failedWebhook)
 		os.Exit(1)
+	}
+
+	if features.Enabled(features.TrainJobProgress) {
+		if err := progress.SetupServer(mgr, cfg.ProgressServer); err != nil {
+			setupLog.Error(err, "Could not create progress server")
+			os.Exit(1)
+		}
 	}
 }
 
