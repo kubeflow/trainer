@@ -2135,7 +2135,7 @@ func TestTrainingRuntime_RuntimeInfo_UnsupportedTemplate(t *testing.T) {
 
 	_, err := rt.RuntimeInfo(
 		trainJob,
-		"invalid-template-type", 
+		"invalid-template-type",
 		nil,
 		nil,
 	)
