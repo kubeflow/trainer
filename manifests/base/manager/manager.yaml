@@ -43,6 +43,9 @@ spec:
             - name: webhook
               containerPort: 9443
               protocol: TCP
+            - name: progress-server
+              containerPort: 10443
+              protocol: TCP
 
           volumeMounts:
             - mountPath: /tmp/k8s-webhook-server/serving-certs
@@ -85,5 +88,9 @@ spec:
       port: 443
       protocol: TCP
       targetPort: webhook
+    - name: progress-server
+      port: 10443
+      protocol: TCP
+      targetPort: progress-server
   selector:
     app.kubernetes.io/component: manager
