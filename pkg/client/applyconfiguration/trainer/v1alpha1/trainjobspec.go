@@ -22,7 +22,6 @@ package v1alpha1
 // TrainJobSpec represents specification of the desired TrainJob.
 type TrainJobSpecApplyConfiguration struct {
 	// runtimeRef is the reference to the training runtime.
-	// The field is immutable.
 	RuntimeRef *RuntimeRefApplyConfiguration `json:"runtimeRef,omitempty"`
 	// initializer defines the configuration of the initializer.
 	Initializer *InitializerApplyConfiguration `json:"initializer,omitempty"`
@@ -38,7 +37,6 @@ type TrainJobSpecApplyConfiguration struct {
 	// When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.
 	PodTemplateOverrides []PodTemplateOverrideApplyConfiguration `json:"podTemplateOverrides,omitempty"`
 	// suspend defines whether to suspend the running TrainJob.
-	// Defaults to false.
 	Suspend *bool `json:"suspend,omitempty"`
 	// managedBy is used to indicate the controller or entity that manages a TrainJob.
 	// The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or
@@ -46,7 +44,6 @@ type TrainJobSpecApplyConfiguration struct {
 	// don't have this field at all or the field value is the reserved string
 	// `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs
 	// with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.
-	// Defaults to `trainer.kubeflow.org/trainjob-controller`
 	ManagedBy *string `json:"managedBy,omitempty"`
 }
 

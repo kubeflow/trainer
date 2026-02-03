@@ -95,18 +95,20 @@ type TrainJobList struct {
 }
 
 // TrainJobSpec represents specification of the desired TrainJob.
+// +kubebuilder:validation:XValidation:rule="(has(oldSelf.suspend) && oldSelf.suspend) || self.podTemplateOverrides == oldSelf.podTemplateOverrides", message="podTemplateOverrides are immutable when suspend is false"
 type TrainJobSpec struct {
 	// runtimeRef is the reference to the training runtime.
-	// The field is immutable.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="runtimeRef is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +required
 	RuntimeRef RuntimeRef `json:"runtimeRef,omitzero"`
 
 	// initializer defines the configuration of the initializer.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	Initializer *Initializer `json:"initializer,omitempty"`
 
 	// trainer defines the configuration of the trainer.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	Trainer *Trainer `json:"trainer,omitempty"`
 
@@ -127,7 +129,6 @@ type TrainJobSpec struct {
 	PodTemplateOverrides []PodTemplateOverride `json:"podTemplateOverrides,omitempty"`
 
 	// suspend defines whether to suspend the running TrainJob.
-	// Defaults to false.
 	// +kubebuilder:default=false
 	// +optional
 	Suspend *bool `json:"suspend,omitempty"`
@@ -138,10 +139,9 @@ type TrainJobSpec struct {
 	// don't have this field at all or the field value is the reserved string
 	// `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs
 	// with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.
-	// Defaults to `trainer.kubeflow.org/trainjob-controller`
 	// +kubebuilder:default="trainer.kubeflow.org/trainjob-controller"
 	// +kubebuilder:validation:XValidation:rule="self in ['trainer.kubeflow.org/trainjob-controller', 'kueue.x-k8s.io/multikueue']", message="ManagedBy must be trainer.kubeflow.org/trainjob-controller or kueue.x-k8s.io/multikueue if set"
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="ManagedBy value is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	ManagedBy *string `json:"managedBy,omitempty"`
 }
@@ -266,7 +266,8 @@ type Trainer struct {
 // PodTemplateOverride represents a custom PodTemplateSpec override that will be applied to the TrainJob's training runtime.
 type PodTemplateOverride struct {
 	// targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.
-	// +listType=atomic
+	// +listType=map
+	// +listMapKey=name
 	// +required
 	TargetJobs []PodTemplateOverrideTargetJob `json:"targetJobs,omitempty"`
 
@@ -291,6 +292,7 @@ type PodTemplateOverrideTargetJob struct {
 // PodTemplateSpecOverride represents the spec overrides for Pod template.
 type PodTemplateSpecOverride struct {
 	// serviceAccountName overrides the service account.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 
@@ -309,24 +311,28 @@ type PodTemplateSpecOverride struct {
 
 	// securityContext overrides the Pod's security context.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
 
 	// volumes overrides the Pod's volumes.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// initContainers overrides the init container in the target job templates.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
 
 	// containers overrides for the containers in the target job templates.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	Containers []ContainerOverride `json:"containers,omitempty"`
 
@@ -340,6 +346,7 @@ type PodTemplateSpecOverride struct {
 	// imagePullSecrets overrides the image pull secrets for the Pods in the target job templates.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
@@ -376,7 +383,6 @@ type ContainerOverride struct {
 // +kubebuilder:validation:MinProperties=1
 type TrainJobStatus struct {
 	// conditions for the TrainJob.
-	//
 	// +optional
 	// +listType=map
 	// +listMapKey=type

@@ -431,6 +431,9 @@ spec:
                         type: string
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: field is immutable
+                  rule: self == oldSelf
               labels:
                 additionalProperties:
                   type: string
@@ -447,13 +450,12 @@ spec:
                   don't have this field at all or the field value is the reserved string
                   `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs
                   with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.
-                  Defaults to `trainer.kubeflow.org/trainjob-controller`
                 type: string
                 x-kubernetes-validations:
                 - message: ManagedBy must be trainer.kubeflow.org/trainjob-controller
                     or kueue.x-k8s.io/multikueue if set
                   rule: self in ['trainer.kubeflow.org/trainjob-controller', 'kueue.x-k8s.io/multikueue']
-                - message: ManagedBy value is immutable
+                - message: field is immutable
                   rule: self == oldSelf
               podTemplateOverrides:
                 description: |-
@@ -1864,6 +1866,9 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
+                          x-kubernetes-validations:
+                          - message: field is immutable
+                            rule: self == oldSelf
                         imagePullSecrets:
                           description: imagePullSecrets overrides the image pull secrets
                             for the Pods in the target job templates.
@@ -1887,6 +1892,9 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
+                          x-kubernetes-validations:
+                          - message: field is immutable
+                            rule: self == oldSelf
                         initContainers:
                           description: initContainers overrides the init container
                             in the target job templates.
@@ -2337,6 +2345,9 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
+                          x-kubernetes-validations:
+                          - message: field is immutable
+                            rule: self == oldSelf
                         nodeSelector:
                           additionalProperties:
                             type: string
@@ -2598,9 +2609,15 @@ spec:
                                   type: string
                               type: object
                           type: object
+                          x-kubernetes-validations:
+                          - message: field is immutable
+                            rule: self == oldSelf
                         serviceAccountName:
                           description: serviceAccountName overrides the service account.
                           type: string
+                          x-kubernetes-validations:
+                          - message: field is immutable
+                            rule: self == oldSelf
                         tolerations:
                           description: tolerations overrides the Pod's tolerations.
                           items:
@@ -4593,6 +4610,9 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
+                          x-kubernetes-validations:
+                          - message: field is immutable
+                            rule: self == oldSelf
                       type: object
                     targetJobs:
                       description: targetJobs is the list of replicated jobs in the
@@ -4608,16 +4628,16 @@ spec:
                         - name
                         type: object
                       type: array
-                      x-kubernetes-list-type: atomic
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                   required:
                   - targetJobs
                   type: object
                 type: array
                 x-kubernetes-list-type: atomic
               runtimeRef:
-                description: |-
-                  runtimeRef is the reference to the training runtime.
-                  The field is immutable.
+                description: runtimeRef is the reference to the training runtime.
                 properties:
                   apiGroup:
                     default: trainer.kubeflow.org
@@ -4642,13 +4662,11 @@ spec:
                 - name
                 type: object
                 x-kubernetes-validations:
-                - message: runtimeRef is immutable
+                - message: field is immutable
                   rule: self == oldSelf
               suspend:
                 default: false
-                description: |-
-                  suspend defines whether to suspend the running TrainJob.
-                  Defaults to false.
+                description: suspend defines whether to suspend the running TrainJob.
                 type: boolean
               trainer:
                 description: trainer defines the configuration of the trainer.
@@ -4905,9 +4923,16 @@ spec:
                         type: object
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: field is immutable
+                  rule: self == oldSelf
             required:
             - runtimeRef
             type: object
+            x-kubernetes-validations:
+            - message: podTemplateOverrides are immutable when suspend is false
+              rule: (has(oldSelf.suspend) && oldSelf.suspend) || self.podTemplateOverrides
+                == oldSelf.podTemplateOverrides
           status:
             description: status of TrainJob.
             minProperties: 1

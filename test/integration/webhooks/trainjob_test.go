@@ -20,6 +20,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -444,7 +445,7 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 				g.Expect(k8sClient.Update(ctx, new(oldTrainJob))).Should(errorMatcher)
 			}, util.Timeout, util.Interval).Should(gomega.Succeed())
 		},
-			ginkgo.Entry("Should fail to update TrainJob managedBy",
+			ginkgo.Entry("Should fail to update managedBy",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-managed-by").
 						ManagedBy("trainer.kubeflow.org/trainjob-controller").
@@ -464,6 +465,277 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 				},
 				func(job *trainer.TrainJob) *trainer.TrainJob {
 					job.Spec.RuntimeRef.Name = "forbidden-update"
+					return job
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to update initializer",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-initializer").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Initializer(&trainer.Initializer{
+							Model: &trainer.ModelInitializer{
+								StorageUri: ptr.To("s3://test/path"),
+							},
+						}).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.Initializer.Model.StorageUri = ptr.To("s3://forbidden-update")
+					return job
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to update trainer",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-trainer").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Trainer(&trainer.Trainer{
+							Image: ptr.To("test-image"),
+						}).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.Trainer.Image = ptr.To("forbidden-update")
+					return job
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should success to update podTemplateOverride when suspend is true",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-trainer").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(true).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										NodeSelector: map[string]string{"test": "test"},
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodTemplateOverrides[0].Spec.NodeSelector = map[string]string{"allow": "update"}
+					return job
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to update podTemplateOverride when suspend is false",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-trainer").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(false).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										NodeSelector: map[string]string{"test": "test"},
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodTemplateOverrides[0].Spec.NodeSelector = map[string]string{"forbidden": "update"}
+					return job
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to update serviceAccount in podTemplateOverrides",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-trainer").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(true).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										ServiceAccountName: ptr.To("test-sa"),
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodTemplateOverrides[0].Spec.ServiceAccountName = ptr.To("forbidden-update")
+					return job
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to update securityContext in podTemplateOverrides",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-security-context").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(true).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										SecurityContext: &corev1.PodSecurityContext{
+											RunAsUser: ptr.To(int64(1000)),
+										},
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodTemplateOverrides[0].Spec.SecurityContext.RunAsUser = ptr.To(int64(2000))
+					return job
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to update volumes in podTemplateOverrides",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-volumes").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(true).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										Volumes: []corev1.Volume{
+											{
+												Name: "test-volume",
+												VolumeSource: corev1.VolumeSource{
+													EmptyDir: &corev1.EmptyDirVolumeSource{},
+												},
+											},
+										},
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodTemplateOverrides[0].Spec.Volumes[0].VolumeSource.EmptyDir.SizeLimit = ptr.To(resource.MustParse("1Gi"))
+					return job
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to update initContainers in podTemplateOverrides",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-init-containers").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(true).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										InitContainers: []trainer.ContainerOverride{
+											{
+												Name: "init-test",
+												Env: []corev1.EnvVar{
+													{
+														Name:  "TEST_VAR",
+														Value: "test-value",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodTemplateOverrides[0].Spec.InitContainers[0].Env[0].Value = "forbidden-update"
+					return job
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to update containers in podTemplateOverrides",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-containers").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(true).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										Containers: []trainer.ContainerOverride{
+											{
+												Name: "trainer",
+												Env: []corev1.EnvVar{
+													{
+														Name:  "TEST_VAR",
+														Value: "test-value",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodTemplateOverrides[0].Spec.Containers[0].Env[0].Value = "forbidden-update"
+					return job
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to update imagePullSecrets in podTemplateOverrides",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-image-pull-secrets").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(true).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										ImagePullSecrets: []corev1.LocalObjectReference{
+											{
+												Name: "test-secret",
+											},
+										},
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodTemplateOverrides[0].Spec.ImagePullSecrets[0].Name = "forbidden-update"
 					return job
 				},
 				testingutil.BeInvalidError()),

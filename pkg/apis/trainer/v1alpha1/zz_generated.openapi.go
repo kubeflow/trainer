@@ -1016,7 +1016,10 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateOverride(ref common.ReferenceCa
 					"targetJobs": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -1479,7 +1482,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 				Properties: map[string]spec.Schema{
 					"runtimeRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "runtimeRef is the reference to the training runtime. The field is immutable.",
+							Description: "runtimeRef is the reference to the training runtime.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef"),
 						},
@@ -1549,14 +1552,14 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 					},
 					"suspend": {
 						SchemaProps: spec.SchemaProps{
-							Description: "suspend defines whether to suspend the running TrainJob. Defaults to false.",
+							Description: "suspend defines whether to suspend the running TrainJob.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"managedBy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`",
+							Description: "managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
