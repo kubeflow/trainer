@@ -1016,10 +1016,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateOverride(ref common.ReferenceCa
 					"targetJobs": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type": "map",
+								"x-kubernetes-list-type": "atomic",
 							},
 						},
 						SchemaProps: spec.SchemaProps{

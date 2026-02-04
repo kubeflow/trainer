@@ -266,8 +266,7 @@ type Trainer struct {
 // PodTemplateOverride represents a custom PodTemplateSpec override that will be applied to the TrainJob's training runtime.
 type PodTemplateOverride struct {
 	// targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.
-	// +listType=map
-	// +listMapKey=name
+	// +listType=atomic
 	// +required
 	TargetJobs []PodTemplateOverrideTargetJob `json:"targetJobs,omitempty"`
 
