@@ -18,9 +18,14 @@ package v1alpha1
 
 // PodGroupPolicySourceApplyConfiguration represents a declarative configuration of the PodGroupPolicySource type for use
 // with apply.
+//
+// PodGroupPolicySource represents supported plugins for gang-scheduling.
+// Only one of its members may be specified.
 type PodGroupPolicySourceApplyConfiguration struct {
+	// coscheduling plugin from the Kubernetes scheduler-plugins for gang-scheduling.
 	Coscheduling *CoschedulingPodGroupPolicySourceApplyConfiguration `json:"coscheduling,omitempty"`
-	Volcano      *VolcanoPodGroupPolicySourceApplyConfiguration      `json:"volcano,omitempty"`
+	// volcano plugin for gang-scheduling.
+	Volcano *VolcanoPodGroupPolicySourceApplyConfiguration `json:"volcano,omitempty"`
 }
 
 // PodGroupPolicySourceApplyConfiguration constructs a declarative configuration of the PodGroupPolicySource type for use with

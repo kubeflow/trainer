@@ -19,6 +19,7 @@ package v1alpha1
 // PodTemplateOverrideTargetJobApplyConfiguration represents a declarative configuration of the PodTemplateOverrideTargetJob type for use
 // with apply.
 type PodTemplateOverrideTargetJobApplyConfiguration struct {
+	// name is the target training job name for which the PodTemplateSpec is overridden.
 	Name *string `json:"name,omitempty"`
 }
 

@@ -81,3 +81,18 @@ tests:
       - matchRegex:
           path: data["controller_manager_config.yaml"]
           pattern: "ClusterTrainingRuntime.trainer.kubeflow.org: 3"
+
+  - it: should set feature gates
+    set:
+      manager.config.featureGates.FeatOn: true
+      manager.config.featureGates.FeatOff: false
+    asserts:
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "featureGates:"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "FeatOff: false"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "FeatOn: true"

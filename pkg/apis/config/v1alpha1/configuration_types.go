@@ -59,6 +59,11 @@ type Configuration struct {
 	// API server client.
 	// +optional
 	ClientConnection *ClientConnection `json:"clientConnection,omitempty"`
+
+	// featureGates is a map of feature names to bools that allows to override the
+	// default enablement status of a feature.
+	// +optional
+	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 }
 
 // ControllerWebhook defines the webhook server for the controller.

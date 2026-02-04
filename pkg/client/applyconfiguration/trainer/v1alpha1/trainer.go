@@ -23,14 +23,29 @@ import (
 
 // TrainerApplyConfiguration represents a declarative configuration of the Trainer type for use
 // with apply.
+//
+// Trainer represents the desired configuration for the training job.
+// The Trainer spec will override the runtime template
+// which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: trainer`
 type TrainerApplyConfiguration struct {
-	Image            *string                                    `json:"image,omitempty"`
-	Command          []string                                   `json:"command,omitempty"`
-	Args             []string                                   `json:"args,omitempty"`
-	Env              []v1.EnvVarApplyConfiguration              `json:"env,omitempty"`
-	NumNodes         *int32                                     `json:"numNodes,omitempty"`
+	// image is the container image for the training container.
+	Image *string `json:"image,omitempty"`
+	// command for the entrypoint of the training container.
+	Command []string `json:"command,omitempty"`
+	// args for the entrypoint for the training container.
+	Args []string `json:"args,omitempty"`
+	// env is the list of environment variables to set in the training container.
+	// These values will be merged with the TrainingRuntime's trainer environments.
+	Env []v1.EnvVarApplyConfiguration `json:"env,omitempty"`
+	// numNodes is the number of training nodes.
+	// TODO (andreyvelich): Do we want to support dynamic num of nodes in TrainJob for PyTorch elastic: `--nnodes=1:4` ?
+	NumNodes *int32 `json:"numNodes,omitempty"`
+	// resourcesPerNode defines the compute resources for each training node.
 	ResourcesPerNode *v1.ResourceRequirementsApplyConfiguration `json:"resourcesPerNode,omitempty"`
-	NumProcPerNode   *intstr.IntOrString                        `json:"numProcPerNode,omitempty"`
+	// numProcPerNode is the number of processes/workers/slots on every training node.
+	// For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set.
+	// For the MPI runtime only int value can be set.
+	NumProcPerNode *intstr.IntOrString `json:"numProcPerNode,omitempty"`
 }
 
 // TrainerApplyConfiguration constructs a declarative configuration of the Trainer type for use with

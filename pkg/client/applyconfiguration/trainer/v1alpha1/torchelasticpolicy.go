@@ -22,11 +22,24 @@ import (
 
 // TorchElasticPolicyApplyConfiguration represents a declarative configuration of the TorchElasticPolicy type for use
 // with apply.
+//
+// TorchElasticPolicy represents a configuration for the PyTorch elastic training.
+// If this policy is set, the `.spec.numNodes` parameter must be omitted, since min and max node
+// is used to configure the `torchrun` CLI argument: `--nnodes=minNodes:maxNodes`.
+// Only `c10d` backend is supported for the Rendezvous communication.
 type TorchElasticPolicyApplyConfiguration struct {
-	MaxRestarts *int32                            `json:"maxRestarts,omitempty"`
-	MinNodes    *int32                            `json:"minNodes,omitempty"`
-	MaxNodes    *int32                            `json:"maxNodes,omitempty"`
-	Metrics     []v2.MetricSpecApplyConfiguration `json:"metrics,omitempty"`
+	// maxRestarts defines how many times the training job can be restarted.
+	// This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and
+	// the `.spec.failurePolicy.maxRestarts` parameter of the training Job.
+	MaxRestarts *int32 `json:"maxRestarts,omitempty"`
+	// minNodes is the lower limit for the number of nodes to which training job can scale down.
+	MinNodes *int32 `json:"minNodes,omitempty"`
+	// maxNodes is the upper limit for the number of nodes to which training job can scale up.
+	MaxNodes *int32 `json:"maxNodes,omitempty"`
+	// metrics which are used to calculate the desired number of nodes. See the individual
+	// metric source types for more information about how each type of metric must respond.
+	// The HPA will be created to perform auto-scaling.
+	Metrics []v2.MetricSpecApplyConfiguration `json:"metrics,omitempty"`
 }
 
 // TorchElasticPolicyApplyConfiguration constructs a declarative configuration of the TorchElasticPolicy type for use with

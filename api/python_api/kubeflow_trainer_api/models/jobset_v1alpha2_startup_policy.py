@@ -26,7 +26,7 @@ class JobsetV1alpha2StartupPolicy(BaseModel):
     """
     JobsetV1alpha2StartupPolicy
     """ # noqa: E501
-    startup_policy_order: StrictStr = Field(description="StartupPolicyOrder determines the startup order of the ReplicatedJobs. AnyOrder means to start replicated jobs in any order. InOrder means to start them as they are listed in the JobSet. A ReplicatedJob is started only when all the jobs of the previous one are ready.", alias="startupPolicyOrder")
+    startup_policy_order: StrictStr = Field(description="startupPolicyOrder determines the startup order of the ReplicatedJobs. AnyOrder means to start replicated jobs in any order. InOrder means to start them as they are listed in the JobSet. A ReplicatedJob is started only when all the jobs of the previous one are ready.", alias="startupPolicyOrder")
     __properties: ClassVar[List[str]] = ["startupPolicyOrder"]
 
     model_config = ConfigDict(

@@ -68,7 +68,7 @@ func TestClusterTrainingRuntimeValidateCreate(t *testing.T) {
 				obj.Labels = tc.labels
 			}
 
-			validator := &ClusterTrainingRuntimeWebhook{}
+			validator := &ClusterTrainingRuntimeValidator{}
 			warnings, err := validator.ValidateCreate(ctx, obj)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)

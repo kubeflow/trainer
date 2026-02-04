@@ -18,15 +18,36 @@ package v1alpha1
 
 // TrainJobSpecApplyConfiguration represents a declarative configuration of the TrainJobSpec type for use
 // with apply.
+//
+// TrainJobSpec represents specification of the desired TrainJob.
 type TrainJobSpecApplyConfiguration struct {
-	RuntimeRef           *RuntimeRefApplyConfiguration           `json:"runtimeRef,omitempty"`
-	Initializer          *InitializerApplyConfiguration          `json:"initializer,omitempty"`
-	Trainer              *TrainerApplyConfiguration              `json:"trainer,omitempty"`
-	Labels               map[string]string                       `json:"labels,omitempty"`
-	Annotations          map[string]string                       `json:"annotations,omitempty"`
+	// runtimeRef is the reference to the training runtime.
+	// The field is immutable.
+	RuntimeRef *RuntimeRefApplyConfiguration `json:"runtimeRef,omitempty"`
+	// initializer defines the configuration of the initializer.
+	Initializer *InitializerApplyConfiguration `json:"initializer,omitempty"`
+	// trainer defines the configuration of the trainer.
+	Trainer *TrainerApplyConfiguration `json:"trainer,omitempty"`
+	// labels to apply for the derivative JobSet and Jobs.
+	// They will be merged with the TrainingRuntime values.
+	Labels map[string]string `json:"labels,omitempty"`
+	// annotations to apply for the derivative JobSet and Jobs.
+	// They will be merged with the TrainingRuntime values.
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// podTemplateOverrides define the PodTemplateOverrides for the training runtime.
+	// When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.
 	PodTemplateOverrides []PodTemplateOverrideApplyConfiguration `json:"podTemplateOverrides,omitempty"`
-	Suspend              *bool                                   `json:"suspend,omitempty"`
-	ManagedBy            *string                                 `json:"managedBy,omitempty"`
+	// suspend defines whether to suspend the running TrainJob.
+	// Defaults to false.
+	Suspend *bool `json:"suspend,omitempty"`
+	// managedBy is used to indicate the controller or entity that manages a TrainJob.
+	// The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or
+	// `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which
+	// don't have this field at all or the field value is the reserved string
+	// `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs
+	// with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.
+	// Defaults to `trainer.kubeflow.org/trainjob-controller`
+	ManagedBy *string `json:"managedBy,omitempty"`
 }
 
 // TrainJobSpecApplyConfiguration constructs a declarative configuration of the TrainJobSpec type for use with

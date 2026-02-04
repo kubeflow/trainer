@@ -62,3 +62,8 @@ data:
       enable: {{ .Values.manager.config.certManagement.enable }}
       webhookServiceName: {{ if .Values.manager.config.certManagement.webhookServiceName }}{{ .Values.manager.config.certManagement.webhookServiceName }}{{ else }}{{ include "trainer.webhook.service.name" . }}{{ end }}
       webhookSecretName: {{ if .Values.manager.config.certManagement.webhookSecretName }}{{ .Values.manager.config.certManagement.webhookSecretName }}{{ else }}{{ include "trainer.webhook.secret.name" . }}{{ end }}
+
+    {{ with .Values.manager.config.featureGates }}
+    # Feature gates
+    featureGates: {{ toYaml . | nindent 6 }}
+    {{ end }}

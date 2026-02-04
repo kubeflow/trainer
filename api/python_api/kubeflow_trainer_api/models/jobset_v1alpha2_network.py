@@ -26,9 +26,9 @@ class JobsetV1alpha2Network(BaseModel):
     """
     JobsetV1alpha2Network
     """ # noqa: E501
-    enable_dns_hostnames: Optional[StrictBool] = Field(default=None, description="EnableDNSHostnames allows pods to be reached via their hostnames. Pods will be reachable using the fully qualified pod hostname: <jobSet.name>-<spec.replicatedJob.name>-<job-index>-<pod-index>.<subdomain>", alias="enableDNSHostnames")
-    publish_not_ready_addresses: Optional[StrictBool] = Field(default=None, description="Indicates if DNS records of pods should be published before the pods are ready. Defaults to True.", alias="publishNotReadyAddresses")
-    subdomain: Optional[StrictStr] = Field(default=None, description="Subdomain is an explicit choice for a network subdomain name When set, any replicated job in the set is added to this network. Defaults to <jobSet.name> if not set.")
+    enable_dns_hostnames: Optional[StrictBool] = Field(default=None, description="enableDNSHostnames allows pods to be reached via their hostnames. Pods will be reachable using the fully qualified pod hostname: <jobSet.name>-<spec.replicatedJob.name>-<job-index>-<pod-index>.<subdomain>", alias="enableDNSHostnames")
+    publish_not_ready_addresses: Optional[StrictBool] = Field(default=None, description="publishNotReadyAddresses indicates if DNS records of pods should be published before the pods are ready. Defaults to True.", alias="publishNotReadyAddresses")
+    subdomain: Optional[StrictStr] = Field(default=None, description="subdomain is an explicit choice for a network subdomain name When set, any replicated job in the set is added to this network. Defaults to <jobSet.name> if not set.")
     __properties: ClassVar[List[str]] = ["enableDNSHostnames", "publishNotReadyAddresses", "subdomain"]
 
     model_config = ConfigDict(

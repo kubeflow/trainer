@@ -25,9 +25,14 @@ import (
 
 // JobSetTemplateSpecApplyConfiguration represents a declarative configuration of the JobSetTemplateSpec type for use
 // with apply.
+//
+// JobSetTemplateSpec represents a template of the desired JobSet.
 type JobSetTemplateSpecApplyConfiguration struct {
+	// metadata for custom JobSet's labels and annotations.
+	// JobSet name and namespace is equal to the TrainJob's name and namespace.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *v1alpha2.JobSetSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec of the desired JobSet which will be created from TrainJob.
+	Spec *v1alpha2.JobSetSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // JobSetTemplateSpecApplyConfiguration constructs a declarative configuration of the JobSetTemplateSpec type for use with

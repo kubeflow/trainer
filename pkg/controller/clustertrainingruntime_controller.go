@@ -24,7 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -46,14 +46,14 @@ import (
 type ClusterTrainingRuntimeReconciler struct {
 	log                        logr.Logger
 	client                     client.Client
-	recorder                   record.EventRecorder
+	recorder                   events.EventRecorder
 	nonClRuntimeObjectUpdateCh chan event.TypedGenericEvent[iter.Seq[types.NamespacedName]]
 }
 
 var _ reconcile.Reconciler = (*ClusterTrainingRuntimeReconciler)(nil)
 var _ TrainJobWatcher = (*ClusterTrainingRuntimeReconciler)(nil)
 
-func NewClusterTrainingRuntimeReconciler(cli client.Client, recorder record.EventRecorder) *ClusterTrainingRuntimeReconciler {
+func NewClusterTrainingRuntimeReconciler(cli client.Client, recorder events.EventRecorder) *ClusterTrainingRuntimeReconciler {
 	return &ClusterTrainingRuntimeReconciler{
 		log:                        ctrl.Log.WithName("clustertrainingruntime-controller"),
 		client:                     cli,

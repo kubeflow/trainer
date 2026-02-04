@@ -22,11 +22,22 @@ import (
 
 // MPIMLPolicySourceApplyConfiguration represents a declarative configuration of the MPIMLPolicySource type for use
 // with apply.
+//
+// MPIMLPolicySource represents a MPI runtime configuration.
 type MPIMLPolicySourceApplyConfiguration struct {
-	NumProcPerNode    *int32                             `json:"numProcPerNode,omitempty"`
+	// numProcPerNode is the number of processes per node.
+	// This value is equal to the number of slots for each node in the hostfile.
+	// Defaults to 1.
+	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
+	// mpiImplementation is the name of the MPI implementation to create the appropriate hostfile.
+	// Defaults to OpenMPI.
 	MPIImplementation *trainerv1alpha1.MPIImplementation `json:"mpiImplementation,omitempty"`
-	SSHAuthMountPath  *string                            `json:"sshAuthMountPath,omitempty"`
-	RunLauncherAsNode *bool                              `json:"runLauncherAsNode,omitempty"`
+	// sshAuthMountPath is the directory where SSH keys are mounted.
+	// Defaults to /root/.ssh.
+	SSHAuthMountPath *string `json:"sshAuthMountPath,omitempty"`
+	// runLauncherAsNode defines whether to run training process on the launcher Job.
+	// Defaults to false.
+	RunLauncherAsNode *bool `json:"runLauncherAsNode,omitempty"`
 }
 
 // MPIMLPolicySourceApplyConfiguration constructs a declarative configuration of the MPIMLPolicySource type for use with

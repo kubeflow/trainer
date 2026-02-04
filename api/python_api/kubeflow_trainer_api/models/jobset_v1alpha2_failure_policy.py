@@ -27,9 +27,9 @@ class JobsetV1alpha2FailurePolicy(BaseModel):
     """
     JobsetV1alpha2FailurePolicy
     """ # noqa: E501
-    max_restarts: Optional[StrictInt] = Field(default=None, description="MaxRestarts defines the limit on the number of JobSet restarts. A restart is achieved by recreating all active child jobs.", alias="maxRestarts")
-    restart_strategy: Optional[StrictStr] = Field(default=None, description="RestartStrategy defines the strategy to use when restarting the JobSet. Defaults to Recreate.", alias="restartStrategy")
-    rules: Optional[List[JobsetV1alpha2FailurePolicyRule]] = Field(default=None, description="List of failure policy rules for this JobSet. For a given Job failure, the rules will be evaluated in order, and only the first matching rule will be executed. If no matching rule is found, the RestartJobSet action is applied.")
+    max_restarts: Optional[StrictInt] = Field(default=None, description="maxRestarts defines the limit on the number of JobSet restarts. If the restart strategy \"InPlaceRestart\" is used, this field also defines the limit on the number of container restarts of any child container. This is required to handle the edge case in which a container keeps failing too fast to complete a JobSet restart.", alias="maxRestarts")
+    restart_strategy: Optional[StrictStr] = Field(default=None, description="restartStrategy defines the strategy to use when restarting the JobSet. Defaults to Recreate.", alias="restartStrategy")
+    rules: Optional[List[JobsetV1alpha2FailurePolicyRule]] = Field(default=None, description="rules is a list of failure policy rules for this JobSet. For a given Job failure, the rules will be evaluated in order, and only the first matching rule will be executed. If no matching rule is found, the RestartJobSet action is applied.")
     __properties: ClassVar[List[str]] = ["maxRestarts", "restartStrategy", "rules"]
 
     model_config = ConfigDict(

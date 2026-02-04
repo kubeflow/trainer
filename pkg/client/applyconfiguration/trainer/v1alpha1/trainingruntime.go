@@ -24,10 +24,16 @@ import (
 
 // TrainingRuntimeApplyConfiguration represents a declarative configuration of the TrainingRuntime type for use
 // with apply.
+//
+// TrainingRuntime represents a training runtime which can be referenced as part of
+// `runtimeRef` API in TrainJob. This resource is a namespaced-scoped and can be referenced
+// by TrainJob that created in the *same* namespace as the TrainingRuntime.
 type TrainingRuntimeApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata of the TrainingRuntime.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *TrainingRuntimeSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec of the TrainingRuntime.
+	Spec *TrainingRuntimeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // TrainingRuntime constructs a declarative configuration of the TrainingRuntime type for use with
@@ -40,6 +46,7 @@ func TrainingRuntime(name, namespace string) *TrainingRuntimeApplyConfiguration 
 	b.WithAPIVersion("trainer.kubeflow.org/v1alpha1")
 	return b
 }
+
 func (b TrainingRuntimeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

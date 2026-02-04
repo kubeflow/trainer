@@ -110,7 +110,13 @@ cherry pick your changes from the `master` branch and submit a PR.
    - [data-cache](../../manifests/overlays/data-cache/kustomization.yaml)
    - `CACHE_IMAGE` in [the torch-distributed-with-cache runtime](../../manifests/base/runtimes/data-cache/torch_distributed_with_cache.yaml)
 
-   The image tags must be equal to the release version, for example: `newTag: v2.0.0-rc.1`
+    The image tags must be equal to the release version, for example: `newTag: v2.0.0-rc.1`
+
+    Additionally, update the public ConfigMap version used by the manager overlay:
+
+    - In `manifests/overlays/manager/kustomization.yaml`, set the `kubeflow_trainer_version` literal
+       under `configMapGenerator` to the release version with `v` prefix (for example,
+       `kubeflow_trainer_version=v2.0.0-rc.1`). Update this value whenever cutting a new release.
 
 1. Update the [Helm charts](../../charts/kubeflow-trainer/Chart.yaml) version.
 

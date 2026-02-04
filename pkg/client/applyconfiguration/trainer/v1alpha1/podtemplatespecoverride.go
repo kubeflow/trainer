@@ -23,17 +23,31 @@ import (
 
 // PodTemplateSpecOverrideApplyConfiguration represents a declarative configuration of the PodTemplateSpecOverride type for use
 // with apply.
+//
+// PodTemplateSpecOverride represents the spec overrides for Pod template.
 type PodTemplateSpecOverrideApplyConfiguration struct {
-	ServiceAccountName *string                               `json:"serviceAccountName,omitempty"`
-	NodeSelector       map[string]string                     `json:"nodeSelector,omitempty"`
-	Affinity           *v1.Affinity                          `json:"affinity,omitempty"`
-	Tolerations        []corev1.TolerationApplyConfiguration `json:"tolerations,omitempty"`
-	SecurityContext    *v1.PodSecurityContext                `json:"securityContext,omitempty"`
-	Volumes            []corev1.VolumeApplyConfiguration     `json:"volumes,omitempty"`
-	InitContainers     []ContainerOverrideApplyConfiguration `json:"initContainers,omitempty"`
-	Containers         []ContainerOverrideApplyConfiguration `json:"containers,omitempty"`
-	SchedulingGates    []v1.PodSchedulingGate                `json:"schedulingGates,omitempty"`
-	ImagePullSecrets   []v1.LocalObjectReference             `json:"imagePullSecrets,omitempty"`
+	// serviceAccountName overrides the service account.
+	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
+	// nodeSelector overrides the node selector to place Pod on the specific node.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// affinity overrides for the Pod's affinity.
+	Affinity *v1.Affinity `json:"affinity,omitempty"`
+	// tolerations overrides the Pod's tolerations.
+	Tolerations []corev1.TolerationApplyConfiguration `json:"tolerations,omitempty"`
+	// securityContext overrides the Pod's security context.
+	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	SecurityContext *v1.PodSecurityContext `json:"securityContext,omitempty"`
+	// volumes overrides the Pod's volumes.
+	Volumes []corev1.VolumeApplyConfiguration `json:"volumes,omitempty"`
+	// initContainers overrides the init container in the target job templates.
+	InitContainers []ContainerOverrideApplyConfiguration `json:"initContainers,omitempty"`
+	// containers overrides for the containers in the target job templates.
+	Containers []ContainerOverrideApplyConfiguration `json:"containers,omitempty"`
+	// schedulingGates overrides the scheduling gates of the Pods in the target job templates.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/
+	SchedulingGates []v1.PodSchedulingGate `json:"schedulingGates,omitempty"`
+	// imagePullSecrets overrides the image pull secrets for the Pods in the target job templates.
+	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 // PodTemplateSpecOverrideApplyConfiguration constructs a declarative configuration of the PodTemplateSpecOverride type for use with

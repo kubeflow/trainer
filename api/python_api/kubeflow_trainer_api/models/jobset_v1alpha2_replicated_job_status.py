@@ -26,12 +26,12 @@ class JobsetV1alpha2ReplicatedJobStatus(BaseModel):
     """
     ReplicatedJobStatus defines the observed ReplicatedJobs Readiness.
     """ # noqa: E501
-    active: StrictInt = Field(description="Active is the number of child Jobs with at least 1 pod in a running or pending state which are not marked for deletion.")
-    failed: StrictInt = Field(description="Failed is the number of failed child Jobs.")
-    name: StrictStr = Field(description="Name of the ReplicatedJob.")
-    ready: StrictInt = Field(description="Ready is the number of child Jobs where the number of ready pods and completed pods is greater than or equal to the total expected pod count for the Job (i.e., the minimum of job.spec.parallelism and job.spec.completions).")
-    succeeded: StrictInt = Field(description="Succeeded is the number of successfully completed child Jobs.")
-    suspended: StrictInt = Field(description="Suspended is the number of child Jobs which are in a suspended state.")
+    active: StrictInt = Field(description="active is the number of child Jobs with at least 1 pod in a running or pending state which are not marked for deletion.")
+    failed: StrictInt = Field(description="failed is the number of failed child Jobs.")
+    name: StrictStr = Field(description="name of the ReplicatedJob.")
+    ready: StrictInt = Field(description="ready is the number of child Jobs where the number of ready pods and completed pods is greater than or equal to the total expected pod count for the Job (i.e., the minimum of job.spec.parallelism and job.spec.completions).")
+    succeeded: StrictInt = Field(description="succeeded is the number of successfully completed child Jobs.")
+    suspended: StrictInt = Field(description="suspended is the number of child Jobs which are in a suspended state.")
     __properties: ClassVar[List[str]] = ["active", "failed", "name", "ready", "succeeded", "suspended"]
 
     model_config = ConfigDict(

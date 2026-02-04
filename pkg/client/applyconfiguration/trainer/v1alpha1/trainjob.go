@@ -24,11 +24,16 @@ import (
 
 // TrainJobApplyConfiguration represents a declarative configuration of the TrainJob type for use
 // with apply.
+//
+// TrainJob represents configuration of a training job.
 type TrainJobApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata of the TrainJob.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *TrainJobSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *TrainJobStatusApplyConfiguration `json:"status,omitempty"`
+	// spec of the TrainJob.
+	Spec *TrainJobSpecApplyConfiguration `json:"spec,omitempty"`
+	// status of TrainJob.
+	Status *TrainJobStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // TrainJob constructs a declarative configuration of the TrainJob type for use with
@@ -41,6 +46,7 @@ func TrainJob(name, namespace string) *TrainJobApplyConfiguration {
 	b.WithAPIVersion("trainer.kubeflow.org/v1alpha1")
 	return b
 }
+
 func (b TrainJobApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

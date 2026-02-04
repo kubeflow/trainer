@@ -22,9 +22,13 @@ import (
 
 // TrainJobStatusApplyConfiguration represents a declarative configuration of the TrainJobStatus type for use
 // with apply.
+//
+// TrainJobStatus represents the current status of TrainJob.
 type TrainJobStatusApplyConfiguration struct {
+	// conditions for the TrainJob.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	JobsStatus []JobStatusApplyConfiguration    `json:"jobsStatus,omitempty"`
+	// jobsStatus tracks the child Jobs in TrainJob.
+	JobsStatus []JobStatusApplyConfiguration `json:"jobsStatus,omitempty"`
 }
 
 // TrainJobStatusApplyConfiguration constructs a declarative configuration of the TrainJobStatus type for use with
