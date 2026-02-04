@@ -93,6 +93,27 @@ const (
 )
 ```
 
+#### TrainJobStatus Changes
+
+Add fields to store resolved values that survive runtime deletion:
+
+```go
+type TrainJobStatus struct {
+    // ... existing fields ...
+
+    // ResolvedActiveDeadlineSeconds stores the effective deadline resolved
+    // at creation time. This value survives runtime deletion and controller
+    // restarts.
+    // +optional
+    ResolvedActiveDeadlineSeconds *int64 `json:"resolvedActiveDeadlineSeconds,omitempty"`
+
+    // ResolvedTTLSecondsAfterFinished stores the TTL resolved from the
+    // TrainingRuntime at creation time.
+    // +optional
+    ResolvedTTLSecondsAfterFinished *int32 `json:"resolvedTTLSecondsAfterFinished,omitempty"`
+}
+```
+
 ### Value Resolution
 
 The controller resolves effective values using the following precedence:
@@ -191,6 +212,49 @@ spec:
 4. **Clock Skew Handling:**
     - If calculated requeue time is in the past (due to clock skew), requeue with a small delay (e.g., 1 second)
 
+### Clock Skew Handling
+
+Kubernetes clusters may experience clock skew between nodes. When calculating requeue times:
+
+- If the calculated `RequeueAfter` duration is negative or zero (due to clock skew or processing delays), the controller requeues with a 1-second delay
+- This prevents tight reconciliation loops while ensuring timely processing
+- Example: If `deleteTime` is 10:00:00 but the controller's clock reads 10:00:02, instead of an invalid negative requeue, we wait 1 second and retry
+
+```go
+requeueAfter := deleteTime.Sub(time.Now())
+if requeueAfter <= 0 {
+    // Clock skew detected, use minimum delay
+    requeueAfter = 1 * time.Second
+}
+return ctrl.Result{RequeueAfter: requeueAfter}, nil
+```
+
+### Handling TrainingRuntime Deletion
+
+If a TrainingRuntime is deleted while TrainJobs reference it:
+
+**Option A (Recommended): Store resolved values in Status**
+
+The controller resolves `TTLSecondsAfterFinished` and `ActiveDeadlineSeconds` during the first reconciliation and stores them in `TrainJobStatus.ResolvedTTLSecondsAfterFinished` and `TrainJobStatus.ResolvedActiveDeadlineSeconds`. This ensures TTL/deadline enforcement continues even if the runtime is later deleted.
+
+**Option B: Graceful degradation**
+
+If the runtime is not found during reconciliation, log a warning and skip TTL-based cleanup. The TrainJob will remain until manually deleted.
+
+### Controller Restart Behavior
+
+The controller is stateless and stores no timers in memory. On restart:
+
+1. Controller-runtime triggers initial sync, reconciling all TrainJobs
+2. For each TrainJob, deadlines and TTL are recalculated from:
+   - `metadata.creationTimestamp` for deadline calculation
+   - `status.completionTime` for TTL calculation
+   - Resolved values stored in `status` (if runtime was deleted)
+3. If deadline/TTL already expired during downtime, action is taken immediately
+4. Otherwise, appropriate requeue times are set
+
+This design ensures no TrainJobs are "forgotten" after a controller restart.
+
 **Webhook Validation** (`pkg/webhooks/trainjob_webhook.go`):
 
 For TrainJob:
@@ -284,6 +348,8 @@ to implement this enhancement.
 - Deadline not reached → requeue at deadline
 - Value resolution with missing runtime → graceful handling
 - Clock skew → requeue with delay instead of negative duration
+- Runtime deleted while TrainJob running → uses resolved values from status
+- Runtime deleted before first reconciliation → fails with clear error
 
 #### Integration Tests
 
