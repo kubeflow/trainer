@@ -88,3 +88,22 @@ cargo run --bin client -- --endpoint http://localhost:50051 --local-rank 2 --wor
 The system supports two runtime environments:
 - **Local Development**: Set `RUNTIME_ENV=LOCAL` to use localhost workers on ports 50052/50053
 - **Kubernetes/LWS**: Uses `LWS_LEADER_ADDRESS` and `LWS_GROUP_SIZE` for service discovery
+
+
+## Local Iceberg Table Support (Planned)
+
+Currently, Kubeflow Data Cache integrates with static Iceberg tables backed by S3,
+as described in the *Remote Table Testing* workflow above. While this works well
+for production-like environments, it makes local development and end-to-end (e2e)
+validation difficult without access to AWS infrastructure.
+
+Issue #3174 tracks adding support for **local Iceberg tables backed by Parquet files**
+on the local filesystem. The primary goals of this work are:
+
+- Enable local validation of Data Cache behavior without S3
+- Simplify developer workflows for testing and debugging
+- Improve e2e test coverage in CI environments
+
+This functionality is currently under development. Once available, this section
+will be updated with instructions for setting up local Iceberg tables and running
+local validation and e2e tests.
