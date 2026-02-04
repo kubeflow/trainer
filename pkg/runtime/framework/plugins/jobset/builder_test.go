@@ -54,78 +54,6 @@ func TestInitializer(t *testing.T) {
 												{
 													Env: []corev.EnvVarApplyConfiguration{
 														{
-															Name: ptr.To("example_1"),
-														},
-													},
-													EnvFrom: []corev.EnvFromSourceApplyConfiguration{
-														{
-															SecretRef: &corev.SecretEnvSourceApplyConfiguration{
-																Optional: ptr.To(false),
-															},
-														},
-													},
-													Name: ptr.To(constants.DatasetInitializer),
-												},
-											},
-										},
-									},
-								},
-								ObjectMetaApplyConfiguration: &metav1.ObjectMetaApplyConfiguration{
-									Labels: map[string]string{
-										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
-									},
-								},
-							},
-							Name:      ptr.To("test_replica_name_1"),
-							GroupName: ptr.To("test_group_name_1"),
-							Replicas:  ptr.To(int32(1)),
-						},
-					},
-				},
-			},
-			trainJob: &trainer.TrainJob{
-				Spec: trainer.TrainJobSpec{
-					Labels: map[string]string{
-						"hello_world":   "1234",
-						"hello_world_1": "3456",
-					},
-					RuntimeRef: trainer.RuntimeRef{
-						Name:     "",
-						APIGroup: ptr.To(""),
-						Kind:     ptr.To(""),
-					},
-					Initializer: &trainer.Initializer{
-						Model: &trainer.ModelInitializer{
-							StorageUri: ptr.To("example_1"),
-						},
-						Dataset: &trainer.DatasetInitializer{
-							StorageUri: ptr.To("example_1"),
-							SecretRef: &corev1.LocalObjectReference{
-								Name: "",
-							},
-						},
-					},
-					Trainer: &trainer.Trainer{
-						Image: ptr.To(""),
-					},
-				},
-			},
-		},
-		{
-			name: "ancestor is dataset initializer",
-			jobset: &jobsetv1alpha2ac.JobSetApplyConfiguration{
-				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
-					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
-						{
-							Template: &v1.JobTemplateSpecApplyConfiguration{
-								Spec: &v1.JobSpecApplyConfiguration{
-									Completions: ptr.To(int32(2)),
-									Template: &corev.PodTemplateSpecApplyConfiguration{
-										Spec: &corev.PodSpecApplyConfiguration{
-											Containers: []corev.ContainerApplyConfiguration{
-												{
-													Env: []corev.EnvVarApplyConfiguration{
-														{
 															Name: ptr.To(jobsetplgconsts.InitializerEnvStorageUri),
 														},
 													},
@@ -185,7 +113,7 @@ func TestInitializer(t *testing.T) {
 			},
 		},
 		{
-			name: "ancestor is dataset initializer",
+			name: "ancestor is model initializer",
 			jobset: &jobsetv1alpha2ac.JobSetApplyConfiguration{
 				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
 					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
@@ -309,7 +237,7 @@ func TestTrainer(t *testing.T) {
 		trainJob *trainer.TrainJob
 	}{
 		{
-			name: "ancestor is dataset initializer",
+			name: "job metadata constant is Ancestor Trainer",
 			jobset: &jobsetv1alpha2ac.JobSetApplyConfiguration{
 				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
 					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
@@ -370,7 +298,7 @@ func TestTrainer(t *testing.T) {
 			},
 		},
 		{
-			name: "ancestor is dataset initializer",
+			name: "job meta data constant is ancestor trainer or job name is node",
 			jobset: &jobsetv1alpha2ac.JobSetApplyConfiguration{
 				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
 					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
