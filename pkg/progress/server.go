@@ -18,7 +18,9 @@ package progress
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -106,9 +108,12 @@ func bodySizeLimitMiddleware(log logr.Logger, maxBytes int64) Middleware {
 }
 
 // NewServer creates a new Server for collecting progress updates.
-func NewServer(cfg *configapi.ProgressServer) (*Server, error) {
+func NewServer(cfg *configapi.ProgressServer, tlsConfig *tls.Config) (*Server, error) {
 	if cfg == nil || cfg.Port == nil {
-		return nil, fmt.Errorf("cfg info is missing")
+		return nil, fmt.Errorf("cfg info is required")
+	}
+	if tlsConfig == nil {
+		return nil, fmt.Errorf("tlsConfig is required")
 	}
 
 	log := ctrl.Log.WithName("progress")
@@ -131,16 +136,18 @@ func NewServer(cfg *configapi.ProgressServer) (*Server, error) {
 	httpServer := http.Server{
 		Addr:         fmt.Sprintf(":%d", *cfg.Port),
 		Handler:      handler,
+		TLSConfig:    tlsConfig,
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 		IdleTimeout:  idleTimeout,
 	}
+
 	s.httpServer = &httpServer
 
 	return s, nil
 }
 
-// Start implements manager.Runnable and starts the HTTP Server.
+// Start implements manager.Runnable and starts the HTTPS Server.
 // It blocks until the Server stops, either due to an error or graceful shutdown.
 func (s *Server) Start(ctx context.Context) error {
 	// Handle graceful shutdown in background
@@ -154,8 +161,8 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}()
 
-	s.log.Info("Starting progress Server", "address", s.httpServer.Addr)
-	if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	s.log.Info("Starting progress Server with TLS", "address", s.httpServer.Addr)
+	if err := s.httpServer.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("progress Server failed: %w", err)
 	}
 	return nil
