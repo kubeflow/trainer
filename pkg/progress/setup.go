@@ -20,10 +20,16 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/util/cert"
 )
 
 func SetupServer(mgr ctrl.Manager, cfg *configapi.ProgressServer) error {
-	server, err := NewServer(cfg)
+	tlsConfig, err := cert.SetupTLSConfig(mgr)
+	if err != nil {
+		return err
+	}
+
+	server, err := NewServer(cfg, tlsConfig)
 	if err != nil {
 		return err
 	}
