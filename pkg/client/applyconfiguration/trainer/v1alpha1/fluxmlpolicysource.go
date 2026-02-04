@@ -18,7 +18,10 @@ package v1alpha1
 
 // FluxMLPolicySourceApplyConfiguration represents a declarative configuration of the FluxMLPolicySource type for use
 // with apply.
+//
+// FluxMLPolicySource represents a Flux HPC runtime configuration.
 type FluxMLPolicySourceApplyConfiguration struct {
+	// numProcPerNode is the number of processes per node.
 	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
 }
 

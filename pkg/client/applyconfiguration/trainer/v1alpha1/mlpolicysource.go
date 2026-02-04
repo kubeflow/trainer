@@ -24,9 +24,10 @@ package v1alpha1
 type MLPolicySourceApplyConfiguration struct {
 	// torch defines the configuration for the PyTorch runtime.
 	Torch *TorchMLPolicySourceApplyConfiguration `json:"torch,omitempty"`
-	// mpi defines the configuration for the MPI Runtime.
-	MPI  *MPIMLPolicySourceApplyConfiguration  `json:"mpi,omitempty"`
+	// flux defines the configuration for the Flux runtime.
 	Flux *FluxMLPolicySourceApplyConfiguration `json:"flux,omitempty"`
+	// mpi defines the configuration for the MPI Runtime.
+	MPI *MPIMLPolicySourceApplyConfiguration `json:"mpi,omitempty"`
 }
 
 // MLPolicySourceApplyConfiguration constructs a declarative configuration of the MLPolicySource type for use with

@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	"sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
+	jobsetapply "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
@@ -61,9 +61,13 @@ var (
 		"FLUX_VIEW_IMAGE":     "ghcr.io/converged-computing/flux-view-ubuntu:tag-jammy",
 		"FLUX_NETWORK_DEVICE": "eth0",
 		"FLUX_QUEUE_POLICY":   "fcfs",
-
 		// Extra flux or broker options can be added as needed.
 	}
+
+	// Persist througout, and can be inspected / use by other controllers
+	AnnotationOriginalCommand = "flux.kubeflow.org/original-command"
+	AnnotationViewImage       = "flux.kubeflow.org/view-image"
+	AnnotationQueuePolicy     = "flux.kubeflow.org/queue-policy"
 )
 
 var _ framework.CustomValidationPlugin = (*Flux)(nil)
@@ -103,21 +107,12 @@ func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobO
 		allErrs = append(allErrs, field.Invalid(numProcPerNodePath, *fluxPolicy.NumProcPerNode, "must be greater than or equal to 1 for Flux TrainJob"))
 	}
 
-	// Ensure we don't have an initContainer named flux-installer
-	js, ok := runtime.TemplateSpecApply[v1alpha2.JobSetSpecApplyConfiguration](runtimeInfo)
-	if !ok || js == nil {
-		return nil, allErrs
-	}
-
-	// We have to loop through replicated jobs -> podspecs -> init containers.
-	for i := range js.ReplicatedJobs {
-		rj := &js.ReplicatedJobs[i]
-		if rj.Name != nil && *rj.Name == constants.Node {
-			podSpec := rj.Template.Spec.Template.Spec
-			for _, ic := range podSpec.InitContainers {
-				if ic.Name != nil && *ic.Name == "flux-installer" {
-					path := field.NewPath("spec").Child("trainer").Child("initContainers").Index(0).Child("name")
-					allErrs = append(allErrs, field.Invalid(path, *ic.Name, "InitContainer 'flux-installer' found, invalid name"))
+	// Iterate through Trainer's internal PodSet abstraction
+	for _, ps := range runtimeInfo.TemplateSpec.PodSets {
+		if ps.Name == constants.Node {
+			for _, ic := range ps.InitContainers {
+				if ic.Name == "flux-installer" {
+					allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "trainer", "initContainers"), ic.Name, "InitContainer 'flux-installer' is reserved"))
 				}
 			}
 		}
@@ -132,72 +127,93 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 		return nil
 	}
 
-	js, ok := runtime.TemplateSpecApply[v1alpha2.JobSetSpecApplyConfiguration](info)
-	if !ok || js == nil {
-		return fmt.Errorf("failed to retrieve JobSet spec from info")
-	}
-
-	settings := f.brokerSettingsFromTrainJob(trainJob)
+	settings := f.brokerSettingsFromEnvironment(trainJob, info)
 	configMapName := fmt.Sprintf("%s-flux-entrypoint", trainJob.Name)
 	curveSecretName := fmt.Sprintf("%s-flux-curve", trainJob.Name)
 	sharedVolumes := getViewVolumes(configMapName)
 
-	// Ensure we have headless service for JobSet
-	ensureJobSetNetwork(js, trainJob)
+	if trainJob.Annotations == nil {
+		trainJob.Annotations = make(map[string]string)
+	}
+
+	// Capture and set the values as annotations
+	// This effectively "saves" the state onto the Kubernetes resource itself
+	originalCmd := getOriginalCommand(trainJob, info)
+	trainJob.Annotations[AnnotationOriginalCommand] = originalCmd
+	trainJob.Annotations[AnnotationViewImage] = settings["FLUX_VIEW_IMAGE"]
+
+	// Update the command here so we wrap the original command saved earlier
+	trainJob.Spec.Trainer.Command = []string{"/bin/bash", "/etc/flux-config/entrypoint.sh"}
 
 	// Define the Init Container. This has a spack view with flux pre-built, and we add to an emptyDir
 	// with configuration that is then accessible to the application. The OS/version should match.
+	// For VolumeMounts, you can still use corev1ac because runtime.Container
+	// methods accept the corev1ac types for nested fields
 	fluxInstaller := corev1ac.Container().
 		WithName("flux-installer").
 		WithImage(settings["FLUX_VIEW_IMAGE"]).
-		WithCommand("/bin/bash", "/etc/flux-config/init.sh").
+		WithCommand([]string{"/bin/bash", "/etc/flux-config/init.sh"}...).
 		WithVolumeMounts(
-			corev1ac.VolumeMount().WithName("flux-install").WithMountPath("/mnt/flux"),
-			corev1ac.VolumeMount().WithName(configMapName).WithMountPath("/etc/flux-config").WithReadOnly(true),
+			corev1ac.VolumeMount().
+				WithName("flux-install").
+				WithMountPath("/mnt/flux"),
+			corev1ac.VolumeMount().
+				WithName(configMapName).
+				WithMountPath("/etc/flux-config").
+				WithReadOnly(true),
 		)
 
-	for i := range js.ReplicatedJobs {
-		rj := &js.ReplicatedJobs[i]
-		if rj.Name != nil && *rj.Name == constants.Node {
-			podSpec := rj.Template.Spec.Template.Spec
+	// Making changes directly to the PodSet allows them to persist
+	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetapply.JobSetSpecApplyConfiguration](info)
+	if !ok {
+		return nil
+	}
 
-			// Add the Secret Volume itself.
-			curveVolume := corev1ac.Volume().
-				WithName("flux-curve").
-				WithSecret(corev1ac.SecretVolumeSource().
-					WithSecretName(curveSecretName).
-					// Flux requires 0400 permissions
-					WithDefaultMode(0400))
+	// Update the PodSets (Abstractions for the ReplicatedJobs)
+	for psIdx, ps := range info.TemplateSpec.PodSets {
+		if ps.Name != constants.Node {
+			continue
+		}
 
-			apply.UpsertVolumes(&podSpec.Volumes, sharedVolumes...)
-			apply.UpsertVolumes(&podSpec.Volumes, *curveVolume)
+		// Add Volumes to the PodSet
+		curveVolume := corev1ac.Volume().
+			WithName("flux-curve").
+			WithSecret(corev1ac.SecretVolumeSource().WithSecretName(curveSecretName).WithDefaultMode(0400))
 
-			// Check if it already exists before appending
-			found := false
-			for _, ic := range podSpec.InitContainers {
-				if ic.Name != nil && *ic.Name == "flux-installer" {
+		apply.UpsertVolumes(&info.TemplateSpec.PodSets[psIdx].Volumes, sharedVolumes...)
+		apply.UpsertVolumes(&info.TemplateSpec.PodSets[psIdx].Volumes, *curveVolume)
+
+		// Important! We have to add this to the JobSet to actually take
+		// Does the initContainer exist?
+		found := false
+		for _, ic := range ps.InitContainers {
+			for idx, existingIC := range jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers {
+				if existingIC.Name != nil && *existingIC.Name == ic.Name {
+					jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[idx] = *fluxInstaller
 					found = true
 					break
 				}
 			}
-			if !found {
-				fmt.Println("init container was not found.")
-				podSpec.InitContainers = append(podSpec.InitContainers, *fluxInstaller)
-			}
+		}
 
-			for j := range podSpec.Containers {
-				container := &podSpec.Containers[j]
-				if container.Name != nil && *container.Name == constants.Node {
-					container.WithCommand("/bin/bash", "/etc/flux-config/entrypoint.sh")
-					container.WithTTY(true).WithStdin(true)
-					apply.UpsertVolumeMounts(
-						&container.VolumeMounts,
-						*corev1ac.VolumeMount().WithName("flux-install").WithMountPath("/mnt/flux"),
-						*corev1ac.VolumeMount().WithName("spack-install").WithMountPath("/opt/software"),
-						*corev1ac.VolumeMount().WithName(configMapName).WithMountPath("/etc/flux-config").WithReadOnly(true),
-						*corev1ac.VolumeMount().WithName("flux-curve").WithMountPath("/curve").WithReadOnly(true),
-					)
-				}
+		if !found {
+			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers = append(
+				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers,
+				*fluxInstaller,
+			)
+		}
+
+		// Update Containers in the PodSet
+		for cIdx, container := range ps.Containers {
+			if container.Name == constants.Node {
+				//				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[cIdx].Command = []string{"/bin/bash", "/etc/flux-config/entrypoint.sh"}
+				apply.UpsertVolumeMounts(
+					&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].VolumeMounts,
+					*corev1ac.VolumeMount().WithName("flux-install").WithMountPath("/mnt/flux"),
+					*corev1ac.VolumeMount().WithName("spack-install").WithMountPath("/opt/software"),
+					*corev1ac.VolumeMount().WithName(configMapName).WithMountPath("/etc/flux-config").WithReadOnly(true),
+					*corev1ac.VolumeMount().WithName("flux-curve").WithMountPath("/curve").WithReadOnly(true),
+				)
 			}
 		}
 	}
@@ -211,12 +227,6 @@ func (f *Flux) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.
 	// Many configuration params cannot be represented in JobSet alone.
 	policy := info.RuntimePolicy.FluxPolicySource
 
-	// Don't error, but assume this can't be applied here
-	js, ok := runtime.TemplateSpecApply[v1alpha2.JobSetSpecApplyConfiguration](info)
-	if !ok || js == nil {
-		return nil, nil
-	}
-
 	// If the user's chosen runtime does not have the flux policy enabled, skip this plugin
 	if policy == nil {
 		return nil, nil
@@ -225,10 +235,10 @@ func (f *Flux) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.
 	// Note that for Flux, we currently support a design that allows for
 	// derivation of options from envars that are associated with the job.
 	// We get these from the designated node container.
-	settings := f.brokerSettingsFromTrainJob(trainJob)
+	settings := f.brokerSettingsFromEnvironment(trainJob, info)
 
 	// We need a custom entrypoint to prepare the view and configure flux
-	cm, err := buildInitScriptConfigMap(js, trainJob, settings)
+	cm, err := f.buildInitScriptConfigMap(trainJob, info, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -265,16 +275,36 @@ func (f *Flux) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 }
 
 // brokerSettingsFromTrainJob derives Flux broker config settings from the jobspet node container environment.
-func (f *Flux) brokerSettingsFromTrainJob(trainJob *trainer.TrainJob) map[string]string {
+func (f *Flux) brokerSettingsFromEnvironment(trainJob *trainer.TrainJob, info *runtime.Info) map[string]string {
+
+	// All settings defaults that we support are already defined here
 	settings := maps.Clone(brokerDefaults)
 
 	if trainJob.Spec.Trainer.Env == nil {
 		return settings
 	}
 
-	// Look through the containers in the TrainJob spec
+	// Look through the envars in the runtime spec.
+	// We only care about the environment defined for the main workers/nodes
+	if info != nil {
+		for _, ps := range info.TemplateSpec.PodSets {
+			if ps.Name == constants.Node {
+				for _, container := range ps.Containers {
+					for _, envar := range container.Env {
+						if envar.Name != nil && envar.Value != nil {
+							if _, ok := settings[*envar.Name]; ok {
+								settings[*envar.Name] = *envar.Value
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// TrainJob (user) gets first preference
+	// If the variable name matches one of our Flux settings, override it
 	for _, envar := range trainJob.Spec.Trainer.Env {
-		// If the variable name matches one of our Flux settings, override it
 		if _, ok := settings[envar.Name]; ok {
 			settings[envar.Name] = envar.Value
 		}
@@ -301,40 +331,16 @@ func getViewVolumes(configMapName string) []corev1ac.VolumeApplyConfiguration {
 	return []corev1ac.VolumeApplyConfiguration{*spackInstallAC, *fluxVolumeAC, *cmAC}
 }
 
-// ensureJobSetNetwork ensures we have a headless service.
-func ensureJobSetNetwork(js *v1alpha2.JobSetSpecApplyConfiguration, trainJob *trainer.TrainJob) {
-	// Get a handle to the existing Network builder, or create a new one if it's nil.
-	networkConfig := js.Network
-	if networkConfig == nil {
-		networkConfig = v1alpha2.Network()
-	}
-
-	// Ensure EnableDNSHostnames is explicitly set to true.
-	networkConfig.WithEnableDNSHostnames(true)
-
-	// If a subdomain isn't already set, default it to the job name.
-	if networkConfig.Subdomain == nil || *networkConfig.Subdomain == "" {
-		networkConfig.WithSubdomain(trainJob.Name)
-	}
-
-	// Set the (potentially new or modified) network config back onto the main JobSet spec builder.
-	// This is the crucial step that applies the changes.
-	js.WithNetwork(networkConfig)
-
-	// Note from vsoch: I am worried about the length of the DNS name here.
-	// In practice with the JobSet / rpelicated jobs, it gets too long quickly.
-}
-
 // buildInitScriptConfigMap creates a ConfigMapApplyConfiguration to support server-side Apply
-func buildInitScriptConfigMap(
-	js *v1alpha2.JobSetSpecApplyConfiguration,
+func (f *Flux) buildInitScriptConfigMap(
 	trainJob *trainer.TrainJob,
+	info *runtime.Info,
 	settings map[string]string,
 ) (*corev1ac.ConfigMapApplyConfiguration, error) {
 
 	// The entrypoint script finishes Flux setup and executes the wrapped application
-	initScript := generateInitEntrypoint(js, trainJob, settings)
-	entrypointScript := generateFluxEntrypoint(trainJob)
+	initScript := generateInitEntrypoint(trainJob, settings)
+	entrypointScript := f.generateFluxEntrypoint(trainJob, info)
 
 	// Build the ConfigMap using the Apply Configuration pattern
 	configMapName := fmt.Sprintf("%s-flux-entrypoint", trainJob.Name)
@@ -360,7 +366,6 @@ func buildInitScriptConfigMap(
 
 // generateBrokerConfig writes the entrypoint file, which prepares the install and configures Flux
 func generateBrokerConfig(
-	js *v1alpha2.JobSetSpecApplyConfiguration,
 	trainJob *trainer.TrainJob,
 	hosts string,
 	settings map[string]string,
@@ -371,9 +376,6 @@ func generateBrokerConfig(
 	queuePolicy := settings["FLUX_QUEUE_POLICY"]
 
 	subdomain := trainJob.Name
-	if js.Network != nil && js.Network.Subdomain != nil {
-		subdomain = *js.Network.Subdomain
-	}
 	fqdn := fmt.Sprintf("%s.%s.svc.cluster.local", subdomain, trainJob.Namespace)
 
 	// TODO: we can eventually derive network device from init container
@@ -416,12 +418,44 @@ queue-policy = "%s"
 	)
 }
 
+// getOriginalCommand derives the original Kubeflow command we need to wrap / handoff to Flux
+func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) string {
+	var command []string
+	var args []string
+
+	// check PodSets first
+	for _, ps := range info.TemplateSpec.PodSets {
+		if ps.Name == constants.Node {
+			for _, container := range ps.Containers {
+				// Assume for now entire entrypoint logic is in command (with args)
+				if container.Name == constants.Node {
+					command = container.Command
+				}
+			}
+		}
+	}
+
+	// Override if user defined them in the top-level Trainer spec
+	if trainJob.Spec.Trainer != nil {
+		if trainJob.Spec.Trainer.Command != nil {
+			command = trainJob.Spec.Trainer.Command
+		}
+		if trainJob.Spec.Trainer.Args != nil {
+			args = trainJob.Spec.Trainer.Args
+		}
+	}
+
+	// Combine into a single string for the shell script
+	fullCommand := strings.Join(append(command, args...), " ")
+	return strings.TrimSpace(fullCommand)
+}
+
 // generateFluxEntrypoint generates the flux entrypoint to prepare the view and run the job
-func generateFluxEntrypoint(trainJob *trainer.TrainJob) string {
+func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.Info) string {
 	mainHost := fmt.Sprintf("%s-%s-0-0", trainJob.Name, constants.Node)
 
 	// Derive the original command intended by the user
-	command := getOriginalCommand(trainJob)
+	// command := getOriginalCommand(trainJob, info)
 
 	// TODO we can set strict mode as an option
 	script := `#!/bin/sh
@@ -447,8 +481,8 @@ cp -R ${viewbase}/software/* /opt/software/
 foundroot=$(find $viewroot -maxdepth 2 -type d -path $viewroot/lib/python3\*) > /dev/null 2>&1
 pythonversion=$(basename ${foundroot})
 pythonversion=${viewroot}/bin/${pythonversion}
-echo "Python version: $pythonversion" > /dev/null 2>&1
-echo "Python root: $foundroot" > /dev/null 2>&1
+echo "Python version: $pythonversion"
+echo "Python root: $foundroot"
 
 # If we found the right python, ensure it's linked (old link does not work)
 if [[ -f "${pythonversion}" ]]; then
@@ -525,7 +559,7 @@ function run_interactive_cluster() {
 # Start flux with the original entrypoint
 if [ $(hostname) == "${mainHost}" ]; then
 
-  echo "Command provided is: ${command}" > /dev/null 2>&1
+  echo "Command provided is: ${command}"
   if [ "${command}" == "" ]; then
     run_interactive_cluster
   else
@@ -534,7 +568,7 @@ if [ $(hostname) == "${mainHost}" ]; then
     node_spec="-n2"
     node_spec="${node_spec}"
     flags="${node_spec}  "
-    echo "Flags for flux are ${flags}" > /dev/null 2>&1
+    echo "Flags for flux are ${flags}"
     flux start  -o --config ${cfg} ${brokerOptions} flux submit ${flags} --quiet --watch ${command}
   fi
 
@@ -564,6 +598,9 @@ fi
 touch $viewbase/flux-operator-complete.txt
 `
 
+	// Get original command from annotations
+	command := trainJob.Annotations[AnnotationOriginalCommand]
+
 	return fmt.Sprintf(
 		script,
 		command,
@@ -573,7 +610,6 @@ touch $viewbase/flux-operator-complete.txt
 
 // generateInitEntrypoint generates the flux entrypoint to prepare flux
 func generateInitEntrypoint(
-	js *v1alpha2.JobSetSpecApplyConfiguration,
 	trainJob *trainer.TrainJob,
 	settings map[string]string,
 ) string {
@@ -588,7 +624,7 @@ func generateInitEntrypoint(
 	// We need the initial jobset size, and container command
 	size := *trainJob.Spec.Trainer.NumNodes
 	hosts := generateHostlist(trainJob.Name, size)
-	brokerConfig := generateBrokerConfig(js, trainJob, hosts, settings)
+	brokerConfig := generateBrokerConfig(trainJob, hosts, settings)
 	setup := `#!/bin/sh
 fluxroot=%s
 mainHost=%s
@@ -666,8 +702,6 @@ func generateHostlist(prefix string, size int32) string {
 
 	// Assume a setup without bursting / changing size.
 	// We can extend this in the future to allow adding hosts
-	// TODO where does the first index 0 come from?
-	// TODO can we be guaranteed the pod (and network) will always be node?
 	return fmt.Sprintf("%s-%s-0-[%s]", prefix, constants.Node, generateRange(size, 0))
 }
 

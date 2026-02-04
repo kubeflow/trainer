@@ -24,7 +24,7 @@ type MLPolicyApplyConfiguration struct {
 	// numNodes is the number of training nodes.
 	// Defaults to 1.
 	NumNodes *int32 `json:"numNodes,omitempty"`
-	// Configuration for the runtime-specific parameters, such as Torch or MPI.
+	// Configuration for the runtime-specific parameters, such as Torch, Flux, or MPI.
 	// Only one of its members may be specified.
 	MLPolicySourceApplyConfiguration `json:",inline"`
 }

@@ -79,6 +79,8 @@ type PodSet struct {
 
 type Container struct {
 	Name         string
+	Image        string
+	Command      []string
 	Env          []corev1ac.EnvVarApplyConfiguration
 	Ports        []corev1ac.ContainerPortApplyConfiguration
 	VolumeMounts []corev1ac.VolumeMountApplyConfiguration

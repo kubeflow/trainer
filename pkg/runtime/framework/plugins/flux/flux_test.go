@@ -389,3 +389,42 @@ func TestBuildCurveSecret(t *testing.T) {
 		t.Error("certContent does not use the required 4-space indentation for key fields")
 	}
 }
+
+func TestGetOriginalCommand(t *testing.T) {
+	cases := []struct {
+		name     string
+		trainJob *trainer.TrainJob
+		info     *runtime.Info
+		want     string
+	}{
+		{
+			name: "full command and args",
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					Container("image", []string{"python"}, []string{"train.py", "--epochs", "10"}, nil).
+					Obj()).
+				Obj(),
+			info: &runtime.Info{},
+			want: "python train.py --epochs 10",
+		},
+		{
+			name: "command and args with extra spaces",
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					Container("image", []string{"  python  "}, []string{" script.py "}, nil).
+					Obj()).
+				Obj(),
+			info: &runtime.Info{},
+			want: "python    script.py",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := getOriginalCommand(tc.trainJob, tc.info)
+			if got != tc.want {
+				t.Errorf("getOriginalCommand() = %q; want %q", got, tc.want)
+			}
+		})
+	}
+}
