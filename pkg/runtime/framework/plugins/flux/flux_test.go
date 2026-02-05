@@ -56,6 +56,9 @@ func TestFlux(t *testing.T) {
 	cases := map[string]struct {
 		info               *runtime.Info
 		trainJob           *trainer.TrainJob
+		wantMLPolicyError  error
+		wantInfo           *runtime.Info
+		wantBuildError     error
 		wantObjs           []apiruntime.Object
 		wantInitContainers []string
 		wantCommand        []string
@@ -120,8 +123,17 @@ func TestFlux(t *testing.T) {
 			p, _ := New(ctx, cli, nil)
 
 			err := p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(tc.info, tc.trainJob)
-			if err != nil {
-				t.Fatalf("EnforceMLPolicy failed: %v", err)
+			if diff := gocmp.Diff(tc.wantMLPolicyError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from EnforceMLPolicy (-want, +got): %s", diff)
+			}
+			if tc.wantInfo != nil {
+				if diff := gocmp.Diff(tc.wantInfo, tc.info,
+					cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+					cmpopts.SortMaps(func(a, b int) bool { return a < b }),
+					utiltesting.PodSetEndpointsCmpOpts,
+				); len(diff) != 0 {
+					t.Errorf("Unexpected info from EnforceMLPolicy (-want, +got): %s", diff)
+				}
 			}
 
 			if tc.info.RuntimePolicy.FluxPolicySource != nil && tc.info.TemplateSpec.ObjApply != nil {
@@ -150,9 +162,10 @@ func TestFlux(t *testing.T) {
 				}
 			}
 
-			objs, err := p.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
-			if err != nil {
-				t.Fatalf("Build failed: %v", err)
+			var objs []apiruntime.ApplyConfiguration
+			objs, err = p.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
+			if diff := gocmp.Diff(tc.wantBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
 			}
 
 			typedObjs, _ := utiltesting.ToObject(cli.Scheme(), objs...)
