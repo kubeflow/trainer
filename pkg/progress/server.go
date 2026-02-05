@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -82,6 +83,7 @@ func NewServer(cfg *configapi.ProgressServer, tlsConfig *tls.Config) (*Server, e
 		Addr:         fmt.Sprintf(":%d", *cfg.Port),
 		Handler:      handler,
 		TLSConfig:    tlsConfig,
+		ErrorLog:     slog.NewLogLogger(logr.ToSlogHandler(log), slog.LevelInfo),
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 		IdleTimeout:  idleTimeout,
