@@ -42,30 +42,40 @@ MANIFESTS_DIR="$REPO_ROOT/manifests"
 CHART_DIR="$REPO_ROOT/charts/kubeflow-trainer"
 CHART_FILE="$CHART_DIR/Chart.yaml"
 PYTHON_API_VERSION_FILE="$REPO_ROOT/api/python_api/kubeflow_trainer_api/__init__.py"
+RELEASE_BRANCH="release-$NEW_VERSION"
 
-
-# Identify branch and ensure it's up to date if it tracks a remote
+# Ensure we're on master branch
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
+if [ "$CURRENT_BRANCH" != "master" ]; then
+  echo "Current branch is ${CURRENT_BRANCH}, switching to master..."
+  git checkout master
+fi
 
-# Fetch refs and verify tag absence
+# Fetch refs and sync with origin/master
+echo "Fetching latest changes from origin..."
 git fetch --tags
 git fetch origin master
-if [ -n "$UPSTREAM" ]; then
-  git pull --ff-only
+
+# Ensure master is up to date with origin/master
+if ! git merge-base --is-ancestor HEAD origin/master; then
+  echo "Local master is ahead of origin/master. Please push or resolve conflicts first."
+  exit 1
 fi
+
+echo "Syncing master with origin/master..."
+git reset --hard origin/master
+
+# Verify tag doesn't already exist
 if git tag --list | grep -q "^${TAG}$"; then
   echo "Tag: ${TAG} already exists. Release can't be published."
   exit 1
 fi
 
-# Ensure current branch contains origin/master
-if ! git merge-base --is-ancestor origin/master HEAD; then
-  echo "Current branch ${CURRENT_BRANCH} is not up to date with origin/master. Please rebase or merge origin/master first."
-  exit 1
-fi
+# Create new release branch
+echo "Creating new branch: ${RELEASE_BRANCH}"
+git checkout -b "$RELEASE_BRANCH"
 
-echo -e "\nCreating a new release commit on branch ${CURRENT_BRANCH}. Tag to be created: ${TAG}\n"
+echo -e "\nCreating a new release commit on branch ${RELEASE_BRANCH}. Tag to be created: ${TAG}\n"
 
 echo -n "v$NEW_VERSION" > "$VERSION_FILE"
 echo "Updated VERSION file to $NEW_VERSION"
@@ -108,13 +118,33 @@ chart_path.write_text(pattern.sub(f"version: {new_version}", data, count=1))
 PYTHON
 echo "Updated Helm chart version to $NEW_VERSION"
 
+CHANGELOG_PATH="$REPO_ROOT/CHANGELOG.md"
+echo "Generating changelog for $TAG"
+ABSOLUTE_REPO_ROOT="$(cd "$REPO_ROOT" && pwd)"
+if [ -z "${GITHUB_TOKEN:-}" ]; then
+  echo "WARNING: GITHUB_TOKEN not set. Set it to avoid GitHub API rate limits."
+  echo "Export GITHUB_TOKEN before running this script: export GITHUB_TOKEN=your_token"
+fi
+
+# Generate and prepend new changelog section
+TEMP_FILE=$(mktemp)
+docker run --rm -u "$(id -u):$(id -g)" -v "$ABSOLUTE_REPO_ROOT:/app" \
+  -e "GITHUB_TOKEN=$GITHUB_TOKEN" -w /app \
+  "ghcr.io/orhun/git-cliff/git-cliff:latest" --unreleased --tag "$TAG" -o - > "$TEMP_FILE"
+
+if [ -f "$CHANGELOG_PATH" ]; then
+  sed -i "1 r $TEMP_FILE" "$CHANGELOG_PATH"
+else
+  { echo "# Changelog"; cat "$TEMP_FILE"; } > "$CHANGELOG_PATH"
+fi
+rm "$TEMP_FILE"
+echo "Changelog generated at $CHANGELOG_PATH"
 
 echo "Running make generate"
 make -C "$REPO_ROOT" generate
 echo "Completed make generate"
 
-git add "$VERSION_FILE" "$MANIFESTS_DIR" "$CHART_DIR" "$PYTHON_API_VERSION_FILE"
+git add "$VERSION_FILE" "$MANIFESTS_DIR" "$CHART_DIR" "$PYTHON_API_VERSION_FILE" "$CHANGELOG_PATH"
 git commit -s -m "Release $TAG"
 
-echo -e "\nRelease $NEW_VERSION is ready. Commit created locally on branch ${CURRENT_BRANCH}."
-echo "Open a PR with this commit; pushing is intentionally not done by the script."
+echo -e "\nRelease $NEW_VERSION is ready. Commit created on branch ${RELEASE_BRANCH}."

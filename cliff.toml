@@ -3,13 +3,25 @@ owner = "kubeflow"
 repo = "trainer"
 
 [changelog]
-header = """
-# Changelog
-"""
-
 body = """
 {%- if version %}
 ## [{{ version }}](https://github.com/kubeflow/trainer/releases/tag/{{ version }}) ({{ timestamp | date(format="%Y-%m-%d") }})
+
+This is Kubeflow Trainer {{ version }} release.
+
+```bash
+kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/manager?ref={{ version }}"
+kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifests/overlays/runtimes?ref={{ version }}"
+```
+
+You can now install controller manager with Helm charts 🚀
+
+```bash
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version {{ version | trim_start_matches(pat="v") }}
+```
+
+For more information, please see [the Kubeflow Trainer docs](https://www.kubeflow.org/docs/components/trainer/overview/)
+
 {%- else %}
 ## [Unreleased]
 {%- endif %}
@@ -24,12 +36,13 @@ body = """
 {% for commit in group_commits | reverse -%}
 {%- set message = commit.message | split(pat="\n") | first | trim -%}
 {%- set parts = message | split(pat=" (#") -%}
+{%- set author = commit.remote.username | default(value=commit.author.name) -%}
    {% if parts | length > 1 and parts | last | trim | split(pat=")") | length > 1 -%}
       {%- set pr_part = parts | last | trim -%}
       {%- set pr_number = pr_part | replace(from=")", to="") -%}
-      - {{ parts | slice(end=-1) | join(sep=" (#") }} ([#{{ pr_number }}](https://github.com/kubeflow/trainer/pull/{{ pr_number }}) by @{{ commit.remote.username }})
+      - {{ parts | slice(end=-1) | join(sep=" (#") }} ([#{{ pr_number }}](https://github.com/kubeflow/trainer/pull/{{ pr_number }}) by @{{ author }})
    {% else -%}
-      - {{ message }} (@{{ commit.remote.username }})
+      - {{ message }} (@{{ author }})
    {% endif -%}
 {% endfor %}
 
