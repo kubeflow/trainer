@@ -6,7 +6,7 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-cmp v0.7.0
 	github.com/onsi/ginkgo/v2 v2.28.1
-	github.com/onsi/gomega v1.39.0
+	github.com/onsi/gomega v1.39.1
 	github.com/open-policy-agent/cert-controller v0.15.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.47.0
