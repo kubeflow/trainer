@@ -1,6 +1,10 @@
 import logging
 import time
 
+from kubernetes import client, config
+from kubernetes.client.rest import ApiException
+from kubernetes.dynamic.exceptions import ConflictError
+
 import pkg.initializers.types.types as types
 import pkg.initializers.utils.utils as utils
 
@@ -40,11 +44,6 @@ class CacheInitializer(utils.DatasetProvider):
 
     def download_dataset(self):
         """Bootstrap cache cluster with dataset"""
-        # Import kubernetes libraries only when needed (Kubernetes environment only)
-        from kubernetes import client, config
-        from kubernetes.client.rest import ApiException
-        from kubernetes.dynamic.exceptions import ConflictError
-
         logging.info(
             f"Cache initializer called with storage URI: {self.config.storage_uri}"
         )
