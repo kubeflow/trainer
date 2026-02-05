@@ -93,7 +93,6 @@ jobs:
           import re
           import sys
           from pathlib import Path
-          
           path = Path(os.environ["PY_API_VERSION_FILE"])
           text = path.read_text()
           match = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
