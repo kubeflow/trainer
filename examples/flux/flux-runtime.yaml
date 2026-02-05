@@ -22,4 +22,4 @@ spec:
                   # An init container will be added here to install flux
                   containers:
                     - name: node
-                      image: "placeholder-image"
+                      image: ubuntu:jammy

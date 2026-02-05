@@ -184,29 +184,14 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 		apply.UpsertVolumes(&info.TemplateSpec.PodSets[psIdx].Volumes, *curveVolume)
 
 		// Important! We have to add this to the JobSet to actually take
-		// Does the initContainer exist?
-		found := false
-		for _, ic := range ps.InitContainers {
-			for idx, existingIC := range jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers {
-				if existingIC.Name != nil && *existingIC.Name == ic.Name {
-					jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[idx] = *fluxInstaller
-					found = true
-					break
-				}
-			}
-		}
-
-		if !found {
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers = append(
-				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers,
-				*fluxInstaller,
-			)
-		}
+		jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers = append(
+			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers,
+			*fluxInstaller,
+		)
 
 		// Update Containers in the PodSet
 		for cIdx, container := range ps.Containers {
 			if container.Name == constants.Node {
-				//				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[cIdx].Command = []string{"/bin/bash", "/etc/flux-config/entrypoint.sh"}
 				apply.UpsertVolumeMounts(
 					&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].VolumeMounts,
 					*corev1ac.VolumeMount().WithName("flux-install").WithMountPath("/mnt/flux"),
@@ -223,12 +208,8 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 // Build creates the extra config map (configuration) and curve secret for Flux.
 func (f *Flux) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
 
-	// policy defines the Flux HPC cluster setup
-	// Many configuration params cannot be represented in JobSet alone.
-	policy := info.RuntimePolicy.FluxPolicySource
-
 	// If the user's chosen runtime does not have the flux policy enabled, skip this plugin
-	if policy == nil {
+	if info == nil || info.RuntimePolicy.FluxPolicySource == nil {
 		return nil, nil
 	}
 
@@ -287,15 +268,12 @@ func (f *Flux) brokerSettingsFromEnvironment(trainJob *trainer.TrainJob, info *r
 	// Look through the envars in the runtime spec.
 	// We only care about the environment defined for the main workers/nodes
 	if info != nil {
-		for _, ps := range info.TemplateSpec.PodSets {
-			if ps.Name == constants.Node {
-				for _, container := range ps.Containers {
-					for _, envar := range container.Env {
-						if envar.Name != nil && envar.Value != nil {
-							if _, ok := settings[*envar.Name]; ok {
-								settings[*envar.Name] = *envar.Value
-							}
-						}
+		trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node)
+		if trainerContainer != nil {
+			for _, envar := range trainerContainer.Env {
+				if envar.Name != nil && envar.Value != nil {
+					if _, ok := settings[*envar.Name]; ok {
+						settings[*envar.Name] = *envar.Value
 					}
 				}
 			}
@@ -424,15 +402,9 @@ func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) string {
 	var args []string
 
 	// check PodSets first
-	for _, ps := range info.TemplateSpec.PodSets {
-		if ps.Name == constants.Node {
-			for _, container := range ps.Containers {
-				// Assume for now entire entrypoint logic is in command (with args)
-				if container.Name == constants.Node {
-					command = container.Command
-				}
-			}
-		}
+	trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node)
+	if trainerContainer != nil {
+		command = trainerContainer.Command
 	}
 
 	// Override if user defined them in the top-level Trainer spec
