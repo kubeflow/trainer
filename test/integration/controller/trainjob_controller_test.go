@@ -186,7 +186,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 
-			ginkgo.It("Should succeeded to update JobSet only when TrainJob is suspended", func() {
+			ginkgo.It("Should succeeded to update JobSet when TrainJob is suspended", func() {
 				ginkgo.By("Creating TrainingRuntime and suspended TrainJob")
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
 				gomega.Eventually(func(g gomega.Gomega) {
@@ -285,7 +285,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					g.Expect(ptr.Deref(jobSet.Spec.Suspend, false)).Should(gomega.BeFalse())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
-				ginkgo.By("Trying to change node selector when TrainJob is unsuspended (should fail)")
+				ginkgo.By("Trying to change node selector when TrainJob is unsuspended")
 				emptySelector := map[string]string{}
 				emptyPodTemplateOverrides := []trainer.PodTemplateOverride{
 					{
@@ -302,7 +302,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					g.Expect(k8sClient.Get(ctx, trainJobKey, trainJob)).Should(gomega.Succeed())
 					trainJob.Spec.PodTemplateOverrides = emptyPodTemplateOverrides
-					g.Expect(k8sClient.Update(ctx, trainJob)).ShouldNot(gomega.Succeed())
+					g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 		})

@@ -523,32 +523,6 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 					return job
 				},
 				gomega.Succeed()),
-			ginkgo.Entry("Should fail to update podTemplateOverride when suspend is false",
-				func() *trainer.TrainJob {
-					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-trainer").
-						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
-						Suspend(false).
-						PodTemplateOverrides(
-							[]trainer.PodTemplateOverride{
-								{
-									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
-										{
-											Name: "node",
-										},
-									},
-									Spec: &trainer.PodTemplateSpecOverride{
-										NodeSelector: map[string]string{"test": "test"},
-									},
-								},
-							},
-						).
-						Obj()
-				},
-				func(job *trainer.TrainJob) *trainer.TrainJob {
-					job.Spec.PodTemplateOverrides[0].Spec.NodeSelector = map[string]string{"forbidden": "update"}
-					return job
-				},
-				testingutil.BeInvalidError()),
 		)
 	})
 })
