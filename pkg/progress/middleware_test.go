@@ -6,12 +6,10 @@ import (
 	"testing"
 
 	"k8s.io/klog/v2/ktesting"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func TestRecoveryMiddleware(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	ctrl.SetLogger(logger)
 
 	// Create a handler that panics
 	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

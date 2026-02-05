@@ -34,9 +34,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -94,9 +92,6 @@ func newTestServer(t *testing.T, cfg *configapi.ProgressServer) *httptest.Server
 }
 
 func TestHandleProgressStatus(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	ctrl.SetLogger(logger)
-
 	validProgressStatus := trainer.ProgressStatus{
 		TrainerStatus: &trainer.TrainJobTrainerStatus{
 			ProgressPercentage:        ptr.To[int32](75),
@@ -184,9 +179,6 @@ func TestHandleProgressStatus(t *testing.T) {
 }
 
 func TestServerErrorResponses(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	ctrl.SetLogger(logger)
-
 	cases := []struct {
 		name         string
 		url          string
