@@ -29,7 +29,7 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.ProgressServer) error {
 		return err
 	}
 
-	server, err := NewServer(cfg, tlsConfig)
+	server, err := NewServer(mgr.GetClient(), cfg, tlsConfig)
 	if err != nil {
 		return err
 	}

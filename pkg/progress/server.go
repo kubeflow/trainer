@@ -29,6 +29,7 @@ import (
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -51,10 +52,11 @@ const (
 type Server struct {
 	log        logr.Logger
 	httpServer *http.Server
+	client     client.Client
 }
 
 // NewServer creates a new Server for collecting progress updates.
-func NewServer(cfg *configapi.ProgressServer, tlsConfig *tls.Config) (*Server, error) {
+func NewServer(c client.Client, cfg *configapi.ProgressServer, tlsConfig *tls.Config) (*Server, error) {
 	if cfg == nil || cfg.Port == nil {
 		return nil, fmt.Errorf("cfg info is required")
 	}
@@ -65,7 +67,8 @@ func NewServer(cfg *configapi.ProgressServer, tlsConfig *tls.Config) (*Server, e
 	log := ctrl.Log.WithName("progress")
 
 	s := &Server{
-		log: log,
+		log:    log,
+		client: c,
 	}
 
 	mux := http.NewServeMux()
@@ -131,6 +134,20 @@ func (s *Server) handleProgressStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var trainJob = trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Status: trainer.TrainJobStatus{
+			TrainerStatus: progressStatus.TrainerStatus,
+		},
+	}
+	if err := s.client.Status().Patch(r.Context(), &trainJob, client.Merge); err != nil {
+		s.log.Error(err, "Failed to update train job", "namespace", namespace, "name", name)
+		badRequest(w, s.log, "Internal error", metav1.StatusReasonInternalError, http.StatusInternalServerError)
+		return
+	}
 	// PLACEHOLDER: Log the received progress status
 	s.log.Info("Handled progress status update", "namespace", namespace, "name", name, "status", progressStatus)
 
