@@ -35,9 +35,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 // newTestTLSConfig creates a TLS config with a self-signed certificate for testing.
@@ -80,10 +82,15 @@ func newTestTLSConfig(t *testing.T) *tls.Config {
 	}
 }
 
-func newTestServer(t *testing.T, cfg *configapi.ProgressServer) *httptest.Server {
+func newTestServer(t *testing.T, cfg *configapi.ProgressServer, objs ...client.Object) *httptest.Server {
 	t.Helper()
 
-	srv, err := NewServer(cfg, newTestTLSConfig(t))
+	fakeClient := utiltesting.NewClientBuilder().
+		WithObjects(objs...).
+		WithStatusSubresource(objs...).
+		Build()
+
+	srv, err := NewServer(fakeClient, cfg, newTestTLSConfig(t))
 	if err != nil {
 		t.Fatalf("NewServer() error: %v", err)
 	}
@@ -104,6 +111,14 @@ func TestHandleProgressStatus(t *testing.T) {
 	}
 
 	validBody, _ := json.Marshal(validProgressStatus)
+
+	// TrainJob that exists in the cluster
+	existingTrainJob := &trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job",
+			Namespace: "default",
+		},
+	}
 
 	cases := []struct {
 		name         string
@@ -141,7 +156,7 @@ func TestHandleProgressStatus(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)})
+			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)}, existingTrainJob)
 			defer ts.Close()
 
 			// Make actual HTTP request
@@ -179,6 +194,14 @@ func TestHandleProgressStatus(t *testing.T) {
 }
 
 func TestServerErrorResponses(t *testing.T) {
+	// TrainJob that exists in the cluster
+	existingTrainJob := &trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job",
+			Namespace: "default",
+		},
+	}
+
 	cases := []struct {
 		name         string
 		url          string
@@ -223,7 +246,7 @@ func TestServerErrorResponses(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)})
+			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)}, existingTrainJob)
 			defer ts.Close()
 
 			// Make actual HTTP request
