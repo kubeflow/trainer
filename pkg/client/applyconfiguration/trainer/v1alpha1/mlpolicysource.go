@@ -24,6 +24,8 @@ package v1alpha1
 type MLPolicySourceApplyConfiguration struct {
 	// torch defines the configuration for the PyTorch runtime.
 	Torch *TorchMLPolicySourceApplyConfiguration `json:"torch,omitempty"`
+	// flux defines the configuration for the Flux runtime.
+	Flux *FluxMLPolicySourceApplyConfiguration `json:"flux,omitempty"`
 	// mpi defines the configuration for the MPI Runtime.
 	MPI *MPIMLPolicySourceApplyConfiguration `json:"mpi,omitempty"`
 }
@@ -39,6 +41,14 @@ func MLPolicySource() *MLPolicySourceApplyConfiguration {
 // If called multiple times, the Torch field is set to the value of the last call.
 func (b *MLPolicySourceApplyConfiguration) WithTorch(value *TorchMLPolicySourceApplyConfiguration) *MLPolicySourceApplyConfiguration {
 	b.Torch = value
+	return b
+}
+
+// WithFlux sets the Flux field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Flux field is set to the value of the last call.
+func (b *MLPolicySourceApplyConfiguration) WithFlux(value *FluxMLPolicySourceApplyConfiguration) *MLPolicySourceApplyConfiguration {
+	b.Flux = value
 	return b
 }
 
