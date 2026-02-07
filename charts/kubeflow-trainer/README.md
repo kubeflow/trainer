@@ -35,6 +35,14 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --v
 
 You can optionally deploy ClusterTrainingRuntimes as part of the Helm installation. Runtimes are disabled by default to keep the chart lightweight.
 
+To enable all default runtimes (torch, deepspeed, mlx, torchtune):
+
+```bash
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+  --version 2.1.0 \
+  --set runtimes.defaultEnabled=true
+```
+
 To enable specific runtimes:
 
 ```bash
@@ -51,20 +59,19 @@ Or use a custom values file:
 runtimes:
   torchDistributed:
     enabled: true
-  torchDistributedWithCache:
-    enabled: true
-    dataCache:
-      enabled: true
-      cacheImage:
-        tag: "v2.0.0"
   deepspeedDistributed:
     enabled: true
   mlxDistributed:
     enabled: true
 
-# Required for torch-distributed-with-cache
+# For torch-distributed-with-cache, enable both dataCache.enabled and dataCache.runtimes.torchDistributed.enabled
 dataCache:
   enabled: true
+  cacheImage:
+    tag: "v2.0.0"
+  runtimes:
+    torchDistributed:
+      enabled: true
 ```
 
 Then install with:
@@ -123,15 +130,15 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |
 | dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency. Set to `false` if LeaderWorkerSet is already installed in the cluster. |
 | dataCache.lws.fullnameOverride | string | `"lws"` | String to fully override LeaderWorkerSet release name. |
-| runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"defaultEnabled":false,"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchDistributedWithCache":{"dataCache":{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":true},"enabled":false},"torchtuneDistributed":{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
+| dataCache.cacheImage.registry | string | `"ghcr.io"` | Data cache image registry |
+| dataCache.cacheImage.repository | string | `"kubeflow/trainer/data-cache"` | Data cache image repository |
+| dataCache.cacheImage.tag | string | `""` | Data cache image tag. Defaults to chart version if empty. |
+| dataCache.runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training with data cache support |
+| dataCache.runtimes.torchDistributed.enabled | bool | `false` | Enable deployment of torch-distributed-with-cache runtime |
+| runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"defaultEnabled":false,"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchtuneDistributed":{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
 | runtimes.defaultEnabled | bool | `false` | Enable all default runtimes (torch, deepspeed, mlx, torchtune) when set to true. Individual runtime settings will be ignored if this is enabled. |
 | runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training runtime (no custom images required) |
 | runtimes.torchDistributed.enabled | bool | `false` | Enable deployment of torch-distributed runtime |
-| runtimes.torchDistributedWithCache | object | `{"dataCache":{"cacheImage":{"registry":"ghcr.io","repository":"kubeflow/trainer/data-cache","tag":""},"enabled":true},"enabled":false}` | PyTorch distributed training with data cache support |
-| runtimes.torchDistributedWithCache.enabled | bool | `false` | Enable deployment of torch-distributed-with-cache runtime |
-| runtimes.torchDistributedWithCache.dataCache.cacheImage.registry | string | `"ghcr.io"` | Data cache image registry |
-| runtimes.torchDistributedWithCache.dataCache.cacheImage.repository | string | `"kubeflow/trainer/data-cache"` | Data cache image repository |
-| runtimes.torchDistributedWithCache.dataCache.cacheImage.tag | string | `""` | Data cache image tag. Defaults to chart version if empty. |
 | runtimes.deepspeedDistributed | object | `{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}}` | DeepSpeed distributed training runtime |
 | runtimes.deepspeedDistributed.enabled | bool | `false` | Enable deployment of deepspeed-distributed runtime |
 | runtimes.deepspeedDistributed.image.registry | string | `"ghcr.io"` | DeepSpeed runtime image registry |

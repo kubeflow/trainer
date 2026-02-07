@@ -148,6 +148,18 @@ dataCache:
     install: true
     # -- String to fully override LeaderWorkerSet release name.
     fullnameOverride: lws
+  cacheImage:
+    # -- Data cache image registry
+    registry: ghcr.io
+    # -- Data cache image repository
+    repository: kubeflow/trainer/data-cache
+    # -- Data cache image tag. Defaults to chart version if empty.
+    tag: ""
+  runtimes:
+    # -- PyTorch distributed training with data cache support
+    torchDistributed:
+      # -- Enable deployment of torch-distributed-with-cache runtime
+      enabled: false
 
 # -- ClusterTrainingRuntimes configuration
 # These are optional runtime templates that can be deployed with the Helm chart.
@@ -161,20 +173,6 @@ runtimes:
   torchDistributed:
     # -- Enable deployment of torch-distributed runtime
     enabled: false
-
-  # -- PyTorch distributed training with data cache support
-  torchDistributedWithCache:
-    # -- Enable deployment of torch-distributed-with-cache runtime
-    enabled: false
-    dataCache:
-      enabled: true
-      cacheImage:
-        # -- Data cache image registry
-        registry: ghcr.io
-        # -- Data cache image repository
-        repository: kubeflow/trainer/data-cache
-        # -- Data cache image tag. Defaults to chart version if empty.
-        tag: ""
 
   # -- DeepSpeed distributed training runtime
   deepspeedDistributed:
