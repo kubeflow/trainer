@@ -150,6 +150,10 @@ type PodGroupPolicySource struct {
 	// volcano plugin for gang-scheduling.
 	// +optional
 	Volcano *VolcanoPodGroupPolicySource `json:"volcano,omitempty"`
+
+	// kai scheduler plugin for gang-scheduling with hierarchical queues and GPU sharing.
+	// +optional
+	KAI *KAIPodGroupPolicySource `json:"kai,omitempty"`
 }
 
 // CoschedulingPodGroupPolicySource represents configuration for coscheduling plugin.
@@ -168,6 +172,21 @@ type VolcanoPodGroupPolicySource struct {
 	// networkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.
 	// +optional
 	NetworkTopology *volcanov1beta1.NetworkTopologySpec `json:"networkTopology,omitempty"`
+}
+
+// KAIPodGroupPolicySource represents configuration for NVIDIA KAI Scheduler.
+// KAI Scheduler provides hierarchical queues, GPU sharing, and elastic workloads.
+type KAIPodGroupPolicySource struct {
+	// queueName is the name of the KAI Queue to schedule the PodGroup.
+	// +optional
+	QueueName *string `json:"queueName,omitempty"`
+
+	// scheduleTimeoutSeconds is the maximum duration to schedule PodGroup for gang-scheduling.
+	// If the scheduling timeout is equal to 0, the default value is used.
+	// Defaults to 60 seconds.
+	// +kubebuilder:default=60
+	// +optional
+	ScheduleTimeoutSeconds *int32 `json:"scheduleTimeoutSeconds,omitempty"`
 }
 
 // MLPolicy represents configuration for the model training with ML-specific parameters.
