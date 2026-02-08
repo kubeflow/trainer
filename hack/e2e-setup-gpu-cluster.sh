@@ -174,6 +174,11 @@ kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
     exit 1
 )
 
+# hotfix: patch CRDs to run on GPU nodes (Check #3067)
+kubectl get clustertrainingruntimes -o name | xargs -I {} \
+  kubectl patch {} --type='json' \
+  -p='[{"op": "add", "path": "/spec/template/spec/replicatedJobs/0/template/spec/template/spec/runtimeClassName", "value": "nvidia"}]'
+
 # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
 TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
 ${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
