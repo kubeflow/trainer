@@ -236,4 +236,41 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 			})
 		})
 	})
+
+	ginkgo.When("Creating a TrainJob with PodTemplateOverrides", func() {
+		ginkgo.It("should allow the user to set the manager field and default to 'Unknown' if empty", func() {
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
+				PodTemplateOverrides([]trainer.PodTemplateOverride{
+					{
+						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
+						Spec: &trainer.PodTemplateSpecOverride{
+							ServiceAccountName: ptr.To("test-sa-1"),
+						},
+					},
+					{
+						Manager:    ptr.To("test-manager"),
+						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
+						Spec: &trainer.PodTemplateSpecOverride{
+							ServiceAccountName: ptr.To("test-sa-2"),
+						},
+					},
+				}).
+				Obj()
+
+			ginkgo.By("Create a TrainJob with PodTemplateOverrides", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Verify manager field preserves user input and defaults to 'Unknown' if empty", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Spec.PodTemplateOverrides).Should(gomega.HaveLen(2))
+					g.Expect(*gotTrainJob.Spec.PodTemplateOverrides[0].Manager).To(gomega.Equal("Unknown"))
+					g.Expect(*gotTrainJob.Spec.PodTemplateOverrides[1].Manager).To(gomega.Equal("test-manager"))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
+	})
 })
