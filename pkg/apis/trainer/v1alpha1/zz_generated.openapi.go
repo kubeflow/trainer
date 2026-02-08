@@ -1032,6 +1032,13 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateOverride(ref common.ReferenceCa
 							},
 						},
 					},
+					"manager": {
+						SchemaProps: spec.SchemaProps{
+							Description: "manager indicates which controller created this PodTemplateOverride object. It can be used by external controllers or admission webhooks to track ownership and avoid conflicts with other controllers. For example, Kueue sets this field to \"kueue.k8s.io/manager\". Defaults to `trainer.kubeflow.org/unknown`",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Description: "metadata overrides the Pod template metadata. These values will be merged with the TrainingRuntime's Pod template metadata.",
