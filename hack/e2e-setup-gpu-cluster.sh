@@ -92,8 +92,7 @@ helm install --wait --generate-name \
   -n gpu-operator --create-namespace \
   nvidia/gpu-operator \
   --version="${GPU_OPERATOR_VERSION}" \
-  --set driver.enabled=false \
-  --set toolkit.enabled=false
+  --set driver.enabled=false
 
 # Validation steps for GPU operator installation
 kubectl get ns gpu-operator
