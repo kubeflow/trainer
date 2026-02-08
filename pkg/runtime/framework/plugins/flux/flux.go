@@ -123,7 +123,6 @@ func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobO
 // EnforceMLPolicy updates the JobSet
 func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Flux == nil {
-		fmt.Println("FluxPolicySource is nil.")
 		return nil
 	}
 
@@ -209,7 +208,7 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 func (f *Flux) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
 
 	// If the user's chosen runtime does not have the flux policy enabled, skip this plugin
-	if info == nil || info.RuntimePolicy.FluxPolicySource == nil {
+	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Flux == nil {
 		return nil, nil
 	}
 

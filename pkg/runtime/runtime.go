@@ -119,7 +119,6 @@ func WithMLPolicySource(mlPolicy *trainer.MLPolicy) InfoOption {
 	return func(o *InfoOptions) {
 		if mlPolicy != nil {
 			o.runtimePolicy.MLPolicySource = &mlPolicy.MLPolicySource
-			o.runtimePolicy.FluxPolicySource = mlPolicy.Flux
 		}
 	}
 }
