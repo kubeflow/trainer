@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This shell is used to generate a release for X.Y.Z version.
+# This shell is used to prepare a release commit for X.Y.Z version.
 
 set -o errexit
 set -o nounset
@@ -42,40 +42,15 @@ MANIFESTS_DIR="$REPO_ROOT/manifests"
 CHART_DIR="$REPO_ROOT/charts/kubeflow-trainer"
 CHART_FILE="$CHART_DIR/Chart.yaml"
 PYTHON_API_VERSION_FILE="$REPO_ROOT/api/python_api/kubeflow_trainer_api/__init__.py"
-RELEASE_BRANCH="release-$NEW_VERSION"
-
-# Ensure we're on master branch
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-if [ "$CURRENT_BRANCH" != "master" ]; then
-  echo "Current branch is ${CURRENT_BRANCH}, switching to master..."
-  git checkout master
-fi
-
-# Fetch refs and sync with origin/master
-echo "Fetching latest changes from origin..."
-git fetch --tags
-git fetch origin master
-
-# Ensure master is up to date with origin/master
-if ! git merge-base --is-ancestor HEAD origin/master; then
-  echo "Local master is ahead of origin/master. Please push or resolve conflicts first."
-  exit 1
-fi
-
-echo "Syncing master with origin/master..."
-git reset --hard origin/master
 
 # Verify tag doesn't already exist
+git fetch --tags
 if git tag --list | grep -q "^${TAG}$"; then
   echo "Tag: ${TAG} already exists. Release can't be published."
   exit 1
 fi
 
-# Create new release branch
-echo "Creating new branch: ${RELEASE_BRANCH}"
-git checkout -b "$RELEASE_BRANCH"
-
-echo -e "\nCreating a new release commit on branch ${RELEASE_BRANCH}. Tag to be created: ${TAG}\n"
+echo -e "\nPreparing release commit for ${TAG}\n"
 
 echo -n "v$NEW_VERSION" > "$VERSION_FILE"
 echo "Updated VERSION file to $NEW_VERSION"
@@ -147,4 +122,8 @@ echo "Completed make generate"
 git add "$VERSION_FILE" "$MANIFESTS_DIR" "$CHART_DIR" "$PYTHON_API_VERSION_FILE" "$CHANGELOG_PATH"
 git commit -s -m "Release $TAG"
 
-echo -e "\nRelease $NEW_VERSION is ready. Commit created on branch ${RELEASE_BRANCH}."
+echo -e "\nRelease commit for $TAG created successfully."
+echo "Next steps:"
+echo "  1. Push your branch to your fork"
+echo "  2. Open a PR against master"
+echo "  3. Once merged, GitHub Actions will create the release branch and tag"

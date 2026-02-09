@@ -54,8 +54,29 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "is-prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
 
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "TAG=${TAG}" >> $GITHUB_ENV
+      - name: Ensure tag does not exist
+        run: |
+          git fetch --tags
+          if git tag -l | grep -q "^${{ steps.vars.outputs.tag }}$"; then
+            echo "Tag '${{ steps.vars.outputs.tag }}' already exists."
+            exit 1
+          fi
+
+      - name: Check manifests image tag matches version
+        run: |
+          TAG="${{ steps.vars.outputs.tag }}"
+          MANIFEST_TAGS=$(grep -r 'newTag:' manifests | sed 's/.*newTag:[[:space:]]*//' | tr -d '"' | tr -d "'" | sort | uniq)
+          if [ -z "$MANIFEST_TAGS" ]; then
+              echo "No newTag found in manifests."
+              exit 1
+          fi
+          for t in $MANIFEST_TAGS; do
+              if [ "$t" != "$TAG" ]; then
+                  echo "Image tag in manifests ($t) does not match version tag ($TAG)."
+                  exit 1
+              fi
+          done
+          echo "All image tags in manifests match version tag $TAG."
 
   build_python_api:
     needs:
@@ -65,9 +86,6 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.prepare.outputs.branch }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -110,9 +128,28 @@ jobs:
           name: python-dist-${{ needs.prepare.outputs.version }}
           path: api/python_api/dist/
 
-      - name: Ensure release branch exists
+  create_branch_and_tag:
+    needs:
+      - prepare
+      - build_python_api
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
         run: |
-          BRANCH="${{ steps.vars.outputs.branch }}"
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Create release branch
+        run: |
+          BRANCH="${{ needs.prepare.outputs.branch }}"
           git fetch origin
           if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
             echo "Release branch $BRANCH already exists."
@@ -122,58 +159,16 @@ jobs:
             git push origin "$BRANCH"
           fi
 
-      - name: Ensure tag does not exist
-        run: |
-          git fetch --tags
-          if git tag -l | grep -q "^${{ steps.vars.outputs.tag }}$"; then
-            echo "Tag '${{ steps.vars.outputs.tag }}' already exists."
-            exit 1
-          fi
-
-      - name: Check manifests image tag matches version
-        run: |
-          TAG="${{ steps.vars.outputs.tag }}"
-          MANIFEST_TAGS=$(grep -r 'newTag:' manifests | sed 's/.*newTag:[[:space:]]*//' | tr -d '"' | tr -d "'" | sort | uniq)
-          if [ -z "$MANIFEST_TAGS" ]; then
-              echo "No newTag found in manifests."
-              exit 1
-          fi
-          for t in $MANIFEST_TAGS; do
-              if [ "$t" != "$TAG" ]; then
-                  echo "Image tag in manifests ($t) does not match version tag ($TAG)."
-                  exit 1
-              fi
-          done
-          echo "All image tags in manifests match version tag $TAG."
-
-  push_tag:
-    needs:
-      - prepare
-      - build_python_api
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.prepare.outputs.branch }}
-
-      - name: Configure Git
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
       - name: Create and push tag
         run: |
-          git tag -a "${{ needs.prepare.outputs.tag }}" -m "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
+          git tag -a "${{ needs.prepare.outputs.tag }}" "$GITHUB_SHA" -m "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
           git push origin "${{ needs.prepare.outputs.tag }}"
 
   publish_pypi:
     needs:
       - prepare
       - build_python_api
-      - push_tag
+      - create_branch_and_tag
     runs-on: ubuntu-latest
     environment:
       name: release
@@ -194,9 +189,9 @@ jobs:
 
   github_release:
     needs:
-      - push_tag
-      - publish_pypi
       - prepare
+      - create_branch_and_tag
+      - publish_pypi
 
     permissions:
       contents: write
@@ -208,12 +203,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ needs.prepare.outputs.branch }}
-
-      - name: Read version
-        run: |
-          echo "VERSION=${{ needs.prepare.outputs.version }}" >> $GITHUB_ENV
-          echo "TAG=${{ needs.prepare.outputs.tag }}" >> $GITHUB_ENV
 
       - name: Generate changelog
         id: changelog
@@ -230,7 +219,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
           tag_name: ${{ needs.prepare.outputs.tag }}
-          target_commitish: ${{ needs.prepare.outputs.branch }}
+          target_commitish: ${{ github.sha }}
           prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
           draft: false
           body: ${{ steps.changelog.outputs.changelog }}
