@@ -8,3 +8,22 @@ resources:
 
 patches:
   - path: patches/remove-namespace.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kubeflow-trainer-controller-manager
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: kubeflow-trainer-controller-manager
+        namespace: kubeflow-system
+      spec:
+        selector:
+          matchLabels:
+            app: kubeflow-trainer
+        template:
+          metadata:
+            labels:
+              app: kubeflow-trainer
