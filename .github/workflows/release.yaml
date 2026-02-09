@@ -164,6 +164,37 @@ jobs:
           git tag -a "${{ needs.prepare.outputs.tag }}" "$GITHUB_SHA" -m "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
           git push origin "${{ needs.prepare.outputs.tag }}"
 
+  trigger_builds:
+    needs:
+      - prepare
+      - create_branch_and_tag
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+
+    steps:
+      - name: Trigger image build for release tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-and-push-images.yaml',
+              ref: '${{ needs.prepare.outputs.tag }}',
+            })
+
+      - name: Trigger Helm chart publish for release tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'publish-helm-charts.yaml',
+              ref: '${{ needs.prepare.outputs.tag }}',
+            })
+
   publish_pypi:
     needs:
       - prepare
