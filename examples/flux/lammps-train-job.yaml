@@ -1,0 +1,28 @@
+# This example deploys the LAMMPS Molecular Dynamic Simulator
+# with MPI orchestrated by the Flux workload manager on 4 nodes.
+# The problem size is defined by the coordinates x,y,z, and the
+# parameter file reaxc.hns.
+# The image has the application, LAMMPS, installed (no Flux)
+# A Flux view will be added on the fly by the Kubeflow trainer
+# The 4 pods ideally map 1:1 to nodes, encompassing a cluster
+# The underlying abstraction is a JobSet with a headless service
+# Flux supports low-latency with Infiniband, EFA, etc., however
+# standard ethernet is used here.
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: lammps-flux
+spec:
+  # Reference the pre-defined runtime by name
+  runtimeRef:
+    name: flux-runtime
+  trainer:
+    numNodes: 4
+    image: ghcr.io/converged-computing/metric-lammps:latest
+    # You do not need to write "flux run, etc" here. It will be wrapped
+    command: ["lmp", "-v", "x", "2", "-v", "y", "2", "-v", "z", "2", "-in", "in.reaxc.hns", "-nocite"]
+    # See flux-interactive.yaml for running the above interactively.
+    # This is how we match the view (operating system and verison) of the initContainer to install Flux
+    env:
+     - name: FLUX_VIEW_IMAGE
+       value: ghcr.io/converged-computing/flux-view-ubuntu:tag-jammy
