@@ -46,9 +46,8 @@ XGBoost supports distributed training through **Rabit**, which requires coordina
 | Non-Goal | Rationale |
 |:---------|:----------|
 | Framework CRD | Trainer V2 uses generic TrainJob |
-| MPI Support | Modern XGBoost uses Rabit |
+| MPI Support | Modern XGBoost uses Rabit/Collective |
 | Elastic Training | Out of scope |
-| Multi-GPU per Node | Initial version supports 1 worker per node; multi-GPU per node deferred |
 
 ---
 
@@ -62,13 +61,13 @@ flowchart LR
     B --> E[Trainer Controller]
     D --> E
 
-    E -->|Resolve Runtime<br/>Enforce XGBoost MLPolicy| F[Inject Rabit Env Vars]
+    E -->|Resolve Runtime<br/>Enforce XGBoost MLPolicy| F[Inject Collective Env Vars]
     F --> G[Create JobSet]
     G --> H[Launch Pods]
 
     subgraph K8s["Kubernetes Cluster"]
         subgraph HS["Headless Service"]
-            P0[Pod rank=0<br/>Rabit Tracker]
+            P0[Pod rank=0<br/>Tracker]
             P1[Pod rank=1]
             P2[Pod rank=2]
             P3[Pod rank=3]
@@ -84,8 +83,8 @@ flowchart LR
 
 The XGBoost runtime plugin:
 1. Adds `XGBoost *XGBoostMLPolicySource` to the existing `MLPolicySource` struct
-2. Injects Rabit environment variables automatically
-3. Injects env vars so user code on rank-0 can start the Rabit tracker
+2. Injects collective/Rabit environment variables automatically
+3. Injects env vars so user code on rank-0 can start the tracker
 
 ---
 
@@ -105,13 +104,17 @@ from kubeflow.trainer import TrainerClient, CustomTrainer
 
 def xgboost_train(num_rounds: int = 100, max_depth: int = 6):
     """
-    Distributed XGBoost training function.
-    
+    Distributed XGBoost training function using the modern collective API.
+
     DMLC_* env vars are injected by the Trainer V2 XGBoost plugin.
-    Rank 0 must start the Rabit tracker before workers can connect.
+    Rank 0 must start the tracker before workers can connect.
+
+    Note: XGBoost 2.0+ uses xgb.collective instead of the deprecated xgb.rabit.
     """
     import os
     import xgboost as xgb
+    from xgboost import collective as coll
+    from xgboost.tracker import RabitTracker
     from sklearn.datasets import make_classification
     from sklearn.model_selection import train_test_split
 
@@ -121,32 +124,42 @@ def xgboost_train(num_rounds: int = 100, max_depth: int = 6):
     tracker_uri = os.environ["DMLC_TRACKER_URI"]
     tracker_port = int(os.environ["DMLC_TRACKER_PORT"])
 
-    # Rank 0 starts the Rabit tracker (required for coordination)
+    # Rank 0 starts the tracker (required for coordination)
+    tracker = None
     if rank == 0:
-        tracker = xgb.RabitTracker(host_ip="0.0.0.0", n_workers=world_size, port=tracker_port)
-        tracker.start(world_size)
+        tracker = RabitTracker(host_ip="0.0.0.0", n_workers=world_size, port=tracker_port)
+        tracker.start()
         print(f"Tracker started on {tracker_uri}:{tracker_port}")
 
-    # All workers initialize Rabit and connect to tracker
-    xgb.rabit.init()
-    print(f"Worker {rank}/{world_size} connected to tracker")
+    # All workers initialize the collective communicator
+    with coll.CommunicatorContext(
+        dmlc_tracker_uri=tracker_uri,
+        dmlc_tracker_port=tracker_port,
+        dmlc_task_id=str(rank),
+    ):
+        print(f"Worker {coll.get_rank()}/{coll.get_world_size()} connected")
 
-    # Load data (in practice, each worker loads a shard)
-    X, y = make_classification(n_samples=10000, n_features=20, random_state=42 + rank)
-    X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2)
-    dtrain = xgb.DMatrix(X_train, label=y_train)
-    dvalid = xgb.DMatrix(X_valid, label=y_valid)
+        # Load data (in practice, each worker loads a shard)
+        # NOTE: DMatrix construction MUST be inside the communicator context
+        # because it involves synchronization for data shape and quantization.
+        X, y = make_classification(n_samples=10000, n_features=20, random_state=42 + rank)
+        X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2)
+        dtrain = xgb.DMatrix(X_train, label=y_train)
+        dvalid = xgb.DMatrix(X_valid, label=y_valid)
 
-    # Training params (for GPU: add device="cuda")
-    params = {"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.1}
+        # Training params (for GPU: add device="cuda")
+        params = {"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.1}
 
-    # Distributed training - Rabit synchronizes gradients
-    model = xgb.train(params, dtrain, num_boost_round=num_rounds, evals=[(dvalid, "val")])
+        # Distributed training - collective operations synchronize gradients
+        model = xgb.train(params, dtrain, num_boost_round=num_rounds, evals=[(dvalid, "val")])
 
-    # Finalize Rabit and save model from rank 0
-    xgb.rabit.finalize()
-    if rank == 0:
-        model.save_model("/workspace/model/xgboost_model.json")
+        # Save model from rank 0
+        if coll.get_rank() == 0:
+            model.save_model("/workspace/model/xgboost_model.json")
+
+    # Wait for tracker to finish (rank 0 only)
+    if tracker is not None:
+        tracker.wait_for()
 
 
 # Submit the training job
@@ -159,9 +172,14 @@ job_id = client.train(
 
 > **Key Points:**
 > - All ranks run the same Python script (`python train.py`)
-> - Rank 0 must start `xgb.RabitTracker()` before other workers connect
+> - Uses modern `xgb.collective` API (XGBoost 2.0+); `xgb.rabit` is deprecated
+> - Rank 0 starts `RabitTracker()` before other workers connect
+> - `DMatrix` construction **must** be inside the communicator context (requires synchronization)
 > - Environment variables are injected by the plugin; tracker startup is user responsibility
 > - For GPU training, add `device="cuda"` to params
+
+> [!CAUTION]
+> **DMatrix must be constructed inside the collective context.** The construction involves synchronization for data shape and quantization across workers. Constructing DMatrix outside the context may appear to work with regular/dense data, but the behavior is undefined and quantization results will be invalid.
 
 </details>
 
@@ -181,11 +199,14 @@ type MLPolicySource struct {
 }
 
 // XGBoostMLPolicySource represents an XGBoost runtime configuration.
-// Currently empty - presence activates the XGBoost plugin with defaults.
-// Future fields (see Future Work section):
-//   - TrackerPort *int32 - Override default Rabit tracker port (9091)
-//   - TrackerTimeout *int32 - Connection timeout in seconds
-type XGBoostMLPolicySource struct {}
+// The number of workers per node is automatically derived from container GPU resources:
+//   - GPU training: 1 worker per GPU (from resourcesPerNode)
+//   - CPU training: 1 worker per node
+// DMLC_NUM_WORKER = numNodes × workersPerNode (where workersPerNode = GPU count or 1)
+type XGBoostMLPolicySource struct {
+    // Empty for initial implementation.
+    // Future: TrackerPort, TrackerTimeout can be added here.
+}
 ```
 
 > [!IMPORTANT]
@@ -198,18 +219,26 @@ type XGBoostMLPolicySource struct {}
 
 ### Environment Variables
 
-The plugin injects XGBoost's native Rabit environment variables:
+The plugin injects XGBoost's native collective/Rabit environment variables:
 
 | Variable | Description | Example Value |
 |:---------|:------------|:--------------|
-| `DMLC_TRACKER_URI` | Address of rank-0 pod (Rabit tracker) | `myjob-node-0-0.myjob` |
+| `DMLC_TRACKER_URI` | Address of rank-0 pod (tracker host) | `myjob-node-0-0.myjob` |
 | `DMLC_TRACKER_PORT` | Tracker port | `9091` |
 | `DMLC_TASK_ID` | Worker rank | `0`, `1`, `2`... |
-| `DMLC_NUM_WORKER` | Total worker count | `4` |
+| `DMLC_NUM_WORKER` | Total worker count | `8` |
 
 **How `DMLC_NUM_WORKER` is calculated:**
-- Set to `numNodes` from TrainJob (or ClusterTrainingRuntime if not overridden)
-- 1 worker per pod (XGBoost can use multiple GPUs/CPUs within a single process)
+```
+DMLC_NUM_WORKER = numNodes × workersPerNode
+
+where workersPerNode:
+  - GPU training: number of GPUs per node (from container limits)
+  - CPU training: 1
+```
+
+- **CPU Training:** Typically 1 worker per node (XGBoost uses multi-threading within a process)
+- **GPU Training:** 1 worker per GPU (XGBoost 2.0+ uses one GPU per worker process)
 
 ---
 
@@ -219,47 +248,101 @@ XGBoost has two levels of parallelism:
 
 | Level | Mechanism | Controlled By |
 |:------|:----------|:--------------|
-| **Intra-node** | Multi-threading within a single process | `nthread` param in XGBoost |
-| **Inter-node** | Distributed coordination across pods | Rabit (this KEP) |
+| **Intra-worker** | Multi-threading within a single process | `nthread` param in XGBoost |
+| **Inter-worker** | Distributed coordination across workers | Collective/Rabit (this KEP) |
 
-**CPU Training:**
-- Each pod runs 1 XGBoost worker process
+> [!IMPORTANT]
+> **XGBoost 2.0+ Architecture:** The deprecated `n_gpus` parameter was removed. Modern XGBoost uses **one worker process per GPU**. This means `DMLC_NUM_WORKER = numNodes × workersPerNode` (where `workersPerNode` is derived from GPU count or defaults to 1).
+
+#### CPU Training
+
+- Each pod runs **1 XGBoost worker process**
 - XGBoost uses all available CPU cores automatically (or set `nthread` to limit)
-- Example: 4 pods × 8 cores each = 4 Rabit workers, each using 8 threads
+- Example: 4 pods × 8 cores each = 4 workers, each using 8 threads
 
-**GPU Training:**
+```yaml
+# CPU training: 4 nodes, 1 worker per node
+spec:
+  mlPolicy:
+    numNodes: 4
+    xgboost: {}
+```
+
+#### GPU Training
+
 - Set `device="cuda"` in XGBoost params
-- A single XGBoost process can utilize multiple GPUs on a node
-- Request GPUs via `resourcesPerNode.limits["nvidia.com/gpu"]`
+- **One worker per GPU** (XGBoost 2.0+ removed the deprecated `n_gpus` parameter)
+- `numWorkersPerNode` is **auto-derived** from container GPU resources when not set
+
+```yaml
+# GPU training: 2 nodes × 4 GPUs each = 8 workers total
+spec:
+  mlPolicy:
+    numNodes: 2
+    xgboost: {}  # numWorkersPerNode auto-derived from container resources
+  template:
+    spec:
+      replicatedJobs:
+        - name: node
+          template:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      resources:
+                        limits:
+                          nvidia.com/gpu: 4  # Auto-derives numWorkersPerNode=4
+```
+
+| Configuration | numNodes | numWorkersPerNode | DMLC_NUM_WORKER |
+|:--------------|:---------|:------------------|:----------------|
+| 4 nodes, CPU-only | 4 | 1 | 4 |
+| 2 nodes, 4 GPUs each | 2 | 4 | 8 |
+| 1 node, 8 GPUs | 1 | 8 | 8 |
 
 ```python
-# CPU: uses all cores, or limit with nthread
+# CPU training
 params = {"nthread": 8, "tree_method": "hist"}
 
-# GPU: single process uses all available GPUs on the node
+# GPU training
 params = {"device": "cuda", "tree_method": "hist"}
 ```
 
-> **Note:** Unlike PyTorch (which requires one process per GPU), XGBoost's single-process architecture can use multiple GPUs directly. Therefore, `numWorkerPerNode` is not needed for multi-GPU setups—simply request multiple GPUs per pod.
-
 ---
 
-### Rabit Tracker Coordination
+### Tracker Coordination
 
 ```mermaid
 flowchart TB
     subgraph Kubernetes Cluster
         subgraph Headless Service
-            R0[Pod: node-0-0<br/>DMLC_TASK_ID=0<br/>Rabit Tracker]
-            W1[Pod: node-0-1<br/>DMLC_TASK_ID=1]
-            W2[Pod: node-0-2<br/>DMLC_TASK_ID=2]
-            W3[Pod: node-0-3<br/>DMLC_TASK_ID=3]
+            R0["Pod: myjob-node-0-0<br/>DMLC_TASK_ID=0<br/>Tracker"]
+            W1["Pod: myjob-node-0-1<br/>DMLC_TASK_ID=1"]
+            W2["Pod: myjob-node-0-2<br/>DMLC_TASK_ID=2"]
+            W3["Pod: myjob-node-0-3<br/>DMLC_TASK_ID=3"]
         end
     end
-    
+
     W1 --> R0
     W2 --> R0
     W3 --> R0
+```
+
+**Pod Naming Convention:**
+- Pattern: `<trainjob-name>-<replicatedjob-name>-<job-index>-<pod-index>`
+- For XGBoost: `<job-index>` is always `0` (single ReplicatedJob)
+- `<pod-index>` corresponds to `DMLC_TASK_ID` (0, 1, 2, 3...)
+- Tracker runs on the first pod: `<trainjob-name>-node-0-0`
+
+**Example (numNodes=4):**
+```
+DMLC_NUM_WORKER=4
+
+myjob-node-0-0  DMLC_TASK_ID=0  (Tracker)
+myjob-node-0-1  DMLC_TASK_ID=1
+myjob-node-0-2  DMLC_TASK_ID=2
+myjob-node-0-3  DMLC_TASK_ID=3
 ```
 
 Workers discover the tracker via headless service DNS:
@@ -280,7 +363,7 @@ metadata:
   name: xgboost-distributed
 spec:
   mlPolicy:
-    numNodes: 4
+    numNodes: 1  # Default, can be overridden by TrainJob
     xgboost: {}
   template:
     spec:
@@ -297,16 +380,16 @@ spec:
                   containers:
                     - name: node
                       image: ghcr.io/kubeflow/xgboost:latest
-                      command: ["python", "train.py"]
 ```
 
 ### TrainJob
 
+**CPU Training (4 nodes, 1 worker per node):**
 ```yaml
 apiVersion: trainer.kubeflow.org/v2alpha1
 kind: TrainJob
 metadata:
-  name: example-xgboost
+  name: example-xgboost-cpu
 spec:
   runtimeRef:
     name: xgboost-distributed
@@ -314,6 +397,26 @@ spec:
     image: ghcr.io/kubeflow/xgboost:latest
     command: ["python", "train.py"]
     numNodes: 4
+```
+
+**GPU Training (multi-node, multi-GPU):**
+```yaml
+apiVersion: trainer.kubeflow.org/v2alpha1
+kind: TrainJob
+metadata:
+  name: example-xgboost-gpu
+spec:
+  runtimeRef:
+    name: xgboost-distributed
+  trainer:
+    image: ghcr.io/kubeflow/xgboost-gpu:latest
+    command: ["python", "train.py"]
+    numNodes: 2                    # Number of nodes
+    resourcesPerNode:
+      limits:
+        nvidia.com/gpu: 4          # 4 GPUs per node → auto-derives numWorkersPerNode=4
+# Total workers = 2 nodes × 4 GPUs = 8 (auto-calculated)
+# Note: numWorkersPerNode is automatically derived from GPU resources
 ```
 
 ---
@@ -345,23 +448,29 @@ The XGBoost plugin will implement the `EnforceMLPolicyPlugin` interface:
 ```
 XGBoost Plugin:
 ├── Implements: framework.EnforceMLPolicyPlugin
-├── Implements: framework.CustomValidationPlugin (for reserved env validation)
+├── Implements: framework.CustomValidationPlugin
 │
 ├── EnforceMLPolicy(info, trainJob):
 │   ├── Guard: Return early if XGBoost policy not configured
 │   ├── Override numNodes from TrainJob if specified
-│   ├── Find trainer container by ancestor label
+│   │
+│   ├── Derive numWorkersPerNode:
+│   │   ├── If explicitly set → use that value
+│   │   └── Else → numWorkersPerNode = max(1, gpuCount)
+│   │
+│   ├── Calculate: totalWorkers = numNodes × numWorkersPerNode
+│   │
 │   └── Inject DMLC_* environment variables:
-│       ├── DMLC_NUM_WORKER = numNodes
-│       ├── DMLC_TASK_ID = Job completion index (downward API)
+│       ├── DMLC_NUM_WORKER = totalWorkers
+│       ├── DMLC_TASK_ID = JOB_COMPLETION_INDEX (pod index from JobSet)
 │       ├── DMLC_TRACKER_URI = <trainjob>-node-0-0.<trainjob>
-│       └── DMLC_TRACKER_PORT = 9091 (default)
+│       └── DMLC_TRACKER_PORT = 9091
 │
 └── Validate(info, oldObj, newObj):
-    └── Reject if user sets reserved DMLC_* env vars in TrainJob.spec.trainer.env
+    └── Reject if user sets reserved DMLC_* env vars
 ```
 
-> **Note:** The plugin must validate that users don't manually set reserved `DMLC_*` environment variables, similar to how the Torch plugin validates `PET_*` variables.
+> **Note:** The plugin must validate that users don't manually set reserved `DMLC_*` environment variables.
 
 ---
 
@@ -378,20 +487,19 @@ XGBoost Plugin:
 
 ### Container Image
 
-The `ghcr.io/kubeflow/xgboost:latest` image should:
+The `ghcr.io/kubeflow/xgboost-runtime` image should:
 
 | Requirement | Details |
 |:------------|:--------|
 | Base | Python 3.9+ with XGBoost installed |
-| XGBoost Version | 2.0+ (supports `xgb.collective` API) |
+| XGBoost Version | 2.0+ (uses `xgb.collective` API; `xgb.rabit` is deprecated) |
 | CPU/GPU | Single image supports both; GPU via `device="cuda"` param at runtime |
-| Dependencies | `scikit-learn` for data utilities (optional) |
 
 **Dockerfile example:**
 ```dockerfile
-FROM python:3.11-slim
-RUN pip install xgboost>=2.0 scikit-learn
-# For GPU support, use nvidia/cuda base and install xgboost[cuda]
+FROM nvidia/cuda:12.4.0-runtime-ubuntu22.04
+RUN apt update && apt install -y python3 python3-pip && \
+    pip install xgboost>=2.0
 WORKDIR /workspace
 ```
 
@@ -436,6 +544,8 @@ Provide runnable notebook examples demonstrating how to create and run XGBoost t
 |:----------|:------|
 | `pkg/runtime/framework/plugins/xgboost/xgboost_test.go` | Validate environment variable injection |
 | | Test `numNodes` override from TrainJob |
+| | Test `numWorkersPerNode` for multi-GPU scenarios |
+| | Verify `DMLC_NUM_WORKER = numNodes × numWorkersPerNode` |
 | | Verify tracker URI format generation |
 | | Ensure reserved env validation works |
 
@@ -453,17 +563,21 @@ Provide runnable notebook examples demonstrating how to create and run XGBoost t
 
 | Feature | Description |
 |:--------|:------------|
-| GPU Support | Enable GPU-based training with NCCL backend |
 | Configurable Tracker | Add port/timeout fields to `XGBoostMLPolicySource` |
 | Observability | Metrics and logging integration |
+| Federated Learning | Support for XGBoost's federated learning mode |
 
 <details>
 <summary><b>Future Enhancement: Configurable XGBoostMLPolicySource</b></summary>
 
 ```go
 // XGBoostMLPolicySource represents an XGBoost runtime configuration.
-// Future iteration - add configuration options for advanced use cases.
+// Future iteration - add tracker configuration options for advanced use cases.
 type XGBoostMLPolicySource struct {
+    // NumWorkersPerNode specifies the number of worker processes per node.
+    // Already implemented - see Design Details section.
+    NumWorkersPerNode *int32 `json:"numWorkersPerNode,omitempty"`
+
     // TrackerPort overrides the default Rabit tracker port.
     // Defaults to 9091.
     // +kubebuilder:default=9091
@@ -471,17 +585,11 @@ type XGBoostMLPolicySource struct {
     TrackerPort *int32 `json:"trackerPort,omitempty"`
 
     // TrackerTimeout is the connection timeout in seconds for workers
-    // to connect to the Rabit tracker.
+    // to connect to the tracker.
     // Defaults to 300 (5 minutes).
     // +kubebuilder:default=300
     // +optional
     TrackerTimeout *int32 `json:"trackerTimeout,omitempty"`
-
-    // NumWorkerPerNode specifies processes per node for multi-GPU setups.
-    // Defaults to 1.
-    // +kubebuilder:default=1
-    // +optional
-    NumWorkerPerNode *int32 `json:"numWorkerPerNode,omitempty"`
 }
 ```
 
@@ -489,11 +597,11 @@ type XGBoostMLPolicySource struct {
 ```yaml
 spec:
   mlPolicy:
-    numNodes: 4
+    numNodes: 2
     xgboost:
-      trackerPort: 9099
-      trackerTimeout: 600
-      numWorkerPerNode: 2
+      numWorkersPerNode: 4    # 4 GPUs per node
+      trackerPort: 9099       # Custom port (future)
+      trackerTimeout: 600     # 10 minute timeout (future)
 ```
 
 </details>
@@ -502,6 +610,5 @@ spec:
 
 ## Implementation History
 - Initial draft: January 22nd 2026
-- Review changes Addressed: January 27th 2026
-
+- Review changes addressed: January 27th 2026
 ---
