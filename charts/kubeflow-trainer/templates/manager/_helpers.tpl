@@ -40,7 +40,7 @@ Selector labels for the manager.
 {{ include "trainer.selectorLabels" . }}
 app.kubernetes.io/part-of: kubeflow
 app.kubernetes.io/component: manager
-{{- with .Values.manager.labels }}
+{{- with .Values.manager.selectorLabels }}
 {{- toYaml . | nindent 0 }}
 {{- end }}
 {{- end -}}
