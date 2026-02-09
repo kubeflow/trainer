@@ -14442,7 +14442,7 @@
             }
           },
           "managedBy": {
-            "description": "managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`",
+            "description": "managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.",
             "type": "string"
           },
           "podTemplateOverrides": {
@@ -14459,7 +14459,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "runtimeRef": {
-            "description": "runtimeRef is the reference to the training runtime. The field is immutable.",
+            "description": "runtimeRef is the reference to the training runtime.",
             "default": {},
             "allOf": [
               {
@@ -14468,7 +14468,7 @@
             ]
           },
           "suspend": {
-            "description": "suspend defines whether to suspend the running TrainJob. Defaults to false.",
+            "description": "suspend defines whether to suspend the running TrainJob.",
             "type": "boolean"
           },
           "trainer": {
