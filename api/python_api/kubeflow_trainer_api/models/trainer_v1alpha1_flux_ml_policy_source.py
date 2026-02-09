@@ -17,16 +17,17 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict
-from typing import Any, ClassVar, Dict, Optional
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1TorchMLPolicySource(BaseModel):
+class TrainerV1alpha1FluxMLPolicySource(BaseModel):
     """
-    TorchMLPolicySource represents a PyTorch runtime configuration.
+    FluxMLPolicySource represents a Flux HPC runtime configuration.
     """ # noqa: E501
-    __properties: ClassVar[list[str]] = []
+    num_proc_per_node: Optional[StrictInt] = Field(default=None, description="numProcPerNode is the number of processes per node.", alias="numProcPerNode")
+    __properties: ClassVar[List[str]] = ["numProcPerNode"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -46,7 +47,7 @@ class TrainerV1alpha1TorchMLPolicySource(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TorchMLPolicySource from a JSON string"""
+        """Create an instance of TrainerV1alpha1FluxMLPolicySource from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -71,14 +72,16 @@ class TrainerV1alpha1TorchMLPolicySource(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TorchMLPolicySource from a dict"""
+        """Create an instance of TrainerV1alpha1FluxMLPolicySource from a dict"""
         if obj is None:
             return None
 
         if not isinstance(obj, dict):
             return cls.model_validate(obj)
 
-        _obj = cls.model_validate({})
+        _obj = cls.model_validate({
+            "numProcPerNode": obj.get("numProcPerNode")
+        })
         return _obj
 
 
