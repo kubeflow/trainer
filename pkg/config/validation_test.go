@@ -27,7 +27,6 @@ import (
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 )
 
-// TestValidate provides comprehensive validation testing following Kueue patterns
 func TestValidate(t *testing.T) {
 	testCases := map[string]struct {
 		cfg     *configapi.Configuration
@@ -40,8 +39,8 @@ func TestValidate(t *testing.T) {
 		"valid complete configuration": {
 			cfg: &configapi.Configuration{
 				Webhook: configapi.ControllerWebhook{
-					Port: ptr.To(9443),
-					Host: "0.0.0.0",
+					Port: ptr.To[int32](9443),
+					Host: ptr.To("0.0.0.0"),
 				},
 				Metrics: configapi.ControllerMetrics{
 					BindAddress:   ":8443",
@@ -57,7 +56,7 @@ func TestValidate(t *testing.T) {
 					Burst: ptr.To[int32](100),
 				},
 				Controller: &configapi.ControllerConfigurationSpec{
-					GroupKindConcurrency: map[string]int{
+					GroupKindConcurrency: map[string]int32{
 						"TrainJob.trainer.kubeflow.org": 5,
 					},
 				},
@@ -67,7 +66,7 @@ func TestValidate(t *testing.T) {
 		"invalid webhook port too low": {
 			cfg: &configapi.Configuration{
 				Webhook: configapi.ControllerWebhook{
-					Port: ptr.To(0),
+					Port: ptr.To[int32](0),
 				},
 			},
 			wantErr: field.ErrorList{
@@ -80,7 +79,7 @@ func TestValidate(t *testing.T) {
 		"invalid webhook port too high": {
 			cfg: &configapi.Configuration{
 				Webhook: configapi.ControllerWebhook{
-					Port: ptr.To(70000),
+					Port: ptr.To[int32](70000),
 				},
 			},
 			wantErr: field.ErrorList{
@@ -93,7 +92,7 @@ func TestValidate(t *testing.T) {
 		"valid webhook port at lower boundary": {
 			cfg: &configapi.Configuration{
 				Webhook: configapi.ControllerWebhook{
-					Port: ptr.To(1),
+					Port: ptr.To[int32](1),
 				},
 			},
 			wantErr: nil,
@@ -101,7 +100,7 @@ func TestValidate(t *testing.T) {
 		"valid webhook port at upper boundary": {
 			cfg: &configapi.Configuration{
 				Webhook: configapi.ControllerWebhook{
-					Port: ptr.To(65535),
+					Port: ptr.To[int32](65535),
 				},
 			},
 			wantErr: nil,
@@ -159,7 +158,7 @@ func TestValidate(t *testing.T) {
 		"invalid concurrency zero": {
 			cfg: &configapi.Configuration{
 				Controller: &configapi.ControllerConfigurationSpec{
-					GroupKindConcurrency: map[string]int{
+					GroupKindConcurrency: map[string]int32{
 						"TrainJob.trainer.kubeflow.org": 0,
 					},
 				},
@@ -174,7 +173,7 @@ func TestValidate(t *testing.T) {
 		"invalid concurrency negative": {
 			cfg: &configapi.Configuration{
 				Controller: &configapi.ControllerConfigurationSpec{
-					GroupKindConcurrency: map[string]int{
+					GroupKindConcurrency: map[string]int32{
 						"TrainJob.trainer.kubeflow.org": -5,
 					},
 				},
@@ -189,7 +188,7 @@ func TestValidate(t *testing.T) {
 		"valid concurrency at minimum": {
 			cfg: &configapi.Configuration{
 				Controller: &configapi.ControllerConfigurationSpec{
-					GroupKindConcurrency: map[string]int{
+					GroupKindConcurrency: map[string]int32{
 						"TrainJob.trainer.kubeflow.org": 1,
 					},
 				},
@@ -199,7 +198,7 @@ func TestValidate(t *testing.T) {
 		"valid high concurrency": {
 			cfg: &configapi.Configuration{
 				Controller: &configapi.ControllerConfigurationSpec{
-					GroupKindConcurrency: map[string]int{
+					GroupKindConcurrency: map[string]int32{
 						"TrainJob.trainer.kubeflow.org": 1000,
 					},
 				},
@@ -209,14 +208,14 @@ func TestValidate(t *testing.T) {
 		"multiple validation errors": {
 			cfg: &configapi.Configuration{
 				Webhook: configapi.ControllerWebhook{
-					Port: ptr.To(99999),
+					Port: ptr.To[int32](99999),
 				},
 				ClientConnection: &configapi.ClientConnection{
 					QPS:   ptr.To[float32](-10),
 					Burst: ptr.To[int32](-20),
 				},
 				Controller: &configapi.ControllerConfigurationSpec{
-					GroupKindConcurrency: map[string]int{
+					GroupKindConcurrency: map[string]int32{
 						"TrainJob.trainer.kubeflow.org": -1,
 					},
 				},
@@ -243,7 +242,7 @@ func TestValidate(t *testing.T) {
 		"multiple resources with mixed validity": {
 			cfg: &configapi.Configuration{
 				Controller: &configapi.ControllerConfigurationSpec{
-					GroupKindConcurrency: map[string]int{
+					GroupKindConcurrency: map[string]int32{
 						"TrainJob.trainer.kubeflow.org":               10,
 						"TrainingRuntime.trainer.kubeflow.org":        -1,
 						"ClusterTrainingRuntime.trainer.kubeflow.org": 5,
@@ -276,100 +275,93 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-// TestValidate_PortBoundaries tests webhook port edge cases
-func TestValidate_PortBoundaries(t *testing.T) {
-	testCases := []struct {
-		name    string
-		port    int
-		wantErr bool
-	}{
-		{"port 0 invalid", 0, true},
-		{"port 1 valid", 1, false},
-		{"port 80 valid", 80, false},
-		{"port 443 valid", 443, false},
-		{"port 8080 valid", 8080, false},
-		{"port 9443 valid", 9443, false},
-		{"port 65535 valid", 65535, false},
-		{"port 65536 invalid", 65536, true},
-		{"port -1 invalid", -1, true},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			cfg := &configapi.Configuration{
-				Webhook: configapi.ControllerWebhook{
-					Port: ptr.To(tc.port),
-				},
-			}
-			errs := validate(cfg)
-			if tc.wantErr && len(errs) == 0 {
-				t.Error("Expected validation error but got none")
-			}
-			if !tc.wantErr && len(errs) > 0 {
-				t.Errorf("Expected no validation errors, got: %v", errs)
-			}
-		})
-	}
-}
-
-// TestValidate_ClientConnectionEdgeCases tests QPS and Burst edge cases
-func TestValidate_ClientConnectionEdgeCases(t *testing.T) {
+func TestValidateClientConnection(t *testing.T) {
 	testCases := map[string]struct {
-		qps     *float32
-		burst   *int32
-		wantErr bool
+		cfg     *configapi.Configuration
+		wantErr field.ErrorList
 	}{
-		"both nil": {
-			qps:     nil,
-			burst:   nil,
-			wantErr: false,
+		"nil client connection": {
+			cfg: &configapi.Configuration{
+				ClientConnection: nil,
+			},
 		},
-		"QPS zero, Burst zero": {
-			qps:     ptr.To[float32](0),
-			burst:   ptr.To[int32](0),
-			wantErr: false,
+		"valid QPS and Burst at zero": {
+			cfg: &configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{
+					QPS:   ptr.To[float32](0),
+					Burst: ptr.To[int32](0),
+				},
+			},
 		},
-		"QPS positive, Burst positive": {
-			qps:     ptr.To[float32](100),
-			burst:   ptr.To[int32](200),
-			wantErr: false,
+		"valid QPS and Burst positive": {
+			cfg: &configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{
+					QPS:   ptr.To[float32](100),
+					Burst: ptr.To[int32](200),
+				},
+			},
 		},
-		"QPS negative": {
-			qps:     ptr.To[float32](-0.1),
-			burst:   ptr.To[int32](100),
-			wantErr: true,
+		"valid large QPS and Burst": {
+			cfg: &configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{
+					QPS:   ptr.To[float32](999999.99),
+					Burst: ptr.To[int32](999999),
+				},
+			},
 		},
-		"Burst negative": {
-			qps:     ptr.To[float32](100),
-			burst:   ptr.To[int32](-1),
-			wantErr: true,
+		"invalid negative QPS": {
+			cfg: &configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{
+					QPS:   ptr.To[float32](-0.1),
+					Burst: ptr.To[int32](100),
+				},
+			},
+			wantErr: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "clientConnection.qps",
+				},
+			},
 		},
-		"both negative": {
-			qps:     ptr.To[float32](-1),
-			burst:   ptr.To[int32](-1),
-			wantErr: true,
+		"invalid negative Burst": {
+			cfg: &configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{
+					QPS:   ptr.To[float32](100),
+					Burst: ptr.To[int32](-1),
+				},
+			},
+			wantErr: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "clientConnection.burst",
+				},
+			},
 		},
-		"QPS very large": {
-			qps:     ptr.To[float32](999999.99),
-			burst:   ptr.To[int32](999999),
-			wantErr: false,
+		"invalid both negative": {
+			cfg: &configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{
+					QPS:   ptr.To[float32](-1),
+					Burst: ptr.To[int32](-1),
+				},
+			},
+			wantErr: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "clientConnection.qps",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "clientConnection.burst",
+				},
+			},
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			cfg := &configapi.Configuration{
-				ClientConnection: &configapi.ClientConnection{
-					QPS:   tc.qps,
-					Burst: tc.burst,
-				},
-			}
-			errs := validate(cfg)
-			if tc.wantErr && len(errs) == 0 {
-				t.Error("Expected validation error but got none")
-			}
-			if !tc.wantErr && len(errs) > 0 {
-				t.Errorf("Expected no validation errors, got: %v", errs)
+			errs := validate(tc.cfg)
+			if diff := cmp.Diff(tc.wantErr, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")); diff != "" {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
 			}
 		})
 	}
