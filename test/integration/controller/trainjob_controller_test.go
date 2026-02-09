@@ -273,36 +273,11 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 						util.IgnoreObjectMetadata))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
-				ginkgo.By("Unsuspending TrainJob")
+				ginkgo.By("Should fail to update TrainJob image")
 				gomega.Eventually(func(g gomega.Gomega) {
 					g.Expect(k8sClient.Get(ctx, trainJobKey, trainJob)).Should(gomega.Succeed())
-					trainJob.Spec.Suspend = ptr.To(false)
-					g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
-				}, util.Timeout, util.Interval).Should(gomega.Succeed())
-				gomega.Eventually(func(g gomega.Gomega) {
-					jobSet := &jobsetv1alpha2.JobSet{}
-					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
-					g.Expect(ptr.Deref(jobSet.Spec.Suspend, false)).Should(gomega.BeFalse())
-				}, util.Timeout, util.Interval).Should(gomega.Succeed())
-
-				ginkgo.By("Trying to change node selector when TrainJob is unsuspended")
-				emptySelector := map[string]string{}
-				emptyPodTemplateOverrides := []trainer.PodTemplateOverride{
-					{
-						TargetJobs: []trainer.PodTemplateOverrideTargetJob{
-							{
-								Name: "node",
-							},
-						},
-						Spec: &trainer.PodTemplateSpecOverride{
-							NodeSelector: emptySelector,
-						},
-					},
-				}
-				gomega.Eventually(func(g gomega.Gomega) {
-					g.Expect(k8sClient.Get(ctx, trainJobKey, trainJob)).Should(gomega.Succeed())
-					trainJob.Spec.PodTemplateOverrides = emptyPodTemplateOverrides
-					g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
+					trainJob.Spec.Trainer.Image = ptr.To("new-image")
+					g.Expect(k8sClient.Update(ctx, trainJob)).Should(testingutil.BeInvalidError())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 		})
