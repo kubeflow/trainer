@@ -186,7 +186,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 
-			ginkgo.It("Should succeeded to update JobSet only when TrainJob is suspended", func() {
+			ginkgo.It("Should succeeded to update JobSet when TrainJob is suspended", func() {
 				ginkgo.By("Creating TrainingRuntime and suspended TrainJob")
 				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
 				gomega.Eventually(func(g gomega.Gomega) {
@@ -200,16 +200,28 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					g.Expect(k8sClient.Get(ctx, trainJobKey, &schedulerpluginsv1alpha1.PodGroup{})).Should(gomega.Succeed())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
-				ginkgo.By("Updating suspended TrainJob Trainer image")
-				updatedImageName := "updated-trainer-image"
-				originImageName := *trainJob.Spec.Trainer.Image
+				ginkgo.By("Updating suspended TrainJob node selector")
+				updatedSelector := map[string]string{"updated": "selector"}
+				podTemplateOverrides := []trainer.PodTemplateOverride{
+					{
+						TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+							{
+								Name: "node",
+							},
+						},
+						Spec: &trainer.PodTemplateSpecOverride{
+							NodeSelector: updatedSelector,
+						},
+					},
+				}
+
 				gomega.Eventually(func(g gomega.Gomega) {
 					g.Expect(k8sClient.Get(ctx, trainJobKey, trainJob)).Should(gomega.Succeed())
-					trainJob.Spec.Trainer.Image = &updatedImageName
+					trainJob.Spec.PodTemplateOverrides = podTemplateOverrides
 					g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
-				ginkgo.By("Trainer image should be updated")
+				ginkgo.By("Trainer node selector should be updated")
 				gomega.Eventually(func(g gomega.Gomega) {
 					jobSet := &jobsetv1alpha2.JobSet{}
 					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
@@ -242,7 +254,8 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									},
 								}...,
 							).
-							Container(constants.Node, constants.Node, updatedImageName, []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							NodeSelector(constants.Node, updatedSelector).
 							Obj(),
 						util.IgnoreObjectMetadata))
 					pg := &schedulerpluginsv1alpha1.PodGroup{}
@@ -260,55 +273,11 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 						util.IgnoreObjectMetadata))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
-				ginkgo.By("Unsuspending TrainJob")
+				ginkgo.By("Should fail to update TrainJob image")
 				gomega.Eventually(func(g gomega.Gomega) {
 					g.Expect(k8sClient.Get(ctx, trainJobKey, trainJob)).Should(gomega.Succeed())
-					trainJob.Spec.Suspend = ptr.To(false)
-					g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
-				}, util.Timeout, util.Interval).Should(gomega.Succeed())
-				gomega.Eventually(func(g gomega.Gomega) {
-					jobSet := &jobsetv1alpha2.JobSet{}
-					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
-					g.Expect(ptr.Deref(jobSet.Spec.Suspend, false)).Should(gomega.BeFalse())
-				}, util.Timeout, util.Interval).Should(gomega.Succeed())
-
-				ginkgo.By("Trying to restore Trainer image")
-				gomega.Eventually(func(g gomega.Gomega) {
-					g.Expect(k8sClient.Get(ctx, trainJobKey, trainJob)).Should(gomega.Succeed())
-					trainJob.Spec.Trainer.Image = &originImageName
-					g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
-				}, util.Timeout, util.Interval).Should(gomega.Succeed())
-
-				ginkgo.By("Checking if JobSet keep having updated Trainer image")
-				gomega.Consistently(func(g gomega.Gomega) {
-					jobSet := &jobsetv1alpha2.JobSet{}
-					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
-					for _, rJob := range jobSet.Spec.ReplicatedJobs {
-						if rJob.Name == constants.Node {
-							g.Expect(rJob.Template.Spec.Template.Spec.Containers[0].Image).Should(gomega.Equal(updatedImageName))
-						}
-					}
-				}, util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
-
-				ginkgo.By("Trying to re-suspend TrainJob and restore Trainer image")
-				gomega.Eventually(func(g gomega.Gomega) {
-					g.Expect(k8sClient.Get(ctx, trainJobKey, trainJob))
-					trainJob.Spec.Suspend = ptr.To(true)
-					trainJob.Spec.Trainer.Image = &originImageName
-					g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
-				}, util.Timeout, util.Interval).Should(gomega.Succeed())
-
-				ginkgo.By("Checking if JobSet image is restored")
-				gomega.Eventually(func(g gomega.Gomega) {
-					jobSet := &jobsetv1alpha2.JobSet{}
-					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
-					g.Expect(jobSet.Spec.Suspend).ShouldNot(gomega.BeNil())
-					g.Expect(*jobSet.Spec.Suspend).Should(gomega.BeTrue())
-					for _, rJob := range jobSet.Spec.ReplicatedJobs {
-						if rJob.Name == constants.Node {
-							g.Expect(rJob.Template.Spec.Template.Spec.Containers[0].Image).Should(gomega.Equal(originImageName))
-						}
-					}
+					trainJob.Spec.Trainer.Image = ptr.To("new-image")
+					g.Expect(k8sClient.Update(ctx, trainJob)).Should(testingutil.BeInvalidError())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 		})

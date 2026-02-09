@@ -97,16 +97,17 @@ type TrainJobList struct {
 // TrainJobSpec represents specification of the desired TrainJob.
 type TrainJobSpec struct {
 	// runtimeRef is the reference to the training runtime.
-	// The field is immutable.
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="runtimeRef is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +required
 	RuntimeRef RuntimeRef `json:"runtimeRef,omitzero"`
 
 	// initializer defines the configuration of the initializer.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	Initializer *Initializer `json:"initializer,omitempty"`
 
 	// trainer defines the configuration of the trainer.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	Trainer *Trainer `json:"trainer,omitempty"`
 
@@ -127,7 +128,6 @@ type TrainJobSpec struct {
 	PodTemplateOverrides []PodTemplateOverride `json:"podTemplateOverrides,omitempty"`
 
 	// suspend defines whether to suspend the running TrainJob.
-	// Defaults to false.
 	// +kubebuilder:default=false
 	// +optional
 	Suspend *bool `json:"suspend,omitempty"`
@@ -138,10 +138,9 @@ type TrainJobSpec struct {
 	// don't have this field at all or the field value is the reserved string
 	// `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs
 	// with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.
-	// Defaults to `trainer.kubeflow.org/trainjob-controller`
 	// +kubebuilder:default="trainer.kubeflow.org/trainjob-controller"
 	// +kubebuilder:validation:XValidation:rule="self in ['trainer.kubeflow.org/trainjob-controller', 'kueue.x-k8s.io/multikueue']", message="ManagedBy must be trainer.kubeflow.org/trainjob-controller or kueue.x-k8s.io/multikueue if set"
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="ManagedBy value is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	ManagedBy *string `json:"managedBy,omitempty"`
 }
@@ -376,7 +375,6 @@ type ContainerOverride struct {
 // +kubebuilder:validation:MinProperties=1
 type TrainJobStatus struct {
 	// conditions for the TrainJob.
-	//
 	// +optional
 	// +listType=map
 	// +listMapKey=type

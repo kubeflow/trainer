@@ -431,6 +431,9 @@ spec:
                         type: string
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: field is immutable
+                  rule: self == oldSelf
               labels:
                 additionalProperties:
                   type: string
@@ -447,13 +450,12 @@ spec:
                   don't have this field at all or the field value is the reserved string
                   `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs
                   with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.
-                  Defaults to `trainer.kubeflow.org/trainjob-controller`
                 type: string
                 x-kubernetes-validations:
                 - message: ManagedBy must be trainer.kubeflow.org/trainjob-controller
                     or kueue.x-k8s.io/multikueue if set
                   rule: self in ['trainer.kubeflow.org/trainjob-controller', 'kueue.x-k8s.io/multikueue']
-                - message: ManagedBy value is immutable
+                - message: field is immutable
                   rule: self == oldSelf
               podTemplateOverrides:
                 description: |-
@@ -4615,9 +4617,7 @@ spec:
                 type: array
                 x-kubernetes-list-type: atomic
               runtimeRef:
-                description: |-
-                  runtimeRef is the reference to the training runtime.
-                  The field is immutable.
+                description: runtimeRef is the reference to the training runtime.
                 properties:
                   apiGroup:
                     default: trainer.kubeflow.org
@@ -4642,13 +4642,11 @@ spec:
                 - name
                 type: object
                 x-kubernetes-validations:
-                - message: runtimeRef is immutable
+                - message: field is immutable
                   rule: self == oldSelf
               suspend:
                 default: false
-                description: |-
-                  suspend defines whether to suspend the running TrainJob.
-                  Defaults to false.
+                description: suspend defines whether to suspend the running TrainJob.
                 type: boolean
               trainer:
                 description: trainer defines the configuration of the trainer.
@@ -4905,6 +4903,9 @@ spec:
                         type: object
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: field is immutable
+                  rule: self == oldSelf
             required:
             - runtimeRef
             type: object
