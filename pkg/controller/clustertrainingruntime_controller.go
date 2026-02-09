@@ -80,12 +80,14 @@ func (r *ClusterTrainingRuntimeReconciler) Reconcile(ctx context.Context, reques
 	}); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	prevClRuntime := clRuntime.DeepCopy()
 	if !ctrlutil.ContainsFinalizer(&clRuntime, constants.ResourceInUseFinalizer) && len(trainJobs.Items) != 0 {
 		ctrlutil.AddFinalizer(&clRuntime, constants.ResourceInUseFinalizer)
-		return ctrl.Result{}, r.client.Update(ctx, &clRuntime)
+		return ctrl.Result{}, r.client.Patch(ctx, &clRuntime, client.MergeFrom(prevClRuntime))
 	} else if !clRuntime.DeletionTimestamp.IsZero() && len(trainJobs.Items) == 0 {
 		ctrlutil.RemoveFinalizer(&clRuntime, constants.ResourceInUseFinalizer)
-		return ctrl.Result{}, r.client.Update(ctx, &clRuntime)
+		return ctrl.Result{}, r.client.Patch(ctx, &clRuntime, client.MergeFrom(prevClRuntime))
 	}
 	return ctrl.Result{}, nil
 }
