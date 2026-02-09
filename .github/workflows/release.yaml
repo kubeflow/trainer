@@ -217,6 +217,7 @@ jobs:
         with:
           print-hash: true
           packages-dir: dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
   github_release:
     needs:
