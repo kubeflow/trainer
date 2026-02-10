@@ -264,7 +264,7 @@ type TemplateOverride struct {
 
 	// jobTemplateOverrides defines overrides that applied to JobTemplateSpec
 	// +kubebuilder:validation:XValidation:rule="!has(oldSelf) || oldSelf.all(old, self.exists(new, old.time == new.time && old == new))", message="existing entries cannot be modified or removed in template overrides"
-	// +kubebuilder:validation:XValidation:rule="!has(oldSelf) || size(self) >= size(oldSelf)", message="pod template override entries cannot be deleted"
+	// +kubebuilder:validation:XValidation:rule="!has(oldSelf) || size(self) >= size(oldSelf)", message="job template override entries cannot be deleted"
 	// +listType=map
 	// +listMapKey=time
 	JobTemplateOverrides []JobTemplateOverride `json:"job,omitempty"`
