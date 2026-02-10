@@ -759,7 +759,8 @@ In the future, we can add more parameters if we find use-cases when it is requir
 
 Every TemplateOverride must have unique manager which control that set of overrides. Managers can
 apply additional overrides during lifecycle of TrainJob, but only the latest overrides will be
-applied. Users must set Time to tell TrainJob controller when override was added.
+applied. Overrides are ordered by their Time; if Time is not specified, the TrainJob controller
+will default it to the time the override was observed.
 
 **Append-Only History**: Template overrides are append-only. Each manager maintains a history
 of overrides by adding new entries over time. When multiple entries from the same manager
