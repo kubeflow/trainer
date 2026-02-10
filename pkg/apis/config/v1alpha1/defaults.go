@@ -67,4 +67,10 @@ func SetDefaults_Configuration(cfg *Configuration) {
 	if cfg.ProgressServer.Port == nil {
 		cfg.ProgressServer.Port = ptr.To[int32](10443)
 	}
+	if cfg.ProgressServer.QPS == nil {
+		cfg.ProgressServer.QPS = ptr.To[float32](5)
+	}
+	if cfg.ProgressServer.Burst == nil {
+		cfg.ProgressServer.Burst = ptr.To[int32](10)
+	}
 }

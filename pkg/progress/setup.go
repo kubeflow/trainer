@@ -17,7 +17,10 @@ limitations under the License.
 package progress
 
 import (
+	"fmt"
+
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
@@ -29,9 +32,35 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.ProgressServer) error {
 		return err
 	}
 
-	server, err := NewServer(mgr.GetClient(), cfg, tlsConfig)
+	// Create a separate client with its own QPS/Burst limits
+	// to avoid impacting the main reconciler's rate limits
+	progressClient, err := createClient(mgr, cfg)
+	if err != nil {
+		return err
+	}
+
+	server, err := NewServer(progressClient, cfg, tlsConfig)
 	if err != nil {
 		return err
 	}
 	return mgr.Add(server)
+}
+
+func createClient(mgr ctrl.Manager, cfg *configapi.ProgressServer) (client.Client, error) {
+	// Clone the manager's rest config and override rate limits
+	progressConfig := *mgr.GetConfig()
+	if cfg.QPS != nil {
+		progressConfig.QPS = *cfg.QPS
+	}
+	if cfg.Burst != nil {
+		progressConfig.Burst = int(*cfg.Burst)
+	}
+
+	progressClient, err := client.New(&progressConfig, client.Options{})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create progress server client: %w", err)
+	}
+
+	return progressClient, nil
 }
