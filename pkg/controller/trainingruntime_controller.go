@@ -84,12 +84,14 @@ func (r *TrainingRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	prevRuntime := runtime.DeepCopy()
 	if !ctrlutil.ContainsFinalizer(&runtime, constants.ResourceInUseFinalizer) && len(trainJobs.Items) != 0 {
 		ctrlutil.AddFinalizer(&runtime, constants.ResourceInUseFinalizer)
-		return ctrl.Result{}, r.client.Update(ctx, &runtime)
+		return ctrl.Result{}, r.client.Patch(ctx, &runtime, client.MergeFrom(prevRuntime))
 	} else if !runtime.DeletionTimestamp.IsZero() && len(trainJobs.Items) == 0 {
 		ctrlutil.RemoveFinalizer(&runtime, constants.ResourceInUseFinalizer)
-		return ctrl.Result{}, r.client.Update(ctx, &runtime)
+		return ctrl.Result{}, r.client.Patch(ctx, &runtime, client.MergeFrom(prevRuntime))
 	}
 	return ctrl.Result{}, nil
 }

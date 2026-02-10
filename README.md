@@ -65,9 +65,15 @@ develop and fine-tune LLMs while leveraging the Kubeflow Trainer APIs: TrainJob 
 
 ## Kubeflow Trainer Introduction
 
-The following KubeCon + CloudNativeCon 2024 talk provides an overview of Kubeflow Trainer capabilities:
+Checkout following KubeCon + CloudNativeCon talks for Kubeflow Trainer capabilities:
 
 [![Kubeflow Trainer](https://img.youtube.com/vi/Lgy4ir1AhYw/0.jpg)](https://www.youtube.com/watch?v=Lgy4ir1AhYw)
+
+Additional talks:
+
+- [From High Performance Computing To AI Workloads on Kubernetes: MPI Runtime in Kubeflow TrainJob](https://youtu.be/Fnb1a5Kaxgo)
+- [Streamline LLM Fine-tuning on Kubernetes With Kubeflow LLM Trainer](https://youtu.be/O7cNlaz3Hqs)
+
 
 ## Getting Started
 

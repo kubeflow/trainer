@@ -28,6 +28,6 @@ secretGenerator:
 configMapGenerator:
   - name: kubeflow-trainer-public
     literals:
-      - kubeflow_trainer_version=latest
+      - kubeflow_trainer_version=dev
     options:
       disableNameSuffixHash: true

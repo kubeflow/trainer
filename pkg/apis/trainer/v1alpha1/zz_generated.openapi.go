@@ -39,6 +39,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource": schema_pkg_apis_trainer_v1alpha1_CoschedulingPodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.DatasetInitializer":               schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Initializer":                      schema_pkg_apis_trainer_v1alpha1_Initializer(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource":                schema_pkg_apis_trainer_v1alpha1_JAXMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec":               schema_pkg_apis_trainer_v1alpha1_JobSetTemplateSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobStatus":                        schema_pkg_apis_trainer_v1alpha1_JobStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicy":                         schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref),
@@ -692,6 +693,17 @@ func schema_pkg_apis_trainer_v1alpha1_Initializer(ref common.ReferenceCallback) 
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_JAXMLPolicySource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JAXMLPolicySource represents a jax runtime configuration.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_JobSetTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -802,11 +814,17 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref common.ReferenceCallback) com
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource"),
 						},
 					},
+					"jax": {
+						SchemaProps: spec.SchemaProps{
+							Description: "jax defines the configuration for the JAX Runtime",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
 	}
 }
 
@@ -829,11 +847,17 @@ func schema_pkg_apis_trainer_v1alpha1_MLPolicySource(ref common.ReferenceCallbac
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource"),
 						},
 					},
+					"jax": {
+						SchemaProps: spec.SchemaProps{
+							Description: "jax defines the configuration for the JAX Runtime",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource"},
 	}
 }
 
@@ -1455,7 +1479,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 				Properties: map[string]spec.Schema{
 					"runtimeRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "runtimeRef is the reference to the training runtime. The field is immutable.",
+							Description: "runtimeRef is the reference to the training runtime.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef"),
 						},
@@ -1525,14 +1549,14 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 					},
 					"suspend": {
 						SchemaProps: spec.SchemaProps{
-							Description: "suspend defines whether to suspend the running TrainJob. Defaults to false.",
+							Description: "suspend defines whether to suspend the running TrainJob.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"managedBy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable. Defaults to `trainer.kubeflow.org/trainjob-controller`",
+							Description: "managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

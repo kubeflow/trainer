@@ -36,6 +36,10 @@ if [ -z "${PAPERMILL_TIMEOUT}" ]; then
     exit 1
 fi
 
+# PAPERMILL_PARAMS should contain full papermill parameter flags.
+# Example: "-p num_cpu 3 -p gpu 1"
+PAPERMILL_PARAMS="${PAPERMILL_PARAMS:-}"
+
 print_results() {
     # Only run kubectl commands if we're testing Kubernetes notebooks
     if command -v kubectl &> /dev/null && kubectl cluster-info &> /dev/null; then
@@ -58,5 +62,5 @@ print_results() {
     fi
 }
 
-(papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" --execution-timeout "${PAPERMILL_TIMEOUT}" && print_results) ||
+(papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" ${PAPERMILL_PARAMS} --execution-timeout "${PAPERMILL_TIMEOUT}" && print_results) ||
     (print_results && exit 1)
