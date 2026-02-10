@@ -200,4 +200,18 @@ type ProgressServer struct {
 	// +optional
 	// +kubebuilder:default=10443
 	Port *int32 `json:"port,omitempty"`
+
+	// qps controls the number of queries per second allowed for the progress server's
+	// Kubernetes client before client-side throttling.
+	// Defaults to 5.
+	// +optional
+	// +kubebuilder:default=5
+	QPS *float32 `json:"qps,omitempty"`
+
+	// burst allows extra queries to accumulate when the progress server client is not
+	// using its full QPS allocation.
+	// Defaults to 10.
+	// +optional
+	// +kubebuilder:default=10
+	Burst *int32 `json:"burst,omitempty"`
 }
