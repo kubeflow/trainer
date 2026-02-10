@@ -45,13 +45,14 @@ type TrainJobSpec struct {
     // ... existing fields ...
 
     // ActiveDeadlineSeconds specifies the duration in seconds relative to the TrainJob
-    // creation time that the TrainJob may be active before the system tries to terminate
-    // it. Value must be a positive integer. Once reached, all running Pods are terminated
-    // and the TrainJob status becomes Failed with reason: DeadlineExceeded.
+    // start time (which resets on resume from suspension) that the TrainJob may be active
+    // before the system tries to terminate it. Value must be a positive integer.
+    // Once reached, all running Pods are terminated and the TrainJob status becomes
+    // Failed with reason: DeadlineExceeded.
     // This value overrides any default set in the referenced TrainingRuntime.
     // +optional
     // +kubebuilder:validation:Minimum=1
-    // +kubebuilder:validation:XValidation:rule="self == oldSelf", message="activeDeadlineSeconds is immutable"
+    // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="field is immutable"
     ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 }
 ```
@@ -71,6 +72,7 @@ type TrainingRuntimeSpec struct {
     // If set to zero, TrainJobs become eligible for immediate deletion after finishing.
     // This is a platform-level policy that individual TrainJobs cannot override.
     // +optional
+    // +kubebuilder:validation:Minimum=0
     TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 
     // ActiveDeadlineSeconds specifies the default maximum runtime for TrainJobs
@@ -93,26 +95,6 @@ const (
 )
 ```
 
-#### TrainJobStatus Changes
-
-Add fields to store resolved values that survive runtime deletion:
-
-```go
-type TrainJobStatus struct {
-    // ... existing fields ...
-
-    // ResolvedActiveDeadlineSeconds stores the effective deadline resolved
-    // at creation time. This value survives runtime deletion and controller
-    // restarts.
-    // +optional
-    ResolvedActiveDeadlineSeconds *int64 `json:"resolvedActiveDeadlineSeconds,omitempty"`
-
-    // ResolvedTTLSecondsAfterFinished stores the TTL resolved from the
-    // TrainingRuntime at creation time.
-    // +optional
-    ResolvedTTLSecondsAfterFinished *int32 `json:"resolvedTTLSecondsAfterFinished,omitempty"`
-}
-```
 
 ### Value Resolution
 
@@ -205,8 +187,8 @@ spec:
 
 3. **Deadline Enforcement:**
     - Check if job is running and effective deadline is set
-    - Calculate `deadline = creationTime + effectiveActiveDeadlineSeconds`
-    - If exceeded, mark TrainJob as Failed (`Reason: DeadlineExceeded`) and delete JobSet
+    - Calculate `deadline = startTime + effectiveActiveDeadlineSeconds` (where `startTime` is reset on each resume from suspension)
+    - If exceeded, mark TrainJob as Failed (`Reason: DeadlineExceeded`); the runtime framework handles cleanup of the underlying JobSet
     - Otherwise, requeue at `deadline`
 
 4. **Clock Skew Handling:**
@@ -229,17 +211,6 @@ if requeueAfter <= 0 {
 return ctrl.Result{RequeueAfter: requeueAfter}, nil
 ```
 
-### Handling TrainingRuntime Deletion
-
-If a TrainingRuntime is deleted while TrainJobs reference it:
-
-**Option A (Recommended): Store resolved values in Status**
-
-The controller resolves `TTLSecondsAfterFinished` and `ActiveDeadlineSeconds` during the first reconciliation and stores them in `TrainJobStatus.ResolvedTTLSecondsAfterFinished` and `TrainJobStatus.ResolvedActiveDeadlineSeconds`. This ensures TTL/deadline enforcement continues even if the runtime is later deleted.
-
-**Option B: Graceful degradation**
-
-If the runtime is not found during reconciliation, log a warning and skip TTL-based cleanup. The TrainJob will remain until manually deleted.
 
 ### Controller Restart Behavior
 
@@ -247,85 +218,33 @@ The controller is stateless and stores no timers in memory. On restart:
 
 1. Controller-runtime triggers initial sync, reconciling all TrainJobs
 2. For each TrainJob, deadlines and TTL are recalculated from:
-   - `metadata.creationTimestamp` for deadline calculation
-   - `status.completionTime` for TTL calculation
-   - Resolved values stored in `status` (if runtime was deleted)
+   - The last resume time (or `metadata.creationTimestamp` if never suspended) for deadline calculation
+   - `LastTransitionTime` of the `Complete` or `Failed` condition for TTL calculation
+   - The referenced TrainingRuntime (protected from deletion via the `ResourceInUse` finalizer)
 3. If deadline/TTL already expired during downtime, action is taken immediately
 4. Otherwise, appropriate requeue times are set
 
 This design ensures no TrainJobs are "forgotten" after a controller restart.
 
-**Webhook Validation** (`pkg/webhooks/trainjob_webhook.go`):
+**Validation:**
 
-For TrainJob:
-- Validate `ActiveDeadlineSeconds > 0` if set
-- Make `ActiveDeadlineSeconds` immutable after creation
+Most validation is handled via kubebuilder CEL markers on the API types:
+- `+kubebuilder:validation:Minimum=1` on `ActiveDeadlineSeconds` (both `TrainJobSpec` and `TrainingRuntimeSpec`)
+- `+kubebuilder:validation:Minimum=0` on `TTLSecondsAfterFinished` (`TrainingRuntimeSpec`)
+- `+kubebuilder:validation:XValidation:rule="self == oldSelf"` on `ActiveDeadlineSeconds` (`TrainJobSpec`) for immutability
 
-For TrainingRuntime:
-- Validate `TTLSecondsAfterFinished >= 0` if set
-- Validate `ActiveDeadlineSeconds > 0` if set
-- Warn if `TTLSecondsAfterFinished < 60s`
+The existing `TrainJobValidator` webhook in `pkg/webhooks/trainjob_webhook.go` delegates to `runtime.ValidateObjects()`. The `TrainingRuntimeValidator` and `ClusterTrainingRuntimeValidator` webhooks validate the runtime spec.
 
-### Kubeflow SDK Changes
-
-Update the Python SDK to expose `ActiveDeadlineSeconds` for data scientists in `api/python_api`:
-
-```python
-@dataclass
-class TrainJobSpec:
-    runtime_ref: RuntimeRef
-    trainer: Optional[Trainer] = None
-    initializer: Optional[Initializer] = None
-    labels: Optional[Dict[str, str]] = None
-    annotations: Optional[Dict[str, str]] = None
-    suspend: Optional[bool] = None
-    managed_by: Optional[str] = None
-    # NEW: Exposed for data scientists
-    active_deadline_seconds: Optional[int] = None
-
-
-def train(
-    self,
-    name: str,
-    func: Optional[Callable] = None,
-    runtime_ref: str = "torch-distributed",
-    num_nodes: int = 1,
-    resources_per_node: Optional[Dict[str, str]] = None,
-    active_deadline_seconds: Optional[int] = None,  # NEW parameter
-    # ... other parameters
-) -> str:
-    """Create a TrainJob."""
-    # ...
-```
-
-> **Note:** `TTLSecondsAfterFinished` is intentionally NOT exposed in the SDK as it is a platform admin policy.
+The only validation requiring actual webhook code (not expressible via CEL) is:
+- Warn if `TTLSecondsAfterFinished < 60s` (warnings require webhook response)
 
 ### Interaction with Suspend
 
-If a TrainJob is suspended, the `ActiveDeadlineSeconds` timer continues to count down. This aligns with the behavior of Kubernetes Jobs. Platform admins should account for potential suspend duration when setting default deadlines.
+Matching Kubernetes Job behavior (K8s 1.35+ with `MutableSchedulingDirectivesForSuspendedJobs`), the `ActiveDeadlineSeconds` timer is **stopped and reset** when a TrainJob is suspended. When the TrainJob is resumed, the timer **restarts from zero**, giving the job the full `ActiveDeadlineSeconds` duration again.
 
-### Metrics
-
-Add Prometheus metrics for observability:
-
-```go
-var (
-    deadlineExceededTotal = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "trainjob_deadline_exceeded_total",
-            Help: "Total number of TrainJobs that exceeded their deadline",
-        },
-        []string{"namespace"},
-    )
-    ttlDeletionsTotal = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "trainjob_ttl_deletions_total",
-            Help: "Total number of TrainJobs deleted due to TTL expiration",
-        },
-        []string{"namespace"},
-    )
-)
-```
+- If a TrainJob is created in a suspended state, the timer does not start until the TrainJob is first unsuspended
+- When a running TrainJob is suspended, the controller clears the internal start time reference. On resume, the start time is reset to the current time, and the full `ActiveDeadlineSeconds` window applies from that point
+- TTL (`TTLSecondsAfterFinished`) is not affected by suspension — it only begins counting after the TrainJob reaches a terminal state (`Complete` or `Failed`)
 
 ### Test Plan
 
@@ -335,7 +254,7 @@ to implement this enhancement.
 
 #### Unit Tests
 
-- `pkg/controller/trainjob/`: High coverage expected for new logic
+- `pkg/controller/`: High coverage expected for new logic in `trainjob_controller.go`
 
 **Test Cases:**
 - TTL from runtime → job deleted after expiration
@@ -348,8 +267,6 @@ to implement this enhancement.
 - Deadline not reached → requeue at deadline
 - Value resolution with missing runtime → graceful handling
 - Clock skew → requeue with delay instead of negative duration
-- Runtime deleted while TrainJob running → uses resolved values from status
-- Runtime deleted before first reconciliation → fails with clear error
 
 #### Integration Tests
 
