@@ -312,17 +312,10 @@ type TrainJobSpec struct {
 	// Configuration of the trainer.
 	Trainer *Trainer `json:"trainer,omitempty"`
 
-	// Labels to apply for the derivative JobSet and Jobs.
-	// They will be merged with the TrainingRuntime values.
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// Annotations to apply for the derivative JobSet and Jobs.
-	// They will be merged with the TrainingRuntime values.
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// Custom overrides for the training runtime.
-	// +listType=atomic
-	PodTemplateOverrides []PodTemplateOverride `json:"podTemplateOverrides,omitempty"`
+	// templateOverrides defines template overrides that will be applied to the TrainJob's training runtime template.
+	// +listType=map
+	// +listMapKey=manager
+	TemplateOverrides []TemplateOverride `json:"templateOverrides,omitempty"`
 
 	// Whether the controller should suspend the running TrainJob.
 	// Defaults to false.
@@ -427,16 +420,10 @@ This table explains the rationale for each `TrainJob` parameter:
    </td>
   </tr>
   <tr>
-   <td><code>Labels and Annotations</code>
-   </td>
-   <td>Custom metadata that needs to be applied to the <code>TrainJob</code> resources: JobSet, Job, and Pods.
-   </td>
-  </tr>
-  <tr>
-   <td><code>PodTemplateOverrides</code>
+   <td><code>TemplateOverrides</code>
    </td>
    <td>Custom overrides that are specific to the <code>TrainJob</code> and need to be applied to the
-    <code>TrainJob</code> resources. For example, the user identity. Usually, it is managed by
+    underlying template. For example, the user identity. Usually, it is managed by
     custom admission webhooks that inject data to the <code>TrainJob</code> after the user creates it
     via the Python SDK or <code>kubectl</code>
    </td>
@@ -760,9 +747,9 @@ replicatedJobs:
                     value: AutoModelForCausalLM
 ```
 
-### The PodTemplateOverride APIs
+### The TemplateOverrides APIs
 
-The `PodTemplateOverride` represents overrides for the `TrainingRuntime` when `TrainJob` is created.
+The `TemplateOverrides` represents overrides for the `TrainingRuntime` when `TrainJob` is created.
 These parameters can include the user's identity or PVC.
 
 Usually, these parameters should not be configured by the user and should be attached during the
@@ -770,70 +757,168 @@ orchestration (e.g. using Kubernetes admission webhooks or custom clients).
 
 In the future, we can add more parameters if we find use-cases when it is required.
 
+Every TemplateOverride must have unique manager which control that set of overrides. Managers can
+apply additional overrides during lifecycle of TrainJob, but only the latest overrides will be
+applied. Users must set Time to tell TrainJob controller when override was added.
+
+**Append-Only History**: Template overrides are append-only. Each manager maintains a history
+of overrides by adding new entries over time. When multiple entries from the same manager
+target the same job, later entries (by timestamp) override earlier ones for conflicting fields.
+This preserves an audit trail of all override changes.
+
 ```golang
-// PodTemplateOverride represents the custom overrides that will be applied for the TrainJob's resources.
-type PodTemplateOverride struct {
-	// TargetJobs are the training job replicas in the training runtime template to apply the overrides.
-	// +listType=atomic
-	TargetJobs []PodTemplateOverrideTargetJob `json:"targetJobs"`
 
-	// Override for the Pod template metadata.
-	// These values will be merged with the TrainingRuntime's Pod template metadata.
-	Metadata *metav1.ObjectMeta `json:"metadata,omitempty"`
+// TemplateOverride represents a custom override that will be applied to the TrainJob's training runtime template.
+type TemplateOverride struct {
+	// manager indicates who owns this set of overrides. It can be configured by user, external
+	// controllers or admission webhooks to track ownership and avoid conflicts.
+	// For example, Kueue sets this field to "kueue.x-k8s.io/manager"
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Manager string `json:"manager,omitempty"`
 
-	// Override for the Pod template spec.
-	// These values will be merged with the TrainingRuntime's Pod template spec.
-	Spec *PodTemplateSpecOverride `json:"spec,omitempty"`
+	// jobTemplateOverrides defines overrides that applied to JobTemplateSpec
+	// +listType=map
+	// +listMapKey=time
+	JobTemplateOverrides []JobTemplateOverride `json:"job,omitempty"`
+
+	// podTemplateOverrides defines overrides that applied to PodTemplateSpec
+	// +listType=map
+	// +listMapKey=time
+	PodTemplateOverrides []PodTemplateOverride `json:"pod,omitempty"`
 }
 
-type PodTemplateOverrideTargetJob struct {
-	// Name is the target training job name for which the PodSpec is overridden.
-	Name string `json:"name"`
+// TemplateOverrideTargetJob represent target job to which override should be applied.
+type TemplateOverrideTargetJob struct {
+	// name is the target training job name for which the PodTemplateSpec is overridden.
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Name string `json:"name,omitempty"`
+}
+
+// JobTemplateOverride represents a custom override that will be applied to the JobTemplateSpec
+type JobTemplateOverride struct {
+	// Time is the timestamp of when the JobTemplateOverride entry was added.
+	// +required
+	Time metav1.Time `json:"time,omitempty"`
+
+	// targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.
+  // If TargetJob is empty, values are applied to the JobSet spec.
+	// +listType=atomic
+	// +optional
+	TargetJobs []TemplateOverrideTargetJob `json:"targetJobs,omitempty"`
+
+	// metadata overrides the Pod template metadata.
+	// These values will be merged with the TrainingRuntime's Pod template metadata.
+	// +optional
+	Metadata *metav1.ObjectMeta `json:"metadata,omitempty"`
+}
+
+// PodTemplateOverride represents a custom override that will be applied to the PodTemplateSpec
+type PodTemplateOverride struct {
+
+	// Time is the timestamp of when the PodTemplateOverride entry was added.
+	// +required
+	Time metav1.Time `json:"time,omitempty"`
+
+	// targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.
+	// +listType=atomic
+	// +required
+	TargetJobs []TemplateOverrideTargetJob `json:"targetJobs,omitempty"`
+
+	// metadata overrides the Pod template metadata.
+	// These values will be merged with the TrainingRuntime's Pod template metadata.
+	// +optional
+	Metadata *metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// spec overrides the Pod template spec.
+	// These values will be merged with the TrainingRuntime's Pod template spec.
+	// +optional
+	Spec *PodTemplateSpecOverride `json:"spec,omitempty"`
 }
 
 // PodTemplateSpecOverride represents the spec overrides for Pod template.
 type PodTemplateSpecOverride struct {
-	// Override for the service account.
+	// serviceAccountName overrides the service account.
+	// +optional
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 
-	// Override for the node selector to place Pod on the specific mode.
+	// nodeSelector overrides the node selector to place Pod on the specific node.
+	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
-	// Override for the Pod's affinity.
+	// affinity overrides for the Pod's affinity.
+	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 
-	// Override for the Pod's tolerations.
+	// tolerations overrides the Pod's tolerations.
+	// +listType=atomic
+	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// Overrides for the Pod volume configuration.
+	// securityContext overrides the Pod's security context.
+	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// volumes overrides the Pod's volumes.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
-	// Overrides for the init container in the desired job templates.
+	// initContainers overrides the init container in the target job templates.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
 	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
 
-	// Overrides for the containers in the desired job templates.
+	// containers overrides for the containers in the target job templates.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
 	Containers []ContainerOverride `json:"containers,omitempty"`
 
-	// SchedulingGates overrides the scheduling gates of the Pods in the target job templates.
+	// schedulingGates overrides the scheduling gates of the Pods in the target job templates.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/
+	// +listType=map
+	// +listMapKey=name
+	// +optional
 	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
 
-	// ImagePullSecrets overrides the image pull secrets for the Pods in the target job templates.
+	// imagePullSecrets overrides the image pull secrets for the Pods in the target job templates.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
-// ContainerOverride represents parameters that can be overridden using PodTemplateOverrides.
+// ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
 type ContainerOverride struct {
-	// Name for the container. TrainingRuntime must have this container.
-	Name string `json:"name"`
+	// name for the container. TrainingRuntime must have this container.
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Name string `json:"name,omitempty"`
 
-	// List of environment variables to set in the container.
+	// env is the list of environment variables to set in the container.
 	// These values will be merged with the TrainingRuntime's environments.
-	// This value can't be set for container with the name: `node`, `dataset-initializer`, or
-	// `model-initializer`. For those containers the envs can be set via Trainer or Initializer APIs.
+	// These values can't be set for container with the name: `node`, `dataset-initializer`, or
+	// `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
-	// Pod volumes to mount into the container's filesystem.
+	// volumeMounts are the volumes to mount into the container's filesystem.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// securityContext overrides the container's security context.
+	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 }
 ```
 
@@ -861,27 +946,31 @@ spec:
     name: pytorch-distributed-gpu
   trainer:
     image: docker.io/custom-training
-  podTemplateOverrides:
-    - targetJobs:
-        - name: node
-      spec:
-        initContainers:
-          - name: fetch-identity
-            env:
-              - name: USER_ID
-                value: "123"
-        containers:
-          - name: trainer
-            volumeMounts:
+  templateOverrides:
+    - manager: trainer.kubeflow.org/kubeflow-sdk
+      pod:
+        - time: 2026-05-01T15:20:00Z
+          targetJobs:
+            - name: node
+          spec:
+            containers:
+              - name: trainer
+                volumeMounts:
+                  - name: user-123-volume
+                    mountPath: /workspace
+            volumes:
               - name: user-123-volume
-                mountPath: /workspace
-        volumes:
-          - name: user-123-volume
-            persistentVolumeClaim:
-              claimName: user-123-volume
+                persistentVolumeClaim:
+                  claimName: user-123-volume
+      job:
+        - time: 2026-05-01T15:20:00Z
+          metadata:
+            labels:
+              custom-label: value
 ```
 
-Users can also define multiple PodTemplateOverrides for every ReplicatedJob:
+Same managers can also apply multiple overrides during lifecycle of TrainJob.Can
+For example, Kueue might update node selectors as resources become available:
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v2alpha1
@@ -894,23 +983,23 @@ spec:
     name: pytorch-distributed-gpu
   trainer:
     image: docker.io/custom-training
-  podTemplateOverrides:
-    - targetJobs:
-        - name: dataset-initializer
-      spec:
-        initContainers:
-          - name: fetch-identity
-            env:
-              - name: USER_ID
-                value: "123"
-    - targetJobs:
-        - name: node
-      spec:
-        initContainers:
-          - name: fetch-identity
-            env:
-              - name: USER_ID
-                value: "123"
+  templateOverrides:
+    - manager: kueue.x-k8s.io/manager
+      pod:
+        - time: "2026-02-05T10:05:00Z"
+          targetJobs:
+            - name: node
+          spec:
+            nodeSelector:
+              node-type: gpu-a100
+              zone: us-west-1a
+        - time: "2026-02-05T10:10:00Z"
+          targetJobs:
+            - name: node
+          spec:
+            nodeSelector:
+              node-type: gpu-a100
+              zone: us-west-1b
 ```
 
 ### State Transition
@@ -1771,6 +1860,7 @@ spec:
 - 2025-03-15 Updated the initializer APIs
 - 2025-10-09 Added PodTemplateOverrides to TrainJob V2 API
 - 2026-02-23 Remove ElasticPolicy from the Torch API – will be implemented in the future KEPs
+- 2025-10-09 Replace PodTemplateOverrides with TemplateOverrides API
 
 ## Alternatives
 
