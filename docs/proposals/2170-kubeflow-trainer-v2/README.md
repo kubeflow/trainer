@@ -969,7 +969,7 @@ spec:
               custom-label: value
 ```
 
-Same managers can also apply multiple overrides during lifecycle of TrainJob.Can
+The same managers can also apply multiple overrides during the lifecycle of a TrainJob.
 For example, Kueue might update node selectors as resources become available:
 
 ```yaml
