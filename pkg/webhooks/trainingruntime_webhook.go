@@ -66,7 +66,25 @@ func (w *TrainingRuntimeWebhook) ValidateCreate(ctx context.Context, obj apirunt
 	trainingRuntime := obj.(*trainer.TrainingRuntime)
 	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
 	log.V(5).Info("Validating create", "trainingRuntime", klog.KObj(trainingRuntime))
-	return nil, validateReplicatedJobs(trainingRuntime.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+
+	warnings := validateLifecycleFields(&trainingRuntime.Spec)
+	errs := validateReplicatedJobs(trainingRuntime.Spec.Template.Spec.ReplicatedJobs)
+	return warnings, errs.ToAggregate()
+}
+
+// validateLifecycleFields validates TTL and ActiveDeadlineSeconds on TrainingRuntimeSpec
+func validateLifecycleFields(spec *trainer.TrainingRuntimeSpec) admission.Warnings {
+	var warnings admission.Warnings
+
+	if spec.TTLSecondsAfterFinished != nil {
+		ttl := *spec.TTLSecondsAfterFinished
+		if ttl > 0 && ttl < 60 {
+			warnings = append(warnings,
+				fmt.Sprintf("ttlSecondsAfterFinished=%d is very short; TrainJobs may be deleted before you can review them", ttl))
+		}
+	}
+
+	return warnings
 }
 
 func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorList {

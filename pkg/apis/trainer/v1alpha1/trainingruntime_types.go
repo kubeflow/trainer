@@ -116,6 +116,20 @@ type TrainingRuntimeSpec struct {
 	// +optional
 	PodGroupPolicy *PodGroupPolicy `json:"podGroupPolicy,omitempty"`
 
+	// ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished
+	// execution (either Complete or Failed). If this field is set, TrainJobs using
+	// this runtime will be deleted after ttlSecondsAfterFinished expires post-completion.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
+
+	// activeDeadlineSeconds specifies the default maximum runtime for TrainJobs
+	// using this runtime. Individual TrainJobs can override this value by setting
+	// their own ActiveDeadlineSeconds.
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
+
 	// template for the JobSet which will be used by TrainJob.
 	// +optional
 	Template JobSetTemplateSpec `json:"template,omitzero"`

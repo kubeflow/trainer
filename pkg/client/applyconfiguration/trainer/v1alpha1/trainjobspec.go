@@ -19,16 +19,15 @@ package v1alpha1
 // TrainJobSpecApplyConfiguration represents a declarative configuration of the TrainJobSpec type for use
 // with apply.
 type TrainJobSpecApplyConfiguration struct {
-	RuntimeRef              *RuntimeRefApplyConfiguration           `json:"runtimeRef,omitempty"`
-	Initializer             *InitializerApplyConfiguration          `json:"initializer,omitempty"`
-	Trainer                 *TrainerApplyConfiguration              `json:"trainer,omitempty"`
-	Labels                  map[string]string                       `json:"labels,omitempty"`
-	Annotations             map[string]string                       `json:"annotations,omitempty"`
-	PodTemplateOverrides    []PodTemplateOverrideApplyConfiguration `json:"podTemplateOverrides,omitempty"`
-	Suspend                 *bool                                   `json:"suspend,omitempty"`
-	ManagedBy               *string                                 `json:"managedBy,omitempty"`
-	TTLSecondsAfterFinished *int32                                  `json:"ttlSecondsAfterFinished,omitempty"`
-	ActiveDeadlineSeconds   *int64                                  `json:"activeDeadlineSeconds,omitempty"`
+	RuntimeRef            *RuntimeRefApplyConfiguration           `json:"runtimeRef,omitempty"`
+	Initializer           *InitializerApplyConfiguration          `json:"initializer,omitempty"`
+	Trainer               *TrainerApplyConfiguration              `json:"trainer,omitempty"`
+	Labels                map[string]string                       `json:"labels,omitempty"`
+	Annotations           map[string]string                       `json:"annotations,omitempty"`
+	PodTemplateOverrides  []PodTemplateOverrideApplyConfiguration `json:"podTemplateOverrides,omitempty"`
+	Suspend               *bool                                   `json:"suspend,omitempty"`
+	ManagedBy             *string                                 `json:"managedBy,omitempty"`
+	ActiveDeadlineSeconds *int64                                  `json:"activeDeadlineSeconds,omitempty"`
 }
 
 // TrainJobSpecApplyConfiguration constructs a declarative configuration of the TrainJobSpec type for use with
@@ -115,14 +114,6 @@ func (b *TrainJobSpecApplyConfiguration) WithSuspend(value bool) *TrainJobSpecAp
 // If called multiple times, the ManagedBy field is set to the value of the last call.
 func (b *TrainJobSpecApplyConfiguration) WithManagedBy(value string) *TrainJobSpecApplyConfiguration {
 	b.ManagedBy = &value
-	return b
-}
-
-// WithTTLSecondsAfterFinished sets the TTLSecondsAfterFinished field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the TTLSecondsAfterFinished field is set to the value of the last call.
-func (b *TrainJobSpecApplyConfiguration) WithTTLSecondsAfterFinished(value int32) *TrainJobSpecApplyConfiguration {
-	b.TTLSecondsAfterFinished = &value
 	return b
 }
 

@@ -19,9 +19,11 @@ package v1alpha1
 // TrainingRuntimeSpecApplyConfiguration represents a declarative configuration of the TrainingRuntimeSpec type for use
 // with apply.
 type TrainingRuntimeSpecApplyConfiguration struct {
-	MLPolicy       *MLPolicyApplyConfiguration           `json:"mlPolicy,omitempty"`
-	PodGroupPolicy *PodGroupPolicyApplyConfiguration     `json:"podGroupPolicy,omitempty"`
-	Template       *JobSetTemplateSpecApplyConfiguration `json:"template,omitempty"`
+	MLPolicy                *MLPolicyApplyConfiguration           `json:"mlPolicy,omitempty"`
+	PodGroupPolicy          *PodGroupPolicyApplyConfiguration     `json:"podGroupPolicy,omitempty"`
+	TTLSecondsAfterFinished *int32                                `json:"ttlSecondsAfterFinished,omitempty"`
+	ActiveDeadlineSeconds   *int64                                `json:"activeDeadlineSeconds,omitempty"`
+	Template                *JobSetTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
 
 // TrainingRuntimeSpecApplyConfiguration constructs a declarative configuration of the TrainingRuntimeSpec type for use with
@@ -43,6 +45,22 @@ func (b *TrainingRuntimeSpecApplyConfiguration) WithMLPolicy(value *MLPolicyAppl
 // If called multiple times, the PodGroupPolicy field is set to the value of the last call.
 func (b *TrainingRuntimeSpecApplyConfiguration) WithPodGroupPolicy(value *PodGroupPolicyApplyConfiguration) *TrainingRuntimeSpecApplyConfiguration {
 	b.PodGroupPolicy = value
+	return b
+}
+
+// WithTTLSecondsAfterFinished sets the TTLSecondsAfterFinished field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TTLSecondsAfterFinished field is set to the value of the last call.
+func (b *TrainingRuntimeSpecApplyConfiguration) WithTTLSecondsAfterFinished(value int32) *TrainingRuntimeSpecApplyConfiguration {
+	b.TTLSecondsAfterFinished = &value
+	return b
+}
+
+// WithActiveDeadlineSeconds sets the ActiveDeadlineSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ActiveDeadlineSeconds field is set to the value of the last call.
+func (b *TrainingRuntimeSpecApplyConfiguration) WithActiveDeadlineSeconds(value int64) *TrainingRuntimeSpecApplyConfiguration {
+	b.ActiveDeadlineSeconds = &value
 	return b
 }
 

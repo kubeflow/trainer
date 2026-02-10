@@ -1532,16 +1532,9 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
-					"ttlSecondsAfterFinished": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished execution (either Complete or Failed). If this field is set, once the TrainJob finishes, it will be deleted after ttlSecondsAfterFinished expires. If this field is unset, the TrainJob will not be automatically deleted. If set to zero, the TrainJob becomes eligible for immediate deletion after finishing. The field is immutable.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
 					"activeDeadlineSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob creation time that the TrainJob may be active before the system tries to terminate it. Value must be a positive integer. Once reached, the TrainJob status becomes Failed with reason: DeadlineExceeded. The field is immutable.",
+							Description: "activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob creation time that the TrainJob may be active before the system tries to terminate it. Value must be a positive integer. Once reached, the TrainJob status becomes Failed with reason: DeadlineExceeded. This value overrides any default set in the referenced TrainingRuntime. The field is immutable.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -1828,6 +1821,20 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCa
 						SchemaProps: spec.SchemaProps{
 							Description: "podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via supported plugins.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicy"),
+						},
+					},
+					"ttlSecondsAfterFinished": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished execution (either Complete or Failed). If this field is set, TrainJobs using this runtime will be deleted after ttlSecondsAfterFinished expires post-completion. If this field is unset, TrainJobs will not be automatically deleted. If set to zero, TrainJobs become eligible for immediate deletion after finishing. This is a platform-level policy that individual TrainJobs cannot override.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"activeDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "activeDeadlineSeconds specifies the default maximum runtime for TrainJobs using this runtime. Individual TrainJobs can override this value by setting their own ActiveDeadlineSeconds.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 					"template": {

@@ -1697,5 +1697,225 @@ alpha-node-0-1.alpha slots=8
 				g.Expect(failedCond.Reason).Should(gomega.Equal(trainer.TrainJobDeadlineExceededReason))
 			}, 5*util.Timeout, util.Interval).Should(gomega.Succeed())
 		})
+
+		ginkgo.Context("Lifecycle Management - TTL and Deadline", func() {
+			var (
+				lifecycleRuntime *trainer.TrainingRuntime
+			)
+
+			ginkgo.BeforeEach(func() {
+				lifecycleRuntime = testingutil.MakeTrainingRuntimeWrapper(ns.Name, "lifecycle-runtime").
+					RuntimeSpec(
+						testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "lifecycle-runtime").Spec).
+							Container(constants.Node, constants.Node, "test:runtime", []string{"sleep"}, []string{"10"}, resRequests).
+							Obj()).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, lifecycleRuntime)).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should delete TrainJob after TTL expires (from TrainingRuntime)", func() {
+				ginkgo.By("Setting TTL on TrainingRuntime")
+				lifecycleRuntime.Spec.TTLSecondsAfterFinished = ptr.To[int32](3)
+				gomega.Expect(k8sClient.Update(ctx, lifecycleRuntime)).Should(gomega.Succeed())
+
+				ginkgo.By("Creating and completing TrainJob")
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "ttl-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "lifecycle-runtime").
+					Suspend(false).
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							Container("test:runtime", []string{"echo"}, []string{"done"}, resRequests).
+							Obj(),
+					).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Simulating job completion by setting Complete condition")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					meta.SetStatusCondition(&gotTrainJob.Status.Conditions, metav1.Condition{
+						Type:    trainer.TrainJobComplete,
+						Status:  metav1.ConditionTrue,
+						Reason:  "JobSetCompleted",
+						Message: "Job completed successfully",
+					})
+					g.Expect(k8sClient.Status().Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Verifying TrainJob is deleted after TTL expires")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					err := k8sClient.Get(ctx, trainJobKey, gotTrainJob)
+					g.Expect(client.IgnoreNotFound(err)).Should(gomega.Succeed())
+					g.Expect(err).Should(gomega.HaveOccurred())
+				}, 10*util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should respect ActiveDeadlineSeconds from TrainingRuntime when not overridden", func() {
+				ginkgo.By("Setting ActiveDeadlineSeconds on TrainingRuntime")
+				lifecycleRuntime.Spec.ActiveDeadlineSeconds = ptr.To[int64](2)
+				gomega.Expect(k8sClient.Update(ctx, lifecycleRuntime)).Should(gomega.Succeed())
+
+				ginkgo.By("Creating TrainJob without ActiveDeadlineSeconds override")
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "runtime-deadline-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "lifecycle-runtime").
+					Suspend(false).
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							Container("test:runtime", []string{"sleep"}, []string{"1h"}, resRequests).
+							Obj(),
+					).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Verifying TrainJob fails due to runtime deadline")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					failedCond := meta.FindStatusCondition(gotTrainJob.Status.Conditions, trainer.TrainJobFailed)
+					g.Expect(failedCond).ShouldNot(gomega.BeNil())
+					g.Expect(failedCond.Status).Should(gomega.Equal(metav1.ConditionTrue))
+					g.Expect(failedCond.Reason).Should(gomega.Equal(trainer.TrainJobDeadlineExceededReason))
+				}, 5*util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should allow TrainJob to override Runtime's ActiveDeadlineSeconds", func() {
+				ginkgo.By("Setting short deadline on TrainingRuntime")
+				lifecycleRuntime.Spec.ActiveDeadlineSeconds = ptr.To[int64](2)
+				gomega.Expect(k8sClient.Update(ctx, lifecycleRuntime)).Should(gomega.Succeed())
+
+				ginkgo.By("Creating TrainJob with longer deadline override")
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "override-deadline-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "lifecycle-runtime").
+					Suspend(false).
+					ActiveDeadlineSeconds(3600). // 1 hour - overrides runtime's 2 seconds
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							Container("test:runtime", []string{"sleep"}, []string{"5"}, resRequests).
+							Obj(),
+					).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Waiting for JobSet to complete without deadline failure")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					// Should not fail with deadline exceeded within reasonable time
+					failedCond := meta.FindStatusCondition(gotTrainJob.Status.Conditions, trainer.TrainJobFailed)
+					if failedCond != nil && failedCond.Status == metav1.ConditionTrue {
+						g.Expect(failedCond.Reason).ShouldNot(gomega.Equal(trainer.TrainJobDeadlineExceededReason))
+					}
+				}, 10*util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should handle TTL=0 for immediate deletion", func() {
+				ginkgo.By("Setting TTL=0 on TrainingRuntime")
+				lifecycleRuntime.Spec.TTLSecondsAfterFinished = ptr.To[int32](0)
+				gomega.Expect(k8sClient.Update(ctx, lifecycleRuntime)).Should(gomega.Succeed())
+
+				ginkgo.By("Creating and completing TrainJob")
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "immediate-ttl-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "lifecycle-runtime").
+					Suspend(false).
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							Container("test:runtime", []string{"echo"}, []string{"done"}, resRequests).
+							Obj(),
+					).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Simulating job completion")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					meta.SetStatusCondition(&gotTrainJob.Status.Conditions, metav1.Condition{
+						Type:    trainer.TrainJobComplete,
+						Status:  metav1.ConditionTrue,
+						Reason:  "JobSetCompleted",
+						Message: "Job completed successfully",
+					})
+					g.Expect(k8sClient.Status().Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Verifying TrainJob is deleted immediately")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					err := k8sClient.Get(ctx, trainJobKey, gotTrainJob)
+					g.Expect(client.IgnoreNotFound(err)).Should(gomega.Succeed())
+					g.Expect(err).Should(gomega.HaveOccurred())
+				}, 5*util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should not delete TrainJob when TTL is not set", func() {
+				ginkgo.By("Ensuring TTL is not set on TrainingRuntime")
+				lifecycleRuntime.Spec.TTLSecondsAfterFinished = nil
+				gomega.Expect(k8sClient.Update(ctx, lifecycleRuntime)).Should(gomega.Succeed())
+
+				ginkgo.By("Creating and completing TrainJob")
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "no-ttl-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "lifecycle-runtime").
+					Suspend(false).
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							Container("test:runtime", []string{"echo"}, []string{"done"}, resRequests).
+							Obj(),
+					).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Simulating job completion")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					meta.SetStatusCondition(&gotTrainJob.Status.Conditions, metav1.Condition{
+						Type:    trainer.TrainJobComplete,
+						Status:  metav1.ConditionTrue,
+						Reason:  "JobSetCompleted",
+						Message: "Job completed successfully",
+					})
+					g.Expect(k8sClient.Status().Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Verifying TrainJob is NOT deleted")
+				gomega.Consistently(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+				}, 5*util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should not enforce deadline when job is suspended", func() {
+				ginkgo.By("Creating suspended TrainJob with short deadline")
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "suspended-deadline-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "lifecycle-runtime").
+					Suspend(true).
+					ActiveDeadlineSeconds(2).
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							Container("test:runtime", []string{"sleep"}, []string{"1h"}, resRequests).
+							Obj(),
+					).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Waiting past the deadline duration")
+				gomega.Consistently(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					failedCond := meta.FindStatusCondition(gotTrainJob.Status.Conditions, trainer.TrainJobFailed)
+					if failedCond != nil {
+						g.Expect(failedCond.Status).ShouldNot(gomega.Equal(metav1.ConditionTrue))
+					}
+				}, 5*util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
+			})
+		})
 	})
 })

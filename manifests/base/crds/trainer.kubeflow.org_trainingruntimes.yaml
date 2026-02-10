@@ -43,6 +43,14 @@ spec:
             description: spec of the TrainingRuntime.
             minProperties: 1
             properties:
+              activeDeadlineSeconds:
+                description: |-
+                  activeDeadlineSeconds specifies the default maximum runtime for TrainJobs
+                  using this runtime. Individual TrainJobs can override this value by setting
+                  their own ActiveDeadlineSeconds.
+                format: int64
+                minimum: 1
+                type: integer
               mlPolicy:
                 description: mlPolicy provides the ML-specific parameters for the
                   model training.
@@ -10445,6 +10453,17 @@ spec:
                       rule: '!(has(self.startupPolicy) && self.startupPolicy.startupPolicyOrder
                         == ''InOrder'' && self.replicatedJobs.exists(x, has(x.dependsOn)))'
                 type: object
+              ttlSecondsAfterFinished:
+                description: |-
+                  ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished
+                  execution (either Complete or Failed). If this field is set, TrainJobs using
+                  this runtime will be deleted after ttlSecondsAfterFinished expires post-completion.
+                  If this field is unset, TrainJobs will not be automatically deleted.
+                  If set to zero, TrainJobs become eligible for immediate deletion after finishing.
+                  This is a platform-level policy that individual TrainJobs cannot override.
+                format: int32
+                minimum: 0
+                type: integer
             type: object
         type: object
     served: true

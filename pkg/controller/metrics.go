@@ -22,17 +22,19 @@ import (
 )
 
 var (
-	ttlDeletionsTotal = prometheus.NewCounter(
+	ttlDeletionsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "trainjob_ttl_deletions_total",
 			Help: "Total number of TrainJobs deleted due to TTL expiration",
 		},
+		[]string{"namespace"},
 	)
-	deadlineExceededTotal = prometheus.NewCounter(
+	deadlineExceededTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "trainjob_deadline_exceeded_total",
 			Help: "Total number of TrainJobs that exceeded their activeDeadlineSeconds",
 		},
+		[]string{"namespace"},
 	)
 )
 

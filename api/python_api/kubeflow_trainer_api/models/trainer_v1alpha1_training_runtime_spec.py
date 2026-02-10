@@ -17,7 +17,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_job_set_template_spec import TrainerV1alpha1JobSetTemplateSpec
 from kubeflow_trainer_api.models.trainer_v1alpha1_ml_policy import TrainerV1alpha1MLPolicy
@@ -29,10 +29,12 @@ class TrainerV1alpha1TrainingRuntimeSpec(BaseModel):
     """
     TrainingRuntimeSpec represents a specification of the desired training runtime.
     """ # noqa: E501
+    active_deadline_seconds: Optional[StrictInt] = Field(default=None, description="activeDeadlineSeconds specifies the default maximum runtime for TrainJobs using this runtime. Individual TrainJobs can override this value by setting their own ActiveDeadlineSeconds.", alias="activeDeadlineSeconds")
     ml_policy: Optional[TrainerV1alpha1MLPolicy] = Field(default=None, description="mlPolicy provides the ML-specific parameters for the model training.", alias="mlPolicy")
     pod_group_policy: Optional[TrainerV1alpha1PodGroupPolicy] = Field(default=None, description="podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via supported plugins.", alias="podGroupPolicy")
     template: Optional[TrainerV1alpha1JobSetTemplateSpec] = Field(default=None, description="template for the JobSet which will be used by TrainJob.")
-    __properties: ClassVar[List[str]] = ["mlPolicy", "podGroupPolicy", "template"]
+    ttl_seconds_after_finished: Optional[StrictInt] = Field(default=None, description="ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished execution (either Complete or Failed). If this field is set, TrainJobs using this runtime will be deleted after ttlSecondsAfterFinished expires post-completion. If this field is unset, TrainJobs will not be automatically deleted. If set to zero, TrainJobs become eligible for immediate deletion after finishing. This is a platform-level policy that individual TrainJobs cannot override.", alias="ttlSecondsAfterFinished")
+    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "mlPolicy", "podGroupPolicy", "template", "ttlSecondsAfterFinished"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -94,9 +96,11 @@ class TrainerV1alpha1TrainingRuntimeSpec(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
+            "activeDeadlineSeconds": obj.get("activeDeadlineSeconds"),
             "mlPolicy": TrainerV1alpha1MLPolicy.from_dict(obj["mlPolicy"]) if obj.get("mlPolicy") is not None else None,
             "podGroupPolicy": TrainerV1alpha1PodGroupPolicy.from_dict(obj["podGroupPolicy"]) if obj.get("podGroupPolicy") is not None else None,
-            "template": TrainerV1alpha1JobSetTemplateSpec.from_dict(obj["template"]) if obj.get("template") is not None else None
+            "template": TrainerV1alpha1JobSetTemplateSpec.from_dict(obj["template"]) if obj.get("template") is not None else None,
+            "ttlSecondsAfterFinished": obj.get("ttlSecondsAfterFinished")
         })
         return _obj
 

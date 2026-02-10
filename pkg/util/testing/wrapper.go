@@ -662,11 +662,6 @@ func (t *TrainJobWrapper) ManagedBy(m string) *TrainJobWrapper {
 	return t
 }
 
-func (t *TrainJobWrapper) TTLSecondsAfterFinished(ttl int32) *TrainJobWrapper {
-	t.Spec.TTLSecondsAfterFinished = &ttl
-	return t
-}
-
 func (t *TrainJobWrapper) ActiveDeadlineSeconds(deadline int64) *TrainJobWrapper {
 	t.Spec.ActiveDeadlineSeconds = &deadline
 	return t
@@ -963,6 +958,16 @@ func (r *TrainingRuntimeWrapper) RuntimeSpec(spec trainer.TrainingRuntimeSpec) *
 	return r
 }
 
+func (r *TrainingRuntimeWrapper) TTLSecondsAfterFinished(ttl int32) *TrainingRuntimeWrapper {
+	r.Spec.TTLSecondsAfterFinished = &ttl
+	return r
+}
+
+func (r *TrainingRuntimeWrapper) ActiveDeadlineSeconds(deadline int64) *TrainingRuntimeWrapper {
+	r.Spec.ActiveDeadlineSeconds = &deadline
+	return r
+}
+
 func (r *TrainingRuntimeWrapper) Obj() *trainer.TrainingRuntime {
 	return &r.TrainingRuntime
 }
@@ -1098,6 +1103,16 @@ func (r *ClusterTrainingRuntimeWrapper) DeletionTimestamp(t metav1.Time) *Cluste
 
 func (r *ClusterTrainingRuntimeWrapper) RuntimeSpec(spec trainer.TrainingRuntimeSpec) *ClusterTrainingRuntimeWrapper {
 	r.Spec = spec
+	return r
+}
+
+func (r *ClusterTrainingRuntimeWrapper) TTLSecondsAfterFinished(ttl int32) *ClusterTrainingRuntimeWrapper {
+	r.Spec.TTLSecondsAfterFinished = &ttl
+	return r
+}
+
+func (r *ClusterTrainingRuntimeWrapper) ActiveDeadlineSeconds(deadline int64) *ClusterTrainingRuntimeWrapper {
+	r.Spec.ActiveDeadlineSeconds = &deadline
 	return r
 }
 

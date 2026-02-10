@@ -134,7 +134,12 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	setSuspendedCondition(&trainJob)
 
-	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
+	runtimeSpec, runtimeErr := r.getRuntimeSpec(ctx, &trainJob)
+	if runtimeErr != nil {
+		log.V(5).Info("Could not fetch runtime spec for lifecycle management", "error", runtimeErr)
+	}
+
+	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob, runtimeSpec); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
 		if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
 			if patchErr := r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)); patchErr != nil {
 				return ctrl.Result{}, errors.Join(deadlineErr, patchErr)
@@ -156,7 +161,7 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Check TTL after status is synced (job may now be finished)
-	if ttlResult, ttlErr := r.reconcileTTL(ctx, &trainJob); ttlErr != nil || ttlResult.RequeueAfter > 0 {
+	if ttlResult, ttlErr := r.reconcileTTL(ctx, &trainJob, runtimeSpec); ttlErr != nil || ttlResult.RequeueAfter > 0 {
 		return ttlResult, errors.Join(err, ttlErr)
 	}
 
@@ -266,20 +271,59 @@ func trainJobFinishTime(trainJob *trainer.TrainJob) *metav1.Time {
 	return nil
 }
 
-func needsTTLCleanup(trainJob *trainer.TrainJob) bool {
-	return trainJob.Spec.TTLSecondsAfterFinished != nil && trainJobFinishTime(trainJob) != nil
+func (r *TrainJobReconciler) getRuntimeSpec(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainingRuntimeSpec, error) {
+	runtimeRef := trainJob.Spec.RuntimeRef
+	kind := ptr.Deref(runtimeRef.Kind, trainer.ClusterTrainingRuntimeKind)
+
+	switch kind {
+	case trainer.TrainingRuntimeKind:
+		var rt trainer.TrainingRuntime
+		if err := r.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: runtimeRef.Name}, &rt); err != nil {
+			return nil, err
+		}
+		return &rt.Spec, nil
+	case trainer.ClusterTrainingRuntimeKind:
+		var crt trainer.ClusterTrainingRuntime
+		if err := r.client.Get(ctx, client.ObjectKey{Name: runtimeRef.Name}, &crt); err != nil {
+			return nil, err
+		}
+		return &crt.Spec, nil
+	default:
+		return nil, fmt.Errorf("unsupported runtime kind: %s", kind)
+	}
 }
 
-func needsDeadlineEnforcement(trainJob *trainer.TrainJob) bool {
-	if trainJob.Spec.ActiveDeadlineSeconds == nil {
+func getEffectiveActiveDeadlineSeconds(trainJob *trainer.TrainJob, runtimeSpec *trainer.TrainingRuntimeSpec) *int64 {
+	if trainJob.Spec.ActiveDeadlineSeconds != nil {
+		return trainJob.Spec.ActiveDeadlineSeconds
+	}
+	if runtimeSpec != nil {
+		return runtimeSpec.ActiveDeadlineSeconds
+	}
+	return nil
+}
+
+func getEffectiveTTLSecondsAfterFinished(runtimeSpec *trainer.TrainingRuntimeSpec) *int32 {
+	if runtimeSpec != nil {
+		return runtimeSpec.TTLSecondsAfterFinished
+	}
+	return nil
+}
+
+func needsTTLCleanup(trainJob *trainer.TrainJob, runtimeSpec *trainer.TrainingRuntimeSpec) bool {
+	return getEffectiveTTLSecondsAfterFinished(runtimeSpec) != nil && trainJobFinishTime(trainJob) != nil
+}
+
+func needsDeadlineEnforcement(trainJob *trainer.TrainJob, runtimeSpec *trainer.TrainingRuntimeSpec) bool {
+	if getEffectiveActiveDeadlineSeconds(trainJob, runtimeSpec) == nil {
 		return false
 	}
 	// Skip if already finished
 	return trainJobFinishTime(trainJob) == nil
 }
 
-func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
-	if !needsDeadlineEnforcement(trainJob) {
+func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob, runtimeSpec *trainer.TrainingRuntimeSpec) (ctrl.Result, error) {
+	if !needsDeadlineEnforcement(trainJob, runtimeSpec) {
 		return ctrl.Result{}, nil
 	}
 
@@ -287,7 +331,8 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 		return ctrl.Result{}, nil
 	}
 
-	deadline := time.Duration(*trainJob.Spec.ActiveDeadlineSeconds) * time.Second
+	effectiveDeadline := getEffectiveActiveDeadlineSeconds(trainJob, runtimeSpec)
+	deadline := time.Duration(*effectiveDeadline) * time.Second
 	creationTime := trainJob.CreationTimestamp.Time
 	deadlineAt := creationTime.Add(deadline)
 	now := time.Now()
@@ -301,13 +346,13 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 			"creationTime", creationTime,
 			"deadlineAt", deadlineAt)
 
-		deadlineExceededTotal.Inc()
+		deadlineExceededTotal.WithLabelValues(trainJob.Namespace).Inc()
 
 		meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
 			Type:    trainer.TrainJobFailed,
 			Status:  metav1.ConditionTrue,
 			Reason:  trainer.TrainJobDeadlineExceededReason,
-			Message: fmt.Sprintf("TrainJob exceeded ActiveDeadlineSeconds of %d seconds", *trainJob.Spec.ActiveDeadlineSeconds),
+			Message: fmt.Sprintf("TrainJob exceeded ActiveDeadlineSeconds of %d seconds", *effectiveDeadline),
 		})
 
 		r.recorder.Event(trainJob, corev1.EventTypeWarning, "DeadlineExceeded",
@@ -319,9 +364,9 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 	return ctrl.Result{RequeueAfter: remaining}, nil
 }
 
-func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
+func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer.TrainJob, runtimeSpec *trainer.TrainingRuntimeSpec) (ctrl.Result, error) {
 
-	if !needsTTLCleanup(trainJob) {
+	if !needsTTLCleanup(trainJob, runtimeSpec) {
 		return ctrl.Result{}, nil
 	}
 
@@ -330,7 +375,8 @@ func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer
 	}
 
 	finishTime := trainJobFinishTime(trainJob)
-	ttl := time.Duration(*trainJob.Spec.TTLSecondsAfterFinished) * time.Second
+	effectiveTTL := getEffectiveTTLSecondsAfterFinished(runtimeSpec)
+	ttl := time.Duration(*effectiveTTL) * time.Second
 	expireAt := finishTime.Add(ttl)
 	now := time.Now()
 
@@ -345,7 +391,7 @@ func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer
 
 	if remaining <= 0 {
 		log := ctrl.LoggerFrom(ctx)
-		log.Info("TTL expired, deleting TrainJob", "ttl", ttl,"finishTime", finishTime.Time,"expireAt", expireAt)
+		log.Info("TTL expired, deleting TrainJob", "ttl", ttl, "finishTime", finishTime.Time, "expireAt", expireAt)
 
 		policy := metav1.DeletePropagationForeground
 		opts := client.DeleteOptions{
@@ -356,9 +402,10 @@ func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
 
+		ttlDeletionsTotal.WithLabelValues(trainJob.Namespace).Inc()
+
 		r.recorder.Event(trainJob, corev1.EventTypeNormal, "TTLExpired",
 			fmt.Sprintf("TrainJob deleted after TTL of %v expired", ttl))
-		ttlDeletionsTotal.Inc()
 		return ctrl.Result{}, nil
 	}
 

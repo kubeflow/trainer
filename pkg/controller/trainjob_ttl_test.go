@@ -130,14 +130,12 @@ func TestNeedsTTLCleanup(t *testing.T) {
 	fiveMinutesAgo := metav1.NewTime(now.Add(-5 * time.Minute))
 
 	testCases := map[string]struct {
-		trainJob *trainer.TrainJob
-		want     bool
+		trainJob    *trainer.TrainJob
+		runtimeSpec *trainer.TrainingRuntimeSpec
+		want        bool
 	}{
 		"TTL not set - returns false": {
 			trainJob: &trainer.TrainJob{
-				Spec: trainer.TrainJobSpec{
-					TTLSecondsAfterFinished: nil,
-				},
 				Status: trainer.TrainJobStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -148,13 +146,13 @@ func TestNeedsTTLCleanup(t *testing.T) {
 					},
 				},
 			},
+			runtimeSpec: &trainer.TrainingRuntimeSpec{
+				TTLSecondsAfterFinished: nil,
+			},
 			want: false,
 		},
 		"TTL set but job not finished - returns false": {
 			trainJob: &trainer.TrainJob{
-				Spec: trainer.TrainJobSpec{
-					TTLSecondsAfterFinished: ptr.To(int32(60)),
-				},
 				Status: trainer.TrainJobStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -164,13 +162,13 @@ func TestNeedsTTLCleanup(t *testing.T) {
 					},
 				},
 			},
+			runtimeSpec: &trainer.TrainingRuntimeSpec{
+				TTLSecondsAfterFinished: ptr.To(int32(60)),
+			},
 			want: false,
 		},
 		"TTL set and job completed - returns true": {
 			trainJob: &trainer.TrainJob{
-				Spec: trainer.TrainJobSpec{
-					TTLSecondsAfterFinished: ptr.To(int32(60)),
-				},
 				Status: trainer.TrainJobStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -181,13 +179,13 @@ func TestNeedsTTLCleanup(t *testing.T) {
 					},
 				},
 			},
+			runtimeSpec: &trainer.TrainingRuntimeSpec{
+				TTLSecondsAfterFinished: ptr.To(int32(60)),
+			},
 			want: true,
 		},
 		"TTL set and job failed - returns true": {
 			trainJob: &trainer.TrainJob{
-				Spec: trainer.TrainJobSpec{
-					TTLSecondsAfterFinished: ptr.To(int32(60)),
-				},
 				Status: trainer.TrainJobStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -198,13 +196,13 @@ func TestNeedsTTLCleanup(t *testing.T) {
 					},
 				},
 			},
+			runtimeSpec: &trainer.TrainingRuntimeSpec{
+				TTLSecondsAfterFinished: ptr.To(int32(60)),
+			},
 			want: true,
 		},
 		"TTL = 0 and job completed - returns true": {
 			trainJob: &trainer.TrainJob{
-				Spec: trainer.TrainJobSpec{
-					TTLSecondsAfterFinished: ptr.To(int32(0)),
-				},
 				Status: trainer.TrainJobStatus{
 					Conditions: []metav1.Condition{
 						{
@@ -215,13 +213,16 @@ func TestNeedsTTLCleanup(t *testing.T) {
 					},
 				},
 			},
+			runtimeSpec: &trainer.TrainingRuntimeSpec{
+				TTLSecondsAfterFinished: ptr.To(int32(0)),
+			},
 			want: true,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			got := needsTTLCleanup(tc.trainJob)
+			got := needsTTLCleanup(tc.trainJob, tc.runtimeSpec)
 			if got != tc.want {
 				t.Errorf("needsTTLCleanup() = %v, want %v", got, tc.want)
 			}
@@ -234,10 +235,11 @@ func TestNeedsDeadlineEnforcement(t *testing.T) {
 	fiveMinutesAgo := metav1.NewTime(now.Add(-5 * time.Minute))
 
 	testCases := map[string]struct {
-		trainJob *trainer.TrainJob
-		want     bool
+		trainJob    *trainer.TrainJob
+		runtimeSpec *trainer.TrainingRuntimeSpec
+		want        bool
 	}{
-		"deadline not set - returns false": {
+		"deadline not set in either - returns false": {
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
 					ActiveDeadlineSeconds: nil,
@@ -246,9 +248,12 @@ func TestNeedsDeadlineEnforcement(t *testing.T) {
 					Conditions: nil,
 				},
 			},
+			runtimeSpec: &trainer.TrainingRuntimeSpec{
+				ActiveDeadlineSeconds: nil,
+			},
 			want: false,
 		},
-		"deadline set and job not finished - returns true": {
+		"deadline set in TrainJob and job not finished - returns true": {
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
 					ActiveDeadlineSeconds: ptr.To(int64(3600)),
@@ -261,6 +266,26 @@ func TestNeedsDeadlineEnforcement(t *testing.T) {
 						},
 					},
 				},
+			},
+			runtimeSpec: nil,
+			want:        true,
+		},
+		"deadline set in Runtime and job not finished - returns true": {
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					ActiveDeadlineSeconds: nil,
+				},
+				Status: trainer.TrainJobStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   trainer.TrainJobSuspended,
+							Status: metav1.ConditionFalse,
+						},
+					},
+				},
+			},
+			runtimeSpec: &trainer.TrainingRuntimeSpec{
+				ActiveDeadlineSeconds: ptr.To(int64(3600)),
 			},
 			want: true,
 		},
@@ -279,7 +304,8 @@ func TestNeedsDeadlineEnforcement(t *testing.T) {
 					},
 				},
 			},
-			want: false,
+			runtimeSpec: nil,
+			want:        false,
 		},
 		"deadline set but job failed - returns false": {
 			trainJob: &trainer.TrainJob{
@@ -296,13 +322,14 @@ func TestNeedsDeadlineEnforcement(t *testing.T) {
 					},
 				},
 			},
-			want: false,
+			runtimeSpec: nil,
+			want:        false,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			got := needsDeadlineEnforcement(tc.trainJob)
+			got := needsDeadlineEnforcement(tc.trainJob, tc.runtimeSpec)
 			if got != tc.want {
 				t.Errorf("needsDeadlineEnforcement() = %v, want %v", got, tc.want)
 			}

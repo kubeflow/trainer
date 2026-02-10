@@ -59,6 +59,8 @@ func (w *ClusterTrainingRuntimeWebhook) ValidateCreate(ctx context.Context, obj 
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
+	lifecycleWarnings := validateLifecycleFields(&clTrainingRuntime.Spec)
+	warnings = append(warnings, lifecycleWarnings...)
 	return warnings, validateReplicatedJobs(clTrainingRuntime.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
 }
 

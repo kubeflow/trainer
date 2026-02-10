@@ -50,33 +50,13 @@ func (w *TrainJobWebhook) ValidateCreate(ctx context.Context, obj apiruntime.Obj
 	log := ctrl.LoggerFrom(ctx).WithName("trainJob-webhook")
 	log.V(5).Info("Validating create", "TrainJob", klog.KObj(trainJob))
 
-	ttlWarnings := validateTTLSecondsAfterFinished(trainJob)
-
 	runtimeRefGK := runtime.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := w.runtimes[runtimeRefGK]
 	if !ok {
-		return ttlWarnings, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
+		return nil, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 	}
 	warnings, errors := runtime.ValidateObjects(ctx, nil, trainJob)
-	warnings = append(warnings, ttlWarnings...)
 	return warnings, errors.ToAggregate()
-}
-
-func validateTTLSecondsAfterFinished(trainJob *trainer.TrainJob) admission.Warnings {
-	var warnings admission.Warnings
-
-	if trainJob.Spec.TTLSecondsAfterFinished == nil {
-		return nil
-	}
-
-	ttl := *trainJob.Spec.TTLSecondsAfterFinished
-
-	if ttl > 0 && ttl < 60 {
-		warnings = append(warnings,
-			fmt.Sprintf("ttlSecondsAfterFinished=%d is very short; TrainJob may be deleted before you can review it", ttl))
-	}
-
-	return warnings
 }
 
 func (w *TrainJobWebhook) ValidateUpdate(ctx context.Context, oldObj apiruntime.Object, newObj apiruntime.Object) (admission.Warnings, error) {

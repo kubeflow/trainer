@@ -30,7 +30,7 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
     """
     TrainJobSpec represents specification of the desired TrainJob.
     """ # noqa: E501
-    active_deadline_seconds: Optional[StrictInt] = Field(default=None, description="activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob creation time that the TrainJob may be active before the system tries to terminate it. Value must be a positive integer. Once reached, the TrainJob status becomes Failed with reason: DeadlineExceeded. The field is immutable.", alias="activeDeadlineSeconds")
+    active_deadline_seconds: Optional[StrictInt] = Field(default=None, description="activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob creation time that the TrainJob may be active before the system tries to terminate it. Value must be a positive integer. Once reached, the TrainJob status becomes Failed with reason: DeadlineExceeded. This value overrides any default set in the referenced TrainingRuntime. The field is immutable.", alias="activeDeadlineSeconds")
     annotations: Optional[Dict[str, StrictStr]] = Field(default=None, description="annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
     initializer: Optional[TrainerV1alpha1Initializer] = Field(default=None, description="initializer defines the configuration of the initializer.")
     labels: Optional[Dict[str, StrictStr]] = Field(default=None, description="labels to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
@@ -39,8 +39,7 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
     runtime_ref: TrainerV1alpha1RuntimeRef = Field(description="runtimeRef is the reference to the training runtime. The field is immutable.", alias="runtimeRef")
     suspend: Optional[StrictBool] = Field(default=None, description="suspend defines whether to suspend the running TrainJob. Defaults to false.")
     trainer: Optional[TrainerV1alpha1Trainer] = Field(default=None, description="trainer defines the configuration of the trainer.")
-    ttl_seconds_after_finished: Optional[StrictInt] = Field(default=None, description="ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished execution (either Complete or Failed). If this field is set, once the TrainJob finishes, it will be deleted after ttlSecondsAfterFinished expires. If this field is unset, the TrainJob will not be automatically deleted. If set to zero, the TrainJob becomes eligible for immediate deletion after finishing. The field is immutable.", alias="ttlSecondsAfterFinished")
-    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "annotations", "initializer", "labels", "managedBy", "podTemplateOverrides", "runtimeRef", "suspend", "trainer", "ttlSecondsAfterFinished"]
+    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "annotations", "initializer", "labels", "managedBy", "podTemplateOverrides", "runtimeRef", "suspend", "trainer"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -117,8 +116,7 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
             "podTemplateOverrides": [TrainerV1alpha1PodTemplateOverride.from_dict(_item) for _item in obj["podTemplateOverrides"]] if obj.get("podTemplateOverrides") is not None else None,
             "runtimeRef": TrainerV1alpha1RuntimeRef.from_dict(obj["runtimeRef"]) if obj.get("runtimeRef") is not None else None,
             "suspend": obj.get("suspend"),
-            "trainer": TrainerV1alpha1Trainer.from_dict(obj["trainer"]) if obj.get("trainer") is not None else None,
-            "ttlSecondsAfterFinished": obj.get("ttlSecondsAfterFinished")
+            "trainer": TrainerV1alpha1Trainer.from_dict(obj["trainer"]) if obj.get("trainer") is not None else None
         })
         return _obj
 
