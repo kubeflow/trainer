@@ -293,7 +293,7 @@ type JobTemplateOverride struct {
 	Time *metav1.Time `json:"time,omitempty"`
 
 	// targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.
-	// If TargetJob is empty, values are applied to the JobSet spec.
+	// If targetJobs is empty, values are applied to the JobSet spec.
 	// +listType=atomic
 	// +optional
 	TargetJobs []TemplateOverrideTargetJob `json:"targetJobs,omitempty"`
