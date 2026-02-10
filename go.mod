@@ -24,7 +24,7 @@ require (
 	sigs.k8s.io/jobset v0.11.0
 	sigs.k8s.io/kind v0.31.0
 	sigs.k8s.io/scheduler-plugins v0.34.1-devel
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.2
 	volcano.sh/apis v1.13.1-0.20251028070205-46d20c0699e7
 )
 
