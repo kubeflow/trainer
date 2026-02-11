@@ -23,6 +23,7 @@ import (
 
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/flux"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
@@ -36,6 +37,7 @@ type Registry map[string]func(ctx context.Context, client client.Client, indexer
 func NewRegistry() Registry {
 	return Registry{
 		coscheduling.Name: coscheduling.New,
+		flux.Name:         flux.New,
 		volcano.Name:      volcano.New,
 		mpi.Name:          mpi.New,
 		plainml.Name:      plainml.New,

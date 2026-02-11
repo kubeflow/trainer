@@ -30,6 +30,8 @@ type MLPolicySourceApplyConfiguration struct {
 	Torch *TorchMLPolicySourceApplyConfiguration `json:"torch,omitempty"`
 	// mpi defines the configuration for the MPI Runtime.
 	MPI *MPIMLPolicySourceApplyConfiguration `json:"mpi,omitempty"`
+	// flux defines the configuration for the Flux runtime.
+	Flux *FluxMLPolicySourceApplyConfiguration `json:"flux,omitempty"`
 	// jax defines the configuration for the JAX Runtime
 	JAX *trainerv1alpha1.JAXMLPolicySource `json:"jax,omitempty"`
 }
@@ -53,6 +55,14 @@ func (b *MLPolicySourceApplyConfiguration) WithTorch(value *TorchMLPolicySourceA
 // If called multiple times, the MPI field is set to the value of the last call.
 func (b *MLPolicySourceApplyConfiguration) WithMPI(value *MPIMLPolicySourceApplyConfiguration) *MLPolicySourceApplyConfiguration {
 	b.MPI = value
+	return b
+}
+
+// WithFlux sets the Flux field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Flux field is set to the value of the last call.
+func (b *MLPolicySourceApplyConfiguration) WithFlux(value *FluxMLPolicySourceApplyConfiguration) *MLPolicySourceApplyConfiguration {
+	b.Flux = value
 	return b
 }
 
