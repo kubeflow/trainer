@@ -228,3 +228,18 @@ helm-lint: ## Run Helm chart lint test.
 .PHONY: helm-docs
 helm-docs: helm-docs-plugin ## Generates markdown documentation for helm charts from requirements and values files.
 	$(HELM_DOCS) --sort-values-order=file
+
+##@ Release
+
+# Release version (X.Y.Z or X.Y.Z-rc.N)
+VERSION ?=
+GITHUB_TOKEN ?=
+
+.PHONY: release
+release: ## Create a new release.
+	@if [ -z "$(VERSION)" ]; then \
+		echo "ERROR: VERSION is required. Usage: make release VERSION=X.Y.Z GITHUB_TOKEN=<token>"; \
+		exit 1; \
+	fi
+	@export GITHUB_TOKEN=$(GITHUB_TOKEN); \
+	./hack/release.sh $(VERSION)
