@@ -451,6 +451,11 @@ func (in *PodTemplateOverride) DeepCopyInto(out *PodTemplateOverride) {
 		*out = make([]PodTemplateOverrideTargetJob, len(*in))
 		copy(*out, *in)
 	}
+	if in.Manager != nil {
+		in, out := &in.Manager, &out.Manager
+		*out = new(string)
+		**out = **in
+	}
 	if in.Metadata != nil {
 		in, out := &in.Metadata, &out.Metadata
 		*out = new(metav1.ObjectMeta)

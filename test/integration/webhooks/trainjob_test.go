@@ -392,6 +392,31 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						Suspend(false).
 						Obj()
 				}),
+			ginkgo.Entry("Should succeed to default PodTemplateOverrides.Manager='Unknown'",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "null-podtemplateoverrides-manager").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						PodTemplateOverrides([]trainer.PodTemplateOverride{
+							{
+								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
+							},
+						}).
+						Suspend(true).
+						Obj()
+				},
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "null-podtemplateoverrides-manager").
+						ManagedBy("trainer.kubeflow.org/trainjob-controller").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						PodTemplateOverrides([]trainer.PodTemplateOverride{
+							{
+								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
+								Manager:    ptr.To("Unknown"),
+							},
+						}).
+						Suspend(true).
+						Obj()
+				}),
 			ginkgo.Entry("Should succeed to default managedBy=trainer.kubeflow.org/trainjob-controller",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name, "null-managed-by").
