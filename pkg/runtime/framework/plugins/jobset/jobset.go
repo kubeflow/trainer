@@ -162,9 +162,12 @@ func (j *JobSet) checkPodTemplateOverridesImmutability(ctx context.Context, oldO
 
 	jobSet := &jobsetv1alpha2.JobSet{}
 	changed := !equality.Semantic.DeepEqual(oldObj.Spec.PodTemplateOverrides, newObj.Spec.PodTemplateOverrides)
-	suspended := ptr.Equal(newObj.Spec.Suspend, ptr.To(true))
+	// Check if the old TrainJob was suspended, allowing atomic unsuspend + podTemplateOverrides update.
+	// This follows the Kubernetes core Job validation pattern and enables Kueue to perform both operations
+	// in a single API request, eliminating race conditions.
+	oldSuspended := ptr.Equal(oldObj.Spec.Suspend, ptr.To(true))
 	if changed {
-		if !suspended {
+		if !oldSuspended {
 			allErrs = append(allErrs, field.Forbidden(podTemplateOverridePath, "PodTemplateOverrides can only be modified when the TrainJob is suspended"))
 		} else if err := j.client.Get(ctx, client.ObjectKeyFromObject(newObj), jobSet); client.IgnoreNotFound(err) != nil {
 			allErrs = append(allErrs, field.InternalError(podTemplateOverridePath, err))

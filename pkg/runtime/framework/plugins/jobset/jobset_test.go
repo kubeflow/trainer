@@ -1286,6 +1286,66 @@ func TestValidate(t *testing.T) {
 				field.InternalError(podTemplateOverridePath, fmt.Errorf("client error")),
 			},
 		},
+		"allow atomic update: unsuspend and modify podTemplateOverrides in single request": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.Node),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				PodTemplateOverrides([]trainer.PodTemplateOverride{
+					{
+						TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+							{
+								Name: constants.Node,
+							},
+						},
+						Spec: &trainer.PodTemplateSpecOverride{
+							ServiceAccountName: ptr.To("service-account"),
+						},
+					},
+				}).
+				Obj(),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				PodTemplateOverrides([]trainer.PodTemplateOverride{
+					{
+						TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+							{
+								Name: constants.Node,
+							},
+						},
+						Spec: &trainer.PodTemplateSpecOverride{
+							NodeSelector: map[string]string{
+								"accelerator": "nvidia-h100",
+							},
+						},
+					},
+				}).
+				Obj(),
+			clientErr: apierrors.NewNotFound(jobsetv1alpha2.Resource("jobset"), ""),
+			wantError: nil,
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
