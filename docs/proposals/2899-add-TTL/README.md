@@ -6,7 +6,6 @@ Add lifecycle management fields to the Trainer APIs with a clear separation of c
 
 - **`ActiveDeadlineSeconds`** on `TrainJobSpec`: Allows data scientists to set maximum runtime for individual TrainJobs via the Kubeflow SDK.
 - **`TTLSecondsAfterFinished`** on `TrainingRuntimeSpec`: Allows platform admins to configure automatic cleanup policies as defaults for all TrainJobs using a runtime.
-- **`ActiveDeadlineSeconds`** on `TrainingRuntimeSpec` (optional): Allows platform admins to set a default deadline that individual TrainJobs can override.
 
 This brings TrainJob lifecycle management in line with Kubernetes Jobs and JobSets while respecting the separation between platform administration and data science workflows.
 
@@ -22,7 +21,6 @@ Currently, `TrainJob` resources persist in the cluster indefinitely after comple
 
 - Add `ActiveDeadlineSeconds` to `TrainJobSpec` for data scientists to control individual job timeouts
 - Add `TTLSecondsAfterFinished` to `TrainingRuntimeSpec` for platform admins to set cleanup defaults
-- Optionally add `ActiveDeadlineSeconds` to `TrainingRuntimeSpec` as a default deadline
 - Expose `ActiveDeadlineSeconds` in the Kubeflow Python SDK for data scientists
 - Follow Kubernetes Job/JobSet patterns and existing Trainer API conventions
 
@@ -31,6 +29,38 @@ Currently, `TrainJob` resources persist in the cluster indefinitely after comple
 - Expose `TTLSecondsAfterFinished` in the SDK (this is platform admin controlled)
 - Automatically migrate existing TrainJobs to use new defaults
 - Provide per-namespace TTL overrides
+
+## Proposal
+
+### User Stories
+
+#### Story 1
+
+As a **Data Scientist**, I want to set a maximum runtime on my TrainJob so that a training job that hangs or diverges is automatically terminated after a specified duration, freeing up expensive GPU resources for other experiments.
+
+#### Story 2
+
+As a **Platform Admin**, I want to configure an automatic cleanup policy on my ClusterTrainingRuntime so that completed or failed TrainJobs are automatically deleted after a defined period, preventing etcd bloat and reducing operational overhead across all teams using the runtime.
+
+#### Story 3
+
+As a **Data Scientist**, I want to set a `timeout` via the Kubeflow Python SDK when submitting a training job from my notebook, so that I don't need to write or understand Kubernetes YAML to protect my experiment from running indefinitely.
+
+```python
+from kubeflow.trainer import TrainerClient, CustomTrainer, Initializer, HuggingFaceDatasetInitializer
+
+TrainerClient().train(
+    trainer=CustomTrainer(
+        func=train_func,
+        num_nodes=3,
+    ),
+    initializer=Initializer(
+        model=HuggingFaceDatasetInitializer(storage_uri="hf://qwen3.2-instruct")
+    ),
+    timeout=28800,  # 8 hours max
+)
+```
+
 
 ## Design Details
 
@@ -49,7 +79,6 @@ type TrainJobSpec struct {
     // before the system tries to terminate it. Value must be a positive integer.
     // Once reached, all running Pods are terminated and the TrainJob status becomes
     // Failed with reason: DeadlineExceeded.
-    // This value overrides any default set in the referenced TrainingRuntime.
     // +optional
     // +kubebuilder:validation:Minimum=1
     // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="field is immutable"
@@ -59,7 +88,7 @@ type TrainJobSpec struct {
 
 #### TrainingRuntimeSpec Changes
 
-Add both fields to `TrainingRuntimeSpec` in `pkg/apis/trainer/v1alpha1/trainingruntime_types.go`:
+Add `TTLSecondsAfterFinished` to `TrainingRuntimeSpec` in `pkg/apis/trainer/v1alpha1/trainingruntime_types.go`:
 
 ```go
 type TrainingRuntimeSpec struct {
@@ -74,13 +103,6 @@ type TrainingRuntimeSpec struct {
     // +optional
     // +kubebuilder:validation:Minimum=0
     TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
-
-    // ActiveDeadlineSeconds specifies the default maximum runtime for TrainJobs
-    // using this runtime. Individual TrainJobs can override this value by setting
-    // their own ActiveDeadlineSeconds.
-    // +optional
-    // +kubebuilder:validation:Minimum=1
-    ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 }
 ```
 
@@ -90,31 +112,20 @@ Add new condition reason in `pkg/apis/trainer/v1alpha1/trainjob_types.go`:
 
 ```go
 const (
-    // TrainJobDeadlineExceededReason is used when ActiveDeadlineSeconds is exceeded
+    // TrainJobDeadlineExceededReason is the reason for the "Failed" condition
+    // when ActiveDeadlineSeconds is exceeded.
     TrainJobDeadlineExceededReason string = "DeadlineExceeded"
 )
 ```
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 230e8a19 (docs: Clarify ActiveDeadlineSeconds behavior with suspension, add TTLSecondsAfterFinished validation, and remove proposed status fields, SDK changes, and metrics.)
+When a TrainJob exceeds its `ActiveDeadlineSeconds`, the controller sets a `Failed` condition with `Reason: DeadlineExceeded`, matching the [Kubernetes Job behavior](https://kubernetes.io/docs/concepts/workloads/controllers/job/#job-termination-and-cleanup).
 ### Value Resolution
 
-The controller resolves effective values using the following precedence:
-
-| Field | TrainJob Value | Runtime Value | Effective Value |
-|-------|---------------|---------------|-----------------|
-| `ActiveDeadlineSeconds` | Set | Set | **TrainJob value** (override) |
-| `ActiveDeadlineSeconds` | Set | Unset | TrainJob value |
-| `ActiveDeadlineSeconds` | Unset | Set | Runtime value (default) |
-| `ActiveDeadlineSeconds` | Unset | Unset | No deadline enforced |
-| `TTLSecondsAfterFinished` | N/A | Set | Runtime value |
-| `TTLSecondsAfterFinished` | N/A | Unset | No TTL cleanup |
+`ActiveDeadlineSeconds` is set directly on `TrainJobSpec` by the data scientist. `TTLSecondsAfterFinished` is set on `TrainingRuntimeSpec` by the platform admin and applies to all TrainJobs using that runtime.
 
 ### User Examples
 
-**TrainingRuntime with Defaults (Platform Admin):**
+**TrainingRuntime with TTL (Platform Admin):**
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
@@ -123,7 +134,6 @@ metadata:
   name: torch-distributed-gpu
 spec:
   ttlSecondsAfterFinished: 86400      # Auto-delete after 24 hours
-  activeDeadlineSeconds: 28800        # Default max runtime: 8 hours
   mlPolicy:
     torch:
       numProcPerNode: auto
@@ -140,7 +150,7 @@ spec:
                       image: ghcr.io/kubeflow/trainer/torch-trainer
 ```
 
-**TrainJob Using Defaults (Data Scientist):**
+**TrainJob with Deadline (Data Scientist):**
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
@@ -148,39 +158,41 @@ kind: TrainJob
 metadata:
   name: quick-experiment
 spec:
+  activeDeadlineSeconds: 28800        # Max runtime: 8 hours
   runtimeRef:
     name: torch-distributed-gpu
   trainer:
     image: my-training:latest
     numNodes: 2
-# Uses runtime defaults: 8-hour deadline, 24-hour TTL
+# 8-hour deadline set on TrainJob, runtime's 24-hour TTL applies after completion
 ```
 
-**TrainJob Overriding Deadline (Data Scientist):**
+**TrainJob with Timeout via SDK (Data Scientist):**
 
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: TrainJob
-metadata:
-  name: long-finetune
-spec:
-  activeDeadlineSeconds: 259200       # Override: 72 hours for this job
-  runtimeRef:
-    name: torch-distributed-gpu
-  trainer:
-    image: my-training:latest
-    numNodes: 8
-# Uses job-specific 72-hour deadline, runtime's 24-hour TTL still applies
+```python
+from kubeflow.trainer import TrainerClient, CustomTrainer, Initializer, HuggingFaceDatasetInitializer
+
+TrainerClient().train(
+    trainer=CustomTrainer(
+        func=train_func,
+        num_nodes=3,
+    ),
+    initializer=Initializer(
+        model=HuggingFaceDatasetInitializer(storage_uri="hf://qwen3.2-instruct")
+    ),
+    timeout=28800,  # 8 hours max
+)
 ```
+
+The `timeout` parameter in the SDK maps to `ActiveDeadlineSeconds` on the created `TrainJob`.
 
 ### Implementation Overview
 
 **Controller Changes** (`pkg/controller/trainjob_controller.go`):
 
-1. **Effective Value Resolution:**
-    - Fetch the referenced TrainingRuntime/ClusterTrainingRuntime
-    - Resolve `ActiveDeadlineSeconds`: TrainJob value takes precedence over Runtime
-    - Resolve `TTLSecondsAfterFinished`: Only from Runtime (not on TrainJob)
+1. **Value Resolution:**
+    - Read `ActiveDeadlineSeconds` directly from `TrainJobSpec`
+    - Fetch the referenced TrainingRuntime/ClusterTrainingRuntime for `TTLSecondsAfterFinished`
 
 2. **TTL Reconciliation:**
     - Check if job is finished and Runtime has TTL set
@@ -231,14 +243,19 @@ This design ensures no TrainJobs are "forgotten" after a controller restart.
 
 **Validation:**
 
-Most validation is handled via kubebuilder CEL markers on the API types:
-- `+kubebuilder:validation:Minimum=1` on `ActiveDeadlineSeconds` (both `TrainJobSpec` and `TrainingRuntimeSpec`)
-- `+kubebuilder:validation:Minimum=0` on `TTLSecondsAfterFinished` (`TrainingRuntimeSpec`)
-- `+kubebuilder:validation:XValidation:rule="self == oldSelf"` on `ActiveDeadlineSeconds` (`TrainJobSpec`) for immutability
+**Field-level CEL markers** on the API types:
 
-The existing `TrainJobValidator` webhook in `pkg/webhooks/trainjob_webhook.go` delegates to `runtime.ValidateObjects()`. The `TrainingRuntimeValidator` and `ClusterTrainingRuntimeValidator` webhooks validate the runtime spec.
+- `Minimum=1` on `ActiveDeadlineSeconds` (`TrainJobSpec`)
+- `Minimum=0` on `TTLSecondsAfterFinished` (`TrainingRuntimeSpec`)
+- `XValidation: self == oldSelf` on `ActiveDeadlineSeconds` (`TrainJobSpec`) - immutable after creation
 
-The only validation requiring actual webhook code (not expressible via CEL) is:
+**Cross-field CEL markers** on `TrainingRuntimeSpec` to prevent conflicting lifecycle fields in the JobSet/Job template:
+
+- `!has(self.template.spec.ttlSecondsAfterFinished)` - JobSet-level TTL would delete the JobSet independently, leaving orphaned TrainJobs
+- `self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec.activeDeadlineSeconds))` - Job-level deadline would terminate pods independently from TrainJob deadline tracking
+- `self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec.ttlSecondsAfterFinished))` - Job-level TTL conflicts with TrainJob-level lifecycle management
+
+**Webhook validation** (not expressible via CEL):
 - Warn if `TTLSecondsAfterFinished < 60s` (warnings require webhook response)
 
 ### Interaction with Suspend
@@ -263,22 +280,22 @@ to implement this enhancement.
 - TTL from runtime → job deleted after expiration
 - TTL not set on runtime → no deletion
 - TTL = 0 → immediate deletion after completion
-- Deadline from TrainJob only → enforced
-- Deadline from Runtime only → enforced as default
-- Deadline on both → TrainJob value wins
+- Deadline from TrainJob → enforced
+- No deadline set → no enforcement
 - Deadline exceeded → job failed with DeadlineExceeded reason
 - Deadline not reached → requeue at deadline
-- Value resolution with missing runtime → graceful handling
 - Clock skew → requeue with delay instead of negative duration
 
 #### Integration Tests
 
 - `test/integration/controller/trainjob_controller_test.go`:
     - End-to-end TTL deletion from Runtime default
-    - End-to-end deadline from Runtime default
-    - TrainJob deadline overriding Runtime deadline
+    - End-to-end deadline enforcement from TrainJob
     - Cascade deletion of owned resources
     - Controller restart (verify timers resume correctly)
+    - Suspended TrainJob → deadline timer does not start until first unsuspend
+    - Running TrainJob suspended and resumed → deadline timer resets (full duration available again)
+    - Suspended TrainJob reaching terminal state → TTL countdown begins from completion, not from suspend time
 
 #### E2E Tests
 
@@ -296,8 +313,6 @@ to implement this enhancement.
 
 ## Drawbacks
 
-- **Complexity:** Two-level API (TrainJob + Runtime) adds complexity compared to a single-level approach
-- **Potential User Confusion:** Users might not realize their jobs have a default deadline from the Runtime
 - **Loss of Job History:** TTL deletion removes TrainJob metadata permanently
 
 ## Alternatives
@@ -326,3 +341,17 @@ Put both fields only on `TrainingRuntimeSpec`.
 **Cons:**
 - Data scientists cannot customize deadlines for specific jobs
 - Less flexible for varying job requirements
+
+### Alternative 3: Add `ActiveDeadlineSeconds` to TrainingRuntimeSpec as Default
+
+Add `ActiveDeadlineSeconds` to `TrainingRuntimeSpec` as a default that individual TrainJobs can override.
+
+**Pros:**
+- Platform admins can enforce default deadlines for all jobs
+- Data scientists can still override per job
+
+**Cons:**
+- Adds complexity to value resolution logic
+- Potential user confusion (users may not realize a default deadline exists)
+
+**Decision:** Deferred to a future iteration. If user feedback shows demand for runtime-level default deadlines, this extension can be added without breaking changes.
