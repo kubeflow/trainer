@@ -193,6 +193,24 @@ const (
 
 	// TorchTuneCheckpointerDir is the config item name for the checkpointer directory.
 	TorchTuneCheckpointDir string = "checkpointer.checkpoint_dir"
+
+	// Distributed envs for XGBoost collective/Rabit.
+	// Ref: https://xgboost.readthedocs.io/en/stable/tutorials/dask.html
+
+	// XGBoostEnvTrackerURI is the env name for the tracker URI.
+	XGBoostEnvTrackerURI string = "DMLC_TRACKER_URI"
+
+	// XGBoostEnvTrackerPort is the env name for the tracker port.
+	XGBoostEnvTrackerPort string = "DMLC_TRACKER_PORT"
+
+	// XGBoostEnvTaskID is the env name for the worker task ID (rank).
+	XGBoostEnvTaskID string = "DMLC_TASK_ID"
+
+	// XGBoostEnvNumWorker is the env name for the total number of workers.
+	XGBoostEnvNumWorker string = "DMLC_NUM_WORKER"
+
+	// XGBoostDefaultTrackerPort is the default port for the tracker.
+	XGBoostDefaultTrackerPort int32 = 9091
 )
 
 const (
@@ -215,6 +233,9 @@ var (
 
 	// TorchRunReservedEnvNames is torchrun reserved env names
 	TorchRunReservedEnvNames = sets.New(TorchEnvNumNodes, TorchEnvNumProcPerNode, TorchEnvNodeRank, TorchEnvMasterAddr, TorchEnvMasterPort)
+
+	// XGBoostReservedEnvNames is XGBoost reserved env names that should not be set by users.
+	XGBoostReservedEnvNames = sets.New(XGBoostEnvTrackerURI, XGBoostEnvTrackerPort, XGBoostEnvTaskID, XGBoostEnvNumWorker)
 
 	// ResourceInUseFinalizer is a finalizer for managed resources which is used by other resources.
 	ResourceInUseFinalizer = fmt.Sprintf("%s/resource-in-use", trainer.GroupVersion.Group)

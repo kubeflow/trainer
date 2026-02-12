@@ -44,7 +44,11 @@ func (p *PlainML) Name() string {
 
 func (p *PlainML) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil ||
-		(info.RuntimePolicy.MLPolicySource != nil && (info.RuntimePolicy.MLPolicySource.Torch != nil || info.RuntimePolicy.MLPolicySource.MPI != nil)) {
+		(info.RuntimePolicy.MLPolicySource != nil &&
+			(info.RuntimePolicy.MLPolicySource.Torch != nil ||
+				info.RuntimePolicy.MLPolicySource.MPI != nil ||
+				info.RuntimePolicy.MLPolicySource.JAX != nil ||
+				info.RuntimePolicy.MLPolicySource.XGBoost != nil)) {
 		return nil
 	}
 
