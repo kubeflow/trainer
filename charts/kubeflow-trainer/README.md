@@ -56,8 +56,9 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | image.pullSecrets | list | `[]` | Image pull secrets for private image registry. |
 | manager.replicas | int | `1` | Number of replicas of manager. |
+| manager.selectorLabels | object | `{}` | Extra selector labels for manager Deployment. These labels are added to spec.selector.matchLabels and spec.template.metadata.labels. NOTE: Selector labels are immutable after deployment creation. |
 | manager.labels | object | `{}` | Extra labels for manager pods. |
-| manager.annotations | object | `{}` | Extra annotations for manager pods. |
+| manager.podAnnotations | object | `{"traffic.sidecar.istio.io/excludeInboundPorts":"9443"}` | Extra annotations for manager pods. |
 | manager.volumes | list | `[]` | Volumes for manager pods. |
 | manager.nodeSelector | object | `{}` | Node selector for manager pods. |
 | manager.affinity | object | `{}` | Affinity for manager pods. |
