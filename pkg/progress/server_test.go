@@ -18,6 +18,7 @@ package progress
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -32,6 +33,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -82,6 +84,15 @@ func newTestTLSConfig(t *testing.T) *tls.Config {
 	}
 }
 
+// noopVerifier is a token verifier for testing.
+type noopVerifier struct {
+	validToken string
+}
+
+func (noopVerifier) Verify(context.Context, string) (*oidc.IDToken, error) {
+	return nil, nil
+}
+
 func newTestServer(t *testing.T, cfg *configapi.ProgressServer, objs ...client.Object) *httptest.Server {
 	t.Helper()
 
@@ -90,7 +101,7 @@ func newTestServer(t *testing.T, cfg *configapi.ProgressServer, objs ...client.O
 		WithStatusSubresource(objs...).
 		Build()
 
-	srv, err := NewServer(fakeClient, cfg, newTestTLSConfig(t), NewNoopVerifier())
+	srv, err := NewServer(fakeClient, cfg, newTestTLSConfig(t), noopVerifier{})
 	if err != nil {
 		t.Fatalf("NewServer() error: %v", err)
 	}
@@ -210,12 +221,58 @@ func TestServerErrorResponses(t *testing.T) {
 		name         string
 		url          string
 		body         string
+		authHeader   string
 		wantResponse *metav1.Status
 	}{
 		{
-			name: "POST with invalid JSON triggers invalid payload error",
-			url:  "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
-			body: "{invalid json}",
+			name:       "missing Authorization header fails with 401",
+			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			authHeader: "",
+			wantResponse: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: "Missing Authorization header",
+				Reason:  metav1.StatusReasonUnauthorized,
+				Code:    http.StatusUnauthorized,
+			},
+		},
+		{
+			name:       "invalid Authorization header format triggers unauthorized",
+			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			authHeader: "Basic dXNlcjpwYXNz",
+			wantResponse: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: "Invalid Authorization header format",
+				Reason:  metav1.StatusReasonUnauthorized,
+				Code:    http.StatusUnauthorized,
+			},
+		},
+		{
+			name:       "invalid Authorization header format triggers unauthorized",
+			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			authHeader: "Bearer",
+			wantResponse: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: "Invalid Authorization header format",
+				Reason:  metav1.StatusReasonUnauthorized,
+				Code:    http.StatusUnauthorized,
+			},
+		},
+		{
+			name:       "empty bearer token triggers unauthorized",
+			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			authHeader: "Bearer ",
+			wantResponse: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: "Invalid Authorization header format",
+				Reason:  metav1.StatusReasonUnauthorized,
+				Code:    http.StatusUnauthorized,
+			},
+		},
+		{
+			name:       "invalid JSON triggers invalid payload error",
+			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			body:       "{invalid json}",
+			authHeader: "Bearer test-token",
 			wantResponse: &metav1.Status{
 				Status:  metav1.StatusFailure,
 				Message: "Invalid payload",
@@ -224,9 +281,10 @@ func TestServerErrorResponses(t *testing.T) {
 			},
 		},
 		{
-			name: "POST with malformed data triggers invalid payload error",
-			url:  "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
-			body: "not json at all",
+			name:       "malformed data triggers invalid payload error",
+			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			body:       "not json at all",
+			authHeader: "Bearer test-token",
 			wantResponse: &metav1.Status{
 				Status:  metav1.StatusFailure,
 				Message: "Invalid payload",
@@ -235,10 +293,11 @@ func TestServerErrorResponses(t *testing.T) {
 			},
 		},
 		{
-			name: "POST with oversized body triggers payload too large error",
+			name: "oversized body triggers payload too large error",
 			url:  "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			// Generate ~1MB payload (exceeds 64kB limit)
-			body: `{"trainerStatus": {"metrics": [` + strings.Repeat(`{"name":"m","value":"0.5"},`, 40000) + `]}}`,
+			body:       `{"trainerStatus": {"metrics": [` + strings.Repeat(`{"name":"m","value":"0.5"},`, 40000) + `]}}`,
+			authHeader: "Bearer test-token",
 			wantResponse: &metav1.Status{
 				Status:  metav1.StatusFailure,
 				Message: "Payload too large",
@@ -259,7 +318,7 @@ func TestServerErrorResponses(t *testing.T) {
 				t.Fatalf("Failed to create request: %v", err)
 			}
 			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Authorization", "Bearer test-token")
+			req.Header.Set("Authorization", tc.authHeader)
 
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
