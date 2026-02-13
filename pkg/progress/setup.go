@@ -56,8 +56,10 @@ func createClient(mgr ctrl.Manager, cfg *configapi.ProgressServer) (client.Clien
 		progressConfig.Burst = int(*cfg.Burst)
 	}
 
-	progressClient, err := client.New(&progressConfig, client.Options{})
-
+	progressClient, err := client.New(&progressConfig, client.Options{
+		Scheme: mgr.GetScheme(),
+		Mapper: mgr.GetRESTMapper(),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create progress server client: %w", err)
 	}
