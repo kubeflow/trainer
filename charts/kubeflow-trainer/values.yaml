@@ -165,7 +165,7 @@ dataCache:
 # These are optional runtime templates that can be deployed with the Helm chart.
 # Each runtime provides a blueprint for different ML frameworks and configurations.
 runtimes:
-  # -- Enable all default runtimes (torch, deepspeed, mlx, torchtune) when set to true.
+  # -- Enable all default runtimes (torch, deepspeed, mlx, jax, torchtune) when set to true.
   # Individual runtime settings will be ignored if this is enabled.
   defaultEnabled: false
 
