@@ -18,16 +18,18 @@ package progress
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"k8s.io/client-go/rest"
 )
 
 const (
-	// issuerUrl is the in-cluster issuer
-	issuerURL = "https://kubernetes.default.svc"
-	audience  = "trainer.kubeflow.org"
+	audience = "trainer.kubeflow.org"
 )
 
 // TokenVerifier verifies OIDC tokens.
@@ -38,6 +40,10 @@ type TokenVerifier interface {
 // NewProjectedServiceAccountTokenVerifier creates an OIDC token verifier for validating Kubernetes
 // projected service account tokens against the in-cluster OIDC issuer.
 func NewProjectedServiceAccountTokenVerifier(ctx context.Context, config *rest.Config) (TokenVerifier, error) {
+	issuerURL, err := getClusterOIDCIssuerURL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover issuer URL: %w", err)
+	}
 
 	// Create an authenticated HTTP client using the provided rest config
 	httpClient, err := rest.HTTPClientFor(config)
@@ -58,4 +64,36 @@ func NewProjectedServiceAccountTokenVerifier(ctx context.Context, config *rest.C
 	})
 
 	return verifier, nil
+}
+
+// getClusterOIDCIssuerURL tries to look up the cluster token issuer from the in-cluster service account token
+// Different clusters may use different issuers. This is a reliable way of discovering the issuer.
+func getClusterOIDCIssuerURL() (string, error) {
+	tokenBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+	if err != nil {
+		return "", err
+	}
+
+	parts := strings.Split(strings.TrimSpace(string(tokenBytes)), ".")
+	if len(parts) != 3 {
+		return "", fmt.Errorf("serviceaccount token is not a jwt")
+	}
+
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", fmt.Errorf("serviceaccount token is not a jwt: %w", err)
+	}
+
+	var claims struct {
+		Issuer string `json:"iss"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return "", fmt.Errorf("serviceaccount token is not a jwt: %w", err)
+	}
+
+	if claims.Issuer == "" {
+		return "", fmt.Errorf("serviceaccount token missing issuer claim")
+	}
+
+	return claims.Issuer, nil
 }
