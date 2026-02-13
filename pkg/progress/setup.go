@@ -17,6 +17,7 @@ limitations under the License.
 package progress
 
 import (
+	"context"
 	"fmt"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,7 +40,13 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.ProgressServer) error {
 		return err
 	}
 
-	server, err := NewServer(progressClient, cfg, tlsConfig)
+	// Initialize OIDC verifier for token authentication
+	verifier, err := NewProjectedServiceAccountTokenVerifier(context.Background(), mgr.GetConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create projected service account token verifier: %w", err)
+	}
+
+	server, err := NewServer(progressClient, cfg, tlsConfig, verifier)
 	if err != nil {
 		return err
 	}

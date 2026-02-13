@@ -90,7 +90,7 @@ func newTestServer(t *testing.T, cfg *configapi.ProgressServer, objs ...client.O
 		WithStatusSubresource(objs...).
 		Build()
 
-	srv, err := NewServer(fakeClient, cfg, newTestTLSConfig(t))
+	srv, err := NewServer(fakeClient, cfg, newTestTLSConfig(t), NewNoopVerifier())
 	if err != nil {
 		t.Fatalf("NewServer() error: %v", err)
 	}
@@ -160,10 +160,14 @@ func TestHandleProgressStatus(t *testing.T) {
 			defer ts.Close()
 
 			// Make actual HTTP request
-			resp, err := http.Post(
-				ts.URL+tc.url,
-				"application/json",
-				bytes.NewReader([]byte(tc.body)))
+			req, err := http.NewRequest("POST", ts.URL+tc.url, bytes.NewReader([]byte(tc.body)))
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer test-token")
+
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Fatalf("HTTP POST failed: %v", err)
 			}
@@ -250,10 +254,14 @@ func TestServerErrorResponses(t *testing.T) {
 			defer ts.Close()
 
 			// Make actual HTTP request
-			resp, err := http.Post(
-				ts.URL+tc.url,
-				"application/json",
-				bytes.NewReader([]byte(tc.body)))
+			req, err := http.NewRequest("POST", ts.URL+tc.url, bytes.NewReader([]byte(tc.body)))
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer test-token")
+
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Fatalf("HTTP POST failed: %v", err)
 			}

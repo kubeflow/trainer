@@ -56,12 +56,15 @@ type Server struct {
 }
 
 // NewServer creates a new Server for collecting progress updates.
-func NewServer(c client.Client, cfg *configapi.ProgressServer, tlsConfig *tls.Config) (*Server, error) {
+func NewServer(c client.Client, cfg *configapi.ProgressServer, tlsConfig *tls.Config, verifier TokenVerifier) (*Server, error) {
 	if cfg == nil || cfg.Port == nil {
 		return nil, fmt.Errorf("cfg info is required")
 	}
 	if tlsConfig == nil {
 		return nil, fmt.Errorf("tlsConfig is required")
+	}
+	if verifier == nil {
+		return nil, fmt.Errorf("verifier is required")
 	}
 
 	log := ctrl.Log.WithName("progress")
@@ -75,10 +78,11 @@ func NewServer(c client.Client, cfg *configapi.ProgressServer, tlsConfig *tls.Co
 	mux.HandleFunc(progressURL, s.handleProgressStatus)
 	mux.HandleFunc("/", s.handleDefault)
 
-	// Apply middleware (order: recovery -> body size limit -> logging -> handlers)
+	// Apply middleware
 	handler := chain(mux,
 		recoveryMiddleware(log),
 		loggingMiddleware(log),
+		authMiddleware(log, verifier),
 		bodySizeLimitMiddleware(log, maxBodySize),
 	)
 
