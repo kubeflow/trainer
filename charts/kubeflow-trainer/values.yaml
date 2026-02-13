@@ -198,6 +198,11 @@ runtimes:
       # -- MLX runtime image tag. Defaults to chart version if empty.
       tag: ""
 
+  # -- JAX distributed training runtime (no custom images required)
+  jaxDistributed:
+    # -- Enable deployment of jax-distributed runtime
+    enabled: false
+
   # -- TorchTune distributed training runtime
   torchtuneDistributed:
     image:
