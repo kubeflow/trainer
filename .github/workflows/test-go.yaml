@@ -38,7 +38,7 @@ jobs:
         run: |
           make fmt
           git diff --exit-code || (echo 'Please run "make fmt" to verify gofmt' && exit 1);
-      - name: Check go fmt
+      - name: Check go vet
         run: |
           make vet
           git diff --exit-code || (echo 'Please run "make vet" to verify govet' && exit 1);
