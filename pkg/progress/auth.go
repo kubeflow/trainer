@@ -59,15 +59,3 @@ func NewProjectedServiceAccountTokenVerifier(ctx context.Context, config *rest.C
 
 	return verifier, nil
 }
-
-// noopVerifier is a no-op token verifier for testing.
-type noopVerifier struct{}
-
-func (noopVerifier) Verify(context.Context, string) (*oidc.IDToken, error) {
-	return nil, nil
-}
-
-// NewNoopVerifier returns a verifier that accepts all tokens (for testing only).
-func NewNoopVerifier() TokenVerifier {
-	return noopVerifier{}
-}
