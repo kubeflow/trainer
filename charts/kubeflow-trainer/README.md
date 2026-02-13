@@ -35,7 +35,7 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --v
 
 You can optionally deploy ClusterTrainingRuntimes as part of the Helm installation. Runtimes are disabled by default to keep the chart lightweight.
 
-To enable all default runtimes (torch, deepspeed, mlx, jax, torchtune):
+To enable all default runtimes (torch, deepspeed, mlx, torchtune):
 
 ```bash
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
@@ -88,7 +88,6 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
 - **torch-distributed-with-cache**: PyTorch with distributed data cache support (requires `dataCache.enabled=true`)
 - **deepspeed-distributed**: DeepSpeed distributed training with MPI
 - **mlx-distributed**: MLX distributed training with MPI
-- **jax-distributed**: JAX distributed training (no custom images)
 
 ### Uninstall the chart
 
@@ -137,7 +136,7 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | dataCache.runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training with data cache support |
 | dataCache.runtimes.torchDistributed.enabled | bool | `false` | Enable deployment of torch-distributed-with-cache runtime |
 | runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"defaultEnabled":false,"jaxDistributed":{"enabled":false},"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchtuneDistributed":{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
-| runtimes.defaultEnabled | bool | `false` | Enable all default runtimes (torch, deepspeed, mlx, jax, torchtune) when set to true. Individual runtime settings will be ignored if this is enabled. |
+| runtimes.defaultEnabled | bool | `false` | Enable all default runtimes (torch, deepspeed, mlx, torchtune) when set to true. Individual runtime settings will be ignored if this is enabled. |
 | runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training runtime (no custom images required) |
 | runtimes.torchDistributed.enabled | bool | `false` | Enable deployment of torch-distributed runtime |
 | runtimes.deepspeedDistributed | object | `{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}}` | DeepSpeed distributed training runtime |
