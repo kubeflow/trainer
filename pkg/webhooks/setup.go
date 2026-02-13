@@ -24,10 +24,10 @@ import (
 )
 
 func Setup(mgr ctrl.Manager, runtimes map[string]runtime.Runtime) (string, error) {
-	if err := setupWebhookForClusterTrainingRuntime(mgr, runtimes); err != nil {
+	if err := setupWebhookForClusterTrainingRuntime(mgr); err != nil {
 		return trainer.ClusterTrainingRuntimeKind, err
 	}
-	if err := setupWebhookForTrainingRuntime(mgr, runtimes); err != nil {
+	if err := setupWebhookForTrainingRuntime(mgr); err != nil {
 		return trainer.TrainingRuntimeKind, err
 	}
 	if err := setupWebhookForTrainJob(mgr, runtimes); err != nil {

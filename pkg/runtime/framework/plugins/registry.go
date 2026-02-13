@@ -23,6 +23,7 @@ import (
 
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
@@ -40,5 +41,6 @@ func NewRegistry() Registry {
 		plainml.Name:      plainml.New,
 		torch.Name:        torch.New,
 		jobset.Name:       jobset.New,
+		jax.Name:          jax.New,
 	}
 }

@@ -1503,3 +1503,9 @@ func (s *SecretWrapper) ControllerReference(gvk schema.GroupVersionKind, name, u
 func (s *SecretWrapper) Obj() *corev1.Secret {
 	return &s.Secret
 }
+
+// JAXPolicy sets the JAX policy source
+func (w *MLPolicySourceWrapper) JAXPolicy() *MLPolicySourceWrapper {
+	w.JAX = &trainer.JAXMLPolicySource{}
+	return w
+}

@@ -20,18 +20,15 @@ import (
 	"context"
 	"fmt"
 
-	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
-	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
 const (
@@ -47,26 +44,23 @@ var (
 	}
 )
 
-type TrainingRuntimeWebhook struct {
-	runtimes map[string]runtime.Runtime
-}
+// +kubebuilder:webhook:path=/validate-trainer-kubeflow-org-v1alpha1-trainingruntime,mutating=false,failurePolicy=fail,sideEffects=None,groups=trainer.kubeflow.org,resources=trainingruntimes,verbs=create;update,versions=v1alpha1,name=validator.trainingruntime.trainer.kubeflow.org,admissionReviewVersions=v1
 
-func setupWebhookForTrainingRuntime(mgr ctrl.Manager, run map[string]runtime.Runtime) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(&trainer.TrainingRuntime{}).
-		WithValidator(&TrainingRuntimeWebhook{runtimes: run}).
+// TrainingRuntimeValidator validates TrainingRuntimes
+type TrainingRuntimeValidator struct{}
+
+var _ admission.Validator[*trainer.TrainingRuntime] = (*TrainingRuntimeValidator)(nil)
+
+func setupWebhookForTrainingRuntime(mgr ctrl.Manager) error {
+	return ctrl.NewWebhookManagedBy(mgr, &trainer.TrainingRuntime{}).
+		WithValidator(&TrainingRuntimeValidator{}).
 		Complete()
 }
 
-// +kubebuilder:webhook:path=/validate-trainer-kubeflow-org-v1alpha1-trainingruntime,mutating=false,failurePolicy=fail,sideEffects=None,groups=trainer.kubeflow.org,resources=trainingruntimes,verbs=create;update,versions=v1alpha1,name=validator.trainingruntime.trainer.kubeflow.org,admissionReviewVersions=v1
-
-var _ webhook.CustomValidator = (*TrainingRuntimeWebhook)(nil)
-
-func (w *TrainingRuntimeWebhook) ValidateCreate(ctx context.Context, obj apiruntime.Object) (admission.Warnings, error) {
-	trainingRuntime := obj.(*trainer.TrainingRuntime)
+func (w *TrainingRuntimeValidator) ValidateCreate(ctx context.Context, obj *trainer.TrainingRuntime) (admission.Warnings, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
-	log.V(5).Info("Validating create", "trainingRuntime", klog.KObj(trainingRuntime))
-	return nil, validateReplicatedJobs(trainingRuntime.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	log.V(5).Info("Validating create", "trainingRuntime", klog.KObj(obj))
+	return nil, validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
 }
 
 func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorList {
@@ -110,10 +104,10 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 	return allErrs
 }
 
-func (w *TrainingRuntimeWebhook) ValidateUpdate(context.Context, apiruntime.Object, apiruntime.Object) (admission.Warnings, error) {
+func (w *TrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.TrainingRuntime) (admission.Warnings, error) {
 	return nil, nil
 }
 
-func (w *TrainingRuntimeWebhook) ValidateDelete(context.Context, apiruntime.Object) (admission.Warnings, error) {
+func (w *TrainingRuntimeValidator) ValidateDelete(ctx context.Context, obj *trainer.TrainingRuntime) (admission.Warnings, error) {
 	return nil, nil
 }

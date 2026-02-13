@@ -26,8 +26,8 @@ class JobsetV1alpha2SuccessPolicy(BaseModel):
     """
     JobsetV1alpha2SuccessPolicy
     """ # noqa: E501
-    operator: StrictStr = Field(description="Operator determines either All or Any of the selected jobs should succeed to consider the JobSet successful")
-    target_replicated_jobs: Optional[List[StrictStr]] = Field(default=None, description="TargetReplicatedJobs are the names of the replicated jobs the operator will apply to. A null or empty list will apply to all replicatedJobs.", alias="targetReplicatedJobs")
+    operator: StrictStr = Field(description="operator determines either All or Any of the selected jobs should succeed to consider the JobSet successful")
+    target_replicated_jobs: Optional[List[StrictStr]] = Field(default=None, description="targetReplicatedJobs are the names of the replicated jobs the operator will apply to. A null or empty list will apply to all replicatedJobs.", alias="targetReplicatedJobs")
     __properties: ClassVar[List[str]] = ["operator", "targetReplicatedJobs"]
 
     model_config = ConfigDict(

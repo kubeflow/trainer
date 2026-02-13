@@ -24,7 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -46,14 +46,14 @@ import (
 type ClusterTrainingRuntimeReconciler struct {
 	log                        logr.Logger
 	client                     client.Client
-	recorder                   record.EventRecorder
+	recorder                   events.EventRecorder
 	nonClRuntimeObjectUpdateCh chan event.TypedGenericEvent[iter.Seq[types.NamespacedName]]
 }
 
 var _ reconcile.Reconciler = (*ClusterTrainingRuntimeReconciler)(nil)
 var _ TrainJobWatcher = (*ClusterTrainingRuntimeReconciler)(nil)
 
-func NewClusterTrainingRuntimeReconciler(cli client.Client, recorder record.EventRecorder) *ClusterTrainingRuntimeReconciler {
+func NewClusterTrainingRuntimeReconciler(cli client.Client, recorder events.EventRecorder) *ClusterTrainingRuntimeReconciler {
 	return &ClusterTrainingRuntimeReconciler{
 		log:                        ctrl.Log.WithName("clustertrainingruntime-controller"),
 		client:                     cli,
@@ -80,12 +80,14 @@ func (r *ClusterTrainingRuntimeReconciler) Reconcile(ctx context.Context, reques
 	}); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	prevClRuntime := clRuntime.DeepCopy()
 	if !ctrlutil.ContainsFinalizer(&clRuntime, constants.ResourceInUseFinalizer) && len(trainJobs.Items) != 0 {
 		ctrlutil.AddFinalizer(&clRuntime, constants.ResourceInUseFinalizer)
-		return ctrl.Result{}, r.client.Update(ctx, &clRuntime)
+		return ctrl.Result{}, r.client.Patch(ctx, &clRuntime, client.MergeFrom(prevClRuntime))
 	} else if !clRuntime.DeletionTimestamp.IsZero() && len(trainJobs.Items) == 0 {
 		ctrlutil.RemoveFinalizer(&clRuntime, constants.ResourceInUseFinalizer)
-		return ctrl.Result{}, r.client.Update(ctx, &clRuntime)
+		return ctrl.Result{}, r.client.Patch(ctx, &clRuntime, client.MergeFrom(prevClRuntime))
 	}
 	return ctrl.Result{}, nil
 }

@@ -444,7 +444,7 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 				g.Expect(k8sClient.Update(ctx, new(oldTrainJob))).Should(errorMatcher)
 			}, util.Timeout, util.Interval).Should(gomega.Succeed())
 		},
-			ginkgo.Entry("Should fail to update TrainJob managedBy",
+			ginkgo.Entry("Should fail to update managedBy",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-managed-by").
 						ManagedBy("trainer.kubeflow.org/trainjob-controller").
@@ -467,6 +467,62 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 					return job
 				},
 				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to update initializer",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-initializer").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Initializer(&trainer.Initializer{
+							Model: &trainer.ModelInitializer{
+								StorageUri: ptr.To("s3://test/path"),
+							},
+						}).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.Initializer.Model.StorageUri = ptr.To("s3://forbidden-update")
+					return job
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to update trainer",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-trainer").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Trainer(&trainer.Trainer{
+							Image: ptr.To("test-image"),
+						}).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.Trainer.Image = ptr.To("forbidden-update")
+					return job
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed to update podTemplateOverride when suspend is true",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-trainer").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(true).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										NodeSelector: map[string]string{"test": "test"},
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodTemplateOverrides[0].Spec.NodeSelector = map[string]string{"allow": "update"}
+					return job
+				},
+				gomega.Succeed()),
 		)
 	})
 })

@@ -18,10 +18,15 @@ package v1alpha1
 
 // TrainingRuntimeSpecApplyConfiguration represents a declarative configuration of the TrainingRuntimeSpec type for use
 // with apply.
+//
+// TrainingRuntimeSpec represents a specification of the desired training runtime.
 type TrainingRuntimeSpecApplyConfiguration struct {
-	MLPolicy       *MLPolicyApplyConfiguration           `json:"mlPolicy,omitempty"`
-	PodGroupPolicy *PodGroupPolicyApplyConfiguration     `json:"podGroupPolicy,omitempty"`
-	Template       *JobSetTemplateSpecApplyConfiguration `json:"template,omitempty"`
+	// mlPolicy provides the ML-specific parameters for the model training.
+	MLPolicy *MLPolicyApplyConfiguration `json:"mlPolicy,omitempty"`
+	// podGroupPolicy defines the configuration for the PodGroup to enable gang-scheduling via supported plugins.
+	PodGroupPolicy *PodGroupPolicyApplyConfiguration `json:"podGroupPolicy,omitempty"`
+	// template for the JobSet which will be used by TrainJob.
+	Template *JobSetTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
 
 // TrainingRuntimeSpecApplyConfiguration constructs a declarative configuration of the TrainingRuntimeSpec type for use with

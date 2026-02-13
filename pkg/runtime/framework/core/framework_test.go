@@ -49,6 +49,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
@@ -82,11 +83,13 @@ func TestNew(t *testing.T) {
 					plainml.Name:      &plainml.PlainML{},
 					torch.Name:        &torch.Torch{},
 					jobset.Name:       &jobset.JobSet{},
+					jax.Name:          &jax.Jax{},
 				},
 				enforceMLPlugins: []framework.EnforceMLPolicyPlugin{
 					&mpi.MPI{},
 					&plainml.PlainML{},
 					&torch.Torch{},
+					&jax.Jax{},
 				},
 				enforcePodGroupPolicyPlugins: []framework.EnforcePodGroupPolicyPlugin{
 					&coscheduling.CoScheduling{},
@@ -97,6 +100,7 @@ func TestNew(t *testing.T) {
 					&torch.Torch{},
 					&jobset.JobSet{},
 					&volcano.Volcano{},
+					&jax.Jax{},
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
 					&coscheduling.CoScheduling{},

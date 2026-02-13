@@ -431,6 +431,9 @@ spec:
                         type: string
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: field is immutable
+                  rule: self == oldSelf
               labels:
                 additionalProperties:
                   type: string
@@ -447,13 +450,12 @@ spec:
                   don't have this field at all or the field value is the reserved string
                   `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs
                   with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.
-                  Defaults to `trainer.kubeflow.org/trainjob-controller`
                 type: string
                 x-kubernetes-validations:
                 - message: ManagedBy must be trainer.kubeflow.org/trainjob-controller
                     or kueue.x-k8s.io/multikueue if set
                   rule: self in ['trainer.kubeflow.org/trainjob-controller', 'kueue.x-k8s.io/multikueue']
-                - message: ManagedBy value is immutable
+                - message: field is immutable
                   rule: self == oldSelf
               podTemplateOverrides:
                 description: |-
@@ -2621,9 +2623,10 @@ spec:
                               operator:
                                 description: |-
                                   Operator represents a key's relationship to the value.
-                                  Valid operators are Exists and Equal. Defaults to Equal.
+                                  Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                                   Exists is equivalent to wildcard for value, so that a pod can
                                   tolerate all taints of a particular category.
+                                  Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                                 type: string
                               tolerationSeconds:
                                 description: |-
@@ -3254,7 +3257,7 @@ spec:
                                           resources:
                                             description: |-
                                               resources represents the minimum resources the volume should have.
-                                              If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
+                                              Users are allowed to specify resource requirements
                                               that are lower than previous value but must still be higher than capacity recorded in the
                                               status field of the claim.
                                               More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
@@ -4145,6 +4148,24 @@ spec:
                                               description: Kubelet's generated CSRs
                                                 will be addressed to this signer.
                                               type: string
+                                            userAnnotations:
+                                              additionalProperties:
+                                                type: string
+                                              description: |-
+                                                userAnnotations allow pod authors to pass additional information to
+                                                the signer implementation.  Kubernetes does not restrict or validate this
+                                                metadata in any way.
+
+                                                These values are copied verbatim into the `spec.unverifiedUserAnnotations` field of
+                                                the PodCertificateRequest objects that Kubelet creates.
+
+                                                Entries are subject to the same validation as object metadata annotations,
+                                                with the addition that all keys must be domain-prefixed. No restrictions
+                                                are placed on values, except an overall size limitation on the entire field.
+
+                                                Signers should document the keys and values they support. Signers should
+                                                deny requests that contain keys they do not recognize.
+                                              type: object
                                           required:
                                           - keyType
                                           - signerName
@@ -4596,9 +4617,7 @@ spec:
                 type: array
                 x-kubernetes-list-type: atomic
               runtimeRef:
-                description: |-
-                  runtimeRef is the reference to the training runtime.
-                  The field is immutable.
+                description: runtimeRef is the reference to the training runtime.
                 properties:
                   apiGroup:
                     default: trainer.kubeflow.org
@@ -4623,13 +4642,11 @@ spec:
                 - name
                 type: object
                 x-kubernetes-validations:
-                - message: runtimeRef is immutable
+                - message: field is immutable
                   rule: self == oldSelf
               suspend:
                 default: false
-                description: |-
-                  suspend defines whether to suspend the running TrainJob.
-                  Defaults to false.
+                description: suspend defines whether to suspend the running TrainJob.
                 type: boolean
               trainer:
                 description: trainer defines the configuration of the trainer.
@@ -4886,6 +4903,9 @@ spec:
                         type: object
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: field is immutable
+                  rule: self == oldSelf
             required:
             - runtimeRef
             type: object

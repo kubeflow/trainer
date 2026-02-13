@@ -19,19 +19,20 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - limitranges
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  - events.k8s.io
+  resources:
   - events
   verbs:
   - create
   - patch
   - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - limitranges
-  verbs:
-  - get
-  - list
   - watch
 - apiGroups:
   - admissionregistration.k8s.io

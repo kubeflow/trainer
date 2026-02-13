@@ -31,9 +31,9 @@ class JobsetV1alpha2JobSet(BaseModel):
     """ # noqa: E501
     api_version: Optional[StrictStr] = Field(default=None, description="APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources", alias="apiVersion")
     kind: Optional[StrictStr] = Field(default=None, description="Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds")
-    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = None
-    spec: Optional[JobsetV1alpha2JobSetSpec] = None
-    status: Optional[JobsetV1alpha2JobSetStatus] = None
+    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="metadata is the object metadata for JobSet")
+    spec: Optional[JobsetV1alpha2JobSetSpec] = Field(default=None, description="spec is the specification for jobset")
+    status: Optional[JobsetV1alpha2JobSetStatus] = Field(default=None, description="status is the status of the jobset")
     __properties: ClassVar[List[str]] = ["apiVersion", "kind", "metadata", "spec", "status"]
 
     model_config = ConfigDict(

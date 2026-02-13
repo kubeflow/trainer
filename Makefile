@@ -18,7 +18,7 @@ TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
 LOCALBIN ?= $(PROJECT_DIR)/bin
 
 # Tool versions
-K8S_VERSION ?= 1.34.0
+K8S_VERSION ?= 1.35.0
 GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
 ENVTEST_VERSION ?= release-0.22
 CONTROLLER_GEN_VERSION ?= v0.18.0
@@ -209,10 +209,11 @@ test-e2e: ginkgo ## Run Go e2e test.
 # Input and output location for Notebooks executed with Papermill.
 NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
 NOTEBOOK_OUTPUT=$(PROJECT_DIR)/artifacts/notebooks/trainer_output.ipynb
+PAPERMILL_PARAMS=
 PAPERMILL_TIMEOUT=900
 .PHONY: test-e2e-notebook
 test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
-	NOTEBOOK_INPUT=$(NOTEBOOK_INPUT) NOTEBOOK_OUTPUT=$(NOTEBOOK_OUTPUT) PAPERMILL_TIMEOUT=$(PAPERMILL_TIMEOUT) ./hack/e2e-run-notebook.sh
+	NOTEBOOK_INPUT=$(NOTEBOOK_INPUT) NOTEBOOK_OUTPUT=$(NOTEBOOK_OUTPUT) PAPERMILL_PARAMS="$(PAPERMILL_PARAMS)" PAPERMILL_TIMEOUT=$(PAPERMILL_TIMEOUT) ./hack/e2e-run-notebook.sh
 
 ##@ Helm
 

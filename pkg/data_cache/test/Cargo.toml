@@ -5,10 +5,10 @@ edition = "2024"
 
 [dependencies]
 futures = "0.3.31"
-arrow-flight = "57.2.0"
+arrow-flight = "57.3.0"
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros"] }
-tonic = "0.14.2"
-bytes = "1.11.0"
+tonic = "0.14.3"
+bytes = "1.11.1"
 bincode = "3.0.0"
 serde = { version = "1.0.228", features = ["derive"] }
 tracing = "0.1.44"
