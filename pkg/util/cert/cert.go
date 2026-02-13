@@ -19,30 +19,20 @@ package cert
 import (
 	"crypto/tls"
 	"fmt"
-	"os"
-	"strings"
 
 	cert "github.com/open-policy-agent/cert-controller/pkg/rotator"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
+
+	"github.com/kubeflow/trainer/v2/pkg/util/runtime"
 )
 
 const (
-	certDir          = "/tmp/k8s-webhook-server/serving-certs"
-	caName           = "kubeflow-trainer-ca"
-	caOrganization   = "kubeflow-trainer"
-	defaultNamespace = "kubeflow-system"
+	certDir        = "/tmp/k8s-webhook-server/serving-certs"
+	caName         = "kubeflow-trainer-ca"
+	caOrganization = "kubeflow-trainer"
 )
-
-func getOperatorNamespace() string {
-	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
-		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
-			return ns
-		}
-	}
-	return defaultNamespace
-}
 
 type Config struct {
 	WebhookServiceName       string
@@ -56,7 +46,7 @@ type Config struct {
 // ManageCerts creates all certs for webhooks.
 func ManageCerts(mgr ctrl.Manager, cfg Config, setupFinished chan struct{}) error {
 
-	ns := getOperatorNamespace()
+	ns := runtime.GetOperatorNamespace()
 	// DNSName is <service name>.<namespace>.svc
 	dnsName := fmt.Sprintf("%s.%s.svc", cfg.WebhookServiceName, ns)
 
