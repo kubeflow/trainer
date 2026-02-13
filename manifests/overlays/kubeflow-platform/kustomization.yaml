@@ -27,3 +27,5 @@ patches:
           metadata:
             labels:
               app: kubeflow-trainer
+            annotations:
+              traffic.sidecar.istio.io/excludeInboundPorts: "9443"

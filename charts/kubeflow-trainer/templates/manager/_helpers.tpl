@@ -62,3 +62,12 @@ Create the name of the manager configmap.
 {{- define "trainer.manager.configmap.name" -}}
 {{ include "trainer.fullname" . }}-config
 {{- end -}}
+
+{{/*
+Pod annotations for the manager.
+*/}}
+{{- define "trainer.manager.podAnnotations" -}}
+{{- with .Values.manager.podAnnotations }}
+{{- toYaml . }}
+{{- end }}
+{{- end -}}
