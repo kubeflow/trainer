@@ -3,6 +3,7 @@ package progress
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,6 +59,51 @@ func bodySizeLimitMiddleware(log logr.Logger, maxBytes int64) Middleware {
 
 			// Wrap body to enforce limit for chunked/streaming requests
 			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// authMiddleware validates bearer tokens in requests.
+func authMiddleware(log logr.Logger, verifier TokenVerifier) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Extract bearer token from Authorization header
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				badRequest(w, log, "Missing Authorization header",
+					v1.StatusReasonUnauthorized,
+					http.StatusUnauthorized)
+				return
+			}
+
+			// Check for "Bearer " prefix
+			const bearerPrefix = "Bearer "
+			if !strings.HasPrefix(authHeader, bearerPrefix) {
+				badRequest(w, log, "Invalid Authorization header format",
+					v1.StatusReasonUnauthorized,
+					http.StatusUnauthorized)
+				return
+			}
+
+			token := strings.TrimPrefix(authHeader, bearerPrefix)
+			if token == "" {
+				badRequest(w, log, "Empty bearer token",
+					v1.StatusReasonUnauthorized,
+					http.StatusUnauthorized)
+				return
+			}
+
+			// Validate the token
+			if _, err := verifier.Verify(r.Context(), token); err != nil {
+				log.V(5).Error(err, "Token validation failed")
+				badRequest(w, log, "Invalid or expired token",
+					v1.StatusReasonUnauthorized,
+					http.StatusUnauthorized)
+				return
+			}
+
+			// Token is valid, proceed to next handler
 			next.ServeHTTP(w, r)
 		})
 	}
