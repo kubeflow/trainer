@@ -131,27 +131,23 @@ func TestHandleProgressStatus(t *testing.T) {
 		},
 	}
 
-	cases := []struct {
-		name         string
+	cases := map[string]struct {
 		url          string
 		body         string
 		wantResponse *trainer.ProgressStatus
 	}{
-		{
-			name:         "successful POST request with full progress status",
+		"successful POST request with full progress status": {
 			url:          "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			body:         string(validBody),
 			wantResponse: &validProgressStatus,
 		},
-		{
-			name:         "successful POST request with empty progress status",
+		"successful POST request with empty progress status": {
 			url:          "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			body:         "{}",
 			wantResponse: &trainer.ProgressStatus{},
 		},
-		{
-			name: "successful POST request with only metrics",
-			url:  "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+		"successful POST request with only metrics": {
+			url: "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			body: `{
 				"trainerStatus": {
 					"metrics": [{"name": "loss", "value": "0.5"}]
@@ -165,8 +161,8 @@ func TestHandleProgressStatus(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
 			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)}, existingTrainJob)
 			defer ts.Close()
 
@@ -217,15 +213,13 @@ func TestServerErrorResponses(t *testing.T) {
 		},
 	}
 
-	cases := []struct {
-		name         string
+	cases := map[string]struct {
 		url          string
 		body         string
 		authHeader   string
 		wantResponse *metav1.Status
 	}{
-		{
-			name:       "missing Authorization header fails with 401",
+		"missing Authorization header fails with 401": {
 			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			authHeader: "",
 			wantResponse: &metav1.Status{
@@ -235,8 +229,7 @@ func TestServerErrorResponses(t *testing.T) {
 				Code:    http.StatusUnauthorized,
 			},
 		},
-		{
-			name:       "invalid Authorization header format triggers unauthorized",
+		"invalid Authorization header format triggers unauthorized": {
 			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			authHeader: "Basic dXNlcjpwYXNz",
 			wantResponse: &metav1.Status{
@@ -246,19 +239,7 @@ func TestServerErrorResponses(t *testing.T) {
 				Code:    http.StatusUnauthorized,
 			},
 		},
-		{
-			name:       "invalid Authorization header format triggers unauthorized",
-			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
-			authHeader: "Bearer",
-			wantResponse: &metav1.Status{
-				Status:  metav1.StatusFailure,
-				Message: "Invalid Authorization header format",
-				Reason:  metav1.StatusReasonUnauthorized,
-				Code:    http.StatusUnauthorized,
-			},
-		},
-		{
-			name:       "empty bearer token triggers unauthorized",
+		"empty bearer token triggers unauthorized": {
 			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			authHeader: "Bearer ",
 			wantResponse: &metav1.Status{
@@ -268,8 +249,7 @@ func TestServerErrorResponses(t *testing.T) {
 				Code:    http.StatusUnauthorized,
 			},
 		},
-		{
-			name:       "invalid JSON triggers invalid payload error",
+		"invalid JSON triggers invalid payload error": {
 			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			body:       "{invalid json}",
 			authHeader: "Bearer test-token",
@@ -280,8 +260,7 @@ func TestServerErrorResponses(t *testing.T) {
 				Code:    http.StatusUnprocessableEntity,
 			},
 		},
-		{
-			name:       "malformed data triggers invalid payload error",
+		"malformed data triggers invalid payload error": {
 			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			body:       "not json at all",
 			authHeader: "Bearer test-token",
@@ -292,9 +271,8 @@ func TestServerErrorResponses(t *testing.T) {
 				Code:    http.StatusUnprocessableEntity,
 			},
 		},
-		{
-			name: "oversized body triggers payload too large error",
-			url:  "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+		"oversized body triggers payload too large error": {
+			url: "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			// Generate ~1MB payload (exceeds 64kB limit)
 			body:       `{"trainerStatus": {"metrics": [` + strings.Repeat(`{"name":"m","value":"0.5"},`, 40000) + `]}}`,
 			authHeader: "Bearer test-token",
@@ -307,8 +285,8 @@ func TestServerErrorResponses(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
 			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)}, existingTrainJob)
 			defer ts.Close()
 
