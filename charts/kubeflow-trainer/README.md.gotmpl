@@ -1,5 +1,5 @@
 {{- /*
-Copyright 2025 The Kubeflow authors.
+Copyright 2026 The Kubeflow authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,6 +48,64 @@ Alternatively, you can install the latest version from the master branch (e.g. `
 ```bash
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version 0.0.0-sha-bfccb7b
 ```
+
+### Install with ClusterTrainingRuntimes
+
+You can optionally deploy ClusterTrainingRuntimes as part of the Helm installation. Runtimes are disabled by default to keep the chart lightweight.
+
+To enable all default runtimes (torch, deepspeed, mlx, torchtune):
+
+```bash
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+  --version 2.1.0 \
+  --set runtimes.defaultEnabled=true
+```
+
+To enable specific runtimes:
+
+```bash
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+  --version 2.1.0 \
+  --set runtimes.torchDistributed.enabled=true \
+  --set runtimes.deepspeedDistributed.enabled=true
+```
+
+Or use a custom values file:
+
+```yaml
+# values.yaml
+runtimes:
+  torchDistributed:
+    enabled: true
+  deepspeedDistributed:
+    enabled: true
+  mlxDistributed:
+    enabled: true
+
+# For torch-distributed-with-cache, enable both dataCache.enabled and dataCache.runtimes.torchDistributed.enabled
+dataCache:
+  enabled: true
+  cacheImage:
+    tag: "v2.0.0"
+  runtimes:
+    torchDistributed:
+      enabled: true
+```
+
+Then install with:
+
+```bash
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+  --version 2.1.0 \
+  -f values.yaml
+```
+
+### Available Runtimes
+
+- **torch-distributed**: PyTorch distributed training (no custom images)
+- **torch-distributed-with-cache**: PyTorch with distributed data cache support (requires `dataCache.enabled=true`)
+- **deepspeed-distributed**: DeepSpeed distributed training with MPI
+- **mlx-distributed**: MLX distributed training with MPI
 
 ### Uninstall the chart
 
