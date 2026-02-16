@@ -148,9 +148,7 @@ func getClusterOIDCIssuerURL() (string, error) {
 		return "", fmt.Errorf("serviceaccount token is not a jwt: %w", err)
 	}
 
-	var claims struct {
-		Issuer string `json:"iss"`
-	}
+	var claims ProjectedServiceAccountToken
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return "", fmt.Errorf("serviceaccount token is not a jwt: %w", err)
 	}
