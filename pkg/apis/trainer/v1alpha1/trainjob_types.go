@@ -269,6 +269,15 @@ type PodTemplateOverride struct {
 	// +required
 	TargetJobs []PodTemplateOverrideTargetJob `json:"targetJobs,omitempty"`
 
+	// manager indicates which controller created this PodTemplateOverride object.
+	// It can be used by external controllers or admission webhooks to track ownership
+	// and avoid conflicts with other controllers. For example, Kueue sets this field
+	// to "kueue.k8s.io/manager".
+	// Defaults to `trainer.kubeflow.org/unknown`
+	// +kubebuilder:default="trainer.kubeflow.org/unknown"
+	// +optional
+	Manager *string `json:"manager,omitempty"`
+
 	// metadata overrides the Pod template metadata.
 	// These values will be merged with the TrainingRuntime's Pod template metadata.
 	// +optional

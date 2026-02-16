@@ -27,6 +27,12 @@ import (
 type PodTemplateOverrideApplyConfiguration struct {
 	// targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.
 	TargetJobs []PodTemplateOverrideTargetJobApplyConfiguration `json:"targetJobs,omitempty"`
+	// manager indicates which controller created this PodTemplateOverride object.
+	// It can be used by external controllers or admission webhooks to track ownership
+	// and avoid conflicts with other controllers. For example, Kueue sets this field
+	// to "kueue.k8s.io/manager".
+	// Defaults to `trainer.kubeflow.org/unknown`
+	Manager *string `json:"manager,omitempty"`
 	// metadata overrides the Pod template metadata.
 	// These values will be merged with the TrainingRuntime's Pod template metadata.
 	Metadata *v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
@@ -51,6 +57,14 @@ func (b *PodTemplateOverrideApplyConfiguration) WithTargetJobs(values ...*PodTem
 		}
 		b.TargetJobs = append(b.TargetJobs, *values[i])
 	}
+	return b
+}
+
+// WithManager sets the Manager field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Manager field is set to the value of the last call.
+func (b *PodTemplateOverrideApplyConfiguration) WithManager(value string) *PodTemplateOverrideApplyConfiguration {
+	b.Manager = &value
 	return b
 }
 

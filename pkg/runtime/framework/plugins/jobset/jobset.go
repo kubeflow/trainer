@@ -29,6 +29,7 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
@@ -124,6 +125,9 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 
 	// TODO (andreyvelich): Validate Volumes, VolumeMounts, and Tolerations.
 	for _, podTemplateOverride := range newObj.Spec.PodTemplateOverrides {
+		if podTemplateOverride.Manager != nil {
+			allErrs = append(allErrs, validation.IsDomainPrefixedPath(podTemplateOverridePath.Child("manager"), *podTemplateOverride.Manager)...)
+		}
 		for _, targetJob := range podTemplateOverride.TargetJobs {
 			containers, ok := rJobContainerNames[targetJob.Name]
 			if !ok {
