@@ -173,6 +173,8 @@ func (s *Server) handleDefault(w http.ResponseWriter, _ *http.Request) {
 	badRequest(w, s.log, "Not found", metav1.StatusReasonNotFound, http.StatusNotFound)
 }
 
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get
+
 // authoriseRequest checks whether the service account token bearer token used by this request comes from
 // a pod that is part of the TrainJob that is being updated.
 func (s *Server) authoriseRequest(r *http.Request, namespace, trainJobName string) bool {
