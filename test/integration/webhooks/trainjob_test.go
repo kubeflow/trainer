@@ -372,6 +372,32 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should succeed to create trainJob with valid PodTemplateOverrides.Manager",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-podtemplateoverrides-manager").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						PodTemplateOverrides([]trainer.PodTemplateOverride{
+							{
+								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
+								Manager:    ptr.To("kueue.k8s.io/manager"),
+							},
+						}).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create trainJob with invalid PodTemplateOverrides.Manager",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "invalid-podtemplateoverrides-manager").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						PodTemplateOverrides([]trainer.PodTemplateOverride{
+							{
+								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
+								Manager:    ptr.To("kueue.k8s.io/"),
+							},
+						}).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
 		)
 		ginkgo.DescribeTable("Defaulting TrainJob on creation", func(trainJob func() *trainer.TrainJob, wantTrainJob func() *trainer.TrainJob) {
 			created := trainJob()
@@ -390,6 +416,31 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						ManagedBy("kueue.x-k8s.io/multikueue").
 						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "testing").
 						Suspend(false).
+						Obj()
+				}),
+			ginkgo.Entry("Should succeed to default PodTemplateOverrides.Manager='trainer.kubeflow.org/unknown'",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "null-podtemplateoverrides-manager").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						PodTemplateOverrides([]trainer.PodTemplateOverride{
+							{
+								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
+							},
+						}).
+						Suspend(true).
+						Obj()
+				},
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "null-podtemplateoverrides-manager").
+						ManagedBy("trainer.kubeflow.org/trainjob-controller").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						PodTemplateOverrides([]trainer.PodTemplateOverride{
+							{
+								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
+								Manager:    ptr.To("trainer.kubeflow.org/unknown"),
+							},
+						}).
+						Suspend(true).
 						Obj()
 				}),
 			ginkgo.Entry("Should succeed to default managedBy=trainer.kubeflow.org/trainjob-controller",
