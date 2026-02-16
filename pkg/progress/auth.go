@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 )
 
@@ -32,9 +33,59 @@ const (
 	audience = "trainer.kubeflow.org"
 )
 
-// TokenVerifier verifies OIDC tokens.
+// TokenVerifier verifies OIDC tokens and returns decoded service account token claims.
 type TokenVerifier interface {
-	Verify(ctx context.Context, token string) (*oidc.IDToken, error)
+	Verify(ctx context.Context, token string) (*ProjectedServiceAccountToken, error)
+}
+
+// ProjectedServiceAccountToken is a decoded kubernetes projected service account token
+type ProjectedServiceAccountToken struct {
+	Issuer     string           `json:"iss"`           // e.g. https://kubernetes.default.svc
+	Subject    string           `json:"sub"`           // system:serviceaccount:<namespace>:<name>
+	Audience   []string         `json:"aud,omitempty"` // audiences the token is valid for
+	Expiry     int64            `json:"exp"`           // expiration time (unix)
+	NotBefore  int64            `json:"nbf,omitempty"` // not valid before (unix)
+	IssuedAt   int64            `json:"iat"`           // issued at (unix)
+	Kubernetes KubernetesClaims `json:"kubernetes.io"`
+}
+
+type KubernetesClaims struct {
+	Namespace      string         `json:"namespace"`
+	ServiceAccount ServiceAccount `json:"serviceaccount"`
+	Pod            *Pod           `json:"pod,omitempty"`
+}
+
+// ServiceAccount identifies the service account.
+type ServiceAccount struct {
+	Name string    `json:"name"`
+	UID  types.UID `json:"uid"`
+}
+
+// Pod is included when the token is bound to a pod.
+type Pod struct {
+	Name string    `json:"name"`
+	UID  types.UID `json:"uid"`
+}
+
+// projectedServiceAccountTokenVerifier wraps an OIDC verifier and decodes tokens into ProjectedServiceAccountToken.
+type projectedServiceAccountTokenVerifier struct {
+	oidcVerifier *oidc.IDTokenVerifier
+}
+
+// Verify validates the token and decodes it into a ProjectedServiceAccountToken.
+func (v *projectedServiceAccountTokenVerifier) Verify(ctx context.Context, token string) (*ProjectedServiceAccountToken, error) {
+	idToken, err := v.oidcVerifier.Verify(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decode the token into a struct
+	var saToken ProjectedServiceAccountToken
+	if err := idToken.Claims(&saToken); err != nil {
+		return nil, fmt.Errorf("failed to decode token claims: %w", err)
+	}
+
+	return &saToken, nil
 }
 
 // NewProjectedServiceAccountTokenVerifier creates an OIDC token verifier for validating Kubernetes
@@ -63,7 +114,20 @@ func NewProjectedServiceAccountTokenVerifier(ctx context.Context, config *rest.C
 		ClientID: audience,
 	})
 
-	return verifier, nil
+	return &projectedServiceAccountTokenVerifier{
+		oidcVerifier: verifier,
+	}, nil
+}
+
+type projectServiceAccountTokenContextKey struct{}
+
+func withServiceAccountToken(ctx context.Context, token ProjectedServiceAccountToken) context.Context {
+	return context.WithValue(ctx, projectServiceAccountTokenContextKey{}, &token)
+}
+
+func serviceAccountTokenFromContext(ctx context.Context) (*ProjectedServiceAccountToken, bool) {
+	t, ok := ctx.Value(projectServiceAccountTokenContextKey{}).(*ProjectedServiceAccountToken)
+	return t, ok
 }
 
 // getClusterOIDCIssuerURL tries to look up the cluster token issuer from the in-cluster service account token
