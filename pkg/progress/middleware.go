@@ -64,8 +64,8 @@ func bodySizeLimitMiddleware(log logr.Logger, maxBytes int64) Middleware {
 	}
 }
 
-// authMiddleware validates bearer tokens in requests.
-func authMiddleware(log logr.Logger, verifier TokenVerifier) Middleware {
+// authenticationMiddleware validates the request has a valid projected service account token.
+func authenticationMiddleware(log logr.Logger, verifier TokenVerifier) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Extract bearer token from Authorization header
