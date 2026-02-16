@@ -180,11 +180,11 @@ TrainerClient().train(
     initializer=Initializer(
         model=HuggingFaceDatasetInitializer(storage_uri="hf://qwen3.2-instruct")
     ),
-    timeout=28800,  # 8 hours max
+    active_deadline_seconds=28800,  # 8 hours max
 )
 ```
 
-The `timeout` parameter in the SDK maps to `ActiveDeadlineSeconds` on the created `TrainJob`.
+The `active_deadline_seconds` parameter in the SDK maps to `ActiveDeadlineSeconds` on the created `TrainJob`.
 
 ### Implementation Overview
 
