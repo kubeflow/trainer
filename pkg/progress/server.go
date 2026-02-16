@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,7 +38,6 @@ import (
 
 const (
 	shutdownTimeout = 5 * time.Second
-	progressURL     = "POST /apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status"
 
 	// HTTP Server timeouts to prevent resource exhaustion
 	readTimeout  = 10 * time.Second
@@ -75,7 +75,7 @@ func NewServer(c client.Client, cfg *configapi.ProgressServer, tlsConfig *tls.Co
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc(progressURL, s.handleProgressStatus)
+	mux.HandleFunc("POST "+statusUrl("{namespace}", "{name}"), s.handleProgressStatus)
 	mux.HandleFunc("/", s.handleDefault)
 
 	// Apply middleware
@@ -127,20 +127,25 @@ func (s *Server) Start(ctx context.Context) error {
 func (s *Server) handleProgressStatus(w http.ResponseWriter, r *http.Request) {
 
 	namespace := r.PathValue("namespace")
-	name := r.PathValue("name")
+	trainJobName := r.PathValue("name")
+
+	if !s.authoriseRequest(r, namespace, trainJobName) {
+		badRequest(w, s.log, "Forbidden", metav1.StatusReasonForbidden, http.StatusForbidden)
+		return
+	}
 
 	// Parse request body
 	var progressStatus trainer.ProgressStatus
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&progressStatus); err != nil {
-		s.log.V(5).Error(err, "Failed to parse progress status", "namespace", namespace, "name", name)
+		s.log.V(5).Error(err, "Failed to parse progress status", "namespace", namespace, "trainJobName", trainJobName)
 		badRequest(w, s.log, "Invalid payload", metav1.StatusReasonInvalid, http.StatusUnprocessableEntity)
 		return
 	}
 
 	var trainJob = trainer.TrainJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			Name:      trainJobName,
 			Namespace: namespace,
 		},
 		Status: trainer.TrainJobStatus{
@@ -148,24 +153,88 @@ func (s *Server) handleProgressStatus(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	if err := s.client.Status().Patch(r.Context(), &trainJob, client.Merge); err != nil {
-		s.log.Error(err, "Failed to update train job", "namespace", namespace, "name", name)
+		s.log.Error(err, "Failed to update train job", "namespace", namespace, "name", trainJobName)
 		badRequest(w, s.log, "Internal error", metav1.StatusReasonInternalError, http.StatusInternalServerError)
 		return
 	}
 	// PLACEHOLDER: Log the received progress status
-	s.log.Info("Handled progress status update", "namespace", namespace, "name", name, "status", progressStatus)
+	s.log.Info("Handled progress status update", "namespace", namespace, "trainJobName", trainJobName, "status", progressStatus)
 
 	// Return the parsed payload
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(progressStatus); err != nil {
-		s.log.Error(err, "Failed to write progress status", "namespace", namespace, "name", name)
+		s.log.Error(err, "Failed to write progress status", "namespace", namespace, "trainJobName", trainJobName)
 	}
 }
 
 // handleDefault is the default handler for unknown requests.
 func (s *Server) handleDefault(w http.ResponseWriter, _ *http.Request) {
 	badRequest(w, s.log, "Not found", metav1.StatusReasonNotFound, http.StatusNotFound)
+}
+
+// authoriseRequest checks whether the service account token bearer token used by this request comes from
+// a pod that is part of the TrainJob that is being updated.
+func (s *Server) authoriseRequest(r *http.Request, namespace, trainJobName string) bool {
+	token, ok := serviceAccountTokenFromContext(r.Context())
+	if !ok {
+		s.log.V(5).Info("Unauthorized request", "namespace", namespace, "trainJob", trainJobName)
+		return false
+	}
+
+	// Check namespace matches
+	if token.Kubernetes.Namespace != namespace {
+		s.log.V(5).Info("Namespace mismatch",
+			"expected", namespace,
+			"got", token.Kubernetes.Namespace)
+		return false
+	}
+
+	// Check token is bound to a pod
+	if token.Kubernetes.Pod == nil {
+		s.log.V(5).Info("Token not bound to a pod")
+		return false
+	}
+
+	// Look up the pod from the Kubernetes API to verify it has the correct label
+	pod := &corev1.Pod{}
+	podKey := client.ObjectKey{
+		Namespace: token.Kubernetes.Namespace,
+		Name:      token.Kubernetes.Pod.Name,
+	}
+
+	if err := s.client.Get(r.Context(), podKey, pod); err != nil {
+		s.log.V(5).Error(err, "Failed to get pod",
+			"namespace", podKey.Namespace,
+			"pod", podKey.Name)
+		return false
+	}
+
+	if token.Kubernetes.Pod.UID != pod.UID {
+		s.log.V(5).Info("Pod UID does not match",
+			"namespace", pod.Namespace,
+			"pod", podKey.Name)
+		return false
+	}
+
+	// Verify the pod has the label identifying it belongs to this TrainJob
+	trainJobNameFromLabel, ok := pod.Labels[LabelTrainJobName]
+	if !ok {
+		s.log.V(5).Info("Pod missing TrainJob label",
+			"namespace", pod.Namespace, "pod", pod.Name)
+		return false
+	}
+
+	if trainJobName != trainJobNameFromLabel {
+		s.log.V(5).Info("Pod TrainJob label does not match",
+			"expected", trainJobName,
+			"got", trainJobName,
+			"namespace", pod.Namespace,
+			"pod", pod.Name)
+		return false
+	}
+
+	return true
 }
 
 // badRequest sends a kubernetes Status response with the error message
