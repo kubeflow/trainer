@@ -29,6 +29,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	progresspkg "github.com/kubeflow/trainer/v2/pkg/progress"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	utilruntime "github.com/kubeflow/trainer/v2/pkg/util/runtime"
@@ -78,6 +79,15 @@ func (p *Progress) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJo
 	if info == nil || trainJob == nil {
 		return nil
 	}
+
+	// Add label to identify which TrainJob the pod belongs to
+	if info.Scheduler == nil {
+		info.Scheduler = &runtime.Scheduler{}
+	}
+	if info.Scheduler.PodLabels == nil {
+		info.Scheduler.PodLabels = make(map[string]string)
+	}
+	info.Scheduler.PodLabels[progresspkg.LabelTrainJobName] = trainJob.Name
 
 	envVars := createEnvVars(trainJob)
 	volumeMount := createTokenVolumeMount()

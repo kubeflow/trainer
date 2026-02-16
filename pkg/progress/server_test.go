@@ -33,8 +33,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/google/go-cmp/cmp"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,13 +84,25 @@ func newTestTLSConfig(t *testing.T) *tls.Config {
 	}
 }
 
-// noopVerifier is a token verifier for testing.
-type noopVerifier struct {
-	validToken string
-}
+// testVerifier is a token verifier for testing.
+// It returns a mock ProjectedServiceAccountToken without actual OIDC verification.
+type testVerifier struct{}
 
-func (noopVerifier) Verify(context.Context, string) (*oidc.IDToken, error) {
-	return nil, nil
+func (testVerifier) Verify(context.Context, string) (*ProjectedServiceAccountToken, error) {
+	// Return a mock token that matches the test scenarios (default namespace, test-job TrainJob)
+	return &ProjectedServiceAccountToken{
+		Kubernetes: KubernetesClaims{
+			Namespace: "default",
+			ServiceAccount: ServiceAccount{
+				Name: "test-sa",
+				UID:  "test-sa-uid",
+			},
+			Pod: &Pod{
+				Name: "test-job-node-0-0",
+				UID:  "test-pod-uid",
+			},
+		},
+	}, nil
 }
 
 func newTestServer(t *testing.T, cfg *configapi.ProgressServer, objs ...client.Object) *httptest.Server {
@@ -101,7 +113,7 @@ func newTestServer(t *testing.T, cfg *configapi.ProgressServer, objs ...client.O
 		WithStatusSubresource(objs...).
 		Build()
 
-	srv, err := NewServer(fakeClient, cfg, newTestTLSConfig(t), noopVerifier{})
+	srv, err := NewServer(fakeClient, cfg, newTestTLSConfig(t), testVerifier{})
 	if err != nil {
 		t.Fatalf("NewServer() error: %v", err)
 	}
@@ -128,6 +140,18 @@ func TestHandleProgressStatus(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-job",
 			Namespace: "default",
+		},
+	}
+
+	// Pod that belongs to the TrainJob (matches the token's pod name and has the required label)
+	existingPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job-node-0-0",
+			Namespace: "default",
+			UID:       "test-pod-uid",
+			Labels: map[string]string{
+				LabelTrainJobName: existingTrainJob.Name,
+			},
 		},
 	}
 
@@ -163,7 +187,7 @@ func TestHandleProgressStatus(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)}, existingTrainJob)
+			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)}, existingTrainJob, existingPod)
 			defer ts.Close()
 
 			// Make actual HTTP request
@@ -210,6 +234,18 @@ func TestServerErrorResponses(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-job",
 			Namespace: "default",
+		},
+	}
+
+	// Pod that belongs to the TrainJob (matches the token's pod name and has the required label)
+	existingPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job-node-0-0",
+			Namespace: "default",
+			UID:       "test-pod-uid",
+			Labels: map[string]string{
+				LabelTrainJobName: "test-job",
+			},
 		},
 	}
 
@@ -287,7 +323,7 @@ func TestServerErrorResponses(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)}, existingTrainJob)
+			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)}, existingTrainJob, existingPod)
 			defer ts.Close()
 
 			// Make actual HTTP request

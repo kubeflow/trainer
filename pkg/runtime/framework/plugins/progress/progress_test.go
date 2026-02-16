@@ -64,6 +64,11 @@ func TestEnforceMLPolicy(t *testing.T) {
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(1).Obj()).
 				Obj(),
 			wantInfo: &runtime.Info{
+				Scheduler: &runtime.Scheduler{
+					PodLabels: map[string]string{
+						"trainer.kubeflow.org/trainjob-name": "test-job",
+					},
+				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
@@ -97,6 +102,11 @@ func TestEnforceMLPolicy(t *testing.T) {
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(2).Obj()).
 				Obj(),
 			wantInfo: &runtime.Info{
+				Scheduler: &runtime.Scheduler{
+					PodLabels: map[string]string{
+						"trainer.kubeflow.org/trainjob-name": "test-job",
+					},
+				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
@@ -177,6 +187,11 @@ func TestEnforceMLPolicy(t *testing.T) {
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(1).Obj()).
 				Obj(),
 			wantInfo: &runtime.Info{
+				Scheduler: &runtime.Scheduler{
+					PodLabels: map[string]string{
+						"trainer.kubeflow.org/trainjob-name": "test-job",
+					},
+				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{

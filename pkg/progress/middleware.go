@@ -94,8 +94,9 @@ func authenticationMiddleware(log logr.Logger, verifier TokenVerifier) Middlewar
 				return
 			}
 
-			// Validate the token
-			if _, err := verifier.Verify(r.Context(), token); err != nil {
+			// Verify and decode the token
+			saToken, err := verifier.Verify(r.Context(), token)
+			if err != nil || saToken == nil {
 				log.V(5).Error(err, "Token validation failed")
 				badRequest(w, log, "Invalid or expired token",
 					v1.StatusReasonUnauthorized,
@@ -103,8 +104,11 @@ func authenticationMiddleware(log logr.Logger, verifier TokenVerifier) Middlewar
 				return
 			}
 
+			// Add token to context for authorization
+			ctx := withServiceAccountToken(r.Context(), *saToken)
+
 			// Token is valid, proceed to next handler
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
