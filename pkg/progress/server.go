@@ -82,7 +82,7 @@ func NewServer(c client.Client, cfg *configapi.ProgressServer, tlsConfig *tls.Co
 	handler := chain(mux,
 		recoveryMiddleware(log),
 		loggingMiddleware(log),
-		authMiddleware(log, verifier),
+		authenticationMiddleware(log, verifier),
 		bodySizeLimitMiddleware(log, maxBodySize),
 	)
 
