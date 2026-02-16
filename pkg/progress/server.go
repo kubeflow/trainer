@@ -28,6 +28,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -154,11 +155,23 @@ func (s *Server) handleProgressStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.client.Status().Patch(r.Context(), &trainJob, client.Merge); err != nil {
 		s.log.Error(err, "Failed to update train job", "namespace", namespace, "name", trainJobName)
+
+		// Check if the error is due to validation failure
+		if apierrors.IsInvalid(err) || apierrors.IsBadRequest(err) {
+			// Extract the validation error message for the user
+			statusErr, ok := err.(*apierrors.StatusError)
+			if ok && statusErr.ErrStatus.Message != "" {
+				badRequest(w, s.log, statusErr.ErrStatus.Message, metav1.StatusReasonInvalid, http.StatusUnprocessableEntity)
+			} else {
+				badRequest(w, s.log, "Validation failed: "+err.Error(), metav1.StatusReasonInvalid, http.StatusUnprocessableEntity)
+			}
+			return
+		}
+
+		// For other errors, return internal server error
 		badRequest(w, s.log, "Internal error", metav1.StatusReasonInternalError, http.StatusInternalServerError)
 		return
 	}
-	// PLACEHOLDER: Log the received progress status
-	s.log.Info("Handled progress status update", "namespace", namespace, "trainJobName", trainJobName, "status", progressStatus)
 
 	// Return the parsed payload
 	w.Header().Set("Content-Type", "application/json")
