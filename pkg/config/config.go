@@ -66,11 +66,14 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 
 	// Set webhook server options
 	if cfg.Webhook.Port != nil {
-		o.WebhookServer = webhook.NewServer(webhook.Options{
+		webhookOpts := webhook.Options{
 			Port:    int(*cfg.Webhook.Port),
-			Host:    *cfg.Webhook.Host,
 			TLSOpts: tlsOpts,
-		})
+		}
+		if cfg.Webhook.Host != nil {
+			webhookOpts.Host = *cfg.Webhook.Host
+		}
+		o.WebhookServer = webhook.NewServer(webhookOpts)
 	}
 
 	// Set health probe bind address

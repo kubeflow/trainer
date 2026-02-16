@@ -1,0 +1,121 @@
+#
+# Copyright 2025 The Kubeflow authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+suite: Test mlx-distributed ClusterTrainingRuntime
+templates:
+  - templates/runtimes/mlx-distributed.yaml
+release:
+  name: kubeflow-trainer
+  namespace: kubeflow-trainer
+tests:
+  - it: Should not render ClusterTrainingRuntime when runtimes.mlxDistributed.enabled is false
+    set:
+      runtimes:
+        mlxDistributed:
+          enabled: false
+          image:
+            registry: ghcr.io
+            repository: kubeflow/trainer/mlx-runtime
+            tag: ""
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: Should render ClusterTrainingRuntime when runtimes.mlxDistributed.enabled is true
+    set:
+      runtimes:
+        mlxDistributed:
+          enabled: true
+          image:
+            registry: ghcr.io
+            repository: kubeflow/trainer/mlx-runtime
+            tag: ""
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ClusterTrainingRuntime
+      - equal:
+          path: metadata.name
+          value: mlx-distributed
+
+  - it: Should have correct framework label
+    set:
+      runtimes:
+        mlxDistributed:
+          enabled: true
+          image:
+            registry: ghcr.io
+            repository: kubeflow/trainer/mlx-runtime
+            tag: ""
+    asserts:
+      - equal:
+          path: metadata.labels["trainer.kubeflow.org/framework"]
+          value: mlx
+
+  - it: Should have correct MPI mlPolicy configuration
+    set:
+      runtimes:
+        mlxDistributed:
+          enabled: true
+          image:
+            registry: ghcr.io
+            repository: kubeflow/trainer/mlx-runtime
+            tag: ""
+    asserts:
+      - equal:
+          path: spec.mlPolicy.numNodes
+          value: 1
+      - equal:
+          path: spec.mlPolicy.mpi.numProcPerNode
+          value: 1
+      - equal:
+          path: spec.mlPolicy.mpi.mpiImplementation
+          value: OpenMPI
+      - equal:
+          path: spec.mlPolicy.mpi.runLauncherAsNode
+          value: true
+
+  - it: Should use custom image tag when specified
+    set:
+      runtimes:
+        mlxDistributed:
+          enabled: true
+          image:
+            registry: ghcr.io
+            repository: kubeflow/trainer/mlx-runtime
+            tag: "v1.0.0"
+    asserts:
+      - equal:
+          path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.containers[0].image
+          value: ghcr.io/kubeflow/trainer/mlx-runtime:v1.0.0
+
+  - it: Should have launcher and node replicatedJobs
+    set:
+      runtimes:
+        mlxDistributed:
+          enabled: true
+          image:
+            registry: ghcr.io
+            repository: kubeflow/trainer/mlx-runtime
+            tag: ""
+    asserts:
+      - equal:
+          path: spec.template.spec.replicatedJobs[0].name
+          value: launcher
+      - equal:
+          path: spec.template.spec.replicatedJobs[1].name
+          value: node

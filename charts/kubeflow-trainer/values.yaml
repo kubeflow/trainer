@@ -1,5 +1,5 @@
 #
-# Copyright 2025 The Kubeflow authors.
+# Copyright 2026 The Kubeflow authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -148,3 +148,82 @@ dataCache:
     install: true
     # -- String to fully override LeaderWorkerSet release name.
     fullnameOverride: lws
+  cacheImage:
+    # -- Data cache image registry
+    registry: ghcr.io
+    # -- Data cache image repository
+    repository: kubeflow/trainer/data-cache
+    # -- Data cache image tag. Defaults to chart version if empty.
+    tag: ""
+  runtimes:
+    # -- PyTorch distributed training with data cache support
+    torchDistributed:
+      # -- Enable deployment of torch-distributed-with-cache runtime
+      enabled: false
+
+# -- ClusterTrainingRuntimes configuration
+# These are optional runtime templates that can be deployed with the Helm chart.
+# Each runtime provides a blueprint for different ML frameworks and configurations.
+runtimes:
+  # -- Enable all default runtimes (torch, deepspeed, mlx, jax, torchtune) when set to true.
+  # Individual runtime settings will be ignored if this is enabled.
+  defaultEnabled: false
+
+  # -- PyTorch distributed training runtime (no custom images required)
+  torchDistributed:
+    # -- Enable deployment of torch-distributed runtime
+    enabled: false
+
+  # -- DeepSpeed distributed training runtime
+  deepspeedDistributed:
+    # -- Enable deployment of deepspeed-distributed runtime
+    enabled: false
+    image:
+      # -- DeepSpeed runtime image registry
+      registry: ghcr.io
+      # -- DeepSpeed runtime image repository
+      repository: kubeflow/trainer/deepspeed-runtime
+      # -- DeepSpeed runtime image tag. Defaults to chart version if empty.
+      tag: ""
+
+  # -- MLX distributed training runtime
+  mlxDistributed:
+    # -- Enable deployment of mlx-distributed runtime
+    enabled: false
+    image:
+      # -- MLX runtime image registry
+      registry: ghcr.io
+      # -- MLX runtime image repository
+      repository: kubeflow/trainer/mlx-runtime
+      # -- MLX runtime image tag. Defaults to chart version if empty.
+      tag: ""
+
+  # -- JAX distributed training runtime (no custom images required)
+  jaxDistributed:
+    # -- Enable deployment of jax-distributed runtime
+    enabled: false
+
+  # -- TorchTune distributed training runtime
+  torchtuneDistributed:
+    image:
+      # -- TorchTune runtime image registry
+      registry: ghcr.io
+      # -- TorchTune runtime image repository
+      repository: kubeflow/trainer/torchtune-trainer
+      # -- TorchTune runtime image tag. Defaults to chart version if empty.
+      tag: ""
+
+    # -- Llama 3.2 1B model configuration
+    llama3_2_1B:
+      # -- Enable deployment of Llama 3.2 1B runtime
+      enabled: false
+
+    # -- Llama 3.2 3B model configuration
+    llama3_2_3B:
+      # -- Enable deployment of Llama 3.2 3B runtime
+      enabled: false
+
+    # -- Qwen 2.5 1.5B model configuration
+    qwen2_5_1_5B:
+      # -- Enable deployment of Qwen 2.5 1.5B runtime
+      enabled: false
