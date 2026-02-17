@@ -1509,3 +1509,9 @@ func (w *MLPolicySourceWrapper) JAXPolicy() *MLPolicySourceWrapper {
 	w.JAX = &trainer.JAXMLPolicySource{}
 	return w
 }
+
+// XGBoostPolicy sets the XGBoost policy source
+func (w *MLPolicySourceWrapper) XGBoostPolicy() *MLPolicySourceWrapper {
+	w.XGBoost = &trainer.XGBoostMLPolicySource{}
+	return w
+}
