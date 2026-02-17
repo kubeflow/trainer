@@ -115,8 +115,7 @@ impl WorkerDataSource {
         // Validate that source schema does not already contain cache_index column
         if schema.field_with_name(CACHE_INDEX_COLUMN).is_ok() {
             return Err(format!(
-                "Source schema already contains a column named '{}'. \
-         This conflicts with the cache index column added by the data cache worker.",
+                "Source schema already contains a column named '{}'. This conflicts with the cache index column added by the data cache worker.",
                 CACHE_INDEX_COLUMN
             )
             .into());
