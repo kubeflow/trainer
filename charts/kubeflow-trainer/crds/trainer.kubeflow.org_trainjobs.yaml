@@ -5082,6 +5082,9 @@ spec:
                     minimum: 0
                     type: integer
                 type: object
+                x-kubernetes-validations:
+                - message: lastUpdatedTime is required when trainerStatus is present
+                  rule: has(self.lastUpdatedTime)
             type: object
         type: object
         x-kubernetes-validations:
