@@ -438,6 +438,7 @@ type JobStatus struct {
 }
 
 // TrainJobTrainerStatus represents the latest known progress and metrics of the Trainer part of the TrainJob.
+// +kubebuilder:validation:XValidation:rule="has(self.lastUpdatedTime)",message="lastUpdatedTime is required when trainerStatus is present"
 type TrainJobTrainerStatus struct {
 
 	// progressPercentage gives an estimate of how complete the TrainJob is as a percentage.
