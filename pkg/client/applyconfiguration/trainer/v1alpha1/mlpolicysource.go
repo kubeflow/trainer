@@ -32,6 +32,8 @@ type MLPolicySourceApplyConfiguration struct {
 	MPI *MPIMLPolicySourceApplyConfiguration `json:"mpi,omitempty"`
 	// jax defines the configuration for the JAX Runtime
 	JAX *trainerv1alpha1.JAXMLPolicySource `json:"jax,omitempty"`
+	// xgboost defines the configuration for the XGBoost Runtime.
+	XGBoost *trainerv1alpha1.XGBoostMLPolicySource `json:"xgboost,omitempty"`
 }
 
 // MLPolicySourceApplyConfiguration constructs a declarative configuration of the MLPolicySource type for use with
@@ -61,5 +63,13 @@ func (b *MLPolicySourceApplyConfiguration) WithMPI(value *MPIMLPolicySourceApply
 // If called multiple times, the JAX field is set to the value of the last call.
 func (b *MLPolicySourceApplyConfiguration) WithJAX(value trainerv1alpha1.JAXMLPolicySource) *MLPolicySourceApplyConfiguration {
 	b.JAX = &value
+	return b
+}
+
+// WithXGBoost sets the XGBoost field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the XGBoost field is set to the value of the last call.
+func (b *MLPolicySourceApplyConfiguration) WithXGBoost(value trainerv1alpha1.XGBoostMLPolicySource) *MLPolicySourceApplyConfiguration {
+	b.XGBoost = &value
 	return b
 }
