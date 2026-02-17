@@ -4,7 +4,8 @@ This document describes the implementation of GPU testing infrastructure for Kub
 
 ## Overview
 
-PR [#3067](https://github.com/kubeflow/trainer/pull/3067) replaced the VM-based GPU runner with GPU-enabled ARC from CNCF. This transition enables automated GPU testing for LLM blueprints while addressing several technical challenges related to NVIDIA driver compatibility and nvkind limitations.
+PR [#3067](https://github.com/kubeflow/trainer/pull/3067) replaced the VM-based GPU runner with GPU-enabled ARC from CNCF. This transition enables automated GPU testing for LLM blueprints using ARC which is more scalable and cost-effective than the previous VM-based approach.
+It also addresses some technical challenges related to NVIDIA driver compatibility and nvkind limitations.
 
 ## Hardware Specifications
 
@@ -45,6 +46,14 @@ Previously, a separate job deleted the Kind cluster after tests. This is now han
 
 ## Technical Implementation
 
+### CNCF ARC Runner
+
+<img src="./images/cncf-arc-diagram.png" alt="arc-gpu-runner-setup" width="500">
+
+Above diagram shows the high-level architecture of ARC GPU runner setup. How the job listens the events from GitHub and spins up the runner pod to execute the job. The runner pod is ephemeral and is deleted after the job is completed. Actually the runner provisions a new VM which actually runs the job. This method is different from the previous method where we used to provision the VM manually and then install the GPU drivers and dependencies.
+
+Reference: https://github.com/cncf/automation
+
 ### NVIDIA Driver and CDI Compatibility Issues
 
 #### Problem: CDI Blocker
@@ -53,7 +62,7 @@ Recent NVIDIA driver updates (v570+) introduced breaking changes with Container 
 - [NVIDIA/nvkind#20](https://github.com/NVIDIA/nvkind/issues/20) - CDI driver compatibility
 - [NVIDIA/nvkind#57](https://github.com/NVIDIA/nvkind/issues/57) - Missing nvidia-container-runtime on newer systems
 
-**Root Cause**: 
+**Root Cause**:
 The NVIDIA Container Toolkit v1.18.0+ moved to CDI-first architecture, deprecating the legacy `nvidia-container-runtime`. However, nvkind still expects the older runtime configuration, causing cluster creation failures.
 
 **Symptom**:
@@ -166,4 +175,3 @@ The KEP also has Terraform to provision OCI GPU VMs as self-hosted runners. Thes
   - [NVIDIA/nvkind#57](https://github.com/NVIDIA/nvkind/issues/57) - Missing nvidia-container-runtime
 - **CNCF Infrastructure**: [cncf/automation#115](https://github.com/cncf/automation/issues/115)
 - **Oracle GPU Shapes**: [OCI Compute Shapes Documentation](https://docs.oracle.com/en-us/iaas/Content/Compute/References/computeshapes.htm#vm-gpu)
-
