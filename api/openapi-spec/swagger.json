@@ -13962,6 +13962,14 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.TorchMLPolicySource"
               }
             ]
+          },
+          "xgboost": {
+            "description": "xgboost defines the configuration for the XGBoost Runtime.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.XGBoostMLPolicySource"
+              }
+            ]
           }
         }
       },
@@ -13998,6 +14006,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.TorchMLPolicySource"
+              }
+            ]
+          },
+          "xgboost": {
+            "description": "xgboost defines the configuration for the XGBoost Runtime.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.XGBoostMLPolicySource"
               }
             ]
           }
@@ -14674,6 +14690,10 @@
             ]
           }
         }
+      },
+      "trainer.v1alpha1.XGBoostMLPolicySource": {
+        "description": "XGBoostMLPolicySource represents an XGBoost runtime configuration. The number of workers per node is automatically derived from container GPU resources:\n  - GPU training: 1 worker per GPU (from resourcesPerNode)\n  - CPU training: 1 worker per node\n\nDMLC_NUM_WORKER = numNodes × workersPerNode (where workersPerNode = GPU count or 1)",
+        "type": "object"
       }
     }
   }

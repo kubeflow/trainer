@@ -33,7 +33,8 @@ class TrainerV1alpha1MLPolicy(BaseModel):
     mpi: Optional[TrainerV1alpha1MPIMLPolicySource] = Field(default=None, description="mpi defines the configuration for the MPI Runtime.")
     num_nodes: Optional[StrictInt] = Field(default=None, description="numNodes is the number of training nodes. Defaults to 1.", alias="numNodes")
     torch: Optional[Dict[str, Any]] = Field(default=None, description="torch defines the configuration for the PyTorch runtime.")
-    __properties: ClassVar[List[str]] = ["flux", "jax", "mpi", "numNodes", "torch"]
+    xgboost: Optional[Dict[str, Any]] = Field(default=None, description="xgboost defines the configuration for the XGBoost Runtime.")
+    __properties: ClassVar[List[str]] = ["flux", "jax", "mpi", "numNodes", "torch", "xgboost"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -96,7 +97,8 @@ class TrainerV1alpha1MLPolicy(BaseModel):
             "jax": obj.get("jax"),
             "mpi": TrainerV1alpha1MPIMLPolicySource.from_dict(obj["mpi"]) if obj.get("mpi") is not None else None,
             "numNodes": obj.get("numNodes"),
-            "torch": obj.get("torch")
+            "torch": obj.get("torch"),
+            "xgboost": obj.get("xgboost")
         })
         return _obj
 
