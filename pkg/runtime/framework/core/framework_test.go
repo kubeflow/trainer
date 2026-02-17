@@ -57,6 +57,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/xgboost"
 	index "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
@@ -86,6 +87,7 @@ func TestNew(t *testing.T) {
 					torch.Name:        &torch.Torch{},
 					jobset.Name:       &jobset.JobSet{},
 					jax.Name:          &jax.Jax{},
+					xgboost.Name:      &xgboost.XGBoost{},
 				},
 				enforceMLPlugins: []framework.EnforceMLPolicyPlugin{
 					&flux.Flux{},
@@ -93,6 +95,7 @@ func TestNew(t *testing.T) {
 					&plainml.PlainML{},
 					&torch.Torch{},
 					&jax.Jax{},
+					&xgboost.XGBoost{},
 				},
 				enforcePodGroupPolicyPlugins: []framework.EnforcePodGroupPolicyPlugin{
 					&coscheduling.CoScheduling{},
@@ -105,6 +108,7 @@ func TestNew(t *testing.T) {
 					&jobset.JobSet{},
 					&volcano.Volcano{},
 					&jax.Jax{},
+					&xgboost.XGBoost{},
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
 					&flux.Flux{},
@@ -143,8 +147,12 @@ func TestNew(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(Framework{}),
+<<<<<<< HEAD
 		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, flux.Flux{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
 		cmpopts.IgnoreFields(flux.Flux{}, "client", "scheme"),
+=======
+		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}, xgboost.XGBoost{}),
+>>>>>>> 7cdbd7aa (Add XGBoost plugin unit tests and update framework test registry)
 		cmpopts.IgnoreFields(coscheduling.CoScheduling{}, "client"),
 		cmpopts.IgnoreFields(volcano.Volcano{}, "client"),
 		cmpopts.IgnoreFields(jobset.JobSet{}, "client", "restMapper", "scheme", "logger"),
