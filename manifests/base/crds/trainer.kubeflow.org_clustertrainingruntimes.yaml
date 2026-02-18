@@ -633,22 +633,14 @@ spec:
                         format: int32
                         type: integer
                     type: object
-                  kai:
-                    description: kai scheduler plugin for gang-scheduling with hierarchical
-                      queues and GPU sharing.
+                  kaiScheduler:
+                    description: KAI Scheduler plugin for gang-scheduling.
                     properties:
-                      queueName:
-                        description: queueName is the name of the KAI Queue to schedule
-                          the PodGroup.
-                        type: string
-                      scheduleTimeoutSeconds:
-                        default: 60
+                      queue:
                         description: |-
-                          scheduleTimeoutSeconds is the maximum duration to schedule PodGroup for gang-scheduling.
-                          If the scheduling timeout is equal to 0, the default value is used.
-                          Defaults to 60 seconds.
-                        format: int32
-                        type: integer
+                          queue is the name of the KAI Scheduler queue to submit the job to.
+                          The queue must exist in the cluster for the job to be scheduled.
+                        type: string
                     type: object
                   volcano:
                     description: volcano plugin for gang-scheduling.
