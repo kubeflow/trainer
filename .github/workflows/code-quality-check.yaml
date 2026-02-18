@@ -1,0 +1,17 @@
+name: Code Quality Checks
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Code Quality Checks
+        run: |
+          make lint-manifests
+          make helm-lint

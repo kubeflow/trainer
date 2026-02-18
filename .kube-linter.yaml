@@ -1,5 +1,5 @@
 # KubeLinter configuration file
-# For more information, see https://docs.kubelinter.io/#/usage/configuration
+# For more information, see https://docs.kubelinter.io/#/usage/configuring-kubelinter
 
 # checks section configures which checks to run.
 checks:
@@ -16,9 +16,7 @@ checks:
   exclude:
     - "unset-cpu-requirements"
     - "unset-memory-requirements"
-    - "no-read-only-root-fs"
     - "no-anti-affinity"
     - "non-existent-service-account" # Often false positive in kustomize
     - "latest-tag"
-    - "liveness-port"
-    - "readiness-port"
+    
