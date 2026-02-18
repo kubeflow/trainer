@@ -596,6 +596,13 @@ The same feature gate is required to be enabled in TrainJob config:
 GenericWorkload
 ```
 
+## Defaulting/Validation
+
+- Workload API should not be configured in JobSet or Job templates
+- Only one of `coscheduling`, `volcano`, or `workload` may be specified (CEL)
+- `GenericWorkload` feature gate must be enabled (webhook)
+- `spec.schedulingGroup` must not be manually set in Pod templates
+
 ## Test Plan
 
 - [x] I/we understand the owners of the involved components may require updates to
