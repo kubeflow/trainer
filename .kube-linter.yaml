@@ -20,4 +20,3 @@ checks:
     - "no-anti-affinity"
     - "non-existent-service-account" # Often false positive in kustomize
     - "latest-tag"
-    
