@@ -1,0 +1,26 @@
+name: Code Quality Checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  code-quality:
+    if: github.repository == 'kubeflow/trainer'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Run Code Quality Checks
+        run: |
+          make lint-manifests
+          make helm-lint TARGET_BRANCH=${{ github.base_ref || 'master' }}
