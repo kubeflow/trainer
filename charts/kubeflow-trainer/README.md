@@ -41,6 +41,16 @@ This removes all the Kubernetes resources associated with the chart and deletes 
 
 See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command documentation.
 
+### Istio sidecar configuration
+
+When running with Istio sidecar injection enabled, you may need to exclude the controller manager's metrics port from the Envoy sidecar. You can configure this via the `manager.podAnnotations` value:
+
+```yaml
+manager:
+    podAnnotations:
+        traffic.sidecar.istio.io/excludeInboundPorts: "9443"
+```
+
 ## Values
 
 | Key | Type | Default | Description |
@@ -58,7 +68,7 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | manager.replicas | int | `1` | Number of replicas of manager. |
 | manager.selectorLabels | object | `{}` | Extra selector labels for manager Deployment. These labels are added to spec.selector.matchLabels and spec.template.metadata.labels. NOTE: Selector labels are immutable after deployment creation. |
 | manager.labels | object | `{}` | Extra labels for manager pods. |
-| manager.podAnnotations | object | `{"traffic.sidecar.istio.io/excludeInboundPorts":"9443"}` | Extra annotations for manager pods. |
+| manager.podAnnotations | object | `{}` | Extra annotations for manager pods. |
 | manager.volumes | list | `[]` | Volumes for manager pods. |
 | manager.nodeSelector | object | `{}` | Node selector for manager pods. |
 | manager.affinity | object | `{}` | Affinity for manager pods. |
