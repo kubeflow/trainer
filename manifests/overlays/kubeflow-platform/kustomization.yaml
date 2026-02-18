@@ -29,3 +29,19 @@ patches:
               app: kubeflow-trainer
             annotations:
               traffic.sidecar.istio.io/excludeInboundPorts: "9443"
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: jobset-controller-manager
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: jobset-controller-manager
+        namespace: kubeflow-system
+      spec:
+        template:
+          metadata:
+            annotations:
+              traffic.sidecar.istio.io/excludeInboundPorts: "9443"
