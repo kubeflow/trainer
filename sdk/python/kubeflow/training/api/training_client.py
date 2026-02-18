@@ -599,11 +599,10 @@ class TrainingClient(object):
 
         # Handle Kueue queue validation and labeling
         if queue_name is not None:
-            queue_exists = self._check_queue_exists(queue_name, namespace)
-            if queue_exists is not False:
-                if job.metadata.labels is None:
-                    job.metadata.labels = {}
-                job.metadata.labels[constants.LOCAL_QUEUE_LABEL] = queue_name
+            self._check_queue_exists(queue_name, namespace)
+            if job.metadata.labels is None:
+                job.metadata.labels = {}
+            job.metadata.labels[constants.LOCAL_QUEUE_LABEL] = queue_name
 
         # Create the Training Job.
         try:
