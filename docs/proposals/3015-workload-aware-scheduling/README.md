@@ -660,8 +660,10 @@ spec:
 
 ### Custom Setting for PodGroupTemplates
 
-We can allow users to override default behavior of Workload API for custom orchestration of TrainJob.
-That will require us to extend `.workload` API as follows:
+We could allow users to override the default Workload API behavior to enable custom orchestration for
+TrainJob. To support this, we would need to extend the `.workload` API accordingly.
+Alternatively, we could rely on [the JobSet integration](https://github.com/kubernetes-sigs/jobset/pull/1068)
+to provide users with more fine-grained control over PodGroup configuration.
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
