@@ -505,7 +505,7 @@ type PodGroupPolicySource struct {
     Volcano *VolcanoPodGroupPolicySource `json:"volcano,omitempty"`
 
     // Workload plugin using native Kubernetes Workload API for gang-scheduling
-    // Requires Kubernetes v1.35+ with GenericWorkload and GangScheduling feature gates enabled.
+    // Requires Kubernetes v1.35+ with GenericWorkload feature gates enabled.
     Workload *WorkloadPodGroupPolicySource `json:"workload,omitempty"`
 }
 
@@ -580,7 +580,7 @@ The TrainJob controller requires permissions to manage Workload resources:
 ```go
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=workloads/status,verbs=get
-// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=podgroups,verbs=get;list;watch;create;update;patch;list;watch
+// +kubebuilder:rbac:groups=scheduling.k8s.io,resources=podgroups,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=podgroups/status,verbs=get
 ```
 
@@ -643,7 +643,7 @@ podGroupPolicy:
 
 ### Set Workload Spec in the TrainJob API
 
-We can integrate the Workload spec in the TrainJob API directly. That might introduce in-consistency
+We can integrate the Workload spec in the TrainJob API directly. That might introduce inconsistency
 with other PodGroupPolicy plugins. Alternatively, we can allow to set Workload parameters in the
 Runtime and TrainJob spec, similarly to the Trainer/Initializer.
 
