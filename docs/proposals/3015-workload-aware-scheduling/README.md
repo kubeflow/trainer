@@ -528,14 +528,14 @@ from the Pipeline Framework:
 The plugin implements the `ComponentBuilder` interface to build the Workload object:
 
 ```go
-func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trainv1alpha1.TrainJob) (client.Object, error) {
+func (w *Workload) Build(ctx context.Context, info *runtime.Info, trainJob *trainv1alpha1.TrainJob) ([]runtime.ApplyConfiguration, error) {
     // 1. Extract numNodes from runtime info
     // 2. Build Workload object with:
     //    - controllerRef pointing to TrainJob
     //    - podGroupTemplate with gang scheduling policy
     //    - minCount equal to numNodes
     // 3. Build PodGroup objects.
-    // 4. Return Workload object for deployment
+    // 4. Return a slice of apply configurations for the Workload and PodGroup objects
 }
 ```
 
