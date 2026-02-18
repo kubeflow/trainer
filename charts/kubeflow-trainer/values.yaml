@@ -64,8 +64,7 @@ manager:
     # key2: value2
 
   # -- Extra annotations for manager pods.
-  podAnnotations:
-    traffic.sidecar.istio.io/excludeInboundPorts: "9443"
+  podAnnotations: {}
 
   # -- Volumes for manager pods.
   volumes: []
