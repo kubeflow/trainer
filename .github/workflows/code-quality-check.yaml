@@ -23,4 +23,4 @@ jobs:
       - name: Run Code Quality Checks
         run: |
           make lint-manifests
-          make helm-lint TARGET_BRANCH=${{ github.base_ref || 'master' }}
+          make helm-lint TARGET_BRANCH=${{ github.event.pull_request.base.ref || github.event.repository.default_branch || 'master' }}
