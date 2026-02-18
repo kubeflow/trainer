@@ -26,7 +26,7 @@ The Kubernetes community has recognized gang scheduling as a fundamental require
 native support through the Workload API. This API is becoming the standard way to express gang
 scheduling in Kubernetes, with integration planned for:
 
-- **Job controller**: [KEP-5547](https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/4671-gang-scheduling): Automatic Workload/PodGroup creation for parallel jobs
+- **Job controller**: [KEP-4671](https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/4671-gang-scheduling): Automatic Workload/PodGroup creation for parallel jobs
 - **JobSet**: [KEP-969](https://github.com/kubernetes-sigs/jobset/pull/1068): Gang scheduling support for job groups
 
 ### Goals
