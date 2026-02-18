@@ -12,7 +12,7 @@ jobs:
   gpu-e2e-test:
     name: GPU E2E Test
     runs-on:
-      labels: oracle-vm-gpu-a10-1
+      labels: oracle-vm-gpu-a10-2
       group: GPUs
 
     env:
@@ -57,7 +57,7 @@ jobs:
         run: |
           mkdir -p artifacts/notebooks
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/torchtune/qwen2_5/qwen2.5-1.5B-with-alpaca.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_qwen2_5_with_alpaca-trainjob-yaml.ipynb PAPERMILL_TIMEOUT=1800
-          make test-e2e-notebook NOTEBOOK_INPUT=./examples/jax/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_jax_mnist.ipynb PAPERMILL_PARAMS="-p num_cpu 8 -p num_gpu 1 -p num_nodes 1" PAPERMILL_TIMEOUT=1800
+          make test-e2e-notebook NOTEBOOK_INPUT=./examples/jax/image-classification/mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_jax_mnist.ipynb PAPERMILL_PARAMS="-p num_cpu 8 -p num_gpu 2 -p num_nodes 1" PAPERMILL_TIMEOUT=1800
 
       - name: Upload Artifacts to GitHub
         if: always()
