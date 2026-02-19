@@ -172,7 +172,7 @@ type VolcanoPodGroupPolicySource struct {
 
 // MLPolicy represents configuration for the model training with ML-specific parameters.
 // +kubebuilder:validation:XValidation:rule="!(has(self.numNodes) && (has(self.torch) && has(self.torch.elasticPolicy)))", message="numNodes should not be set if torch.elasticPolicy is configured"
-// +kubebuilder:validation:XValidation:rule="!(has(self.torch) && has(self.mpi))", message="Only one of the policy can be configured"
+// +kubebuilder:validation:XValidation:rule="[has(self.torch), has(self.mpi), has(self.jax)].filter(x, x).size() <= 1", message="Only one of the policy can be configured"
 type MLPolicy struct {
 	// numNodes is the number of training nodes.
 	// Defaults to 1.
