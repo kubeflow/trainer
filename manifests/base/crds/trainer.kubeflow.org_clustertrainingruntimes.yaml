@@ -615,7 +615,8 @@ spec:
                 - message: numNodes should not be set if torch.elasticPolicy is configured
                   rule: '!(has(self.numNodes) && (has(self.torch) && has(self.torch.elasticPolicy)))'
                 - message: Only one of the policy can be configured
-                  rule: '!(has(self.torch) && has(self.mpi))'
+                  rule: '[has(self.torch), has(self.mpi), has(self.jax)].filter(x,
+                    x).size() <= 1'
               podGroupPolicy:
                 description: podGroupPolicy defines the configuration for the PodGroup
                   to enable gang-scheduling via supported plugins.
