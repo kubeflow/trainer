@@ -1,5 +1,5 @@
 # KubeLinter configuration file
-# For more information, see https://docs.kubelinter.io/#/usage/configuring-kubelinter
+# For more information, see https://docs.kubelinter.io/#/configuring-kubelinter
 
 # checks section configures which checks to run.
 checks:
