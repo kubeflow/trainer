@@ -111,21 +111,11 @@ type TrainJobSpec struct {
 	// +optional
 	Trainer *Trainer `json:"trainer,omitempty"`
 
-	// labels to apply for the derivative JobSet and Jobs.
-	// They will be merged with the TrainingRuntime values.
+	// templateOverrides defines template overrides that will be applied to the TrainJob's training runtime template.
+	// +listType=map
+	// +listMapKey=manager
 	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// annotations to apply for the derivative JobSet and Jobs.
-	// They will be merged with the TrainingRuntime values.
-	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// podTemplateOverrides define the PodTemplateOverrides for the training runtime.
-	// When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.
-	// +listType=atomic
-	// +optional
-	PodTemplateOverrides []PodTemplateOverride `json:"podTemplateOverrides,omitempty"`
+	TemplateOverrides []TemplateOverride `json:"templateOverrides,omitempty"`
 
 	// suspend defines whether to suspend the running TrainJob.
 	// +kubebuilder:default=false
@@ -262,12 +252,70 @@ type Trainer struct {
 	NumProcPerNode *intstr.IntOrString `json:"numProcPerNode,omitempty"`
 }
 
-// PodTemplateOverride represents a custom PodTemplateSpec override that will be applied to the TrainJob's training runtime.
+// TemplateOverride represents a custom override that will be applied to the TrainJob's training runtime template.
+type TemplateOverride struct {
+	// manager indicates who owns this set of overrides. It can be configured by user, external
+	// controllers or admission webhooks to track ownership and avoid conflicts.
+	// For example, Kueue sets this field to "kueue.x-k8s.io/manager"
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
+	// +required
+	Manager string `json:"manager,omitempty"`
+
+	// jobTemplateOverrides defines overrides that applied to JobTemplateSpec
+	// +kubebuilder:validation:XValidation:rule="!has(oldSelf) || oldSelf.all(old, self.exists(new, old.time == new.time && old == new))", message="existing entries cannot be modified or removed in template overrides"
+	// +kubebuilder:validation:XValidation:rule="!has(oldSelf) || size(self) >= size(oldSelf)", message="job template override entries cannot be deleted"
+	// +listType=map
+	// +listMapKey=time
+	JobTemplateOverrides []JobTemplateOverride `json:"job,omitempty"`
+
+	// podTemplateOverrides defines overrides that applied to PodTemplateSpec
+	// +kubebuilder:validation:XValidation:rule="!has(oldSelf) || oldSelf.all(old, self.exists(new, old.time == new.time && old == new))", message="existing entries cannot be modified or removed in template overrides"
+	// +kubebuilder:validation:XValidation:rule="!has(oldSelf) || size(self) >= size(oldSelf)", message="pod template override entries cannot be deleted"
+	// +listType=map
+	// +listMapKey=time
+	PodTemplateOverrides []PodTemplateOverride `json:"pod,omitempty"`
+}
+
+// TemplateOverrideTargetJob represents target job to which override should be applied.
+type TemplateOverrideTargetJob struct {
+	// name is the target training job name for which the PodTemplateSpec is overridden.
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Name string `json:"name,omitempty"`
+}
+
+// JobTemplateOverride represents a custom override that will be applied to the JobTemplateSpec
+type JobTemplateOverride struct {
+	// Time is the timestamp of when the JobTemplateOverride entry was added. If value is omitted,
+	// controller defaults this value to the current timestamp.
+	// +optional
+	Time *metav1.Time `json:"time,omitempty"`
+
+	// targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.
+	// If targetJobs is empty, values are applied to the JobSet spec.
+	// +listType=atomic
+	// +optional
+	TargetJobs []TemplateOverrideTargetJob `json:"targetJobs,omitempty"`
+
+	// metadata overrides the Job template metadata or JobSet metadata.
+	// If targetJobs is specified, these values are merged with the specific ReplicatedJob's Job template metadata.
+	// If targetJobs is empty, these values are merged with the JobSet object metadata.
+	// +optional
+	Metadata *metav1.ObjectMeta `json:"metadata,omitempty"`
+}
+
+// PodTemplateOverride represents a custom override that will be applied to the PodTemplateSpec
 type PodTemplateOverride struct {
+	// Time is the timestamp of when the JobTemplateOverride entry was added. If value is omitted,
+	// controller defaults this value to the current timestamp.
+	// +optional
+	Time *metav1.Time `json:"time,omitempty"`
+
 	// targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.
 	// +listType=atomic
 	// +required
-	TargetJobs []PodTemplateOverrideTargetJob `json:"targetJobs,omitempty"`
+	TargetJobs []TemplateOverrideTargetJob `json:"targetJobs,omitempty"`
 
 	// manager indicates which controller created this PodTemplateOverride object.
 	// It can be used by external controllers or admission webhooks to track ownership
@@ -287,13 +335,6 @@ type PodTemplateOverride struct {
 	// These values will be merged with the TrainingRuntime's Pod template spec.
 	// +optional
 	Spec *PodTemplateSpecOverride `json:"spec,omitempty"`
-}
-
-type PodTemplateOverrideTargetJob struct {
-	// name is the target training job name for which the PodTemplateSpec is overridden.
-	// +kubebuilder:validation:MinLength=1
-	// +required
-	Name string `json:"name,omitempty"`
 }
 
 // PodTemplateSpecOverride represents the spec overrides for Pod template.
