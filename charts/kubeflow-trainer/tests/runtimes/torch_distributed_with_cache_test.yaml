@@ -16,7 +16,7 @@
 
 suite: Test torch-distributed-with-cache ClusterTrainingRuntime
 templates:
-  - templates/runtimes/torch-distributed-with-cache.yaml
+  - templates/runtimes/data-cache/torch-distributed-with-cache.yaml
 release:
   name: kubeflow-trainer
   namespace: kubeflow-trainer
