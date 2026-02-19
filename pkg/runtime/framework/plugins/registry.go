@@ -21,12 +21,14 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/progress"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
 )
@@ -34,7 +36,7 @@ import (
 type Registry map[string]func(ctx context.Context, client client.Client, indexer client.FieldIndexer) (framework.Plugin, error)
 
 func NewRegistry() Registry {
-	return Registry{
+	registry := Registry{
 		coscheduling.Name: coscheduling.New,
 		volcano.Name:      volcano.New,
 		mpi.Name:          mpi.New,
@@ -43,4 +45,10 @@ func NewRegistry() Registry {
 		jobset.Name:       jobset.New,
 		jax.Name:          jax.New,
 	}
+
+	if features.Enabled(features.TrainJobProgress) {
+		registry[progress.Name] = progress.New
+	}
+
+	return registry
 }

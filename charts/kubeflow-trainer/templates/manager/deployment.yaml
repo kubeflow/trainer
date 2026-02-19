@@ -52,6 +52,9 @@ spec:
         - name: webhook
           containerPort: 9443
           protocol: TCP
+        - name: progress-server
+          containerPort: 10443
+          protocol: TCP
 
         {{- with .Values.manager.env }}
         env:
