@@ -51,15 +51,20 @@ manager:
   # -- Number of replicas of manager.
   replicas: 1
 
+  # -- Extra selector labels for manager Deployment.
+  # These labels are added to spec.selector.matchLabels and spec.template.metadata.labels.
+  # NOTE: Selector labels are immutable after deployment creation.
+  selectorLabels: {}
+    # key1: value1
+    # key2: value2
+
   # -- Extra labels for manager pods.
   labels: {}
     # key1: value1
     # key2: value2
 
   # -- Extra annotations for manager pods.
-  annotations: {}
-    # key1: value1
-    # key2: value2
+  podAnnotations: {}
 
   # -- Volumes for manager pods.
   volumes: []

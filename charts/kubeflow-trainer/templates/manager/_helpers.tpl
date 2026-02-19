@@ -40,7 +40,7 @@ Selector labels for the manager.
 {{ include "trainer.selectorLabels" . }}
 app.kubernetes.io/part-of: kubeflow
 app.kubernetes.io/component: manager
-{{- with .Values.manager.labels }}
+{{- with .Values.manager.selectorLabels }}
 {{- toYaml . | nindent 0 }}
 {{- end }}
 {{- end -}}
@@ -61,4 +61,13 @@ Create the name of the manager configmap.
 */}}
 {{- define "trainer.manager.configmap.name" -}}
 {{ include "trainer.fullname" . }}-config
+{{- end -}}
+
+{{/*
+Pod annotations for the manager.
+*/}}
+{{- define "trainer.manager.podAnnotations" -}}
+{{- with .Values.manager.podAnnotations }}
+{{- toYaml . }}
+{{- end }}
 {{- end -}}

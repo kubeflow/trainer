@@ -30,6 +30,10 @@ spec:
     metadata:
       labels:
         {{- include "trainer.manager.selectorLabels" . | nindent 8 }}
+      {{- with include "trainer.manager.podAnnotations" . }}
+      annotations:
+        {{- . | nindent 8 }}
+      {{- end }}
     spec:
       containers:
       - name: manager

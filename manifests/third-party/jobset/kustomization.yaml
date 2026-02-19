@@ -6,9 +6,9 @@ resources:
 
 # Add required patches.
 patches:
-  # Remove namespace from the JobSet release manifests.
-  - path: patches/jobset_remove_namespace.yaml
-    target:
-      group: ""
-      version: v1
-      kind: Namespace
+# Remove namespace from the JobSet release manifests.
+- path: patches/jobset_remove_namespace.yaml
+  target:
+    group: ""
+    version: v1
+    kind: Namespace
