@@ -264,6 +264,12 @@ this is not: valid: yaml: content
 		Burst: ptr.To[int32](100),
 	}
 
+	defaultProgressServer := &configapi.ProgressServer{
+		Port:  ptr.To[int32](10443),
+		QPS:   ptr.To[float32](5),
+		Burst: ptr.To[int32](10),
+	}
+
 	defaultWebhook := configapi.ControllerWebhook{
 		Port: ptr.To[int32](9443),
 	}
@@ -317,6 +323,7 @@ this is not: valid: yaml: content
 				Health:           defaultHealth,
 				CertManagement:   defaultCertManagement,
 				ClientConnection: defaultClientConnection,
+				ProgressServer:   defaultProgressServer,
 			},
 			wantOptions: defaultOptions,
 		},
@@ -330,6 +337,7 @@ this is not: valid: yaml: content
 				Health:           defaultHealth,
 				CertManagement:   defaultCertManagement,
 				ClientConnection: defaultClientConnection,
+				ProgressServer:   defaultProgressServer,
 			},
 			wantOptions: defaultOptions,
 		},
@@ -370,6 +378,7 @@ this is not: valid: yaml: content
 					QPS:   ptr.To[float32](100),
 					Burst: ptr.To[int32](200),
 				},
+				ProgressServer: defaultProgressServer,
 			},
 			wantOptions: ctrl.Options{
 				HealthProbeBindAddress: ":8082",
@@ -394,6 +403,7 @@ this is not: valid: yaml: content
 				Health:           defaultHealth,
 				CertManagement:   defaultCertManagement,
 				ClientConnection: defaultClientConnection,
+				ProgressServer:   defaultProgressServer,
 				LeaderElection: &componentconfigv1alpha1.LeaderElectionConfiguration{
 					LeaderElect:       ptr.To(true),
 					ResourceName:      "trainer-leader",
@@ -434,6 +444,7 @@ this is not: valid: yaml: content
 				Health:           defaultHealth,
 				CertManagement:   defaultCertManagement,
 				ClientConnection: defaultClientConnection,
+				ProgressServer:   defaultProgressServer,
 				Controller: &configapi.ControllerConfigurationSpec{
 					GroupKindConcurrency: map[string]int32{
 						"TrainJob.trainer.kubeflow.org":               10,
@@ -471,6 +482,7 @@ this is not: valid: yaml: content
 				Metrics:          defaultMetrics,
 				Health:           defaultHealth,
 				ClientConnection: defaultClientConnection,
+				ProgressServer:   defaultProgressServer,
 				CertManagement: &configapi.CertManagement{
 					Enable:             ptr.To(true),
 					WebhookServiceName: "custom-webhook-service",
@@ -488,6 +500,7 @@ this is not: valid: yaml: content
 				Metrics:          defaultMetrics,
 				Health:           defaultHealth,
 				ClientConnection: defaultClientConnection,
+				ProgressServer:   defaultProgressServer,
 				CertManagement: &configapi.CertManagement{
 					Enable:             ptr.To(false),
 					WebhookServiceName: "kubeflow-trainer-controller-manager",
@@ -509,6 +522,7 @@ this is not: valid: yaml: content
 				Health:           defaultHealth,
 				CertManagement:   defaultCertManagement,
 				ClientConnection: defaultClientConnection,
+				ProgressServer:   defaultProgressServer,
 			},
 			wantOptions: ctrl.Options{
 				HealthProbeBindAddress: ":8081",
@@ -536,6 +550,7 @@ this is not: valid: yaml: content
 				Health:           defaultHealth,
 				CertManagement:   defaultCertManagement,
 				ClientConnection: defaultClientConnection,
+				ProgressServer:   defaultProgressServer,
 			},
 			wantOptions: ctrl.Options{
 				HealthProbeBindAddress: ":8081",
@@ -565,6 +580,7 @@ this is not: valid: yaml: content
 				},
 				CertManagement:   defaultCertManagement,
 				ClientConnection: defaultClientConnection,
+				ProgressServer:   defaultProgressServer,
 			},
 			wantOptions: ctrl.Options{
 				HealthProbeBindAddress: ":9090",
@@ -607,6 +623,7 @@ this is not: valid: yaml: content
 				},
 				CertManagement:   defaultCertManagement,
 				ClientConnection: defaultClientConnection,
+				ProgressServer:   defaultProgressServer,
 			},
 			wantOptions: ctrl.Options{
 				HealthProbeBindAddress: ":8081",
