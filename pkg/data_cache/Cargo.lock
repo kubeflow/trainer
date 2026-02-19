@@ -262,7 +262,7 @@ dependencies = [
  "futures",
  "prost",
  "prost-types",
- "tonic",
+ "tonic 0.12.3",
 ]
 
 [[package]]
@@ -2618,7 +2618,7 @@ dependencies = [
  "iceberg-datafusion",
  "serde",
  "tokio",
- "tonic",
+ "tonic 0.14.4",
  "tower 0.5.3",
  "tracing",
  "tracing-subscriber",
@@ -4516,6 +4516,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "tonic"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f32a6f80051a4111560201420c7885d0082ba9efe2ab61875c587bb6b18b9a0"
+dependencies = [
+ "async-trait",
+ "axum 0.8.8",
+ "base64",
+ "bytes",
+ "h2",
+ "http",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-timeout",
+ "hyper-util",
+ "percent-encoding",
+ "pin-project",
+ "socket2 0.6.1",
+ "sync_wrapper",
+ "tokio",
+ "tokio-stream",
+ "tower 0.5.3",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4543,9 +4572,12 @@ checksum = "ebe5ef63511595f1344e2d5cfa636d973292adc0eec1f0ad45fae9f0851ab1d4"
 dependencies = [
  "futures-core",
  "futures-util",
+ "indexmap 2.12.1",
  "pin-project-lite",
+ "slab",
  "sync_wrapper",
  "tokio",
+ "tokio-util",
  "tower-layer",
  "tower-service",
  "tracing",
