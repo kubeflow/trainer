@@ -1,0 +1,24 @@
+# KubeLinter configuration file
+# For more information, see https://docs.kubelinter.io/#/configuring-kubelinter
+
+# checks section configures which checks to run.
+checks:
+  # Do not include any of the default checks.
+  # If this is false, all default checks are included,
+  # and the "include" and "exclude" lists are applied on top of them.
+  doNotIncludeBuiltIn: false
+
+  # include is a list of check names to include.
+  # include:
+  #   - "check-name-1"
+
+  # exclude is a list of check names to exclude.
+  exclude:
+    - "unset-cpu-requirements"
+    - "unset-memory-requirements"
+    - "mismatching-selector"
+    - "no-read-only-root-fs"
+    - "run-as-non-root"
+    - "no-anti-affinity"
+    - "non-existent-service-account" # Often false positive in kustomize
+    - "latest-tag"
