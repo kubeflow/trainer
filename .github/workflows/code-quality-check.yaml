@@ -6,7 +6,6 @@ on:
 
 jobs:
   code-quality:
-    if: github.repository == 'kubeflow/trainer'
     runs-on: ubuntu-latest
 
     steps:
