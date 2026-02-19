@@ -172,7 +172,7 @@ type VolcanoPodGroupPolicySource struct {
 
 // MLPolicy represents configuration for the model training with ML-specific parameters.
 // +kubebuilder:validation:XValidation:rule="!(has(self.numNodes) && (has(self.torch) && has(self.torch.elasticPolicy)))", message="numNodes should not be set if torch.elasticPolicy is configured"
-// +kubebuilder:validation:XValidation:rule="!(has(self.torch) && has(self.mpi))", message="Only one of the policy can be configured"
+// +kubebuilder:validation:XValidation:rule="[has(self.torch), has(self.mpi), has(self.jax), has(self.xgboost)].filter(x, x).size() <= 1", message="Only one of the policy can be configured"
 type MLPolicy struct {
 	// numNodes is the number of training nodes.
 	// Defaults to 1.
@@ -198,6 +198,10 @@ type MLPolicySource struct {
 	// jax defines the configuration for the JAX Runtime
 	// +optional
 	JAX *JAXMLPolicySource `json:"jax,omitempty"`
+
+	// xgboost defines the configuration for the XGBoost Runtime.
+	// +optional
+	XGBoost *XGBoostMLPolicySource `json:"xgboost,omitempty"`
 }
 
 // TorchMLPolicySource represents a PyTorch runtime configuration.
@@ -245,6 +249,14 @@ type TorchElasticPolicy struct {
 
 // JAXMLPolicySource represents a jax runtime configuration.
 type JAXMLPolicySource struct{}
+
+// XGBoostMLPolicySource represents an XGBoost runtime configuration.
+// The number of workers per node is automatically derived from container GPU resources:
+//   - GPU training: 1 worker per GPU (from resourcesPerNode)
+//   - CPU training: 1 worker per node
+//
+// DMLC_NUM_WORKER = numNodes × workersPerNode (where workersPerNode = GPU count or 1)
+type XGBoostMLPolicySource struct{}
 
 // MPIMLPolicySource represents a MPI runtime configuration.
 type MPIMLPolicySource struct {
