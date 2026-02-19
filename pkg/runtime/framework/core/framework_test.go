@@ -52,6 +52,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/kaischeduler"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
@@ -78,6 +79,7 @@ func TestNew(t *testing.T) {
 				registry: fwkplugins.NewRegistry(),
 				plugins: map[string]framework.Plugin{
 					coscheduling.Name: &coscheduling.CoScheduling{},
+					kaischeduler.Name: &kaischeduler.KAIScheduler{},
 					volcano.Name:      &volcano.Volcano{},
 					mpi.Name:          &mpi.MPI{},
 					plainml.Name:      &plainml.PlainML{},
@@ -93,6 +95,7 @@ func TestNew(t *testing.T) {
 				},
 				enforcePodGroupPolicyPlugins: []framework.EnforcePodGroupPolicyPlugin{
 					&coscheduling.CoScheduling{},
+					&kaischeduler.KAIScheduler{},
 					&volcano.Volcano{},
 				},
 				customValidationPlugins: []framework.CustomValidationPlugin{

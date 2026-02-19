@@ -633,6 +633,15 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                  kaiScheduler:
+                    description: KAI Scheduler plugin for gang-scheduling.
+                    properties:
+                      queue:
+                        description: |-
+                          queue is the name of the KAI Scheduler queue to submit the job to.
+                          The queue must exist in the cluster for the job to be scheduled.
+                        type: string
+                    type: object
                   volcano:
                     description: volcano plugin for gang-scheduling.
                     properties:
