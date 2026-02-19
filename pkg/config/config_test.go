@@ -155,6 +155,18 @@ health:
 		t.Fatal(err)
 	}
 
+	progressServerConfig := filepath.Join(tmpDir, "progress.yaml")
+	if err := os.WriteFile(progressServerConfig, []byte(`
+apiVersion: config.trainer.kubeflow.org/v1alpha1
+kind: Configuration
+progressServer:
+  port: 12443
+  qps: 1
+  burst: 2
+`), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	completeConfig := filepath.Join(tmpDir, "complete.yaml")
 	if err := os.WriteFile(completeConfig, []byte(`
 apiVersion: config.trainer.kubeflow.org/v1alpha1
@@ -188,6 +200,10 @@ certManagement:
 clientConnection:
   qps: 50
   burst: 100
+progressServer:
+  port: 12443
+  qps: 1
+  burst: 2
 `), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
 	}
@@ -567,6 +583,35 @@ this is not: valid: yaml: content
 			},
 		},
 		{
+			name:       "progress server config",
+			configFile: progressServerConfig,
+			wantConfiguration: configapi.Configuration{
+				TypeMeta:         typeMeta,
+				Webhook:          defaultWebhook,
+				Metrics:          defaultMetrics,
+				Health:           defaultHealth,
+				CertManagement:   defaultCertManagement,
+				ClientConnection: defaultClientConnection,
+				ProgressServer: &configapi.ProgressServer{
+					Port:  ptr.To[int32](12443),
+					QPS:   ptr.To[float32](1),
+					Burst: ptr.To[int32](2),
+				},
+			},
+			wantOptions: ctrl.Options{
+				HealthProbeBindAddress: ":8081",
+				Metrics: metricsserver.Options{
+					BindAddress:   ":8443",
+					SecureServing: true,
+				},
+				WebhookServer: &webhook.DefaultServer{
+					Options: webhook.Options{
+						Port: 9443,
+					},
+				},
+			},
+		},
+		{
 			name:       "health config with custom endpoints",
 			configFile: healthConfig,
 			wantConfiguration: configapi.Configuration{
@@ -623,7 +668,11 @@ this is not: valid: yaml: content
 				},
 				CertManagement:   defaultCertManagement,
 				ClientConnection: defaultClientConnection,
-				ProgressServer:   defaultProgressServer,
+				ProgressServer: &configapi.ProgressServer{
+					Port:  ptr.To[int32](12443),
+					QPS:   ptr.To[float32](1),
+					Burst: ptr.To[int32](2),
+				},
 			},
 			wantOptions: ctrl.Options{
 				HealthProbeBindAddress: ":8081",
