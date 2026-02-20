@@ -186,7 +186,7 @@ test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd volca
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(K8S_VERSION) -p path)" $(GINKGO) -v ./test/integration/...
 
 .PHONY: release
-release:
+release: ## Create a new release changelog for the specified VERSION (X.Y.Z).
 	@if [ -z "$(VERSION)" ] || ! echo "$(VERSION)" | grep -E -q '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
 		echo "Error: VERSION must be set in X.Y.Z format. Usage: make release VERSION=X.Y.Z"; \
 		exit 1; \
