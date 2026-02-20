@@ -1,0 +1,93 @@
+name: Release Kubeflow Trainer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 2.2.0)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add upstream and fetch everything
+        run: |
+          git remote add upstream https://github.com/kubeflow/trainer.git || true
+          git fetch upstream --tags
+          git fetch origin --tags
+
+      - name: Prepare release branch
+        id: prep
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+          BRANCH_NAME="release-${MAJOR_MINOR}"
+
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "PATCH=$PATCH" >> $GITHUB_ENV
+
+          # If patch == 0 → new minor release
+          if [ "$PATCH" = "0" ]; then
+            echo "Minor release detected"
+
+            git checkout -B $BRANCH_NAME upstream/${GITHUB_REF_NAME}
+            git push -u origin $BRANCH_NAME --force-with-lease
+
+          else
+            echo "Patch release detected"
+
+            if git ls-remote --exit-code --heads origin $BRANCH_NAME; then
+              git checkout $BRANCH_NAME
+              git pull origin $BRANCH_NAME
+            else
+              echo "Release branch does not exist. Creating from upstream."
+              git checkout -B $BRANCH_NAME upstream/${GITHUB_REF_NAME}
+              git push -u origin $BRANCH_NAME
+            fi
+          fi
+
+      - name: Generate Changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          version: v2.12.0
+          config: cliff.toml
+          args: >
+            --tag v${{ github.event.inputs.version }}
+            --github-repo kubeflow/trainer
+            --prepend CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITCLIFF_GH_TOKEN }}
+
+      - name: Commit and Push Changelog
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add CHANGELOG.md
+          git commit -m "Kubeflow Trainer Official Release v${{ github.event.inputs.version }}"
+          git push origin $BRANCH_NAME
+
+      - name: Create Git Tag
+        run: |
+          git tag v${{ github.event.inputs.version }}
+          git push origin v${{ github.event.inputs.version }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: v${{ github.event.inputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
