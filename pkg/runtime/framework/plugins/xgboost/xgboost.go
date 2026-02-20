@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
@@ -91,10 +92,15 @@ func (x *XGBoost) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 			// Auto-derive numWorkersPerNode from GPU resources.
 			// GPU training: 1 worker per GPU | CPU training: 1 worker per node.
 			numWorkersPerNode := int32(1)
-			if res := runtime.ExtractResourcePerNodeFromRuntime(info); res != nil {
-				if gpuCount := runtime.GetNumGPUPerNode(res); gpuCount > 0 {
-					numWorkersPerNode = int32(gpuCount)
-				}
+			// Step 1: Get resources from Runtime (ClusterTrainingRuntime template).
+			resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
+			// Step 2: Override with TrainJob resources if specified.
+			if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
+				resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
+			}
+			// Step 3: Derive GPU count from the final resolved resources.
+			if gpuCount := runtime.GetNumGPUPerNode(&resourcesPerNode); gpuCount > 0 {
+				numWorkersPerNode = int32(gpuCount)
 			}
 			totalWorkers := numNodes * numWorkersPerNode
 

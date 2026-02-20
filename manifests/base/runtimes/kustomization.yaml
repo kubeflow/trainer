@@ -5,4 +5,5 @@ resources:
   - mlx_distributed.yaml
   - torch_distributed.yaml
   - jax_distributed.yaml
+  - xgboost_distributed.yaml
   - torchtune
