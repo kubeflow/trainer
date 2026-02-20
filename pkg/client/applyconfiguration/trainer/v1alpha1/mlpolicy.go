@@ -28,7 +28,7 @@ type MLPolicyApplyConfiguration struct {
 	// numNodes is the number of training nodes.
 	// Defaults to 1.
 	NumNodes *int32 `json:"numNodes,omitempty"`
-	// Configuration for the runtime-specific parameters, such as Torch or MPI.
+	// Configuration for the runtime-specific parameters, such as Torch, Flux, or MPI.
 	// Only one of its members may be specified.
 	MLPolicySourceApplyConfiguration `json:",inline"`
 }
@@ -60,6 +60,14 @@ func (b *MLPolicyApplyConfiguration) WithTorch(value *TorchMLPolicySourceApplyCo
 // If called multiple times, the MPI field is set to the value of the last call.
 func (b *MLPolicyApplyConfiguration) WithMPI(value *MPIMLPolicySourceApplyConfiguration) *MLPolicyApplyConfiguration {
 	b.MLPolicySourceApplyConfiguration.MPI = value
+	return b
+}
+
+// WithFlux sets the Flux field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Flux field is set to the value of the last call.
+func (b *MLPolicyApplyConfiguration) WithFlux(value *FluxMLPolicySourceApplyConfiguration) *MLPolicyApplyConfiguration {
+	b.MLPolicySourceApplyConfiguration.Flux = value
 	return b
 }
 

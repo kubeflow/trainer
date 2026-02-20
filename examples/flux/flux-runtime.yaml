@@ -1,0 +1,25 @@
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: flux-runtime
+  labels:
+    trainer.kubeflow.org/framework: flux
+spec:
+  mlPolicy:
+    numNodes: 1
+    flux: {}
+  template:
+    spec:
+      replicatedJobs:
+        - name: node
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  # An init container will be added here to install flux
+                  containers:
+                    - name: node
+                      image: ubuntu:jammy
