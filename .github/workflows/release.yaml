@@ -1,0 +1,257 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - VERSION
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SEMVER_PATTERN: '^(v)?([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.([0-9]+))?$'
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
+      tag: ${{ steps.vars.outputs.tag }}
+      branch: ${{ steps.vars.outputs.branch }}
+      is-prerelease: ${{ steps.vars.outputs.is-prerelease }}
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version and set outputs
+        id: vars
+        run: |
+          RAW_VERSION=$(cat VERSION | tr -d ' \n\r')
+          VERSION=${RAW_VERSION#v}
+          if [[ ! ${RAW_VERSION} =~ ${{ env.SEMVER_PATTERN }} ]]; then
+            echo "Version '${RAW_VERSION}' does not match semver pattern."
+            exit 1
+          fi
+
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+          BRANCH="release-${MAJOR_MINOR}"
+          TAG="v${VERSION}"
+          IS_PRERELEASE=false
+          if [[ ${VERSION} == *"-rc."* ]]; then
+            IS_PRERELEASE=true
+          fi
+
+          echo "Version '${RAW_VERSION}' matches semver pattern."
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "is-prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+
+      - name: Ensure tag does not exist
+        run: |
+          git fetch --tags
+          if git tag -l | grep -q "^${{ steps.vars.outputs.tag }}$"; then
+            echo "Tag '${{ steps.vars.outputs.tag }}' already exists."
+            exit 1
+          fi
+
+      - name: Check manifests image tag matches version
+        run: |
+          TAG="${{ steps.vars.outputs.tag }}"
+          MANIFEST_TAGS=$(grep -r 'newTag:' manifests | sed 's/.*newTag:[[:space:]]*//' | tr -d '"' | tr -d "'" | sort | uniq)
+          if [ -z "$MANIFEST_TAGS" ]; then
+            echo "No newTag found in manifests."
+            exit 1
+          fi
+          for t in $MANIFEST_TAGS; do
+            if [ "$t" != "$TAG" ]; then
+              echo "Image tag in manifests ($t) does not match version tag ($TAG)."
+              exit 1
+            fi
+          done
+          echo "All image tags in manifests match version tag $TAG."
+
+  build_python_api:
+    needs:
+      - prepare
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+
+      - name: Verify Python package version matches release
+        run: |
+          EXPECTED="${{ needs.prepare.outputs.version }}"
+          PY_VER=$(python - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path('api/python_api/kubeflow_trainer_api/__init__.py').read_text()
+          m = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
+          if not m:
+              raise SystemExit("__version__ not found")
+          print(m.group(1))
+          PY
+          )
+          echo "Expected: ${EXPECTED}; Package: ${PY_VER}"
+          if [ "$PY_VER" != "$EXPECTED" ]; then
+            echo "Python API version mismatch"
+            exit 1
+          fi
+
+      - name: Build Python package
+        working-directory: api/python_api
+        run: |
+          python -m build
+          python -m twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist-${{ needs.prepare.outputs.version }}
+          path: api/python_api/dist/
+
+  create_branch_and_tag:
+    needs:
+      - prepare
+      - build_python_api
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Create release branch
+        run: |
+          BRANCH="${{ needs.prepare.outputs.branch }}"
+          git fetch origin
+          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+            echo "Release branch $BRANCH already exists."
+          else
+            echo "Creating release branch $BRANCH from $GITHUB_SHA"
+            git checkout -b "$BRANCH" "$GITHUB_SHA"
+            git push origin "$BRANCH"
+          fi
+
+      - name: Create and push tag
+        run: |
+          git tag -a "${{ needs.prepare.outputs.tag }}" "$GITHUB_SHA" -m "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
+          git push origin "${{ needs.prepare.outputs.tag }}"
+
+  trigger_builds:
+    needs:
+      - prepare
+      - create_branch_and_tag
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+
+    steps:
+      - name: Trigger image build for release tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-and-push-images.yaml',
+              ref: '${{ needs.prepare.outputs.tag }}',
+            })
+
+      - name: Trigger Helm chart publish for release tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'publish-helm-charts.yaml',
+              ref: '${{ needs.prepare.outputs.tag }}',
+            })
+
+  publish_pypi:
+    needs:
+      - prepare
+      - build_python_api
+      - create_branch_and_tag
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://pypi.org/project/kubeflow-trainer-api/
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist-${{ needs.prepare.outputs.version }}
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
+          packages-dir: dist/
+
+  github_release:
+    needs:
+      - prepare
+      - create_branch_and_tag
+      - publish_pypi
+
+    permissions:
+      contents: write
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        uses: orhun/git-cliff-action@v2
+        with:
+          config: cliff.toml
+          args: --latest --tag ${{ needs.prepare.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
+          draft: false
+          body: ${{ steps.changelog.outputs.changelog }}
