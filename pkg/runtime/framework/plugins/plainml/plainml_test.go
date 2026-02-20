@@ -33,6 +33,8 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+
+	// Ensure we have logic for JAX/XGBoost in utiltesting if needed, though MakeMLPolicySourceWrapper likely handles it.
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
