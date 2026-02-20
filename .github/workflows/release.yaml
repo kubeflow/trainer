@@ -21,11 +21,11 @@ jobs:
           fetch-depth: 0
 
       # Activate this when trying for fork repo
-      # - name: Add upstream and fetch everything
-      #   run: |
-      #     git remote add upstream https://github.com/kubeflow/trainer.git
-      #     git fetch upstream --tags
-      #     git fetch origin --tags
+      #- name: Add upstream and fetch everything
+        #run: |
+          #git remote add upstream https://github.com/kubeflow/trainer.git
+          #git fetch upstream --tags
+          #git fetch origin --tags
 
       - name: Prepare release branch
         id: prep
@@ -50,6 +50,7 @@ jobs:
           fi
 
       - name: Generate Changelog
+        id: cliff
         uses: orhun/git-cliff-action@v4
         with:
           version: v2.12.0
@@ -80,6 +81,6 @@ jobs:
         with:
           tag_name: v${{ github.event.inputs.version }}
           name: v${{ github.event.inputs.version }}
-          body_path: CHANGELOG.md
+          body: ${{ steps.cliff.outputs.changelog }}
           draft: false
           prerelease: false
