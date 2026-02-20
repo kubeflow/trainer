@@ -198,7 +198,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
-								ContainerPort: ptr.To(constants.XGBoostDefaultTrackerPort),
+								ContainerPort: ptr.To(constants.ContainerTrainerPort),
 							}},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -207,7 +207,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvTrackerPort),
-									Value: ptr.To(fmt.Sprintf("%d", constants.XGBoostDefaultTrackerPort)),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 								{
 									Name: ptr.To(constants.XGBoostEnvTaskID),
@@ -265,7 +265,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
-								ContainerPort: ptr.To(constants.XGBoostDefaultTrackerPort),
+								ContainerPort: ptr.To(constants.ContainerTrainerPort),
 							}},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -274,7 +274,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvTrackerPort),
-									Value: ptr.To(fmt.Sprintf("%d", constants.XGBoostDefaultTrackerPort)),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 								{
 									Name: ptr.To(constants.XGBoostEnvTaskID),
@@ -338,7 +338,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
-								ContainerPort: ptr.To(constants.XGBoostDefaultTrackerPort),
+								ContainerPort: ptr.To(constants.ContainerTrainerPort),
 							}},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -347,7 +347,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvTrackerPort),
-									Value: ptr.To(fmt.Sprintf("%d", constants.XGBoostDefaultTrackerPort)),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 								{
 									Name: ptr.To(constants.XGBoostEnvTaskID),
@@ -405,7 +405,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
-								ContainerPort: ptr.To(constants.XGBoostDefaultTrackerPort),
+								ContainerPort: ptr.To(constants.ContainerTrainerPort),
 							}},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -414,7 +414,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvTrackerPort),
-									Value: ptr.To(fmt.Sprintf("%d", constants.XGBoostDefaultTrackerPort)),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 								{
 									Name: ptr.To(constants.XGBoostEnvTaskID),
@@ -472,7 +472,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
-								ContainerPort: ptr.To(constants.XGBoostDefaultTrackerPort),
+								ContainerPort: ptr.To(constants.ContainerTrainerPort),
 							}},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -481,7 +481,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvTrackerPort),
-									Value: ptr.To(fmt.Sprintf("%d", constants.XGBoostDefaultTrackerPort)),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 								{
 									Name: ptr.To(constants.XGBoostEnvTaskID),
@@ -543,7 +543,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Containers: []runtime.Container{{
 							Name: constants.Node,
 							Ports: []corev1ac.ContainerPortApplyConfiguration{{
-								ContainerPort: ptr.To(constants.XGBoostDefaultTrackerPort),
+								ContainerPort: ptr.To(constants.ContainerTrainerPort),
 							}},
 							Env: []corev1ac.EnvVarApplyConfiguration{
 								{
@@ -552,7 +552,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvTrackerPort),
-									Value: ptr.To(fmt.Sprintf("%d", constants.XGBoostDefaultTrackerPort)),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
 								{
 									Name: ptr.To(constants.XGBoostEnvTaskID),

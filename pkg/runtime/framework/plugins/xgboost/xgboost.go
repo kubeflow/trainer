@@ -117,7 +117,7 @@ func (x *XGBoost) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 				// DMLC_TRACKER_PORT - Default tracker port.
 				*corev1ac.EnvVar().
 					WithName(constants.XGBoostEnvTrackerPort).
-					WithValue(fmt.Sprintf("%d", constants.XGBoostDefaultTrackerPort)),
+					WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 				// DMLC_TASK_ID - Worker rank from Job completion index.
 				*corev1ac.EnvVar().
 					WithName(constants.XGBoostEnvTaskID).
@@ -133,7 +133,7 @@ func (x *XGBoost) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 			// Add container port for tracker communication.
 			apply.UpsertPort(&trainerContainer.Ports,
 				*corev1ac.ContainerPort().
-					WithContainerPort(constants.XGBoostDefaultTrackerPort))
+					WithContainerPort(constants.ContainerTrainerPort))
 		}
 	}
 
