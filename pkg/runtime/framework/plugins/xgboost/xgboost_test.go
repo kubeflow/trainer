@@ -38,6 +38,101 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
+func TestXGBoostValidate(t *testing.T) {
+	cases := map[string]struct {
+		trainJob *trainer.TrainJob
+		wantErrs field.ErrorList
+	}{
+		"no error when trainer is nil": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+		},
+		"no error when env does not contain reserved names": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(1).
+						Obj(),
+				).
+				Obj(),
+		},
+		"error when using reserved DMLC_TRACKER_URI env": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(1).
+						Env(corev1.EnvVar{Name: constants.XGBoostEnvTrackerURI, Value: "custom-tracker"}).
+						Obj(),
+				).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "trainer", "env").Index(0),
+					fmt.Sprintf("%s is reserved for the XGBoost runtime", constants.XGBoostEnvTrackerURI),
+				),
+			},
+		},
+		"error when using reserved DMLC_NUM_WORKER env": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(1).
+						Env(corev1.EnvVar{Name: constants.XGBoostEnvNumWorker, Value: "10"}).
+						Obj(),
+				).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "trainer", "env").Index(0),
+					fmt.Sprintf("%s is reserved for the XGBoost runtime", constants.XGBoostEnvNumWorker),
+				),
+			},
+		},
+		"multiple errors when using multiple reserved envs": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(1).
+						Env(
+							corev1.EnvVar{Name: constants.XGBoostEnvTrackerURI, Value: "custom"},
+							corev1.EnvVar{Name: constants.XGBoostEnvTaskID, Value: "0"},
+						).
+						Obj(),
+				).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "trainer", "env").Index(0),
+					fmt.Sprintf("%s is reserved for the XGBoost runtime", constants.XGBoostEnvTrackerURI),
+				),
+				field.Forbidden(
+					field.NewPath("spec", "trainer", "env").Index(1),
+					fmt.Sprintf("%s is reserved for the XGBoost runtime", constants.XGBoostEnvTaskID),
+				),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+			cliBuilder := utiltesting.NewClientBuilder()
+			p, err := New(ctx, cliBuilder.Build(), nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize XGBoost plugin: %v", err)
+			}
+
+			// Test Validate
+			_, errs := p.(framework.CustomValidationPlugin).Validate(ctx, nil, nil, tc.trainJob)
+			if diff := cmp.Diff(tc.wantErrs, errs, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestXGBoostEnforceMLPolicy(t *testing.T) {
 	cases := map[string]struct {
 		info              *runtime.Info
@@ -221,7 +316,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						Container("xgboost/xgboost:latest", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("8"),
 							corev1.ResourceMemory: resource.MustParse("32Gi"),
-							"nvidia.com/gpu":      resource.MustParse("4"),
+							"example.com/gpu":     resource.MustParse("4"),
 						}).
 						Obj(),
 				).
@@ -264,7 +359,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.XGBoostEnvNumWorker),
-									Value: ptr.To("2"),
+									Value: ptr.To("8"),
 								},
 							},
 						}},
@@ -340,6 +435,144 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
+		"resources not set - defaults to 1 worker per node": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							XGBoostPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 2, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "no-res-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						Obj()).
+				Obj(),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						XGBoostPolicy().
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](2),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To(constants.XGBoostDefaultTrackerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.XGBoostEnvTrackerURI),
+									Value: ptr.To(fmt.Sprintf("no-res-job-%s-0-0.no-res-job", constants.Node)),
+								},
+								{
+									Name:  ptr.To(constants.XGBoostEnvTrackerPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.XGBoostDefaultTrackerPort)),
+								},
+								{
+									Name: ptr.To(constants.XGBoostEnvTaskID),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.XGBoostEnvNumWorker),
+									Value: ptr.To("2"),
+								},
+							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
+		"resources set in TrainJob only": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							XGBoostPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainjob-res").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						Container("xgboost/xgboost:latest", nil, nil, corev1.ResourceList{
+							"example.com/gpu": resource.MustParse("4"),
+						}).
+						Obj(),
+				).
+				Obj(),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						XGBoostPolicy().
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](2),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To(constants.XGBoostDefaultTrackerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.XGBoostEnvTrackerURI),
+									Value: ptr.To(fmt.Sprintf("trainjob-res-%s-0-0.trainjob-res", constants.Node)),
+								},
+								{
+									Name:  ptr.To(constants.XGBoostEnvTrackerPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.XGBoostDefaultTrackerPort)),
+								},
+								{
+									Name: ptr.To(constants.XGBoostEnvTaskID),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.XGBoostEnvNumWorker),
+									Value: ptr.To("8"),
+								},
+							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -366,101 +599,6 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected RuntimeInfo (-want,+got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestXGBoostValidate(t *testing.T) {
-	cases := map[string]struct {
-		trainJob *trainer.TrainJob
-		wantErrs field.ErrorList
-	}{
-		"no error when trainer is nil": {
-			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
-		},
-		"no error when env does not contain reserved names": {
-			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-				Trainer(
-					utiltesting.MakeTrainJobTrainerWrapper().
-						NumNodes(1).
-						Obj(),
-				).
-				Obj(),
-		},
-		"error when using reserved DMLC_TRACKER_URI env": {
-			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-				Trainer(
-					utiltesting.MakeTrainJobTrainerWrapper().
-						NumNodes(1).
-						Env(corev1.EnvVar{Name: constants.XGBoostEnvTrackerURI, Value: "custom-tracker"}).
-						Obj(),
-				).
-				Obj(),
-			wantErrs: field.ErrorList{
-				field.Forbidden(
-					field.NewPath("spec", "trainer", "env").Index(0),
-					fmt.Sprintf("%s is reserved for the XGBoost runtime", constants.XGBoostEnvTrackerURI),
-				),
-			},
-		},
-		"error when using reserved DMLC_NUM_WORKER env": {
-			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-				Trainer(
-					utiltesting.MakeTrainJobTrainerWrapper().
-						NumNodes(1).
-						Env(corev1.EnvVar{Name: constants.XGBoostEnvNumWorker, Value: "10"}).
-						Obj(),
-				).
-				Obj(),
-			wantErrs: field.ErrorList{
-				field.Forbidden(
-					field.NewPath("spec", "trainer", "env").Index(0),
-					fmt.Sprintf("%s is reserved for the XGBoost runtime", constants.XGBoostEnvNumWorker),
-				),
-			},
-		},
-		"multiple errors when using multiple reserved envs": {
-			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-				Trainer(
-					utiltesting.MakeTrainJobTrainerWrapper().
-						NumNodes(1).
-						Env(
-							corev1.EnvVar{Name: constants.XGBoostEnvTrackerURI, Value: "custom"},
-							corev1.EnvVar{Name: constants.XGBoostEnvTaskID, Value: "0"},
-						).
-						Obj(),
-				).
-				Obj(),
-			wantErrs: field.ErrorList{
-				field.Forbidden(
-					field.NewPath("spec", "trainer", "env").Index(0),
-					fmt.Sprintf("%s is reserved for the XGBoost runtime", constants.XGBoostEnvTrackerURI),
-				),
-				field.Forbidden(
-					field.NewPath("spec", "trainer", "env").Index(1),
-					fmt.Sprintf("%s is reserved for the XGBoost runtime", constants.XGBoostEnvTaskID),
-				),
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			var cancel func()
-			ctx, cancel = context.WithCancel(ctx)
-			t.Cleanup(cancel)
-			cliBuilder := utiltesting.NewClientBuilder()
-			p, err := New(ctx, cliBuilder.Build(), nil)
-			if err != nil {
-				t.Fatalf("Failed to initialize XGBoost plugin: %v", err)
-			}
-
-			// Test Validate
-			_, errs := p.(framework.CustomValidationPlugin).Validate(ctx, nil, nil, tc.trainJob)
-			if diff := cmp.Diff(tc.wantErrs, errs, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
-				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
 			}
 		})
 	}

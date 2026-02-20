@@ -195,7 +195,7 @@ const (
 	TorchTuneCheckpointDir string = "checkpointer.checkpoint_dir"
 
 	// Distributed envs for XGBoost collective/Rabit.
-	// Ref: https://xgboost.readthedocs.io/en/stable/tutorials/dask.html
+	// Ref:TODO[krishna-kg732]: Add the correct link(update XG boost docs)
 
 	// XGBoostEnvTrackerURI is the env name for the tracker URI.
 	XGBoostEnvTrackerURI string = "DMLC_TRACKER_URI"
