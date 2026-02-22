@@ -128,7 +128,7 @@ jobs:
           name: python-dist-${{ needs.prepare.outputs.version }}
           path: api/python_api/dist/
 
-  create_branch_and_tag:
+  create_branch:
     needs:
       - prepare
       - build_python_api
@@ -159,15 +159,10 @@ jobs:
             git push origin "$BRANCH"
           fi
 
-      - name: Create and push tag
-        run: |
-          git tag -a "${{ needs.prepare.outputs.tag }}" "$GITHUB_SHA" -m "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
-          git push origin "${{ needs.prepare.outputs.tag }}"
-
   trigger_builds:
     needs:
       - prepare
-      - create_branch_and_tag
+      - github_release
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -199,7 +194,7 @@ jobs:
     needs:
       - prepare
       - build_python_api
-      - create_branch_and_tag
+      - create_branch
     runs-on: ubuntu-latest
     environment:
       name: release
@@ -222,7 +217,7 @@ jobs:
   github_release:
     needs:
       - prepare
-      - create_branch_and_tag
+      - create_branch
       - publish_pypi
 
     permissions:
@@ -235,7 +230,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          fetch-tags: false
 
       - name: Generate changelog
         id: changelog
@@ -247,6 +241,16 @@ jobs:
             --tag ${{ needs.prepare.outputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Create and push tag
+        run: |
+          git tag -a "${{ needs.prepare.outputs.tag }}" "$GITHUB_SHA" -m "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
+          git push origin "${{ needs.prepare.outputs.tag }}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
