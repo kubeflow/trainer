@@ -19,8 +19,6 @@ spec:
         app.kubernetes.io/name: trainer
         app.kubernetes.io/component: manager
         app.kubernetes.io/part-of: kubeflow
-      annotations:
-        traffic.sidecar.istio.io/excludeInboundPorts: "9443"
     spec:
       containers:
         - name: manager
