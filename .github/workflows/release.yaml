@@ -240,7 +240,6 @@ jobs:
           args: >
             --unreleased
             --tag ${{ needs.prepare.outputs.tag }}
-            --prepend CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -261,7 +260,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          name: "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
+          name: "${{ needs.prepare.outputs.tag }}"
           tag_name: ${{ needs.prepare.outputs.tag }}
           target_commitish: ${{ github.sha }}
           prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
