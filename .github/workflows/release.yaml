@@ -219,16 +219,12 @@ jobs:
           packages-dir: dist/
           password: ${{ secrets.PYPI_API_TOKEN }}
 
-  github_release:
+  generate_changelog:
     needs:
       - prepare
-      - create_branch_and_tag
-      - publish_pypi
-
-    permissions:
-      contents: write
-
     runs-on: ubuntu-latest
+    outputs:
+      changelog: ${{ steps.changelog.outputs.changelog }}
 
     steps:
       - name: Checkout
@@ -241,10 +237,26 @@ jobs:
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
-          args: --unreleased --tag ${{ needs.prepare.outputs.tag }} -o -
+          args: >
+            --unreleased
+            --tag ${{ needs.prepare.outputs.tag }}
+            --prepend CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  github_release:
+    needs:
+      - prepare
+      - create_branch_and_tag
+      - publish_pypi
+      - generate_changelog
+
+    permissions:
+      contents: write
+
+    runs-on: ubuntu-latest
+
+    steps:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -254,4 +266,4 @@ jobs:
           target_commitish: ${{ github.sha }}
           prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
           draft: false
-          body: ${{ steps.changelog.outputs.changelog }}
+          body: ${{ needs.generate_changelog.outputs.changelog }}
