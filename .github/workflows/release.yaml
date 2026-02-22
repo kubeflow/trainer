@@ -219,18 +219,23 @@ jobs:
           packages-dir: dist/
           password: ${{ secrets.PYPI_API_TOKEN }}
 
-  generate_changelog:
+  github_release:
     needs:
       - prepare
+      - create_branch_and_tag
+      - publish_pypi
+
+    permissions:
+      contents: write
+
     runs-on: ubuntu-latest
-    outputs:
-      changelog: ${{ steps.changelog.outputs.changelog }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: false
 
       - name: Generate changelog
         id: changelog
@@ -243,19 +248,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  github_release:
-    needs:
-      - prepare
-      - create_branch_and_tag
-      - publish_pypi
-      - generate_changelog
-
-    permissions:
-      contents: write
-
-    runs-on: ubuntu-latest
-
-    steps:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -265,4 +257,4 @@ jobs:
           target_commitish: ${{ github.sha }}
           prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
           draft: false
-          body: ${{ needs.generate_changelog.outputs.changelog }}
+          body_path: ${{ steps.changelog.outputs.changelog }}
