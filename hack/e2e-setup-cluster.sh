@@ -92,21 +92,22 @@ kubectl apply --server-side -k manifests/overlays/runtimes || (
     exit 1
 )
 
-# TODO (andreyvelich): We should build runtime images before adding them.
-TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
-DEEPSPEED_RUNTIME_IMAGE=ghcr.io/kubeflow/trainer/deepspeed-runtime:latest
-JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
+# hotfix(jaiakash) - skip pre-load due to kind failure
+# # TODO (andreyvelich): We should build runtime images before adding them.
+# TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+# DEEPSPEED_RUNTIME_IMAGE=ghcr.io/kubeflow/trainer/deepspeed-runtime:latest
+# JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
 
-# Load Torch runtime image in KinD
-${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
-load_image_to_kind ${TORCH_RUNTIME_IMAGE}
+# # Load Torch runtime image in KinD
+# ${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
+# load_image_to_kind ${TORCH_RUNTIME_IMAGE}
 
-# Load DeepSpeed runtime image in KinD
-${CONTAINER_RUNTIME} pull ${DEEPSPEED_RUNTIME_IMAGE}
-load_image_to_kind ${DEEPSPEED_RUNTIME_IMAGE}
+# # Load DeepSpeed runtime image in KinD
+# ${CONTAINER_RUNTIME} pull ${DEEPSPEED_RUNTIME_IMAGE}
+# load_image_to_kind ${DEEPSPEED_RUNTIME_IMAGE}
 
-# Load JAX runtime image in KinD
-${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
-load_image_to_kind ${JAX_RUNTIME_IMAGE}
+# # Load JAX runtime image in KinD
+# ${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
+# load_image_to_kind ${JAX_RUNTIME_IMAGE}
 
 print_cluster_info
