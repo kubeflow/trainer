@@ -41,7 +41,8 @@ jobs:
             exit 1
           fi
 
-          BRANCH="release-${VERSION}"
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+          BRANCH="release-${MAJOR_MINOR}"
           TAG="v${VERSION}"
           IS_PRERELEASE=false
           if [[ ${VERSION} == *"-rc."* ]]; then
