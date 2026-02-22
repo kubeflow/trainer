@@ -5,6 +5,18 @@
 - Docker available locally (required by `hack/release.sh` for changelog generation with `git-cliff`).
 - `GITHUB_TOKEN` exported locally (recommended to avoid GitHub API rate limits while generating changelog):
 
+```bash
+export GITHUB_TOKEN=<token>
+```
+
+- If you are working from a fork, ensure upstream tags are available locally before running release:
+
+```bash
+git remote add upstream https://github.com/kubeflow/trainer.git  # if missing
+git fetch upstream --tags
+git fetch origin --tags
+```
+
 ## Prepare a release PR
 
 Run the release target from your working branch:
