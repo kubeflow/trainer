@@ -241,7 +241,7 @@ jobs:
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
-          args: --tag ${{ needs.prepare.outputs.tag }}
+          args: --unreleased --tag ${{ needs.prepare.outputs.tag }} -o -
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
