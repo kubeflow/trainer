@@ -54,7 +54,7 @@ func (t *Torch) Name() string {
 }
 
 func (t *Torch) ReservedEnvVarNames() sets.Set[string] {
-    return constants.TorchRunReservedEnvNames
+	return constants.TorchRunReservedEnvNames
 }
 
 func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
