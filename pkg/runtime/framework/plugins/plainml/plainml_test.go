@@ -49,7 +49,7 @@ func TestPlainML(t *testing.T) {
 				Labels: map[string]string{"key": "value"},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 			},
@@ -57,7 +57,7 @@ func TestPlainML(t *testing.T) {
 				Labels: map[string]string{"key": "value"},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 			},

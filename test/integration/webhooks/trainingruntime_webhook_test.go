@@ -168,20 +168,6 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					return runtime
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("Should fail to create trainingRuntime with minNodes and torch.elasticPolicy",
-				func() *trainer.TrainingRuntime {
-					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
-					runtime.Spec.MLPolicy = &trainer.MLPolicy{
-						NumNodes: ptr.To[int32](2),
-						MLPolicySource: trainer.MLPolicySource{
-							Torch: &trainer.TorchMLPolicySource{
-								ElasticPolicy: &trainer.TorchElasticPolicy{},
-							},
-						},
-					}
-					return runtime
-				},
-				testingutil.BeInvalidError()),
 			ginkgo.Entry("Should fail to create trainingRuntime with non-supported mpi.mpiImplementation",
 				func() *trainer.TrainingRuntime {
 					return testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").
