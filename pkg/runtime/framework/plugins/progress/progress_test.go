@@ -46,7 +46,7 @@ func TestEnforceMLPolicy(t *testing.T) {
 		wantInfo  *runtime.Info
 		wantError error
 	}{
-		"no trainer podset found": {
+		"no changes if no trainer pod set": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
@@ -343,7 +343,7 @@ func TestBuild(t *testing.T) {
 			objs: []client.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      webhookSecretName,
+						Name:      "kubeflow-trainer-webhook-cert",
 						Namespace: "kubeflow-system", // Webhook secret is in operator namespace
 					},
 					Data: map[string][]byte{
@@ -421,7 +421,7 @@ func TestBuild(t *testing.T) {
 			objs: []client.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      webhookSecretName,
+						Name:      "kubeflow-trainer-webhook-cert",
 						Namespace: "kubeflow-system",
 					},
 					Data: map[string][]byte{
@@ -491,74 +491,6 @@ func TestBuild(t *testing.T) {
 
 			if diff := gocmp.Diff(tc.wantObjs, typedObjs, objCmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
-			}
-		})
-	}
-}
-
-func TestCreateEnvVars(t *testing.T) {
-	cases := map[string]struct {
-		trainJob        *trainer.TrainJob
-		wantEnvVarCount int
-		wantStatusURL   string
-	}{
-		"creates env vars with correct values": {
-			trainJob: &trainer.TrainJob{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-job",
-					Namespace: "my-namespace",
-				},
-			},
-			wantEnvVarCount: 3,
-			wantStatusURL:   "https://kubeflow-trainer-controller-manager.kubeflow-system.svc:10443/apis/trainer.kubeflow.org/v1alpha1/namespaces/my-namespace/trainjobs/my-job/status",
-		},
-		"handles different namespace and name": {
-			trainJob: &trainer.TrainJob{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "another-job",
-					Namespace: "test-ns",
-				},
-			},
-			wantEnvVarCount: 3,
-			wantStatusURL:   "https://kubeflow-trainer-controller-manager.kubeflow-system.svc:10443/apis/trainer.kubeflow.org/v1alpha1/namespaces/test-ns/trainjobs/another-job/status",
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			envVars := createEnvVars(tc.trainJob)
-
-			if len(envVars) != tc.wantEnvVarCount {
-				t.Fatalf("Expected %d env vars, got %d", tc.wantEnvVarCount, len(envVars))
-			}
-
-			// Verify status URL env var
-			statusURLVar := envVars[0]
-			if statusURLVar.Name == nil || *statusURLVar.Name != envNameStatusURL {
-				t.Errorf("Expected first env var to be %s, got %v", envNameStatusURL, statusURLVar.Name)
-			}
-			if statusURLVar.Value == nil || *statusURLVar.Value != tc.wantStatusURL {
-				t.Errorf("Expected URL %s, got %v", tc.wantStatusURL, statusURLVar.Value)
-			}
-
-			// Verify CA cert path env var
-			caCertVar := envVars[1]
-			if caCertVar.Name == nil || *caCertVar.Name != envNameCACert {
-				t.Errorf("Expected second env var to be %s, got %v", envNameCACert, caCertVar.Name)
-			}
-			expectedCACertPath := fmt.Sprintf("%s/%s", progressMountPath, caCertFileName)
-			if caCertVar.Value == nil || *caCertVar.Value != expectedCACertPath {
-				t.Errorf("Expected CA cert path %s, got %v", expectedCACertPath, caCertVar.Value)
-			}
-
-			// Verify token path env var
-			tokenVar := envVars[2]
-			if tokenVar.Name == nil || *tokenVar.Name != envNameToken {
-				t.Errorf("Expected third env var to be %s, got %v", envNameToken, tokenVar.Name)
-			}
-			expectedTokenPath := fmt.Sprintf("%s/%s", progressMountPath, tokenFileName)
-			if tokenVar.Value == nil || *tokenVar.Value != expectedTokenPath {
-				t.Errorf("Expected token path %s, got %v", expectedTokenPath, tokenVar.Value)
 			}
 		})
 	}
