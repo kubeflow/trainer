@@ -70,7 +70,7 @@ dataCache:
   cacheImage:
     tag: "v2.0.0"
   runtimes:
-    torchDistributed:
+    torchDistributedWithCache:
       enabled: true
 ```
 
@@ -133,8 +133,8 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | dataCache.cacheImage.registry | string | `"ghcr.io"` | Data cache image registry |
 | dataCache.cacheImage.repository | string | `"kubeflow/trainer/data-cache"` | Data cache image repository |
 | dataCache.cacheImage.tag | string | `""` | Data cache image tag. Defaults to chart version if empty. |
-| dataCache.runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training with data cache support |
-| dataCache.runtimes.torchDistributed.enabled | bool | `false` | Enable deployment of torch-distributed-with-cache runtime |
+| dataCache.runtimes.torchDistributedWithCache | object | `{"enabled":false}` | PyTorch distributed training with data cache support |
+| dataCache.runtimes.torchDistributedWithCache.enabled | bool | `false` | Enable deployment of torch-distributed-with-cache runtime |
 | runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"defaultEnabled":false,"jaxDistributed":{"enabled":false},"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchtuneDistributed":{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
 | runtimes.defaultEnabled | bool | `false` | Enable all default runtimes (torch, deepspeed, mlx, jax, torchtune) when set to true. Individual runtime settings will be ignored if this is enabled. |
 | runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training runtime (no custom images required) |

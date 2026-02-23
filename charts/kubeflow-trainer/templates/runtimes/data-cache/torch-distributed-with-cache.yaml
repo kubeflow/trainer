@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */ -}}
 
-{{- if and .Values.runtimes.torchDistributedWithCache.enabled (not .Values.dataCache.enabled) }}
-{{- fail "runtimes.torchDistributedWithCache.enabled requires dataCache.enabled to be true" }}
+{{- if and .Values.dataCache.runtimes.torchDistributedWithCache.enabled (not .Values.dataCache.enabled) }}
+{{- fail "dataCache.runtimes.torchDistributedWithCache.enabled requires dataCache.enabled to be true" }}
 {{- end }}
 
-{{- if and .Values.dataCache.enabled .Values.runtimes.torchDistributedWithCache.enabled }}
+{{- if and .Values.dataCache.enabled .Values.dataCache.runtimes.torchDistributedWithCache.enabled }}
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
@@ -49,7 +49,7 @@ spec:
                     image: {{ printf "ghcr.io/kubeflow/trainer/dataset-initializer:%s" (include "trainer.defaultImageTag" .) }}
                     env:
                       - name: CACHE_IMAGE
-                        value: {{ include "trainer.runtimeImage" (list .Values.runtimes.torchDistributedWithCache.cacheImage .) | quote }}
+                        value: {{ include "trainer.runtimeImage" (list .Values.dataCache.cacheImage .) | quote }}
                       - name: TRAIN_JOB_NAME
                         valueFrom:
                           fieldRef:
