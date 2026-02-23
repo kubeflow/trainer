@@ -121,8 +121,9 @@ func (p *Progress) Build(ctx context.Context, info *runtime.Info, trainJob *trai
 
 func createEnvVars(trainJob *trainer.TrainJob) []corev1ac.EnvVarApplyConfiguration {
 	// TODO: get the url from the config
-	statusURL := fmt.Sprintf("https://kubeflow-trainer-controller-manager.%s.svc:10443/apis/trainer.kubeflow.org/v1alpha1/namespaces/%s/trainjobs/%s/status",
-		utilruntime.GetOperatorNamespace(), trainJob.Namespace, trainJob.Name)
+	svc := fmt.Sprintf("https://kubeflow-trainer-controller-manager.%s.svc:10443", utilruntime.GetOperatorNamespace())
+	path := progresspkg.StatusUrl(trainJob.Namespace, trainJob.Name)
+	statusURL := svc + path
 
 	return []corev1ac.EnvVarApplyConfiguration{
 		*corev1ac.EnvVar().
