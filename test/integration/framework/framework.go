@@ -45,6 +45,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/controller"
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
+	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	kubeflowwebhooks "github.com/kubeflow/trainer/v2/pkg/webhooks"
 )
 
@@ -101,7 +102,7 @@ func (f *Framework) RunManager(cfg *rest.Config, startControllers bool) (context
 	})
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), "failed to create manager")
 
-	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer())
+	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer(), testingutil.NewConfig())
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
 	gomega.ExpectWithOffset(1, runtimes).NotTo(gomega.BeNil())
 

@@ -46,7 +46,7 @@ func TestEnforceMLPolicy(t *testing.T) {
 		wantInfo  *runtime.Info
 		wantError error
 	}{
-		"no changes if no trainer pod set": {
+		"does nothing if no trainer pods": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
@@ -281,8 +281,9 @@ func TestEnforceMLPolicy(t *testing.T) {
 			t.Cleanup(cancel)
 
 			cli := utiltesting.NewClientBuilder().Build()
+			cfg := utiltesting.NewConfig()
 
-			p, err := New(ctx, cli, nil)
+			p, err := New(ctx, cli, nil, cfg)
 			if err != nil {
 				t.Fatalf("Failed to initialize Progress plugin: %v", err)
 			}
@@ -462,7 +463,9 @@ func TestBuild(t *testing.T) {
 			b := utiltesting.NewClientBuilder().WithObjects(tc.objs...)
 			cli := b.Build()
 
-			p, err := New(ctx, cli, nil)
+			cfg := utiltesting.NewConfig()
+
+			p, err := New(ctx, cli, nil, cfg)
 			if err != nil {
 				t.Fatalf("Failed to initialize Progress plugin: %v", err)
 			}

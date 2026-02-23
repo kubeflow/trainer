@@ -315,7 +315,7 @@ func TestJobSet(t *testing.T) {
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
 			cli := utiltesting.NewClientBuilder().Build()
-			p, err := New(ctx, cli, nil)
+			p, err := New(ctx, cli, nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
 			}
@@ -1310,7 +1310,7 @@ func TestValidate(t *testing.T) {
 			}
 			cli := clientBuilder.Build()
 
-			p, err := New(ctx, cli, nil)
+			p, err := New(ctx, cli, nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
 			}

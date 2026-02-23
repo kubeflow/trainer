@@ -359,7 +359,7 @@ func TestVolcano(t *testing.T) {
 			}
 
 			cli := clientBuilder.Build()
-			plugin, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder))
+			plugin, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatalf("Failed to create plugin: %v", err)
 			}
@@ -507,7 +507,7 @@ func TestValidate(t *testing.T) {
 			clientBuilder := utiltesting.NewClientBuilder().WithObjects(tc.objs...)
 			cli := clientBuilder.Build()
 
-			v, err := New(ctx, cli, nil)
+			v, err := New(ctx, cli, nil, nil)
 			if err != nil {
 				t.Fatalf("failed to init Volcano plugin: %v", err)
 			}

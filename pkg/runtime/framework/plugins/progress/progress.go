@@ -26,6 +26,7 @@ import (
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -55,20 +56,20 @@ const (
 	tokenAudience      = "trainer.kubeflow.org"
 	tokenExpirySeconds = 3600
 
-	// ConfigMap and Secret names
-	webhookSecretName = "kubeflow-trainer-webhook-cert"
-	caCertKey         = "ca.crt"
+	// Server tls config
+	caCertKey = "ca.crt"
 )
 
 type Progress struct {
 	client client.Client
+	cfg    *configapi.Configuration
 }
 
 var _ framework.ComponentBuilderPlugin = (*Progress)(nil)
 var _ framework.EnforceMLPolicyPlugin = (*Progress)(nil)
 
-func New(_ context.Context, c client.Client, _ client.FieldIndexer) (framework.Plugin, error) {
-	return &Progress{client: c}, nil
+func New(_ context.Context, c client.Client, _ client.FieldIndexer, cfg *configapi.Configuration) (framework.Plugin, error) {
+	return &Progress{client: c, cfg: cfg}, nil
 }
 
 func (p *Progress) Name() string {
@@ -89,7 +90,10 @@ func (p *Progress) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJo
 	}
 	info.Scheduler.PodLabels[progresspkg.LabelTrainJobName] = trainJob.Name
 
-	envVars := createEnvVars(trainJob)
+	envVars, err := p.createEnvVars(trainJob)
+	if err != nil {
+		return err
+	}
 	volumeMount := createTokenVolumeMount()
 	volume := createTokenVolume(trainJob)
 
@@ -119,9 +123,12 @@ func (p *Progress) Build(ctx context.Context, info *runtime.Info, trainJob *trai
 	return []apiruntime.ApplyConfiguration{configMap}, nil
 }
 
-func createEnvVars(trainJob *trainer.TrainJob) []corev1ac.EnvVarApplyConfiguration {
-	// TODO: get the url from the config
-	svc := fmt.Sprintf("https://kubeflow-trainer-controller-manager.%s.svc:10443", utilruntime.GetOperatorNamespace())
+func (p *Progress) createEnvVars(trainJob *trainer.TrainJob) ([]corev1ac.EnvVarApplyConfiguration, error) {
+	if p.cfg.ProgressServer.Port == nil {
+		return nil, fmt.Errorf("missing progress server port")
+	}
+	// TODO: consider renaming the CertManagement.WebhookServiceName name?
+	svc := fmt.Sprintf("https://%s.%s.svc:%d", p.cfg.CertManagement.WebhookServiceName, utilruntime.GetOperatorNamespace(), *p.cfg.ProgressServer.Port)
 	path := progresspkg.StatusUrl(trainJob.Namespace, trainJob.Name)
 	statusURL := svc + path
 
@@ -135,7 +142,7 @@ func createEnvVars(trainJob *trainer.TrainJob) []corev1ac.EnvVarApplyConfigurati
 		*corev1ac.EnvVar().
 			WithName(envNameToken).
 			WithValue(fmt.Sprintf("%s/%s", progressMountPath, tokenFileName)),
-	}
+	}, nil
 }
 
 func createTokenVolumeMount() corev1ac.VolumeMountApplyConfiguration {
@@ -182,7 +189,7 @@ func (p *Progress) buildProgressServerCaCrtConfigMap(ctx context.Context, trainJ
 	secret := &corev1.Secret{}
 	secretKey := client.ObjectKey{
 		Namespace: utilruntime.GetOperatorNamespace(),
-		Name:      webhookSecretName, // TODO: get secret name from config
+		Name:      p.cfg.CertManagement.WebhookSecretName,
 	}
 
 	var caCertData string

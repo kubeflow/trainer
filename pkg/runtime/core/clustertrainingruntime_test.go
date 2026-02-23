@@ -150,8 +150,9 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 				clientBuilder.WithObjects(tc.clusterTrainingRuntime)
 			}
 			c := clientBuilder.Build()
+			cfg := testingutil.NewConfig()
 
-			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder))
+			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -161,7 +162,7 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 				t.Fatal("Failed type assertion from Runtime interface to TrainingRuntime")
 			}
 
-			clTrainingRuntime, err := NewClusterTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder))
+			clTrainingRuntime, err := NewClusterTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), cfg)
 			if err != nil {
 				t.Fatal(err)
 			}

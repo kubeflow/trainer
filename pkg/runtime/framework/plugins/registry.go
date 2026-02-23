@@ -21,6 +21,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
@@ -33,7 +34,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
 )
 
-type Registry map[string]func(ctx context.Context, client client.Client, indexer client.FieldIndexer) (framework.Plugin, error)
+type Registry map[string]func(ctx context.Context, client client.Client, indexer client.FieldIndexer, cfg *configapi.Configuration) (framework.Plugin, error)
 
 func NewRegistry() Registry {
 	registry := Registry{
