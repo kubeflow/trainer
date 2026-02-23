@@ -43,10 +43,6 @@ jobs:
           echo "Install Kubeflow SDK with Docker support for local Notebooks"
           pip install "kubeflow[docker] @ git+https://github.com/kubeflow/sdk.git@main"
 
-      - name: Pre-pull DeepSpeed runtime image (force amd64)
-        run: |
-          docker pull --platform=linux/amd64 ghcr.io/kubeflow/trainer/deepspeed-runtime:latest
-
       - name: Setup cluster
         run: |
           make test-e2e-setup-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
