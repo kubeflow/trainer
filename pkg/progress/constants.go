@@ -23,7 +23,7 @@ const (
 	LabelTrainJobName = "trainer.kubeflow.org/trainjob-name"
 )
 
-// statusUrl is the Url endpoint for receiving status updates
-func statusUrl(namespace, name string) string {
+// StatusUrl is the path of the endpoint for receiving status updates
+func StatusUrl(namespace, name string) string {
 	return fmt.Sprintf("/apis/trainer.kubeflow.org/v1alpha1/namespaces/%s/trainjobs/%s/status", namespace, name)
 }

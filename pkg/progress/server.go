@@ -78,7 +78,7 @@ func NewServer(c client.Client, cfg *configapi.ProgressServer, tlsConfig *tls.Co
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST "+statusUrl("{namespace}", "{name}"), s.handleProgressStatus)
+	mux.HandleFunc("POST "+StatusUrl("{namespace}", "{name}"), s.handleProgressStatus)
 	mux.HandleFunc("/", s.handleDefault)
 
 	// Apply middleware
