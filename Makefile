@@ -196,7 +196,7 @@ release: ## Create a new release changelog for the specified VERSION (X.Y.Z).
 	if ! git-cliff --unreleased --tag "v$(VERSION)" --prepend CHANGELOG.md; then \
 		echo ""; \
 		echo "ERROR: git-cliff failed."; \
-		echo "Make sure you have your GitHub PAT configured via GITHUB_TOKEN environment variable."; \
+		echo "Ensure git-cliff is installed and available in your PATH, and that a valid GITHUB_TOKEN is set.; \
 		exit 1; \
 	fi; \
 	echo "Changelog generated at CHANGELOG.md"

@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
 
     steps:
       - name: Checkout code
@@ -53,8 +56,7 @@ jobs:
         id: cliff
         uses: orhun/git-cliff-action@v4
         with:
-          version: v2.12.0
-          config: cliff.toml
+          version: v2.12.0 # Using fixed version of git-cliff (check https://github.com/orhun/git-cliff-action/issues/73)
           args: >
             --unreleased
             --tag v${{ github.event.inputs.version }}
