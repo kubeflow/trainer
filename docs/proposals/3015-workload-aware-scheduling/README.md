@@ -108,6 +108,7 @@ metadata:
     - apiVersion: trainer.kubeflow.org/v1alpha1
       kind: TrainJob
       name: my-job
+      controller: true
 spec:
   controllerRef:
     apiVersion: trainer.kubeflow.org/v1alpha1
@@ -134,6 +135,7 @@ metadata:
     - apiVersion: trainer.kubeflow.org/v1alpha1
       kind: TrainJob
       name: my-job
+      controller: true
 spec:
   podGroupTemplateRef:
     workloadName: my-job
@@ -240,6 +242,7 @@ metadata:
     - apiVersion: trainer.kubeflow.org/v1alpha1
       kind: TrainJob
       name: my-job
+      controller: true
 spec:
   controllerRef:
     apiVersion: trainer.kubeflow.org/v1alpha1
@@ -266,6 +269,7 @@ metadata:
     - apiVersion: trainer.kubeflow.org/v1alpha1
       kind: TrainJob
       name: my-job
+      controller: true
 spec:
   podGroupTemplateRef:
     workloadName: my-job
@@ -407,6 +411,7 @@ metadata:
     - apiVersion: trainer.kubeflow.org/v1alpha1
       kind: TrainJob
       name: my-job
+      controller: true
 spec:
   controllerRef:
     apiVersion: trainer.kubeflow.org/v1alpha1
@@ -436,6 +441,7 @@ metadata:
     - apiVersion: trainer.kubeflow.org/v1alpha1
       kind: TrainJob
       name: my-job
+      controller: true
 spec:
   podGroupTemplateRef:
     workloadName: my-job
@@ -454,6 +460,7 @@ metadata:
     - apiVersion: trainer.kubeflow.org/v1alpha1
       kind: TrainJob
       name: my-job
+      controller: true
 spec:
   podGroupTemplateRef:
     workloadName: my-job
@@ -559,6 +566,31 @@ func (w *Workload) ReconcilerBuilders() []runtime.ReconcilerBuilder {
     // 2. Trigger reconciliation on PodGroup status changes
 }
 ```
+
+### OwnerReferences Relationship
+
+The ownerReferences relationship between `TrainJob`, `Workload`, `PodGroup`, and `Pod` is as follows:
+
+```mermaid
+flowchart BT
+    Pod[Pod]
+    PodGroup[PodGroup]
+    Workload[Workload]
+    TrainJob[TrainJob]
+
+    Workload -->|ownerRef| TrainJob
+    PodGroup -->|ownerRef| TrainJob
+    Pod -->|ownerRef| TrainJob
+
+    PodGroup -->|ownerRef| Workload
+    Pod -->|ownerRef| PodGroup
+```
+
+- The `Workload` object has an ownerReference to the `TrainJob` object with `controller: true` in case it was created by the TrainJob controller
+- The `PodGroup` object has an ownerReference to the `TrainJob` object with `controller: true` in case it was created by the TrainJob controller and another ownerReference to the `Workload` object
+- The `Pod` object has an ownerReference to the `TrainJob` object with `controller: true` and another ownerReference to the `PodGroup` object
+
+By this ownerReferences relationship, garbage collection will remove objects accordingly that avoids orphaned Pods with a stale PodGroup reference.
 
 ### Resource Lifecycle
 
