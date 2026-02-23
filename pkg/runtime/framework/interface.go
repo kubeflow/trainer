@@ -21,6 +21,7 @@ import (
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -34,6 +35,14 @@ type Plugin interface {
 type CustomValidationPlugin interface {
 	Plugin
 	Validate(ctx context.Context, info *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList)
+}
+
+// EnvVarsReserverPlugin is an optional interface that plugins can implement
+// to expose the set of environment variable names they reserve.
+// Used for cross-plugin env conflict detection during TrainJob validation.
+type EnvVarsReserverPlugin interface {
+    Plugin
+    ReservedEnvVarNames() sets.Set[string]
 }
 
 type WatchExtensionPlugin interface {
