@@ -41,8 +41,8 @@ type CustomValidationPlugin interface {
 // to expose the set of environment variable names they reserve.
 // Used for cross-plugin env conflict detection during TrainJob validation.
 type EnvVarsReserverPlugin interface {
-    Plugin
-    ReservedEnvVarNames() sets.Set[string]
+	Plugin
+	ReservedEnvVarNames() sets.Set[string]
 }
 
 type WatchExtensionPlugin interface {
