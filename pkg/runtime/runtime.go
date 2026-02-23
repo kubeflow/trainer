@@ -47,9 +47,9 @@ type Info struct {
 }
 
 type RuntimePolicy struct {
-	MLPolicySource   *trainer.MLPolicySource
-	PodGroupPolicy   *trainer.PodGroupPolicy
-	FluxPolicySource *trainer.FluxMLPolicySource
+	MLPolicySource *trainer.MLPolicySource
+	PodGroupPolicy *trainer.PodGroupPolicy
+	//FluxPolicySource *trainer.FluxMLPolicySource
 }
 
 type TemplateSpec struct {

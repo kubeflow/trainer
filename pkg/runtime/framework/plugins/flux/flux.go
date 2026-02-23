@@ -257,10 +257,6 @@ func (f *Flux) brokerSettingsFromEnvironment(trainJob *trainer.TrainJob, info *r
 	// All settings defaults that we support are already defined here
 	settings := maps.Clone(brokerDefaults)
 
-	if trainJob.Spec.Trainer.Env == nil {
-		return settings
-	}
-
 	// Look through the envars in the runtime spec.
 	// We only care about the environment defined for the main workers/nodes
 	if info != nil {
@@ -422,6 +418,13 @@ func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) string {
 func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.Info) string {
 	mainHost := fmt.Sprintf("%s-%s-0-0", trainJob.Name, constants.Node)
 
+	// Derive number of tasks
+	// This may not technically be the number of processes per node,
+	// but that is all the TrainJob can currently represent.
+	tasks := *info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode
+	fmt.Println("TASKS")
+	fmt.Println(tasks)
+
 	// TODO we can set strict mode as an option
 	script := `#!/bin/sh
 
@@ -516,21 +519,21 @@ brokerOptions="-Scron.directory=${configroot}/etc/flux/system/cron.d \
   -Slog-stderr-mode=local"
 
 # Run an interactive cluster, giving no command to flux start
-function run_interactive_cluster() {
+run_interactive_cluster() {
     echo "🌀 flux broker --config-path ${cfg} ${brokerOptions}"
     flux broker --config-path ${cfg} ${brokerOptions}
 }
 
 # Start flux with the original entrypoint
-if [ $(hostname) == "${mainHost}" ]; then
+if [ "$(hostname)" = "${mainHost}" ]; then
 
   echo "Command provided is: ${command}"
-  if [ "${command}" == "" ]; then
+  if [ -z "${command}" ]; then
     run_interactive_cluster
   else
 
     # If tasks are == 0, then only define nodes
-    node_spec="-n2"
+	node_spec="-n %d"
     node_spec="${node_spec}"
     flags="${node_spec}  "
     echo "Flags for flux are ${flags}"
@@ -570,6 +573,7 @@ touch $viewbase/flux-operator-complete.txt
 		script,
 		command,
 		mainHost,
+		tasks,
 	)
 }
 

@@ -126,7 +126,7 @@ func TestFlux(t *testing.T) {
 				t.Fatalf("EnforceMLPolicy failed: %v", err)
 			}
 
-			if tc.info.RuntimePolicy.FluxPolicySource != nil && tc.info.TemplateSpec.ObjApply != nil {
+			if tc.info.RuntimePolicy.MLPolicySource != nil && tc.info.RuntimePolicy.MLPolicySource.Flux != nil && tc.info.TemplateSpec.ObjApply != nil {
 				js := tc.info.TemplateSpec.ObjApply.(*v1alpha2.JobSetSpecApplyConfiguration)
 				for _, rj := range js.ReplicatedJobs {
 					if ptr.Deref(rj.Name, "") == constants.Node {
@@ -177,7 +177,9 @@ func TestValidate(t *testing.T) {
 		"valid when flux policy is present": {
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
-					FluxPolicySource: &trainer.FluxMLPolicySource{},
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{},
+					},
 				},
 			},
 			newObj: &trainer.TrainJob{},

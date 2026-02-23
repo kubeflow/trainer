@@ -22,7 +22,7 @@ spec:
     # You do not need to write "flux run, etc" here. It will be wrapped
     command: ["lmp", "-v", "x", "2", "-v", "y", "2", "-v", "z", "2", "-in", "in.reaxc.hns", "-nocite"]
     # See flux-interactive.yaml for running the above interactively.
-    # This is how we match the view (operating system and verison) of the initContainer to install Flux
+    # This is how we match the view (operating system and version) of the initContainer to install Flux
     env:
      - name: FLUX_VIEW_IMAGE
        value: ghcr.io/converged-computing/flux-view-ubuntu:tag-jammy
