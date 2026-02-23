@@ -1843,7 +1843,7 @@ func schema_pkg_apis_trainer_v1alpha1_XGBoostMLPolicySource(ref common.Reference
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "XGBoostMLPolicySource represents an XGBoost runtime configuration. The number of workers per node is automatically derived from container GPU resources:\n  - GPU training: 1 worker per GPU (from resourcesPerNode)\n  - CPU training: 1 worker per node\n\nDMLC_NUM_WORKER = numNodes × workersPerNode (where workersPerNode = GPU count or 1)",
+				Description: "XGBoostMLPolicySource represents an XGBoost runtime configuration. The number of workers per node is automatically derived from container GPU resources:\n  - GPU training: 1 worker per GPU (from resourcesPerNode)\n  - CPU training: 1 worker per node (each worker utilizes all available CPU cores\n    via XGBoost's multi-threaded execution, controlled by the nthread parameter)\n\nDMLC_NUM_WORKER = numNodes × workersPerNode (where workersPerNode = GPU count or 1)",
 				Type:        []string{"object"},
 			},
 		},
