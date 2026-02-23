@@ -66,8 +66,6 @@ var (
 
 	// Persist througout, and can be inspected / use by other controllers
 	AnnotationOriginalCommand = "flux.kubeflow.org/original-command"
-	AnnotationViewImage       = "flux.kubeflow.org/view-image"
-	AnnotationQueuePolicy     = "flux.kubeflow.org/queue-policy"
 )
 
 var _ framework.CustomValidationPlugin = (*Flux)(nil)
@@ -139,7 +137,6 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 	// This effectively "saves" the state onto the Kubernetes resource itself
 	originalCmd := getOriginalCommand(trainJob, info)
 	trainJob.Annotations[AnnotationOriginalCommand] = originalCmd
-	trainJob.Annotations[AnnotationViewImage] = settings["FLUX_VIEW_IMAGE"]
 
 	// Update the command here so we wrap the original command saved earlier
 	trainJob.Spec.Trainer.Command = []string{"/bin/bash", "/etc/flux-config/entrypoint.sh"}
@@ -424,9 +421,6 @@ func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) string {
 // generateFluxEntrypoint generates the flux entrypoint to prepare the view and run the job
 func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.Info) string {
 	mainHost := fmt.Sprintf("%s-%s-0-0", trainJob.Name, constants.Node)
-
-	// Derive the original command intended by the user
-	// command := getOriginalCommand(trainJob, info)
 
 	// TODO we can set strict mode as an option
 	script := `#!/bin/sh
