@@ -42,6 +42,7 @@ import (
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -176,7 +177,8 @@ func TestNew(t *testing.T) {
 				})
 			}
 			clientBuilder := testingutil.NewClientBuilder()
-			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder))
+			cfg := testingutil.NewConfig()
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), cfg)
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}
@@ -335,8 +337,9 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 			clientBuilder := testingutil.NewClientBuilder()
+			cfg := testingutil.NewConfig()
 
-			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder))
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -430,8 +433,9 @@ func TestRunEnforcePodGroupPolicyPlugins(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 			clientBuilder := testingutil.NewClientBuilder()
+			cfg := testingutil.NewConfig()
 
-			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder))
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -470,8 +474,9 @@ func TestRunCustomValidationPlugins(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 			clientBuildr := testingutil.NewClientBuilder()
+			cfg := testingutil.NewConfig()
 
-			fwk, err := New(ctx, clientBuildr.Build(), tc.registry, testingutil.AsIndex(clientBuildr))
+			fwk, err := New(ctx, clientBuildr.Build(), tc.registry, testingutil.AsIndex(clientBuildr), cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2202,8 +2207,9 @@ test-job-node-0-1.test-job slots=1
 
 			clientBuilder := testingutil.NewClientBuilder()
 			c := clientBuilder.Build()
+			cfg := testingutil.NewConfig()
 
-			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder))
+			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder), cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2291,8 +2297,9 @@ func TestWatchExtensionPlugins(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 			clientBuilder := testingutil.NewClientBuilder()
+			cfg := testingutil.NewConfig()
 
-			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder))
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2308,7 +2315,7 @@ type fakeTrainJobStatusPlugin struct{}
 
 var _ framework.TrainJobStatusPlugin = (*fakeTrainJobStatusPlugin)(nil)
 
-func newFakeJobsStatusPlugin(context.Context, client.Client, client.FieldIndexer) (framework.Plugin, error) {
+func newFakeJobsStatusPlugin(context.Context, client.Client, client.FieldIndexer, *configapi.Configuration) (framework.Plugin, error) {
 	return &fakeTrainJobStatusPlugin{}, nil
 }
 
@@ -2526,7 +2533,9 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 			}
 			c := clientBuilder.Build()
 
-			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder))
+			cfg := testingutil.NewConfig()
+
+			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder), cfg)
 			if err != nil {
 				if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 					t.Errorf("Unexpected error (-want,+got):\n%s", diff)
@@ -2642,7 +2651,8 @@ func TestPodNetworkPlugins(t *testing.T) {
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
 			cliBuilder := testingutil.NewClientBuilder()
-			fwk, err := New(ctx, cliBuilder.Build(), tc.registry, testingutil.AsIndex(cliBuilder))
+			cfg := testingutil.NewConfig()
+			fwk, err := New(ctx, cliBuilder.Build(), tc.registry, testingutil.AsIndex(cliBuilder), cfg)
 			if err != nil {
 				t.Fatal(err)
 			}

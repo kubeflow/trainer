@@ -1374,7 +1374,7 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
 			cliBuilder := utiltesting.NewClientBuilder()
-			p, err := New(ctx, cliBuilder.Build(), nil)
+			p, err := New(ctx, cliBuilder.Build(), nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize Torch plugin: %v", err)
 			}
@@ -1682,7 +1682,7 @@ func TestTorchValidate(t *testing.T) {
 			var cancel func()
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
-			p, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil)
+			p, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize Torch plugin: %v", err)
 			}
