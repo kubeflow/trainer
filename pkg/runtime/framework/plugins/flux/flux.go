@@ -139,7 +139,9 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 	trainJob.Annotations[AnnotationOriginalCommand] = originalCmd
 
 	// Update the command here so we wrap the original command saved earlier
+	// Also clear existing args so only the Flux entrypoint controls execution
 	trainJob.Spec.Trainer.Command = []string{"/bin/bash", "/etc/flux-config/entrypoint.sh"}
+	trainJob.Spec.Trainer.Args = nil
 
 	// Define the Init Container. This has a spack view with flux pre-built, and we add to an emptyDir
 	// with configuration that is then accessible to the application. The OS/version should match.
@@ -422,8 +424,6 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	// This may not technically be the number of processes per node,
 	// but that is all the TrainJob can currently represent.
 	tasks := *info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode
-	fmt.Println("TASKS")
-	fmt.Println(tasks)
 
 	// TODO we can set strict mode as an option
 	script := `#!/bin/sh
