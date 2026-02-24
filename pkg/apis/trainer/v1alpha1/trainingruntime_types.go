@@ -150,6 +150,10 @@ type PodGroupPolicySource struct {
 	// volcano plugin for gang-scheduling.
 	// +optional
 	Volcano *VolcanoPodGroupPolicySource `json:"volcano,omitempty"`
+
+	// KAI Scheduler plugin for gang-scheduling.
+	// +optional
+	KAIScheduler *KAISchedulerPodGroupPolicySource `json:"kaiScheduler,omitempty"`
 }
 
 // CoschedulingPodGroupPolicySource represents configuration for coscheduling plugin.
@@ -168,6 +172,15 @@ type VolcanoPodGroupPolicySource struct {
 	// networkTopology defines the NetworkTopology config, this field works in conjunction with network topology feature and hyperNode CRD.
 	// +optional
 	NetworkTopology *volcanov1beta1.NetworkTopologySpec `json:"networkTopology,omitempty"`
+}
+
+// KAISchedulerPodGroupPolicySource represents configuration for the KAI Scheduler.
+// KAI Scheduler provides advanced gang-scheduling capabilities with queue management,
+// priority-based scheduling, and preemption support.
+type KAISchedulerPodGroupPolicySource struct {
+	// queue is the name of the KAI Scheduler queue to submit the job to.
+	// The queue must exist in the cluster for the job to be scheduled.
+	Queue *string `json:"queue,omitempty"`
 }
 
 // MLPolicy represents configuration for the model training with ML-specific parameters.
