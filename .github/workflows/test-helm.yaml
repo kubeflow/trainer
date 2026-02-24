@@ -27,4 +27,15 @@ jobs:
         run: make test-e2e-setup-cluster
 
       - name: Run Go E2E Tests
-        run: make test-e2e
+        run: |
+          set -euo pipefail
+          if ! make test-e2e; then
+            echo "E2E tests failed, collecting cluster diagnostics..."
+            echo "=== Pods (all namespaces) ==="
+            kubectl get pods -A || true
+            echo "=== Pod descriptions (all namespaces) ==="
+            kubectl describe pods -A || true
+            echo "=== Events (all namespaces) ==="
+            kubectl get events -A --sort-by=.lastTimestamp || true
+            exit 1
+          fi
