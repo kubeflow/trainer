@@ -70,6 +70,40 @@ const (
 	// When RunLauncherAsNode: true, for the launcher Job the container name is node.
 	Launcher string = "launcher"
 
+	// Flux Framework
+	// The Flux View container image for the initContainer with Flux pre-installed
+	FluxInstallerImage = "ghcr.io/converged-computing/flux-view-ubuntu:tag-jammy"
+
+	// Network device used by the tree-based overlay network (TBON)
+	FluxNewtowkDevice = "eth0"
+
+	// Flux queue policy for scheduler in cluster (first come, first serve)
+	FluxQueuePolicy = "fcfs"
+
+	// Flux view container image name
+	FluxInstallerContainerName = "flux-installer"
+
+	// Name for the flux volume (emptyDir Flux is added to)
+	FluxInstallVolumeName = "flux-install"
+
+	// Name for the flux config volume
+	FluxConfigVolumeName = "/etc/flux-config"
+
+	// Path to mount flux volume
+	FluxVolumePath = "/mnt/flux"
+
+	// Volume name for Flux curve volume
+	FluxCurveVolumeName = "flux-curve"
+
+	// Path for Flux curve path
+	FluxCurveVolumePath = "/curve"
+
+	// emptyDir volume using for complete spack view software
+	FluxSpackViewVolumeName = "spack-install"
+
+	// path for spack view volume
+	FluxSpackViewVolumePath = "/opt/software"
+
 	// MPISSHAuthSecretSuffix is the name suffix for Secret with MPI SSH keys.
 	MPISSHAuthSecretSuffix string = "-mpi-ssh-auth"
 

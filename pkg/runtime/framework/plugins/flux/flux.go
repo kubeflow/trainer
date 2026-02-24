@@ -59,9 +59,9 @@ var (
 		// ghcr.io/converged-computing/flux-view-ubuntu:arm-jammy
 		// ghcr.io/converged-computing/flux-view-ubuntu:arm-focal
 		// We use an ubuntu (more recent) default since it is common
-		"FLUX_VIEW_IMAGE":     "ghcr.io/converged-computing/flux-view-ubuntu:tag-jammy",
-		"FLUX_NETWORK_DEVICE": "eth0",
-		"FLUX_QUEUE_POLICY":   "fcfs",
+		"FLUX_VIEW_IMAGE":     constants.FluxInstallerImage,
+		"FLUX_NETWORK_DEVICE": constants.FluxNewtowkDevice,
+		"FLUX_QUEUE_POLICY":   constants.FluxQueuePolicy,
 		// Extra flux or broker options can be added as needed.
 	}
 
@@ -110,7 +110,7 @@ func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobO
 	for _, ps := range runtimeInfo.TemplateSpec.PodSets {
 		if ps.Name == constants.Node {
 			for _, ic := range ps.InitContainers {
-				if ic.Name == "flux-installer" {
+				if ic.Name == constants.FluxInstallerContainerName {
 					allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "trainer", "initContainers"), ic.Name, "InitContainer 'flux-installer' is reserved"))
 				}
 			}
@@ -145,16 +145,16 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 	// For VolumeMounts, you can still use corev1ac because runtime.Container
 	// methods accept the corev1ac types for nested fields
 	fluxInstaller := corev1ac.Container().
-		WithName("flux-installer").
+		WithName(constants.FluxInstallerContainerName).
 		WithImage(settings["FLUX_VIEW_IMAGE"]).
 		WithCommand([]string{"/bin/bash", "/etc/flux-config/init.sh"}...).
 		WithVolumeMounts(
 			corev1ac.VolumeMount().
-				WithName("flux-install").
-				WithMountPath("/mnt/flux"),
+				WithName(constants.FluxInstallVolumeName).
+				WithMountPath(constants.FluxVolumePath),
 			corev1ac.VolumeMount().
 				WithName(configMapName).
-				WithMountPath("/etc/flux-config").
+				WithMountPath(constants.FluxConfigVolumeName).
 				WithReadOnly(true),
 		)
 
@@ -172,7 +172,7 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 
 		// Add Volumes to the PodSet
 		curveVolume := corev1ac.Volume().
-			WithName("flux-curve").
+			WithName(constants.FluxCurveVolumeName).
 			WithSecret(corev1ac.SecretVolumeSource().WithSecretName(curveSecretName).WithDefaultMode(0400))
 
 		apply.UpsertVolumes(&info.TemplateSpec.PodSets[psIdx].Volumes, sharedVolumes...)
@@ -189,10 +189,10 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 			if container.Name == constants.Node {
 				apply.UpsertVolumeMounts(
 					&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].VolumeMounts,
-					*corev1ac.VolumeMount().WithName("flux-install").WithMountPath("/mnt/flux"),
-					*corev1ac.VolumeMount().WithName("spack-install").WithMountPath("/opt/software"),
-					*corev1ac.VolumeMount().WithName(configMapName).WithMountPath("/etc/flux-config").WithReadOnly(true),
-					*corev1ac.VolumeMount().WithName("flux-curve").WithMountPath("/curve").WithReadOnly(true),
+					*corev1ac.VolumeMount().WithName(constants.FluxInstallVolumeName).WithMountPath(constants.FluxVolumePath),
+					*corev1ac.VolumeMount().WithName(constants.FluxSpackViewVolumeName).WithMountPath(constants.FluxSpackViewVolumePath),
+					*corev1ac.VolumeMount().WithName(configMapName).WithMountPath(constants.FluxConfigVolumeName).WithReadOnly(true),
+					*corev1ac.VolumeMount().WithName(constants.FluxCurveVolumeName).WithMountPath(constants.FluxCurveVolumePath).WithReadOnly(true),
 				)
 			}
 		}
@@ -285,11 +285,11 @@ func (f *Flux) brokerSettingsFromEnvironment(trainJob *trainer.TrainJob, info *r
 // We need everything here except the curve certificate
 func getViewVolumes(configMapName string) []corev1ac.VolumeApplyConfiguration {
 	spackInstallAC := corev1ac.Volume().
-		WithName("spack-install").
+		WithName(constants.FluxSpackViewVolumeName).
 		WithEmptyDir(corev1ac.EmptyDirVolumeSource())
 	fluxVolumeAC := corev1ac.Volume().
 		WithEmptyDir(corev1ac.EmptyDirVolumeSource()).
-		WithName("flux-install")
+		WithName(constants.FluxInstallVolumeName)
 	cmAC := corev1ac.Volume().
 		WithName(configMapName).
 		WithConfigMap(

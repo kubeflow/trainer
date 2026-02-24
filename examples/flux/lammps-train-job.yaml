@@ -17,8 +17,8 @@ spec:
   runtimeRef:
     name: flux-runtime
   trainer:
-    numNodes: 1
-    numProcPerNode: 8
+    numNodes: 2
+    numProcPerNode: 4
     image: ghcr.io/converged-computing/metric-lammps:latest
     # You do not need to write "flux run, etc" here. It will be wrapped
     command: ["lmp", "-v", "x", "4", "-v", "y", "4", "-v", "z", "4", "-in", "in.reaxc.hns", "-nocite"]
