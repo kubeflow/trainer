@@ -30,8 +30,6 @@ type TorchMLPolicySourceApplyConfiguration struct {
 	// Supported values: `auto`, `cpu`, `gpu`, or int value.
 	// Defaults to `auto`.
 	NumProcPerNode *intstr.IntOrString `json:"numProcPerNode,omitempty"`
-	// elasticPolicy defines the Elastic policy for the PyTorch training.
-	ElasticPolicy *TorchElasticPolicyApplyConfiguration `json:"elasticPolicy,omitempty"`
 }
 
 // TorchMLPolicySourceApplyConfiguration constructs a declarative configuration of the TorchMLPolicySource type for use with
@@ -45,13 +43,5 @@ func TorchMLPolicySource() *TorchMLPolicySourceApplyConfiguration {
 // If called multiple times, the NumProcPerNode field is set to the value of the last call.
 func (b *TorchMLPolicySourceApplyConfiguration) WithNumProcPerNode(value intstr.IntOrString) *TorchMLPolicySourceApplyConfiguration {
 	b.NumProcPerNode = &value
-	return b
-}
-
-// WithElasticPolicy sets the ElasticPolicy field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ElasticPolicy field is set to the value of the last call.
-func (b *TorchMLPolicySourceApplyConfiguration) WithElasticPolicy(value *TorchElasticPolicyApplyConfiguration) *TorchMLPolicySourceApplyConfiguration {
-	b.ElasticPolicy = value
 	return b
 }

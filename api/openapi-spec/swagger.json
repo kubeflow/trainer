@@ -14279,52 +14279,10 @@
           }
         }
       },
-      "trainer.v1alpha1.TorchElasticPolicy": {
-        "description": "TorchElasticPolicy represents a configuration for the PyTorch elastic training. If this policy is set, the `.spec.numNodes` parameter must be omitted, since min and max node is used to configure the `torchrun` CLI argument: `--nnodes=minNodes:maxNodes`. Only `c10d` backend is supported for the Rendezvous communication.",
-        "type": "object",
-        "properties": {
-          "maxNodes": {
-            "description": "maxNodes is the upper limit for the number of nodes to which training job can scale up.",
-            "type": "integer",
-            "format": "int32"
-          },
-          "maxRestarts": {
-            "description": "maxRestarts defines how many times the training job can be restarted. This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and the `.spec.failurePolicy.maxRestarts` parameter of the training Job.",
-            "type": "integer",
-            "format": "int32"
-          },
-          "metrics": {
-            "description": "metrics which are used to calculate the desired number of nodes. See the individual metric source types for more information about how each type of metric must respond. The HPA will be created to perform auto-scaling.",
-            "type": "array",
-            "items": {
-              "default": {},
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.autoscaling.v2.MetricSpec"
-                }
-              ]
-            },
-            "x-kubernetes-list-type": "atomic"
-          },
-          "minNodes": {
-            "description": "minNodes is the lower limit for the number of nodes to which training job can scale down.",
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
       "trainer.v1alpha1.TorchMLPolicySource": {
         "description": "TorchMLPolicySource represents a PyTorch runtime configuration.",
         "type": "object",
         "properties": {
-          "elasticPolicy": {
-            "description": "elasticPolicy defines the Elastic policy for the PyTorch training.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.TorchElasticPolicy"
-              }
-            ]
-          },
           "numProcPerNode": {
             "description": "numProcPerNode is the number of processes per node. This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI. Supported values: `auto`, `cpu`, `gpu`, or int value. Defaults to `auto`.",
             "allOf": [

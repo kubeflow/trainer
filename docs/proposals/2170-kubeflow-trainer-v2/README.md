@@ -1171,31 +1171,6 @@ type TorchMLPolicySource struct {
 	// Supported values: `auto`, `cpu`, `gpu`, or int value.
 	// Defaults to `auto`.
 	NumProcPerNode *string `json:"numProcPerNode,omitempty"`
-
-	// Elastic policy for the PyTorch training.
-	ElasticPolicy *TorchElasticPolicy `json:"elasticPolicy,omitempty"`
-}
-
-// TorchElasticPolicy represents a configuration for the PyTorch elastic training.
-// If this policy is set, the `.spec.numNodes` parameter must be omitted, since min and max node
-// is used to configure the `torchrun` CLI argument: `--nnodes=minNodes:maxNodes`.
-// Only `c10d` backend is supported for the Rendezvous communication.
-type TorchElasticPolicy struct {
-	// How many times the training job can be restarted.
-	// This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and
-	// the `.spec.failurePolicy.maxRestarts` parameter of the training Job.
-	MaxRestarts *int32 `json:"maxRestarts,omitempty"`
-
-	// Lower limit for the number of nodes to which training job can scale down.
-	MinNodes *int32 `json:"minNodes,omitempty"`
-
-	// Upper limit for the number of nodes to which training job can scale up.
-	MaxNodes *int32 `json:"maxNodes,omitempty"`
-
-	// Specification which are used to calculate the desired number of nodes. See the individual
-	// metric source types for more information about how each type of metric must respond.
-	// The HPA will be created to perform auto-scaling.
-	Metrics []autoscalingv2.MetricSpec `json:"metrics,omitempty"`
 }
 ```
 
@@ -1293,51 +1268,6 @@ spec:
         nvidia.com/gpu: 1
     args:
       - num-epochs=5
-```
-
-#### PyTorch Elastic Runtime
-
-Training runtime for PyTorch Elastic:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v2alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: torch-distributed-elastic
-spec:
-  mlPolicy:
-    torchSpec:
-      elasticPolicy:
-        minNodes: 5
-        maxNodes: 10
-        metrics:
-          - type: Resource
-            resource:
-              name: cpu
-              target:
-                type: Utilization
-                averageUtilization: 80
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                metadata:
-                  labels:
-                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
-                spec:
-                  containers:
-                    - name: trainer
-                      image: docker.io/kubeflow/pytorch-mnist
-                      env:
-                        - name: MASTER_ADDR
-                          value: "pytorch-node-0-0.pytorch"
-                        - name: MASTER_PORT
-                          value: 29400
-                      command:
-                        - torchrun train.py
 ```
 
 #### Additional PyTorch Runtimes
@@ -1840,6 +1770,7 @@ spec:
 - 2024-07-16 Creation date
 - 2025-03-15 Updated the initializer APIs
 - 2025-10-09 Added PodTemplateOverrides to TrainJob V2 API
+- 2026-02-23 Remove ElasticPolicy from the Torch API – will be implemented in the future KEPs
 
 ## Alternatives
 
