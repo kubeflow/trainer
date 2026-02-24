@@ -24,7 +24,7 @@ jobs:
         run: make helm-unittest
 
       - name: Setup Kind Cluster
-        run: make test-e2e-setup-cluster K8S_VERSION=1.35.0
+        run: make test-e2e-setup-cluster
 
       - name: Run Go E2E Tests
         run: make test-e2e
