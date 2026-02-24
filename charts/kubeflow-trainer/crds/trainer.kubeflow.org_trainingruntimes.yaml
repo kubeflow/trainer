@@ -124,7 +124,7 @@ spec:
                 type: object
                 x-kubernetes-validations:
                 - message: Only one of the policy can be configured
-                  rule: '[has(self.torch), has(self.mpi), has(self.jax)].filter(x,
+                  rule: '[has(self.torch), has(self.mpi), has(self.jax), has(self.flux)].filter(x,
                     x).size() <= 1'
               podGroupPolicy:
                 description: podGroupPolicy defines the configuration for the PodGroup

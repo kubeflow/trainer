@@ -143,6 +143,42 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					return runtime
 				},
 				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to create trainingRuntime with both Torch and Flux runtimes",
+				func() *trainer.TrainingRuntime {
+					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
+					runtime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{
+							Torch: &trainer.TorchMLPolicySource{},
+							Flux:  &trainer.FluxMLPolicySource{},
+						},
+					}
+					return runtime
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to create trainingRuntime with both MPI and Flux runtimes",
+				func() *trainer.TrainingRuntime {
+					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
+					runtime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{
+							MPI:  &trainer.MPIMLPolicySource{},
+							Flux: &trainer.FluxMLPolicySource{},
+						},
+					}
+					return runtime
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to create trainingRuntime with both JAX and Flux runtimes",
+				func() *trainer.TrainingRuntime {
+					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
+					runtime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{
+							Flux: &trainer.FluxMLPolicySource{},
+							JAX:  &trainer.JAXMLPolicySource{},
+						},
+					}
+					return runtime
+				},
+				testingutil.BeInvalidError()),
 			ginkgo.Entry("Should fail to create trainingRuntime with both JAX and MPI runtimes",
 				func() *trainer.TrainingRuntime {
 					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
@@ -155,7 +191,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					return runtime
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("Should fail to create trainingRuntime with all three runtimes configured",
+			ginkgo.Entry("Should fail to create trainingRuntime with all four runtimes configured",
 				func() *trainer.TrainingRuntime {
 					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
 					runtime.Spec.MLPolicy = &trainer.MLPolicy{
@@ -163,6 +199,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 							Torch: &trainer.TorchMLPolicySource{},
 							MPI:   &trainer.MPIMLPolicySource{},
 							JAX:   &trainer.JAXMLPolicySource{},
+							Flux:  &trainer.FluxMLPolicySource{},
 						},
 					}
 					return runtime
