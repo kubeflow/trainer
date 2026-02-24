@@ -64,6 +64,7 @@ type JobSet struct {
 
 var _ framework.WatchExtensionPlugin = (*JobSet)(nil)
 var _ framework.PodNetworkPlugin = (*JobSet)(nil)
+var _ framework.BuildParallelCountPlugin = (*JobSet)(nil)
 var _ framework.ComponentBuilderPlugin = (*JobSet)(nil)
 var _ framework.TrainJobStatusPlugin = (*JobSet)(nil)
 var _ framework.CustomValidationPlugin = (*JobSet)(nil)
@@ -233,6 +234,36 @@ func (j *JobSet) IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJ
 				if !yield(endpoint) {
 					return
 				}
+			}
+		}
+	}
+	return nil
+}
+
+// BuildParallelCount synchronizes PodSets.Count values to the JobSet's Parallelism/Completions.
+// This ensures that when PodSets.Count is updated (e.g., by EnforceMLPolicy plugins),
+// the underlying JobSet template spec reflects those changes.
+// This is necessary for external consumers of RuntimeInfo (like Kueue) who may not call Build().
+// Matching is done by name for robustness against ordering differences.
+func (j *JobSet) BuildParallelCount(info *runtime.Info) error {
+	if info == nil {
+		return nil
+	}
+	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+	if !ok || jobSetSpec == nil {
+		return nil
+	}
+
+	for _, ps := range info.TemplateSpec.PodSets {
+		if ps.Count == nil {
+			continue
+		}
+		// Find the matching ReplicatedJob by name.
+		for rJobIdx := range jobSetSpec.ReplicatedJobs {
+			if jobSetSpec.ReplicatedJobs[rJobIdx].Name != nil && *jobSetSpec.ReplicatedJobs[rJobIdx].Name == ps.Name {
+				jobSetSpec.ReplicatedJobs[rJobIdx].Template.Spec.Parallelism = ps.Count
+				jobSetSpec.ReplicatedJobs[rJobIdx].Template.Spec.Completions = ps.Count
+				break
 			}
 		}
 	}

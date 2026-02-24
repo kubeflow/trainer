@@ -42,7 +42,7 @@ type Info struct {
 	// Scheduler parameters to add to the RuntimeJobTemplate.
 	Scheduler *Scheduler
 	// TemplateSpec is TrainingRuntime Template object.
-	// ObjApply podSpecs and this PodSets should be kept in sync by info.SyncPodSetsToTemplateSpec().
+	// ObjApply podSpecs and this PodSets should be kept in sync by the BuildParallelCountPlugin.
 	TemplateSpec TemplateSpec
 }
 
@@ -194,32 +194,6 @@ func NewInfo(opts ...InfoOption) *Info {
 func TemplateSpecApply[A any](info *Info) (*A, bool) {
 	spec, ok := info.TemplateSpec.ObjApply.(*A)
 	return spec, ok
-}
-
-// SyncPodSetsToTemplateSpec synchronizes PodSets.Count values to the TemplateSpec.ObjApply.
-// This ensures that when PodSets.Count is updated (e.g., by EnforceMLPolicy plugins),
-// the underlying template spec (e.g., JobSet's Parallelism/Completions) reflects those changes.
-// This is necessary for external consumers of RuntimeInfo (like Kueue) who may not call Build().
-// Matching is done by name for robustness against ordering differences.
-func (i *Info) SyncPodSetsToTemplateSpec() {
-	jobSetSpec, ok := TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](i)
-	if !ok || jobSetSpec == nil {
-		return
-	}
-
-	for _, ps := range i.TemplateSpec.PodSets {
-		if ps.Count == nil {
-			continue
-		}
-		// Find the matching ReplicatedJob by name
-		for rJobIdx := range jobSetSpec.ReplicatedJobs {
-			if jobSetSpec.ReplicatedJobs[rJobIdx].Name != nil && *jobSetSpec.ReplicatedJobs[rJobIdx].Name == ps.Name {
-				jobSetSpec.ReplicatedJobs[rJobIdx].Template.Spec.Parallelism = ps.Count
-				jobSetSpec.ReplicatedJobs[rJobIdx].Template.Spec.Completions = ps.Count
-				break
-			}
-		}
-	}
 }
 
 // FindContainerByPodSetAncestorContainerName finds runtime.Container from Info.TemplateSpec.PodSet by PodSet Ancestor and Container name.

@@ -111,7 +111,9 @@ func (r *TrainingRuntime) RuntimeInfo(
 	// Sync PodSets.Count to TemplateSpec.ObjApply so that external consumers
 	// (like Kueue) get the correct Parallelism/Completions values without
 	// needing to call Build().
-	info.SyncPodSetsToTemplateSpec()
+	if err = r.framework.RunBuildParallelCountPlugins(info); err != nil {
+		return nil, err
+	}
 
 	if err = r.framework.RunEnforcePodGroupPolicyPlugins(info, trainJob); err != nil {
 		return nil, err

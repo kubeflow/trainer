@@ -42,6 +42,7 @@ type Framework struct {
 	customValidationPlugins      []framework.CustomValidationPlugin
 	watchExtensionPlugins        []framework.WatchExtensionPlugin
 	podNetworkPlugins            []framework.PodNetworkPlugin
+	buildParallelCountPlugins    []framework.BuildParallelCountPlugin
 	componentBuilderPlugins      []framework.ComponentBuilderPlugin
 	trainJobStatusPlugin         framework.TrainJobStatusPlugin
 }
@@ -75,6 +76,9 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 		}
 		if p, ok := plugin.(framework.PodNetworkPlugin); ok {
 			f.podNetworkPlugins = append(f.podNetworkPlugins, p)
+		}
+		if p, ok := plugin.(framework.BuildParallelCountPlugin); ok {
+			f.buildParallelCountPlugins = append(f.buildParallelCountPlugins, p)
 		}
 		if p, ok := plugin.(framework.ComponentBuilderPlugin); ok {
 			f.componentBuilderPlugins = append(f.componentBuilderPlugins, p)
@@ -126,6 +130,15 @@ func (f *Framework) RunCustomValidationPlugins(ctx context.Context, info *runtim
 func (f *Framework) RunPodNetworkPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	for _, plugin := range f.podNetworkPlugins {
 		if err := plugin.IdentifyPodNetwork(info, trainJob); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f *Framework) RunBuildParallelCountPlugins(info *runtime.Info) error {
+	for _, plugin := range f.buildParallelCountPlugins {
+		if err := plugin.BuildParallelCount(info); err != nil {
 			return err
 		}
 	}
