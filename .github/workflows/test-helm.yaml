@@ -1,4 +1,4 @@
-name: Unit and Integration Test - Helm
+name: Unit and E2E Test - Helm
 
 on:
   - pull_request
@@ -22,3 +22,13 @@ jobs:
 
       - name: Run Helm Unit Tests
         run: make helm-unittest
+
+      - name: Install Helm
+        run: make helm
+
+      # Setup Kind (skip Kustomize deploy)
+      - name: Setup Kind Cluster
+        run: make test-e2e-setup-cluster INSTALL_METHOD=helm
+
+      - name: Run Go E2E Tests
+        run: make test-e2e || (kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer && exit 1)

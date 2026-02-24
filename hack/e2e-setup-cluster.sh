@@ -21,6 +21,8 @@ set -o nounset
 set -o pipefail
 set -x
 
+INSTALL_METHOD=${INSTALL_METHOD:-kustomize}
+
 # Source container runtime utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/scripts/container-runtime.sh"
@@ -38,7 +40,15 @@ TIMEOUT="5m"
 
 # Tag used for all locally-built CI images.
 CI_IMAGE_TAG="test"
+XGBOOST_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/xgboost-runtime"
 
+print_cluster_info() {
+  kubectl version
+  kubectl cluster-info
+  kubectl get nodes
+  kubectl get pods -n ${NAMESPACE}
+  kubectl describe pod -n ${NAMESPACE}
+}
 # Kubeflow Trainer images.
 # TODO (andreyvelich): Support initializers images.
 CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-manager"
@@ -52,10 +62,11 @@ ${KIND} create cluster --image "${KIND_NODE_VERSION}"
 # Load Trainer controller manager image in KinD
 load_image_to_kind ${CONTROLLER_MANAGER_CI_IMAGE}
 
-echo "Deploy Kubeflow Trainer control plane"
-E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
-mkdir -p "${E2E_MANIFESTS_DIR}"
-cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
+if [ "${INSTALL_METHOD}" = "kustomize" ]; then
+  echo "Deploy Kubeflow Trainer control plane"
+  E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
+  mkdir -p "${E2E_MANIFESTS_DIR}"
+  cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
   apiVersion: kustomize.config.k8s.io/v1beta1
   kind: Kustomization
   resources:
@@ -74,47 +85,61 @@ cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
       name: kubeflow-trainer-controller-manager
 EOF
 
-kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
-
-# We should wait until Deployment is in Ready status.
-echo "Wait for Kubeflow Trainer to be ready"
-(kubectl wait deploy/kubeflow-trainer-controller-manager --for=condition=available -n ${NAMESPACE} --timeout ${TIMEOUT} &&
-  kubectl wait pods --for=condition=ready -n ${NAMESPACE} --timeout ${TIMEOUT} --all) ||
-  (
-    echo "Failed to wait until Kubeflow Trainer is ready" &&
-      kubectl get pods -n ${NAMESPACE} &&
-      kubectl describe pods -n ${NAMESPACE} &&
-      exit 1
-  )
-
-print_cluster_info() {
-  kubectl version
-  kubectl cluster-info
-  kubectl get nodes
-  kubectl get pods -n ${NAMESPACE}
-  kubectl describe pod -n ${NAMESPACE}
-}
-
+  kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
 # TODO (andreyvelich): Currently, we print manager logs due to flaky test.
-echo "Deploy Kubeflow Trainer runtimes"
-E2E_RUNTIMES_DIR="artifacts/e2e/runtimes"
-mkdir -p "${E2E_RUNTIMES_DIR}"
-XGBOOST_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/xgboost-runtime"
-cat <<EOF >"${E2E_RUNTIMES_DIR}/kustomization.yaml"
+echo "Wait for Kubeflow Trainer to be ready"
+(kubectl wait deploy/kubeflow-trainer-controller-manager \
+  --for=condition=available \
+  -n ${NAMESPACE} \
+  --timeout ${TIMEOUT} && \
+ kubectl wait pods \
+  --for=condition=ready \
+  -n ${NAMESPACE} \
+  --timeout ${TIMEOUT} \
+  --all) || (
+    echo "Failed to wait until Kubeflow Trainer is ready" &&
+    kubectl get pods -n ${NAMESPACE} &&
+    kubectl describe pods -n ${NAMESPACE} &&
+    exit 1
+)
+
+  echo "Deploy Kubeflow Trainer runtimes"
+
+  E2E_RUNTIMES_DIR="artifacts/e2e/runtimes"
+  mkdir -p "${E2E_RUNTIMES_DIR}"
+
+  cat <<EOF >"${E2E_RUNTIMES_DIR}/kustomization.yaml"
   apiVersion: kustomize.config.k8s.io/v1beta1
   kind: Kustomization
   resources:
   - ../../../manifests/overlays/runtimes
   images:
-  - name: "${XGBOOST_RUNTIME_CI_IMAGE_NAME}"
-    newTag: "${CI_IMAGE_TAG}"
+  - name: ${XGBOOST_RUNTIME_CI_IMAGE_NAME}
+    newTag: ${CI_IMAGE_TAG}
 EOF
 
-kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
-  kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
-    print_cluster_info &&
-    exit 1
-)
+kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}"
+
+
+elif [ "${INSTALL_METHOD}" = "helm" ]; then
+  echo "Skipping Kustomize control plane deployment (Helm will handle control plane)"
+  echo "Installing Kubeflow Trainer via Helm"
+
+  # Build Helm dependencies
+  helm dependency build charts/kubeflow-trainer
+
+  # Install Trainer via Helm
+  helm install trainer charts/kubeflow-trainer \
+    --namespace ${NAMESPACE} \
+    --create-namespace \
+    --set runtimes.defaultEnabled=true \
+    --set runtimes.xgboost.image.repository=${XGBOOST_RUNTIME_CI_IMAGE_NAME} \
+    --set runtimes.xgboost.image.tag=${CI_IMAGE_TAG} \
+    --set controllerManager.image.tag=${CI_IMAGE_TAG} \
+    --set manager.config.featureGates.TrainJobStatus=true \
+    --wait
+
+fi
 
 # hotfix(jaiakash) - skip pre-load due to kind failure
 # # TODO (andreyvelich): We should build runtime images before adding them.
