@@ -69,6 +69,7 @@ func init() {
 func main() {
 	var configFile string
 	var enableHTTP2 bool
+	var featureGates string
 
 	flag.StringVar(&configFile, "config", "",
 		"The controller will load its initial configuration from this file. "+
@@ -82,6 +83,9 @@ func main() {
 	// - https://github.com/advisories/GHSA-4374-p667-p6c8
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&featureGates, "feature-gates", "",
+		"A comma-separated list of key=value pairs that describe feature gates. "+
+			"Command-line feature gates override those specified in the config file.")
 
 	zapOpts := zap.Options{
 		TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
@@ -99,9 +103,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Set feature gates from config file first
 	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(cfg.FeatureGates); err != nil {
-		setupLog.Error(err, "Unable to set flag gates for known features")
+		setupLog.Error(err, "Unable to set feature gates from config file")
 		os.Exit(1)
+	}
+
+	// Command-line feature gates override config file settings
+	if featureGates != "" {
+		if err := utilfeature.DefaultMutableFeatureGate.Set(featureGates); err != nil {
+			setupLog.Error(err, "Unable to set feature gates from command line")
+			os.Exit(1)
+		}
 	}
 
 	setupLog.Info("Creating manager")
