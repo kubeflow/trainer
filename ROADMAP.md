@@ -2,18 +2,19 @@
 
 ## 2026
 
-- Distributed AI Scheduling Enhancements
+- Scheduling & Scalability
   - Workload-Aware Scheduling for TrainJobs: https://github.com/kubeflow/trainer/issues/3015
   - KAI Scheduler Integrations: https://github.com/kubeflow/trainer/issues/2628
   - Enhanced Multi-Node NVLink Support
   - First-Class Integration with [Kueue](https://kueue.sigs.k8s.io/docs/tasks/run/trainjobs/) for
     multi-cluster job dispatching, topology-aware scheduling, and other features.
+  - Enhanced Scalability for Massively Distributed TrainJobs: https://github.com/kubeflow/trainer/issues/2318
 - MPI and HPC on Kubernetes
   - Flux Integration for MPI and HPC workloads: https://github.com/kubeflow/trainer/issues/2841
   - IntelMPI Support: https://github.com/kubeflow/trainer/issues/1807
   - PMIx Investigation with Flux or Slurm: https://github.com/kubeflow/mpi-operator/issues/12
   - Enhance MPI Orchestration: https://github.com/kubeflow/trainer/issues/2751
-- Observability and Reliability
+- Observability & Reliability
   - TrainJob Progress Tracking & Metrics Exposure: https://github.com/kubeflow/trainer/issues/2779
   - Transparent Checkpoint/Restore for GPU-Accelerated TrainJobs: https://github.com/kubeflow/trainer/issues/2245
   - TTLs and ActiveDeadlineSeconds for TrainJobs: https://github.com/kubeflow/trainer/issues/2899
