@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
@@ -64,7 +65,7 @@ var (
 		// Extra flux or broker options can be added as needed.
 	}
 
-	// Persist througout, and can be inspected / use by other controllers
+	// Persist throughput, and can be inspected / use by other controllers
 	AnnotationOriginalCommand = "flux.kubeflow.org/original-command"
 )
 
@@ -129,18 +130,14 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 	curveSecretName := fmt.Sprintf("%s-flux-curve", trainJob.Name)
 	sharedVolumes := getViewVolumes(configMapName)
 
-	if trainJob.Annotations == nil {
-		trainJob.Annotations = make(map[string]string)
-	}
-
 	// Capture and set the values as annotations
 	// This effectively "saves" the state onto the Kubernetes resource itself
+	// We provide the original command to the entrypoint
 	originalCmd := getOriginalCommand(trainJob, info)
-	trainJob.Annotations[AnnotationOriginalCommand] = originalCmd
 
 	// Update the command here so we wrap the original command saved earlier
 	// Also clear existing args so only the Flux entrypoint controls execution
-	trainJob.Spec.Trainer.Command = []string{"/bin/bash", "/etc/flux-config/entrypoint.sh"}
+	trainJob.Spec.Trainer.Command = []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", originalCmd}
 	trainJob.Spec.Trainer.Args = nil
 
 	// Define the Init Container. This has a spack view with flux pre-built, and we add to an emptyDir
@@ -423,7 +420,22 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	// Derive number of tasks
 	// This may not technically be the number of processes per node,
 	// but that is all the TrainJob can currently represent.
-	tasks := *info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode
+	var tasks string
+	nodes := *trainJob.Spec.Trainer.NumNodes
+	if trainJob.Spec.Trainer.NumProcPerNode != nil {
+		if trainJob.Spec.Trainer.NumProcPerNode.Type == intstr.Int {
+			tasks = fmt.Sprintf("-N %d -n %d", nodes, trainJob.Spec.Trainer.NumProcPerNode.IntVal*nodes)
+		} else {
+			// auto, cpu, gpu, or int value
+			// TODO: how do we know what "gpu" and "cpu" mean?
+			// taskStr := trainJob.Spec.Trainer.NumProcPerNode.StrVal
+			// Auto means we want all discovered procs per node
+			// For now, just cover number of nodes and exclusive (all resources)
+			tasks = fmt.Sprintf("-N %d --exclusive", nodes)
+		}
+	} else {
+		tasks = fmt.Sprintf("-N %d -n %d", nodes, *info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode*nodes)
+	}
 
 	// TODO we can set strict mode as an option
 	script := `#!/bin/sh
@@ -484,7 +496,7 @@ mv /tmp/flux-view.sh ${viewbase}/flux-view.sh
 
 # Variables we can use again
 cfg="${configroot}/etc/flux/config"
-command="%s"
+command="$@"
 
 # Copy mounted curve to expected location
 curvepath=/mnt/flux/config/etc/curve/curve.cert
@@ -533,11 +545,10 @@ if [ "$(hostname)" = "${mainHost}" ]; then
   else
 
     # If tasks are == 0, then only define nodes
-	node_spec="-n %d"
-    node_spec="${node_spec}"
-    flags="${node_spec}  "
+    flags="%s  "
     echo "Flags for flux are ${flags}"
-    flux start  -o --config ${cfg} ${brokerOptions} flux submit ${flags} --quiet --watch ${command}
+    echo "🌀 flux start  -o --config ${cfg} ${brokerOptions} flux submit ${flags} --quiet --watch ${command}"
+	flux start  -o --config ${cfg} ${brokerOptions} flux run ${flags} ${command}
   fi
 
 # Block run by workers
@@ -566,12 +577,8 @@ fi
 touch $viewbase/flux-operator-complete.txt
 `
 
-	// Get original command from annotations
-	command := trainJob.Annotations[AnnotationOriginalCommand]
-
 	return fmt.Sprintf(
 		script,
-		command,
 		mainHost,
 		tasks,
 	)

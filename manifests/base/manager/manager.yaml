@@ -23,7 +23,6 @@ spec:
       containers:
         - name: manager
           image: ghcr.io/kubeflow/trainer/trainer-controller-manager
-          imagePullPolicy: Never
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
