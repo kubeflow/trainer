@@ -34,6 +34,7 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	progresspkg "github.com/kubeflow/trainer/v2/pkg/progress"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
@@ -144,7 +145,7 @@ func TestEnforceMLPolicy(t *testing.T) {
 												corev1ac.VolumeProjection().
 													WithServiceAccountToken(
 														corev1ac.ServiceAccountTokenProjection().
-															WithAudience(tokenAudience).
+															WithAudience(progresspkg.TokenAudience).
 															WithExpirationSeconds(tokenExpirySeconds).
 															WithPath(tokenFileName),
 													),
@@ -249,7 +250,7 @@ func TestEnforceMLPolicy(t *testing.T) {
 												corev1ac.VolumeProjection().
 													WithServiceAccountToken(
 														corev1ac.ServiceAccountTokenProjection().
-															WithAudience(tokenAudience).
+															WithAudience(progresspkg.TokenAudience).
 															WithExpirationSeconds(tokenExpirySeconds).
 															WithPath(tokenFileName),
 													),

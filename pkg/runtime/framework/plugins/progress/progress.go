@@ -39,8 +39,6 @@ import (
 const (
 	Name = "Progress"
 
-	// TODO: move these somewhere central?
-
 	// Environment variable names
 	envNameStatusURL = "KUBEFLOW_TRAINER_STATUS_URL"
 	envNameCACert    = "KUBEFLOW_TRAINER_STATUS_CA_CERT"
@@ -53,7 +51,6 @@ const (
 	tokenVolumeName   = "kubeflow-trainer-token"
 
 	// Service account token configuration
-	tokenAudience      = "trainer.kubeflow.org"
 	tokenExpirySeconds = 3600
 
 	// Server tls config
@@ -163,7 +160,7 @@ func createTokenVolume(trainJob *trainer.TrainJob) corev1ac.VolumeApplyConfigura
 					corev1ac.VolumeProjection().
 						WithServiceAccountToken(
 							corev1ac.ServiceAccountTokenProjection().
-								WithAudience(tokenAudience).
+								WithAudience(progresspkg.TokenAudience).
 								WithExpirationSeconds(tokenExpirySeconds).
 								WithPath(tokenFileName),
 						),
