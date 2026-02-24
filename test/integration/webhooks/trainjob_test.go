@@ -574,6 +574,90 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 					return job
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should succeed to atomically unsuspend and modify podTemplateOverrides",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "atomic-unsuspend").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(true).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										ServiceAccountName: ptr.To("old-sa"),
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.Suspend = ptr.To(false)
+					job.Spec.PodTemplateOverrides[0].Spec = &trainer.PodTemplateSpecOverride{
+						NodeSelector: map[string]string{"accelerator": "nvidia-h100"},
+					}
+					return job
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should succeed to atomically suspend and modify podTemplateOverrides",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "atomic-suspend").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(false).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										NodeSelector: map[string]string{"accelerator": "nvidia-h100"},
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.Suspend = ptr.To(true)
+					job.Spec.PodTemplateOverrides[0].Spec = &trainer.PodTemplateSpecOverride{
+						ServiceAccountName: ptr.To("restored-sa"),
+					}
+					return job
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to update podTemplateOverride when not suspended",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "forbid-update").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(false).
+						PodTemplateOverrides(
+							[]trainer.PodTemplateOverride{
+								{
+									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
+										{
+											Name: "node",
+										},
+									},
+									Spec: &trainer.PodTemplateSpecOverride{
+										NodeSelector: map[string]string{"test": "test"},
+									},
+								},
+							},
+						).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.PodTemplateOverrides[0].Spec.NodeSelector = map[string]string{"forbidden": "update"}
+					return job
+				},
+				testingutil.BeForbiddenError()),
 		)
 	})
 })
