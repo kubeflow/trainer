@@ -29,10 +29,6 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const (
-	audience = "trainer.kubeflow.org"
-)
-
 // TokenVerifier verifies OIDC tokens and returns decoded service account token claims.
 type TokenVerifier interface {
 	Verify(ctx context.Context, token string) (*ProjectedServiceAccountToken, error)
@@ -111,7 +107,7 @@ func NewProjectedServiceAccountTokenVerifier(ctx context.Context, config *rest.C
 	}
 
 	verifier := provider.Verifier(&oidc.Config{
-		ClientID: audience,
+		ClientID: TokenAudience,
 	})
 
 	return &projectedServiceAccountTokenVerifier{

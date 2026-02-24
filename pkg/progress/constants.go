@@ -21,6 +21,10 @@ import "fmt"
 const (
 	// LabelTrainJobName is the label key used to identify which TrainJob a pod belongs to
 	LabelTrainJobName = "trainer.kubeflow.org/trainjob-name"
+
+	// TokenAudience is the required audience of the projected service account tokens used to
+	// authenticate with the progress server.
+	TokenAudience = "trainer.kubeflow.org"
 )
 
 // StatusUrl is the path of the endpoint for receiving status updates
