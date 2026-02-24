@@ -1,4 +1,4 @@
-name: Unit and Integration Test - Helm
+name: Helm Unit and E2E Tests
 
 on:
   - pull_request
@@ -28,7 +28,7 @@ jobs:
 
       - name: Run Go E2E Tests
         run: |
-          set -euo pipefail
+          set -uo pipefail
           if ! make test-e2e; then
             echo "E2E tests failed, collecting cluster diagnostics..."
             echo "=== Pods (all namespaces) ==="
