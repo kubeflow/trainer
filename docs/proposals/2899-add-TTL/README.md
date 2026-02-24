@@ -44,7 +44,7 @@ As a **Platform Admin**, I want to configure an automatic cleanup policy on my C
 
 #### Story 3
 
-As a **Data Scientist**, I want to set a `timeout` via the Kubeflow Python SDK when submitting a training job from my notebook, so that I don't need to write or understand Kubernetes YAML to protect my experiment from running indefinitely.
+As a **Data Scientist**, I want to set a `activeDeadlineSeconds` via the Kubeflow Python SDK when submitting a training job from my notebook, so that I don't need to write or understand Kubernetes YAML to protect my experiment from running indefinitely.
 
 ```python
 from kubeflow.trainer import TrainerClient, CustomTrainer, Initializer, HuggingFaceDatasetInitializer
@@ -57,7 +57,7 @@ TrainerClient().train(
     initializer=Initializer(
         model=HuggingFaceDatasetInitializer(storage_uri="hf://qwen3.2-instruct")
     ),
-    timeout=28800,  # 8 hours max
+    activeDeadlineSeconds=28800,  # 8 hours max
 )
 ```
 
@@ -167,7 +167,7 @@ spec:
 # 8-hour deadline set on TrainJob, runtime's 24-hour TTL applies after completion
 ```
 
-**TrainJob with Timeout via SDK (Data Scientist):**
+**TrainJob with activeDeadlineSeconds via SDK (Data Scientist):**
 
 ```python
 from kubeflow.trainer import TrainerClient, CustomTrainer, Initializer, HuggingFaceDatasetInitializer
