@@ -77,60 +77,9 @@ jobs:
           done
           echo "All image tags in manifests match version tag $TAG."
 
-  build_python_api:
-    needs:
-      - prepare
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install build tooling
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install build twine
-
-      - name: Verify Python package version matches release
-        run: |
-          EXPECTED="${{ needs.prepare.outputs.version }}"
-          PY_VER=$(python - <<'PY'
-          import re
-          from pathlib import Path
-          text = Path('api/python_api/kubeflow_trainer_api/__init__.py').read_text()
-          m = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
-          if not m:
-              raise SystemExit("__version__ not found")
-          print(m.group(1))
-          PY
-          )
-          echo "Expected: ${EXPECTED}; Package: ${PY_VER}"
-          if [ "$PY_VER" != "$EXPECTED" ]; then
-            echo "Python API version mismatch"
-            exit 1
-          fi
-
-      - name: Build Python package
-        working-directory: api/python_api
-        run: |
-          python -m build
-          python -m twine check dist/*
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-dist-${{ needs.prepare.outputs.version }}
-          path: api/python_api/dist/
-
   create_branch_and_tag:
     needs:
       - prepare
-      - build_python_api
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -194,40 +143,12 @@ jobs:
               ref: '${{ needs.prepare.outputs.tag }}',
             })
 
-  publish_pypi:
-    needs:
-      - prepare
-      - build_python_api
-      - create_branch_and_tag
-    runs-on: ubuntu-latest
-    environment:
-      name: release
-      url: https://pypi.org/project/kubeflow-trainer-api/
-    permissions:
-      id-token: write
-
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: python-dist-${{ needs.prepare.outputs.version }}
-          path: dist/
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          print-hash: true
-          packages-dir: dist/
-
   github_release:
     needs:
       - prepare
       - create_branch_and_tag
-      - publish_pypi
-
     permissions:
       contents: write
-
     runs-on: ubuntu-latest
 
     steps:
