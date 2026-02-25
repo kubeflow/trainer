@@ -42,13 +42,63 @@ import (
 
 func TestXGBoostValidate(t *testing.T) {
 	cases := map[string]struct {
-		trainJob *trainer.TrainJob
-		wantErrs field.ErrorList
+		runtimeInfo *runtime.Info
+		trainJob    *trainer.TrainJob
+		wantErrs    field.ErrorList
 	}{
+		"no error when runtimeInfo is nil": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(1).
+						Env(corev1.EnvVar{Name: constants.XGBoostEnvTrackerURI, Value: "custom-tracker"}).
+						Obj(),
+				).
+				Obj(),
+		},
+		"no error when runtime is not XGBoost (e.g. Torch)": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(trainer.MLPolicySource{
+							Torch: &trainer.TorchMLPolicySource{},
+						}).
+						Obj(),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(1).
+						Env(corev1.EnvVar{Name: constants.XGBoostEnvTrackerURI, Value: "custom-tracker"}).
+						Obj(),
+				).
+				Obj(),
+		},
 		"no error when trainer is nil": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							XGBoostPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
 		},
 		"no error when env does not contain reserved names": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							XGBoostPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
@@ -58,6 +108,16 @@ func TestXGBoostValidate(t *testing.T) {
 				Obj(),
 		},
 		"error when using reserved DMLC_TRACKER_URI env": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							XGBoostPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
@@ -74,6 +134,16 @@ func TestXGBoostValidate(t *testing.T) {
 			},
 		},
 		"error when using reserved DMLC_NUM_WORKER env": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							XGBoostPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
@@ -90,6 +160,16 @@ func TestXGBoostValidate(t *testing.T) {
 			},
 		},
 		"multiple errors when using multiple reserved envs": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							XGBoostPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
@@ -127,7 +207,7 @@ func TestXGBoostValidate(t *testing.T) {
 			}
 
 			// Test Validate
-			_, errs := p.(framework.CustomValidationPlugin).Validate(ctx, nil, nil, tc.trainJob)
+			_, errs := p.(framework.CustomValidationPlugin).Validate(ctx, tc.runtimeInfo, nil, tc.trainJob)
 			if diff := cmp.Diff(tc.wantErrs, errs, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
 				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
 			}
@@ -162,6 +242,43 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 					utiltesting.MakeMLPolicyWrapper().Obj(),
 				),
 			),
+		},
+		"no env injection when trainJob.Spec.Trainer is nil": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							XGBoostPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						XGBoostPolicy().
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
 		},
 		"single node XGBoost training (CPU)": {
 			info: runtime.NewInfo(

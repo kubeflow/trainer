@@ -51,6 +51,10 @@ func (x *XGBoost) Name() string {
 
 func (x *XGBoost) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil ||
+		runtimeInfo.RuntimePolicy.MLPolicySource.XGBoost == nil {
+		return nil, allErrs
+	}
 	if newObj.Spec.Trainer != nil {
 		specPath := field.NewPath("spec", "trainer", "env")
 		for i, env := range newObj.Spec.Trainer.Env {
@@ -74,6 +78,9 @@ func (x *XGBoost) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 
 	// Find the trainer PodSet.
 	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	if trainerPS == nil {
+		return nil
+	}
 
 	// Set the number of nodes from TrainJob if specified.
 	if trainerPS.Count != nil &&

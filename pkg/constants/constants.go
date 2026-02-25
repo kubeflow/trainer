@@ -224,9 +224,6 @@ const (
 
 	// XGBoostEnvNumWorker is the env name for the total number of workers.
 	XGBoostEnvNumWorker string = "DMLC_NUM_WORKER"
-
-	// XGBoostDefaultTrackerPort is the default port for the tracker.
-	XGBoostDefaultTrackerPort int32 = 9091
 )
 
 const (
