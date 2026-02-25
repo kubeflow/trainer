@@ -27,7 +27,7 @@ spec:
                     image: ghcr.io/kubeflow/trainer/dataset-initializer
                     env:
                       - name: CACHE_IMAGE
-                        value: "ghcr.io/kubeflow/trainer/data-cache:latest"
+                        value: "ghcr.io/kubeflow/trainer/data-cache:v99.0.0"
                       - name: TRAIN_JOB_NAME
                         valueFrom:
                           fieldRef:
