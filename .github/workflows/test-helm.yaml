@@ -46,10 +46,11 @@ jobs:
 
       - name: Wait for Trainer Controller
         run: |
-          kubectl wait deploy/kubeflow-trainer-controller-manager \
-            --for=condition=available \
+          kubectl wait deploy \
             -n kubeflow-system \
-            --timeout=5m
+            --for=condition=available \
+            --timeout=5m \
+            --all
 
       - name: Run Go E2E Tests
         run: |
