@@ -147,6 +147,14 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = errors.Join(err, statusErr)
 	}
 
+	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
+		err = errors.Join(err, deadlineErr)
+		if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
+			return deadlineResult, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
+		}
+		return deadlineResult, err
+	}
+
 	if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
 		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
 		// for sub-resources. See: https://github.com/kubernetes-sigs/controller-runtime/issues/3183
@@ -204,6 +212,29 @@ func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer
 		return ctrl.Result{}, client.IgnoreNotFound(r.client.Delete(ctx, trainJob))
 	}
 	requeueAfter := time.Until(deleteTime)
+	if requeueAfter <= 0 {
+		requeueAfter = time.Second
+	}
+	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+}
+
+func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
+	if trainJob.Spec.ActiveDeadlineSeconds == nil || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
+		return ctrl.Result{}, nil
+	}
+	startTime := trainJob.CreationTimestamp.Time
+	if resumedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobSuspended); resumedCond != nil && resumedCond.Status == metav1.ConditionFalse {
+		startTime = resumedCond.LastTransitionTime.Time
+	}
+	if startTime.IsZero() {
+		return ctrl.Result{}, nil
+	}
+	deadline := startTime.Add(time.Duration(*trainJob.Spec.ActiveDeadlineSeconds) * time.Second)
+	if time.Now().After(deadline) {
+		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
+		return ctrl.Result{}, nil
+	}
+	requeueAfter := time.Until(deadline)
 	if requeueAfter <= 0 {
 		requeueAfter = time.Second
 	}
