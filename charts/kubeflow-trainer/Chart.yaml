@@ -20,7 +20,7 @@ name: kubeflow-trainer
 
 description: A Helm chart for deploying Kubeflow Trainer on Kubernetes.
 
-version: 99.0.0
+version: 2.2.2
 
 type: application
 
