@@ -718,6 +718,11 @@ func (in *TrainJobSpec) DeepCopyInto(out *TrainJobSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.ActiveDeadlineSeconds != nil {
+		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	if in.ManagedBy != nil {
 		in, out := &in.ManagedBy, &out.ManagedBy
 		*out = new(string)
@@ -893,6 +898,11 @@ func (in *TrainingRuntimeSpec) DeepCopyInto(out *TrainingRuntimeSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.Template.DeepCopyInto(&out.Template)
+	if in.TTLSecondsAfterFinished != nil {
+		in, out := &in.TTLSecondsAfterFinished, &out.TTLSecondsAfterFinished
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

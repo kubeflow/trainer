@@ -106,6 +106,9 @@ type TrainingRuntimeList struct {
 
 // TrainingRuntimeSpec represents a specification of the desired training runtime.
 // +kubebuilder:validation:MinProperties=1
+// +kubebuilder:validation:XValidation:rule="!has(self.template.spec.ttlSecondsAfterFinished)",message="template.spec.ttlSecondsAfterFinished must not be set; use ttlSecondsAfterFinished on TrainingRuntimeSpec instead"
+// +kubebuilder:validation:XValidation:rule="!has(self.template.spec.replicatedJobs) || self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec.activeDeadlineSeconds))",message="rj.template.spec.activeDeadlineSeconds must not be set; use activeDeadlineSeconds on TrainJobSpec instead"
+// +kubebuilder:validation:XValidation:rule="!has(self.template.spec.replicatedJobs) || self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec.ttlSecondsAfterFinished))",message="rj.template.spec.ttlSecondsAfterFinished must not be set; use ttlSecondsAfterFinished on TrainingRuntimeSpec instead"
 type TrainingRuntimeSpec struct {
 	// mlPolicy provides the ML-specific parameters for the model training.
 	// +optional
@@ -118,6 +121,16 @@ type TrainingRuntimeSpec struct {
 	// template for the JobSet which will be used by TrainJob.
 	// +optional
 	Template JobSetTemplateSpec `json:"template,omitzero"`
+
+	// ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished
+	// execution (either Complete or Failed). If this field is set, TrainJobs using
+	// this runtime will be deleted ttlSecondsAfterFinished seconds after they finish.
+	// If this field is unset, TrainJobs will not be automatically deleted.
+	// If set to zero, TrainJobs become eligible for deletion immediately after finishing.
+	// This is a platform-level policy that individual TrainJobs cannot override.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 }
 
 // JobSetTemplateSpec represents a template of the desired JobSet.

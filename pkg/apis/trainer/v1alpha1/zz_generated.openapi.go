@@ -1499,6 +1499,13 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"activeDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob start time (which resets on resume from suspension) that the TrainJob may be active before the system tries to terminate it. Value must be a positive integer. Once reached, all running Pods are terminated and the TrainJob status becomes Failed with reason: DeadlineExceeded.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 					"managedBy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.",
@@ -1795,6 +1802,13 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCa
 							Description: "template for the JobSet which will be used by TrainJob.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec"),
+						},
+					},
+					"ttlSecondsAfterFinished": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished execution (either Complete or Failed). If this field is set, TrainJobs using this runtime will be deleted ttlSecondsAfterFinished seconds after they finish. If this field is unset, TrainJobs will not be automatically deleted. If set to zero, TrainJobs become eligible for deletion immediately after finishing. This is a platform-level policy that individual TrainJobs cannot override.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},

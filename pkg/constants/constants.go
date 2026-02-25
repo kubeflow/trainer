@@ -66,6 +66,11 @@ const (
 	// {"type": "Suspended", "status": "True", "reason": "Resumed"} condition.
 	TrainJobResumedMessage = "TrainJob is resumed"
 
+	// TrainJobDeadlineExceededMessage is the status condition message for the
+	// {"type": "Failed", "reason": "DeadlineExceeded"} condition
+	// when the TrainJob exceeds its ActiveDeadlineSeconds.
+	TrainJobDeadlineExceededMessage = "TrainJob exceeded its active deadline"
+
 	// Node is the name of the Job and container for the MPI launcher.
 	// When RunLauncherAsNode: true, for the launcher Job the container name is node.
 	Launcher string = "launcher"
