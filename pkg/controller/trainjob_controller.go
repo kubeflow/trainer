@@ -105,7 +105,10 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	ctx = ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling TrainJob")
 
-	ttl := r.fetchTTLFromRuntime(ctx, &trainJob)
+	ttl, err := r.fetchTTLFromRuntime(ctx, &trainJob)
+	if client.IgnoreNotFound(err) != nil {
+		return ctrl.Result{}, err
+	}
 
 	if trainjob.IsTrainJobFinished(&trainJob) {
 		runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
@@ -117,7 +120,7 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return r.reconcileTTL(ctx, &trainJob, ttl)
 	}
 
-	var err error
+
 	// Keep track of the origin TrainJob status
 	prevTrainJob := trainJob.DeepCopy()
 
@@ -182,24 +185,24 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 	return nil
 }
 
-func (r *TrainJobReconciler) fetchTTLFromRuntime(ctx context.Context, trainJob *trainer.TrainJob) *int32 {
+func (r *TrainJobReconciler) fetchTTLFromRuntime(ctx context.Context, trainJob *trainer.TrainJob) (*int32, error) {
 	if trainjob.RuntimeRefIsTrainingRuntime(trainJob.Spec.RuntimeRef) {
 		var runtime trainer.TrainingRuntime
 		if err := r.client.Get(ctx, client.ObjectKey{
 			Namespace: trainJob.Namespace,
 			Name:      trainJob.Spec.RuntimeRef.Name,
 		}, &runtime); err != nil {
-			return nil
+			return nil, err
 		}
-		return runtime.Spec.TTLSecondsAfterFinished
+		return runtime.Spec.TTLSecondsAfterFinished, nil
 	}
 	var runtime trainer.ClusterTrainingRuntime
 	if err := r.client.Get(ctx, client.ObjectKey{
 		Name: trainJob.Spec.RuntimeRef.Name,
 	}, &runtime); err != nil {
-		return nil
+		return nil, err
 	}
-	return runtime.Spec.TTLSecondsAfterFinished
+	return runtime.Spec.TTLSecondsAfterFinished, nil
 }
 
 func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer.TrainJob, ttl *int32) (ctrl.Result, error) {
