@@ -108,6 +108,12 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	ttl := r.fetchTTLFromRuntime(ctx, &trainJob)
 
 	if trainjob.IsTrainJobFinished(&trainJob) {
+		runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
+		if runtime, ok := r.runtimes[runtimeRefGK]; ok {
+			trainJobCopy := trainJob.DeepCopy()
+			trainJobCopy.Spec.Suspend = ptr.To(true)
+			_ = r.reconcileObjects(ctx, runtime, trainJobCopy)
+		}
 		return r.reconcileTTL(ctx, &trainJob, ttl)
 	}
 
