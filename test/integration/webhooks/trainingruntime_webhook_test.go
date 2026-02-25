@@ -82,7 +82,7 @@ var _ = ginkgo.Describe("TrainingRuntime Webhook", ginkgo.Ordered, func() {
 	})
 
 	ginkgo.When("Validating TrainingRuntime", func() {
-		ginkgo.DescribeTable("TTL and Deadline Validation", func(runtime func() *trainer.TrainingRuntime, wantErr string, wantWarning string) {
+		ginkgo.DescribeTable("TTL and Deadline Validation", func(runtime func() *trainer.TrainingRuntime, wantErr string) {
 			ctx := context.Background()
 			err := k8sClient.Create(ctx, runtime())
 			if wantErr != "" {
@@ -103,7 +103,6 @@ var _ = ginkgo.Describe("TrainingRuntime Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				"", // no error, just a warning
-				"ttlSecondsAfterFinished is less than 60s",
 			),
 			ginkgo.Entry("Error when ttlSecondsAfterFinished is set on JobSet template",
 				func() *trainer.TrainingRuntime {
@@ -117,7 +116,6 @@ var _ = ginkgo.Describe("TrainingRuntime Webhook", ginkgo.Ordered, func() {
 					return runtime
 				},
 				"template.spec.ttlSecondsAfterFinished must not be set",
-				"",
 			),
 		)
 	})
