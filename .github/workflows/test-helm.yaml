@@ -26,6 +26,10 @@ jobs:
       - name: Install Helm
         run: make helm
 
+      # Build dependencies declared in Chart.yaml
+      - name: Build Helm Dependencies
+        run: ./bin/helm dependency build charts/kubeflow-trainer
+
       # Setup Kind (skip Kustomize deploy)
       - name: Setup Kind Cluster
         run: make test-e2e-setup-cluster-helm
