@@ -44,13 +44,10 @@ jobs:
             --set image.tag=test \
             --wait
 
-      - name: Wait for Trainer Controller
+      - name: Deploy Trainer runtimes
         run: |
-          kubectl wait deploy \
-            -n kubeflow-system \
-            --for=condition=available \
-            --timeout=5m \
-            --all
+          kubectl apply --server-side \
+            -k manifests/overlays/runtimes
 
       - name: Run Go E2E Tests
         run: |
@@ -65,6 +62,6 @@ jobs:
             kubectl get events -A --sort-by=.lastTimestamp || true
             echo "=== Trainer logs ==="
             kubectl logs -n kubeflow-system \
-             -l app.kubernetes.io/name=trainer || true
+              -l app.kubernetes.io/instance=trainer || true
             exit 1
           fi
