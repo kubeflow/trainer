@@ -14,7 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */ -}}
 
-{{- if and .Values.dataCache.enabled .Values.dataCache.runtimes.torchDistributed.enabled }}
+{{- if and .Values.dataCache.runtimes.torchDistributedWithCache.enabled (not .Values.dataCache.enabled) }}
+{{- fail "dataCache.runtimes.torchDistributedWithCache.enabled requires dataCache.enabled to be true" }}
+{{- end }}
+
+{{- if and .Values.dataCache.enabled .Values.dataCache.runtimes.torchDistributedWithCache.enabled }}
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:

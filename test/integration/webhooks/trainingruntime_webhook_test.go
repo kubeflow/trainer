@@ -131,15 +131,38 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 					return runtime
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("Should fail to create trainingRuntime with minNodes and torch.elasticPolicy",
+			ginkgo.Entry("Should fail to create trainingRuntime with both JAX and Torch runtimes",
 				func() *trainer.TrainingRuntime {
 					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
 					runtime.Spec.MLPolicy = &trainer.MLPolicy{
-						NumNodes: ptr.To[int32](2),
 						MLPolicySource: trainer.MLPolicySource{
-							Torch: &trainer.TorchMLPolicySource{
-								ElasticPolicy: &trainer.TorchElasticPolicy{},
-							},
+							Torch: &trainer.TorchMLPolicySource{},
+							JAX:   &trainer.JAXMLPolicySource{},
+						},
+					}
+					return runtime
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to create trainingRuntime with both JAX and MPI runtimes",
+				func() *trainer.TrainingRuntime {
+					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
+					runtime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{
+							MPI: &trainer.MPIMLPolicySource{},
+							JAX: &trainer.JAXMLPolicySource{},
+						},
+					}
+					return runtime
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to create trainingRuntime with all three runtimes configured",
+				func() *trainer.TrainingRuntime {
+					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
+					runtime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{
+							Torch: &trainer.TorchMLPolicySource{},
+							MPI:   &trainer.MPIMLPolicySource{},
+							JAX:   &trainer.JAXMLPolicySource{},
 						},
 					}
 					return runtime

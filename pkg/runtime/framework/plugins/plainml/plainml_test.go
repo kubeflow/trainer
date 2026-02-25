@@ -49,7 +49,7 @@ func TestPlainML(t *testing.T) {
 				Labels: map[string]string{"key": "value"},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 			},
@@ -57,7 +57,7 @@ func TestPlainML(t *testing.T) {
 				Labels: map[string]string{"key": "value"},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 			},
@@ -80,6 +80,25 @@ func TestPlainML(t *testing.T) {
 				},
 			},
 		},
+		"no action when mlPolicySource jax is not null": {
+			info: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						JAXPolicy().
+						Obj(),
+				},
+			},
+			wantInfo: &runtime.Info{
+				Labels: map[string]string{"key": "value"},
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						JAXPolicy().
+						Obj(),
+				},
+			},
+		},
+
 		"trainJob trainer numNodes are respected rather than runtimeInfo": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(

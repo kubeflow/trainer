@@ -180,14 +180,15 @@ kubectl get clustertrainingruntimes -o json | jq '
   .items[].spec.template.spec.replicatedJobs[].template.spec.template.spec.runtimeClassName = "nvidia"
 ' | kubectl apply -f -
 
-# TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
-TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
-${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
-load_image_to_kind ${TORCH_RUNTIME_IMAGE} ${GPU_CLUSTER_NAME}
+# hotfix(jaiakash) - skip pre-load due to kind failure
+# # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
+# TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+# ${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
+# load_image_to_kind ${TORCH_RUNTIME_IMAGE} ${GPU_CLUSTER_NAME}
 
-# Pre-pull NVIDIA JAX image for JAX runtime.
-JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
-${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
-load_image_to_kind ${JAX_RUNTIME_IMAGE} ${GPU_CLUSTER_NAME}
+# # Pre-pull NVIDIA JAX image for JAX runtime.
+# JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
+# ${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
+# load_image_to_kind ${JAX_RUNTIME_IMAGE} ${GPU_CLUSTER_NAME}
 
 print_cluster_info

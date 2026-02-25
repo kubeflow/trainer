@@ -74,7 +74,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -96,7 +96,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -157,7 +157,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -171,7 +171,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -230,7 +230,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -244,7 +244,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -305,7 +305,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -319,7 +319,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -380,7 +380,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -394,7 +394,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -455,7 +455,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -469,7 +469,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -530,7 +530,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -544,7 +544,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -605,7 +605,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -619,7 +619,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -680,7 +680,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -694,7 +694,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -755,7 +755,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -769,7 +769,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -830,7 +830,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -844,7 +844,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -906,7 +906,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -920,7 +920,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -981,7 +981,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -995,7 +995,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -1059,7 +1059,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -1080,7 +1080,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -1158,7 +1158,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -1172,7 +1172,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -1242,7 +1242,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -1256,7 +1256,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -1326,7 +1326,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+							TorchPolicy(ptr.To(intstr.FromString("auto"))).
 							Obj(),
 						).
 						Obj(),
@@ -1340,7 +1340,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -1444,7 +1444,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(nil, nil).
+						TorchPolicy(nil).
 						Obj(),
 					).
 					Obj(),
@@ -1465,7 +1465,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("npu")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("npu"))).
 						Obj(),
 					).
 					Obj(),
@@ -1489,7 +1489,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 					).
 					Obj(),
@@ -1506,7 +1506,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 					).
 					Obj(),
@@ -1534,7 +1534,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 					).
 					Obj(),
@@ -1583,7 +1583,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 					).
 					Obj(),
@@ -1617,7 +1617,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 					).
 					Obj(),
@@ -1651,7 +1651,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 					).
 					Obj(),
@@ -1689,7 +1689,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+						TorchPolicy(ptr.To(intstr.FromString("auto"))).
 						Obj(),
 					).
 					Obj(),

@@ -52,7 +52,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateOverrideTargetJob":     schema_pkg_apis_trainer_v1alpha1_PodTemplateOverrideTargetJob(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateSpecOverride":          schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef":                       schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref),
-		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchElasticPolicy":               schema_pkg_apis_trainer_v1alpha1_TorchElasticPolicy(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource":              schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJob":                         schema_pkg_apis_trainer_v1alpha1_TrainJob(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobList":                     schema_pkg_apis_trainer_v1alpha1_TrainJobList(ref),
@@ -1294,61 +1293,6 @@ func schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_pkg_apis_trainer_v1alpha1_TorchElasticPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "TorchElasticPolicy represents a configuration for the PyTorch elastic training. If this policy is set, the `.spec.numNodes` parameter must be omitted, since min and max node is used to configure the `torchrun` CLI argument: `--nnodes=minNodes:maxNodes`. Only `c10d` backend is supported for the Rendezvous communication.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"maxRestarts": {
-						SchemaProps: spec.SchemaProps{
-							Description: "maxRestarts defines how many times the training job can be restarted. This value is inserted into the `--max-restarts` argument of the `torchrun` CLI and the `.spec.failurePolicy.maxRestarts` parameter of the training Job.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"minNodes": {
-						SchemaProps: spec.SchemaProps{
-							Description: "minNodes is the lower limit for the number of nodes to which training job can scale down.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"maxNodes": {
-						SchemaProps: spec.SchemaProps{
-							Description: "maxNodes is the upper limit for the number of nodes to which training job can scale up.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"metrics": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "metrics which are used to calculate the desired number of nodes. See the individual metric source types for more information about how each type of metric must respond. The HPA will be created to perform auto-scaling.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v2.MetricSpec{}.OpenAPIModelName()),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			v2.MetricSpec{}.OpenAPIModelName()},
-	}
-}
-
 func schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -1362,17 +1306,11 @@ func schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref common.ReferenceCa
 							Ref:         ref(intstr.IntOrString{}.OpenAPIModelName()),
 						},
 					},
-					"elasticPolicy": {
-						SchemaProps: spec.SchemaProps{
-							Description: "elasticPolicy defines the Elastic policy for the PyTorch training.",
-							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchElasticPolicy"),
-						},
-					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchElasticPolicy", intstr.IntOrString{}.OpenAPIModelName()},
+			intstr.IntOrString{}.OpenAPIModelName()},
 	}
 }
 

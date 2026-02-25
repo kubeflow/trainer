@@ -16,22 +16,22 @@
 
 suite: Test torch-distributed-with-cache ClusterTrainingRuntime
 templates:
-  - templates/runtimes/torch-distributed-with-cache.yaml
+  - templates/runtimes/data-cache/torch-distributed-with-cache.yaml
 release:
   name: kubeflow-trainer
   namespace: kubeflow-trainer
 tests:
-  - it: Should not render ClusterTrainingRuntime when runtimes.torchDistributedWithCache.enabled is false
+  - it: Should not render ClusterTrainingRuntime when dataCache.runtimes.torchDistributedWithCache.enabled is false
     set:
       dataCache:
         enabled: true
-      runtimes:
-        torchDistributedWithCache:
-          enabled: false
-          cacheImage:
-            registry: ghcr.io
-            repository: kubeflow/trainer/data-cache
-            tag: ""
+        cacheImage:
+          registry: ghcr.io
+          repository: kubeflow/trainer/data-cache
+          tag: ""
+        runtimes:
+          torchDistributedWithCache:
+            enabled: false
     asserts:
       - hasDocuments:
           count: 0
@@ -40,28 +40,28 @@ tests:
     set:
       dataCache:
         enabled: false
-      runtimes:
-        torchDistributedWithCache:
-          enabled: true
-          cacheImage:
-            registry: ghcr.io
-            repository: kubeflow/trainer/data-cache
-            tag: ""
+        cacheImage:
+          registry: ghcr.io
+          repository: kubeflow/trainer/data-cache
+          tag: "v1.0.0"
+        runtimes:
+          torchDistributedWithCache:
+            enabled: true
     asserts:
       - failedTemplate:
-          errorMessage: "runtimes.torchDistributedWithCache.enabled requires dataCache.enabled to be true"
+          errorMessage: "dataCache.runtimes.torchDistributedWithCache.enabled requires dataCache.enabled to be true"
 
   - it: Should render ClusterTrainingRuntime when enabled and dataCache is enabled
     set:
       dataCache:
         enabled: true
-      runtimes:
-        torchDistributedWithCache:
-          enabled: true
-          cacheImage:
-            registry: ghcr.io
-            repository: kubeflow/trainer/data-cache
-            tag: ""
+        cacheImage:
+          registry: ghcr.io
+          repository: kubeflow/trainer/data-cache
+          tag: "v1.0.0"
+        runtimes:
+          torchDistributedWithCache:
+            enabled: true
     asserts:
       - hasDocuments:
           count: 1
@@ -75,13 +75,13 @@ tests:
     set:
       dataCache:
         enabled: true
-      runtimes:
-        torchDistributedWithCache:
-          enabled: true
-          cacheImage:
-            registry: ghcr.io
-            repository: kubeflow/trainer/data-cache
-            tag: ""
+        cacheImage:
+          registry: ghcr.io
+          repository: kubeflow/trainer/data-cache
+          tag: "v1.0.0"
+        runtimes:
+          torchDistributedWithCache:
+            enabled: true
     asserts:
       - equal:
           path: metadata.labels["trainer.kubeflow.org/framework"]
@@ -91,13 +91,13 @@ tests:
     set:
       dataCache:
         enabled: true
-      runtimes:
-        torchDistributedWithCache:
-          enabled: true
-          cacheImage:
-            registry: ghcr.io
-            repository: kubeflow/trainer/data-cache
-            tag: ""
+        cacheImage:
+          registry: ghcr.io
+          repository: kubeflow/trainer/data-cache
+          tag: "v1.0.0"
+        runtimes:
+          torchDistributedWithCache:
+            enabled: true
     asserts:
       - equal:
           path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.serviceAccountName
@@ -107,13 +107,13 @@ tests:
     set:
       dataCache:
         enabled: true
-      runtimes:
-        torchDistributedWithCache:
-          enabled: true
-          cacheImage:
-            registry: ghcr.io
-            repository: kubeflow/trainer/data-cache
-            tag: "v1.0.0"
+        cacheImage:
+          registry: ghcr.io
+          repository: kubeflow/trainer/data-cache
+          tag: "v1.0.0"
+        runtimes:
+          torchDistributedWithCache:
+            enabled: true
     asserts:
       - matchRegex:
           path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.containers[0].env[0].value
@@ -123,13 +123,13 @@ tests:
     set:
       dataCache:
         enabled: true
-      runtimes:
-        torchDistributedWithCache:
-          enabled: true
-          cacheImage:
-            registry: ghcr.io
-            repository: kubeflow/trainer/data-cache
-            tag: ""
+        cacheImage:
+          registry: ghcr.io
+          repository: kubeflow/trainer/data-cache
+          tag: "v1.0.0"
+        runtimes:
+          torchDistributedWithCache:
+            enabled: true
     asserts:
       - equal:
           path: spec.template.spec.replicatedJobs[1].dependsOn[0].name

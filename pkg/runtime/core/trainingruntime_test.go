@@ -977,7 +977,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+								TorchPolicy(ptr.To(intstr.FromString("auto"))).
 								Obj(),
 							).
 							Obj(),
@@ -1071,7 +1071,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+								TorchPolicy(ptr.To(intstr.FromString("auto"))).
 								Obj(),
 							).
 							Obj(),
@@ -1171,7 +1171,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+								TorchPolicy(ptr.To(intstr.FromString("auto"))).
 								Obj(),
 							).
 							Obj(),
@@ -1305,7 +1305,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(1).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+								TorchPolicy(ptr.To(intstr.FromString("auto"))).
 								Obj(),
 							).
 							Obj(),
@@ -1446,7 +1446,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(1).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+								TorchPolicy(ptr.To(intstr.FromString("auto"))).
 								Obj(),
 							).
 							Obj(),
@@ -1588,7 +1588,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(1).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto")), nil).
+								TorchPolicy(ptr.To(intstr.FromString("auto"))).
 								Obj(),
 							).
 							Obj(),

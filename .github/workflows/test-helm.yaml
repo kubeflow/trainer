@@ -1,0 +1,24 @@
+name: Unit and Integration Test - Helm
+
+on:
+  - pull_request
+  - push
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Run Helm Unit Tests
+        run: make helm-unittest
