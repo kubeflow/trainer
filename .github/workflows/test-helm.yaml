@@ -23,8 +23,29 @@ jobs:
       - name: Run Helm Unit Tests
         run: make helm-unittest
 
+      - name: Install Helm
+        run: make helm
+
+      # Setup Kind (skip Kustomize deploy)
       - name: Setup Kind Cluster
-        run: make test-e2e-setup-cluster
+        run: make test-e2e-setup-cluster-helm
+
+      - name: Install Trainer via Helm
+        run: |
+          ./bin/helm install trainer charts/kubeflow-trainer \
+            --namespace kubeflow-system \
+            --create-namespace \
+            --set image.registry=ghcr.io \
+            --set image.repository=kubeflow/trainer/trainer-controller-manager \
+            --set image.tag=test \
+            --wait
+
+      - name: Wait for Trainer Controller
+        run: |
+          kubectl wait deploy/kubeflow-trainer-controller-manager \
+            --for=condition=available \
+            -n kubeflow-system \
+            --timeout=5m
 
       - name: Run Go E2E Tests
         run: |
@@ -37,5 +58,8 @@ jobs:
             kubectl describe pods -A || true
             echo "=== Events (all namespaces) ==="
             kubectl get events -A --sort-by=.lastTimestamp || true
+            echo "=== Trainer logs ==="
+            kubectl logs -n kubeflow-system \
+             -l app.kubernetes.io/name=trainer || true
             exit 1
           fi
