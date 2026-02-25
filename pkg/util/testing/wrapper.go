@@ -611,6 +611,27 @@ func (t *TrainJobWrapper) UID(uid string) *TrainJobWrapper {
 	return t
 }
 
+func (t *TrainJobWrapper) ActiveDeadlineSeconds(deadline *int64) *TrainJobWrapper {
+	t.Spec.ActiveDeadlineSeconds = deadline
+	return t
+}
+
+func (t *TrainJobWrapper) SpecLabel(key, value string) *TrainJobWrapper {
+	if t.Spec.Labels == nil {
+		t.Spec.Labels = make(map[string]string, 1)
+	}
+	t.Spec.Labels[key] = value
+	return t
+}
+
+func (t *TrainJobWrapper) SpecAnnotation(key, value string) *TrainJobWrapper {
+	if t.Spec.Annotations == nil {
+		t.Spec.Annotations = make(map[string]string, 1)
+	}
+	t.Spec.Annotations[key] = value
+	return t
+}
+
 func (t *TrainJobWrapper) RuntimeRef(gvk schema.GroupVersionKind, name string) *TrainJobWrapper {
 	runtimeRef := trainer.RuntimeRef{
 		Name: name,
@@ -936,6 +957,11 @@ func (r *TrainingRuntimeWrapper) RuntimeSpec(spec trainer.TrainingRuntimeSpec) *
 	return r
 }
 
+func (r *TrainingRuntimeWrapper) TTLSecondsAfterFinished(ttl *int32) *TrainingRuntimeWrapper {
+	r.Spec.TTLSecondsAfterFinished = ttl
+	return r
+}
+
 func (r *TrainingRuntimeWrapper) Obj() *trainer.TrainingRuntime {
 	return &r.TrainingRuntime
 }
@@ -1071,6 +1097,11 @@ func (r *ClusterTrainingRuntimeWrapper) DeletionTimestamp(t metav1.Time) *Cluste
 
 func (r *ClusterTrainingRuntimeWrapper) RuntimeSpec(spec trainer.TrainingRuntimeSpec) *ClusterTrainingRuntimeWrapper {
 	r.Spec = spec
+	return r
+}
+
+func (r *ClusterTrainingRuntimeWrapper) TTLSecondsAfterFinished(ttl *int32) *ClusterTrainingRuntimeWrapper {
+	r.Spec.TTLSecondsAfterFinished = ttl
 	return r
 }
 

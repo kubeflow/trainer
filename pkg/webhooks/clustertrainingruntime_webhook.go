@@ -66,7 +66,6 @@ func (w *ClusterTrainingRuntimeValidator) ValidateUpdate(ctx context.Context, ol
 	if newObj.Spec.TTLSecondsAfterFinished != nil && *newObj.Spec.TTLSecondsAfterFinished < 60 {
 		warnings = append(warnings, "ttlSecondsAfterFinished is less than 60s; completed TrainJobs will be deleted very quickly")
 	}
-	// Deprecation warning is not required on updates to avoid spam.
 	return warnings, validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
 }
 
