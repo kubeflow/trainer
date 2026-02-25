@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"iter"
 	"slices"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -104,12 +105,20 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	ctx = ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling TrainJob")
 
+	ttl := r.fetchTTLFromRuntime(ctx, &trainJob)
+
+	if trainjob.IsTrainJobFinished(&trainJob) {
+		return r.reconcileTTL(ctx, &trainJob, ttl)
+	}
+
 	var err error
 	// Keep track of the origin TrainJob status
 	prevTrainJob := trainJob.DeepCopy()
 
 	// Let's clear the failed condition that could have been set previously.
 	// An external change to the TrainJob spec may transition it out of the Failed state.
+	// Safe to call here because the early-exit above ensures we only reach this
+	// point for non-finished jobs.
 	removeFailedCondition(&trainJob)
 
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
@@ -157,6 +166,48 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 		}
 	}
 	return nil
+}
+
+func (r *TrainJobReconciler) fetchTTLFromRuntime(ctx context.Context, trainJob *trainer.TrainJob) *int32 {
+	if trainjob.RuntimeRefIsTrainingRuntime(trainJob.Spec.RuntimeRef) {
+		var runtime trainer.TrainingRuntime
+		if err := r.client.Get(ctx, client.ObjectKey{
+			Namespace: trainJob.Namespace,
+			Name:      trainJob.Spec.RuntimeRef.Name,
+		}, &runtime); err != nil {
+			return nil
+		}
+		return runtime.Spec.TTLSecondsAfterFinished
+	}
+	var runtime trainer.ClusterTrainingRuntime
+	if err := r.client.Get(ctx, client.ObjectKey{
+		Name: trainJob.Spec.RuntimeRef.Name,
+	}, &runtime); err != nil {
+		return nil
+	}
+	return runtime.Spec.TTLSecondsAfterFinished
+}
+
+func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer.TrainJob, ttl *int32) (ctrl.Result, error) {
+	if ttl == nil {
+		return ctrl.Result{}, nil
+	}
+	finishedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobComplete)
+	if finishedCond == nil {
+		finishedCond = meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
+	}
+	if finishedCond == nil {
+		return ctrl.Result{}, nil
+	}
+	deleteTime := finishedCond.LastTransitionTime.Time.Add(time.Duration(*ttl) * time.Second)
+	if !time.Now().Before(deleteTime) {
+		return ctrl.Result{}, client.IgnoreNotFound(r.client.Delete(ctx, trainJob))
+	}
+	requeueAfter := time.Until(deleteTime)
+	if requeueAfter <= 0 {
+		requeueAfter = time.Second
+	}
+	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
 func (r *TrainJobReconciler) Create(e event.TypedCreateEvent[*trainer.TrainJob]) bool {
