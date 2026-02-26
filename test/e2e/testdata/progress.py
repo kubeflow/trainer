@@ -22,7 +22,7 @@ from urllib import error, request
 
 url = os.environ["KUBEFLOW_TRAINER_STATUS_URL"]
 ca_file = os.environ["KUBEFLOW_TRAINER_STATUS_CA_CERT"]
-token = open(os.environ["KUBEFLOW_TRAINER_STATUS_TOKEN"]).read()
+token = open(os.environ["KUBEFLOW_TRAINER_STATUS_TOKEN"]).read().strip()
 ssl_context = ssl.create_default_context(cafile=ca_file)
 
 # Send a single progress update

@@ -79,16 +79,9 @@ func authenticationMiddleware(log logr.Logger, verifier TokenVerifier) Middlewar
 
 			// Check for "Bearer " prefix
 			const bearerPrefix = "Bearer "
-			if !strings.HasPrefix(authHeader, bearerPrefix) {
-				badRequest(w, log, "Invalid Authorization header format",
-					v1.StatusReasonUnauthorized,
-					http.StatusUnauthorized)
-				return
-			}
-
 			token := strings.TrimPrefix(authHeader, bearerPrefix)
-			if token == "" {
-				badRequest(w, log, "Empty bearer token",
+			if !strings.HasPrefix(authHeader, bearerPrefix) || token == "" {
+				badRequest(w, log, "Invalid Authorization header format",
 					v1.StatusReasonUnauthorized,
 					http.StatusUnauthorized)
 				return
