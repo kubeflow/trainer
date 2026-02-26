@@ -463,7 +463,7 @@ type TrainJobTrainerStatus struct {
 	// +optional
 	Metrics []Metric `json:"metrics,omitempty"`
 
-	// lastUpdatedTime is the timestamp when these metrics were observed.
+	// lastUpdatedTime is the timestamp when the runtime status was observed.
 	// +optional
 	LastUpdatedTime metav1.Time `json:"lastUpdatedTime,omitempty"`
 }

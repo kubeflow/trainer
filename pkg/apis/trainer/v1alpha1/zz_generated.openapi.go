@@ -1673,7 +1673,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobTrainerStatus(ref common.Reference
 					},
 					"lastUpdatedTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "lastUpdatedTime is the timestamp when these metrics were observed.",
+							Description: "lastUpdatedTime is the timestamp when the runtime status was observed.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},

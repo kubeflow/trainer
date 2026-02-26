@@ -29,7 +29,7 @@ class TrainerV1alpha1TrainJobTrainerStatus(BaseModel):
     TrainJobTrainerStatus represents the latest known runtime status of the Trainer part of the TrainJob.
     """ # noqa: E501
     estimated_remaining_seconds: Optional[StrictInt] = Field(default=None, description="estimatedRemainingSeconds gives the estimated remaining training time in seconds before the train job is completed. The value will be empty if it is unknown.", alias="estimatedRemainingSeconds")
-    last_updated_time: Optional[datetime] = Field(default=None, description="lastUpdatedTime is the timestamp when these metrics were observed.", alias="lastUpdatedTime")
+    last_updated_time: Optional[datetime] = Field(default=None, description="lastUpdatedTime is the timestamp when the runtime status was observed.", alias="lastUpdatedTime")
     metrics: Optional[List[TrainerV1alpha1Metric]] = Field(default=None, description="metrics contains the current metrics for the model.")
     progress_percentage: Optional[StrictInt] = Field(default=None, description="progressPercentage gives an estimate of how complete the TrainJob is as a percentage. The value will be between 0 and 100, or empty if unknown.", alias="progressPercentage")
     __properties: ClassVar[List[str]] = ["estimatedRemainingSeconds", "lastUpdatedTime", "metrics", "progressPercentage"]

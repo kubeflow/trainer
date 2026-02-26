@@ -5049,8 +5049,8 @@ spec:
                     minimum: 0
                     type: integer
                   lastUpdatedTime:
-                    description: lastUpdatedTime is the timestamp when these metrics
-                      were observed.
+                    description: lastUpdatedTime is the timestamp when the runtime
+                      status was observed.
                     format: date-time
                     type: string
                   metrics:

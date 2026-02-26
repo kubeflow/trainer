@@ -14530,7 +14530,7 @@
             "format": "int32"
           },
           "lastUpdatedTime": {
-            "description": "lastUpdatedTime is the timestamp when these metrics were observed.",
+            "description": "lastUpdatedTime is the timestamp when the runtime status was observed.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
