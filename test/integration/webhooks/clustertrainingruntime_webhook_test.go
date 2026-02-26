@@ -17,8 +17,6 @@ limitations under the License.
 package webhooks
 
 import (
-	"context"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -76,42 +74,4 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 		)
 	})
 
-	ginkgo.When("Validating ClusterTrainingRuntime", func() {
-		ginkgo.DescribeTable("TTL and Deadline Validation", func(runtime func() *trainer.ClusterTrainingRuntime, wantErr string) {
-			ctx := context.Background()
-			err := k8sClient.Create(ctx, runtime())
-			if wantErr != "" {
-				gomega.Expect(err).To(gomega.HaveOccurred())
-				gomega.Expect(err.Error()).To(gomega.ContainSubstring(wantErr))
-			} else {
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			}
-		},
-			ginkgo.Entry("Warning when TTL is very short (< 60s)",
-				func() *trainer.ClusterTrainingRuntime {
-					ttl := int32(30)
-					return testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName + "-short-ttl").
-						RuntimeSpec(
-							testingutil.MakeTrainingRuntimeSpecWrapper(trainer.TrainingRuntimeSpec{}).
-								Obj()).
-						TTLSecondsAfterFinished(&ttl).
-						Obj()
-				},
-				"",
-			),
-			ginkgo.Entry("Error when ttlSecondsAfterFinished is set on JobSet template",
-				func() *trainer.ClusterTrainingRuntime {
-					ttl := int32(3600)
-					runtime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName + "-invalid-ttl-jobset").
-						RuntimeSpec(
-							testingutil.MakeTrainingRuntimeSpecWrapper(trainer.TrainingRuntimeSpec{}).
-								Obj()).
-						Obj()
-					runtime.Spec.Template.Spec.TTLSecondsAfterFinished = &ttl
-					return runtime
-				},
-				"template.spec.ttlSecondsAfterFinished must not be set",
-			),
-		)
-	})
 })

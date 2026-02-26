@@ -958,10 +958,6 @@ func (r *TrainingRuntimeWrapper) RuntimeSpec(spec trainer.TrainingRuntimeSpec) *
 	return r
 }
 
-func (r *TrainingRuntimeWrapper) TTLSecondsAfterFinished(ttl *int32) *TrainingRuntimeWrapper {
-	r.Spec.TTLSecondsAfterFinished = ttl
-	return r
-}
 
 func (r *TrainingRuntimeWrapper) Obj() *trainer.TrainingRuntime {
 	return &r.TrainingRuntime
@@ -1101,10 +1097,6 @@ func (r *ClusterTrainingRuntimeWrapper) RuntimeSpec(spec trainer.TrainingRuntime
 	return r
 }
 
-func (r *ClusterTrainingRuntimeWrapper) TTLSecondsAfterFinished(ttl *int32) *ClusterTrainingRuntimeWrapper {
-	r.Spec.TTLSecondsAfterFinished = ttl
-	return r
-}
 
 func (r *ClusterTrainingRuntimeWrapper) Obj() *trainer.ClusterTrainingRuntime {
 	return &r.ClusterTrainingRuntime

@@ -27,13 +27,6 @@ type TrainingRuntimeSpecApplyConfiguration struct {
 	PodGroupPolicy *PodGroupPolicyApplyConfiguration `json:"podGroupPolicy,omitempty"`
 	// template for the JobSet which will be used by TrainJob.
 	Template *JobSetTemplateSpecApplyConfiguration `json:"template,omitempty"`
-	// ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished
-	// execution (either Complete or Failed). If this field is set, TrainJobs using
-	// this runtime will be deleted ttlSecondsAfterFinished seconds after they finish.
-	// If this field is unset, TrainJobs will not be automatically deleted.
-	// If set to zero, TrainJobs become eligible for deletion immediately after finishing.
-	// This is a platform-level policy that individual TrainJobs cannot override.
-	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 }
 
 // TrainingRuntimeSpecApplyConfiguration constructs a declarative configuration of the TrainingRuntimeSpec type for use with
@@ -63,13 +56,5 @@ func (b *TrainingRuntimeSpecApplyConfiguration) WithPodGroupPolicy(value *PodGro
 // If called multiple times, the Template field is set to the value of the last call.
 func (b *TrainingRuntimeSpecApplyConfiguration) WithTemplate(value *JobSetTemplateSpecApplyConfiguration) *TrainingRuntimeSpecApplyConfiguration {
 	b.Template = value
-	return b
-}
-
-// WithTTLSecondsAfterFinished sets the TTLSecondsAfterFinished field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the TTLSecondsAfterFinished field is set to the value of the last call.
-func (b *TrainingRuntimeSpecApplyConfiguration) WithTTLSecondsAfterFinished(value int32) *TrainingRuntimeSpecApplyConfiguration {
-	b.TTLSecondsAfterFinished = &value
 	return b
 }

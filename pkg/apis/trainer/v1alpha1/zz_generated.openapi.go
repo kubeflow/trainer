@@ -1804,13 +1804,6 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref common.ReferenceCa
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplateSpec"),
 						},
 					},
-					"ttlSecondsAfterFinished": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ttlSecondsAfterFinished limits the lifetime of a TrainJob that has finished execution (either Complete or Failed). If this field is set, TrainJobs using this runtime will be deleted ttlSecondsAfterFinished seconds after they finish. If this field is unset, TrainJobs will not be automatically deleted. If set to zero, TrainJobs become eligible for deletion immediately after finishing. This is a platform-level policy that individual TrainJobs cannot override.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
 				},
 			},
 		},
