@@ -10504,6 +10504,11 @@ spec:
                         == ''InOrder'' && self.replicatedJobs.exists(x, has(x.dependsOn)))'
                 type: object
             type: object
+            x-kubernetes-validations:
+            - message: rj.template.spec.activeDeadlineSeconds must not be set; use
+                activeDeadlineSeconds on TrainJobSpec instead
+              rule: '!has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs)
+                || self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec.activeDeadlineSeconds))'
         type: object
     served: true
     storage: true
