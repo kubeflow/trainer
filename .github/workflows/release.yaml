@@ -159,7 +159,7 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: orhun/git-cliff-action@v2
+        uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
           args: --latest --tag ${{ needs.prepare.outputs.tag }}
