@@ -86,8 +86,6 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 			} else {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			}
-			// Note: The controller-runtime envtest client doesn't currently surface admission warnings
-			// easily in the err return, so the warning test primarily ensures it doesn't hard-fail.
 		},
 			ginkgo.Entry("Warning when TTL is very short (< 60s)",
 				func() *trainer.ClusterTrainingRuntime {
@@ -99,7 +97,7 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 						TTLSecondsAfterFinished(&ttl).
 						Obj()
 				},
-				"", // no error, just a warning
+				"",
 			),
 			ginkgo.Entry("Error when ttlSecondsAfterFinished is set on JobSet template",
 				func() *trainer.ClusterTrainingRuntime {
