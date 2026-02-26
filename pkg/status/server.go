@@ -132,7 +132,7 @@ func (s *Server) handleRuntimeStatus(w http.ResponseWriter, r *http.Request) {
 	namespace := r.PathValue("namespace")
 	trainJobName := r.PathValue("name")
 
-	if !s.authoriseRequest(r, namespace, trainJobName) {
+	if !s.authorizeRequest(r, namespace, trainJobName) {
 		badRequest(w, s.log, "Forbidden", metav1.StatusReasonForbidden, http.StatusForbidden)
 		return
 	}
@@ -188,9 +188,9 @@ func (s *Server) handleDefault(w http.ResponseWriter, _ *http.Request) {
 	badRequest(w, s.log, "Not found", metav1.StatusReasonNotFound, http.StatusNotFound)
 }
 
-// authoriseRequest checks whether the service account token bearer token used by this request comes from
+// authorizeRequest checks whether the service account token bearer token used by this request comes from
 // a pod that is part of the TrainJob that is being updated.
-func (s *Server) authoriseRequest(r *http.Request, namespace, trainJobName string) bool {
+func (s *Server) authorizeRequest(r *http.Request, namespace, trainJobName string) bool {
 	token, ok := serviceAccountTokenFromContext(r.Context())
 	if !ok {
 		s.log.V(5).Info("Unauthorized request", "namespace", namespace, "trainJob", trainJobName)
