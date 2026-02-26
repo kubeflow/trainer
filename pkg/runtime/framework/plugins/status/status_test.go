@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package progress
+package status
 
 import (
 	"cmp"
@@ -34,9 +34,9 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
-	progresspkg "github.com/kubeflow/trainer/v2/pkg/progress"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	statusserver "github.com/kubeflow/trainer/v2/pkg/status"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -123,15 +123,15 @@ func TestEnforceMLPolicy(t *testing.T) {
 											WithValue("https://kubeflow-trainer-controller-manager.kubeflow-system.svc:10443/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status"),
 										*corev1ac.EnvVar().
 											WithName(envNameCACert).
-											WithValue(fmt.Sprintf("%s/%s", progressMountPath, caCertFileName)),
+											WithValue(fmt.Sprintf("%s/%s", configMountPath, caCertFileName)),
 										*corev1ac.EnvVar().
 											WithName(envNameToken).
-											WithValue(fmt.Sprintf("%s/%s", progressMountPath, tokenFileName)),
+											WithValue(fmt.Sprintf("%s/%s", configMountPath, tokenFileName)),
 									},
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 										*corev1ac.VolumeMount().
 											WithName(tokenVolumeName).
-											WithMountPath(progressMountPath).
+											WithMountPath(configMountPath).
 											WithReadOnly(true),
 									},
 								},
@@ -145,7 +145,7 @@ func TestEnforceMLPolicy(t *testing.T) {
 												corev1ac.VolumeProjection().
 													WithServiceAccountToken(
 														corev1ac.ServiceAccountTokenProjection().
-															WithAudience(progresspkg.TokenAudience).
+															WithAudience(statusserver.TokenAudience).
 															WithExpirationSeconds(tokenExpirySeconds).
 															WithPath(tokenFileName),
 													),
@@ -208,15 +208,15 @@ func TestEnforceMLPolicy(t *testing.T) {
 											WithValue("https://kubeflow-trainer-controller-manager.kubeflow-system.svc:10443/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status"),
 										*corev1ac.EnvVar().
 											WithName(envNameCACert).
-											WithValue(fmt.Sprintf("%s/%s", progressMountPath, caCertFileName)),
+											WithValue(fmt.Sprintf("%s/%s", configMountPath, caCertFileName)),
 										*corev1ac.EnvVar().
 											WithName(envNameToken).
-											WithValue(fmt.Sprintf("%s/%s", progressMountPath, tokenFileName)),
+											WithValue(fmt.Sprintf("%s/%s", configMountPath, tokenFileName)),
 									},
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 										*corev1ac.VolumeMount().
 											WithName(tokenVolumeName).
-											WithMountPath(progressMountPath).
+											WithMountPath(configMountPath).
 											WithReadOnly(true),
 									},
 								},
@@ -228,15 +228,15 @@ func TestEnforceMLPolicy(t *testing.T) {
 											WithValue("https://kubeflow-trainer-controller-manager.kubeflow-system.svc:10443/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status"),
 										*corev1ac.EnvVar().
 											WithName(envNameCACert).
-											WithValue(fmt.Sprintf("%s/%s", progressMountPath, caCertFileName)),
+											WithValue(fmt.Sprintf("%s/%s", configMountPath, caCertFileName)),
 										*corev1ac.EnvVar().
 											WithName(envNameToken).
-											WithValue(fmt.Sprintf("%s/%s", progressMountPath, tokenFileName)),
+											WithValue(fmt.Sprintf("%s/%s", configMountPath, tokenFileName)),
 									},
 									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
 										*corev1ac.VolumeMount().
 											WithName(tokenVolumeName).
-											WithMountPath(progressMountPath).
+											WithMountPath(configMountPath).
 											WithReadOnly(true),
 									},
 								},
@@ -250,7 +250,7 @@ func TestEnforceMLPolicy(t *testing.T) {
 												corev1ac.VolumeProjection().
 													WithServiceAccountToken(
 														corev1ac.ServiceAccountTokenProjection().
-															WithAudience(progresspkg.TokenAudience).
+															WithAudience(statusserver.TokenAudience).
 															WithExpirationSeconds(tokenExpirySeconds).
 															WithPath(tokenFileName),
 													),
@@ -286,7 +286,7 @@ func TestEnforceMLPolicy(t *testing.T) {
 
 			p, err := New(ctx, cli, nil, cfg)
 			if err != nil {
-				t.Fatalf("Failed to initialize Progress plugin: %v", err)
+				t.Fatalf("Failed to initialize Status plugin: %v", err)
 			}
 
 			err = p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(tc.info, tc.trainJob)
@@ -417,7 +417,7 @@ func TestBuild(t *testing.T) {
 				UID("test-uid").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(1).Obj()).
 				Obj(),
-			wantError: "failed to look up progress server tls secret",
+			wantError: "failed to look up status server tls secret",
 		},
 		"returns error when CA cert is missing in secret": {
 			objs: []client.Object{
@@ -450,7 +450,7 @@ func TestBuild(t *testing.T) {
 				UID("test-uid").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(1).Obj()).
 				Obj(),
-			wantError: "failed to find progress server ca.crt in tls secret",
+			wantError: "failed to find status server ca.crt in tls secret",
 		},
 	}
 
@@ -468,7 +468,7 @@ func TestBuild(t *testing.T) {
 
 			p, err := New(ctx, cli, nil, cfg)
 			if err != nil {
-				t.Fatalf("Failed to initialize Progress plugin: %v", err)
+				t.Fatalf("Failed to initialize Status plugin: %v", err)
 			}
 
 			var objs []apiruntime.ApplyConfiguration

@@ -61,16 +61,16 @@ func SetDefaults_Configuration(cfg *Configuration) {
 	if cfg.ClientConnection.Burst == nil {
 		cfg.ClientConnection.Burst = ptr.To[int32](100)
 	}
-	if cfg.ProgressServer == nil {
-		cfg.ProgressServer = &ProgressServer{}
+	if cfg.StatusServer == nil {
+		cfg.StatusServer = &StatusServer{}
 	}
-	if cfg.ProgressServer.Port == nil {
-		cfg.ProgressServer.Port = ptr.To[int32](10443)
+	if cfg.StatusServer.Port == nil {
+		cfg.StatusServer.Port = ptr.To[int32](10443)
 	}
-	if cfg.ProgressServer.QPS == nil {
-		cfg.ProgressServer.QPS = ptr.To[float32](5)
+	if cfg.StatusServer.QPS == nil {
+		cfg.StatusServer.QPS = ptr.To[float32](5)
 	}
-	if cfg.ProgressServer.Burst == nil {
-		cfg.ProgressServer.Burst = ptr.To[int32](10)
+	if cfg.StatusServer.Burst == nil {
+		cfg.StatusServer.Burst = ptr.To[int32](10)
 	}
 }

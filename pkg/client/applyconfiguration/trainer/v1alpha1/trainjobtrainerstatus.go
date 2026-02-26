@@ -23,7 +23,7 @@ import (
 // TrainJobTrainerStatusApplyConfiguration represents a declarative configuration of the TrainJobTrainerStatus type for use
 // with apply.
 //
-// TrainJobTrainerStatus represents the latest known progress and metrics of the Trainer part of the TrainJob.
+// TrainJobTrainerStatus represents the latest known runtime status of the Trainer part of the TrainJob.
 type TrainJobTrainerStatusApplyConfiguration struct {
 	// progressPercentage gives an estimate of how complete the TrainJob is as a percentage.
 	// The value will be between 0 and 100, or empty if unknown.

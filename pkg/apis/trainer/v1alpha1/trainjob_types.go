@@ -437,7 +437,7 @@ type JobStatus struct {
 	Suspended *int32 `json:"suspended,omitempty"`
 }
 
-// TrainJobTrainerStatus represents the latest known progress and metrics of the Trainer part of the TrainJob.
+// TrainJobTrainerStatus represents the latest known runtime status of the Trainer part of the TrainJob.
 // +kubebuilder:validation:XValidation:rule="has(self.lastUpdatedTime)",message="lastUpdatedTime is required when trainerStatus is present"
 type TrainJobTrainerStatus struct {
 
@@ -480,8 +480,9 @@ type Metric struct {
 	Value string `json:"value,omitempty"`
 }
 
-// ProgressStatus contains the current progress and metrics for the different stages of the TrainJob.
-type ProgressStatus struct {
+// RuntimeStatus contains the current runtime status (e.g. progress and metrics) for the different stages of the
+// TrainJob.
+type RuntimeStatus struct {
 	// trainerStatus provides a summary of the status of the training
 	// part of the TrainJob.
 	// Empty if the status is unknown, e.g. the job has just started

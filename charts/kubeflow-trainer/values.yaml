@@ -131,7 +131,7 @@ manager:
       # webhookServiceName and webhookSecretName are auto-generated if not specified
       webhookServiceName: ""
       webhookSecretName: ""
-    progressServer:
+    statusServer:
       port: 10443
       qps: 5
       burst: 10

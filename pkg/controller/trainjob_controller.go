@@ -138,9 +138,9 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = errors.Join(err, statusErr)
 	}
 
-	// Remove the fields set by the progress endpoint to prevent the reconcile updating these fields.
-	// There's a race condition if the progress endpoint updates the field between the reconciler reading prevTrainJob
-	// and applying the patch.
+	// Remove the fields set by the status server endpoint to prevent the reconcile updating these fields.
+	// There's a race condition if the status server endpoint updates the field between the reconciler reading
+	// prevTrainJob and applying the patch.
 	removeExternallyManagedFields(&trainJob, prevTrainJob)
 
 	if !equality.Semantic.DeepEqual(&trainJob.Status, &prevTrainJob.Status) {
@@ -241,11 +241,11 @@ func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJo
 	return nil
 }
 
-// removeExternallyManagedFields clears fields that are managed externally (e.g., by the progress server)
+// removeExternallyManagedFields clears fields that are managed externally (e.g. by the status server)
 // from both the current and previous TrainJob objects. This prevents the reconciler from
 // overwriting external updates when it patches the status.
 func removeExternallyManagedFields(trainJob *trainer.TrainJob, prevTrainJob *trainer.TrainJob) {
-	// TrainerStatus is managed by the progress server and should not be updated by the reconciler
+	// TrainerStatus is managed by the status server and should not be updated by the reconciler
 	trainJob.Status.TrainerStatus = nil
 	prevTrainJob.Status.TrainerStatus = nil
 }

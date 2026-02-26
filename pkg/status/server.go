@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package progress
+package status
 
 import (
 	"context"
@@ -51,15 +51,15 @@ const (
 
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
 
-// Server for collecting progress status updates.
+// Server for collecting runtime status updates.
 type Server struct {
 	log        logr.Logger
 	httpServer *http.Server
 	client     client.Client
 }
 
-// NewServer creates a new Server for collecting progress updates.
-func NewServer(c client.Client, cfg *configapi.ProgressServer, tlsConfig *tls.Config, verifier TokenVerifier) (*Server, error) {
+// NewServer creates a new Server for collecting runtime status updates.
+func NewServer(c client.Client, cfg *configapi.StatusServer, tlsConfig *tls.Config, verifier TokenVerifier) (*Server, error) {
 	if cfg == nil || cfg.Port == nil {
 		return nil, fmt.Errorf("cfg info is required")
 	}
@@ -70,7 +70,7 @@ func NewServer(c client.Client, cfg *configapi.ProgressServer, tlsConfig *tls.Co
 		return nil, fmt.Errorf("verifier is required")
 	}
 
-	log := ctrl.Log.WithName("progress")
+	log := ctrl.Log.WithName("runtime-status")
 
 	s := &Server{
 		log:    log,
@@ -78,7 +78,7 @@ func NewServer(c client.Client, cfg *configapi.ProgressServer, tlsConfig *tls.Co
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST "+StatusUrl("{namespace}", "{name}"), s.handleProgressStatus)
+	mux.HandleFunc("POST "+StatusUrl("{namespace}", "{name}"), s.handleRuntimeStatus)
 	mux.HandleFunc("/", s.handleDefault)
 
 	// Apply middleware
@@ -110,24 +110,24 @@ func (s *Server) Start(ctx context.Context) error {
 	// Handle graceful shutdown in background
 	go func() {
 		<-ctx.Done()
-		s.log.Info("Shutting down progress Server")
+		s.log.Info("Shutting down runtime status server")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 		if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
-			s.log.Error(err, "Error shutting down progress Server")
+			s.log.Error(err, "Error shutting down runtime status server")
 		}
 	}()
 
-	s.log.Info("Starting progress Server with TLS", "address", s.httpServer.Addr)
+	s.log.Info("Starting runtime status server with TLS", "address", s.httpServer.Addr)
 	if err := s.httpServer.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return fmt.Errorf("progress Server failed: %w", err)
+		return fmt.Errorf("runtime status server failed: %w", err)
 	}
 	return nil
 }
 
-// handleProgressStatus handles POST requests to update TrainJob progress status.
+// handleRuntimeStatus handles POST requests to update TrainJob status.
 // Expected URL format: /apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status
-func (s *Server) handleProgressStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRuntimeStatus(w http.ResponseWriter, r *http.Request) {
 
 	namespace := r.PathValue("namespace")
 	trainJobName := r.PathValue("name")
@@ -138,10 +138,10 @@ func (s *Server) handleProgressStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse request body
-	var progressStatus trainer.ProgressStatus
+	var runtimeStatus trainer.RuntimeStatus
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&progressStatus); err != nil {
-		s.log.V(5).Error(err, "Failed to parse progress status", "namespace", namespace, "trainJobName", trainJobName)
+	if err := decoder.Decode(&runtimeStatus); err != nil {
+		s.log.V(5).Error(err, "Failed to parse runtime status", "namespace", namespace, "trainJobName", trainJobName)
 		badRequest(w, s.log, "Invalid payload", metav1.StatusReasonInvalid, http.StatusUnprocessableEntity)
 		return
 	}
@@ -152,7 +152,7 @@ func (s *Server) handleProgressStatus(w http.ResponseWriter, r *http.Request) {
 			Namespace: namespace,
 		},
 		Status: trainer.TrainJobStatus{
-			TrainerStatus: progressStatus.TrainerStatus,
+			TrainerStatus: runtimeStatus.TrainerStatus,
 		},
 	}
 	if err := s.client.Status().Patch(r.Context(), &trainJob, client.Merge); err != nil {
@@ -178,8 +178,8 @@ func (s *Server) handleProgressStatus(w http.ResponseWriter, r *http.Request) {
 	// Return the parsed payload
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(progressStatus); err != nil {
-		s.log.Error(err, "Failed to write progress status", "namespace", namespace, "trainJobName", trainJobName)
+	if err := json.NewEncoder(w).Encode(runtimeStatus); err != nil {
+		s.log.Error(err, "Failed to write runtime status", "namespace", namespace, "trainJobName", trainJobName)
 	}
 }
 

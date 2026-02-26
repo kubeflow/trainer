@@ -1,4 +1,4 @@
-package progress
+package status
 
 import (
 	"fmt"

@@ -50,16 +50,16 @@ func validate(cfg *configapi.Configuration) field.ErrorList {
 		}
 	}
 
-	// Validate progress server config
-	if cfg.ProgressServer != nil {
-		if cfg.ProgressServer.Port != nil && (*cfg.ProgressServer.Port < 1 || *cfg.ProgressServer.Port > 65535) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("progressServer", "port"), *cfg.ProgressServer.Port, "must be between 1 and 65535"))
+	// Validate status server config
+	if cfg.StatusServer != nil {
+		if cfg.StatusServer.Port != nil && (*cfg.StatusServer.Port < 1 || *cfg.StatusServer.Port > 65535) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("statusServer", "port"), *cfg.StatusServer.Port, "must be between 1 and 65535"))
 		}
-		if cfg.ProgressServer.QPS != nil && *cfg.ProgressServer.QPS < 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("progressServer", "qps"), *cfg.ProgressServer.QPS, "must be greater than or equal to 0"))
+		if cfg.StatusServer.QPS != nil && *cfg.StatusServer.QPS < 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("statusServer", "qps"), *cfg.StatusServer.QPS, "must be greater than or equal to 0"))
 		}
-		if cfg.ProgressServer.Burst != nil && *cfg.ProgressServer.Burst < 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("progressServer", "burst"), *cfg.ProgressServer.Burst, "must be greater than or equal to 0"))
+		if cfg.StatusServer.Burst != nil && *cfg.StatusServer.Burst < 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("statusServer", "burst"), *cfg.StatusServer.Burst, "must be greater than or equal to 0"))
 		}
 	}
 

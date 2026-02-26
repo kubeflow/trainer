@@ -23,8 +23,8 @@ const (
 	jaxRuntime       = "jax-distributed"
 )
 
-//go:embed testdata/progress.py
-var progressScript string
+//go:embed testdata/status_update.py
+var statusUpdateScript string
 
 var _ = ginkgo.Describe("TrainJob e2e", func() {
 	// Each test runs in a separate namespace.
@@ -279,22 +279,22 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 		})
 	})
 
-	ginkgo.When("Creating TrainJob with progress tracking instrumentation", func() {
-		ginkgo.It("should inject runtime configuration which allows the progress endpoint to be called", func() {
-			// Create a TrainJob that sends a single progress update and exits
-			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-progress").
+	ginkgo.When("Creating TrainJob with runtime status server instrumentation", func() {
+		ginkgo.It("should inject runtime configuration which allows the runtime status endpoint to be called", func() {
+			// Create a TrainJob that sends a single runtime status update and exits
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-runtime-status").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
 				Trainer(&trainer.Trainer{
 					Command: []string{"python3", "-c"},
-					Args:    []string{progressScript},
+					Args:    []string{statusUpdateScript},
 				}).
 				Obj()
 
-			ginkgo.By("Create a TrainJob with progress tracking", func() {
+			ginkgo.By("Create a TrainJob that will call the runtime-status endpoint", func() {
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 			})
 
-			ginkgo.By("Verify trainerStatus is updated with progress information", func() {
+			ginkgo.By("Verify trainerStatus is updated with runtime status information", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())

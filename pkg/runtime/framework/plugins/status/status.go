@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package progress
+package status
 
 import (
 	"context"
@@ -30,14 +30,14 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
-	progresspkg "github.com/kubeflow/trainer/v2/pkg/progress"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	statusserver "github.com/kubeflow/trainer/v2/pkg/status"
 	utilruntime "github.com/kubeflow/trainer/v2/pkg/util/runtime"
 )
 
 const (
-	Name = "Progress"
+	Name = "Status"
 
 	// Environment variable names
 	envNameStatusURL = "KUBEFLOW_TRAINER_STATUS_URL"
@@ -45,10 +45,10 @@ const (
 	envNameToken     = "KUBEFLOW_TRAINER_STATUS_TOKEN"
 
 	// Volume and mount configuration
-	progressMountPath = "/var/run/secrets/kubeflow/trainer"
-	caCertFileName    = "ca.crt"
-	tokenFileName     = "token"
-	tokenVolumeName   = "kubeflow-trainer-token"
+	configMountPath = "/var/run/secrets/kubeflow/trainer"
+	caCertFileName  = "ca.crt"
+	tokenFileName   = "token"
+	tokenVolumeName = "kubeflow-trainer-token"
 
 	// Service account token configuration
 	tokenExpirySeconds = 3600
@@ -57,23 +57,23 @@ const (
 	caCertKey = "ca.crt"
 )
 
-type Progress struct {
+type Status struct {
 	client client.Client
 	cfg    *configapi.Configuration
 }
 
-var _ framework.ComponentBuilderPlugin = (*Progress)(nil)
-var _ framework.EnforceMLPolicyPlugin = (*Progress)(nil)
+var _ framework.ComponentBuilderPlugin = (*Status)(nil)
+var _ framework.EnforceMLPolicyPlugin = (*Status)(nil)
 
 func New(_ context.Context, c client.Client, _ client.FieldIndexer, cfg *configapi.Configuration) (framework.Plugin, error) {
-	return &Progress{client: c, cfg: cfg}, nil
+	return &Status{client: c, cfg: cfg}, nil
 }
 
-func (p *Progress) Name() string {
+func (p *Status) Name() string {
 	return Name
 }
 
-func (p *Progress) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
+func (p *Status) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil || trainJob == nil {
 		return nil
 	}
@@ -85,7 +85,7 @@ func (p *Progress) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJo
 	if info.Scheduler.PodLabels == nil {
 		info.Scheduler.PodLabels = make(map[string]string)
 	}
-	info.Scheduler.PodLabels[progresspkg.LabelTrainJobName] = trainJob.Name
+	info.Scheduler.PodLabels[statusserver.LabelTrainJobName] = trainJob.Name
 
 	envVars, err := p.createEnvVars(trainJob)
 	if err != nil {
@@ -107,12 +107,12 @@ func (p *Progress) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJo
 	return nil
 }
 
-func (p *Progress) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
+func (p *Status) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
 	if info == nil || trainJob == nil {
 		return nil, nil
 	}
 
-	configMap, err := p.buildProgressServerCaCrtConfigMap(ctx, trainJob)
+	configMap, err := p.buildStatusServerCaCrtConfigMap(ctx, trainJob)
 	if err != nil {
 		return nil, err
 	}
@@ -120,13 +120,13 @@ func (p *Progress) Build(ctx context.Context, info *runtime.Info, trainJob *trai
 	return []apiruntime.ApplyConfiguration{configMap}, nil
 }
 
-func (p *Progress) createEnvVars(trainJob *trainer.TrainJob) ([]corev1ac.EnvVarApplyConfiguration, error) {
-	if p.cfg.ProgressServer.Port == nil {
-		return nil, fmt.Errorf("missing progress server port")
+func (p *Status) createEnvVars(trainJob *trainer.TrainJob) ([]corev1ac.EnvVarApplyConfiguration, error) {
+	if p.cfg.StatusServer.Port == nil {
+		return nil, fmt.Errorf("missing status server port")
 	}
 	// TODO: consider renaming the CertManagement.WebhookServiceName name?
-	svc := fmt.Sprintf("https://%s.%s.svc:%d", p.cfg.CertManagement.WebhookServiceName, utilruntime.GetOperatorNamespace(), *p.cfg.ProgressServer.Port)
-	path := progresspkg.StatusUrl(trainJob.Namespace, trainJob.Name)
+	svc := fmt.Sprintf("https://%s.%s.svc:%d", p.cfg.CertManagement.WebhookServiceName, utilruntime.GetOperatorNamespace(), *p.cfg.StatusServer.Port)
+	path := statusserver.StatusUrl(trainJob.Namespace, trainJob.Name)
 	statusURL := svc + path
 
 	return []corev1ac.EnvVarApplyConfiguration{
@@ -135,17 +135,17 @@ func (p *Progress) createEnvVars(trainJob *trainer.TrainJob) ([]corev1ac.EnvVarA
 			WithValue(statusURL),
 		*corev1ac.EnvVar().
 			WithName(envNameCACert).
-			WithValue(fmt.Sprintf("%s/%s", progressMountPath, caCertFileName)),
+			WithValue(fmt.Sprintf("%s/%s", configMountPath, caCertFileName)),
 		*corev1ac.EnvVar().
 			WithName(envNameToken).
-			WithValue(fmt.Sprintf("%s/%s", progressMountPath, tokenFileName)),
+			WithValue(fmt.Sprintf("%s/%s", configMountPath, tokenFileName)),
 	}, nil
 }
 
 func createTokenVolumeMount() corev1ac.VolumeMountApplyConfiguration {
 	return *corev1ac.VolumeMount().
 		WithName(tokenVolumeName).
-		WithMountPath(progressMountPath).
+		WithMountPath(configMountPath).
 		WithReadOnly(true)
 }
 
@@ -160,7 +160,7 @@ func createTokenVolume(trainJob *trainer.TrainJob) corev1ac.VolumeApplyConfigura
 					corev1ac.VolumeProjection().
 						WithServiceAccountToken(
 							corev1ac.ServiceAccountTokenProjection().
-								WithAudience(progresspkg.TokenAudience).
+								WithAudience(statusserver.TokenAudience).
 								WithExpirationSeconds(tokenExpirySeconds).
 								WithPath(tokenFileName),
 						),
@@ -178,8 +178,8 @@ func createTokenVolume(trainJob *trainer.TrainJob) corev1ac.VolumeApplyConfigura
 		)
 }
 
-// buildProgressServerCaCrtConfigMap creates a ConfigMap that will copy the ca.crt from the webhook secret
-func (p *Progress) buildProgressServerCaCrtConfigMap(ctx context.Context, trainJob *trainer.TrainJob) (*corev1ac.ConfigMapApplyConfiguration, error) {
+// buildStatusServerCaCrtConfigMap creates a ConfigMap that will copy the ca.crt from the webhook secret
+func (p *Status) buildStatusServerCaCrtConfigMap(ctx context.Context, trainJob *trainer.TrainJob) (*corev1ac.ConfigMapApplyConfiguration, error) {
 	configMapName := fmt.Sprintf("%s-tls-config", trainJob.Name)
 
 	// Get the CA cert from the webhook secret
@@ -194,10 +194,10 @@ func (p *Progress) buildProgressServerCaCrtConfigMap(ctx context.Context, trainJ
 		if caCert, ok := secret.Data[caCertKey]; ok && len(caCert) > 0 {
 			caCertData = string(caCert)
 		} else {
-			return nil, fmt.Errorf("failed to find progress server ca.crt in tls secret")
+			return nil, fmt.Errorf("failed to find status server ca.crt in tls secret")
 		}
 	} else {
-		return nil, fmt.Errorf("failed to look up progress server tls secret: %w", err)
+		return nil, fmt.Errorf("failed to look up status server tls secret: %w", err)
 	}
 
 	configMap := corev1ac.ConfigMap(configMapName, trainJob.Namespace).

@@ -26,7 +26,7 @@ from typing_extensions import Self
 
 class TrainerV1alpha1TrainJobTrainerStatus(BaseModel):
     """
-    TrainJobTrainerStatus represents the latest known progress and metrics of the Trainer part of the TrainJob.
+    TrainJobTrainerStatus represents the latest known runtime status of the Trainer part of the TrainJob.
     """ # noqa: E501
     estimated_remaining_seconds: Optional[StrictInt] = Field(default=None, description="estimatedRemainingSeconds gives the estimated remaining training time in seconds before the train job is completed. The value will be empty if it is unknown.", alias="estimatedRemainingSeconds")
     last_updated_time: Optional[datetime] = Field(default=None, description="lastUpdatedTime is the timestamp when these metrics were observed.", alias="lastUpdatedTime")

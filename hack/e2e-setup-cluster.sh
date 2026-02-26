@@ -66,7 +66,7 @@ cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
       # enable feature flags
       - op: add
         path: /spec/template/spec/containers/0/args/-
-        value: --feature-gates=TrainJobProgress=true
+        value: --feature-gates=TrainJobRuntimeStatus=true
     target:
       kind: Deployment
       name: kubeflow-trainer-controller-manager

@@ -60,9 +60,9 @@ type Configuration struct {
 	// +optional
 	ClientConnection *ClientConnection `json:"clientConnection,omitempty"`
 
-	// progressServer provides configuration options for the Progress Server.
+	// statusServer provides configuration options for the Runtime Status Server.
 	// +optional
-	ProgressServer *ProgressServer `json:"progressServer,omitempty"`
+	StatusServer *StatusServer `json:"statusServer,omitempty"`
 
 	// featureGates is a map of feature names to bools that allows to override the
 	// default enablement status of a feature.
@@ -194,21 +194,21 @@ type ClientConnection struct {
 	Burst *int32 `json:"burst,omitempty"`
 }
 
-type ProgressServer struct {
-	// port is the port that the progress server serves at.
+type StatusServer struct {
+	// port is the port that the status server serves at.
 	// Defaults to 10443.
 	// +optional
 	// +kubebuilder:default=10443
 	Port *int32 `json:"port,omitempty"`
 
-	// qps controls the number of queries per second allowed for the progress server's
+	// qps controls the number of queries per second allowed for the status server's
 	// Kubernetes client before client-side throttling.
 	// Defaults to 5.
 	// +optional
 	// +kubebuilder:default=5
 	QPS *float32 `json:"qps,omitempty"`
 
-	// burst allows extra queries to accumulate when the progress server client is not
+	// burst allows extra queries to accumulate when the status server client is not
 	// using its full QPS allocation.
 	// Defaults to 10.
 	// +optional

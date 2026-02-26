@@ -52,7 +52,7 @@ spec:
         - name: webhook
           containerPort: 9443
           protocol: TCP
-        - name: progress-server
+        - name: status-server
           containerPort: 10443
           protocol: TCP
 
