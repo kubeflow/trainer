@@ -53,20 +53,11 @@ func (w *ClusterTrainingRuntimeValidator) ValidateCreate(ctx context.Context, ob
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
-	if obj.Spec.TTLSecondsAfterFinished != nil && *obj.Spec.TTLSecondsAfterFinished < 60 {
-		warnings = append(warnings, "ttlSecondsAfterFinished is less than 60s; completed TrainJobs will be deleted very quickly")
-	}
 	return warnings, validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
 }
 
 func (w *ClusterTrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.ClusterTrainingRuntime) (admission.Warnings, error) {
-	log := ctrl.LoggerFrom(ctx).WithName("clustertrainingruntime-webhook")
-	log.V(5).Info("Validating update", "clusterTrainingRuntime", klog.KObj(newObj))
-	var warnings admission.Warnings
-	if newObj.Spec.TTLSecondsAfterFinished != nil && *newObj.Spec.TTLSecondsAfterFinished < 60 {
-		warnings = append(warnings, "ttlSecondsAfterFinished is less than 60s; completed TrainJobs will be deleted very quickly")
-	}
-	return warnings, nil
+	return nil, nil
 }
 
 func (w *ClusterTrainingRuntimeValidator) ValidateDelete(ctx context.Context, obj *trainer.ClusterTrainingRuntime) (admission.Warnings, error) {

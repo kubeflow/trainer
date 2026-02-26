@@ -60,11 +60,7 @@ func setupWebhookForTrainingRuntime(mgr ctrl.Manager) error {
 func (w *TrainingRuntimeValidator) ValidateCreate(ctx context.Context, obj *trainer.TrainingRuntime) (admission.Warnings, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
 	log.V(5).Info("Validating create", "trainingRuntime", klog.KObj(obj))
-	var warnings admission.Warnings
-	if obj.Spec.TTLSecondsAfterFinished != nil && *obj.Spec.TTLSecondsAfterFinished < 60 {
-		warnings = append(warnings, "ttlSecondsAfterFinished is less than 60s; completed TrainJobs will be deleted very quickly")
-	}
-	return warnings, validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	return nil, validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
 }
 
 func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorList {
@@ -109,13 +105,7 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 }
 
 func (w *TrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.TrainingRuntime) (admission.Warnings, error) {
-	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
-	log.V(5).Info("Validating update", "trainingRuntime", klog.KObj(newObj))
-	var warnings admission.Warnings
-	if newObj.Spec.TTLSecondsAfterFinished != nil && *newObj.Spec.TTLSecondsAfterFinished < 60 {
-		warnings = append(warnings, "ttlSecondsAfterFinished is less than 60s; completed TrainJobs will be deleted very quickly")
-	}
-	return warnings, nil
+	return nil, nil
 }
 
 func (w *TrainingRuntimeValidator) ValidateDelete(ctx context.Context, obj *trainer.TrainingRuntime) (admission.Warnings, error) {

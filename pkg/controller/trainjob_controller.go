@@ -104,11 +104,8 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log := ctrl.LoggerFrom(ctx).WithValues("trainJob", klog.KObj(&trainJob))
 	ctx = ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling TrainJob")
-
-	ttl, err := r.fetchTTLFromRuntime(ctx, &trainJob)
-	if client.IgnoreNotFound(err) != nil {
-		return ctrl.Result{}, err
-	}
+	
+	var err error
 
 	if trainjob.IsTrainJobFinished(&trainJob) {
 		runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
@@ -117,7 +114,7 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			trainJobCopy.Spec.Suspend = ptr.To(true)
 			_ = r.reconcileObjects(ctx, runtime, trainJobCopy)
 		}
-		return r.reconcileTTL(ctx, &trainJob, ttl)
+		return ctrl.Result{}, nil
 	}
 
 
@@ -185,47 +182,6 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 	return nil
 }
 
-func (r *TrainJobReconciler) fetchTTLFromRuntime(ctx context.Context, trainJob *trainer.TrainJob) (*int32, error) {
-	if trainjob.RuntimeRefIsTrainingRuntime(trainJob.Spec.RuntimeRef) {
-		var runtime trainer.TrainingRuntime
-		if err := r.client.Get(ctx, client.ObjectKey{
-			Namespace: trainJob.Namespace,
-			Name:      trainJob.Spec.RuntimeRef.Name,
-		}, &runtime); err != nil {
-			return nil, err
-		}
-		return runtime.Spec.TTLSecondsAfterFinished, nil
-	}
-	var runtime trainer.ClusterTrainingRuntime
-	if err := r.client.Get(ctx, client.ObjectKey{
-		Name: trainJob.Spec.RuntimeRef.Name,
-	}, &runtime); err != nil {
-		return nil, err
-	}
-	return runtime.Spec.TTLSecondsAfterFinished, nil
-}
-
-func (r *TrainJobReconciler) reconcileTTL(ctx context.Context, trainJob *trainer.TrainJob, ttl *int32) (ctrl.Result, error) {
-	if ttl == nil {
-		return ctrl.Result{}, nil
-	}
-	finishedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobComplete)
-	if finishedCond == nil {
-		finishedCond = meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
-	}
-	if finishedCond == nil {
-		return ctrl.Result{}, nil
-	}
-	deleteTime := finishedCond.LastTransitionTime.Time.Add(time.Duration(*ttl) * time.Second)
-	if !time.Now().Before(deleteTime) {
-		return ctrl.Result{}, client.IgnoreNotFound(r.client.Delete(ctx, trainJob))
-	}
-	requeueAfter := time.Until(deleteTime)
-	if requeueAfter <= 0 {
-		requeueAfter = time.Second
-	}
-	return ctrl.Result{RequeueAfter: requeueAfter}, nil
-}
 
 func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
 	if trainJob.Spec.ActiveDeadlineSeconds == nil || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
