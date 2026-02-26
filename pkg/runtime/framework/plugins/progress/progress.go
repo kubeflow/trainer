@@ -194,7 +194,7 @@ func (p *Progress) buildProgressServerCaCrtConfigMap(ctx context.Context, trainJ
 		if caCert, ok := secret.Data[caCertKey]; ok && len(caCert) > 0 {
 			caCertData = string(caCert)
 		} else {
-			return nil, fmt.Errorf("failed to find progress server ca.crt in tls secret: %w", err)
+			return nil, fmt.Errorf("failed to find progress server ca.crt in tls secret")
 		}
 	} else {
 		return nil, fmt.Errorf("failed to look up progress server tls secret: %w", err)
