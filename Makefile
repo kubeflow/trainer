@@ -249,10 +249,31 @@ VERSION ?=
 GITHUB_TOKEN ?=
 
 .PHONY: release
-release: ## Create a new release.
-	@if [ -z "$(VERSION)" ]; then \
-		echo "ERROR: VERSION is required. Usage: make release VERSION=X.Y.Z GITHUB_TOKEN=<token>"; \
+release: ## Create a new release and generate changelog.
+	@if [ -z "$(VERSION)" ] || ! echo "$(VERSION)" | grep -E -q '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "ERROR: VERSION must be set in X.Y.Z format. Usage: make release VERSION=X.Y.Z"; \
 		exit 1; \
 	fi
+
+	@if [ -z "$(GITHUB_TOKEN)" ]; then \
+		echo "ERROR: GITHUB_TOKEN is required. Usage: make release VERSION=X.Y.Z GITHUB_TOKEN=<token>"; \
+		exit 1; \
+	fi
+
+	@echo "Fetching upstream tags..."
+	@git fetch --tags https://github.com/kubeflow/trainer.git
+
+	@echo "Generating changelog for v$(VERSION)..."
+	@if ! git-cliff --unreleased --tag "v$(VERSION)" --prepend CHANGELOG.md; then \
+		echo ""; \
+		echo "ERROR: git-cliff failed."; \
+		echo "Ensure git-cliff is installed and GITHUB_TOKEN is valid."; \
+		exit 1; \
+	fi
+
+	@echo "Running release script..."
 	@export GITHUB_TOKEN=$(GITHUB_TOKEN); \
 	./hack/release.sh $(VERSION)
+
+	@echo ""
+	@echo "✅ Release v$(VERSION) prepared successfully."
