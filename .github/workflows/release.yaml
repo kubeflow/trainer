@@ -146,7 +146,7 @@ jobs:
   github_release:
     needs:
       - prepare
-      - create_branch_and_tag
+      - trigger_builds
     permissions:
       contents: write
     runs-on: ubuntu-latest
