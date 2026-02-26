@@ -14275,20 +14275,6 @@
           }
         }
       },
-      "trainer.v1alpha1.ProgressStatus": {
-        "description": "ProgressStatus contains the current progress and metrics for the different stages of the TrainJob.",
-        "type": "object",
-        "properties": {
-          "trainerStatus": {
-            "description": "trainerStatus provides a summary of the status of the training part of the TrainJob. Empty if the status is unknown, e.g. the job has just started or the job is not instrumented to report its status.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobTrainerStatus"
-              }
-            ]
-          }
-        }
-      },
       "trainer.v1alpha1.RuntimeRef": {
         "description": "RuntimeRef represents the reference to the existing training runtime.",
         "type": "object",
@@ -14307,6 +14293,20 @@
           "name": {
             "description": "name of the runtime being referenced. When namespaced-scoped TrainingRuntime is used, the TrainJob must have the same namespace as the deployed runtime.",
             "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.RuntimeStatus": {
+        "description": "RuntimeStatus contains the current runtime status (e.g. progress and metrics) for the different stages of the TrainJob.",
+        "type": "object",
+        "properties": {
+          "trainerStatus": {
+            "description": "trainerStatus provides a summary of the status of the training part of the TrainJob. Empty if the status is unknown, e.g. the job has just started or the job is not instrumented to report its status.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobTrainerStatus"
+              }
+            ]
           }
         }
       },
@@ -14521,7 +14521,7 @@
         }
       },
       "trainer.v1alpha1.TrainJobTrainerStatus": {
-        "description": "TrainJobTrainerStatus represents the latest known progress and metrics of the Trainer part of the TrainJob.",
+        "description": "TrainJobTrainerStatus represents the latest known runtime status of the Trainer part of the TrainJob.",
         "type": "object",
         "properties": {
           "estimatedRemainingSeconds": {

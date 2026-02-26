@@ -52,8 +52,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateOverride":              schema_pkg_apis_trainer_v1alpha1_PodTemplateOverride(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateOverrideTargetJob":     schema_pkg_apis_trainer_v1alpha1_PodTemplateOverrideTargetJob(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplateSpecOverride":          schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref),
-		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ProgressStatus":                   schema_pkg_apis_trainer_v1alpha1_ProgressStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef":                       schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeStatus":                    schema_pkg_apis_trainer_v1alpha1_RuntimeStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource":              schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJob":                         schema_pkg_apis_trainer_v1alpha1_TrainJob(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobList":                     schema_pkg_apis_trainer_v1alpha1_TrainJobList(ref),
@@ -1288,27 +1288,6 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplateSpecOverride(ref common.Referen
 	}
 }
 
-func schema_pkg_apis_trainer_v1alpha1_ProgressStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ProgressStatus contains the current progress and metrics for the different stages of the TrainJob.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"trainerStatus": {
-						SchemaProps: spec.SchemaProps{
-							Description: "trainerStatus provides a summary of the status of the training part of the TrainJob. Empty if the status is unknown, e.g. the job has just started or the job is not instrumented to report its status.",
-							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTrainerStatus"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTrainerStatus"},
-	}
-}
-
 func schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -1341,6 +1320,27 @@ func schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref common.ReferenceCallback) c
 				Required: []string{"name"},
 			},
 		},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_RuntimeStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RuntimeStatus contains the current runtime status (e.g. progress and metrics) for the different stages of the TrainJob.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"trainerStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "trainerStatus provides a summary of the status of the training part of the TrainJob. Empty if the status is unknown, e.g. the job has just started or the job is not instrumented to report its status.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTrainerStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTrainerStatus"},
 	}
 }
 
@@ -1635,7 +1635,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobTrainerStatus(ref common.Reference
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "TrainJobTrainerStatus represents the latest known progress and metrics of the Trainer part of the TrainJob.",
+				Description: "TrainJobTrainerStatus represents the latest known runtime status of the Trainer part of the TrainJob.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"progressPercentage": {
