@@ -73,7 +73,7 @@ func ManageCerts(mgr ctrl.Manager, cfg Config, setupFinished chan struct{}) erro
 // SetupTLSConfig creates a TLS config with automatic certificate rotation support.
 // It creates a cert watcher, adds it to the manager, and returns a TLS config
 // that will automatically pick up rotated certificates.
-func SetupTLSConfig(mgr ctrl.Manager) (*tls.Config, error) {
+func SetupTLSConfig(mgr ctrl.Manager, enableHTTP2 bool) (*tls.Config, error) {
 	certWatcher, err := certwatcher.New(certDir+"/tls.crt", certDir+"/tls.key")
 	if err != nil {
 		return nil, fmt.Errorf("error creating cert watcher: %w", err)
@@ -83,7 +83,14 @@ func SetupTLSConfig(mgr ctrl.Manager) (*tls.Config, error) {
 		return nil, fmt.Errorf("error adding cert watcher to manager: %w", err)
 	}
 
-	return &tls.Config{
+	tlsConfig := &tls.Config{
 		GetCertificate: certWatcher.GetCertificate,
-	}, nil
+	}
+
+	// Disable HTTP/2 unless explicitly enabled (CVE-2023-44487, CVE-2023-39325)
+	if !enableHTTP2 {
+		tlsConfig.NextProtos = []string{"http/1.1"}
+	}
+
+	return tlsConfig, nil
 }
