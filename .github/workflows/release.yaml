@@ -175,4 +175,4 @@ jobs:
           target_commitish: ${{ github.sha }}
           prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
           draft: false
-          body: ${{ steps.cliff.outputs.content }}
+          body: ${{ steps.changelog.outputs.content }}
