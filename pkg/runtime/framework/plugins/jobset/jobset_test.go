@@ -44,9 +44,6 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
-// TODO: Add tests for all Interfaces.
-// REF: https://github.com/kubeflow/trainer/issues/2468
-
 func TestJobSet(t *testing.T) {
 	cases := map[string]struct {
 		trainJob  *trainer.TrainJob
@@ -320,8 +317,12 @@ func TestJobSet(t *testing.T) {
 				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
 			}
 			err = p.(framework.PodNetworkPlugin).IdentifyPodNetwork(tc.info, tc.trainJob)
-			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
-				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			if tc.wantError != nil && err == nil {
+				t.Errorf("Expected error %q but got nil", tc.wantError)
+			} else if tc.wantError == nil && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			} else if tc.wantError != nil && err != nil && tc.wantError.Error() != err.Error() {
+				t.Errorf("Expected error %q but got %q", tc.wantError.Error(), err.Error())
 			}
 			if diff := cmp.Diff(tc.wantInfo, tc.info,
 				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
@@ -1321,6 +1322,281 @@ func TestValidate(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantWarnings, warnings); len(diff) != 0 {
 				t.Errorf("Unexpected warnings from Validate (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestReconcilerBuilders(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	var cancel func()
+	ctx, cancel = context.WithCancel(ctx)
+	t.Cleanup(cancel)
+
+	cli := utiltesting.NewClientBuilder().Build()
+	p, err := New(ctx, cli, nil)
+	if err != nil {
+		t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+	}
+	builders := p.(framework.WatchExtensionPlugin).ReconcilerBuilders()
+	if len(builders) == 0 {
+		t.Error("ReconcilerBuilders must return at least one builder")
+	}
+}
+
+func TestBuild(t *testing.T) {
+	cases := map[string]struct {
+		trainJob  *trainer.TrainJob
+		info      *runtime.Info
+		jobSet    *jobsetv1alpha2.JobSet
+		clientErr error
+		wantObjs  int
+		wantError error
+	}{
+		"returns error when info is nil": {
+			trainJob:  utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			info:      nil,
+			wantError: fmt.Errorf("runtime info or object is missing"),
+		},
+		"returns error when trainJob is nil": {
+			info:      &runtime.Info{},
+			trainJob:  nil,
+			wantError: fmt.Errorf("runtime info or object is missing"),
+		},
+		"returns nil when JobSet already exists and is not suspended": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				Obj(),
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec(),
+				},
+			},
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				Obj(),
+			wantObjs: 0,
+		},
+		"returns nil when info has no JobSetSpec": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: nil,
+				},
+			},
+			wantObjs: 0,
+		},
+		"builds JobSet successfully when suspended": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				Obj(),
+			info: &runtime.Info{
+				Labels:      map[string]string{"key": "value"},
+				Annotations: map[string]string{"anno": "val"},
+				Scheduler:   &runtime.Scheduler{},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](2),
+							Containers: []runtime.Container{
+								{}, // matches the single container in ReplicatedJob above
+							},
+						},
+					},
+				},
+			},
+			wantObjs: 1,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			clientBuilder := utiltesting.NewClientBuilder()
+			if tc.jobSet != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.jobSet)
+			}
+			if tc.clientErr != nil {
+				clientBuilder = clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*jobsetv1alpha2.JobSet); ok {
+							return tc.clientErr
+						}
+						return cli.Get(ctx, key, obj, opts...)
+					},
+				})
+			}
+			cli := clientBuilder.Build()
+
+			p, err := New(ctx, cli, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+			objs, err := p.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
+			if tc.wantError != nil && err == nil {
+				t.Errorf("Expected error %q but got nil", tc.wantError)
+			} else if tc.wantError == nil && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			} else if tc.wantError != nil && err != nil && tc.wantError.Error() != err.Error() {
+				t.Errorf("Expected error %q but got %q", tc.wantError.Error(), err.Error())
+			}
+			if err == nil && len(objs) != tc.wantObjs {
+				t.Errorf("Expected %d objects, got %d", tc.wantObjs, len(objs))
+			}
+		})
+	}
+}
+
+func TestStatus(t *testing.T) {
+	cases := map[string]struct {
+		trainJob   *trainer.TrainJob
+		jobSet     *jobsetv1alpha2.JobSet
+		clientErr  error
+		wantStatus *trainer.TrainJobStatus
+		wantError  error
+	}{
+		"returns nil when JobSet is not found and TrainJob is finished": {
+			trainJob: func() *trainer.TrainJob {
+				tj := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj()
+				tj.Status.Conditions = []metav1.Condition{{
+					Type:   trainer.TrainJobComplete,
+					Status: metav1.ConditionTrue,
+					Reason: "Complete",
+				}}
+				return tj
+			}(),
+			clientErr:  apierrors.NewNotFound(jobsetv1alpha2.Resource("jobsets"), "test"),
+			wantStatus: nil,
+			wantError:  nil,
+		},
+		"maps JobSet Completed condition to TrainJob Complete condition": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Conditions(metav1.Condition{
+					Type:               string(jobsetv1alpha2.JobSetCompleted),
+					Status:             metav1.ConditionTrue,
+					Reason:             "Completed",
+					LastTransitionTime: metav1.Now(),
+				}).
+				Obj(),
+			wantStatus: &trainer.TrainJobStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   trainer.TrainJobComplete,
+						Status: metav1.ConditionTrue,
+						Reason: "Completed",
+					},
+				},
+			},
+		},
+		"maps JobSet Failed condition to TrainJob Failed condition": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				Conditions(metav1.Condition{
+					Type:               string(jobsetv1alpha2.JobSetFailed),
+					Status:             metav1.ConditionTrue,
+					Reason:             "Failed",
+					LastTransitionTime: metav1.Now(),
+				}).
+				Obj(),
+			wantStatus: &trainer.TrainJobStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   trainer.TrainJobFailed,
+						Status: metav1.ConditionTrue,
+						Reason: "Failed",
+					},
+				},
+			},
+		},
+		"maps ReplicatedJobsStatus to JobsStatus": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "test").
+				ReplicatedJobsStatuses([]jobsetv1alpha2.ReplicatedJobStatus{
+					{
+						Name:      constants.Node,
+						Ready:     1,
+						Succeeded: 2,
+						Failed:    0,
+						Active:    1,
+						Suspended: 0,
+					},
+				}).
+				Obj(),
+			wantStatus: &trainer.TrainJobStatus{
+				JobsStatus: []trainer.JobStatus{
+					{
+						Name:      constants.Node,
+						Ready:     ptr.To[int32](1),
+						Succeeded: ptr.To[int32](2),
+						Failed:    ptr.To[int32](0),
+						Active:    ptr.To[int32](1),
+						Suspended: ptr.To[int32](0),
+					},
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			clientBuilder := utiltesting.NewClientBuilder()
+			if tc.jobSet != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.jobSet)
+			}
+			if tc.clientErr != nil {
+				clientBuilder = clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*jobsetv1alpha2.JobSet); ok {
+							return tc.clientErr
+						}
+						return cli.Get(ctx, key, obj, opts...)
+					},
+				})
+			}
+			cli := clientBuilder.Build()
+
+			p, err := New(ctx, cli, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+			status, err := p.(framework.TrainJobStatusPlugin).Status(ctx, tc.trainJob)
+			if tc.wantError != nil && err == nil {
+				t.Errorf("Expected error %q but got nil", tc.wantError)
+			} else if tc.wantError == nil && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			} else if tc.wantError != nil && err != nil && tc.wantError.Error() != err.Error() {
+				t.Errorf("Expected error %q but got %q", tc.wantError.Error(), err.Error())
+			}
+			if diff := cmp.Diff(tc.wantStatus, status,
+				cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime"),
+				cmpopts.SortSlices(func(a, b metav1.Condition) bool { return a.Type < b.Type }),
+			); len(diff) != 0 {
+				t.Errorf("Unexpected status (-want,+got):\n%s", diff)
 			}
 		})
 	}
