@@ -124,7 +124,7 @@ manager:
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | image.pullSecrets | list | `[]` | Image pull secrets for private image registry. |
 | manager.replicas | int | `1` | Number of replicas of manager. |
-| manager.selectorLabels | object | `{}` | Selector labels for the manager Deployment and pods. These labels are used for both `spec.selector.matchLabels` and `spec.template.metadata.labels`. NOTE: Deployment selectors are immutable after creation. |
+| manager.selectorLabels | object | `{}` | Selector labels for the manager Deployment and pods. These labels are used for both `spec.selector.matchLabels` and `spec.template.metadata.labels`. NOTE: Deployment selectors are immutable once created. |
 | manager.podAnnotations | object | `{}` | Pod annotations applied to manager pods. |
 | manager.annotations | object | `{}` | DEPRECATED: use `manager.podAnnotations`. |
 | manager.labels | object | `{}` | Extra labels for manager resources (including the Deployment and pods). |
