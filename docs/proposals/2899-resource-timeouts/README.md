@@ -1,4 +1,4 @@
-# KEP-2899: Add ActiveDeadlineSeconds to Trainer APIs
+# KEP-2899: Add Resource Timeouts APIs to the Trainer
 
 ## Summary
 
@@ -232,7 +232,7 @@ to implement this enhancement.
 
 ### TTLSecondsAfterFinished
 
-We postpone the implementation of `TTLSecondsAfterFinished` on the `TrainingRuntimeSpec` to avoid user confusion in the v2.2 release. In a future iteration, we plan to implement it to allow platform admins to configure automatic cleanup policies as defaults for all TrainJobs using a runtime. 
+We postpone the implementation of `TTLSecondsAfterFinished` on the `TrainingRuntimeSpec` to avoid user confusion in the v2.2 release. In a future iteration, we plan to implement it to allow platform admins to configure automatic cleanup policies as defaults for all TrainJobs using a runtime.
 
 ## Implementation History
 
