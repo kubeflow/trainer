@@ -27,8 +27,8 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
 )
 
-func SetupServer(mgr ctrl.Manager, cfg *configapi.ProgressServer) error {
-	tlsConfig, err := cert.SetupTLSConfig(mgr)
+func SetupServer(mgr ctrl.Manager, cfg *configapi.ProgressServer, enableHTTP2 bool) error {
+	tlsConfig, err := cert.SetupTLSConfig(mgr, enableHTTP2)
 	if err != nil {
 		return err
 	}
