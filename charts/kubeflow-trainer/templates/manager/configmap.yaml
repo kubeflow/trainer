@@ -63,10 +63,10 @@ data:
       webhookServiceName: {{ if .Values.manager.config.certManagement.webhookServiceName }}{{ .Values.manager.config.certManagement.webhookServiceName }}{{ else }}{{ include "trainer.webhook.service.name" . }}{{ end }}
       webhookSecretName: {{ if .Values.manager.config.certManagement.webhookSecretName }}{{ .Values.manager.config.certManagement.webhookSecretName }}{{ else }}{{ include "trainer.webhook.secret.name" . }}{{ end }}
 
-    progressServer:
-      port: {{ .Values.manager.config.progressServer.port }}
-      qps: {{ .Values.manager.config.progressServer.qps }}
-      burst: {{ .Values.manager.config.progressServer.burst }}
+    statusServer:
+      port: {{ .Values.manager.config.statusServer.port }}
+      qps: {{ .Values.manager.config.statusServer.qps }}
+      burst: {{ .Values.manager.config.statusServer.burst }}
 
     {{ with .Values.manager.config.featureGates }}
     # Feature gates

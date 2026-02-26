@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package progress
+package status
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
 )
 
-func SetupServer(mgr ctrl.Manager, cfg *configapi.ProgressServer, enableHTTP2 bool) error {
+func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, enableHTTP2 bool) error {
 	tlsConfig, err := cert.SetupTLSConfig(mgr, enableHTTP2)
 	if err != nil {
 		return err
@@ -35,7 +35,7 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.ProgressServer, enableHTTP2 bo
 
 	// Create a separate client with its own QPS/Burst limits
 	// to avoid impacting the main reconciler's rate limits
-	progressClient, err := createClient(mgr, cfg)
+	cli, err := createClient(mgr, cfg)
 	if err != nil {
 		return err
 	}
@@ -46,30 +46,30 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.ProgressServer, enableHTTP2 bo
 		return fmt.Errorf("failed to create projected service account token verifier: %w", err)
 	}
 
-	server, err := NewServer(progressClient, cfg, tlsConfig, verifier)
+	server, err := NewServer(cli, cfg, tlsConfig, verifier)
 	if err != nil {
 		return err
 	}
 	return mgr.Add(server)
 }
 
-func createClient(mgr ctrl.Manager, cfg *configapi.ProgressServer) (client.Client, error) {
+func createClient(mgr ctrl.Manager, cfg *configapi.StatusServer) (client.Client, error) {
 	// Clone the manager's rest config and override rate limits
-	progressConfig := *mgr.GetConfig()
+	mgrCfg := *mgr.GetConfig()
 	if cfg.QPS != nil {
-		progressConfig.QPS = *cfg.QPS
+		mgrCfg.QPS = *cfg.QPS
 	}
 	if cfg.Burst != nil {
-		progressConfig.Burst = int(*cfg.Burst)
+		mgrCfg.Burst = int(*cfg.Burst)
 	}
 
-	progressClient, err := client.New(&progressConfig, client.Options{
+	cli, err := client.New(&mgrCfg, client.Options{
 		Scheme: mgr.GetScheme(),
 		Mapper: mgr.GetRESTMapper(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create progress server client: %w", err)
+		return nil, fmt.Errorf("failed to create status server client: %w", err)
 	}
 
-	return progressClient, nil
+	return cli, nil
 }

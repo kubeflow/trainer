@@ -43,7 +43,7 @@ spec:
             - name: webhook
               containerPort: 9443
               protocol: TCP
-            - name: progress-server
+            - name: status-server
               containerPort: 10443
               protocol: TCP
 
@@ -88,9 +88,9 @@ spec:
       port: 443
       protocol: TCP
       targetPort: webhook
-    - name: progress-server
+    - name: status-server
       port: 10443
       protocol: TCP
-      targetPort: progress-server
+      targetPort: status-server
   selector:
     app.kubernetes.io/component: manager

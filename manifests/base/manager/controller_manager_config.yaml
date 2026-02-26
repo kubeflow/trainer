@@ -43,7 +43,7 @@ clientConnection:
   qps: 50
   burst: 100
 
-progressServer:
+statusServer:
   port: 10443
   qps: 5
   burst: 10

@@ -23,9 +23,9 @@ from kubeflow_trainer_api.models.trainer_v1alpha1_train_job_trainer_status impor
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1ProgressStatus(BaseModel):
+class TrainerV1alpha1RuntimeStatus(BaseModel):
     """
-    ProgressStatus contains the current progress and metrics for the different stages of the TrainJob.
+    RuntimeStatus contains the current runtime status (e.g. progress and metrics) for the different stages of the TrainJob.
     """ # noqa: E501
     trainer_status: Optional[TrainerV1alpha1TrainJobTrainerStatus] = Field(default=None, description="trainerStatus provides a summary of the status of the training part of the TrainJob. Empty if the status is unknown, e.g. the job has just started or the job is not instrumented to report its status.", alias="trainerStatus")
     __properties: ClassVar[List[str]] = ["trainerStatus"]
@@ -48,7 +48,7 @@ class TrainerV1alpha1ProgressStatus(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1ProgressStatus from a JSON string"""
+        """Create an instance of TrainerV1alpha1RuntimeStatus from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -76,7 +76,7 @@ class TrainerV1alpha1ProgressStatus(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1ProgressStatus from a dict"""
+        """Create an instance of TrainerV1alpha1RuntimeStatus from a dict"""
         if obj is None:
             return None
 

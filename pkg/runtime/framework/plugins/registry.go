@@ -30,7 +30,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
-	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/progress"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/status"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/xgboost"
@@ -51,8 +51,8 @@ func NewRegistry() Registry {
 		xgboost.Name:      xgboost.New,
 	}
 
-	if features.Enabled(features.TrainJobProgress) {
-		registry[progress.Name] = progress.New
+	if features.Enabled(features.TrainJobRuntimeStatus) {
+		registry[status.Name] = status.New
 	}
 
 	return registry

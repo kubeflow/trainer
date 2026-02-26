@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package progress
+package status
 
 import "fmt"
 
@@ -23,7 +23,7 @@ const (
 	LabelTrainJobName = "trainer.kubeflow.org/trainjob-name"
 
 	// TokenAudience is the required audience of the projected service account tokens used to
-	// authenticate with the progress server.
+	// authenticate with the runtime status server.
 	TokenAudience = "trainer.kubeflow.org"
 )
 

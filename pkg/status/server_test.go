@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package progress
+package status
 
 import (
 	"bytes"
@@ -105,7 +105,7 @@ func (testVerifier) Verify(context.Context, string) (*ProjectedServiceAccountTok
 	}, nil
 }
 
-func newTestServer(t *testing.T, cfg *configapi.ProgressServer, objs ...client.Object) *httptest.Server {
+func newTestServer(t *testing.T, cfg *configapi.StatusServer, objs ...client.Object) *httptest.Server {
 	t.Helper()
 
 	fakeClient := utiltesting.NewClientBuilder().
@@ -121,8 +121,8 @@ func newTestServer(t *testing.T, cfg *configapi.ProgressServer, objs ...client.O
 	return httptest.NewServer(srv.httpServer.Handler)
 }
 
-func TestHandleProgressStatus(t *testing.T) {
-	validProgressStatus := trainer.ProgressStatus{
+func TestHandleRuntimeStatus(t *testing.T) {
+	validRuntimeStatus := trainer.RuntimeStatus{
 		TrainerStatus: &trainer.TrainJobTrainerStatus{
 			ProgressPercentage:        ptr.To[int32](75),
 			EstimatedRemainingSeconds: ptr.To[int32](300),
@@ -133,7 +133,7 @@ func TestHandleProgressStatus(t *testing.T) {
 		},
 	}
 
-	validBody, _ := json.Marshal(validProgressStatus)
+	validBody, _ := json.Marshal(validRuntimeStatus)
 
 	// TrainJob that exists in the cluster
 	existingTrainJob := &trainer.TrainJob{
@@ -158,17 +158,17 @@ func TestHandleProgressStatus(t *testing.T) {
 	cases := map[string]struct {
 		url          string
 		body         string
-		wantResponse *trainer.ProgressStatus
+		wantResponse *trainer.RuntimeStatus
 	}{
-		"successful POST request with full progress status": {
+		"successful POST request with full runtime status": {
 			url:          "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			body:         string(validBody),
-			wantResponse: &validProgressStatus,
+			wantResponse: &validRuntimeStatus,
 		},
-		"successful POST request with empty progress status": {
+		"successful POST request with empty runtime status": {
 			url:          "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			body:         "{}",
-			wantResponse: &trainer.ProgressStatus{},
+			wantResponse: &trainer.RuntimeStatus{},
 		},
 		"successful POST request with only metrics": {
 			url: "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
@@ -177,7 +177,7 @@ func TestHandleProgressStatus(t *testing.T) {
 					"metrics": [{"name": "loss", "value": "0.5"}]
 				}
 			}`,
-			wantResponse: &trainer.ProgressStatus{
+			wantResponse: &trainer.RuntimeStatus{
 				TrainerStatus: &trainer.TrainJobTrainerStatus{
 					Metrics: []trainer.Metric{{Name: "loss", Value: "0.5"}},
 				},
@@ -187,7 +187,7 @@ func TestHandleProgressStatus(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)}, existingTrainJob, existingPod)
+			ts := newTestServer(t, &configapi.StatusServer{Port: ptr.To[int32](8080)}, existingTrainJob, existingPod)
 			defer ts.Close()
 
 			// Make actual HTTP request
@@ -217,7 +217,7 @@ func TestHandleProgressStatus(t *testing.T) {
 				t.Fatalf("Failed to read response body: %v", err)
 			}
 
-			var got trainer.ProgressStatus
+			var got trainer.RuntimeStatus
 			if err := json.Unmarshal(body, &got); err != nil {
 				t.Fatalf("Failed to unmarshal response: %v", err)
 			}
@@ -323,7 +323,7 @@ func TestServerErrorResponses(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ts := newTestServer(t, &configapi.ProgressServer{Port: ptr.To[int32](8080)}, existingTrainJob, existingPod)
+			ts := newTestServer(t, &configapi.StatusServer{Port: ptr.To[int32](8080)}, existingTrainJob, existingPod)
 			defer ts.Close()
 
 			// Make actual HTTP request

@@ -41,9 +41,9 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/config"
 	"github.com/kubeflow/trainer/v2/pkg/controller"
 	"github.com/kubeflow/trainer/v2/pkg/features"
-	"github.com/kubeflow/trainer/v2/pkg/progress"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
+	"github.com/kubeflow/trainer/v2/pkg/status"
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
 	"github.com/kubeflow/trainer/v2/pkg/webhooks"
 )
@@ -172,9 +172,9 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 		os.Exit(1)
 	}
 
-	if features.Enabled(features.TrainJobProgress) {
-		if err := progress.SetupServer(mgr, cfg.ProgressServer, enableHTTP2); err != nil {
-			setupLog.Error(err, "Could not create progress server")
+	if features.Enabled(features.TrainJobRuntimeStatus) {
+		if err := status.SetupServer(mgr, cfg.StatusServer, enableHTTP2); err != nil {
+			setupLog.Error(err, "Could not create runtime status server")
 			os.Exit(1)
 		}
 	}

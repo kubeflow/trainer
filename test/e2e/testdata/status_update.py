@@ -1,15 +1,15 @@
 """
-progress.py
+status_update.py
 
-E2E test script for TrainJob progress tracking.
+E2E test script for TrainJob that updates the runtime status using the status server endpoint.
 
-This script validates that the progress tracking endpoint can be called from within
-a training container. It reads the progress server URL, CA certificate, and service
-account token from environment variables injected by the Progress plugin, then sends
-a single progress update with test metrics to verify the TrainJob status is updated.
+This script validates that the runtime status endpoint can be called from within
+a training container. It reads the status server URL, CA certificate, and service
+account token from environment variables injected by the Status plugin, then sends
+a single status update with test metrics to verify the TrainJob status is updated.
 
 Environment variables required:
-- KUBEFLOW_TRAINER_STATUS_URL: HTTPS URL for the progress status endpoint
+- KUBEFLOW_TRAINER_STATUS_URL: HTTPS URL for the status server endpoint
 - KUBEFLOW_TRAINER_STATUS_CA_CERT: Path to CA certificate file for TLS verification
 - KUBEFLOW_TRAINER_STATUS_TOKEN: Path to service account token file for authentication
 """
@@ -25,7 +25,7 @@ ca_file = os.environ["KUBEFLOW_TRAINER_STATUS_CA_CERT"]
 token = open(os.environ["KUBEFLOW_TRAINER_STATUS_TOKEN"]).read().strip()
 ssl_context = ssl.create_default_context(cafile=ca_file)
 
-# Send a single progress update
+# Send a single status update
 payload = {
     "trainerStatus": {
         "progressPercentage": 42,
