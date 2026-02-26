@@ -99,6 +99,16 @@ This removes all the Kubernetes resources associated with the chart and deletes 
 
 See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command documentation.
 
+### Istio sidecar configuration
+
+If you are running Istio and need to exclude the manager webhook port from sidecar interception, configure the annotation via `manager.podAnnotations`:
+
+```yaml
+manager:
+  podAnnotations:
+    traffic.sidecar.istio.io/excludeInboundPorts: "9443"
+```
+
 ## Values
 
 | Key | Type | Default | Description |
@@ -114,8 +124,10 @@ See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command docum
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy. |
 | image.pullSecrets | list | `[]` | Image pull secrets for private image registry. |
 | manager.replicas | int | `1` | Number of replicas of manager. |
-| manager.labels | object | `{}` | Extra labels for manager pods. |
-| manager.annotations | object | `{}` | Extra annotations for manager pods. |
+| manager.selectorLabels | object | `{}` | Selector labels for the manager Deployment and pods. These labels are used for both `spec.selector.matchLabels` and `spec.template.metadata.labels`. NOTE: Deployment selectors are immutable after creation. |
+| manager.podAnnotations | object | `{}` | Pod annotations applied to manager pods. |
+| manager.annotations | object | `{}` | DEPRECATED: use `manager.podAnnotations`. |
+| manager.labels | object | `{}` | Extra labels for manager resources (including the Deployment and pods). |
 | manager.volumes | list | `[]` | Volumes for manager pods. |
 | manager.nodeSelector | object | `{}` | Node selector for manager pods. |
 | manager.affinity | object | `{}` | Affinity for manager pods. |

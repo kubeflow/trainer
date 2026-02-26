@@ -20,7 +20,10 @@ metadata:
   name: {{ include "trainer.manager.deployment.name" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "trainer.manager.labels" . | nindent 4 }}
+    {{- include "trainer.manager.selectorLabels" . | nindent 4 }}
+    {{- with .Values.manager.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ .Values.manager.replicas }}
   selector:
@@ -30,6 +33,15 @@ spec:
     metadata:
       labels:
         {{- include "trainer.manager.selectorLabels" . | nindent 8 }}
+        {{- with .Values.manager.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+
+      {{- $podAnnotations := include "trainer.manager.podAnnotations" . }}
+      {{- if $podAnnotations }}
+      annotations:
+        {{- $podAnnotations | nindent 8 }}
+      {{- end }}
     spec:
       containers:
       - name: manager

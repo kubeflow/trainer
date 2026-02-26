@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubeflow-trainer-controller-manager
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trainer
+      app.kubernetes.io/component: manager
+      app.kubernetes.io/part-of: kubeflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: trainer
+        app.kubernetes.io/component: manager
+        app.kubernetes.io/part-of: kubeflow
+      annotations:
+        traffic.sidecar.istio.io/excludeInboundPorts: "9443"
