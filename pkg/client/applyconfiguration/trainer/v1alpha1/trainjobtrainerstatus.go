@@ -34,7 +34,7 @@ type TrainJobTrainerStatusApplyConfiguration struct {
 	EstimatedRemainingSeconds *int32 `json:"estimatedRemainingSeconds,omitempty"`
 	// metrics contains the current metrics for the model.
 	Metrics []MetricApplyConfiguration `json:"metrics,omitempty"`
-	// lastUpdatedTime is the timestamp when these metrics were observed.
+	// lastUpdatedTime is the timestamp when the runtime status was observed.
 	LastUpdatedTime *v1.Time `json:"lastUpdatedTime,omitempty"`
 }
 
