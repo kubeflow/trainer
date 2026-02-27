@@ -1164,9 +1164,7 @@ Since the [etcd and etcd-v2 are legacy rendezvous](https://pytorch.org/docs/stab
 we won't support them in `TorchMLPolicySource`. We can introduce them in the future if users will require them.
 
 ```golang
-type TorchMLPolicySource struct {
-
-}
+type TorchMLPolicySource struct {}
 ```
 
 ### The MPIMLPolicySource API
@@ -1763,7 +1761,8 @@ spec:
 - 2025-03-15 Updated the initializer APIs
 - 2025-10-09 Added PodTemplateOverrides to TrainJob V2 API
 - 2026-02-23 Remove ElasticPolicy from the Torch API – will be implemented in the future KEPs
-- 2026-02-23 Removed `numProcPerNode` from `TorchMLPolicySource`; `TrainJob.Trainer.numProcPerNode` now accepts only int values (torch defaults to `auto`)
+- 2026-02-23 Removed `numProcPerNode` from `TorchMLPolicySource`; `TrainJob.Trainer.numProcPerNode`
+  now accepts only int values (torch plugin defaults to `auto`)
 
 ## Alternatives
 
