@@ -50,9 +50,6 @@ Pod annotations for the manager.
 */}}
 {{- define "trainer.manager.podAnnotations" -}}
 {{- $annotations := dict -}}
-{{- with .Values.manager.annotations }}
-{{- $annotations = merge $annotations . -}}
-{{- end -}}
 {{- with .Values.manager.podAnnotations }}
 {{- $annotations = merge $annotations . -}}
 {{- end -}}

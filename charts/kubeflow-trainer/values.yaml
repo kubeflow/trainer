@@ -63,11 +63,6 @@ manager:
     # key1: value1
     # key2: value2
 
-  # -- DEPRECATED: use `manager.podAnnotations`.
-  annotations: {}
-    # key1: value1
-    # key2: value2
-
   # -- Extra labels for manager resources (including the Deployment and pods).
   labels: {}
     # key1: value1
