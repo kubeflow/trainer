@@ -6,23 +6,8 @@ Production-ready examples demonstrating advanced Kubeflow Trainer features.
 
 ### 1. PodSpec Overrides (`01-podspec-overrides.yaml`)
 
-Comprehensive example of customizing pod specifications.
+Customizing pod specifications with `podTemplateOverrides` — resource limits, env vars, node selectors, tolerations, and annotations.
 
-**Features:**
-- Custom resource limits and requests
-- Environment variables
-- Node selectors and tolerations
-- Security context
-- Annotations and labels
-- Volume mounts
-
-**Use cases:**
-- Production deployments
-- Resource management
-- Custom pod configurations
-- Security requirements
-
-**Run it:**
 ```bash
 kubectl apply -f 01-podspec-overrides.yaml
 kubectl describe trainjob podspec-example
@@ -31,188 +16,41 @@ kubectl delete trainjob podspec-example
 
 ### 2. Kueue Integration (`02-kueue-integration.yaml`)
 
-Demonstrates job scheduling with Kueue queue manager.
+Queue-based job scheduling with [Kueue](https://kueue.sigs.k8s.io/). Requires Kueue and a configured LocalQueue/ClusterQueue.
 
-**Features:**
-- Queue-based job scheduling
-- Resource quota management
-- Priority handling
-- Fair resource allocation
-
-**Prerequisites:**
-- Kueue must be installed
-- LocalQueue and ClusterQueue configured
-
-**Key configuration:**
-For basic Kueue integration, you only need to add the queue label to the TrainJob metadata:
-```yaml
-metadata:
-  labels:
-    kueue.x-k8s.io/queue-name: training-queue
-spec:
-  suspend: true  # Kueue manages suspension
-```
-
-**Run it:**
 ```bash
 kubectl apply -f 02-kueue-integration.yaml
 kubectl get trainjobs kueue-example
 kubectl delete trainjob kueue-example
 ```
 
-**Learn more:**
-- [Kueue Documentation](https://kueue.sigs.k8s.io/)
-- [Kubeflow Trainer Kueue Guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/kueue/)
-
-**Note:** For advanced Kueue features like TopologyAwareScheduling, you may need to use `podTemplateOverrides` with pod-level annotations. See the Kueue documentation for details.
+See: [Kubeflow Trainer Kueue Guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/kueue/)
 
 ### 3. Volcano Gang Scheduling (`03-volcano-integration.yaml`)
 
-Gang scheduling for multi-node training jobs.
+Gang scheduling for distributed training with [Volcano](https://volcano.sh/). Creates a ClusterTrainingRuntime with `podGroupPolicy` enabled (note: `podGroupPolicy` must be set in the Runtime, not the TrainJob). Requires Volcano scheduler.
 
-**Features:**
-- All-or-nothing pod scheduling
-- Prevents resource deadlocks
-- Optimized for distributed training
-- Automatic PodGroup management
-
-**Prerequisites:**
-- Volcano scheduler installed
-
-**Key configuration:**
-Use the PodGroupPolicy API for Volcano integration:
-```yaml
-spec:
-  podGroupPolicy:
-    volcano: {}  # Automatically creates PodGroup
-```
-
-For advanced features like network topology-aware scheduling:
-```yaml
-spec:
-  podGroupPolicy:
-    volcano:
-      networkTopology:
-        mode: hard
-        highestTierAllowed: 1
-```
-
-**Run it:**
 ```bash
 kubectl apply -f 03-volcano-integration.yaml
 kubectl get trainjobs volcano-example
 kubectl get podgroup -l trainer.kubeflow.org/job-name=volcano-example
-kubectl delete trainjob volcano-example
+kubectl delete trainjob volcano-example && kubectl delete clustertrainingruntime torch-distributed-volcano
 ```
 
-**Learn more:**
-- [Volcano Documentation](https://volcano.sh/)
-- [Kubeflow Trainer Volcano Guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/volcano/)
+See: [Kubeflow Trainer Volcano Guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/volcano/)
 
 ### 4. Multi-Step Pipeline (`04-multi-step.yaml`)
 
-Training pipeline with dataset initialization.
+Training pipeline with dataset initialization — downloads a dataset before training begins.
 
-**Features:**
-- Dataset download and preparation
-- Multi-step job execution
-- Dataset sharing across nodes
-- Support for HuggingFace, S3, and other storage providers
-
-**Use cases:**
-- Large dataset downloads
-- Data preprocessing
-- Model initialization
-- Complex training pipelines
-
-**Key configuration:**
-The initializer runs before the trainer:
-```yaml
-spec:
-  initializer:
-    dataset:
-      storageUri: "hf://tatsu-lab/alpaca"
-      env:
-        - name: HF_HUB_CACHE
-          value: "/workspace/dataset"
-      secretRef:
-        name: hf-secret
-  trainer:
-    # Training configuration
-```
-
-**Run it:**
 ```bash
 kubectl apply -f 04-multi-step.yaml
-# Watch dataset init
-kubectl logs -l trainer.kubeflow.org/job-name=multi-step-example,trainer.kubeflow.org/step-name=dataset -f
-# Watch training
-kubectl logs -l trainer.kubeflow.org/job-name=multi-step-example,trainer.kubeflow.org/step-name=trainer -f
+kubectl logs -l trainer.kubeflow.org/job-name=multi-step-example -f
 kubectl delete trainjob multi-step-example
 ```
 
-## Production Best Practices
+## Additional Resources
 
-### Resource Management
-```yaml
-podSpecOverrides:
-  spec:
-    containers:
-      - name: node
-        resources:
-          requests:
-            cpu: "2000m"
-            memory: "4Gi"
-            nvidia.com/gpu: 1
-          limits:
-            cpu: "4000m"
-            memory: "8Gi"
-            nvidia.com/gpu: 1
-```
-
-### Security
-```yaml
-podSpecOverrides:
-  spec:
-    securityContext:
-      runAsNonRoot: true
-      runAsUser: 1000
-      fsGroup: 1000
-    serviceAccountName: training-sa
-```
-
-### High Availability
-```yaml
-podSpecOverrides:
-  spec:
-    affinity:
-      podAntiAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchLabels:
-                trainer.kubeflow.org/job-name: my-job
-            topologyKey: kubernetes.io/hostname
-```
-
-### Monitoring and Logging
-```yaml
-podSpecOverrides:
-  metadata:
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "8080"
-  spec:
-    containers:
-      - name: node
-        env:
-          - name: PYTHONUNBUFFERED
-            value: "1"
-          - name: LOG_LEVEL
-            value: "INFO"
-```
-
-## Next Steps
-
-- Review [basic examples](../basic/) if you're new to Kubeflow Trainer
-- Check the [main README](../README.md) for complete documentation
-- Explore the [Python SDK](https://www.kubeflow.org/docs/components/trainer/getting-started/) for better developer experience
+- [Kubeflow Trainer Documentation](https://www.kubeflow.org/docs/components/trainer/)
+- [Runtime Guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/)
+- [Job Scheduling Guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/)
