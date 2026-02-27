@@ -185,6 +185,22 @@ test: ## Run Go unit test.
 test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd volcano-crd ## Run Go integration test.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(K8S_VERSION) -p path)" $(GINKGO) -v ./test/integration/...
 
+.PHONY: release
+release: ## Create a new release changelog for the specified VERSION (X.Y.Z).
+	@if [ -z "$(VERSION)" ] || ! echo "$(VERSION)" | grep -E -q '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "Error: VERSION must be set in X.Y.Z format. Usage: make release VERSION=X.Y.Z"; \
+		exit 1; \
+	fi
+	@echo "Generating changelog for $(VERSION) (unreleased)..."; \
+	git fetch --tags https://github.com/kubeflow/trainer.git; \
+	if ! git-cliff --unreleased --tag "v$(VERSION)" --prepend CHANGELOG.md; then \
+		echo ""; \
+		echo "ERROR: git-cliff failed."; \
+		echo "Ensure git-cliff is installed and available in your PATH, and that a valid GITHUB_TOKEN is set.; \
+		exit 1; \
+	fi; \
+	echo "Changelog generated at CHANGELOG.md"
+
 .PHONY: test-python
 test-python: ## Run Python unit test.
 	pip install pytest
