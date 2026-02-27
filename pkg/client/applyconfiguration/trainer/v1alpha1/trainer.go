@@ -17,7 +17,6 @@
 package v1alpha1
 
 import (
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
@@ -43,9 +42,9 @@ type TrainerApplyConfiguration struct {
 	// resourcesPerNode defines the compute resources for each training node.
 	ResourcesPerNode *v1.ResourceRequirementsApplyConfiguration `json:"resourcesPerNode,omitempty"`
 	// numProcPerNode is the number of processes/workers/slots on every training node.
-	// For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set.
-	// For the MPI runtime only int value can be set.
-	NumProcPerNode *intstr.IntOrString `json:"numProcPerNode,omitempty"`
+	// For the MPI runtime only int value can be set to represent number of slots per node.
+	// For the Torch runtime the value defaults to `auto` and can be overridden with an int.
+	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
 }
 
 // TrainerApplyConfiguration constructs a declarative configuration of the Trainer type for use with
@@ -114,7 +113,7 @@ func (b *TrainerApplyConfiguration) WithResourcesPerNode(value *v1.ResourceRequi
 // WithNumProcPerNode sets the NumProcPerNode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NumProcPerNode field is set to the value of the last call.
-func (b *TrainerApplyConfiguration) WithNumProcPerNode(value intstr.IntOrString) *TrainerApplyConfiguration {
+func (b *TrainerApplyConfiguration) WithNumProcPerNode(value int32) *TrainerApplyConfiguration {
 	b.NumProcPerNode = &value
 	return b
 }

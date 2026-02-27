@@ -91,22 +91,6 @@ spec:
                     type: integer
                   torch:
                     description: torch defines the configuration for the PyTorch runtime.
-                    properties:
-                      numProcPerNode:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        default: auto
-                        description: |-
-                          numProcPerNode is the number of processes per node.
-                          This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI.
-                          Supported values: `auto`, `cpu`, `gpu`, or int value.
-                          Defaults to `auto`.
-                        x-kubernetes-int-or-string: true
-                        x-kubernetes-validations:
-                        - message: NumProcPerNode must be equal to auto, cpu, gpu,
-                            or int value
-                          rule: self > 0 || self in ['auto', 'cpu', 'gpu']
                     type: object
                 type: object
                 x-kubernetes-validations:

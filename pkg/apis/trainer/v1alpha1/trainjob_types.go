@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -256,10 +255,10 @@ type Trainer struct {
 	ResourcesPerNode *corev1.ResourceRequirements `json:"resourcesPerNode,omitempty"`
 
 	// numProcPerNode is the number of processes/workers/slots on every training node.
-	// For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set.
-	// For the MPI runtime only int value can be set.
+	// For the MPI runtime only int value can be set to represent number of slots per node.
+	// For the Torch runtime the value defaults to `auto` and can be overridden with an int.
 	// +optional
-	NumProcPerNode *intstr.IntOrString `json:"numProcPerNode,omitempty"`
+	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
 }
 
 // PodTemplateOverride represents a custom PodTemplateSpec override that will be applied to the TrainJob's training runtime.

@@ -17,9 +17,8 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_util_intstr_int_or_string import IoK8sApimachineryPkgUtilIntstrIntOrString
+from pydantic import BaseModel, ConfigDict
+from typing import Any, ClassVar, Dict, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -27,8 +26,7 @@ class TrainerV1alpha1TorchMLPolicySource(BaseModel):
     """
     TorchMLPolicySource represents a PyTorch runtime configuration.
     """ # noqa: E501
-    num_proc_per_node: Optional[IoK8sApimachineryPkgUtilIntstrIntOrString] = Field(default=None, description="numProcPerNode is the number of processes per node. This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI. Supported values: `auto`, `cpu`, `gpu`, or int value. Defaults to `auto`.", alias="numProcPerNode")
-    __properties: ClassVar[List[str]] = ["numProcPerNode"]
+    __properties: ClassVar[list[str]] = []
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -69,9 +67,6 @@ class TrainerV1alpha1TorchMLPolicySource(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of num_proc_per_node
-        if self.num_proc_per_node:
-            _dict['numProcPerNode'] = self.num_proc_per_node.to_dict()
         return _dict
 
     @classmethod
@@ -83,9 +78,7 @@ class TrainerV1alpha1TorchMLPolicySource(BaseModel):
         if not isinstance(obj, dict):
             return cls.model_validate(obj)
 
-        _obj = cls.model_validate({
-            "numProcPerNode": IoK8sApimachineryPkgUtilIntstrIntOrString.from_dict(obj["numProcPerNode"]) if obj.get("numProcPerNode") is not None else None
-        })
+        _obj = cls.model_validate({})
         return _obj
 
 

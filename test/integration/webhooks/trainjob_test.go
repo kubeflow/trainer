@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -177,33 +176,13 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				gomega.Succeed()),
-			ginkgo.Entry("Should fail in creating trainJob with invalid trainer config for mpi runtime",
-				func() *trainer.TrainJob {
-					trainingRuntime.Spec.MLPolicy = &trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{MPI: &trainer.MPIMLPolicySource{}}}
-					gomega.Expect(k8sClient.Update(ctx, trainingRuntime)).To(gomega.Succeed())
-					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
-						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
-						Trainer(&trainer.Trainer{NumProcPerNode: ptr.To(intstr.FromString("invalid"))}).
-						Obj()
-				},
-				testingutil.BeForbiddenError()),
-			ginkgo.Entry("Should fail in creating trainJob with invalid trainer config for torch runtime",
-				func() *trainer.TrainJob {
-					trainingRuntime.Spec.MLPolicy = &trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}}}
-					gomega.Expect(k8sClient.Update(ctx, trainingRuntime)).To(gomega.Succeed())
-					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
-						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
-						Trainer(&trainer.Trainer{NumProcPerNode: ptr.To(intstr.FromString("invalid"))}).
-						Obj()
-				},
-				testingutil.BeForbiddenError()),
 			ginkgo.Entry("Should succeed in creating trainJob with valid trainer config for torch runtime",
 				func() *trainer.TrainJob {
 					trainingRuntime.Spec.MLPolicy = &trainer.MLPolicy{MLPolicySource: trainer.MLPolicySource{Torch: &trainer.TorchMLPolicySource{}}}
 					gomega.Expect(k8sClient.Update(ctx, trainingRuntime)).To(gomega.Succeed())
 					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
 						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
-						Trainer(&trainer.Trainer{NumProcPerNode: ptr.To(intstr.FromString("auto"))}).
+						Trainer(&trainer.Trainer{NumProcPerNode: ptr.To[int32](4)}).
 						Obj()
 				},
 				gomega.Succeed()),
@@ -213,7 +192,7 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 					gomega.Expect(k8sClient.Update(ctx, trainingRuntime)).To(gomega.Succeed())
 					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
 						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
-						Trainer(&trainer.Trainer{NumProcPerNode: ptr.To(intstr.FromString("auto")), Env: []corev1.EnvVar{{Name: "PET_NODE_RANK", Value: "1"}}}).
+						Trainer(&trainer.Trainer{Env: []corev1.EnvVar{{Name: "PET_NODE_RANK", Value: "1"}}}).
 						Obj()
 				},
 				testingutil.BeForbiddenError()),

@@ -24,7 +24,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
@@ -49,7 +48,7 @@ func TestPlainML(t *testing.T) {
 				Labels: map[string]string{"key": "value"},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 			},
@@ -57,7 +56,7 @@ func TestPlainML(t *testing.T) {
 				Labels: map[string]string{"key": "value"},
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 			},

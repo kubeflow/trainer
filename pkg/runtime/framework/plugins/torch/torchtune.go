@@ -50,7 +50,10 @@ func validateTorchTune(runtimeInfo *runtime.Info, newObj *trainer.TrainJob) (adm
 	}
 
 	numProcPerNodeRefPath := specPath.Child("trainer").Child("numProcPerNode")
-	numProcPerNode := *newObj.Spec.Trainer.NumProcPerNode
+	numProcPerNode := intstr.FromString("auto")
+	if newObj.Spec.Trainer.NumProcPerNode != nil {
+		numProcPerNode = intstr.FromInt32(*newObj.Spec.Trainer.NumProcPerNode)
+	}
 	resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(runtimeInfo), corev1.ResourceRequirements{})
 	if jobTrainer := newObj.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
 		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})

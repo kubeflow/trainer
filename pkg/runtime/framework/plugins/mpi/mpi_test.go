@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -259,7 +258,7 @@ trainJob-node-1-1.trainJob slots=1
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumNodes(1).
-						NumProcPerNode(intstr.FromInt32(2)).
+						NumProcPerNode(2).
 						Obj()).
 				Obj(),
 			wantInfo: &runtime.Info{
@@ -905,29 +904,6 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Obj(),
 		},
-		"numProcPerNode typed is string": {
-			info: runtime.NewInfo(
-				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
-					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, nil, nil).
-						Obj(),
-					).
-					Obj()),
-			),
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(intstr.FromString("invalid")).
-					Obj(),
-				).
-				Obj(),
-			wantError: field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec").Child("trainer").Child("numProcPerNode"),
-					intstr.FromString("invalid"),
-					"must have an int value for MPI TrainJob",
-				),
-			},
-		},
 		"numProcPerNode typed is int": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
@@ -940,7 +916,7 @@ func TestValidate(t *testing.T) {
 			),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(intstr.FromInt32(8)).
+					NumProcPerNode(8).
 					Obj(),
 				).
 				Obj(),

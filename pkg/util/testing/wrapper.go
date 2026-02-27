@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
@@ -681,7 +680,7 @@ func (t *TrainJobTrainerWrapper) NumNodes(numNodes int32) *TrainJobTrainerWrappe
 	return t
 }
 
-func (t *TrainJobTrainerWrapper) NumProcPerNode(numProcPerNode intstr.IntOrString) *TrainJobTrainerWrapper {
+func (t *TrainJobTrainerWrapper) NumProcPerNode(numProcPerNode int32) *TrainJobTrainerWrapper {
 	t.Trainer.NumProcPerNode = &numProcPerNode
 	return t
 }
@@ -1265,14 +1264,14 @@ func MakeMLPolicySourceWrapper() *MLPolicySourceWrapper {
 	return &MLPolicySourceWrapper{}
 }
 
-func (m *MLPolicySourceWrapper) TorchPolicy(numProcPerNode *intstr.IntOrString) *MLPolicySourceWrapper {
-	if m.Torch == nil {
-		m.Torch = &trainer.TorchMLPolicySource{}
-	}
-	m.Torch = &trainer.TorchMLPolicySource{
-		NumProcPerNode: numProcPerNode,
-	}
+func (m *MLPolicySourceWrapper) TorchPolicy() *MLPolicySourceWrapper {
+	m.Torch = &trainer.TorchMLPolicySource{}
 	return m
+}
+
+func (w *MLPolicySourceWrapper) JAXPolicy() *MLPolicySourceWrapper {
+	w.JAX = &trainer.JAXMLPolicySource{}
+	return w
 }
 
 func (m *MLPolicySourceWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsNode *bool) *MLPolicySourceWrapper {
@@ -1501,10 +1500,4 @@ func (s *SecretWrapper) ControllerReference(gvk schema.GroupVersionKind, name, u
 
 func (s *SecretWrapper) Obj() *corev1.Secret {
 	return &s.Secret
-}
-
-// JAXPolicy sets the JAX policy source
-func (w *MLPolicySourceWrapper) JAXPolicy() *MLPolicySourceWrapper {
-	w.JAX = &trainer.JAXMLPolicySource{}
-	return w
 }

@@ -21,7 +21,6 @@ import (
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -192,31 +191,7 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 			gomega.Expect(k8sClient.Create(ctx, created)).Should(gomega.Succeed())
 			gomega.Expect(created).Should(gomega.BeComparableTo(wantTrainingRuntime(), util.IgnoreObjectMetadata))
 		},
-			ginkgo.Entry("Should succeed to default torch.NumProcPerNode=auto",
-				func() *trainer.TrainingRuntime {
-					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
-					runtime.Spec.MLPolicy = &trainer.MLPolicy{
-						MLPolicySource: trainer.MLPolicySource{
-							Torch: &trainer.TorchMLPolicySource{},
-						},
-					}
-					return runtime
-				},
-				func() *trainer.TrainingRuntime {
-					runtime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj()
-					runtime.Spec.MLPolicy = &trainer.MLPolicy{
-						MLPolicySource: trainer.MLPolicySource{
-							Torch: &trainer.TorchMLPolicySource{
-								NumProcPerNode: ptr.To(intstr.FromString("auto")),
-							},
-						},
-					}
-					runtime.Spec.Template.Spec = testingutil.MakeJobSetWrapper(ns.Name, "runtime").
-						Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
-						Obj().
-						Spec
-					return runtime
-				}),
+
 			ginkgo.Entry("Should succeed to default mpi.mpiImplementation=OpenMPI",
 				func() *trainer.TrainingRuntime {
 					return testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").
