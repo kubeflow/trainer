@@ -166,9 +166,16 @@ func (j *JobSet) checkPodTemplateOverridesImmutability(ctx context.Context, oldO
 
 	jobSet := &jobsetv1alpha2.JobSet{}
 	changed := !equality.Semantic.DeepEqual(oldObj.Spec.PodTemplateOverrides, newObj.Spec.PodTemplateOverrides)
-	suspended := ptr.Equal(newObj.Spec.Suspend, ptr.To(true))
+	// PodTemplateOverrides are only immutable when both old and new TrainJob are not suspended.
+	// This follows the Kubernetes core Job validation pattern, allowing external controllers to
+	// atomically update podTemplateOverrides during any suspend state transition:
+	// - Inject scheduling directives on resume (old=suspended, new=unsuspended)
+	// - Restore scheduling directives on suspend (old=unsuspended, new=suspended)
+	// - Update while suspended (old=suspended, new=suspended)
+	oldSuspended := ptr.Equal(oldObj.Spec.Suspend, ptr.To(true))
+	newSuspended := ptr.Equal(newObj.Spec.Suspend, ptr.To(true))
 	if changed {
-		if !suspended {
+		if !oldSuspended && !newSuspended {
 			allErrs = append(allErrs, field.Forbidden(podTemplateOverridePath, "PodTemplateOverrides can only be modified when the TrainJob is suspended"))
 		} else if err := j.client.Get(ctx, client.ObjectKeyFromObject(newObj), jobSet); client.IgnoreNotFound(err) != nil {
 			allErrs = append(allErrs, field.InternalError(podTemplateOverridePath, err))
