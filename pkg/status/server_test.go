@@ -121,7 +121,7 @@ func newTestServer(t *testing.T, cfg *configapi.StatusServer, objs ...client.Obj
 	return httptest.NewServer(srv.httpServer.Handler)
 }
 
-func TestHandleRuntimeStatus(t *testing.T) {
+func TestHandleTrainJobRuntimeStatus(t *testing.T) {
 	validRuntimeStatus := trainer.RuntimeStatus{
 		TrainerStatus: &trainer.TrainJobTrainerStatus{
 			ProgressPercentage:        ptr.To[int32](75),
