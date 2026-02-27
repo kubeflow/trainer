@@ -394,6 +394,13 @@ type TrainJobStatus struct {
 	// +listMapKey=name
 	// +optional
 	JobsStatus []JobStatus `json:"jobsStatus,omitempty"`
+
+	// trainerStatus provides a summary of the status of the training
+	// part of the TrainJob.
+	// Empty if the status is unknown, e.g. the job has just started
+	// or the job is not instrumented to report its status.
+	// +optional
+	TrainerStatus *TrainJobTrainerStatus `json:"trainerStatus,omitempty"`
 }
 
 type JobStatus struct {
@@ -428,6 +435,60 @@ type JobStatus struct {
 	// +kubebuilder:validation:Minimum=0
 	// +required
 	Suspended *int32 `json:"suspended,omitempty"`
+}
+
+// TrainJobTrainerStatus represents the latest known runtime status of the Trainer part of the TrainJob.
+// +kubebuilder:validation:XValidation:rule="has(self.lastUpdatedTime)",message="lastUpdatedTime is required when trainerStatus is present"
+type TrainJobTrainerStatus struct {
+
+	// progressPercentage gives an estimate of how complete the TrainJob is as a percentage.
+	// The value will be between 0 and 100, or empty if unknown.
+	//
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	ProgressPercentage *int32 `json:"progressPercentage,omitempty"`
+
+	// estimatedRemainingSeconds gives the estimated remaining training time in seconds
+	// before the train job is completed.
+	// The value will be empty if it is unknown.
+	//
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	EstimatedRemainingSeconds *int32 `json:"estimatedRemainingSeconds,omitempty"`
+
+	// metrics contains the current metrics for the model.
+	//
+	// +listType=atomic
+	// +optional
+	Metrics []Metric `json:"metrics,omitempty"`
+
+	// lastUpdatedTime is the timestamp when the runtime status was observed.
+	// +optional
+	LastUpdatedTime metav1.Time `json:"lastUpdatedTime,omitempty"`
+}
+
+type Metric struct {
+	// name is a user-defined label for the metric, e.g. "loss", "eval_accuracy".
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Name string `json:"name,omitempty"`
+
+	// value of the metric. Values must be serialized as a string.
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Value string `json:"value,omitempty"`
+}
+
+// RuntimeStatus contains the current runtime status (e.g. progress and metrics) for the different stages of the
+// TrainJob.
+type RuntimeStatus struct {
+	// trainerStatus provides a summary of the status of the training
+	// part of the TrainJob.
+	// Empty if the status is unknown, e.g. the job has just started
+	// or the job is not instrumented to report its status.
+	// +optional
+	TrainerStatus *TrainJobTrainerStatus `json:"trainerStatus,omitempty"`
 }
 
 func init() {

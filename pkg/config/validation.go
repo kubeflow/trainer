@@ -50,5 +50,18 @@ func validate(cfg *configapi.Configuration) field.ErrorList {
 		}
 	}
 
+	// Validate status server config
+	if cfg.StatusServer != nil {
+		if cfg.StatusServer.Port != nil && (*cfg.StatusServer.Port < 1 || *cfg.StatusServer.Port > 65535) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("statusServer", "port"), *cfg.StatusServer.Port, "must be between 1 and 65535"))
+		}
+		if cfg.StatusServer.QPS != nil && *cfg.StatusServer.QPS < 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("statusServer", "qps"), *cfg.StatusServer.QPS, "must be greater than or equal to 0"))
+		}
+		if cfg.StatusServer.Burst != nil && *cfg.StatusServer.Burst < 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("statusServer", "burst"), *cfg.StatusServer.Burst, "must be greater than or equal to 0"))
+		}
+	}
+
 	return allErrs
 }

@@ -13,6 +13,8 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	"github.com/kubeflow/trainer/v2/test/util"
+
+	_ "embed"
 )
 
 const (
@@ -20,6 +22,9 @@ const (
 	deepSpeedRuntime = "deepspeed-distributed"
 	jaxRuntime       = "jax-distributed"
 )
+
+//go:embed testdata/status_update.py
+var statusUpdateScript string
 
 var _ = ginkgo.Describe("TrainJob e2e", func() {
 	// Each test runs in a separate namespace.
@@ -270,6 +275,66 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 					g.Expect(*gotTrainJob.Spec.PodTemplateOverrides[0].Manager).To(gomega.Equal("trainer.kubeflow.org/unknown"))
 					g.Expect(*gotTrainJob.Spec.PodTemplateOverrides[1].Manager).To(gomega.Equal("kueue.k8s.io/manager"))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
+	})
+
+	ginkgo.When("Creating TrainJob with runtime status server instrumentation", func() {
+		ginkgo.It("should inject runtime configuration which allows the runtime status endpoint to be called", func() {
+			// Create a TrainJob that sends a single runtime status update and exits
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-runtime-status").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
+				Trainer(&trainer.Trainer{
+					Command: []string{"python3", "-c"},
+					Args:    []string{statusUpdateScript},
+				}).
+				Obj()
+
+			ginkgo.By("Create a TrainJob that will call the runtime-status endpoint", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Verify trainerStatus is updated with runtime status information", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+
+					// Verify trainerStatus is not nil
+					g.Expect(gotTrainJob.Status.TrainerStatus).ShouldNot(gomega.BeNil())
+
+					// Verify progress percentage
+					g.Expect(gotTrainJob.Status.TrainerStatus.ProgressPercentage).ShouldNot(gomega.BeNil())
+					g.Expect(*gotTrainJob.Status.TrainerStatus.ProgressPercentage).Should(gomega.Equal(int32(42)))
+
+					// Verify estimated remaining seconds
+					g.Expect(gotTrainJob.Status.TrainerStatus.EstimatedRemainingSeconds).ShouldNot(gomega.BeNil())
+					g.Expect(*gotTrainJob.Status.TrainerStatus.EstimatedRemainingSeconds).Should(gomega.Equal(int32(120)))
+
+					// Verify metrics
+					g.Expect(gotTrainJob.Status.TrainerStatus.Metrics).Should(gomega.HaveLen(2))
+					g.Expect(gotTrainJob.Status.TrainerStatus.Metrics[0].Name).Should(gomega.Equal("loss"))
+					g.Expect(gotTrainJob.Status.TrainerStatus.Metrics[0].Value).Should(gomega.Equal("0.123"))
+					g.Expect(gotTrainJob.Status.TrainerStatus.Metrics[1].Name).Should(gomega.Equal("accuracy"))
+					g.Expect(gotTrainJob.Status.TrainerStatus.Metrics[1].Value).Should(gomega.Equal("0.95"))
+
+					// Verify lastUpdatedTime is set
+					g.Expect(gotTrainJob.Status.TrainerStatus.LastUpdatedTime.IsZero()).Should(gomega.BeFalse())
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
+						{
+							Type:    trainer.TrainJobComplete,
+							Status:  metav1.ConditionTrue,
+							Reason:  jobsetconsts.AllJobsCompletedReason,
+							Message: jobsetconsts.AllJobsCompletedMessage,
+						},
+					}, util.IgnoreConditions))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 		})
 	})

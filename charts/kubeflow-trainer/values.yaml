@@ -131,6 +131,10 @@ manager:
       # webhookServiceName and webhookSecretName are auto-generated if not specified
       webhookServiceName: ""
       webhookSecretName: ""
+    statusServer:
+      port: 10443
+      qps: 5
+      burst: 10
     featureGates: {}
 
 webhook:

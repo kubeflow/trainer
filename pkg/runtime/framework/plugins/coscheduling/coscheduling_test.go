@@ -554,7 +554,7 @@ func TestCoScheduling(t *testing.T) {
 				},
 			})
 			cli := clientBuilder.Build()
-			plugin, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder))
+			plugin, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatalf("Failed to create plugin: %v", err)
 			}

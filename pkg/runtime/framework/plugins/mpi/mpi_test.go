@@ -848,7 +848,7 @@ trainJob-node-1-0.trainJob slots=1
 			})
 			cli := b.Build()
 
-			p, err := New(ctx, cli, nil)
+			p, err := New(ctx, cli, nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize MPI plugin: %v", err)
 			}
@@ -1018,7 +1018,7 @@ func TestValidate(t *testing.T) {
 			var cancel func()
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
-			p, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil)
+			p, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize MPI plugin: %v", err)
 			}

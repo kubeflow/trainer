@@ -60,6 +60,10 @@ type Configuration struct {
 	// +optional
 	ClientConnection *ClientConnection `json:"clientConnection,omitempty"`
 
+	// statusServer provides configuration options for the Runtime Status Server.
+	// +optional
+	StatusServer *StatusServer `json:"statusServer,omitempty"`
+
 	// featureGates is a map of feature names to bools that allows to override the
 	// default enablement status of a feature.
 	// +optional
@@ -187,5 +191,27 @@ type ClientConnection struct {
 	// Defaults to 100.
 	// +optional
 	// +kubebuilder:default=100
+	Burst *int32 `json:"burst,omitempty"`
+}
+
+type StatusServer struct {
+	// port is the port that the status server serves at.
+	// Defaults to 10443.
+	// +optional
+	// +kubebuilder:default=10443
+	Port *int32 `json:"port,omitempty"`
+
+	// qps controls the number of queries per second allowed for the status server's
+	// Kubernetes client before client-side throttling.
+	// Defaults to 5.
+	// +optional
+	// +kubebuilder:default=5
+	QPS *float32 `json:"qps,omitempty"`
+
+	// burst allows extra queries to accumulate when the status server client is not
+	// using its full QPS allocation.
+	// Defaults to 10.
+	// +optional
+	// +kubebuilder:default=10
 	Burst *int32 `json:"burst,omitempty"`
 }

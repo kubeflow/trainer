@@ -40,8 +40,10 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/config"
 	"github.com/kubeflow/trainer/v2/pkg/controller"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
+	"github.com/kubeflow/trainer/v2/pkg/status"
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
 	"github.com/kubeflow/trainer/v2/pkg/webhooks"
 )
@@ -67,6 +69,7 @@ func init() {
 func main() {
 	var configFile string
 	var enableHTTP2 bool
+	var featureGates string
 
 	flag.StringVar(&configFile, "config", "",
 		"The controller will load its initial configuration from this file. "+
@@ -80,6 +83,9 @@ func main() {
 	// - https://github.com/advisories/GHSA-4374-p667-p6c8
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&featureGates, "feature-gates", "",
+		"A comma-separated list of key=value pairs that describe feature gates. "+
+			"Command-line feature gates override those specified in the config file.")
 
 	zapOpts := zap.Options{
 		TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
@@ -97,9 +103,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Set feature gates from config file first
 	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(cfg.FeatureGates); err != nil {
-		setupLog.Error(err, "Unable to set flag gates for known features")
+		setupLog.Error(err, "Unable to set feature gates from config file")
 		os.Exit(1)
+	}
+
+	// Command-line feature gates override config file settings
+	if featureGates != "" {
+		if err := utilfeature.DefaultMutableFeatureGate.Set(featureGates); err != nil {
+			setupLog.Error(err, "Unable to set feature gates from command line")
+			os.Exit(1)
+		}
 	}
 
 	setupLog.Info("Creating manager")
@@ -128,13 +143,13 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 
 	setupProbeEndpoints(mgr, certsReady)
-	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer())
+	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer(), &cfg)
 	if err != nil {
 		setupLog.Error(err, "Could not initialize runtimes")
 		os.Exit(1)
 	}
-	// Set up controllers using goroutines to start the manager quickly.
-	go setupControllers(mgr, runtimes, certsReady)
+	// Set up controllers and other components using goroutines to start the manager quickly.
+	go setupManagerComponents(mgr, runtimes, &cfg, certsReady, enableHTTP2)
 
 	setupLog.Info("Starting manager")
 	if err = mgr.Start(ctx); err != nil {
@@ -143,7 +158,7 @@ func main() {
 	}
 }
 
-func setupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, certsReady <-chan struct{}) {
+func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, cfg *configapi.Configuration, certsReady <-chan struct{}, enableHTTP2 bool) {
 	setupLog.Info("Waiting for certificate generation to complete")
 	<-certsReady
 	setupLog.Info("Certs ready")
@@ -155,6 +170,13 @@ func setupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, cer
 	if failedWebhook, err := webhooks.Setup(mgr, runtimes); err != nil {
 		setupLog.Error(err, "Could not create webhook", "webhook", failedWebhook)
 		os.Exit(1)
+	}
+
+	if features.Enabled(features.TrainJobRuntimeStatus) {
+		if err := status.SetupServer(mgr, cfg.StatusServer, enableHTTP2); err != nil {
+			setupLog.Error(err, "Could not create runtime status server")
+			os.Exit(1)
+		}
 	}
 }
 

@@ -21,20 +21,23 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/status"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
 )
 
-type Registry map[string]func(ctx context.Context, client client.Client, indexer client.FieldIndexer) (framework.Plugin, error)
+type Registry map[string]func(ctx context.Context, client client.Client, indexer client.FieldIndexer, cfg *configapi.Configuration) (framework.Plugin, error)
 
 func NewRegistry() Registry {
-	return Registry{
+	registry := Registry{
 		coscheduling.Name: coscheduling.New,
 		volcano.Name:      volcano.New,
 		mpi.Name:          mpi.New,
@@ -43,4 +46,10 @@ func NewRegistry() Registry {
 		jobset.Name:       jobset.New,
 		jax.Name:          jax.New,
 	}
+
+	if features.Enabled(features.TrainJobRuntimeStatus) {
+		registry[status.Name] = status.New
+	}
+
+	return registry
 }

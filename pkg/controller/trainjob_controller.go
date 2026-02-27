@@ -138,7 +138,12 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = errors.Join(err, statusErr)
 	}
 
-	if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
+	// Remove the fields set by the status server endpoint to prevent the reconcile updating these fields.
+	// There's a race condition if the status server endpoint updates the field between the reconciler reading
+	// prevTrainJob and applying the patch.
+	removeExternallyManagedFields(&trainJob, prevTrainJob)
+
+	if !equality.Semantic.DeepEqual(&trainJob.Status, &prevTrainJob.Status) {
 		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
 		// for sub-resources. See: https://github.com/kubernetes-sigs/controller-runtime/issues/3183
 		return ctrl.Result{}, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
@@ -234,6 +239,15 @@ func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJo
 		trainJob.Status = *status
 	}
 	return nil
+}
+
+// removeExternallyManagedFields clears fields that are managed externally (e.g. by the status server)
+// from both the current and previous TrainJob objects. This prevents the reconciler from
+// overwriting external updates when it patches the status.
+func removeExternallyManagedFields(trainJob *trainer.TrainJob, prevTrainJob *trainer.TrainJob) {
+	// TrainerStatus is managed by the status server and should not be updated by the reconciler
+	trainJob.Status.TrainerStatus = nil
+	prevTrainJob.Status.TrainerStatus = nil
 }
 
 func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {

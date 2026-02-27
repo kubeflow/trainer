@@ -63,7 +63,7 @@ We propose an approach with the following high-level **push-based** design:
 
 Users can choose not to instrument their runtime, in which case no progress and metrics will be available on the TrainJob. The feature is therefore optional and opt-in.
 
-The feature will have an associated feature gate `TrainJobProgress`, defaulting to "disabled". Disabling the gate will disable the http service.
+The feature will have an associated feature gate `TrainJobRuntimeStatus`, defaulting to "disabled". Disabling the gate will disable the http service.
 
 ### CRD changes
 

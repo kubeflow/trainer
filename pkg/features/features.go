@@ -30,13 +30,23 @@ func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultFeatureGates))
 }
 
+const (
+	// owner: robert-bell
+	// kep: https://github.com/kubeflow/trainer/blob/main/docs/proposals/2779-trainjob-progress/README.md
+	//
+	// Enables status server allowing TrainJob pods to update their status.
+	TrainJobRuntimeStatus featuregate.Feature = "TrainJobRuntimeStatus"
+)
+
 // defaultFeatureGates consists of all known Trainer-specific feature keys.
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Trainer binaries.
 //
 // Entries are separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
-var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}
+var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	TrainJobRuntimeStatus: {Default: false, PreRelease: featuregate.Alpha},
+}
 
 func SetFeatureGateDuringTest(tb testing.TB, f featuregate.Feature, value bool) {
 	featuregatetesting.SetFeatureGateDuringTest(tb, utilfeature.DefaultFeatureGate, f, value)
