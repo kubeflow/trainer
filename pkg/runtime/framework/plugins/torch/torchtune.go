@@ -44,7 +44,7 @@ func validateTorchTune(runtimeInfo *runtime.Info, newObj *trainer.TrainJob) (adm
 	}
 
 	numNodesRefPath := specPath.Child("trainer").Child("numNodes")
-	numNodes := *newObj.Spec.Trainer.NumNodes
+	numNodes := ptr.Deref(newObj.Spec.Trainer.NumNodes, 1)
 	if numNodes > 1 && model != constants.TORCHTUNE_MODEL_LLAMA3_3_70B {
 		allErrs = append(allErrs, field.Invalid(numNodesRefPath, numNodes, fmt.Sprintf("must be 1 for %v model", model)))
 	}
