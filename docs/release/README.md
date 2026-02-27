@@ -1,201 +1,70 @@
-# Releasing the Kubeflow Trainer
+# Releasing Kubeflow Trainer
 
-## Prerequisite
+## Prerequisites
 
-- [Write](https://docs.github.com/en/organizations/managing-access-to-your-organizations-repositories/repository-permission-levels-for-an-organization#permission-levels-for-repositories-owned-by-an-organization)
-  permission for the Kubeflow Trainer repository.
+- Docker available locally (required by `hack/release.sh` for changelog generation with `git-cliff`).
+- `GITHUB_TOKEN` exported locally (recommended to avoid GitHub API rate limits while generating changelog):
 
-- Maintainer access to [the Kubeflow Trainer API Python modules](https://pypi.org/project/kubeflow-trainer-api/).
-
-- Create a [GitHub Token](https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token).
-
-- Install `PyGithub` to generate the [Changelog](./../../CHANGELOG.md):
-
-  ```
-  pip install PyGithub>=1.55
-  ```
-
-- Install `twine` and `build` to publish the SDK package:
-
-  ```
-  pip install twine>=6.1.0
-  pip install build>=1.3.0
-  ```
-
-  - Create a [PyPI Token](https://pypi.org/help/#apitoken) to publish Training SDK.
-
-  - Add the following config to your `~/.pypirc` file:
-
-    ```
-    [pypi]
-       username = __token__
-       password = <PYPI_TOKEN>
-    ```
-
-## Versioning policy
-
-Kubeflow Trainer version format follows [Semantic Versioning](https://semver.org/).
-Kubeflow Trainer versions are in the format of `vX.Y.Z`, where `X` is the major version, `Y` is
-the minor version, and `Z` is the patch version.
-The patch version contains only bug fixes.
-
-Additionally, Kubeflow Trainer does pre-releases in this format: `vX.Y.Z-rc.N` where `N` is a number
-of the `Nth` release candidate (RC) before an upcoming public release named `vX.Y.Z`.
-
-## Release branches and tags
-
-Kubeflow Trainer releases are tagged with tags like `vX.Y.Z`, for example `v2.0.0`.
-
-Release branches are in the format of `release-X.Y`, where `X.Y` stands for
-the minor release.
-
-`vX.Y.Z` releases are released from the `release-X.Y` branch. For example,
-`v2.0.0` release should be on `release-2.0` branch.
-
-If you want to push changes to the `release-X.Y` release branch, you have to
-cherry pick your changes from the `master` branch and submit a PR.
-
-## Create a new Kubeflow Trainer release
-
-### Create release branch
-
-1. Depends on what version you want to release,
-
-   - Major or Minor version - Use the GitHub UI to create a release branch from `master` and name
-     the release branch `release-X.Y`
-   - Patch version - You don't need to create a new release branch.
-
-1. Fetch the upstream changes into your local directory:
-
-   ```
-   git fetch upstream
-   ```
-
-1. Checkout into the release branch:
-
-   ```
-   git checkout release-X.Y
-   git rebase upstream/release-X.Y
-   ```
-
-### Release Kubeflow Trainer API Modules
-
-1. Update the `API_VERSION` in [the `gen-api.sh` file](../../hack/python-api/gen-api.sh).
-
-   You must follow this semantic `X.Y.ZrcN` for the RC or `X.Y.Z` for the public release.
-
-   For example:
-
-   ```sh
-   API_VERSION = "2.1.0rc0"
-   ```
-
-1. Generate and publish the Kubeflow Trainer Python API models:
-
-   ```
-   make generate
-   cd api/python_api
-   rm -rf dist
-   python -m build
-   twine upload dist/*
-   cd ../..
-   ```
-
-### Release Kubeflow Trainer images
-
-1. Update the image tag in Kubeflow Trainer manifests:
-
-   - [manager](../../manifests/overlays/manager/kustomization.yaml)
-   - [runtimes](../../manifests/overlays/runtimes/kustomization.yaml)
-   - [data-cache](../../manifests/overlays/data-cache/kustomization.yaml)
-   - `CACHE_IMAGE` in [the torch-distributed-with-cache runtime](../../manifests/base/runtimes/data-cache/torch_distributed_with_cache.yaml)
-
-    The image tags must be equal to the release version, for example: `newTag: v2.0.0-rc.1`
-
-    Additionally, update the public ConfigMap version used by the manager overlay:
-
-    - In `manifests/overlays/manager/kustomization.yaml`, set the `kubeflow_trainer_version` literal
-       under `configMapGenerator` to the release version with `v` prefix (for example,
-       `kubeflow_trainer_version=v2.0.0-rc.1`). Update this value whenever cutting a new release.
-
-1. Update the [Helm charts](../../charts/kubeflow-trainer/Chart.yaml) version.
-
-   Ensure that the version number does not include the `v` prefix.
-
-1. Commit your changes, tag the commit, and push it to upstream.
-
-   - For the RC tag run the following:
-
-   ```sh
-   git add .
-   git commit -s -m "Kubeflow Trainer Official Release vX.Y.Z-rc.N"
-   git tag vX.Y.Z-rc.N
-   git push upstream release-X.Y --tags
-   ```
-
-   - For the official release run the following:
-
-   ```sh
-   git add .
-   git commit -s -m "Kubeflow Trainer Official Release vX.Y.Z"
-   git tag vX.Y.Z
-   git push upstream release-X.Y --tags
-   ```
-
-For example, check [this release commit](https://github.com/kubeflow/trainer/commit/332ad3939a000ecf837a37ecb1a56e3b0494562c).
-
-### Verify the image publish
-
-Check that all GitHub actions on your release branch is complete and images are published to the
-registry. In case of failure, manually restart the GitHub actions.
-
-For example, you can see the
-[completed GitHub actions on the `v2.0.0-rc.1` release](https://github.com/kubeflow/trainer/commit/7122fc1a0f02e3d97b1da2a8eb31148e10b286c9)
-
-### Update the Master Branch
-
-Create the PR in the master branch with the following changes:
-
-1. Update the changelog by running:
-
-   ```
-   python docs/release/changelog.py --token=<github-token> --range=<previous-release>..<current-release>
-   ```
-
-   If you are creating the **first minor pre-release** or the **minor** release (`X.Y`), your
-   `previous-release` is equal to the latest release on the `release-X.Y-1` branch.
-   For example: `--range=v2.0.1..v2.1.0`
-
-   Otherwise, your `previous-release` is equal to the latest release on the `release-X.Y` branch.
-   For example: `--range=v2.0.0-rc.0..v2.0.0-rc.1`
-
-   Group PRs in the changelog into features, bug fixes, misc, etc.
-
-   Check this example: [v2.0.0-rc.0](https://github.com/kubeflow/trainer/blob/master/CHANGELOG.md#v200-rc0-2025-06-10)
-
-1. Bump the `API_VERSION` in [the `gen-api.sh` file](../../hack/python-api/gen-api.sh) and the
-   `version` in [the Helm charts](../../charts/kubeflow-trainer/Chart.yaml) to the latest release.
-
-Finally, submit a PR with the updated files.
-
-### Create GitHub Release
-
-After the changelog PR is merged, create the GitHub release using your tag.
-
-Set as a pre-release for the release candidates (e.g. RC.1) or set as the latest release for the
-official releases.
-
-For the GitHub release description you can use the same PR list as in changelog. You can use this
-script to remove links from the GitHub user names (GitHub releases render the user names without
-links):
-
-```sh
-perl -pi -e 's/\[@([^\]]+)\]\(https:\/\/github\.com\/\1\)/@\1/g' changelog.md
+```bash
+export GITHUB_TOKEN=<token>
 ```
 
-### Announce the new release
+- If you are working from a fork, ensure upstream tags are available locally before running release:
 
-Post the announcement for the new Kubeflow Trainer RC or official release in:
+```bash
+git remote add upstream https://github.com/kubeflow/trainer.git  # if missing
+git fetch upstream --tags
+git fetch origin --tags
+```
 
-- [#kubeflow-trainer](https://www.kubeflow.org/docs/about/community/#slack-channels) Slack channel.
-- [kubeflow-discuss](https://www.kubeflow.org/docs/about/community/#kubeflow-mailing-list) mailing list.
+## Prepare a release PR
+
+Run the release target from your working branch:
+
+```bash
+make release VERSION=X.Y.Z GITHUB_TOKEN=<token>
+# or
+make release VERSION=X.Y.Z-rc.N GITHUB_TOKEN=<token>
+```
+
+`make release` exports `GITHUB_TOKEN` and invokes `hack/release.sh`. The release script will:
+
+1. Validate the version format.
+2. Verify the tag `vX.Y.Z` (or `vX.Y.Z-rc.N`) does not already exist.
+3. Update:
+   - `VERSION`
+   - image tags in `manifests/*.yaml` (`newTag` and pinned `ghcr.io/...:latest`)
+   - `charts/kubeflow-trainer/Chart.yaml` (`version`)
+   - `CHANGELOG.md` (prepends unreleased section using `git-cliff`)
+4. Run `make generate`.
+5. Create a signed-off commit:
+
+```text
+Release vX.Y.Z
+```
+
+Push the branch and open a PR to `master`.
+
+## PR validation (`check-release.yaml`)
+
+When a PR to `master` changes `VERSION`, CI validates:
+
+1. `VERSION` matches semver format.
+2. The tag does not already exist.
+3. Every `manifests` `newTag` equals `v<VERSION-without-leading-v>`.
+4. `charts/kubeflow-trainer/Chart.yaml` version equals `VERSION` without leading `v`.
+5. `api/python_api/kubeflow_trainer_api/__init__.py` `__version__` equals `VERSION` without leading `v`.
+
+## Release automation after merge (`release.yaml`)
+
+When the `VERSION` change is merged into `master`, the workflow:
+
+1. Re-validates version and manifest tags.
+2. Builds and validates Python package artifacts.
+3. Publishes the package to PyPI (`kubeflow-trainer-api`).
+4. Creates release branch `release-<version-without-v>` if it does not exist.
+5. Creates and pushes git tag `v<version-without-v>`.
+6. Creates GitHub Release using generated changelog.
+7. Dispatches:
+   - `build-and-push-images.yaml` for container image publishing
+   - `publish-helm-charts.yaml` for Helm chart publishing
