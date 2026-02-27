@@ -78,7 +78,7 @@ func NewServer(c client.Client, cfg *configapi.StatusServer, tlsConfig *tls.Conf
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST "+StatusUrl("{namespace}", "{name}"), s.handleRuntimeStatus)
+	mux.HandleFunc("POST "+StatusUrl("{namespace}", "{name}"), s.handleTrainJobRuntimeStatus)
 	mux.HandleFunc("/", s.handleDefault)
 
 	// Apply middleware
@@ -125,9 +125,9 @@ func (s *Server) Start(ctx context.Context) error {
 	return nil
 }
 
-// handleRuntimeStatus handles POST requests to update TrainJob status.
+// handleTrainJobRuntimeStatus handles POST requests to update TrainJob status.
 // Expected URL format: /apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status
-func (s *Server) handleRuntimeStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Request) {
 
 	namespace := r.PathValue("namespace")
 	trainJobName := r.PathValue("name")
