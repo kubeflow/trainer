@@ -334,6 +334,238 @@ func TestJobSet(t *testing.T) {
 	}
 }
 
+func TestBuildParallelCount(t *testing.T) {
+	cases := map[string]struct {
+		info            *runtime.Info
+		wantParallelism map[int]*int32
+		wantCompletions map[int]*int32
+	}{
+		"sync PodSets.Count to JobSet Parallelism and Completions": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("node").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1))),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("worker").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1))),
+						),
+					PodSets: []runtime.PodSet{
+						{Name: "node", Count: ptr.To[int32](5)},
+						{Name: "worker", Count: ptr.To[int32](10)},
+					},
+				},
+			},
+			wantParallelism: map[int]*int32{0: ptr.To[int32](5), 1: ptr.To[int32](10)},
+			wantCompletions: map[int]*int32{0: ptr.To[int32](5), 1: ptr.To[int32](10)},
+		},
+		"sync only PodSets with non-nil Count": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("node").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1))),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("worker").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(2).
+										WithCompletions(2))),
+						),
+					PodSets: []runtime.PodSet{
+						{Name: "node", Count: ptr.To[int32](5)},
+						{Name: "worker", Count: nil},
+					},
+				},
+			},
+			wantParallelism: map[int]*int32{0: ptr.To[int32](5), 1: ptr.To[int32](2)},
+			wantCompletions: map[int]*int32{0: ptr.To[int32](5), 1: ptr.To[int32](2)},
+		},
+		"nil info does not panic": {
+			info:            nil,
+			wantParallelism: nil,
+			wantCompletions: nil,
+		},
+		"nil ObjApply does not panic": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: nil,
+					PodSets: []runtime.PodSet{
+						{Name: "node", Count: ptr.To[int32](5)},
+					},
+				},
+			},
+			wantParallelism: nil,
+			wantCompletions: nil,
+		},
+		"more PodSets than ReplicatedJobs does not panic": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("node").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1))),
+						),
+					PodSets: []runtime.PodSet{
+						{Name: "node", Count: ptr.To[int32](5)},
+						{Name: "worker", Count: ptr.To[int32](10)},
+						{Name: "extra", Count: ptr.To[int32](20)},
+					},
+				},
+			},
+			wantParallelism: map[int]*int32{0: ptr.To[int32](5)},
+			wantCompletions: map[int]*int32{0: ptr.To[int32](5)},
+		},
+		"fewer PodSets than ReplicatedJobs syncs available PodSets": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("node").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1))),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("worker").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(2).
+										WithCompletions(2))),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("extra").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(3).
+										WithCompletions(3))),
+						),
+					PodSets: []runtime.PodSet{
+						{Name: "node", Count: ptr.To[int32](5)},
+					},
+				},
+			},
+			wantParallelism: map[int]*int32{0: ptr.To[int32](5), 1: ptr.To[int32](2), 2: ptr.To[int32](3)},
+			wantCompletions: map[int]*int32{0: ptr.To[int32](5), 1: ptr.To[int32](2), 2: ptr.To[int32](3)},
+		},
+		"PodSets and ReplicatedJobs in different order matches by name": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("worker").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1))),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("node").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1))),
+						),
+					PodSets: []runtime.PodSet{
+						{Name: "node", Count: ptr.To[int32](5)},
+						{Name: "worker", Count: ptr.To[int32](10)},
+					},
+				},
+			},
+			wantParallelism: map[int]*int32{0: ptr.To[int32](10), 1: ptr.To[int32](5)},
+			wantCompletions: map[int]*int32{0: ptr.To[int32](10), 1: ptr.To[int32](5)},
+		},
+		"PodSet with no matching ReplicatedJob name is skipped": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("node").
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1))),
+						),
+					PodSets: []runtime.PodSet{
+						{Name: "nonexistent", Count: ptr.To[int32](5)},
+					},
+				},
+			},
+			wantParallelism: map[int]*int32{0: ptr.To[int32](1)},
+			wantCompletions: map[int]*int32{0: ptr.To[int32](1)},
+		},
+		"non-JobSet ObjApply is skipped": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: batchv1ac.JobSpec(),
+					PodSets: []runtime.PodSet{
+						{Name: "node", Count: ptr.To[int32](5)},
+					},
+				},
+			},
+			wantParallelism: nil,
+			wantCompletions: nil,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+			cli := utiltesting.NewClientBuilder().Build()
+			p, err := New(ctx, cli, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+			err = p.(framework.BuildParallelCountPlugin).BuildParallelCount(tc.info)
+			if err != nil {
+				t.Fatalf("Unexpected error from BuildParallelCount: %v", err)
+			}
+
+			if tc.wantParallelism == nil {
+				return
+			}
+
+			jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](tc.info)
+			if !ok {
+				t.Fatalf("Failed to get JobSetSpecApplyConfiguration")
+			}
+
+			for idx, wantP := range tc.wantParallelism {
+				gotP := jobSetSpec.ReplicatedJobs[idx].Template.Spec.Parallelism
+				if diff := cmp.Diff(wantP, gotP); len(diff) != 0 {
+					t.Errorf("Unexpected Parallelism for ReplicatedJob[%d] (-want,+got):\n%s", idx, diff)
+				}
+			}
+			for idx, wantC := range tc.wantCompletions {
+				gotC := jobSetSpec.ReplicatedJobs[idx].Template.Spec.Completions
+				if diff := cmp.Diff(wantC, gotC); len(diff) != 0 {
+					t.Errorf("Unexpected Completions for ReplicatedJob[%d] (-want,+got):\n%s", idx, diff)
+				}
+			}
+		})
+	}
+}
+
 func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info
