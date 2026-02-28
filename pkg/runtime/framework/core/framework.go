@@ -19,8 +19,10 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -120,6 +122,28 @@ func (f *Framework) RunCustomValidationPlugins(ctx context.Context, info *runtim
 			aggregatedErrors = append(aggregatedErrors, errs...)
 		}
 	}
+
+	// Check for cross-plugin env conflicts.
+	pluginReservedEnvs := map[string]sets.Set[string]{}
+	for _, plugin := range f.customValidationPlugins {
+		if reserver, ok := plugin.(framework.EnvVarsReserverPlugin); ok {
+			pluginReservedEnvs[plugin.Name()] = reserver.ReservedEnvVarNames()
+		}
+	}
+	pluginNames := sets.List(sets.KeySet(pluginReservedEnvs))
+	for i, nameA := range pluginNames {
+		for _, nameB := range pluginNames[i+1:] {
+			overlap := pluginReservedEnvs[nameA].Intersection(pluginReservedEnvs[nameB])
+			for _, envVar := range sets.List(overlap) {
+				aggregatedErrors = append(aggregatedErrors, field.Invalid(
+					field.NewPath("spec"),
+					envVar,
+					fmt.Sprintf("env var %q is reserved by both %s and %s plugins", envVar, nameA, nameB),
+				))
+			}
+		}
+	}
+
 	return aggregatedWarnings, aggregatedErrors
 }
 

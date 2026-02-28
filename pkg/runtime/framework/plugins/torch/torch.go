@@ -41,6 +41,7 @@ type Torch struct{}
 
 var _ framework.EnforceMLPolicyPlugin = (*Torch)(nil)
 var _ framework.CustomValidationPlugin = (*Torch)(nil)
+var _ framework.EnvVarsReserverPlugin = (*Torch)(nil)
 
 const Name = "Torch"
 
@@ -50,6 +51,10 @@ func New(context.Context, client.Client, client.FieldIndexer) (framework.Plugin,
 
 func (t *Torch) Name() string {
 	return Name
+}
+
+func (t *Torch) ReservedEnvVarNames() sets.Set[string] {
+	return constants.TorchRunReservedEnvNames
 }
 
 func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {

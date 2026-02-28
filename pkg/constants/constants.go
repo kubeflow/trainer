@@ -216,6 +216,14 @@ var (
 	// TorchRunReservedEnvNames is torchrun reserved env names
 	TorchRunReservedEnvNames = sets.New(TorchEnvNumNodes, TorchEnvNumProcPerNode, TorchEnvNodeRank, TorchEnvMasterAddr, TorchEnvMasterPort)
 
+	// MPIRunReservedEnvNames is the set of environment variable names reserved by the MPI plugin.
+	MPIRunReservedEnvNames = sets.New(
+		OpenMPIEnvHostFileLocation,
+		OpenMPIEnvKeyRSHArgs,
+		OpenMPIEnvKeepFQDNHostNames,
+		OpenMPIEnvDefaultSlots,
+	)
+
 	// ResourceInUseFinalizer is a finalizer for managed resources which is used by other resources.
 	ResourceInUseFinalizer = fmt.Sprintf("%s/resource-in-use", trainer.GroupVersion.Group)
 
