@@ -179,7 +179,7 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 }
 
 func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
-	if trainJob.Spec.ActiveDeadlineSeconds == nil || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
+	if trainJob.Spec.ActiveDeadlineSeconds == 0 || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return ctrl.Result{}, nil
 	}
 	startTime := trainJob.CreationTimestamp.Time
@@ -189,7 +189,7 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 	if startTime.IsZero() {
 		return ctrl.Result{}, nil
 	}
-	deadline := startTime.Add(time.Duration(*trainJob.Spec.ActiveDeadlineSeconds) * time.Second)
+	deadline := startTime.Add(time.Duration(trainJob.Spec.ActiveDeadlineSeconds) * time.Second)
 	if time.Now().After(deadline) {
 		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
 		return ctrl.Result{}, nil

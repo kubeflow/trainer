@@ -38,7 +38,7 @@ var _ = ginkgo.Describe("TrainJob Lifecycle e2e", func() {
 			deadline := int64(10)
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-deadline-job").
 				RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
-				ActiveDeadlineSeconds(&deadline).
+				ActiveDeadlineSeconds(deadline).
 				Obj()
 
 			trainJob.Spec.Trainer = &trainer.Trainer{

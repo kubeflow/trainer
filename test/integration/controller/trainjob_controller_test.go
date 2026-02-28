@@ -1451,7 +1451,7 @@ alpha-node-0-1.alpha slots=8
 				deadline := int64(1)
 				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-job").
 					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
-					ActiveDeadlineSeconds(&deadline).
+					ActiveDeadlineSeconds(deadline).
 					Obj()
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
@@ -1480,7 +1480,7 @@ alpha-node-0-1.alpha slots=8
 				deadline := int64(3600)
 				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-not-exceeded-job").
 					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
-					ActiveDeadlineSeconds(&deadline).
+					ActiveDeadlineSeconds(deadline).
 					Obj()
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
@@ -1502,7 +1502,7 @@ alpha-node-0-1.alpha slots=8
 				deadline := int64(1)
 				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-suspended-job").
 					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
-					ActiveDeadlineSeconds(&deadline).
+					ActiveDeadlineSeconds(deadline).
 					Suspend(true).
 					Obj()
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
@@ -1525,7 +1525,7 @@ alpha-node-0-1.alpha slots=8
 				deadline := int64(2)
 				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-resume-job").
 					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
-					ActiveDeadlineSeconds(&deadline).
+					ActiveDeadlineSeconds(deadline).
 					Suspend(true).
 					Obj()
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
