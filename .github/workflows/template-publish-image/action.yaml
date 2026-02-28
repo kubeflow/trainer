@@ -85,7 +85,29 @@ runs:
           type=raw,value=latest,enable={{is_default_branch}}
           type=sha
 
-    - name: Build and Push
+    - name: Single Platform Local Build & Load (AMD64)
+      uses: docker/build-push-action@v5
+      with:
+        platforms: linux/amd64
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        push: false
+        load: true
+        tags: local-scan-target:latest
+        cache-from: type=gha
+        cache-to: type=gha,ignore-error=true
+
+    - name: Run Trivy Vulnerability Scan on Local Artifact
+      uses: aquasecurity/trivy-action@0.34.0
+      with:
+        image-ref: 'local-scan-target:latest'
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Build and Push (Multi-arch)
       uses: docker/build-push-action@v5
       with:
         platforms: ${{ inputs.platforms }}
