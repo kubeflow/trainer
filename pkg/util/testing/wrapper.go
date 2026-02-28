@@ -612,7 +612,7 @@ func (t *TrainJobWrapper) UID(uid string) *TrainJobWrapper {
 	return t
 }
 
-func (t *TrainJobWrapper) ActiveDeadlineSeconds(deadline *int64) *TrainJobWrapper {
+func (t *TrainJobWrapper) ActiveDeadlineSeconds(deadline int64) *TrainJobWrapper {
 	t.Spec.ActiveDeadlineSeconds = deadline
 	return t
 }
