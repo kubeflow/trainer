@@ -117,6 +117,16 @@ This removes all the Kubernetes resources associated with the chart and deletes 
 
 See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command documentation.
 
+### Istio sidecar configuration
+
+If you are running Istio and need to exclude the manager webhook port from sidecar interception, configure the annotation via `manager.podAnnotations`:
+
+```yaml
+manager:
+  podAnnotations:
+    traffic.sidecar.istio.io/excludeInboundPorts: "9443"
+```
+
 {{ template "chart.valuesSection" . }}
 
 {{- define "chart.maintainersTable" -}}

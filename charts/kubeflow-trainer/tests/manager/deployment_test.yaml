@@ -84,6 +84,36 @@ tests:
           path: spec.template.metadata.labels.key2
           value: value2
 
+  - it: Should apply selector labels if `manager.selectorLabels` is set
+    set:
+      manager:
+        selectorLabels:
+          sel1: val1
+          sel2: val2
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels.sel1
+          value: val1
+      - equal:
+          path: spec.selector.matchLabels.sel2
+          value: val2
+      - equal:
+          path: spec.template.metadata.labels.sel1
+          value: val1
+      - equal:
+          path: spec.template.metadata.labels.sel2
+          value: val2
+
+  - it: Should apply pod annotations if `manager.podAnnotations` is set
+    set:
+      manager:
+        podAnnotations:
+          traffic.sidecar.istio.io/excludeInboundPorts: "9443"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["traffic.sidecar.istio.io/excludeInboundPorts"]
+          value: "9443"
+
   - it: Should add environment variables if `controller.env` is set
     set:
       manager:
