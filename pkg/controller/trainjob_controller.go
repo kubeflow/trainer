@@ -104,7 +104,6 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log := ctrl.LoggerFrom(ctx).WithValues("trainJob", klog.KObj(&trainJob))
 	ctx = ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling TrainJob")
-	
 	var err error
 
 	if trainjob.IsTrainJobFinished(&trainJob) {
@@ -117,14 +116,11 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-
 	// Keep track of the origin TrainJob status
 	prevTrainJob := trainJob.DeepCopy()
 
 	// Let's clear the failed condition that could have been set previously.
 	// An external change to the TrainJob spec may transition it out of the Failed state.
-	// Safe to call here because the early-exit above ensures we only reach this
-	// point for non-finished jobs.
 	removeFailedCondition(&trainJob)
 
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
