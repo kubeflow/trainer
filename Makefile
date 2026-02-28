@@ -241,3 +241,39 @@ helm-lint: ## Run Helm chart lint test.
 .PHONY: helm-docs
 helm-docs: helm-docs-plugin ## Generates markdown documentation for helm charts from requirements and values files.
 	$(HELM_DOCS) --sort-values-order=file
+
+##@ Release
+
+# Release version (X.Y.Z or X.Y.Z-rc.N)
+VERSION ?=
+GITHUB_TOKEN ?=
+
+.PHONY: release
+release: ## Create a new release and generate changelog.
+	@if [ -z "$(VERSION)" ] || ! echo "$(VERSION)" | grep -E -q '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "ERROR: VERSION must be set in X.Y.Z format. Usage: make release VERSION=X.Y.Z"; \
+		exit 1; \
+	fi
+
+	@if [ -z "$(GITHUB_TOKEN)" ]; then \
+		echo "ERROR: GITHUB_TOKEN is required. Usage: make release VERSION=X.Y.Z GITHUB_TOKEN=<token>"; \
+		exit 1; \
+	fi
+
+	@echo "Fetching upstream tags..."
+	@git fetch --tags https://github.com/kubeflow/trainer.git
+
+	@echo "Generating changelog for v$(VERSION)..."
+	@if ! git-cliff --unreleased --tag "v$(VERSION)" --prepend CHANGELOG.md; then \
+		echo ""; \
+		echo "ERROR: git-cliff failed."; \
+		echo "Ensure git-cliff is installed and GITHUB_TOKEN is valid."; \
+		exit 1; \
+	fi
+
+	@echo "Running release script..."
+	@export GITHUB_TOKEN=$(GITHUB_TOKEN); \
+	./hack/release.sh $(VERSION)
+
+	@echo ""
+	@echo "✅ Release v$(VERSION) prepared successfully."

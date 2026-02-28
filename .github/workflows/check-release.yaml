@@ -1,0 +1,129 @@
+name: Check Release
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - VERSION
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SEMVER_PATTERN: '^(v)?([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.([0-9]+))?$'
+  CHART_FILE: charts/kubeflow-trainer/Chart.yaml
+  PY_API_VERSION_FILE: api/python_api/kubeflow_trainer_api/__init__.py
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse version and export env vars
+        run: |
+          RAW_VERSION=$(cat VERSION | tr -d ' \n\r')
+          VERSION=${RAW_VERSION#v}
+          if [[ ${RAW_VERSION} =~ ${{ env.SEMVER_PATTERN }} ]]; then
+            echo "Version '${RAW_VERSION}' matches semver pattern."
+          else
+            echo "Version '${RAW_VERSION}' does not match semver pattern."
+            exit 1
+          fi
+          TAG="v${VERSION}"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+
+      - name: Check if tag exists
+        run: |
+          git fetch --tags
+          if git tag -l | grep -q "^${TAG}$"; then
+            echo "Tag '${TAG}' already exists."
+            exit 1
+          else
+            echo "Tag '${TAG}' does not exist."
+          fi
+
+      - name: Check if manifests image tag matches version
+        run: |
+          MANIFEST_TAGS=$(grep -r 'newTag:' manifests | sed 's/.*newTag:[[:space:]]*//' | tr -d '"' | tr -d "'" | sort | uniq)
+          if [ -z "$MANIFEST_TAGS" ]; then
+            echo "No newTag found in manifests."
+            exit 1
+          fi
+          for t in $MANIFEST_TAGS; do
+            if [ "$t" != "$TAG" ]; then
+              echo "Image tag in manifests ($t) does not match version tag ($TAG)."
+              exit 1
+            fi
+          done
+          echo "All image tags in manifests match version tag $TAG."
+
+      - name: Check Helm chart version
+        run: |
+          CHART_VERSION=$(grep -E '^version:' "$CHART_FILE" | head -n1 | awk '{print $2}')
+          if [ -z "$CHART_VERSION" ]; then
+            echo "Chart version not found in $CHART_FILE"
+            exit 1
+          fi
+          if [ "$CHART_VERSION" != "$VERSION" ]; then
+            echo "Chart version ($CHART_VERSION) does not match VERSION ($VERSION)."
+            exit 1
+          fi
+          echo "Chart version matches VERSION ($VERSION)."
+
+      - name: Check Python API version
+        run: |
+          PY_VER=$(python - <<'PY'
+          import os
+          import re
+          import sys
+          from pathlib import Path
+          path = Path(os.environ["PY_API_VERSION_FILE"])
+          text = path.read_text()
+          match = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
+          if not match:
+              print("__version__ not found", file=sys.stderr)
+              sys.exit(1)
+          print(match.group(1))
+          PY
+          )
+          if [ "$PY_VER" != "$VERSION" ]; then
+            echo "Python API version ($PY_VER) does not match VERSION ($VERSION)."
+            exit 1
+          fi
+          echo "Python API version matches VERSION ($VERSION)."
+
+      - name: Check configmap version in manager overlay
+        run: |
+          MANAGER_KUSTOMIZE="manifests/overlays/manager/kustomization.yaml"
+          if [ ! -f "$MANAGER_KUSTOMIZE" ]; then
+            echo "Manager kustomization not found: $MANAGER_KUSTOMIZE"
+            exit 1
+          fi
+          CM_VERSION=$(grep 'kubeflow_trainer_version=' "$MANAGER_KUSTOMIZE" | sed 's/.*kubeflow_trainer_version=//' | tr -d ' \t')
+          if [ -z "$CM_VERSION" ]; then
+            echo "kubeflow_trainer_version not found in $MANAGER_KUSTOMIZE."
+            exit 1
+          fi
+          if [ "$CM_VERSION" != "$TAG" ]; then
+            echo "Configmap version ($CM_VERSION) does not match version tag ($TAG)."
+            exit 1
+          fi
+          echo "Configmap version matches version tag $TAG."
+
+      - name: Check data-cache image is pinned
+        run: |
+          UNPINNED=$(grep -rn 'ghcr\.io/kubeflow/trainer/[A-Za-z0-9._/-]*:latest' manifests || true)
+          if [ -n "$UNPINNED" ]; then
+            echo "Found unpinned :latest image references in manifests:"
+            echo "$UNPINNED"
+            exit 1
+          fi
+          echo "All inline image references in manifests are pinned (no :latest)."

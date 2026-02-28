@@ -42,3 +42,4 @@ jobs:
           ignoreLabels: |
             do-not-merge/work-in-progress
             dependencies
+            area/release
