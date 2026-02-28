@@ -98,7 +98,7 @@ runs:
         cache-to: type=gha,ignore-error=true
 
     - name: Run Trivy Vulnerability Scan on Local Artifact
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@0.34.0
       with:
         image-ref: 'local-scan-target:latest'
         format: 'table'
