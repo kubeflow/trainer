@@ -1,0 +1,84 @@
+# Advanced Example 3: Volcano Gang Scheduling
+#
+# This example demonstrates gang scheduling with Volcano scheduler.
+# Gang scheduling ensures all pods start together, preventing resource deadlocks.
+#
+# The podGroupPolicy must be set in the TrainingRuntime (not the TrainJob).
+# This example creates a ClusterTrainingRuntime with Volcano enabled,
+# then a TrainJob that references it.
+#
+# Prerequisites:
+#   - Volcano scheduler must be installed in your cluster
+#
+# Apply: kubectl apply -f 03-volcano-integration.yaml
+# Check: kubectl get trainjobs volcano-example
+# Pods:  kubectl get pods -l trainer.kubeflow.org/job-name=volcano-example
+# Group: kubectl get podgroup -l trainer.kubeflow.org/job-name=volcano-example
+# Clean: kubectl delete trainjob volcano-example && kubectl delete clustertrainingruntime torch-distributed-volcano
+#
+# For more details, see:
+# https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/volcano/
+
+# Step 1: Create a ClusterTrainingRuntime with Volcano gang scheduling enabled
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: torch-distributed-volcano
+spec:
+  mlPolicy:
+    numNodes: 1
+    torch:
+      numProcPerNode: auto
+  # podGroupPolicy belongs in the Runtime, not the TrainJob
+  podGroupPolicy:
+    volcano: {}
+  template:
+    spec:
+      replicatedJobs:
+        - name: node
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+
+---
+# Step 2: Create a TrainJob that uses the Volcano-enabled runtime
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: volcano-example
+  namespace: default
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: torch-distributed-volcano
+
+  trainer:
+    numNodes: 4
+    command:
+      - python3
+      - -c
+      - |
+        import os
+        import time
+        node_rank = os.getenv('PET_NODE_RANK', '0')
+        nnodes = os.getenv('PET_NNODES', '1')
+        print(f"Node {node_rank}/{nnodes} started via Volcano gang scheduling")
+        print(f"All {nnodes} nodes are guaranteed to start together!")
+        time.sleep(5)
+        print(f"Node {node_rank} training complete")
+
+    resourcesPerNode:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
