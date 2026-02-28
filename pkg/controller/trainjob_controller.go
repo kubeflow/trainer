@@ -178,7 +178,6 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 	return nil
 }
 
-
 func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
 	if trainJob.Spec.ActiveDeadlineSeconds == nil || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return ctrl.Result{}, nil
