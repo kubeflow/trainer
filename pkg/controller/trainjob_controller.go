@@ -107,11 +107,14 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	var err error
 
 	if trainjob.IsTrainJobFinished(&trainJob) {
-		runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
-		if runtime, ok := r.runtimes[runtimeRefGK]; ok {
-			trainJobCopy := trainJob.DeepCopy()
-			trainJobCopy.Spec.Suspend = ptr.To(true)
-			_ = r.reconcileObjects(ctx, runtime, trainJobCopy)
+		failedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobComplete)
+		if failedCond != nil && failedCond.Reason == trainer.TrainJobDeadlineExceededReason {
+			runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
+			if runtime, ok := r.runtimes[runtimeRefGK]; ok {
+				trainJobCopy := trainJob.DeepCopy()
+				trainJobCopy.Spec.Suspend = ptr.To(true)
+				_ = r.reconcileObjects(ctx, runtime, trainJobCopy)
+			}
 		}
 		return ctrl.Result{}, nil
 	}
