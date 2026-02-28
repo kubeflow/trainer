@@ -1405,6 +1405,121 @@ alpha-node-0-1.alpha slots=8
 			})
 		})
 
+		ginkgo.Context("Lifecycle management: Deadline", func() {
+
+			ginkgo.It("Should fail TrainJob with DeadlineExceeded when ActiveDeadlineSeconds expires", func() {
+				// We must create the referenced ClusterTrainingRuntime so the webhook passes
+				runtime := testingutil.MakeClusterTrainingRuntimeWrapper("mock-mpi").Obj()
+				gomega.Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, runtime))).Should(gomega.Succeed())
+
+				deadline := int64(1)
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
+					ActiveDeadlineSeconds(deadline).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Waiting for TrainJob to fail due to deadline")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Ensuring the underlying JobSet is suspended")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(ptr.Deref(jobSet.Spec.Suspend, false)).To(gomega.BeTrue())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should not fail TrainJob if ActiveDeadlineSeconds is not exceeded", func() {
+				// We must create the referenced ClusterTrainingRuntime so the webhook passes
+				runtime := testingutil.MakeClusterTrainingRuntimeWrapper("mock-mpi").Obj()
+				gomega.Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, runtime))).Should(gomega.Succeed())
+
+				deadline := int64(3600)
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-not-exceeded-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
+					ActiveDeadlineSeconds(deadline).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Ensuring TrainJob does not fail immediately")
+				gomega.Consistently(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).ShouldNot(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should not start deadline timer if TrainJob is suspended", func() {
+				// We must create the referenced ClusterTrainingRuntime so the webhook passes
+				runtime := testingutil.MakeClusterTrainingRuntimeWrapper("mock-mpi").Obj()
+				gomega.Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, runtime))).Should(gomega.Succeed())
+
+				deadline := int64(1)
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-suspended-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
+					ActiveDeadlineSeconds(deadline).
+					Suspend(true).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Ensuring TrainJob does not fail while suspended")
+				gomega.Consistently(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).ShouldNot(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should reset deadline timer upon resume", func() {
+				// We must create the referenced ClusterTrainingRuntime so the webhook passes
+				runtime := testingutil.MakeClusterTrainingRuntimeWrapper("mock-mpi").Obj()
+				gomega.Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, runtime))).Should(gomega.Succeed())
+
+				deadline := int64(2)
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-resume-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
+					ActiveDeadlineSeconds(deadline).
+					Suspend(true).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Resuming TrainJob")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					gotTrainJob.Spec.Suspend = ptr.To(false)
+					g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Waiting for TrainJob to fail after resumed duration")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Ensuring the underlying JobSet is suspended")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(ptr.Deref(jobSet.Spec.Suspend, false)).To(gomega.BeTrue())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
+
 		ginkgo.Context("Integration Tests for the Jax Runtime", func() {
 			ginkgo.It("Should succeed to create TrainJob with Jax TrainingRuntime", func() {
 				ginkgo.By("Creating Jax TrainingRuntime and TrainJob")

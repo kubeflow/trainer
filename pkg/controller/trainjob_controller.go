@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"iter"
 	"slices"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -103,8 +104,21 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log := ctrl.LoggerFrom(ctx).WithValues("trainJob", klog.KObj(&trainJob))
 	ctx = ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling TrainJob")
-
 	var err error
+
+	if trainjob.IsTrainJobFinished(&trainJob) {
+		failedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobComplete)
+		if failedCond != nil && failedCond.Reason == trainer.TrainJobDeadlineExceededReason {
+			runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
+			if runtime, ok := r.runtimes[runtimeRefGK]; ok {
+				trainJobCopy := trainJob.DeepCopy()
+				trainJobCopy.Spec.Suspend = ptr.To(true)
+				_ = r.reconcileObjects(ctx, runtime, trainJobCopy)
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
 	// Keep track of the origin TrainJob status
 	prevTrainJob := trainJob.DeepCopy()
 
@@ -138,6 +152,14 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = errors.Join(err, statusErr)
 	}
 
+	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
+		err = errors.Join(err, deadlineErr)
+		if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
+			return deadlineResult, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
+		}
+		return deadlineResult, err
+	}
+
 	if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
 		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
 		// for sub-resources. See: https://github.com/kubernetes-sigs/controller-runtime/issues/3183
@@ -157,6 +179,29 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 		}
 	}
 	return nil
+}
+
+func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
+	if trainJob.Spec.ActiveDeadlineSeconds == 0 || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
+		return ctrl.Result{}, nil
+	}
+	startTime := trainJob.CreationTimestamp.Time
+	if resumedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobSuspended); resumedCond != nil && resumedCond.Status == metav1.ConditionFalse {
+		startTime = resumedCond.LastTransitionTime.Time
+	}
+	if startTime.IsZero() {
+		return ctrl.Result{}, nil
+	}
+	deadline := startTime.Add(time.Duration(trainJob.Spec.ActiveDeadlineSeconds) * time.Second)
+	if time.Now().After(deadline) {
+		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
+		return ctrl.Result{}, nil
+	}
+	requeueAfter := time.Until(deadline)
+	if requeueAfter <= 0 {
+		requeueAfter = time.Second
+	}
+	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
 func (r *TrainJobReconciler) Create(e event.TypedCreateEvent[*trainer.TrainJob]) bool {

@@ -106,6 +106,7 @@ type TrainingRuntimeList struct {
 
 // TrainingRuntimeSpec represents a specification of the desired training runtime.
 // +kubebuilder:validation:MinProperties=1
+// +kubebuilder:validation:XValidation:rule="!has(self.template) || !has(self.template.spec) || !has(self.template.spec.replicatedJobs) || self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec.activeDeadlineSeconds))",message="rj.template.spec.activeDeadlineSeconds must not be set; use activeDeadlineSeconds on TrainJobSpec instead"
 type TrainingRuntimeSpec struct {
 	// mlPolicy provides the ML-specific parameters for the model training.
 	// +optional

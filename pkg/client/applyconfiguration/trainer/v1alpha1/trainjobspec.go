@@ -38,6 +38,12 @@ type TrainJobSpecApplyConfiguration struct {
 	PodTemplateOverrides []PodTemplateOverrideApplyConfiguration `json:"podTemplateOverrides,omitempty"`
 	// suspend defines whether to suspend the running TrainJob.
 	Suspend *bool `json:"suspend,omitempty"`
+	// activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob
+	// start time (which resets on resume from suspension) that the TrainJob may be active
+	// before the system tries to terminate it. Value must be a positive integer.
+	// Once reached, all running Pods are terminated and the TrainJob status becomes
+	// Failed with reason: DeadlineExceeded.
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 	// managedBy is used to indicate the controller or entity that manages a TrainJob.
 	// The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or
 	// `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which
@@ -123,6 +129,14 @@ func (b *TrainJobSpecApplyConfiguration) WithPodTemplateOverrides(values ...*Pod
 // If called multiple times, the Suspend field is set to the value of the last call.
 func (b *TrainJobSpecApplyConfiguration) WithSuspend(value bool) *TrainJobSpecApplyConfiguration {
 	b.Suspend = &value
+	return b
+}
+
+// WithActiveDeadlineSeconds sets the ActiveDeadlineSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ActiveDeadlineSeconds field is set to the value of the last call.
+func (b *TrainJobSpecApplyConfiguration) WithActiveDeadlineSeconds(value int64) *TrainJobSpecApplyConfiguration {
+	b.ActiveDeadlineSeconds = &value
 	return b
 }
 

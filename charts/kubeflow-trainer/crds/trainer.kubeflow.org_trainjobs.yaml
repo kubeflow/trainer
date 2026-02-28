@@ -46,6 +46,19 @@ spec:
           spec:
             description: spec of the TrainJob.
             properties:
+              activeDeadlineSeconds:
+                description: |-
+                  activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob
+                  start time (which resets on resume from suspension) that the TrainJob may be active
+                  before the system tries to terminate it. Value must be a positive integer.
+                  Once reached, all running Pods are terminated and the TrainJob status becomes
+                  Failed with reason: DeadlineExceeded.
+                format: int64
+                minimum: 1
+                type: integer
+                x-kubernetes-validations:
+                - message: activeDeadlineSeconds is immutable
+                  rule: self == oldSelf
               annotations:
                 additionalProperties:
                   type: string

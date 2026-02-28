@@ -77,6 +77,11 @@ const (
 	// TrainJobRuntimeNotSupportedReason is the "Failed" condition reason
 	// when the referenced TrainingRuntime is not supported.
 	TrainJobRuntimeNotSupportedReason string = "TrainingRuntimeNotSupported"
+
+	// TrainJobDeadlineExceededReason is the "Failed" condition reason
+	// when the TrainJob exceeds its ActiveDeadlineSeconds.
+	// Matches the Kubernetes Job behavior.
+	TrainJobDeadlineExceededReason string = "DeadlineExceeded"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -131,6 +136,16 @@ type TrainJobSpec struct {
 	// +kubebuilder:default=false
 	// +optional
 	Suspend *bool `json:"suspend,omitempty"`
+
+	// activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob
+	// start time (which resets on resume from suspension) that the TrainJob may be active
+	// before the system tries to terminate it. Value must be a positive integer.
+	// Once reached, all running Pods are terminated and the TrainJob status becomes
+	// Failed with reason: DeadlineExceeded.
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="activeDeadlineSeconds is immutable"
+	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds,omitempty"`
 
 	// managedBy is used to indicate the controller or entity that manages a TrainJob.
 	// The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or
