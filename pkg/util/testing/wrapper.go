@@ -958,7 +958,6 @@ func (r *TrainingRuntimeWrapper) RuntimeSpec(spec trainer.TrainingRuntimeSpec) *
 	return r
 }
 
-
 func (r *TrainingRuntimeWrapper) Obj() *trainer.TrainingRuntime {
 	return &r.TrainingRuntime
 }
@@ -1096,7 +1095,6 @@ func (r *ClusterTrainingRuntimeWrapper) RuntimeSpec(spec trainer.TrainingRuntime
 	r.Spec = spec
 	return r
 }
-
 
 func (r *ClusterTrainingRuntimeWrapper) Obj() *trainer.ClusterTrainingRuntime {
 	return &r.ClusterTrainingRuntime
