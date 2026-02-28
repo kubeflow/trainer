@@ -49,6 +49,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/coscheduling"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/flux"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
@@ -78,6 +79,7 @@ func TestNew(t *testing.T) {
 				registry: fwkplugins.NewRegistry(),
 				plugins: map[string]framework.Plugin{
 					coscheduling.Name: &coscheduling.CoScheduling{},
+					flux.Name:         &flux.Flux{},
 					volcano.Name:      &volcano.Volcano{},
 					mpi.Name:          &mpi.MPI{},
 					plainml.Name:      &plainml.PlainML{},
@@ -86,6 +88,7 @@ func TestNew(t *testing.T) {
 					jax.Name:          &jax.Jax{},
 				},
 				enforceMLPlugins: []framework.EnforceMLPolicyPlugin{
+					&flux.Flux{},
 					&mpi.MPI{},
 					&plainml.PlainML{},
 					&torch.Torch{},
@@ -96,6 +99,7 @@ func TestNew(t *testing.T) {
 					&volcano.Volcano{},
 				},
 				customValidationPlugins: []framework.CustomValidationPlugin{
+					&flux.Flux{},
 					&mpi.MPI{},
 					&torch.Torch{},
 					&jobset.JobSet{},
@@ -103,6 +107,7 @@ func TestNew(t *testing.T) {
 					&jax.Jax{},
 				},
 				watchExtensionPlugins: []framework.WatchExtensionPlugin{
+					&flux.Flux{},
 					&coscheduling.CoScheduling{},
 					&volcano.Volcano{},
 					&jobset.JobSet{},
@@ -112,6 +117,7 @@ func TestNew(t *testing.T) {
 					&jobset.JobSet{},
 				},
 				componentBuilderPlugins: []framework.ComponentBuilderPlugin{
+					&flux.Flux{},
 					&coscheduling.CoScheduling{},
 					&volcano.Volcano{},
 					&jobset.JobSet{},
@@ -137,7 +143,8 @@ func TestNew(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(Framework{}),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
+		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, flux.Flux{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}),
+		cmpopts.IgnoreFields(flux.Flux{}, "client", "scheme"),
 		cmpopts.IgnoreFields(coscheduling.CoScheduling{}, "client"),
 		cmpopts.IgnoreFields(volcano.Volcano{}, "client"),
 		cmpopts.IgnoreFields(jobset.JobSet{}, "client", "restMapper", "scheme", "logger"),
@@ -2259,6 +2266,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 		"coscheduling, jobset, and mpi are performed": {
 			registry: fwkplugins.NewRegistry(),
 			wantPlugins: []framework.WatchExtensionPlugin{
+				&flux.Flux{},
 				&coscheduling.CoScheduling{},
 				&volcano.Volcano{},
 				&jobset.JobSet{},
@@ -2271,7 +2279,8 @@ func TestWatchExtensionPlugins(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortSlices(func(a, b framework.Plugin) bool { return a.Name() < b.Name() }),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, jobset.JobSet{}, mpi.MPI{}),
+		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, jobset.JobSet{}, mpi.MPI{}, flux.Flux{}),
+		cmpopts.IgnoreFields(flux.Flux{}, "client", "scheme"),
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -1,0 +1,26 @@
+# This example deploys the LAMMPS Molecular Dynamic Simulator
+# with MPI orchestrated by the Flux workload manager on 4 nodes.
+# This is "interactive" mode, so you can shell in to execute lmp.
+# See lammps-train-job.yaml for more details on the setup, and
+# instructions below for running lammps.
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: lammps-flux-interactive
+spec:
+  # Reference the pre-defined runtime by name
+  runtimeRef:
+    name: flux-runtime
+  trainer:
+    numNodes: 4
+    image: ghcr.io/converged-computing/metric-lammps:latest
+    command: ["sleep", "infinity"]
+    # To run lammps, shell into the 0-0 pod:
+    #  # Source environment
+    #  . /mnt/flux/flux-view.sh
+    #  # Connect to the running lead broker socket
+    #  flux proxy $fluxsocket bash
+    #  # See Flux resources!
+    #  flux resource list
+    #  Run lammps!
+    #  flux run -N 4 -n 4 lmp -v x 2 -v y 2 -v z 2 -in in.reaxc.hns -nocite

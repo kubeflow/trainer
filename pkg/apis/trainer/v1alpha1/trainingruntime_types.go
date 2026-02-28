@@ -170,14 +170,15 @@ type VolcanoPodGroupPolicySource struct {
 }
 
 // MLPolicy represents configuration for the model training with ML-specific parameters.
-// +kubebuilder:validation:XValidation:rule="[has(self.torch), has(self.mpi), has(self.jax)].filter(x, x).size() <= 1", message="Only one of the policy can be configured"
+// +kubebuilder:validation:XValidation:rule="!(has(self.numNodes) && (has(self.torch) && has(self.torch.elasticPolicy)))", message="numNodes should not be set if torch.elasticPolicy is configured"
+// +kubebuilder:validation:XValidation:rule="[has(self.torch), has(self.mpi), has(self.jax), has(self.flux)].filter(x, x).size() <= 1", message="Only one of the policy can be configured"
 type MLPolicy struct {
 	// numNodes is the number of training nodes.
 	// Defaults to 1.
 	// +optional
 	NumNodes *int32 `json:"numNodes,omitempty"`
 
-	// Configuration for the runtime-specific parameters, such as Torch or MPI.
+	// Configuration for the runtime-specific parameters, such as Torch, Flux, or MPI.
 	// Only one of its members may be specified.
 	MLPolicySource `json:",inline"`
 }
@@ -192,6 +193,10 @@ type MLPolicySource struct {
 	// mpi defines the configuration for the MPI Runtime.
 	// +optional
 	MPI *MPIMLPolicySource `json:"mpi,omitempty"`
+
+	// flux defines the configuration for the Flux runtime.
+	// +optional
+	Flux *FluxMLPolicySource `json:"flux,omitempty"`
 
 	// jax defines the configuration for the JAX Runtime
 	// +optional
@@ -240,6 +245,15 @@ type MPIMLPolicySource struct {
 	// +kubebuilder:default=false
 	// +optional
 	RunLauncherAsNode *bool `json:"runLauncherAsNode,omitempty"`
+}
+
+// FluxMLPolicySource represents a Flux HPC runtime configuration.
+type FluxMLPolicySource struct {
+	// numProcPerNode is the number of processes per node.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:XValidation:rule="self >= 1",message="NumProcPerNode in fluxPolicy must be >= 1"
+	// +optional
+	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
 }
 
 // MPIImplementation represents one of the supported MPI implementations.

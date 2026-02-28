@@ -19,6 +19,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow_trainer_api.models.trainer_v1alpha1_flux_ml_policy_source import TrainerV1alpha1FluxMLPolicySource
 from kubeflow_trainer_api.models.trainer_v1alpha1_mpiml_policy_source import TrainerV1alpha1MPIMLPolicySource
 from kubeflow_trainer_api.models.trainer_v1alpha1_torch_ml_policy_source import TrainerV1alpha1TorchMLPolicySource
 from typing import Optional, Set
@@ -28,10 +29,11 @@ class TrainerV1alpha1MLPolicySource(BaseModel):
     """
     MLPolicySource represents the runtime-specific configuration for various technologies. One of the following specs can be set.
     """ # noqa: E501
+    flux: Optional[TrainerV1alpha1FluxMLPolicySource] = Field(default=None, description="flux defines the configuration for the Flux runtime.")
     jax: Optional[Dict[str, Any]] = Field(default=None, description="jax defines the configuration for the JAX Runtime")
     mpi: Optional[TrainerV1alpha1MPIMLPolicySource] = Field(default=None, description="mpi defines the configuration for the MPI Runtime.")
     torch: Optional[TrainerV1alpha1TorchMLPolicySource] = Field(default=None, description="torch defines the configuration for the PyTorch runtime.")
-    __properties: ClassVar[List[str]] = ["jax", "mpi", "torch"]
+    __properties: ClassVar[List[str]] = ["flux", "jax", "mpi", "torch"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -72,6 +74,9 @@ class TrainerV1alpha1MLPolicySource(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of flux
+        if self.flux:
+            _dict['flux'] = self.flux.to_dict()
         # override the default output from pydantic by calling `to_dict()` of mpi
         if self.mpi:
             _dict['mpi'] = self.mpi.to_dict()
@@ -90,6 +95,7 @@ class TrainerV1alpha1MLPolicySource(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
+            "flux": TrainerV1alpha1FluxMLPolicySource.from_dict(obj["flux"]) if obj.get("flux") is not None else None,
             "jax": obj.get("jax"),
             "mpi": TrainerV1alpha1MPIMLPolicySource.from_dict(obj["mpi"]) if obj.get("mpi") is not None else None,
             "torch": TrainerV1alpha1TorchMLPolicySource.from_dict(obj["torch"]) if obj.get("torch") is not None else None

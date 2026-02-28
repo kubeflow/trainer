@@ -47,6 +47,19 @@ spec:
                 description: mlPolicy provides the ML-specific parameters for the
                   model training.
                 properties:
+                  flux:
+                    description: flux defines the configuration for the Flux runtime.
+                    properties:
+                      numProcPerNode:
+                        default: 1
+                        description: numProcPerNode is the number of processes per
+                          node.
+                        format: int32
+                        type: integer
+                        x-kubernetes-validations:
+                        - message: NumProcPerNode in fluxPolicy must be >= 1
+                          rule: self >= 1
+                    type: object
                   jax:
                     description: jax defines the configuration for the JAX Runtime
                     type: object
@@ -111,7 +124,7 @@ spec:
                 type: object
                 x-kubernetes-validations:
                 - message: Only one of the policy can be configured
-                  rule: '[has(self.torch), has(self.mpi), has(self.jax)].filter(x,
+                  rule: '[has(self.torch), has(self.mpi), has(self.jax), has(self.flux)].filter(x,
                     x).size() <= 1'
               podGroupPolicy:
                 description: podGroupPolicy defines the configuration for the PodGroup
