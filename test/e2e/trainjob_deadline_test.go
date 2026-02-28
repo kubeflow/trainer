@@ -38,11 +38,11 @@ var _ = ginkgo.Describe("TrainJob Lifecycle e2e", func() {
 	ginkgo.When("testing TrainJob ActiveDeadlineSeconds", func() {
 		ginkgo.It("should fail the TrainJob with DeadlineExceeded when active timeout expires", func() {
 			deadline := int64(10)
-			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-deadline-job").
-				RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
-				ActiveDeadlineSeconds(&deadline).
-				Obj()
-			
+		trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-deadline-job").
+			RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
+			ActiveDeadlineSeconds(&deadline).
+			Obj()
+
 			trainJob.Spec.Trainer = &trainer.Trainer{
 				Image: ptr.To("busybox"),
 				Command: []string{"/bin/sh", "-c", "sleep 600"},

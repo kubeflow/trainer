@@ -17,7 +17,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_initializer import TrainerV1alpha1Initializer
 from kubeflow_trainer_api.models.trainer_v1alpha1_pod_template_override import TrainerV1alpha1PodTemplateOverride
@@ -30,6 +30,7 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
     """
     TrainJobSpec represents specification of the desired TrainJob.
     """ # noqa: E501
+    active_deadline_seconds: Optional[StrictInt] = Field(default=None, description="activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob start time (which resets on resume from suspension) that the TrainJob may be active before the system tries to terminate it. Value must be a positive integer. Once reached, all running Pods are terminated and the TrainJob status becomes Failed with reason: DeadlineExceeded.", alias="activeDeadlineSeconds")
     annotations: Optional[Dict[str, StrictStr]] = Field(default=None, description="annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
     initializer: Optional[TrainerV1alpha1Initializer] = Field(default=None, description="initializer defines the configuration of the initializer.")
     labels: Optional[Dict[str, StrictStr]] = Field(default=None, description="labels to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
@@ -38,7 +39,7 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
     runtime_ref: TrainerV1alpha1RuntimeRef = Field(description="runtimeRef is the reference to the training runtime.", alias="runtimeRef")
     suspend: Optional[StrictBool] = Field(default=None, description="suspend defines whether to suspend the running TrainJob.")
     trainer: Optional[TrainerV1alpha1Trainer] = Field(default=None, description="trainer defines the configuration of the trainer.")
-    __properties: ClassVar[List[str]] = ["annotations", "initializer", "labels", "managedBy", "podTemplateOverrides", "runtimeRef", "suspend", "trainer"]
+    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "annotations", "initializer", "labels", "managedBy", "podTemplateOverrides", "runtimeRef", "suspend", "trainer"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -107,6 +108,7 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
+            "activeDeadlineSeconds": obj.get("activeDeadlineSeconds"),
             "annotations": obj.get("annotations"),
             "initializer": TrainerV1alpha1Initializer.from_dict(obj["initializer"]) if obj.get("initializer") is not None else None,
             "labels": obj.get("labels"),
