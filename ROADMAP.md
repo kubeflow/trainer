@@ -1,5 +1,41 @@
 # Kubeflow Trainer ROADMAP
 
+## 2026
+
+- Scheduling & Scalability
+  - Workload-Aware Scheduling for TrainJobs: https://github.com/kubeflow/trainer/issues/3015
+  - KAI Scheduler Integrations: https://github.com/kubeflow/trainer/issues/2628
+  - Enhanced Multi-Node NVLink Support
+  - First-Class Integration with [Kueue](https://kueue.sigs.k8s.io/docs/tasks/run/trainjobs/) for
+    multi-cluster job dispatching, topology-aware scheduling, and other features.
+  - Enhanced Scalability for Massively Distributed TrainJobs: https://github.com/kubeflow/trainer/issues/2318
+- MPI and HPC on Kubernetes
+  - Flux Integration for MPI and HPC workloads: https://github.com/kubeflow/trainer/issues/2841
+  - IntelMPI Support: https://github.com/kubeflow/trainer/issues/1807
+  - PMIx Investigation with Flux or Slurm: https://github.com/kubeflow/mpi-operator/issues/12
+  - Enhance MPI Orchestration: https://github.com/kubeflow/trainer/issues/2751
+- Observability & Reliability
+  - TrainJob Progress Tracking & Metrics Exposure: https://github.com/kubeflow/trainer/issues/2779
+  - Transparent Checkpoint/Restore for GPU-Accelerated TrainJobs: https://github.com/kubeflow/trainer/issues/2245
+  - TTLs and ActiveDeadlineSeconds for TrainJobs: https://github.com/kubeflow/trainer/issues/2899
+  - Elastic TrainJobs: https://github.com/kubeflow/trainer/issues/2903
+- Distributed Data Cache
+  - Tensor caching to accelerate GPU workloads: https://github.com/kubeflow/trainer/issues/3173
+  - Integration with OptimizationJob
+  - Explore RDMA with AI Schedulers and Data Cache
+- LLM Fine-Tuning Enhancements
+  - Predictive GPU Capacity Planning for TrainJobs
+  - Build Dynamic BuiltinTrainers and LLM Fine-Tuning Blueprints: https://github.com/kubeflow/trainer/issues/2839
+- New Kubeflow Trainer Runtimes
+  - Distributed JAX: https://github.com/kubeflow/trainer/issues/2442
+  - Distributed XGBoost: https://github.com/kubeflow/trainer/issues/2598
+  - Tensor Parallelism with Megatron-LM: https://github.com/kubeflow/trainer/issues/3178
+  - Slurm Runtime Integration: https://github.com/kubeflow/trainer/issues/2249
+- Implement registration mechanism in the Pipeline Framework to extend plugins and supported ML
+  frameworks in the Kubeflow Trainer: https://github.com/kubeflow/trainer/issues/2750
+- Kubeflow Trainer UI and TrainJob History Server: https://github.com/kubeflow/trainer/issues/2648
+- Integration with Kubeflow MCP Server: https://github.com/kubeflow/sdk/issues/238
+
 ## 2025
 
 - Kubeflow Trainer v2 general availability: https://github.com/kubeflow/trainer/issues/2170
