@@ -73,5 +73,4 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 				}),
 		)
 	})
-
 })
