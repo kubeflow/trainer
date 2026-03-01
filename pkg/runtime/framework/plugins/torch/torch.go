@@ -54,22 +54,13 @@ func (t *Torch) Name() string {
 
 func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
-	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer == nil || newObj.Spec.Trainer.NumProcPerNode == nil {
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer == nil {
 		return nil, allErrs
 	}
 
 	specPath := field.NewPath("spec")
 
 	if newObj.Spec.Trainer != nil {
-		numProcPerNodePath := specPath.Child("trainer").Child("numProcPerNode")
-		numProcPerNode := *newObj.Spec.Trainer.NumProcPerNode
-		if numProcPerNode.Type == intstr.String {
-			allowed := sets.New("auto", "cpu", "gpu")
-			if !allowed.Has(numProcPerNode.StrVal) {
-				allErrs = append(allErrs, field.Invalid(numProcPerNodePath, numProcPerNode, fmt.Sprintf("must have an int value or %v", sets.List(allowed))))
-			}
-		}
-
 		// Check reserved envs.
 		torchEnvs := sets.New[string]()
 		for _, env := range newObj.Spec.Trainer.Env {
@@ -105,9 +96,9 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
 	}
 
-	numProcPerNode := ptr.Deref(info.RuntimePolicy.MLPolicySource.Torch.NumProcPerNode, intstr.FromString("auto"))
+	numProcPerNode := intstr.FromString("auto")
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
-		numProcPerNode = ptr.Deref(trainJob.Spec.Trainer.NumProcPerNode, intstr.FromString("auto"))
+		numProcPerNode = intstr.FromInt32(*trainJob.Spec.Trainer.NumProcPerNode)
 	}
 
 	// Determine numProcPerNode based on the resourcesPerNode.
@@ -116,8 +107,8 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
 	}
 	gpuQ := runtime.GetNumGPUPerNode(&resourcesPerNode)
-	// If numProcPerNode is "cpu" or no GPU is set in resource, we calculate numProcPerNode based on CPU.
-	if numProcPerNode.String() == "cpu" || numProcPerNode.String() == "auto" && gpuQ == 0 {
+	// If no GPU is set in resource, calculate numProcPerNode based on CPU.
+	if numProcPerNode.String() == "auto" && gpuQ == 0 {
 		numProcPerNode = intstr.FromInt(max(1, getNumCPUPerNode(&resourcesPerNode)))
 	}
 

@@ -1299,18 +1299,8 @@ func schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref common.ReferenceCa
 			SchemaProps: spec.SchemaProps{
 				Description: "TorchMLPolicySource represents a PyTorch runtime configuration.",
 				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"numProcPerNode": {
-						SchemaProps: spec.SchemaProps{
-							Description: "numProcPerNode is the number of processes per node. This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI. Supported values: `auto`, `cpu`, `gpu`, or int value. Defaults to `auto`.",
-							Ref:         ref(intstr.IntOrString{}.OpenAPIModelName()),
-						},
-					},
-				},
 			},
 		},
-		Dependencies: []string{
-			intstr.IntOrString{}.OpenAPIModelName()},
 	}
 }
 
@@ -1665,15 +1655,16 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 					},
 					"numProcPerNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "numProcPerNode is the number of processes/workers/slots on every training node. For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set. For the MPI runtime only int value can be set.",
-							Ref:         ref(intstr.IntOrString{}.OpenAPIModelName()),
+							Description: "numProcPerNode is the number of processes/workers/slots on every training node. For the MPI runtime only int value can be set to represent number of slots per node. For the Torch runtime the value defaults to `auto` and can be overridden with an int.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.EnvVar{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), intstr.IntOrString{}.OpenAPIModelName()},
+			corev1.EnvVar{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName()},
 	}
 }
 

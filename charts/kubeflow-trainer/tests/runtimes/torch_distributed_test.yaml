@@ -64,8 +64,8 @@ tests:
           path: spec.mlPolicy.numNodes
           value: 1
       - equal:
-          path: spec.mlPolicy.torch.numProcPerNode
-          value: auto
+          path: spec.mlPolicy.torch
+          value: {}
 
   - it: Should use correct PyTorch image
     set:

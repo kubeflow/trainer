@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 )
@@ -199,16 +198,7 @@ type MLPolicySource struct {
 }
 
 // TorchMLPolicySource represents a PyTorch runtime configuration.
-type TorchMLPolicySource struct {
-	// numProcPerNode is the number of processes per node.
-	// This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI.
-	// Supported values: `auto`, `cpu`, `gpu`, or int value.
-	// Defaults to `auto`.
-	// +kubebuilder:default="auto"
-	// +kubebuilder:validation:XValidation:rule="self > 0 || self in ['auto', 'cpu', 'gpu']", message="NumProcPerNode must be equal to auto, cpu, gpu, or int value"
-	// +optional
-	NumProcPerNode *intstr.IntOrString `json:"numProcPerNode,omitempty"`
-}
+type TorchMLPolicySource struct{}
 
 // JAXMLPolicySource represents a jax runtime configuration.
 type JAXMLPolicySource struct{}

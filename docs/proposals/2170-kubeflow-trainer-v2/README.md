@@ -558,9 +558,9 @@ type Trainer struct {
 	ResourcesPerNode *corev1.ResourceRequirements `json:"resourcesPerNode,omitempty"`
 
 	// Number of processes/workers/slots on every training node.
-	// For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set.
 	// For the MPI runtime only int value can be set.
-	NumProcPerNode *string `json:"numProcPerNode,omitempty"`
+	// For the Torch runtime the value defaults to `auto` and can be overridden with an int.
+	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
 }
 ```
 
@@ -1095,8 +1095,7 @@ metadata:
 spec:
   mlPolicy:
     numNodes: 2
-    torch:
-      numProcPerNode: 5
+    torch: {}
   podGroupPolicy:
     coscheduling:
       scheduleTimeoutSeconds: 100
@@ -1165,13 +1164,7 @@ Since the [etcd and etcd-v2 are legacy rendezvous](https://pytorch.org/docs/stab
 we won't support them in `TorchMLPolicySource`. We can introduce them in the future if users will require them.
 
 ```golang
-type TorchMLPolicySource struct {
-	// Number of processes per node.
-	// This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI.
-	// Supported values: `auto`, `cpu`, `gpu`, or int value.
-	// Defaults to `auto`.
-	NumProcPerNode *string `json:"numProcPerNode,omitempty"`
-}
+type TorchMLPolicySource struct {}
 ```
 
 ### The MPIMLPolicySource API
@@ -1226,8 +1219,7 @@ metadata:
 spec:
   mlPolicy:
     numNodes: 2
-    torch:
-      numProcPerNode: 5
+    torch: {}
   template:
     spec:
       replicatedJobs:
@@ -1308,9 +1300,7 @@ kind: ClusterTrainingRuntime
 metadata:
   name: torch-distributed-single-worker
 spec:
-  mlPolicy:
-    torch:
-      numProcPerNode: 5
+  mlPolicy: {}
   template:
     spec:
       replicatedJobs:
@@ -1771,6 +1761,8 @@ spec:
 - 2025-03-15 Updated the initializer APIs
 - 2025-10-09 Added PodTemplateOverrides to TrainJob V2 API
 - 2026-02-23 Remove ElasticPolicy from the Torch API – will be implemented in the future KEPs
+- 2026-02-23 Removed `numProcPerNode` from `TorchMLPolicySource`; `TrainJob.Trainer.numProcPerNode`
+  now accepts only int values (torch plugin defaults to `auto`)
 
 ## Alternatives
 

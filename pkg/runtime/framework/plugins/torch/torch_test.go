@@ -74,7 +74,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -96,7 +96,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -146,7 +146,6 @@ func TestTorch(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("auto")).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("4"),
 						}).
@@ -157,7 +156,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -171,7 +170,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -221,7 +220,6 @@ func TestTorch(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("auto")).
 						Container("test:image", nil, nil, nil).
 						Obj(),
 				).
@@ -230,7 +228,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -244,7 +242,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -294,7 +292,6 @@ func TestTorch(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("auto")).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("2"), // Low CPU limit
 						}).
@@ -305,7 +302,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -319,7 +316,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -369,7 +366,6 @@ func TestTorch(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("auto")).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("3"),
 						}).
@@ -380,7 +376,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -394,7 +390,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -444,7 +440,6 @@ func TestTorch(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("auto")).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("2.5"), // 2.5 CPU cores
 						}).
@@ -455,7 +450,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -469,7 +464,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -519,7 +514,6 @@ func TestTorch(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("auto")).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("0.7"), // 0.7 CPU cores
 						}).
@@ -530,7 +524,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -544,7 +538,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -594,7 +588,6 @@ func TestTorch(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("auto")).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							"example.com/gpu": resource.MustParse("2"),
 						}).
@@ -605,7 +598,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -619,7 +612,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -669,7 +662,7 @@ func TestTorch(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromInt32(3)).
+						NumProcPerNode(3).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("8"),
 						}).
@@ -680,7 +673,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -694,7 +687,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -744,7 +737,6 @@ func TestTorch(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("auto")).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("2500m"), // 2.5 CPU cores in millicore format
 						}).
@@ -755,7 +747,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -769,7 +761,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -819,7 +811,6 @@ func TestTorch(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "cpu-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("cpu")).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("4"),
 						}).
@@ -830,7 +821,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -844,7 +835,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -890,11 +881,10 @@ func TestTorch(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
-		"nproc_per_node=cpu with GPU resources": {
+		"nproc_per_node=auto resolves to GPU count when GPU resources present": {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "cpu-gpu-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("cpu")).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("6"),
 							"example.com/gpu":  resource.MustParse("2"),
@@ -906,7 +896,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -920,7 +910,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -941,7 +931,7 @@ func TestTorch(t *testing.T) {
 								},
 								{
 									Name:  ptr.To(constants.TorchEnvNumProcPerNode),
-									Value: ptr.To("6"),
+									Value: ptr.To("auto"),
 								},
 								{
 									Name: ptr.To(constants.TorchEnvNodeRank),
@@ -970,7 +960,6 @@ func TestTorch(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper("default", "cpu-frac-job").
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
-						NumProcPerNode(intstr.FromString("cpu")).
 						Container("test:image", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU: resource.MustParse("3.7"),
 						}).
@@ -981,7 +970,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -995,7 +984,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -1046,7 +1035,6 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumNodes(4).
-						NumProcPerNode(intstr.FromString("auto")).
 						Container("pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime", nil, nil, corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("8"),
 							corev1.ResourceMemory: resource.MustParse("16Gi"),
@@ -1059,7 +1047,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -1080,7 +1068,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -1131,7 +1119,6 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumNodes(1).
-						NumProcPerNode(intstr.FromString("auto")).
 						Container(
 							"ghcr.io/kubeflow/trainer/torchtune-trainer",
 							[]string{"tune", "run"},
@@ -1158,7 +1145,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -1172,7 +1159,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -1215,7 +1202,7 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumNodes(1).
-						NumProcPerNode(intstr.FromInt32(1)).
+						NumProcPerNode(1).
 						Container(
 							"ghcr.io/kubeflow/trainer/torchtune-trainer",
 							[]string{"tune", "run"},
@@ -1242,7 +1229,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -1256,7 +1243,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -1299,7 +1286,7 @@ func TestTorch(t *testing.T) {
 				Trainer(
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumNodes(2).
-						NumProcPerNode(intstr.FromInt32(8)).
+						NumProcPerNode(8).
 						Container(
 							"ghcr.io/kubeflow/trainer/torchtune-trainer",
 							[]string{"tune", "run"},
@@ -1326,7 +1313,7 @@ func TestTorch(t *testing.T) {
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
 						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-							TorchPolicy(ptr.To(intstr.FromString("auto"))).
+							TorchPolicy().
 							Obj(),
 						).
 						Obj(),
@@ -1340,7 +1327,7 @@ func TestTorch(t *testing.T) {
 				Annotations: make(map[string]string),
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 				},
 				TemplateSpec: runtime.TemplateSpec{
@@ -1444,7 +1431,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(nil).
+						TorchPolicy().
 						Obj(),
 					).
 					Obj(),
@@ -1461,52 +1448,11 @@ func TestValidate(t *testing.T) {
 				).
 				Obj(),
 		},
-		"numProcPerNode is string and invalid": {
-			info: runtime.NewInfo(
-				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
-					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("npu"))).
-						Obj(),
-					).
-					Obj(),
-				),
-			),
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(intstr.FromString("npu")).
-					Obj(),
-				).
-				Obj(),
-			wantError: field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec").Child("trainer").Child("numProcPerNode"),
-					intstr.FromString("npu"),
-					fmt.Sprintf("must have an int value or %v", []string{"auto", "cpu", "gpu"}),
-				),
-			},
-		},
-		"numProcPerNode is valid string": {
-			info: runtime.NewInfo(
-				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
-					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
-						Obj(),
-					).
-					Obj(),
-				),
-			),
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(intstr.FromString("auto")).
-					Obj(),
-				).
-				Obj(),
-		},
 		"valid environment variable present": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 					).
 					Obj(),
@@ -1534,7 +1480,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 					).
 					Obj(),
@@ -1542,7 +1488,6 @@ func TestValidate(t *testing.T) {
 			),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(intstr.FromString("auto")).
 					Env(
 						[]corev1.EnvVar{
 							{
@@ -1583,7 +1528,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 					).
 					Obj(),
@@ -1591,7 +1536,6 @@ func TestValidate(t *testing.T) {
 			),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(intstr.FromString("auto")).
 					NumNodes(int32(1)).
 					Container(
 						"ghcr.io/kubeflow/trainer/torchtune-trainer",
@@ -1617,7 +1561,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 					).
 					Obj(),
@@ -1625,7 +1569,6 @@ func TestValidate(t *testing.T) {
 			),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(intstr.FromString("auto")).
 					NumNodes(int32(2)).
 					Container(
 						"ghcr.io/kubeflow/trainer/torchtune-trainer",
@@ -1651,7 +1594,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 					).
 					Obj(),
@@ -1659,7 +1602,6 @@ func TestValidate(t *testing.T) {
 			),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(intstr.FromString("auto")).
 					NumNodes(int32(1)).
 					Container(
 						"ghcr.io/kubeflow/trainer/torchtune-trainer",
@@ -1689,7 +1631,7 @@ func TestValidate(t *testing.T) {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
 					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
-						TorchPolicy(ptr.To(intstr.FromString("auto"))).
+						TorchPolicy().
 						Obj(),
 					).
 					Obj(),
@@ -1697,7 +1639,6 @@ func TestValidate(t *testing.T) {
 			),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(intstr.FromString("auto")).
 					NumNodes(int32(1)).
 					Container(
 						"ghcr.io/kubeflow/trainer/torchtune-trainer",

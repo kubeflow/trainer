@@ -50,8 +50,8 @@ func (b *MLPolicyApplyConfiguration) WithNumNodes(value int32) *MLPolicyApplyCon
 // WithTorch sets the Torch field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Torch field is set to the value of the last call.
-func (b *MLPolicyApplyConfiguration) WithTorch(value *TorchMLPolicySourceApplyConfiguration) *MLPolicyApplyConfiguration {
-	b.MLPolicySourceApplyConfiguration.Torch = value
+func (b *MLPolicyApplyConfiguration) WithTorch(value trainerv1alpha1.TorchMLPolicySource) *MLPolicyApplyConfiguration {
+	b.MLPolicySourceApplyConfiguration.Torch = &value
 	return b
 }
 

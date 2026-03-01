@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
@@ -977,7 +976,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto"))).
+								TorchPolicy().
 								Obj(),
 							).
 							Obj(),
@@ -1008,7 +1007,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				Trainer(
 					testingutil.MakeTrainJobTrainerWrapper().
 						NumNodes(30).
-						NumProcPerNode(intstr.FromInt32(3)).
+						NumProcPerNode(3).
 						Obj(),
 				).
 				Obj(),
@@ -1071,7 +1070,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto"))).
+								TorchPolicy().
 								Obj(),
 							).
 							Obj(),
@@ -1171,7 +1170,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(100).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto"))).
+								TorchPolicy().
 								Obj(),
 							).
 							Obj(),
@@ -1228,7 +1227,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							},
 							resRequests).
 						NumNodes(30).
-						NumProcPerNode(intstr.FromInt32(3)).
+						NumProcPerNode(3).
 						Obj(),
 				).
 				Obj(),
@@ -1305,7 +1304,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(1).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto"))).
+								TorchPolicy().
 								Obj(),
 							).
 							Obj(),
@@ -1368,7 +1367,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
 						).
 						NumNodes(1).
-						NumProcPerNode(intstr.FromString("auto")).
 						Obj(),
 				).
 				Obj(),
@@ -1446,7 +1444,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(1).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto"))).
+								TorchPolicy().
 								Obj(),
 							).
 							Obj(),
@@ -1510,7 +1508,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							corev1.ResourceList{"example.com/gpu": resource.MustParse("1")},
 						).
 						NumNodes(1).
-						NumProcPerNode(intstr.FromString("auto")).
 						Obj(),
 				).
 				Obj(),
@@ -1588,7 +1585,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 						testingutil.MakeMLPolicyWrapper().
 							WithNumNodes(1).
 							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-								TorchPolicy(ptr.To(intstr.FromString("auto"))).
+								TorchPolicy().
 								Obj(),
 							).
 							Obj(),
@@ -1653,7 +1650,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
 						).
 						NumNodes(1).
-						NumProcPerNode(intstr.FromString("auto")).
 						Obj(),
 				).
 				Obj(),
@@ -1754,7 +1750,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				Trainer(
 					testingutil.MakeTrainJobTrainerWrapper().
 						NumNodes(2).
-						NumProcPerNode(intstr.FromInt32(8)).
+						NumProcPerNode(8).
 						Obj(),
 				).
 				Obj(),

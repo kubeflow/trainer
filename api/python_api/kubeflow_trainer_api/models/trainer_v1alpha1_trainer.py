@@ -21,7 +21,6 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_env_var import IoK8sApiCoreV1EnvVar
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_resource_requirements import IoK8sApiCoreV1ResourceRequirements
-from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_util_intstr_int_or_string import IoK8sApimachineryPkgUtilIntstrIntOrString
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -34,7 +33,7 @@ class TrainerV1alpha1Trainer(BaseModel):
     env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="env is the list of environment variables to set in the training container. These values will be merged with the TrainingRuntime's trainer environments.")
     image: Optional[StrictStr] = Field(default=None, description="image is the container image for the training container.")
     num_nodes: Optional[StrictInt] = Field(default=None, description="numNodes is the number of training nodes.", alias="numNodes")
-    num_proc_per_node: Optional[IoK8sApimachineryPkgUtilIntstrIntOrString] = Field(default=None, description="numProcPerNode is the number of processes/workers/slots on every training node. For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set. For the MPI runtime only int value can be set.", alias="numProcPerNode")
+    num_proc_per_node: Optional[StrictInt] = Field(default=None, description="numProcPerNode is the number of processes/workers/slots on every training node. For the MPI runtime only int value can be set to represent number of slots per node. For the Torch runtime the value defaults to `auto` and can be overridden with an int.", alias="numProcPerNode")
     resources_per_node: Optional[IoK8sApiCoreV1ResourceRequirements] = Field(default=None, description="resourcesPerNode defines the compute resources for each training node.", alias="resourcesPerNode")
     __properties: ClassVar[List[str]] = ["args", "command", "env", "image", "numNodes", "numProcPerNode", "resourcesPerNode"]
 
@@ -84,9 +83,6 @@ class TrainerV1alpha1Trainer(BaseModel):
                 if _item_env:
                     _items.append(_item_env.to_dict())
             _dict['env'] = _items
-        # override the default output from pydantic by calling `to_dict()` of num_proc_per_node
-        if self.num_proc_per_node:
-            _dict['numProcPerNode'] = self.num_proc_per_node.to_dict()
         # override the default output from pydantic by calling `to_dict()` of resources_per_node
         if self.resources_per_node:
             _dict['resourcesPerNode'] = self.resources_per_node.to_dict()
@@ -107,7 +103,7 @@ class TrainerV1alpha1Trainer(BaseModel):
             "env": [IoK8sApiCoreV1EnvVar.from_dict(_item) for _item in obj["env"]] if obj.get("env") is not None else None,
             "image": obj.get("image"),
             "numNodes": obj.get("numNodes"),
-            "numProcPerNode": IoK8sApimachineryPkgUtilIntstrIntOrString.from_dict(obj["numProcPerNode"]) if obj.get("numProcPerNode") is not None else None,
+            "numProcPerNode": obj.get("numProcPerNode"),
             "resourcesPerNode": IoK8sApiCoreV1ResourceRequirements.from_dict(obj["resourcesPerNode"]) if obj.get("resourcesPerNode") is not None else None
         })
         return _obj

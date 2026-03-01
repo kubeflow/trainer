@@ -14281,17 +14281,7 @@
       },
       "trainer.v1alpha1.TorchMLPolicySource": {
         "description": "TorchMLPolicySource represents a PyTorch runtime configuration.",
-        "type": "object",
-        "properties": {
-          "numProcPerNode": {
-            "description": "numProcPerNode is the number of processes per node. This value is inserted into the `--nproc-per-node` argument of the `torchrun` CLI. Supported values: `auto`, `cpu`, `gpu`, or int value. Defaults to `auto`.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
-              }
-            ]
-          }
-        }
+        "type": "object"
       },
       "trainer.v1alpha1.TrainJob": {
         "description": "TrainJob represents configuration of a training job.",
@@ -14529,12 +14519,9 @@
             "format": "int32"
           },
           "numProcPerNode": {
-            "description": "numProcPerNode is the number of processes/workers/slots on every training node. For the Torch runtime: `auto`, `cpu`, `gpu`, or int value can be set. For the MPI runtime only int value can be set.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
-              }
-            ]
+            "description": "numProcPerNode is the number of processes/workers/slots on every training node. For the MPI runtime only int value can be set to represent number of slots per node. For the Torch runtime the value defaults to `auto` and can be overridden with an int.",
+            "type": "integer",
+            "format": "int32"
           },
           "resourcesPerNode": {
             "description": "resourcesPerNode defines the compute resources for each training node.",
