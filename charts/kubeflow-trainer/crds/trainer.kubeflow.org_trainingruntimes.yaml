@@ -108,6 +108,10 @@ spec:
                             or int value
                           rule: self > 0 || self in ['auto', 'cpu', 'gpu']
                     type: object
+                  xgboost:
+                    description: xgboost defines the configuration for the XGBoost
+                      Runtime.
+                    type: object
                 type: object
                 x-kubernetes-validations:
                 - message: Only one of the policy can be configured

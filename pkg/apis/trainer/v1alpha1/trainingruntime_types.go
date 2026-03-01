@@ -196,6 +196,10 @@ type MLPolicySource struct {
 	// jax defines the configuration for the JAX Runtime
 	// +optional
 	JAX *JAXMLPolicySource `json:"jax,omitempty"`
+
+	// xgboost defines the configuration for the XGBoost Runtime.
+	// +optional
+	XGBoost *XGBoostMLPolicySource `json:"xgboost,omitempty"`
 }
 
 // TorchMLPolicySource represents a PyTorch runtime configuration.
@@ -212,6 +216,15 @@ type TorchMLPolicySource struct {
 
 // JAXMLPolicySource represents a jax runtime configuration.
 type JAXMLPolicySource struct{}
+
+// XGBoostMLPolicySource represents an XGBoost runtime configuration.
+// The number of workers per node is automatically derived from container GPU resources:
+//   - GPU training: 1 worker per GPU (from resourcesPerNode)
+//   - CPU training: 1 worker per node (each worker utilizes all available CPU cores
+//     via XGBoost's multi-threaded execution, controlled by the nthread parameter)
+//
+// DMLC_NUM_WORKER = numNodes × workersPerNode (where workersPerNode = GPU count or 1)
+type XGBoostMLPolicySource struct{}
 
 // MPIMLPolicySource represents a MPI runtime configuration.
 type MPIMLPolicySource struct {

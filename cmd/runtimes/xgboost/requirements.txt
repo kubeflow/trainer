@@ -1,0 +1,4 @@
+# GPU-enabled XGBoost (CUDA 12 build)
+xgboost[cuda12]==3.0.2
+# Core numerical stack
+numpy>=1.24,<3.0
