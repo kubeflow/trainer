@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -107,13 +108,19 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	var err error
 
 	if trainjob.IsTrainJobFinished(&trainJob) {
-		failedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobComplete)
+		failedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
 		if failedCond != nil && failedCond.Reason == trainer.TrainJobDeadlineExceededReason {
 			runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 			if runtime, ok := r.runtimes[runtimeRefGK]; ok {
-				trainJobCopy := trainJob.DeepCopy()
-				trainJobCopy.Spec.Suspend = ptr.To(true)
-				_ = r.reconcileObjects(ctx, runtime, trainJobCopy)
+				jobSet := &jobsetv1alpha2.JobSet{}
+				err := r.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Name}, jobSet)
+				if err == nil {
+					trainJobCopy := trainJob.DeepCopy()
+					trainJobCopy.Spec.Suspend = ptr.To(true)
+					if suspendErr := r.reconcileObjects(ctx, runtime, trainJobCopy); suspendErr != nil {
+						log.V(2).Info("Failed to suspend JobSet after deadline exceeded", "error", suspendErr)
+					}
+				}
 			}
 		}
 		return ctrl.Result{}, nil
@@ -148,14 +155,21 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	setSuspendedCondition(&trainJob)
 
-	if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
-		err = errors.Join(err, statusErr)
+	if runtime != nil {
+		if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
+			err = errors.Join(err, statusErr)
+		}
 	}
 
 	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
-		err = errors.Join(err, deadlineErr)
+		if deadlineErr != nil {
+			err = errors.Join(err, deadlineErr)
+		}
 		if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
 			return deadlineResult, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
+		}
+		if deadlineResult.RequeueAfter > 0 {
+			return deadlineResult, nil
 		}
 		return deadlineResult, err
 	}
@@ -185,22 +199,29 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 	if trainJob.Spec.ActiveDeadlineSeconds == 0 || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return ctrl.Result{}, nil
 	}
+	log := ctrl.LoggerFrom(ctx)
 	startTime := trainJob.CreationTimestamp.Time
-	if resumedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobSuspended); resumedCond != nil && resumedCond.Status == metav1.ConditionFalse {
-		startTime = resumedCond.LastTransitionTime.Time
+	suspendedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobSuspended)
+	if suspendedCond != nil && suspendedCond.Status == metav1.ConditionFalse {
+		startTime = suspendedCond.LastTransitionTime.Time
 	}
 	if startTime.IsZero() {
 		return ctrl.Result{}, nil
 	}
 	deadline := startTime.Add(time.Duration(trainJob.Spec.ActiveDeadlineSeconds) * time.Second)
-	if time.Now().After(deadline) {
+	now := time.Now()
+	if now.After(deadline) {
+		log.V(2).Info("TrainJob deadline exceeded, marking as failed",
+			"activeDeadlineSeconds", trainJob.Spec.ActiveDeadlineSeconds,
+			"startTime", startTime,
+			"deadline", deadline)
 		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
 		return ctrl.Result{}, nil
 	}
 	requeueAfter := time.Until(deadline)
-	if requeueAfter <= 0 {
-		requeueAfter = time.Second
-	}
+	log.V(2).Info("Scheduling deadline check",
+		"activeDeadlineSeconds", trainJob.Spec.ActiveDeadlineSeconds,
+		"requeueAfter", requeueAfter)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
