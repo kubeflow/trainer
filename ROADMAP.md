@@ -5,14 +5,14 @@
 - Scheduling & Scalability
   - Workload-Aware Scheduling for TrainJobs: https://github.com/kubeflow/trainer/issues/3015
   - KAI Scheduler Integrations: https://github.com/kubeflow/trainer/issues/2628
-  - Enhanced Multi-Node NVLink Support
+  - Support Multi-Node NVLink (MNNVL) for TrainJob: https://github.com/kubeflow/trainer/issues/3264
   - First-Class Integration with [Kueue](https://kueue.sigs.k8s.io/docs/tasks/run/trainjobs/) for
     multi-cluster job dispatching, topology-aware scheduling, and other features.
   - Enhanced Scalability for Massively Distributed TrainJobs: https://github.com/kubeflow/trainer/issues/2318
 - MPI and HPC on Kubernetes
   - Flux Integration for MPI and HPC workloads: https://github.com/kubeflow/trainer/issues/2841
   - IntelMPI Support: https://github.com/kubeflow/trainer/issues/1807
-  - PMIx Investigation with Flux or Slurm: https://github.com/kubeflow/mpi-operator/issues/12
+  - PMIx Investigation with Flux or Slurm plugins
   - Enhance MPI Orchestration: https://github.com/kubeflow/trainer/issues/2751
 - Observability & Reliability
   - TrainJob Progress Tracking & Metrics Exposure: https://github.com/kubeflow/trainer/issues/2779
