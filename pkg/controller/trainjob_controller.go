@@ -196,7 +196,7 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 }
 
 func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
-	if trainJob.Spec.ActiveDeadlineSeconds == 0 || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
+	if trainJob.Spec.ActiveDeadlineSeconds == nil || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return ctrl.Result{}, nil
 	}
 	log := ctrl.LoggerFrom(ctx)
@@ -208,11 +208,11 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 	if startTime.IsZero() {
 		return ctrl.Result{}, nil
 	}
-	deadline := startTime.Add(time.Duration(trainJob.Spec.ActiveDeadlineSeconds) * time.Second)
+	deadline := startTime.Add(time.Duration(*trainJob.Spec.ActiveDeadlineSeconds) * time.Second)
 	now := time.Now()
 	if now.After(deadline) {
 		log.V(2).Info("TrainJob deadline exceeded, marking as failed",
-			"activeDeadlineSeconds", trainJob.Spec.ActiveDeadlineSeconds,
+			"activeDeadlineSeconds", *trainJob.Spec.ActiveDeadlineSeconds,
 			"startTime", startTime,
 			"deadline", deadline)
 		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
@@ -220,7 +220,7 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 	}
 	requeueAfter := time.Until(deadline)
 	log.V(2).Info("Scheduling deadline check",
-		"activeDeadlineSeconds", trainJob.Spec.ActiveDeadlineSeconds,
+		"activeDeadlineSeconds", *trainJob.Spec.ActiveDeadlineSeconds,
 		"requeueAfter", requeueAfter)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
