@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -54,8 +55,8 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, enableHTTP2 bool
 }
 
 func createClient(mgr ctrl.Manager, cfg *configapi.StatusServer) (client.Client, error) {
-	// Clone the manager's rest config and override rate limits
-	mgrCfg := *mgr.GetConfig()
+	// Copy the manager's rest config and override rate limits
+	mgrCfg := rest.CopyConfig(mgr.GetConfig())
 	if cfg.QPS != nil {
 		mgrCfg.QPS = *cfg.QPS
 	}
@@ -63,7 +64,7 @@ func createClient(mgr ctrl.Manager, cfg *configapi.StatusServer) (client.Client,
 		mgrCfg.Burst = int(*cfg.Burst)
 	}
 
-	cli, err := client.New(&mgrCfg, client.Options{
+	cli, err := client.New(mgrCfg, client.Options{
 		Scheme: mgr.GetScheme(),
 		Mapper: mgr.GetRESTMapper(),
 	})
