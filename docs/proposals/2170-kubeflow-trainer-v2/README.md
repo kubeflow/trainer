@@ -312,17 +312,11 @@ type TrainJobSpec struct {
 	// Configuration of the trainer.
 	Trainer *Trainer `json:"trainer,omitempty"`
 
-	// Labels to apply for the derivative JobSet and Jobs.
-	// They will be merged with the TrainingRuntime values.
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// Annotations to apply for the derivative JobSet and Jobs.
-	// They will be merged with the TrainingRuntime values.
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// Custom overrides for the training runtime.
-	// +listType=atomic
-	PodTemplateOverrides []PodTemplateOverride `json:"podTemplateOverrides,omitempty"`
+	// runtimePatches defines custom patches applied to the TrainJob's Runtime.
+	// Patches are keyed by manager to provide clear ownership and avoid conflicts between controllers.
+	// +listType=map
+	// +listMapKey=manager
+	RuntimePatches []RuntimePatch `json:"runtimePatches,omitempty"`
 
 	// Whether the controller should suspend the running TrainJob.
 	// Defaults to false.
@@ -427,18 +421,12 @@ This table explains the rationale for each `TrainJob` parameter:
    </td>
   </tr>
   <tr>
-   <td><code>Labels and Annotations</code>
+   <td><code>RuntimePatches</code>
    </td>
-   <td>Custom metadata that needs to be applied to the <code>TrainJob</code> resources: JobSet, Job, and Pods.
-   </td>
-  </tr>
-  <tr>
-   <td><code>PodTemplateOverrides</code>
-   </td>
-   <td>Custom overrides that are specific to the <code>TrainJob</code> and need to be applied to the
-    <code>TrainJob</code> resources. For example, the user identity. Usually, it is managed by
-    custom admission webhooks that inject data to the <code>TrainJob</code> after the user creates it
-    via the Python SDK or <code>kubectl</code>
+   <td>Structured patches applied to the TrainJob's Runtime, keyed by manager.
+    Used to inject runtime-specific configuration such as user identity, PVC mounts, node selectors,
+    or scheduling constraints. Typically managed by admission webhooks or external controllers
+    (e.g. Kueue) after the user creates the <code>TrainJob</code> via the Python SDK or <code>kubectl</code>.
    </td>
   </tr>
   <tr>
@@ -760,94 +748,224 @@ replicatedJobs:
                     value: AutoModelForCausalLM
 ```
 
-### The PodTemplateOverride APIs
+### The RuntimePatches API
 
-The `PodTemplateOverride` represents overrides for the `TrainingRuntime` when `TrainJob` is created.
-These parameters can include the user's identity or PVC.
+`runtimePatches` allows controllers, admission webhooks, and custom clients to attach structured
+patches to a `TrainJob` without conflicting with each other. Common use cases include injecting
+user identity, PVC mounts, node selectors, or scheduling constraints that are determined
+outside the TrainJob itself – for example by Kueue during resource allocation or by a
+multi-tenant admission webhook. The patch is applied to the underlying runtime, allowing users
+to customize Job template before creation.
 
-Usually, these parameters should not be configured by the user and should be attached during the
-orchestration (e.g. using Kubernetes admission webhooks or custom clients).
+Each entry is keyed by a unique `manager` field (the list map key). A manager owns its entry
+and updates it in place. The `time` field is set by the Trainer admission webhook on each write
+and is used for observability only — it is not a list map key.
 
-In the future, we can add more parameters if we find use-cases when it is required.
+The `trainingRuntimeSpec` field is a discriminated union over supported runtime kinds. For
+`ClusterTrainingRuntime` and `TrainingRuntime`-based jobs it exposes a restricted subset of the
+runtime spec: JobSet-level metadata, per-replicated-job Job template metadata, and a curated set
+of Pod spec fields.
+
+In the future, we can extend `RuntimePatch` API with other supported Runtimes (e.g. GroveRuntime).
+In that case, users will be able to select one of supported specs, for example: `TrainingRuntimeSpec`
+or `GroveRuntimeSpec`
 
 ```golang
-// PodTemplateOverride represents the custom overrides that will be applied for the TrainJob's resources.
-type PodTemplateOverride struct {
-	// TargetJobs are the training job replicas in the training runtime template to apply the overrides.
-	// +listType=atomic
-	TargetJobs []PodTemplateOverrideTargetJob `json:"targetJobs"`
+// RuntimePatch represents a custom patch applied to the TrainJob's training runtime template.
+// Patches are keyed by manager to provide clear ownership and avoid conflicts between controllers.
+type RuntimePatch struct {
+	// manager indicates who owns this patch entry. It can be set by the user, external
+	// controllers, or admission webhooks to track ownership and avoid conflicts.
+	// For example, Kueue sets this field to "kueue.x-k8s.io/manager".
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
+	// +required
+	Manager string `json:"manager"`
 
-	// Override for the Pod template metadata.
-	// These values will be merged with the TrainingRuntime's Pod template metadata.
+	// time is the timestamp of when this patch was last written.
+	// Set by the Trainer admission webhook on each create or update. Used for observability only,
+	// not used as a list map key.
+	// +optional
+	Time *metav1.Time `json:"time,omitempty"`
+
+	// trainingRuntimeSpec defines allowed patches for ClusterTrainingRuntime or TrainingRuntime-based jobs.
+	// +optional
+	TrainingRuntimeSpec *TrainingRuntimeSpecPatch `json:"trainingRuntimeSpec,omitempty"`
+}
+
+// TrainingRuntimeSpecPatch mirrors TrainingRuntimeSpec but only exposes
+// the fields managers are permitted to patch.
+type TrainingRuntimeSpecPatch struct {
+	// template patches the JobSet template.
+	// +optional
+	Template *JobSetTemplatePatch `json:"template,omitempty"`
+}
+
+// JobSetTemplatePatch defines patches for the JobSet template.
+// It mirrors JobSetTemplateSpec but only exposes metadata and restricted spec fields.
+type JobSetTemplatePatch struct {
+	// metadata patches the JobSet object metadata.
+	// Only labels and annotations are allowed.
+	// +optional
 	Metadata *metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Override for the Pod template spec.
-	// These values will be merged with the TrainingRuntime's Pod template spec.
-	Spec *PodTemplateSpecOverride `json:"spec,omitempty"`
+	// spec patches the JobSet spec with restricted fields.
+	// +optional
+	Spec *JobSetSpecPatch `json:"spec,omitempty"`
 }
 
-type PodTemplateOverrideTargetJob struct {
-	// Name is the target training job name for which the PodSpec is overridden.
+// JobSetSpecPatch defines allowed patches for the JobSet spec.
+type JobSetSpecPatch struct {
+	// replicatedJobs defines per-job patches, keyed by job name.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ReplicatedJobs []ReplicatedJobPatch `json:"replicatedJobs,omitempty"`
+}
+
+// ReplicatedJobPatch defines patches for a specific replicated job within the JobSet.
+type ReplicatedJobPatch struct {
+	// name is the name of the replicated job to patch.
+	// +kubebuilder:validation:MinLength=1
+	// +required
 	Name string `json:"name"`
+
+	// template patches the Job template for this replicated job.
+	// +optional
+	Template *JobTemplatePatch `json:"template,omitempty"`
 }
 
-// PodTemplateSpecOverride represents the spec overrides for Pod template.
-type PodTemplateSpecOverride struct {
-	// Override for the service account.
+// JobTemplatePatch defines patches for a Job template within a replicated job.
+type JobTemplatePatch struct {
+	// metadata patches the Job template metadata.
+	// Only labels and annotations are allowed.
+	// +optional
+	Metadata *metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// spec patches the Job spec with restricted fields.
+	// +optional
+	Spec *JobSpecPatch `json:"spec,omitempty"`
+}
+
+// JobSpecPatch defines allowed patches for the Job spec.
+type JobSpecPatch struct {
+	// template patches the Pod template for this Job.
+	// +optional
+	Template *PodTemplatePatch `json:"template,omitempty"`
+}
+
+// PodTemplatePatch defines patches for a Pod template within a Job.
+type PodTemplatePatch struct {
+	// metadata patches the Pod template metadata.
+	// Only labels and annotations are allowed.
+	// +optional
+	Metadata *metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// spec patches the Pod spec with the fields managers are permitted to set.
+	// +optional
+	Spec *PodSpecPatch `json:"spec,omitempty"`
+}
+
+// PodSpecPatch contains the Pod spec fields that managers are permitted to patch.
+type PodSpecPatch struct {
+	// serviceAccountName patches the service account for the Pods in the target job templates.
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
+	// +optional
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 
-	// Override for the node selector to place Pod on the specific mode.
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// Override for the Pod's affinity.
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Override for the Pod's tolerations.
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// Overrides for the Pod volume configuration.
+	// volumes patches the Pod's volumes.
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
+	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
-	// Overrides for the init container in the desired job templates.
-	InitContainers []ContainerOverride `json:"initContainers,omitempty"`
+	// initContainers patches the init containers in the target job templates.
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
+	// +optional
+	InitContainers []ContainerPatch `json:"initContainers,omitempty"`
 
-	// Overrides for the containers in the desired job templates.
-	Containers []ContainerOverride `json:"containers,omitempty"`
+	// containers patches specific containers in the target job templates.
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
+	// +optional
+	Containers []ContainerPatch `json:"containers,omitempty"`
 
-	// SchedulingGates overrides the scheduling gates of the Pods in the target job templates.
-	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
-
-	// ImagePullSecrets overrides the image pull secrets for the Pods in the target job templates.
+	// imagePullSecrets patches the image pull secrets for the Pods in the target job templates.
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
+	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
+	// securityContext patches the Pod's security context.
+	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
+	// +optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext,omitempty"`
+
+	// nodeSelector patches the node selector to place Pods on specific nodes.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// affinity patches the Pod's scheduling affinity.
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// tolerations patches the Pod's tolerations.
+	// +listType=atomic
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// schedulingGates patches the scheduling gates for the Pods in the target job templates.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
 }
 
-// ContainerOverride represents parameters that can be overridden using PodTemplateOverrides.
-type ContainerOverride struct {
-	// Name for the container. TrainingRuntime must have this container.
-	Name string `json:"name"`
+// ContainerPatch represents parameters that can be patched using PodSpecPatch.
+type ContainerPatch struct {
+	// name for the container. Runtime must have this container.
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Name string `json:"name,omitempty"`
 
-	// List of environment variables to set in the container.
-	// These values will be merged with the TrainingRuntime's environments.
-	// This value can't be set for container with the name: `node`, `dataset-initializer`, or
-	// `model-initializer`. For those containers the envs can be set via Trainer or Initializer APIs.
+	// env is the list of environment variables to set in the container.
+	// These values will be merged with the Runtime's environments.
+	// These values can't be set for container with the name: `node`, `dataset-initializer`, or
+	// `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
-	// Pod volumes to mount into the container's filesystem.
+	// volumeMounts are the volumes to mount into the container's filesystem.
+	// +listType=map
+	// +listMapKey=name
+	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// securityContext patches the container's security context.
+	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 }
 ```
 
-The webhook will validate that TargetJob and Container name exist in the Runtime Job template.
+The webhook validates that the container names in `Containers` and `InitContainers` exist in
+the Runtime's Job template. The patches are applied during the build phase of the
+[Pipelines Framework](#pipeline-framework) in the `ComponentBuilder` plugin. the `RuntimePatches`
+update values in the TrainJob's Runtime template, since they contain the final
+desired values for the underlying Job.
 
-The overrides will be applied during the build phase of [Pipelines Framework](#pipeline-framework)
-in the `ComponentBuilder` plugin.
+#### Example of TrainJob with Patches
 
-The PodTemplateOverrides will override values of TrainJob and Runtime Job template,
-since it should contain the final value for the underlying Job.
-
-#### Example of TrainJob with Overrides
-
-This example shows how to override the user-identity for the sidecar container and add volume to the
+This example shows how to patch the user-identity for the sidecar container and add volume to the
 trainer container.
 
 ```yaml
@@ -861,27 +979,34 @@ spec:
     name: pytorch-distributed-gpu
   trainer:
     image: docker.io/custom-training
-  podTemplateOverrides:
-    - targetJobs:
-        - name: node
-      spec:
-        initContainers:
-          - name: fetch-identity
-            env:
-              - name: USER_ID
-                value: "123"
-        containers:
-          - name: trainer
-            volumeMounts:
-              - name: user-123-volume
-                mountPath: /workspace
-        volumes:
-          - name: user-123-volume
-            persistentVolumeClaim:
-              claimName: user-123-volume
+  runtimePatches:
+    - manager: trainer.kubeflow.org/kubeflow-sdk
+      time: "2026-05-01T15:20:00Z"
+      trainingRuntimeSpec:
+        template:
+          spec:
+            replicatedJobs:
+              - name: node
+                template:
+                  metadata:
+                    labels:
+                      custom-label: value
+                  spec:
+                    template:
+                      spec:
+                        containers:
+                          - name: trainer
+                            volumeMounts:
+                              - name: user-123-volume
+                                mountPath: /workspace
+                        volumes:
+                          - name: user-123-volume
+                            persistentVolumeClaim:
+                              claimName: user-123-volume
 ```
 
-Users can also define multiple PodTemplateOverrides for every ReplicatedJob:
+The same manager can update its patch entry during the lifecycle of a TrainJob.
+For example, Kueue might update node selectors as resources become available:
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v2alpha1
@@ -894,24 +1019,69 @@ spec:
     name: pytorch-distributed-gpu
   trainer:
     image: docker.io/custom-training
-  podTemplateOverrides:
-    - targetJobs:
-        - name: dataset-initializer
-      spec:
-        initContainers:
-          - name: fetch-identity
-            env:
-              - name: USER_ID
-                value: "123"
-    - targetJobs:
-        - name: node
-      spec:
-        initContainers:
-          - name: fetch-identity
-            env:
-              - name: USER_ID
-                value: "123"
+  runtimePatches:
+    - manager: kueue.x-k8s.io/manager
+      time: "2026-02-05T10:10:00Z"
+      trainingRuntimeSpec:
+        template:
+          spec:
+            replicatedJobs:
+              - name: node
+                template:
+                  spec:
+                    template:
+                      spec:
+                        nodeSelector:
+                          node-type: gpu-a100
+                          zone: us-west-1b
 ```
+
+#### Support Arbitrary Patches (Future Extension)
+
+The long-term goal of the Trainer Extension Framework is to support arbitrary runtimes, including
+operators that are not part of the upstream Trainer project, such as in-house or third-party runtime
+implementations. For example, users may operate a custom operator to orchestrate distributed AI
+workloads that Trainer has no schema knowledge of.
+
+To enable this flexibility, the `runtimePatches` API supports custom runtimes through an opaque spec
+patch field. One approach that balances flexibility with API simplicity is to store the spec patch as
+a raw object:
+
+```go
+// +kubebuilder:validation:XValidation:rule="[has(self.trainingRuntimeSpec), has(self.opaqueRuntimeSpec)].filter(x, x).size() <= 1", message="only one spec can be set"
+type RuntimePatch struct {
+	Manager             string                    `json:"manager"`
+	Time                *metav1.Time              `json:"time,omitempty"`
+	TrainingRuntimeSpec *TrainingRuntimeSpecPatch `json:"trainingRuntimeSpec,omitempty"`
+	// opaqueRuntimeSpec stores the full spec patch for runtimes whose schema is unknown to Trainer.
+	// Used when runtimeRef points to a runtime kind not natively supported by Trainer.
+	// +optional
+	OpaqueRuntimeSpec *runtime.RawExtension `json:"opaqueRuntimeSpec,omitempty"`
+}
+```
+
+The following example shows how `opaqueRuntimeSpec` can represent a patch for a `SparkApplication` CRD:
+
+```yaml
+runtimePatches:
+  - manager: kueue.x-k8s.io/manager
+    time: "2026-02-05T10:10:00Z"
+    opaqueRuntimeSpec:
+      driver: # Spark Driver spec
+        template: # Valid PodTemplateSpec
+          spec:
+            nodeSelector:
+              node-type: gpu-a100
+      executor: # Spark Executor spec
+        template: # Valid PodTemplateSpec
+          spec:
+            nodeSelector:
+              node-type: gpu-a100
+```
+
+Since Trainer has no schema knowledge of the target runtime, `opaqueRuntimeSpec` content is not
+validated at admission time beyond confirming it is a valid JSON object. Validation occurs at
+reconcile time when the patch is applied to the target CR.
 
 ### State Transition
 
@@ -1763,6 +1933,7 @@ spec:
 - 2026-02-23 Remove ElasticPolicy from the Torch API – will be implemented in the future KEPs
 - 2026-02-23 Removed `numProcPerNode` from `TorchMLPolicySource`; `TrainJob.Trainer.numProcPerNode`
   now accepts only int values (torch plugin defaults to `auto`)
+- 2025-10-09 Replace PodTemplateOverrides with RuntimePatches API
 
 ## Alternatives
 
