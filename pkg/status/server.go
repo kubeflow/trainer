@@ -36,6 +36,7 @@ import (
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	trainerv1alpha1ac "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 )
 
 const (
@@ -157,16 +158,12 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var trainJob = trainer.TrainJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      trainJobName,
-			Namespace: namespace,
-		},
-		Status: trainer.TrainJobStatus{
-			TrainerStatus: runtimeStatus.TrainerStatus,
-		},
-	}
-	if err := s.client.Status().Patch(r.Context(), &trainJob, client.Merge); err != nil {
+	var trainJob = trainerv1alpha1ac.TrainJob(trainJobName, namespace).
+		WithStatus(trainerv1alpha1ac.TrainJobStatus().
+			WithTrainerStatus(toApplyConfig(runtimeStatus.TrainerStatus)),
+		)
+
+	if err := s.client.Status().Apply(r.Context(), trainJob, client.ForceOwnership, client.FieldOwner("trainer-status")); err != nil {
 		s.log.Error(err, "Failed to update train job", "namespace", namespace, "name", trainJobName)
 
 		// Check if the error is due to validation failure
@@ -277,4 +274,25 @@ func badRequest(w http.ResponseWriter, log logr.Logger, message string, reason m
 	if err := json.NewEncoder(w).Encode(status); err != nil {
 		log.Error(err, "Failed to write bad request details")
 	}
+}
+
+func toApplyConfig(trainerStatus *trainer.TrainJobTrainerStatus) *trainerv1alpha1ac.TrainJobTrainerStatusApplyConfiguration {
+	var status = trainerv1alpha1ac.TrainJobTrainerStatus()
+	if trainerStatus.ProgressPercentage != nil {
+		status = status.WithProgressPercentage(*trainerStatus.ProgressPercentage)
+	}
+	if trainerStatus.EstimatedRemainingSeconds != nil {
+		status = status.WithEstimatedRemainingSeconds(*trainerStatus.EstimatedRemainingSeconds)
+	}
+	for _, m := range trainerStatus.Metrics {
+		status.WithMetrics(
+			trainerv1alpha1ac.Metric().
+				WithName(m.Name).
+				WithValue(m.Value),
+		)
+	}
+
+	status = status.WithLastUpdatedTime(trainerStatus.LastUpdatedTime)
+
+	return status
 }
