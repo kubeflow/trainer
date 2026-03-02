@@ -22,13 +22,11 @@ import (
 	"fmt"
 	"iter"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/events"
@@ -108,11 +106,6 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	ctx = ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling TrainJob")
 	var err error
-
-	// Skip reconciliation if the TrainJob is being deleted.
-	if !trainJob.DeletionTimestamp.IsZero() {
-		return ctrl.Result{}, nil
-	}
 
 	if trainjob.IsTrainJobFinished(&trainJob) {
 		failedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
@@ -196,34 +189,10 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 	}
 	for _, object := range objects {
 		if err := r.client.Apply(ctx, object, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
-			if isNamespaceTerminatingForbiddenError(err) {
-				ctrl.LoggerFrom(ctx).V(2).Info(
-					"Skipping object reconciliation because namespace is terminating",
-					"namespace", trainJob.Namespace,
-					"name", trainJob.Name,
-				)
-				return nil
-			}
 			return err
 		}
 	}
 	return nil
-}
-
-func isNamespaceTerminatingForbiddenError(err error) bool {
-	if !apierrors.IsForbidden(err) {
-		return false
-	}
-	if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-		return true
-	}
-	var statusErr apierrors.APIStatus
-	if errors.As(err, &statusErr) {
-		message := strings.ToLower(statusErr.Status().Message)
-		return strings.Contains(message, "namespace") && strings.Contains(message, "being terminated")
-	}
-	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "namespace") && strings.Contains(message, "being terminated")
 }
 
 func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
