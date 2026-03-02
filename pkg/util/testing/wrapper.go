@@ -1274,6 +1274,11 @@ func (w *MLPolicySourceWrapper) JAXPolicy() *MLPolicySourceWrapper {
 	return w
 }
 
+func (w *MLPolicySourceWrapper) XGBoostPolicy() *MLPolicySourceWrapper {
+	w.XGBoost = &trainer.XGBoostMLPolicySource{}
+	return w
+}
+
 func (m *MLPolicySourceWrapper) MPIPolicy(numProcPerNode *int32, MPImplementation trainer.MPIImplementation, sshAuthMountPath *string, runLauncherAsNode *bool) *MLPolicySourceWrapper {
 	if m.MPI == nil {
 		m.MPI = &trainer.MPIMLPolicySource{}

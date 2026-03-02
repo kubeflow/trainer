@@ -110,4 +110,10 @@ kubectl apply --server-side -k manifests/overlays/runtimes || (
 # ${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
 # load_image_to_kind ${JAX_RUNTIME_IMAGE}
 
+# Build and load custom runtime images that are not available in public registries.
+XGBOOST_RUNTIME_CI_IMAGE="ghcr.io/kubeflow/trainer/xgboost-runtime:latest"
+echo "Build XGBoost runtime image"
+${CONTAINER_RUNTIME} build . -f cmd/runtimes/xgboost/Dockerfile -t ${XGBOOST_RUNTIME_CI_IMAGE}
+load_image_to_kind ${XGBOOST_RUNTIME_CI_IMAGE}
+
 print_cluster_info
