@@ -219,6 +219,9 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 		return ctrl.Result{}, nil
 	}
 	requeueAfter := time.Until(deadline)
+	if requeueAfter <= 0 {
+		requeueAfter = 1 * time.Second
+	}
 	log.V(2).Info("Scheduling deadline check",
 		"activeDeadlineSeconds", *trainJob.Spec.ActiveDeadlineSeconds,
 		"requeueAfter", requeueAfter)
