@@ -26,6 +26,19 @@
     - [Architecture Overview](#architecture-overview)
     - [Component Interaction Flow](#component-interaction-flow)
     - [What Changes vs What Stays](#what-changes-vs-what-stays)
+  - [Design Details](#design-details)
+    - [Python SDK: `LLMBackend` Interface](#python-sdk-llmbackend-interface)
+    - [Python SDK: Backend Registry](#python-sdk-backend-registry)
+    - [Python SDK: `TRLConfig`](#python-sdk-trlconfig)
+    - [Python SDK: Integration into `KubernetesBackend`](#python-sdk-integration-into-kubernetesbackend)
+    - [Go Control Plane: `LLMBackendStrategy` Interface](#go-control-plane-llmbackendstrategy-interface)
+    - [Go Control Plane: `TorchTuneStrategy`](#go-control-plane-torchtunestrategy)
+    - [Go Control Plane: `TRLStrategy`](#go-control-plane-trlstrategy)
+    - [Go Control Plane: Refactored Torch Plugin Dispatch](#go-control-plane-refactored-torch-plugin-dispatch)
+    - [Go Control Plane: New Constant](#go-control-plane-new-constant)
+    - [TRL Container Image](#trl-container-image)
+    - [TRL `ClusterTrainingRuntime` Manifest](#trl-clustertrainingruntime-manifest)
+    - [SDK Usage Example](#sdk-usage-example)
   - [Risks and Mitigations](#risks-and-mitigations)
 <!-- /toc -->
 
@@ -212,6 +225,616 @@ End-to-end for a TRL SFT job:
 | SDK registry | **New** | `@register_backend` decorator |
 | Container images | **New** | `trl-trainer` image |
 | ClusterTrainingRuntimes | **New** | TRL-specific runtime manifests |
+
+---
+
+## Design Details
+
+### Python SDK: `LLMBackend` Interface
+
+Today `BuiltinTrainer.config` is typed as `TorchTuneConfig` directly. This introduces an
+abstract base class that every backend must implement.
+
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+
+class LLMBackend(ABC):
+    """Abstract base for all LLM training backends.
+
+    Each implementation translates its config into a (command, args) pair
+    that the Kubernetes backend writes into the TrainJob CR.
+    """
+
+    @abstractmethod
+    def to_command(self) -> tuple[str, ...]:
+        """Return the container entrypoint command.
+
+        Examples:
+            TorchTune: ("tune", "run")
+            TRL:       ("trl",)
+        """
+        ...
+
+    @abstractmethod
+    def to_args(self, initializer: "Initializer | None" = None) -> list[str]:
+        """Return the CLI arguments for the entrypoint.
+
+        Args:
+            initializer: Optional initializer config for resolving dataset/model paths.
+
+        Returns:
+            List of string arguments (e.g. ["sft", "--model_name_or_path", "/workspace/model"]).
+        """
+        ...
+
+    @abstractmethod
+    def validate(self) -> None:
+        """Raise ValueError if the config is invalid."""
+        ...
+```
+
+`BuiltinTrainer` widens its type annotation:
+
+```python
+@dataclass
+class BuiltinTrainer:
+    """Builtin Trainer configuration."""
+    config: LLMBackend  # was: TorchTuneConfig
+```
+
+`TorchTuneConfig` implements `LLMBackend` with no field changes — backward compatible:
+
+```python
+@dataclass
+class TorchTuneConfig(LLMBackend):
+    dtype: DataType | None = None
+    batch_size: int | None = None
+    epochs: int | None = None
+    loss: Loss | None = None
+    num_nodes: int | None = None
+    peft_config: LoraConfig | None = None
+    dataset_preprocess_config: TorchTuneInstructDataset | None = None
+    resources_per_node: dict | None = None
+
+    def to_command(self) -> tuple[str, ...]:
+        return ("tune", "run")
+
+    def to_args(self, initializer=None) -> list[str]:
+        # Existing get_args_using_torchtune_config() logic moves here
+        ...
+
+    def validate(self) -> None:
+        ...
+```
+
+### Python SDK: Backend Registry
+
+A decorator-based registry enables out-of-tree backends (community requirement from #2752):
+
+```python
+_BACKEND_REGISTRY: dict[str, type[LLMBackend]] = {}
+
+
+def register_backend(name: str):
+    """Register an LLMBackend implementation under a framework name.
+
+    Usage:
+        @register_backend("trl")
+        class TRLConfig(LLMBackend):
+            ...
+    """
+    def decorator(cls: type[LLMBackend]) -> type[LLMBackend]:
+        if not issubclass(cls, LLMBackend):
+            raise TypeError(f"{cls.__name__} must subclass LLMBackend")
+        _BACKEND_REGISTRY[name] = cls
+        return cls
+    return decorator
+
+
+def get_backend(name: str) -> type[LLMBackend]:
+    """Look up a registered backend by name."""
+    if name not in _BACKEND_REGISTRY:
+        raise KeyError(
+            f"Unknown backend '{name}'. Registered: {list(_BACKEND_REGISTRY)}"
+        )
+    return _BACKEND_REGISTRY[name]
+```
+
+Built-in backends register themselves at import time:
+
+```python
+@register_backend("torchtune")
+class TorchTuneConfig(LLMBackend):
+    ...
+
+@register_backend("trl")
+class TRLConfig(LLMBackend):
+    ...
+```
+
+### Python SDK: `TRLConfig`
+
+```python
+from enum import Enum
+
+
+class TRLTrainerType(Enum):
+    """Training algorithms available via the TRL CLI."""
+    SFT = "sft"
+    DPO = "dpo"
+    KTO = "kto"
+    GRPO = "grpo"
+
+
+@dataclass
+@register_backend("trl")
+class TRLConfig(LLMBackend):
+    """TRL LLM Trainer configuration.
+
+    Args:
+        trainer_type: Training algorithm (SFT, DPO, KTO, GRPO).
+        model_name_or_path: HuggingFace model ID or local path.
+        dataset_name: HuggingFace dataset ID or local path.
+        num_nodes: Number of training nodes.
+        resources_per_node: Resource requirements dict.
+        learning_rate: Learning rate.
+        num_train_epochs: Number of training epochs.
+        per_device_train_batch_size: Batch size per device.
+        gradient_checkpointing: Enable gradient checkpointing.
+        bf16: Use bfloat16 precision.
+        use_peft: Enable LoRA via PEFT.
+        lora_r: LoRA rank.
+        lora_alpha: LoRA alpha.
+        lora_target_modules: Comma-separated target modules for LoRA.
+        extra_args: Additional CLI arguments passed through verbatim.
+    """
+
+    trainer_type: TRLTrainerType = TRLTrainerType.SFT
+    model_name_or_path: str | None = None
+    dataset_name: str | None = None
+    num_nodes: int | None = None
+    resources_per_node: dict | None = None
+    learning_rate: float | None = None
+    num_train_epochs: int | None = None
+    per_device_train_batch_size: int | None = None
+    gradient_checkpointing: bool = True
+    bf16: bool = True
+    use_peft: bool = False
+    lora_r: int | None = None
+    lora_alpha: int | None = None
+    lora_target_modules: str | None = None
+    extra_args: dict[str, str] | None = None
+
+    def to_command(self) -> tuple[str, ...]:
+        return ("trl",)
+
+    def to_args(self, initializer=None) -> list[str]:
+        args = [self.trainer_type.value]  # subcommand: "sft", "dpo", etc.
+
+        # Model path: prefer initializer workspace, fall back to config
+        model_path = self.model_name_or_path
+        if initializer and initializer.model:
+            model_path = "/workspace/model"
+        if model_path:
+            args.extend(["--model_name_or_path", model_path])
+
+        # Dataset: prefer initializer workspace, fall back to config
+        dataset = self.dataset_name
+        if initializer and initializer.dataset:
+            dataset = "/workspace/dataset"
+        if dataset:
+            args.extend(["--dataset_name", dataset])
+
+        if self.learning_rate is not None:
+            args.extend(["--learning_rate", str(self.learning_rate)])
+        if self.num_train_epochs is not None:
+            args.extend(["--num_train_epochs", str(self.num_train_epochs)])
+        if self.per_device_train_batch_size is not None:
+            args.extend(["--per_device_train_batch_size", str(self.per_device_train_batch_size)])
+        if self.gradient_checkpointing:
+            args.append("--gradient_checkpointing")
+        if self.bf16:
+            args.append("--bf16")
+        if self.use_peft:
+            args.append("--use_peft")
+            if self.lora_r is not None:
+                args.extend(["--lora_r", str(self.lora_r)])
+            if self.lora_alpha is not None:
+                args.extend(["--lora_alpha", str(self.lora_alpha)])
+            if self.lora_target_modules:
+                args.extend(["--lora_target_modules", self.lora_target_modules])
+
+        # Pass-through extra args
+        if self.extra_args:
+            for k, v in self.extra_args.items():
+                args.extend([f"--{k}", v])
+
+        return args
+
+    def validate(self) -> None:
+        if self.use_peft and self.lora_r is None:
+            raise ValueError("lora_r is required when use_peft=True")
+```
+
+### Python SDK: Integration into `KubernetesBackend`
+
+The current `get_trainer_cr_from_builtin_trainer()` hardcodes `isinstance(trainer.config, TorchTuneConfig)`.
+This changes to use the `LLMBackend` interface:
+
+```python
+# backends/kubernetes/utils.py (modified)
+
+def get_trainer_cr_from_builtin_trainer(
+    runtime: types.Runtime,
+    trainer: types.BuiltinTrainer,
+    initializer: types.Initializer | None = None,
+) -> models.TrainerV1alpha1Trainer:
+    config = trainer.config
+    if not isinstance(config, LLMBackend):
+        raise ValueError(f"BuiltinTrainer config must implement LLMBackend, got: {type(config)}")
+
+    config.validate()
+
+    trainer_cr = models.TrainerV1alpha1Trainer()
+    if hasattr(config, "num_nodes") and config.num_nodes:
+        trainer_cr.num_nodes = config.num_nodes
+    if hasattr(config, "resources_per_node") and config.resources_per_node:
+        trainer_cr.resources_per_node = get_resources_per_node(config.resources_per_node)
+
+    trainer_cr.command = list(config.to_command())
+    trainer_cr.args = config.to_args(initializer)
+    return trainer_cr
+```
+
+### Go Control Plane: `LLMBackendStrategy` Interface
+
+Inside the Torch plugin package, a strategy interface replaces the inline if/else:
+
+```go
+// pkg/runtime/framework/plugins/torch/strategy.go
+
+package torch
+
+import (
+    "k8s.io/apimachinery/pkg/util/validation/field"
+    "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+    trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+    "github.com/kubeflow/trainer/v2/pkg/runtime"
+)
+
+// LLMBackendStrategy defines backend-specific behavior for the Torch plugin.
+// Each strategy handles the portion of EnforceMLPolicy and Validate that differs
+// between backends (e.g., command mutation, env var injection, validation rules).
+type LLMBackendStrategy interface {
+    // EnforceCommand mutates the trainer container's command, args, and env vars
+    // with backend-specific values (e.g., rendezvous args for TorchTune,
+    // accelerate env vars for TRL).
+    EnforceCommand(info *runtime.Info, trainJob *trainer.TrainJob, container *runtime.Container) error
+
+    // Validate performs backend-specific validation on the TrainJob.
+    Validate(runtimeInfo *runtime.Info, trainJob *trainer.TrainJob) (admission.Warnings, field.ErrorList)
+}
+```
+
+### Go Control Plane: `TorchTuneStrategy`
+
+Extracts the existing inline code from `torch.go:159-183` and `torchtune.go`:
+
+```go
+// pkg/runtime/framework/plugins/torch/torchtune_strategy.go
+
+type TorchTuneStrategy struct{}
+
+func (s *TorchTuneStrategy) EnforceCommand(
+    info *runtime.Info,
+    trainJob *trainer.TrainJob,
+    container *runtime.Container,
+) error {
+    // Moved from torch.go:159-183
+    // 1. Build rendezvous endpoint args
+    // 2. Call getRecipeAndConfig() for recipe/config selection
+    // 3. Call extractOverridesFromRuntime() for immutable overrides
+    // 4. Append to trainJob.Spec.Trainer.Command
+    return nil
+}
+
+func (s *TorchTuneStrategy) Validate(
+    runtimeInfo *runtime.Info,
+    trainJob *trainer.TrainJob,
+) (admission.Warnings, field.ErrorList) {
+    // Calls existing validateTorchTune()
+    return validateTorchTune(runtimeInfo, trainJob)
+}
+```
+
+### Go Control Plane: `TRLStrategy`
+
+```go
+// pkg/runtime/framework/plugins/torch/trl_strategy.go
+
+type TRLStrategy struct{}
+
+func (s *TRLStrategy) EnforceCommand(
+    info *runtime.Info,
+    trainJob *trainer.TrainJob,
+    container *runtime.Container,
+) error {
+    trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+    numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
+    masterAddr := fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)
+    masterPort := fmt.Sprintf("%d", constants.ContainerTrainerPort)
+    worldSize := fmt.Sprintf("%d", numNodes * numProcPerNode)
+
+    // TRL uses accelerate, which reads standard env vars (not PET_* variants).
+    // Inject both sets for compatibility.
+    apply.UpsertEnvVars(&container.Env,
+        // PET env vars (for torchrun compatibility)
+        *corev1ac.EnvVar().WithName(constants.TorchEnvMasterAddr).WithValue(masterAddr),
+        *corev1ac.EnvVar().WithName(constants.TorchEnvMasterPort).WithValue(masterPort),
+        // Standard env vars (for accelerate/TRL)
+        *corev1ac.EnvVar().WithName("MASTER_ADDR").WithValue(masterAddr),
+        *corev1ac.EnvVar().WithName("MASTER_PORT").WithValue(masterPort),
+        *corev1ac.EnvVar().WithName("WORLD_SIZE").WithValue(worldSize),
+        *corev1ac.EnvVar().WithName("RANK").WithValueFrom(
+            corev1ac.EnvVarSource().WithFieldRef(
+                corev1ac.ObjectFieldSelector().WithFieldPath(constants.JobCompletionIndexFieldPath),
+            ),
+        ),
+    )
+    return nil
+}
+
+func (s *TRLStrategy) Validate(
+    runtimeInfo *runtime.Info,
+    trainJob *trainer.TrainJob,
+) (admission.Warnings, field.ErrorList) {
+    // TRL validation: check that trainer_type subcommand is valid, etc.
+    return nil, nil
+}
+```
+
+### Go Control Plane: Refactored Torch Plugin Dispatch
+
+The `Torch` struct gains a `backends` map, and `EnforceMLPolicy` dispatches by label:
+
+```go
+// pkg/runtime/framework/plugins/torch/torch.go (modified)
+
+type Torch struct {
+    backends map[string]LLMBackendStrategy
+}
+
+func New(ctx context.Context, c client.Client, fi client.FieldIndexer) (framework.Plugin, error) {
+    return &Torch{
+        backends: map[string]LLMBackendStrategy{
+            "torchtune": &TorchTuneStrategy{},
+            "trl":       &TRLStrategy{},
+        },
+    }, nil
+}
+```
+
+The dispatch logic in `EnforceMLPolicy` changes from command-sniffing to label lookup:
+
+```go
+func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
+    // ... (existing common logic: numNodes, numProcPerNode, PET_NNODES,
+    //       PET_NPROC_PER_NODE, PET_NODE_RANK — unchanged) ...
+
+    // NEW: label-based dispatch replaces command-sniffing
+    framework := info.Labels[constants.RuntimeFrameworkLabel]  // "trainer.kubeflow.org/framework"
+    if strategy, ok := t.backends[framework]; ok {
+        if err := strategy.EnforceCommand(info, trainJob, trainerContainer); err != nil {
+            return err
+        }
+    } else {
+        // Default: standard torchrun path (PET_MASTER_ADDR, PET_MASTER_PORT)
+        apply.UpsertEnvVars(&trainerContainer.Env,
+            *corev1ac.EnvVar().WithName(constants.TorchEnvMasterAddr).WithValue(...),
+            *corev1ac.EnvVar().WithName(constants.TorchEnvMasterPort).WithValue(...),
+        )
+    }
+
+    // ... (existing: add container port) ...
+    return nil
+}
+```
+
+The same pattern applies to `Validate`:
+
+```go
+func (t *Torch) Validate(ctx context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+    // ... (existing common validation: numProcPerNode, reserved envs) ...
+
+    // NEW: label-based dispatch replaces command-sniffing
+    framework := runtimeInfo.Labels[constants.RuntimeFrameworkLabel]
+    if strategy, ok := t.backends[framework]; ok {
+        warnings, errs := strategy.Validate(runtimeInfo, newObj)
+        allErrs = append(allErrs, errs...)
+        return warnings, allErrs
+    }
+    return nil, allErrs
+}
+```
+
+### Go Control Plane: New Constant
+
+```go
+// pkg/constants/constants.go (addition)
+
+// RuntimeFrameworkLabel is the label on ClusterTrainingRuntime manifests
+// that identifies which LLM framework the runtime belongs to.
+// Existing manifests already use this label (e.g., "torchtune").
+const RuntimeFrameworkLabel string = "trainer.kubeflow.org/framework"
+```
+
+### TRL Container Image
+
+A minimal Dockerfile for the TRL trainer image:
+
+```dockerfile
+FROM python:3.11-slim
+
+RUN pip install --no-cache-dir \
+    trl>=0.15.0,<1.0.0 \
+    torch>=2.5.0 \
+    peft>=0.8.0
+
+ENTRYPOINT ["trl"]
+```
+
+The image is published as `ghcr.io/kubeflow/trainer/trl-trainer` alongside the existing
+`ghcr.io/kubeflow/trainer/torchtune-trainer`.
+
+### TRL `ClusterTrainingRuntime` Manifest
+
+Example runtime for Llama 3.2 1B SFT with TRL (modeled on the existing TorchTune runtime):
+
+```yaml
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: trl-llama3.2-1b
+  labels:
+    trainer.kubeflow.org/framework: trl
+spec:
+  mlPolicy:
+    numNodes: 1
+    torch:
+      numProcPerNode: auto
+  template:
+    spec:
+      volumeClaimPolicies:
+        - templates:
+            - metadata:
+                name: initializer
+              spec:
+                accessModes: ["ReadWriteOnce"]
+                resources:
+                  requests:
+                    storage: 20Gi
+      replicatedJobs:
+        - name: dataset-initializer
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: dataset-initializer
+                      image: ghcr.io/kubeflow/trainer/dataset-initializer
+                      env:
+                        - name: STORAGE_URI
+                          value: hf://tatsu-lab/alpaca
+                      volumeMounts:
+                        - mountPath: /workspace
+                          name: initializer
+        - name: model-initializer
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: model-initializer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: model-initializer
+                      image: ghcr.io/kubeflow/trainer/model-initializer
+                      env:
+                        - name: STORAGE_URI
+                          value: hf://meta-llama/Llama-3.2-1B-Instruct
+                      volumeMounts:
+                        - name: initializer
+                          mountPath: /workspace
+        - name: node
+          dependsOn:
+            - name: dataset-initializer
+              status: Complete
+            - name: model-initializer
+              status: Complete
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: ghcr.io/kubeflow/trainer/trl-trainer
+                      command:
+                        - trl
+                      args:
+                        - sft
+                        - --model_name_or_path
+                        - /workspace/model
+                        - --dataset_name
+                        - /workspace/dataset
+                        - --output_dir
+                        - /workspace/output
+                        - --gradient_checkpointing
+                        - --bf16
+                      resources:
+                        limits:
+                          nvidia.com/gpu: 2
+                      volumeMounts:
+                        - mountPath: /workspace
+                          name: initializer
+```
+
+### SDK Usage Example
+
+End-to-end TRL SFT fine-tuning from the Python SDK:
+
+```python
+from kubeflow.trainer import TrainerClient, types
+
+client = TrainerClient()
+
+client.train(
+    runtime="trl-llama3.2-1b",
+    initializer=types.Initializer(
+        model=types.HuggingFaceModelInitializer(
+            storage_uri="hf://meta-llama/Llama-3.2-1B-Instruct",
+        ),
+        dataset=types.HuggingFaceDatasetInitializer(
+            storage_uri="hf://tatsu-lab/alpaca",
+        ),
+    ),
+    trainer=types.BuiltinTrainer(
+        config=types.TRLConfig(
+            trainer_type=types.TRLTrainerType.SFT,
+            num_train_epochs=3,
+            per_device_train_batch_size=4,
+            learning_rate=2e-5,
+            bf16=True,
+            gradient_checkpointing=True,
+            use_peft=True,
+            lora_r=16,
+            lora_alpha=32,
+        ),
+    ),
+)
+```
+
+For DPO, only `trainer_type` and dataset change:
+
+```python
+client.train(
+    runtime="trl-llama3.2-1b",
+    trainer=types.BuiltinTrainer(
+        config=types.TRLConfig(
+            trainer_type=types.TRLTrainerType.DPO,
+            learning_rate=1e-6,
+        ),
+    ),
+)
+```
 
 ---
 
