@@ -822,15 +822,25 @@ client.train(
 )
 ```
 
-For DPO, only `trainer_type` and dataset change:
+For DPO, the `trainer_type` changes and the dataset must be a preference dataset
+with chosen/rejected pairs:
 
 ```python
 client.train(
     runtime="trl-llama3.2-1b",
+    initializer=types.Initializer(
+        model=types.HuggingFaceModelInitializer(
+            storage_uri="hf://meta-llama/Llama-3.2-1B-Instruct",
+        ),
+        dataset=types.HuggingFaceDatasetInitializer(
+            storage_uri="hf://argilla/ultrafeedback-binarized-preferences",
+        ),
+    ),
     trainer=types.BuiltinTrainer(
         config=types.TRLConfig(
             trainer_type=types.TRLTrainerType.DPO,
             learning_rate=1e-6,
+            bf16=True,
         ),
     ),
 )
