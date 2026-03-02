@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -57,6 +58,11 @@ type Server struct {
 	httpServer *http.Server
 	client     client.Client
 }
+
+var (
+	_ manager.Runnable               = &Server{}
+	_ manager.LeaderElectionRunnable = &Server{}
+)
 
 // NewServer creates a new Server for collecting runtime status updates.
 func NewServer(c client.Client, cfg *configapi.StatusServer, tlsConfig *tls.Config, verifier TokenVerifier) (*Server, error) {
@@ -123,6 +129,11 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("runtime status server failed: %w", err)
 	}
 	return nil
+}
+
+func (s *Server) NeedLeaderElection() bool {
+	// server needs to run on all replicas
+	return false
 }
 
 // handleTrainJobRuntimeStatus handles POST requests to update TrainJob status.
