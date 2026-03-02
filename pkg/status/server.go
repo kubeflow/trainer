@@ -24,10 +24,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -51,13 +52,12 @@ const (
 	maxBodySize = 1 << 16
 )
 
-// +kubebuilder:rbac:groups="",resources=pods,verbs=get
-
 // Server for collecting runtime status updates.
 type Server struct {
-	log        logr.Logger
-	httpServer *http.Server
-	client     client.Client
+	log          logr.Logger
+	httpServer   *http.Server
+	client       client.Client
+	oidcProvider *oidc.Provider
 }
 
 var (
@@ -66,33 +66,31 @@ var (
 )
 
 // NewServer creates a new Server for collecting runtime status updates.
-func NewServer(c client.Client, cfg *configapi.StatusServer, tlsConfig *tls.Config, verifier TokenVerifier) (*Server, error) {
+// oidcProvider may be nil for testing purposes, but will panic if authorization is attempted.
+func NewServer(c client.Client, cfg *configapi.StatusServer, tlsConfig *tls.Config, oidcProvider *oidc.Provider) (*Server, error) {
 	if cfg == nil || cfg.Port == nil {
 		return nil, fmt.Errorf("cfg info is required")
 	}
 	if tlsConfig == nil {
 		return nil, fmt.Errorf("tlsConfig is required")
 	}
-	if verifier == nil {
-		return nil, fmt.Errorf("verifier is required")
-	}
 
 	log := ctrl.Log.WithName("runtime-status")
 
 	s := &Server{
-		log:    log,
-		client: c,
+		log:          log,
+		client:       c,
+		oidcProvider: oidcProvider,
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST "+StatusUrl("{namespace}", "{name}"), s.handleTrainJobRuntimeStatus)
 	mux.HandleFunc("/", s.handleDefault)
 
-	// Apply middleware
+	// Apply middleware (authentication happens in handler)
 	handler := chain(mux,
 		recoveryMiddleware(log),
 		loggingMiddleware(log),
-		authenticationMiddleware(log, verifier),
 		bodySizeLimitMiddleware(log, maxBodySize),
 	)
 
@@ -196,66 +194,49 @@ func (s *Server) handleDefault(w http.ResponseWriter, _ *http.Request) {
 	badRequest(w, s.log, "Not found", metav1.StatusReasonNotFound, http.StatusNotFound)
 }
 
-// authorizeRequest checks whether the service account token bearer token used by this request comes from
-// a pod that is part of the TrainJob that is being updated.
+// authorizeRequest verifies the bearer token has the correct audience for the TrainJob.
+// Authorization is based on token audience matching the TrainJob-specific endpoint.
 func (s *Server) authorizeRequest(r *http.Request, namespace, trainJobName string) bool {
-	token, ok := serviceAccountTokenFromContext(r.Context())
-	if !ok {
-		s.log.V(5).Info("Unauthorized request", "namespace", namespace, "trainJob", trainJobName)
+	// Extract bearer token from Authorization header
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		s.log.V(5).Info("Missing Authorization header", "namespace", namespace, "trainJob", trainJobName)
 		return false
 	}
 
-	// Check namespace matches
-	if token.Kubernetes.Namespace != namespace {
-		s.log.V(5).Info("Namespace mismatch",
-			"expected", namespace,
-			"got", token.Kubernetes.Namespace)
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		s.log.V(5).Info("Invalid Authorization header format", "namespace", namespace, "trainJob", trainJobName)
 		return false
 	}
 
-	// Check token is bound to a pod
-	if token.Kubernetes.Pod == nil {
-		s.log.V(5).Info("Token not bound to a pod")
+	rawToken := parts[1]
+	if rawToken == "" {
+		s.log.V(5).Info("Empty bearer token", "namespace", namespace, "trainJob", trainJobName)
 		return false
 	}
 
-	// Look up the pod from the Kubernetes API to verify it has the correct label
-	pod := &corev1.Pod{}
-	podKey := client.ObjectKey{
-		Namespace: token.Kubernetes.Namespace,
-		Name:      token.Kubernetes.Pod.Name,
-	}
+	// Create verifier with TrainJob-specific audience
+	expectedAudience := TokenAudience(namespace, trainJobName)
+	verifier := s.oidcProvider.Verifier(&oidc.Config{
+		ClientID: expectedAudience,
+	})
 
-	if err := s.client.Get(r.Context(), podKey, pod); err != nil {
-		s.log.V(5).Error(err, "Failed to get pod",
-			"namespace", podKey.Namespace,
-			"pod", podKey.Name)
+	// Verify token signature, expiry, and audience
+	idToken, err := verifier.Verify(r.Context(), rawToken)
+	if err != nil {
+		s.log.V(5).Error(err, "Token verification failed",
+			"namespace", namespace,
+			"trainJob", trainJobName,
+			"expectedAudience", expectedAudience)
 		return false
 	}
 
-	if token.Kubernetes.Pod.UID != pod.UID {
-		s.log.V(5).Info("Pod UID does not match",
-			"namespace", pod.Namespace,
-			"pod", podKey.Name)
-		return false
-	}
-
-	// Verify the pod has the label identifying it belongs to this TrainJob
-	trainJobNameFromLabel, ok := pod.Labels[LabelTrainJobName]
-	if !ok {
-		s.log.V(5).Info("Pod missing TrainJob label",
-			"namespace", pod.Namespace, "pod", pod.Name)
-		return false
-	}
-
-	if trainJobName != trainJobNameFromLabel {
-		s.log.V(5).Info("Pod TrainJob label does not match",
-			"expected", trainJobName,
-			"got", trainJobNameFromLabel,
-			"namespace", pod.Namespace,
-			"pod", pod.Name)
-		return false
-	}
+	// Log successful authentication for observability
+	s.log.V(3).Info("Authenticated request",
+		"subject", idToken.Subject,
+		"namespace", namespace,
+		"trainJob", trainJobName)
 
 	return true
 }

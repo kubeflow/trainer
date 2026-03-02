@@ -3,7 +3,6 @@ package status
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,48 +59,6 @@ func bodySizeLimitMiddleware(log logr.Logger, maxBytes int64) Middleware {
 			// Wrap body to enforce limit for chunked/streaming requests
 			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// authenticationMiddleware validates the request has a valid projected service account token.
-func authenticationMiddleware(log logr.Logger, verifier TokenVerifier) Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Extract bearer token from Authorization header
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				badRequest(w, log, "Missing Authorization header",
-					v1.StatusReasonUnauthorized,
-					http.StatusUnauthorized)
-				return
-			}
-
-			// Check for "Bearer " prefix
-			const bearerPrefix = "Bearer "
-			token := strings.TrimPrefix(authHeader, bearerPrefix)
-			if !strings.HasPrefix(authHeader, bearerPrefix) || token == "" {
-				badRequest(w, log, "Invalid Authorization header format",
-					v1.StatusReasonUnauthorized,
-					http.StatusUnauthorized)
-				return
-			}
-
-			// Verify and decode the token
-			saToken, err := verifier.Verify(r.Context(), token)
-			if err != nil || saToken == nil {
-				log.V(5).Error(err, "Token validation failed")
-				badRequest(w, log, "Invalid or expired token",
-					v1.StatusReasonUnauthorized,
-					http.StatusUnauthorized)
-				return
-			}
-
-			// Add token to context for authorization
-			ctx := withServiceAccountToken(r.Context(), *saToken)
-
-			// Token is valid, proceed to next handler
-			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }

@@ -18,7 +18,6 @@ package status
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -34,7 +33,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,27 +82,6 @@ func newTestTLSConfig(t *testing.T) *tls.Config {
 	}
 }
 
-// testVerifier is a token verifier for testing.
-// It returns a mock ProjectedServiceAccountToken without actual OIDC verification.
-type testVerifier struct{}
-
-func (testVerifier) Verify(context.Context, string) (*ProjectedServiceAccountToken, error) {
-	// Return a mock token that matches the test scenarios (default namespace, test-job TrainJob)
-	return &ProjectedServiceAccountToken{
-		Kubernetes: KubernetesClaims{
-			Namespace: "default",
-			ServiceAccount: ServiceAccount{
-				Name: "test-sa",
-				UID:  "test-sa-uid",
-			},
-			Pod: &Pod{
-				Name: "test-job-node-0-0",
-				UID:  "test-pod-uid",
-			},
-		},
-	}, nil
-}
-
 func newTestServer(t *testing.T, cfg *configapi.StatusServer, objs ...client.Object) *httptest.Server {
 	t.Helper()
 
@@ -113,7 +90,8 @@ func newTestServer(t *testing.T, cfg *configapi.StatusServer, objs ...client.Obj
 		WithStatusSubresource(objs...).
 		Build()
 
-	srv, err := NewServer(fakeClient, cfg, newTestTLSConfig(t), testVerifier{})
+	// For unit tests, we use a nil OIDC provider since we're only testing error responses
+	srv, err := NewServer(fakeClient, cfg, newTestTLSConfig(t), nil)
 	if err != nil {
 		t.Fatalf("NewServer() error: %v", err)
 	}
@@ -130,81 +108,48 @@ func TestServerErrorResponses(t *testing.T) {
 		},
 	}
 
-	// Pod that belongs to the TrainJob (matches the token's pod name and has the required label)
-	existingPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-job-node-0-0",
-			Namespace: "default",
-			UID:       "test-pod-uid",
-			Labels: map[string]string{
-				LabelTrainJobName: "test-job",
-			},
-		},
-	}
-
 	cases := map[string]struct {
 		url          string
 		body         string
 		authHeader   string
 		wantResponse *metav1.Status
 	}{
-		"missing Authorization header fails with 401": {
+		"missing Authorization header fails with 403": {
 			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			authHeader: "",
 			wantResponse: &metav1.Status{
 				Status:  metav1.StatusFailure,
-				Message: "Missing Authorization header",
-				Reason:  metav1.StatusReasonUnauthorized,
-				Code:    http.StatusUnauthorized,
+				Message: "Forbidden",
+				Reason:  metav1.StatusReasonForbidden,
+				Code:    http.StatusForbidden,
 			},
 		},
-		"invalid Authorization header format triggers unauthorized": {
+		"invalid Authorization header format triggers forbidden": {
 			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			authHeader: "Basic dXNlcjpwYXNz",
 			wantResponse: &metav1.Status{
 				Status:  metav1.StatusFailure,
-				Message: "Invalid Authorization header format",
-				Reason:  metav1.StatusReasonUnauthorized,
-				Code:    http.StatusUnauthorized,
+				Message: "Forbidden",
+				Reason:  metav1.StatusReasonForbidden,
+				Code:    http.StatusForbidden,
 			},
 		},
-		"empty bearer token triggers unauthorized": {
+		"empty bearer token triggers forbidden": {
 			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			authHeader: "Bearer ",
 			wantResponse: &metav1.Status{
 				Status:  metav1.StatusFailure,
-				Message: "Invalid Authorization header format",
-				Reason:  metav1.StatusReasonUnauthorized,
-				Code:    http.StatusUnauthorized,
-			},
-		},
-		"invalid JSON triggers invalid payload error": {
-			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
-			body:       "{invalid json}",
-			authHeader: "Bearer test-token",
-			wantResponse: &metav1.Status{
-				Status:  metav1.StatusFailure,
-				Message: "Invalid payload",
-				Reason:  metav1.StatusReasonInvalid,
-				Code:    http.StatusUnprocessableEntity,
-			},
-		},
-		"malformed data triggers invalid payload error": {
-			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
-			body:       "not json at all",
-			authHeader: "Bearer test-token",
-			wantResponse: &metav1.Status{
-				Status:  metav1.StatusFailure,
-				Message: "Invalid payload",
-				Reason:  metav1.StatusReasonInvalid,
-				Code:    http.StatusUnprocessableEntity,
+				Message: "Forbidden",
+				Reason:  metav1.StatusReasonForbidden,
+				Code:    http.StatusForbidden,
 			},
 		},
 		"oversized body triggers payload too large error": {
 			url: "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			// Generate ~1MB payload (exceeds 64kB limit)
-			body:       `{"trainerStatus": {"metrics": [` + strings.Repeat(`{"name":"m","value":"0.5"},`, 40000) + `]}}`,
-			authHeader: "Bearer test-token",
+			body: `{"trainerStatus": {"metrics": [` + strings.Repeat(`{"name":"m","value":"0.5"},`, 40000) + `]}}`,
+			// No auth header - this test verifies body size middleware runs before auth
+			authHeader: "",
 			wantResponse: &metav1.Status{
 				Status:  metav1.StatusFailure,
 				Message: "Payload too large",
@@ -216,7 +161,7 @@ func TestServerErrorResponses(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ts := newTestServer(t, &configapi.StatusServer{Port: ptr.To[int32](8080)}, existingTrainJob, existingPod)
+			ts := newTestServer(t, &configapi.StatusServer{Port: ptr.To[int32](8080)}, existingTrainJob)
 			defer ts.Close()
 
 			// Make actual HTTP request

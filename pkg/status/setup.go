@@ -41,13 +41,14 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, enableHTTP2 bool
 		return err
 	}
 
-	// Initialize OIDC verifier for token authentication
-	verifier, err := NewProjectedServiceAccountTokenVerifier(context.Background(), mgr.GetConfig())
+	// Initialize OIDC provider for token authentication
+	// The provider will be used to create verifiers with TrainJob-specific audiences
+	oidcProvider, err := NewOIDCProvider(context.Background(), mgr.GetConfig())
 	if err != nil {
-		return fmt.Errorf("failed to create projected service account token verifier: %w", err)
+		return fmt.Errorf("failed to create OIDC provider: %w", err)
 	}
 
-	server, err := NewServer(cli, cfg, tlsConfig, verifier)
+	server, err := NewServer(cli, cfg, tlsConfig, oidcProvider)
 	if err != nil {
 		return err
 	}

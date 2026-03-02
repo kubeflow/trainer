@@ -78,15 +78,6 @@ func (p *Status) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob)
 		return nil
 	}
 
-	// Add label to identify which TrainJob the pod belongs to
-	if info.Scheduler == nil {
-		info.Scheduler = &runtime.Scheduler{}
-	}
-	if info.Scheduler.PodLabels == nil {
-		info.Scheduler.PodLabels = make(map[string]string)
-	}
-	info.Scheduler.PodLabels[statusserver.LabelTrainJobName] = trainJob.Name
-
 	envVars, err := p.createEnvVars(trainJob)
 	if err != nil {
 		return err
@@ -160,7 +151,7 @@ func createTokenVolume(trainJob *trainer.TrainJob) corev1ac.VolumeApplyConfigura
 					corev1ac.VolumeProjection().
 						WithServiceAccountToken(
 							corev1ac.ServiceAccountTokenProjection().
-								WithAudience(statusserver.TokenAudience).
+								WithAudience(statusserver.TokenAudience(trainJob.Namespace, trainJob.Name)).
 								WithExpirationSeconds(tokenExpirySeconds).
 								WithPath(tokenFileName),
 						),

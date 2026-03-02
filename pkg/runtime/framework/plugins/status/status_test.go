@@ -36,7 +36,6 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
-	statusserver "github.com/kubeflow/trainer/v2/pkg/status"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -65,11 +64,6 @@ func TestEnforceMLPolicy(t *testing.T) {
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(1).Obj()).
 				Obj(),
 			wantInfo: &runtime.Info{
-				Scheduler: &runtime.Scheduler{
-					PodLabels: map[string]string{
-						"trainer.kubeflow.org/trainjob-name": "test-job",
-					},
-				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
@@ -103,11 +97,6 @@ func TestEnforceMLPolicy(t *testing.T) {
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(2).Obj()).
 				Obj(),
 			wantInfo: &runtime.Info{
-				Scheduler: &runtime.Scheduler{
-					PodLabels: map[string]string{
-						"trainer.kubeflow.org/trainjob-name": "test-job",
-					},
-				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
@@ -145,7 +134,7 @@ func TestEnforceMLPolicy(t *testing.T) {
 												corev1ac.VolumeProjection().
 													WithServiceAccountToken(
 														corev1ac.ServiceAccountTokenProjection().
-															WithAudience(statusserver.TokenAudience).
+															WithAudience("trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status").
 															WithExpirationSeconds(tokenExpirySeconds).
 															WithPath(tokenFileName),
 													),
@@ -188,11 +177,6 @@ func TestEnforceMLPolicy(t *testing.T) {
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(1).Obj()).
 				Obj(),
 			wantInfo: &runtime.Info{
-				Scheduler: &runtime.Scheduler{
-					PodLabels: map[string]string{
-						"trainer.kubeflow.org/trainjob-name": "test-job",
-					},
-				},
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{
 						{
@@ -250,7 +234,7 @@ func TestEnforceMLPolicy(t *testing.T) {
 												corev1ac.VolumeProjection().
 													WithServiceAccountToken(
 														corev1ac.ServiceAccountTokenProjection().
-															WithAudience(statusserver.TokenAudience).
+															WithAudience("trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status").
 															WithExpirationSeconds(tokenExpirySeconds).
 															WithPath(tokenFileName),
 													),

@@ -19,13 +19,14 @@ package status
 import "fmt"
 
 const (
-	// LabelTrainJobName is the label key used to identify which TrainJob a pod belongs to
-	LabelTrainJobName = "trainer.kubeflow.org/trainjob-name"
-
-	// TokenAudience is the required audience of the projected service account tokens used to
-	// authenticate with the runtime status server.
-	TokenAudience = "trainer.kubeflow.org"
+	// TokenAudiencePrefix is the prefix for projected service account token audiences
+	TokenAudiencePrefix = "trainer.kubeflow.org"
 )
+
+// TokenAudience returns the required audience for a TrainJob's status endpoint.
+func TokenAudience(namespace, name string) string {
+	return fmt.Sprintf("%s/v1alpha1/namespaces/%s/trainjobs/%s/status", TokenAudiencePrefix, namespace, name)
+}
 
 // StatusUrl is the path of the endpoint for receiving status updates
 func StatusUrl(namespace, name string) string {
