@@ -26,7 +26,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
@@ -424,16 +423,7 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	var tasks string
 	nodes := *trainJob.Spec.Trainer.NumNodes
 	if trainJob.Spec.Trainer.NumProcPerNode != nil {
-		if trainJob.Spec.Trainer.NumProcPerNode.Type == intstr.Int {
-			tasks = fmt.Sprintf("-N %d -n %d", nodes, trainJob.Spec.Trainer.NumProcPerNode.IntVal*nodes)
-		} else {
-			// auto, cpu, gpu, or int value
-			// TODO: how do we know what "gpu" and "cpu" mean?
-			// taskStr := trainJob.Spec.Trainer.NumProcPerNode.StrVal
-			// Auto means we want all discovered procs per node
-			// For now, just cover number of nodes and exclusive (all resources)
-			tasks = fmt.Sprintf("-N %d --exclusive", nodes)
-		}
+		tasks = fmt.Sprintf("-N %d -n %d", nodes, *trainJob.Spec.Trainer.NumProcPerNode*nodes)
 	} else {
 		tasks = fmt.Sprintf("-N %d -n %d", nodes, *info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode*nodes)
 	}

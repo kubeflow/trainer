@@ -28,8 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
-	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
@@ -77,22 +75,11 @@ func TestFlux(t *testing.T) {
 					},
 				},
 				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: v1alpha2.JobSetSpec().WithReplicatedJobs(
-						v1alpha2.ReplicatedJob().WithTemplate(
-							batchv1ac.JobTemplateSpec().WithSpec(
-								batchv1ac.JobSpec().WithTemplate(
-									corev1ac.PodTemplateSpec().WithSpec(
-										corev1ac.PodSpec().WithContainers(
-											corev1ac.Container().WithName(constants.Node),
-										),
-									),
-								),
-							),
-						),
-					),
 					PodSets: []runtime.PodSet{
 						{
-							Name: constants.Node,
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
 						},
 					},
 				},
