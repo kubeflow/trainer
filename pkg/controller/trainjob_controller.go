@@ -41,7 +41,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -105,26 +104,8 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log := ctrl.LoggerFrom(ctx).WithValues("trainJob", klog.KObj(&trainJob))
 	ctx = ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling TrainJob")
-	var err error
 
-	if trainjob.IsTrainJobFinished(&trainJob) {
-		failedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
-		if failedCond != nil && failedCond.Reason == trainer.TrainJobDeadlineExceededReason {
-			runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
-			if runtime, ok := r.runtimes[runtimeRefGK]; ok {
-				jobSet := &jobsetv1alpha2.JobSet{}
-				err := r.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Name}, jobSet)
-				if err == nil {
-					trainJobCopy := trainJob.DeepCopy()
-					trainJobCopy.Spec.Suspend = ptr.To(true)
-					if suspendErr := r.reconcileObjects(ctx, runtime, trainJobCopy); suspendErr != nil {
-						log.V(2).Info("Failed to suspend JobSet after deadline exceeded", "error", suspendErr)
-					}
-				}
-			}
-		}
-		return ctrl.Result{}, nil
-	}
+	var err error
 
 	// Keep track of the origin TrainJob status
 	prevTrainJob := trainJob.DeepCopy()
@@ -161,7 +142,7 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
-	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
+	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, runtime, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
 		if deadlineErr != nil {
 			err = errors.Join(err, deadlineErr)
 		}
@@ -195,7 +176,7 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 	return nil
 }
 
-func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
+func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) (ctrl.Result, error) {
 	if trainJob.Spec.ActiveDeadlineSeconds == 0 || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return ctrl.Result{}, nil
 	}
@@ -216,6 +197,13 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 			"startTime", startTime,
 			"deadline", deadline)
 		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
+		if runtime != nil {
+			trainJobCopy := trainJob.DeepCopy()
+			trainJobCopy.Spec.Suspend = ptr.To(true)
+			if suspendErr := r.reconcileObjects(ctx, runtime, trainJobCopy); suspendErr != nil {
+				log.V(2).Info("Failed to suspend JobSet after deadline exceeded", "error", suspendErr)
+			}
+		}
 		return ctrl.Result{}, nil
 	}
 	requeueAfter := time.Until(deadline)
@@ -291,16 +279,28 @@ func setFailedCondition(trainJob *trainer.TrainJob, message, reason string) {
 }
 
 func removeFailedCondition(trainJob *trainer.TrainJob) {
+	cond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
+	if cond != nil && cond.Reason == trainer.TrainJobDeadlineExceededReason {
+		return
+	}
 	meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobFailed)
 }
 
 func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
+	deadlineCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
+	if deadlineCond != nil && deadlineCond.Reason != trainer.TrainJobDeadlineExceededReason {
+		deadlineCond = nil
+	}
+
 	status, err := runtime.TrainJobStatus(ctx, trainJob)
 	if err != nil {
 		return err
 	}
 	if status != nil {
 		trainJob.Status = *status
+	}
+	if deadlineCond != nil {
+		meta.SetStatusCondition(&trainJob.Status.Conditions, *deadlineCond)
 	}
 	return nil
 }
