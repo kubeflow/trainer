@@ -135,6 +135,18 @@ func TestTorch(t *testing.T) {
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("trainJob-node-0-0.trainJob:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("trainJob"),
+								},
 							},
 						}},
 					}},
@@ -209,6 +221,18 @@ func TestTorch(t *testing.T) {
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("test-job-node-0-0.test-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("test-job"),
+								},
 							},
 						}},
 					}},
@@ -280,6 +304,18 @@ func TestTorch(t *testing.T) {
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("test-job-node-0-0.test-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("test-job"),
 								},
 							},
 						}},
@@ -355,6 +391,18 @@ func TestTorch(t *testing.T) {
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("test-job-node-0-0.test-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("test-job"),
+								},
 							},
 						}},
 					}},
@@ -428,6 +476,18 @@ func TestTorch(t *testing.T) {
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("test-job-node-0-0.test-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("test-job"),
 								},
 							},
 						}},
@@ -503,6 +563,18 @@ func TestTorch(t *testing.T) {
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("test-job-node-0-0.test-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("test-job"),
+								},
 							},
 						}},
 					}},
@@ -577,6 +649,18 @@ func TestTorch(t *testing.T) {
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("test-job-node-0-0.test-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("test-job"),
+								},
 							},
 						}},
 					}},
@@ -650,6 +734,18 @@ func TestTorch(t *testing.T) {
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("test-job-node-0-0.test-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("test-job"),
 								},
 							},
 						}},
@@ -726,6 +822,18 @@ func TestTorch(t *testing.T) {
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("test-job-node-0-0.test-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("test-job"),
+								},
 							},
 						}},
 					}},
@@ -800,6 +908,18 @@ func TestTorch(t *testing.T) {
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("test-job-node-0-0.test-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("test-job"),
+								},
 							},
 						}},
 					}},
@@ -873,6 +993,18 @@ func TestTorch(t *testing.T) {
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("cpu-job-node-0-0.cpu-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("cpu-job"),
 								},
 							},
 						}},
@@ -949,6 +1081,18 @@ func TestTorch(t *testing.T) {
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("cpu-gpu-job-node-0-0.cpu-gpu-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("cpu-gpu-job"),
+								},
 							},
 						}},
 					}},
@@ -1022,6 +1166,18 @@ func TestTorch(t *testing.T) {
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("cpu-frac-job-node-0-0.cpu-frac-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("cpu-frac-job"),
 								},
 							},
 						}},
@@ -1106,6 +1262,18 @@ func TestTorch(t *testing.T) {
 								{
 									Name:  ptr.To(constants.TorchEnvMasterPort),
 									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvBackend),
+									Value: ptr.To("c10d"),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvEndpoint),
+									Value: ptr.To(fmt.Sprintf("gpu-job-node-0-0.gpu-job:%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name:  ptr.To(constants.TorchEnvRdzvId),
+									Value: ptr.To("gpu-job"),
 								},
 							},
 						}},

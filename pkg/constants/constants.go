@@ -134,6 +134,15 @@ const (
 	// TorchEnvMasterPort is the env name for the master node port.
 	TorchEnvMasterPort string = "PET_MASTER_PORT"
 
+	// TorchEnvRdzvBackend is the env name for the rendezvous backend.
+	TorchEnvRdzvBackend string = "PET_RDZV_BACKEND"
+
+	// TorchEnvRdzvEndpoint is the env name for the rendezvous endpoint.
+	TorchEnvRdzvEndpoint string = "PET_RDZV_ENDPOINT"
+
+	// TorchEnvRdzvId is the env name for the rendezvous ID.
+	TorchEnvRdzvId string = "PET_RDZV_ID"
+
 	// TorchTuneArgRdzvEndpoint is the arg name for the rendezvous endpoint.
 	TorchTuneArgRdzvEndpoint string = "--rdzv_endpoint"
 
@@ -214,7 +223,7 @@ var (
 	JobCompletionIndexFieldPath string = fmt.Sprintf("metadata.annotations['%s']", batchv1.JobCompletionIndexAnnotation)
 
 	// TorchRunReservedEnvNames is torchrun reserved env names
-	TorchRunReservedEnvNames = sets.New(TorchEnvNumNodes, TorchEnvNumProcPerNode, TorchEnvNodeRank, TorchEnvMasterAddr, TorchEnvMasterPort)
+	TorchRunReservedEnvNames = sets.New(TorchEnvNumNodes, TorchEnvNumProcPerNode, TorchEnvNodeRank, TorchEnvMasterAddr, TorchEnvMasterPort, TorchEnvRdzvBackend, TorchEnvRdzvEndpoint, TorchEnvRdzvId)
 
 	// ResourceInUseFinalizer is a finalizer for managed resources which is used by other resources.
 	ResourceInUseFinalizer = fmt.Sprintf("%s/resource-in-use", trainer.GroupVersion.Group)

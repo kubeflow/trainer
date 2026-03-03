@@ -138,14 +138,25 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		)
 
 		if !slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
-			// Add PET_MASTER_ADDR and PET_MASTER_PORT envs for torchrun.
+			// Add PET_MASTER_ADDR, PET_MASTER_PORT, and rendezvous envs for torchrun.
+			masterAddr := fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)
+			masterPort := fmt.Sprintf("%d", constants.ContainerTrainerPort)
 			apply.UpsertEnvVars(&trainerContainer.Env,
 				*corev1ac.EnvVar().
 					WithName(constants.TorchEnvMasterAddr).
-					WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
+					WithValue(masterAddr),
 				*corev1ac.EnvVar().
 					WithName(constants.TorchEnvMasterPort).
-					WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+					WithValue(masterPort),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvRdzvBackend).
+					WithValue("c10d"),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvRdzvEndpoint).
+					WithValue(fmt.Sprintf("%s:%s", masterAddr, masterPort)),
+				*corev1ac.EnvVar().
+					WithName(constants.TorchEnvRdzvId).
+					WithValue(trainJob.Name),
 			)
 		} else {
 			// Mutate trainer command for torchtune.

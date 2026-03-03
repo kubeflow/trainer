@@ -1046,6 +1046,18 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								Name:  constants.TorchEnvMasterPort,
 								Value: fmt.Sprintf("%d", constants.ContainerTrainerPort),
 							},
+							{
+								Name:  constants.TorchEnvRdzvBackend,
+								Value: "c10d",
+							},
+							{
+								Name:  constants.TorchEnvRdzvEndpoint,
+								Value: fmt.Sprintf("test-job-%s-0-0.test-job:%d", constants.Node, constants.ContainerTrainerPort),
+							},
+							{
+								Name:  constants.TorchEnvRdzvId,
+								Value: "test-job",
+							},
 						}...,
 					).
 					DependsOn(constants.Node,
@@ -1153,6 +1165,18 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							{
 								Name:  constants.TorchEnvMasterPort,
 								Value: fmt.Sprintf("%d", constants.ContainerTrainerPort),
+							},
+							{
+								Name:  constants.TorchEnvRdzvBackend,
+								Value: "c10d",
+							},
+							{
+								Name:  constants.TorchEnvRdzvEndpoint,
+								Value: fmt.Sprintf("test-job-%s-0-0.test-job:%d", constants.Node, constants.ContainerTrainerPort),
+							},
+							{
+								Name:  constants.TorchEnvRdzvId,
+								Value: "test-job",
 							},
 							{
 								Name:  "RUNTIME",

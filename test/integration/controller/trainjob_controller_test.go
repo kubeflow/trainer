@@ -359,6 +359,18 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 										Name:  constants.TorchEnvMasterPort,
 										Value: fmt.Sprintf("%d", constants.ContainerTrainerPort),
 									},
+									{
+										Name:  constants.TorchEnvRdzvBackend,
+										Value: "c10d",
+									},
+									{
+										Name:  constants.TorchEnvRdzvEndpoint,
+										Value: fmt.Sprintf("alpha-%s-0-0.alpha:%d", constants.Node, constants.ContainerTrainerPort),
+									},
+									{
+										Name:  constants.TorchEnvRdzvId,
+										Value: "alpha",
+									},
 								}...,
 							).
 							Obj(),
@@ -912,6 +924,18 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									{
 										Name:  constants.TorchEnvMasterPort,
 										Value: fmt.Sprintf("%d", constants.ContainerTrainerPort),
+									},
+									{
+										Name:  constants.TorchEnvRdzvBackend,
+										Value: "c10d",
+									},
+									{
+										Name:  constants.TorchEnvRdzvEndpoint,
+										Value: fmt.Sprintf("alpha-%s-0-0.alpha:%d", constants.Node, constants.ContainerTrainerPort),
+									},
+									{
+										Name:  constants.TorchEnvRdzvId,
+										Value: "alpha",
 									},
 								}...,
 							).
