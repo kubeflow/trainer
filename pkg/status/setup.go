@@ -28,7 +28,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
 )
 
-func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, enableHTTP2 bool) error {
+func SetupServer(mgr ctrl.Manager, cfg *configapi.TrainJobStatusServer, enableHTTP2 bool) error {
 	tlsConfig, err := cert.SetupTLSConfig(mgr, enableHTTP2)
 	if err != nil {
 		return err
@@ -55,7 +55,7 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, enableHTTP2 bool
 	return mgr.Add(server)
 }
 
-func createClient(mgr ctrl.Manager, cfg *configapi.StatusServer) (client.Client, error) {
+func createClient(mgr ctrl.Manager, cfg *configapi.TrainJobStatusServer) (client.Client, error) {
 	// Copy the manager's rest config and override rate limits
 	mgrCfg := rest.CopyConfig(mgr.GetConfig())
 	if cfg.QPS != nil {

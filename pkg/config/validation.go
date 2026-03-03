@@ -51,15 +51,15 @@ func validate(cfg *configapi.Configuration) field.ErrorList {
 	}
 
 	// Validate status server config
-	if cfg.StatusServer != nil {
-		if cfg.StatusServer.Port != nil && (*cfg.StatusServer.Port < 1 || *cfg.StatusServer.Port > 65535) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("statusServer", "port"), *cfg.StatusServer.Port, "must be between 1 and 65535"))
+	if cfg.TrainJobStatusServer != nil {
+		if cfg.TrainJobStatusServer.Port != nil && (*cfg.TrainJobStatusServer.Port < 1 || *cfg.TrainJobStatusServer.Port > 65535) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("trainJobStatusServer", "port"), *cfg.TrainJobStatusServer.Port, "must be between 1 and 65535"))
 		}
-		if cfg.StatusServer.QPS != nil && *cfg.StatusServer.QPS < 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("statusServer", "qps"), *cfg.StatusServer.QPS, "must be greater than or equal to 0"))
+		if cfg.TrainJobStatusServer.QPS != nil && *cfg.TrainJobStatusServer.QPS < 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("trainJobStatusServer", "qps"), *cfg.TrainJobStatusServer.QPS, "must be greater than or equal to 0"))
 		}
-		if cfg.StatusServer.Burst != nil && *cfg.StatusServer.Burst < 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("statusServer", "burst"), *cfg.StatusServer.Burst, "must be greater than or equal to 0"))
+		if cfg.TrainJobStatusServer.Burst != nil && *cfg.TrainJobStatusServer.Burst < 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("trainJobStatusServer", "burst"), *cfg.TrainJobStatusServer.Burst, "must be greater than or equal to 0"))
 		}
 	}
 

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	utilruntime "github.com/kubeflow/trainer/v2/pkg/util/runtime"
 	corev1 "k8s.io/api/core/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -33,7 +34,6 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	statusserver "github.com/kubeflow/trainer/v2/pkg/status"
-	utilruntime "github.com/kubeflow/trainer/v2/pkg/util/runtime"
 )
 
 const (
@@ -112,11 +112,11 @@ func (p *Status) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 }
 
 func (p *Status) createEnvVars(trainJob *trainer.TrainJob) ([]corev1ac.EnvVarApplyConfiguration, error) {
-	if p.cfg.StatusServer.Port == nil {
+	if p.cfg.TrainJobStatusServer.Port == nil {
 		return nil, fmt.Errorf("missing status server port")
 	}
 	// TODO: consider renaming the CertManagement.WebhookServiceName name?
-	svc := fmt.Sprintf("https://%s.%s.svc:%d", p.cfg.CertManagement.WebhookServiceName, utilruntime.GetOperatorNamespace(), *p.cfg.StatusServer.Port)
+	svc := fmt.Sprintf("https://%s.%s.svc:%d", p.cfg.CertManagement.WebhookServiceName, utilruntime.GetOperatorNamespace(), *p.cfg.TrainJobStatusServer.Port)
 	path := statusserver.StatusUrl(trainJob.Namespace, trainJob.Name)
 	statusURL := svc + path
 

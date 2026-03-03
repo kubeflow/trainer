@@ -583,9 +583,9 @@ type Metric struct {
 	Value string `json:"value,omitempty"`
 }
 
-// RuntimeStatus contains the current runtime status (e.g. progress and metrics) for the different stages of the
+// UpdateTrainJobStatusRequest contains the current runtime status (e.g. progress and metrics) for the different stages of the
 // TrainJob.
-type RuntimeStatus struct {
+type UpdateTrainJobStatusRequest struct {
 	// trainerStatus provides a summary of the status of the training
 	// part of the TrainJob.
 	// Empty if the status is unknown, e.g. the job has just started

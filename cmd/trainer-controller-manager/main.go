@@ -173,7 +173,7 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 	}
 
 	if features.Enabled(features.TrainJobRuntimeStatus) {
-		if err := status.SetupServer(mgr, cfg.StatusServer, enableHTTP2); err != nil {
+		if err := status.SetupServer(mgr, cfg.TrainJobStatusServer, enableHTTP2); err != nil {
 			setupLog.Error(err, "Could not create runtime status server")
 			os.Exit(1)
 		}

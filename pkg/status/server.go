@@ -67,7 +67,7 @@ var (
 
 // NewServer creates a new Server for collecting runtime status updates.
 // oidcProvider may be nil for testing purposes, but will panic if authorization is attempted.
-func NewServer(c client.Client, cfg *configapi.StatusServer, tlsConfig *tls.Config, oidcProvider *oidc.Provider) (*Server, error) {
+func NewServer(c client.Client, cfg *configapi.TrainJobStatusServer, tlsConfig *tls.Config, oidcProvider *oidc.Provider) (*Server, error) {
 	if cfg == nil || cfg.Port == nil {
 		return nil, fmt.Errorf("cfg info is required")
 	}
@@ -148,7 +148,7 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Parse request body
-	var runtimeStatus trainer.RuntimeStatus
+	var runtimeStatus trainer.UpdateTrainJobStatusRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&runtimeStatus); err != nil {
 		s.log.V(5).Error(err, "Failed to parse runtime status", "namespace", namespace, "trainJobName", trainJobName)

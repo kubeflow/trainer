@@ -60,9 +60,9 @@ type Configuration struct {
 	// +optional
 	ClientConnection *ClientConnection `json:"clientConnection,omitempty"`
 
-	// statusServer provides configuration options for the Runtime Status Server.
+	// trainJobStatusServer provides configuration options for the Runtime Status Server.
 	// +optional
-	StatusServer *StatusServer `json:"statusServer,omitempty"`
+	TrainJobStatusServer *TrainJobStatusServer `json:"trainJobStatusServer,omitempty"`
 
 	// featureGates is a map of feature names to bools that allows to override the
 	// default enablement status of a feature.
@@ -201,7 +201,7 @@ type ClientConnection struct {
 	Burst *int32 `json:"burst,omitempty"`
 }
 
-type StatusServer struct {
+type TrainJobStatusServer struct {
 	// port is the port that the status server serves at.
 	// Defaults to 10443.
 	// +optional

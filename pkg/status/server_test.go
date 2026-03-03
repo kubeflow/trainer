@@ -82,7 +82,7 @@ func newTestTLSConfig(t *testing.T) *tls.Config {
 	}
 }
 
-func newTestServer(t *testing.T, cfg *configapi.StatusServer, objs ...client.Object) *httptest.Server {
+func newTestServer(t *testing.T, cfg *configapi.TrainJobStatusServer, objs ...client.Object) *httptest.Server {
 	t.Helper()
 
 	fakeClient := utiltesting.NewClientBuilder().
@@ -161,7 +161,7 @@ func TestServerErrorResponses(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ts := newTestServer(t, &configapi.StatusServer{Port: ptr.To[int32](8080)}, existingTrainJob)
+			ts := newTestServer(t, &configapi.TrainJobStatusServer{Port: ptr.To[int32](8080)}, existingTrainJob)
 			defer ts.Close()
 
 			// Make actual HTTP request
