@@ -162,7 +162,7 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 		)
 
 	if err := s.client.Status().Apply(r.Context(), trainJob, client.ForceOwnership, client.FieldOwner("trainer-status")); err != nil {
-		s.log.Error(err, "Failed to update train job", "namespace", namespace, "name", trainJobName)
+		s.log.Error(err, "Failed to update TrainJob", "namespace", namespace, "name", trainJobName)
 
 		// Check if the error is due to validation failure
 		if apierrors.IsInvalid(err) || apierrors.IsBadRequest(err) {
@@ -185,7 +185,7 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(runtimeStatus); err != nil {
-		s.log.Error(err, "Failed to write runtime status", "namespace", namespace, "trainJobName", trainJobName)
+		s.log.Error(err, "Failed to write TrainJob status", "namespace", namespace, "name", trainJobName)
 	}
 }
 
