@@ -31,7 +31,7 @@ class TrainerV1alpha1TrainJobStatus(BaseModel):
     """ # noqa: E501
     conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = Field(default=None, description="conditions for the TrainJob.")
     jobs_status: Optional[List[TrainerV1alpha1JobStatus]] = Field(default=None, description="jobsStatus tracks the child Jobs in TrainJob.", alias="jobsStatus")
-    trainer_status: Optional[TrainerV1alpha1TrainJobTrainerStatus] = Field(default=None, description="trainerStatus provides a summary of the status of the training part of the TrainJob. Empty if the status is unknown, e.g. the job has just started or the job is not instrumented to report its status.", alias="trainerStatus")
+    trainer_status: Optional[TrainerV1alpha1TrainJobTrainerStatus] = Field(default=None, description="trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.  This field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).  This is an alpha feature and requires enabling the TrainJobProgress feature gate.", alias="trainerStatus")
     __properties: ClassVar[List[str]] = ["conditions", "jobsStatus", "trainerStatus"]
 
     model_config = ConfigDict(

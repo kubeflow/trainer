@@ -497,10 +497,15 @@ type TrainJobStatus struct {
 	// +optional
 	JobsStatus []JobStatus `json:"jobsStatus,omitempty"`
 
-	// trainerStatus provides a summary of the status of the training
-	// part of the TrainJob.
-	// Empty if the status is unknown, e.g. the job has just started
-	// or the job is not instrumented to report its status.
+	// trainerStatus contains the latest observed runtime status of the
+	// Trainer step of the TrainJob. It reflects progress, remaining time,
+	// metrics, and the last update timestamp.
+	//
+	// This field is nil if the TrainJob does not report trainer-level
+	// status, or if no status has been observed yet (for example,
+	// immediately after the TrainJob is created).
+	//
+	// This is an alpha feature and requires enabling the TrainJobProgress feature gate.
 	// +optional
 	TrainerStatus *TrainJobTrainerStatus `json:"trainerStatus,omitempty"`
 }
