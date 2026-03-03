@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	utilruntime "github.com/kubeflow/trainer/v2/pkg/util/runtime"
 	corev1 "k8s.io/api/core/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -34,6 +33,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	statusserver "github.com/kubeflow/trainer/v2/pkg/status"
+	utilruntime "github.com/kubeflow/trainer/v2/pkg/util/runtime"
 )
 
 const (
