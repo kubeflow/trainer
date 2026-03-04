@@ -774,6 +774,10 @@ In the future, we can extend `RuntimePatch` API with other supported Runtimes (e
 In that case, users will be able to select one of supported specs, for example: `TrainingRuntimeSpec`
 or `GroveRuntimeSpec`
 
+![runtime-patches](./runtime-patches.drawio.svg)
+
+#### API Design
+
 ```golang
 // RuntimePatch represents a custom patch applied to the TrainJob's training runtime template.
 // Patches are keyed by manager to provide clear ownership and avoid conflicts between controllers.
