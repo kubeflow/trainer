@@ -24,9 +24,16 @@ COPY --from=mpi /home/mpiuser/.sshd_config /home/mpiuser/.sshd_config
 ENV HOME=/home/mpiuser
 ENV PATH=$HOME/.local/bin:$PATH
 
+ARG TARGETARCH
 COPY cmd/runtimes/mlx/requirements.txt .
 RUN pip install --upgrade pip
-RUN pip install --user -r requirements.txt
+
+# Conditional MLX installation based on architecture
+# mlx[cuda] is not supported on ARM64 currently (Issue #2469)
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+      sed -i 's/mlx\[cuda\]/mlx\[cpu\]/g' requirements.txt; \
+    fi && \
+    pip install --user -r requirements.txt
 
 # Give mpiuser permission to download packages and HF models.
 # .cache directory is used by ML frameworks to download models.
