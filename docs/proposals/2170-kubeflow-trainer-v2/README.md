@@ -74,6 +74,10 @@ Based on the above personas, we should build an API that everyone will benefit f
   For example, training using MPI orchestration.
 - Introduce Kubeflow `TrainJob` API that allows to reuse these runtimes and quickly start a new
   training job without understanding complex Kubernetes APIs.
+- Enable `TrainJob` to extend `TrainingRuntime` defaults through the `RuntimePatches` API — a typed,
+  multi-owner patch mechanism that lets users, external controllers (e.g. Kueue), and admission
+  webhooks each contribute a named patch entry to configure JobSet/Job metadata and Pod specs
+  (e.g. volumes, scheduling directives, etc.) without conflicting with one another.
 - Update Kubeflow Training SDK to allow data scientists quickly create and monitor `TrainJobs`.
 - Create community-supported `ClusterTrainingRuntime` for distributed training with PyTorch and MPI.
 - Create community-supported `ClusterTrainingRuntime` for LLM fine-tuning for various foundational
