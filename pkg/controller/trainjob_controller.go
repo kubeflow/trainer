@@ -147,7 +147,7 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return deadlineResult, errors.Join(err, deadlineErr)
 	}
 
-	if !equality.Semantic.DeepEqual(&trainJob.Status, &prevTrainJob.Status) {
+	if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
 		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
 		// for sub-resources. See: https://github.com/kubernetes-sigs/controller-runtime/issues/3183
 		return ctrl.Result{}, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
