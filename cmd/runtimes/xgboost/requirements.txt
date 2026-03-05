@@ -2,3 +2,5 @@
 xgboost[cuda12]==3.0.2
 # Core numerical stack
 numpy>=1.24,<3.0
+# Common ML utilities (e.g. accuracy_score)
+scikit-learn>=1.3

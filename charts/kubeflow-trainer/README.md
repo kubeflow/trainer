@@ -146,7 +146,7 @@ manager:
 | dataCache.cacheImage.tag | string | `""` | Data cache image tag. Defaults to chart version if empty. |
 | dataCache.runtimes.torchDistributedWithCache | object | `{"enabled":false}` | PyTorch distributed training with data cache support |
 | dataCache.runtimes.torchDistributedWithCache.enabled | bool | `false` | Enable deployment of torch-distributed-with-cache runtime |
-| runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"defaultEnabled":false,"jaxDistributed":{"enabled":false},"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchtuneDistributed":{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
+| runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"defaultEnabled":false,"jaxDistributed":{"enabled":false},"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchtuneDistributed":{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}},"xgboostDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/xgboost-runtime","tag":""}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
 | runtimes.defaultEnabled | bool | `false` | Enable all default runtimes (torch, deepspeed, mlx, jax, torchtune) when set to true. Individual runtime settings will be ignored if this is enabled. |
 | runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training runtime (no custom images required) |
 | runtimes.torchDistributed.enabled | bool | `false` | Enable deployment of torch-distributed runtime |
@@ -162,6 +162,11 @@ manager:
 | runtimes.mlxDistributed.image.tag | string | `""` | MLX runtime image tag. Defaults to chart version if empty. |
 | runtimes.jaxDistributed | object | `{"enabled":false}` | JAX distributed training runtime (no custom images required) |
 | runtimes.jaxDistributed.enabled | bool | `false` | Enable deployment of jax-distributed runtime |
+| runtimes.xgboostDistributed | object | `{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/xgboost-runtime","tag":""}}` | XGBoost distributed training runtime |
+| runtimes.xgboostDistributed.enabled | bool | `false` | Enable deployment of xgboost-distributed runtime |
+| runtimes.xgboostDistributed.image.registry | string | `"ghcr.io"` | XGBoost runtime image registry |
+| runtimes.xgboostDistributed.image.repository | string | `"kubeflow/trainer/xgboost-runtime"` | XGBoost runtime image repository |
+| runtimes.xgboostDistributed.image.tag | string | `""` | XGBoost runtime image tag. Defaults to chart version if empty. |
 | runtimes.torchtuneDistributed | object | `{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}}` | TorchTune distributed training runtime |
 | runtimes.torchtuneDistributed.image.registry | string | `"ghcr.io"` | TorchTune runtime image registry |
 | runtimes.torchtuneDistributed.image.repository | string | `"kubeflow/trainer/torchtune-trainer"` | TorchTune runtime image repository |

@@ -210,6 +210,18 @@ runtimes:
     # -- Enable deployment of jax-distributed runtime
     enabled: false
 
+  # -- XGBoost distributed training runtime
+  xgboostDistributed:
+    # -- Enable deployment of xgboost-distributed runtime
+    enabled: false
+    image:
+      # -- XGBoost runtime image registry
+      registry: ghcr.io
+      # -- XGBoost runtime image repository
+      repository: kubeflow/trainer/xgboost-runtime
+      # -- XGBoost runtime image tag. Defaults to chart version if empty.
+      tag: ""
+
   # -- TorchTune distributed training runtime
   torchtuneDistributed:
     image:

@@ -36,11 +36,13 @@ KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
 NAMESPACE="kubeflow-system"
 TIMEOUT="5m"
 
+# Tag used for all locally-built CI images.
+CI_IMAGE_TAG="test"
+
 # Kubeflow Trainer images.
 # TODO (andreyvelich): Support initializers images.
 CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-manager"
-CONTROLLER_MANAGER_CI_IMAGE_TAG="test"
-CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
+CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 echo "Build Kubeflow Trainer images"
 ${CONTAINER_RUNTIME} build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
 
@@ -60,7 +62,7 @@ cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
   - ../../../manifests/overlays/manager
   images:
   - name: "${CONTROLLER_MANAGER_CI_IMAGE_NAME}"
-    newTag: "${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
+    newTag: "${CI_IMAGE_TAG}"
 EOF
 
 kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
@@ -111,7 +113,7 @@ kubectl apply --server-side -k manifests/overlays/runtimes || (
 # load_image_to_kind ${JAX_RUNTIME_IMAGE}
 
 # Build and load custom runtime images that are not available in public registries.
-XGBOOST_RUNTIME_CI_IMAGE="ghcr.io/kubeflow/trainer/xgboost-runtime:latest"
+XGBOOST_RUNTIME_CI_IMAGE="ghcr.io/kubeflow/trainer/xgboost-runtime:${CI_IMAGE_TAG}"
 echo "Build XGBoost runtime image"
 ${CONTAINER_RUNTIME} build . -f cmd/runtimes/xgboost/Dockerfile -t ${XGBOOST_RUNTIME_CI_IMAGE}
 load_image_to_kind ${XGBOOST_RUNTIME_CI_IMAGE}

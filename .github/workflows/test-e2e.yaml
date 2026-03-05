@@ -60,6 +60,8 @@ jobs:
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/pytorch/audio-classification/audio-classification.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_audio-classification.ipynb PAPERMILL_TIMEOUT=1800
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/local/local-training-mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_local-training-mnist.ipynb PAPERMILL_TIMEOUT=1800
           make test-e2e-notebook NOTEBOOK_INPUT=./examples/local/local-container-mnist.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_local-container-mnist.ipynb PAPERMILL_TIMEOUT=1800
+        #TODO(Krishna-kg732): uncomment once the xgboost-runtime image is published
+        #make test-e2e-notebook NOTEBOOK_INPUT=./examples/xgboost/distributed-training/xgboost-distributed.ipynb NOTEBOOK_OUTPUT=./artifacts/notebooks/${{ matrix.kubernetes-version }}_xgboost-distributed.ipynb PAPERMILL_TIMEOUT=1800
 
       # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
       - name: Upload Artifacts to GitHub

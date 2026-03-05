@@ -8,6 +8,3 @@ WORKDIR /workspace
 COPY cmd/runtimes/xgboost/requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
-
-# .cache directory
-RUN mkdir -p /root/.cache
