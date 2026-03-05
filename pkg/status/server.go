@@ -257,8 +257,8 @@ func badRequest(w http.ResponseWriter, log logr.Logger, message string, reason m
 	}
 }
 
-func toApplyConfig(trainerStatus *trainer.TrainJobTrainerStatus) *trainerv1alpha1ac.TrainJobTrainerStatusApplyConfiguration {
-	var status = trainerv1alpha1ac.TrainJobTrainerStatus()
+func toApplyConfig(trainerStatus *trainer.TrainerStatus) *trainerv1alpha1ac.TrainerStatusApplyConfiguration {
+	var status = trainerv1alpha1ac.TrainerStatus()
 	if trainerStatus.ProgressPercentage != nil {
 		status = status.WithProgressPercentage(*trainerStatus.ProgressPercentage)
 	}

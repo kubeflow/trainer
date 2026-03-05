@@ -38,7 +38,7 @@ type TrainJobStatusApplyConfiguration struct {
 	// immediately after the TrainJob is created).
 	//
 	// This is an alpha feature and requires enabling the TrainJobProgress feature gate.
-	TrainerStatus *TrainJobTrainerStatusApplyConfiguration `json:"trainerStatus,omitempty"`
+	TrainerStatus *TrainerStatusApplyConfiguration `json:"trainerStatus,omitempty"`
 }
 
 // TrainJobStatusApplyConfiguration constructs a declarative configuration of the TrainJobStatus type for use with
@@ -76,7 +76,7 @@ func (b *TrainJobStatusApplyConfiguration) WithJobsStatus(values ...*JobStatusAp
 // WithTrainerStatus sets the TrainerStatus field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the TrainerStatus field is set to the value of the last call.
-func (b *TrainJobStatusApplyConfiguration) WithTrainerStatus(value *TrainJobTrainerStatusApplyConfiguration) *TrainJobStatusApplyConfiguration {
+func (b *TrainJobStatusApplyConfiguration) WithTrainerStatus(value *TrainerStatusApplyConfiguration) *TrainJobStatusApplyConfiguration {
 	b.TrainerStatus = value
 	return b
 }

@@ -24,9 +24,9 @@ from kubeflow_trainer_api.models.trainer_v1alpha1_metric import TrainerV1alpha1M
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1TrainJobTrainerStatus(BaseModel):
+class TrainerV1alpha1TrainerStatus(BaseModel):
     """
-    TrainJobTrainerStatus represents the latest known runtime status of the Trainer part of the TrainJob.
+    TrainerStatus represents the latest known runtime status of the Trainer step of the TrainJob.
     """ # noqa: E501
     estimated_remaining_seconds: Optional[StrictInt] = Field(default=None, description="estimatedRemainingSeconds gives the estimated remaining training time in seconds before the train job is completed. The value will be empty if it is unknown.", alias="estimatedRemainingSeconds")
     last_updated_time: Optional[datetime] = Field(default=None, description="lastUpdatedTime is the timestamp when the runtime status was observed.", alias="lastUpdatedTime")
@@ -52,7 +52,7 @@ class TrainerV1alpha1TrainJobTrainerStatus(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrainJobTrainerStatus from a JSON string"""
+        """Create an instance of TrainerV1alpha1TrainerStatus from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -84,7 +84,7 @@ class TrainerV1alpha1TrainJobTrainerStatus(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrainJobTrainerStatus from a dict"""
+        """Create an instance of TrainerV1alpha1TrainerStatus from a dict"""
         if obj is None:
             return None
 

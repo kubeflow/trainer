@@ -78,6 +78,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.RuntimeRefApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Trainer"):
 		return &trainerv1alpha1.TrainerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TrainerStatus"):
+		return &trainerv1alpha1.TrainerStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntime"):
 		return &trainerv1alpha1.TrainingRuntimeApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntimeSpec"):

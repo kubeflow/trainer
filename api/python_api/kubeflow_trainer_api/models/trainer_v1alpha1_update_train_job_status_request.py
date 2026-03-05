@@ -19,7 +19,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.trainer_v1alpha1_train_job_trainer_status import TrainerV1alpha1TrainJobTrainerStatus
+from kubeflow_trainer_api.models.trainer_v1alpha1_trainer_status import TrainerV1alpha1TrainerStatus
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -27,7 +27,7 @@ class TrainerV1alpha1UpdateTrainJobStatusRequest(BaseModel):
     """
     UpdateTrainJobStatusRequest contains the current runtime status (e.g. progress and metrics) for the different stages of the TrainJob.
     """ # noqa: E501
-    trainer_status: Optional[TrainerV1alpha1TrainJobTrainerStatus] = Field(default=None, description="trainerStatus provides a summary of the status of the training part of the TrainJob. Empty if the status is unknown, e.g. the job has just started or the job is not instrumented to report its status.", alias="trainerStatus")
+    trainer_status: Optional[TrainerV1alpha1TrainerStatus] = Field(default=None, description="trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.  This field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).  This is an alpha feature and requires enabling the TrainJobProgress feature gate.", alias="trainerStatus")
     __properties: ClassVar[List[str]] = ["trainerStatus"]
 
     model_config = ConfigDict(
@@ -84,7 +84,7 @@ class TrainerV1alpha1UpdateTrainJobStatusRequest(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "trainerStatus": TrainerV1alpha1TrainJobTrainerStatus.from_dict(obj["trainerStatus"]) if obj.get("trainerStatus") is not None else None
+            "trainerStatus": TrainerV1alpha1TrainerStatus.from_dict(obj["trainerStatus"]) if obj.get("trainerStatus") is not None else None
         })
         return _obj
 

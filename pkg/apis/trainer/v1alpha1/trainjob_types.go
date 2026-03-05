@@ -507,7 +507,7 @@ type TrainJobStatus struct {
 	//
 	// This is an alpha feature and requires enabling the TrainJobProgress feature gate.
 	// +optional
-	TrainerStatus *TrainJobTrainerStatus `json:"trainerStatus,omitempty"`
+	TrainerStatus *TrainerStatus `json:"trainerStatus,omitempty"`
 }
 
 type JobStatus struct {
@@ -545,9 +545,9 @@ type JobStatus struct {
 	Suspended *int32 `json:"suspended,omitempty"`
 }
 
-// TrainJobTrainerStatus represents the latest known runtime status of the Trainer part of the TrainJob.
+// TrainerStatus represents the latest known runtime status of the Trainer step of the TrainJob.
 // +kubebuilder:validation:XValidation:rule="has(self.lastUpdatedTime)",message="lastUpdatedTime is required when trainerStatus is present"
-type TrainJobTrainerStatus struct {
+type TrainerStatus struct {
 
 	// progressPercentage gives an estimate of how complete the TrainJob is as a percentage.
 	// The value will be between 0 and 100, or empty if unknown.
@@ -591,12 +591,17 @@ type Metric struct {
 // UpdateTrainJobStatusRequest contains the current runtime status (e.g. progress and metrics) for the different stages of the
 // TrainJob.
 type UpdateTrainJobStatusRequest struct {
-	// trainerStatus provides a summary of the status of the training
-	// part of the TrainJob.
-	// Empty if the status is unknown, e.g. the job has just started
-	// or the job is not instrumented to report its status.
+	// trainerStatus contains the latest observed runtime status of the
+	// Trainer step of the TrainJob. It reflects progress, remaining time,
+	// metrics, and the last update timestamp.
+	//
+	// This field is nil if the TrainJob does not report trainer-level
+	// status, or if no status has been observed yet (for example,
+	// immediately after the TrainJob is created).
+	//
+	// This is an alpha feature and requires enabling the TrainJobProgress feature gate.
 	// +optional
-	TrainerStatus *TrainJobTrainerStatus `json:"trainerStatus,omitempty"`
+	TrainerStatus *TrainerStatus `json:"trainerStatus,omitempty"`
 }
 
 func init() {

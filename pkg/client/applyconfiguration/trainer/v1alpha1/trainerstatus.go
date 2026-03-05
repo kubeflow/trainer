@@ -20,11 +20,11 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TrainJobTrainerStatusApplyConfiguration represents a declarative configuration of the TrainJobTrainerStatus type for use
+// TrainerStatusApplyConfiguration represents a declarative configuration of the TrainerStatus type for use
 // with apply.
 //
-// TrainJobTrainerStatus represents the latest known runtime status of the Trainer part of the TrainJob.
-type TrainJobTrainerStatusApplyConfiguration struct {
+// TrainerStatus represents the latest known runtime status of the Trainer step of the TrainJob.
+type TrainerStatusApplyConfiguration struct {
 	// progressPercentage gives an estimate of how complete the TrainJob is as a percentage.
 	// The value will be between 0 and 100, or empty if unknown.
 	ProgressPercentage *int32 `json:"progressPercentage,omitempty"`
@@ -38,16 +38,16 @@ type TrainJobTrainerStatusApplyConfiguration struct {
 	LastUpdatedTime *v1.Time `json:"lastUpdatedTime,omitempty"`
 }
 
-// TrainJobTrainerStatusApplyConfiguration constructs a declarative configuration of the TrainJobTrainerStatus type for use with
+// TrainerStatusApplyConfiguration constructs a declarative configuration of the TrainerStatus type for use with
 // apply.
-func TrainJobTrainerStatus() *TrainJobTrainerStatusApplyConfiguration {
-	return &TrainJobTrainerStatusApplyConfiguration{}
+func TrainerStatus() *TrainerStatusApplyConfiguration {
+	return &TrainerStatusApplyConfiguration{}
 }
 
 // WithProgressPercentage sets the ProgressPercentage field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ProgressPercentage field is set to the value of the last call.
-func (b *TrainJobTrainerStatusApplyConfiguration) WithProgressPercentage(value int32) *TrainJobTrainerStatusApplyConfiguration {
+func (b *TrainerStatusApplyConfiguration) WithProgressPercentage(value int32) *TrainerStatusApplyConfiguration {
 	b.ProgressPercentage = &value
 	return b
 }
@@ -55,7 +55,7 @@ func (b *TrainJobTrainerStatusApplyConfiguration) WithProgressPercentage(value i
 // WithEstimatedRemainingSeconds sets the EstimatedRemainingSeconds field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the EstimatedRemainingSeconds field is set to the value of the last call.
-func (b *TrainJobTrainerStatusApplyConfiguration) WithEstimatedRemainingSeconds(value int32) *TrainJobTrainerStatusApplyConfiguration {
+func (b *TrainerStatusApplyConfiguration) WithEstimatedRemainingSeconds(value int32) *TrainerStatusApplyConfiguration {
 	b.EstimatedRemainingSeconds = &value
 	return b
 }
@@ -63,7 +63,7 @@ func (b *TrainJobTrainerStatusApplyConfiguration) WithEstimatedRemainingSeconds(
 // WithMetrics adds the given value to the Metrics field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Metrics field.
-func (b *TrainJobTrainerStatusApplyConfiguration) WithMetrics(values ...*MetricApplyConfiguration) *TrainJobTrainerStatusApplyConfiguration {
+func (b *TrainerStatusApplyConfiguration) WithMetrics(values ...*MetricApplyConfiguration) *TrainerStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithMetrics")
@@ -76,7 +76,7 @@ func (b *TrainJobTrainerStatusApplyConfiguration) WithMetrics(values ...*MetricA
 // WithLastUpdatedTime sets the LastUpdatedTime field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LastUpdatedTime field is set to the value of the last call.
-func (b *TrainJobTrainerStatusApplyConfiguration) WithLastUpdatedTime(value v1.Time) *TrainJobTrainerStatusApplyConfiguration {
+func (b *TrainerStatusApplyConfiguration) WithLastUpdatedTime(value v1.Time) *TrainerStatusApplyConfiguration {
 	b.LastUpdatedTime = &value
 	return b
 }
