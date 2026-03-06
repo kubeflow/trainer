@@ -135,6 +135,15 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 				"Reconciling",
 				message,
 			)
+			meta.SetStatusCondition(&trainJob.Status.Conditions, metav1.Condition{
+				Type:               trainer.TrainJobRuntimeStatus,
+				Status:             metav1.ConditionFalse,
+				Reason:             "BackedOff",
+				Message:            message,
+				ObservedGeneration: trainJob.Generation,
+			})
+		} else {
+			meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobRuntimeStatus)
 		}
 	}
 
