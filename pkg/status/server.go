@@ -172,8 +172,6 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	var trainJob = trainerv1alpha1ac.TrainJob(trainJobName, namespace).WithStatus(toApplyConfig(updateRequest))
 
 	if err := s.client.Status().Apply(r.Context(), trainJob, client.ForceOwnership, client.FieldOwner("trainer-status")); err != nil {
-		s.log.Error(err, "Failed to update TrainJob", "namespace", namespace, "name", trainJobName)
-
 		// Check if the error is due to validation failure
 		if apierrors.IsInvalid(err) || apierrors.IsBadRequest(err) {
 			// Extract the validation error message for the user
@@ -186,7 +184,14 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
+		// Check if the error is due to missing object
+		if apierrors.IsNotFound(err) {
+			badRequest(w, s.log, "Train job not found", metav1.StatusReasonNotFound, http.StatusNotFound)
+			return
+		}
+
 		// For other errors, return internal server error
+		s.log.Error(err, "Failed to update TrainJob", "namespace", namespace, "name", trainJobName)
 		badRequest(w, s.log, "Internal error", metav1.StatusReasonInternalError, http.StatusInternalServerError)
 		return
 	}
