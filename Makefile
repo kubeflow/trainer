@@ -209,6 +209,10 @@ test-rust: ## Run Rust unit test.
 test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.
 	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
 
+.PHONY: test-e2e-setup-cluster-helm
+test-e2e-setup-cluster-helm: kind ## Setup Kind cluster without Kustomize deploy (for Helm E2E).
+	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh --skip-deploy
+
 .PHONY: test-e2e-setup-gpu-cluster
 test-e2e-setup-gpu-cluster: kind ## Setup Kind cluster for GPU e2e test.
 	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-gpu-cluster.sh

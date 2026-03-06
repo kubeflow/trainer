@@ -21,6 +21,20 @@ set -o nounset
 set -o pipefail
 set -x
 
+# Optional flag to skip control plane deployment.
+# This is used by Helm CI workflow where deployment is performed via Helm
+# instead of Kustomize.
+SKIP_DEPLOY=false
+
+for arg in "$@"; do
+  case $arg in
+    --skip-deploy)
+      SKIP_DEPLOY=true
+      shift
+      ;;
+  esac
+done
+
 # Source container runtime utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/scripts/container-runtime.sh"
@@ -36,6 +50,14 @@ KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
 NAMESPACE="kubeflow-system"
 TIMEOUT="5m"
 
+print_cluster_info() {
+  kubectl version
+  kubectl cluster-info
+  kubectl get nodes
+  kubectl get pods -n ${NAMESPACE}
+  kubectl describe pod -n ${NAMESPACE}
+}
+
 # Kubeflow Trainer images.
 # TODO (andreyvelich): Support initializers images.
 CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-manager"
@@ -50,47 +72,44 @@ ${KIND} create cluster --image "${KIND_NODE_VERSION}"
 # Load Trainer controller manager image in KinD
 load_image_to_kind ${CONTROLLER_MANAGER_CI_IMAGE}
 
-echo "Deploy Kubeflow Trainer control plane"
-E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
-mkdir -p "${E2E_MANIFESTS_DIR}"
-cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
-  apiVersion: kustomize.config.k8s.io/v1beta1
-  kind: Kustomization
-  resources:
-  - ../../../manifests/overlays/manager
-  images:
-  - name: "${CONTROLLER_MANAGER_CI_IMAGE_NAME}"
-    newTag: "${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
+# Deploy control plane using Kustomize (default behavior).
+# This step is skipped when Helm-based deployment is required.
+if [ "${SKIP_DEPLOY}" = false ]; then
+  echo "Deploy Kubeflow Trainer control plane"
+  E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
+  mkdir -p "${E2E_MANIFESTS_DIR}"
+  cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../../../manifests/overlays/manager
+images:
+- name: "${CONTROLLER_MANAGER_CI_IMAGE_NAME}"
+  newTag: "${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
 EOF
 
-kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
+  kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
 
-# We should wait until Deployment is in Ready status.
-echo "Wait for Kubeflow Trainer to be ready"
-(kubectl wait deploy/kubeflow-trainer-controller-manager --for=condition=available -n ${NAMESPACE} --timeout ${TIMEOUT} &&
-  kubectl wait pods --for=condition=ready -n ${NAMESPACE} --timeout ${TIMEOUT} --all) ||
-  (
-    echo "Failed to wait until Kubeflow Trainer is ready" &&
-      kubectl get pods -n ${NAMESPACE} &&
-      kubectl describe pods -n ${NAMESPACE} &&
-      exit 1
-  )
-
-print_cluster_info() {
-  kubectl version
-  kubectl cluster-info
-  kubectl get nodes
-  kubectl get pods -n ${NAMESPACE}
-  kubectl describe pod -n ${NAMESPACE}
-}
+  # We should wait until Deployment is in Ready status.
+  echo "Wait for Kubeflow Trainer to be ready"
+  (kubectl wait deploy/kubeflow-trainer-controller-manager --for=condition=available -n ${NAMESPACE} --timeout ${TIMEOUT} &&
+    kubectl wait pods --for=condition=ready -n ${NAMESPACE} --timeout ${TIMEOUT} --all) ||
+    (
+      echo "Failed to wait until Kubeflow Trainer is ready" &&
+        kubectl get pods -n ${NAMESPACE} &&
+        kubectl describe pods -n ${NAMESPACE} &&
+        exit 1
+    )
 
 # TODO (andreyvelich): Currently, we print manager logs due to flaky test.
-echo "Deploy Kubeflow Trainer runtimes"
-kubectl apply --server-side -k manifests/overlays/runtimes || (
-  kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
-    print_cluster_info &&
-    exit 1
-)
+  echo "Deploy Kubeflow Trainer runtimes"
+  kubectl apply --server-side -k manifests/overlays/runtimes || (
+    kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
+      print_cluster_info &&
+      exit 1
+  )
+fi
+
 
 # hotfix(jaiakash) - skip pre-load due to kind failure
 # # TODO (andreyvelich): We should build runtime images before adding them.
