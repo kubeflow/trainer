@@ -24,10 +24,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,10 +52,10 @@ const (
 
 // Server for collecting runtime status updates.
 type Server struct {
-	log          logr.Logger
-	httpServer   *http.Server
-	client       client.Client
-	oidcProvider *oidc.Provider
+	log        logr.Logger
+	httpServer *http.Server
+	client     client.Client
+	authorizer TokenAuthorizer
 }
 
 var (
@@ -66,21 +64,23 @@ var (
 )
 
 // NewServer creates a new Server for collecting runtime status updates.
-// oidcProvider may be nil for testing purposes, but will panic if authorization is attempted.
-func NewServer(c client.Client, cfg *configapi.TrainJobStatusServer, tlsConfig *tls.Config, oidcProvider *oidc.Provider) (*Server, error) {
+func NewServer(c client.Client, cfg *configapi.TrainJobStatusServer, tlsConfig *tls.Config, authorizer TokenAuthorizer) (*Server, error) {
 	if cfg == nil || cfg.Port == nil {
 		return nil, fmt.Errorf("cfg info is required")
 	}
 	if tlsConfig == nil {
 		return nil, fmt.Errorf("tlsConfig is required")
 	}
+	if authorizer == nil {
+		return nil, fmt.Errorf("authorizer is required")
+	}
 
 	log := ctrl.Log.WithName("runtime-status")
 
 	s := &Server{
-		log:          log,
-		client:       c,
-		oidcProvider: oidcProvider,
+		log:        log,
+		client:     c,
+		authorizer: authorizer,
 	}
 
 	mux := http.NewServeMux()
@@ -112,6 +112,11 @@ func NewServer(c client.Client, cfg *configapi.TrainJobStatusServer, tlsConfig *
 // Start implements manager.Runnable and starts the HTTPS Server.
 // It blocks until the Server stops, either due to an error or graceful shutdown.
 func (s *Server) Start(ctx context.Context) error {
+	s.log.Info("Initializing token authorizer")
+	if err := s.authorizer.Init(ctx); err != nil {
+		return fmt.Errorf("token authorizer initialization failed: %w", err)
+	}
+
 	// Handle graceful shutdown in background
 	go func() {
 		<-ctx.Done()
@@ -142,7 +147,12 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	namespace := r.PathValue("namespace")
 	trainJobName := r.PathValue("name")
 
-	if !s.authorizeRequest(r, namespace, trainJobName) {
+	authorized, err := s.authorizer.Authorize(r.Context(), r.Header.Get("Authorization"), namespace, trainJobName)
+	if err != nil {
+		badRequest(w, s.log, "Internal error", metav1.StatusReasonInternalError, http.StatusInternalServerError)
+		return
+	}
+	if !authorized {
 		badRequest(w, s.log, "Forbidden", metav1.StatusReasonForbidden, http.StatusForbidden)
 		return
 	}
@@ -192,53 +202,6 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 // handleDefault is the default handler for unknown requests.
 func (s *Server) handleDefault(w http.ResponseWriter, _ *http.Request) {
 	badRequest(w, s.log, "Not found", metav1.StatusReasonNotFound, http.StatusNotFound)
-}
-
-// authorizeRequest verifies the bearer token has the correct audience for the TrainJob.
-// Authorization is based on token audience matching the TrainJob-specific endpoint.
-func (s *Server) authorizeRequest(r *http.Request, namespace, trainJobName string) bool {
-	// Extract bearer token from Authorization header
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		s.log.V(5).Info("Missing Authorization header", "namespace", namespace, "trainJob", trainJobName)
-		return false
-	}
-
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		s.log.V(5).Info("Invalid Authorization header format", "namespace", namespace, "trainJob", trainJobName)
-		return false
-	}
-
-	rawToken := parts[1]
-	if rawToken == "" {
-		s.log.V(5).Info("Empty bearer token", "namespace", namespace, "trainJob", trainJobName)
-		return false
-	}
-
-	// Create verifier with TrainJob-specific audience
-	expectedAudience := TokenAudience(namespace, trainJobName)
-	verifier := s.oidcProvider.Verifier(&oidc.Config{
-		ClientID: expectedAudience,
-	})
-
-	// Verify token signature, expiry, and audience
-	idToken, err := verifier.Verify(r.Context(), rawToken)
-	if err != nil {
-		s.log.V(5).Error(err, "Token verification failed",
-			"namespace", namespace,
-			"trainJob", trainJobName,
-			"expectedAudience", expectedAudience)
-		return false
-	}
-
-	// Log successful authentication for observability
-	s.log.V(3).Info("Authenticated request",
-		"subject", idToken.Subject,
-		"namespace", namespace,
-		"trainJob", trainJobName)
-
-	return true
 }
 
 // badRequest sends a kubernetes Status response with the error message

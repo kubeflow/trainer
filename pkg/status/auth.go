@@ -28,19 +28,44 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// NewOIDCProvider creates an OIDC provider for validating Kubernetes
-// projected service account tokens against the in-cluster OIDC issuer.
-// The provider can be used to create verifiers with TrainJob-specific audiences.
-func NewOIDCProvider(ctx context.Context, config *rest.Config) (*oidc.Provider, error) {
+type TokenAuthorizer interface {
+	Init(ctx context.Context) error
+	Authorize(ctx context.Context, rawIDToken, namespace, trainJobName string) (bool, error)
+}
+
+type projectedServiceAccountTokenAuthorizer struct {
+	oidcProvider *oidc.Provider
+	config       *rest.Config
+}
+
+var _ TokenAuthorizer = &projectedServiceAccountTokenAuthorizer{}
+
+// projectedToken is the set of claims of
+type projectedToken struct {
+	Issuer     string `json:"iss"`
+	Kubernetes struct {
+		Namespace string `json:"namespace"`
+	} `json:"kubernetes.io"`
+}
+
+// NewProjectedServiceAccountTokenAuthorizer creates a validator for checking a bearer token has permission to
+// update the requested train job.
+func NewProjectedServiceAccountTokenAuthorizer(config *rest.Config) TokenAuthorizer {
+	return &projectedServiceAccountTokenAuthorizer{
+		config: config,
+	}
+}
+
+func (p *projectedServiceAccountTokenAuthorizer) Init(ctx context.Context) error {
 	issuerURL, err := getClusterOIDCIssuerURL()
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover issuer URL: %w", err)
+		return fmt.Errorf("failed to discover issuer URL: %w", err)
 	}
 
 	// Create an authenticated HTTP client using the provided rest config
-	httpClient, err := rest.HTTPClientFor(config)
+	httpClient, err := rest.HTTPClientFor(p.config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+		return fmt.Errorf("failed to create HTTP client: %w", err)
 	}
 
 	// Create context with the authenticated HTTP client
@@ -48,10 +73,53 @@ func NewOIDCProvider(ctx context.Context, config *rest.Config) (*oidc.Provider, 
 
 	provider, err := oidc.NewProvider(ctx, issuerURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create OIDC provider: %w", err)
+		return fmt.Errorf("failed to create OIDC provider: %w", err)
+	}
+	p.oidcProvider = provider
+
+	return nil
+}
+
+func (p *projectedServiceAccountTokenAuthorizer) Authorize(ctx context.Context, authHeader, namespace, trainJobName string) (bool, error) {
+	if p.oidcProvider == nil {
+		return false, fmt.Errorf("OIDC provider has not been initialized")
 	}
 
-	return provider, nil
+	rawToken := extractRawToken(authHeader)
+
+	// Create authorizer with TrainJob-specific audience
+	expectedAudience := TokenAudience(namespace, trainJobName)
+	verifier := p.oidcProvider.Verifier(&oidc.Config{
+		ClientID: expectedAudience,
+	})
+
+	// Check token signature, expiry, and audience
+	idToken, err := verifier.Verify(ctx, rawToken)
+	if err != nil {
+		return false, nil
+	}
+
+	// Check token is bound to a pod in the same namespace as the train job
+	parsedToken := projectedToken{}
+	err = idToken.Claims(&parsedToken)
+	if err != nil {
+		return false, nil
+	}
+	if parsedToken.Kubernetes.Namespace != namespace {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func extractRawToken(authHeader string) string {
+	parts := strings.Split(authHeader, " ")
+
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return ""
+	}
+
+	return parts[1]
 }
 
 // getClusterOIDCIssuerURL tries to look up the cluster token issuer from the in-cluster service account token
@@ -72,16 +140,14 @@ func getClusterOIDCIssuerURL() (string, error) {
 		return "", fmt.Errorf("serviceaccount token is not a jwt: %w", err)
 	}
 
-	var claims struct {
-		Issuer string `json:"iss"`
-	}
-	if err := json.Unmarshal(payload, &claims); err != nil {
+	var token projectedToken
+	if err := json.Unmarshal(payload, &token); err != nil {
 		return "", fmt.Errorf("serviceaccount token is not a jwt: %w", err)
 	}
 
-	if claims.Issuer == "" {
+	if token.Issuer == "" {
 		return "", fmt.Errorf("serviceaccount token missing issuer claim")
 	}
 
-	return claims.Issuer, nil
+	return token.Issuer, nil
 }

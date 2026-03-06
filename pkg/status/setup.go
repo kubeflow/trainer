@@ -17,7 +17,6 @@ limitations under the License.
 package status
 
 import (
-	"context"
 	"fmt"
 
 	"k8s.io/client-go/rest"
@@ -43,12 +42,9 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.TrainJobStatusServer, enableHT
 
 	// Initialize OIDC provider for token authentication
 	// The provider will be used to create verifiers with TrainJob-specific audiences
-	oidcProvider, err := NewOIDCProvider(context.Background(), mgr.GetConfig())
-	if err != nil {
-		return fmt.Errorf("failed to create OIDC provider: %w", err)
-	}
+	authorizer := NewProjectedServiceAccountTokenAuthorizer(mgr.GetConfig())
 
-	server, err := NewServer(cli, cfg, tlsConfig, oidcProvider)
+	server, err := NewServer(cli, cfg, tlsConfig, authorizer)
 	if err != nil {
 		return err
 	}
