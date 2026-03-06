@@ -118,6 +118,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	// Handle graceful shutdown in background
+	serverShutdown := make(chan struct{})
 	go func() {
 		<-ctx.Done()
 		s.log.Info("Shutting down runtime status server")
@@ -132,6 +133,8 @@ func (s *Server) Start(ctx context.Context) error {
 	if err := s.httpServer.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("runtime status server failed: %w", err)
 	}
+
+	<-serverShutdown
 	return nil
 }
 
