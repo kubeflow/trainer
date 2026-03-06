@@ -158,18 +158,15 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Parse request body
-	var runtimeStatus trainer.UpdateTrainJobStatusRequest
+	var updateRequest trainer.UpdateTrainJobStatusRequest
 	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&runtimeStatus); err != nil {
+	if err := decoder.Decode(&updateRequest); err != nil {
 		s.log.V(5).Error(err, "Failed to parse runtime status", "namespace", namespace, "trainJobName", trainJobName)
 		badRequest(w, s.log, "Invalid payload", metav1.StatusReasonInvalid, http.StatusUnprocessableEntity)
 		return
 	}
 
-	var trainJob = trainerv1alpha1ac.TrainJob(trainJobName, namespace).
-		WithStatus(trainerv1alpha1ac.TrainJobStatus().
-			WithTrainerStatus(toApplyConfig(runtimeStatus.TrainerStatus)),
-		)
+	var trainJob = trainerv1alpha1ac.TrainJob(trainJobName, namespace).WithStatus(toApplyConfig(updateRequest))
 
 	if err := s.client.Status().Apply(r.Context(), trainJob, client.ForceOwnership, client.FieldOwner("trainer-status")); err != nil {
 		s.log.Error(err, "Failed to update TrainJob", "namespace", namespace, "name", trainJobName)
@@ -194,7 +191,7 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	// Return the parsed payload
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(runtimeStatus); err != nil {
+	if err := json.NewEncoder(w).Encode(updateRequest); err != nil {
 		s.log.Error(err, "Failed to write TrainJob status", "namespace", namespace, "name", trainJobName)
 	}
 }
@@ -220,23 +217,29 @@ func badRequest(w http.ResponseWriter, log logr.Logger, message string, reason m
 	}
 }
 
-func toApplyConfig(trainerStatus *trainer.TrainerStatus) *trainerv1alpha1ac.TrainerStatusApplyConfiguration {
-	var status = trainerv1alpha1ac.TrainerStatus()
-	if trainerStatus.ProgressPercentage != nil {
-		status = status.WithProgressPercentage(*trainerStatus.ProgressPercentage)
-	}
-	if trainerStatus.EstimatedRemainingSeconds != nil {
-		status = status.WithEstimatedRemainingSeconds(*trainerStatus.EstimatedRemainingSeconds)
-	}
-	for _, m := range trainerStatus.Metrics {
-		status.WithMetrics(
-			trainerv1alpha1ac.Metric().
-				WithName(m.Name).
-				WithValue(m.Value),
-		)
-	}
+func toApplyConfig(updateRequest trainer.UpdateTrainJobStatusRequest) *trainerv1alpha1ac.TrainJobStatusApplyConfiguration {
+	var s = trainerv1alpha1ac.TrainJobStatus()
 
-	status = status.WithLastUpdatedTime(trainerStatus.LastUpdatedTime)
+	trainerStatus := updateRequest.TrainerStatus
+	if trainerStatus != nil {
+		var ts = trainerv1alpha1ac.TrainerStatus()
 
-	return status
+		if trainerStatus.ProgressPercentage != nil {
+			ts = ts.WithProgressPercentage(*trainerStatus.ProgressPercentage)
+		}
+		if trainerStatus.EstimatedRemainingSeconds != nil {
+			ts = ts.WithEstimatedRemainingSeconds(*trainerStatus.EstimatedRemainingSeconds)
+		}
+		for _, m := range trainerStatus.Metrics {
+			ts.WithMetrics(
+				trainerv1alpha1ac.Metric().
+					WithName(m.Name).
+					WithValue(m.Value),
+			)
+		}
+
+		ts = ts.WithLastUpdatedTime(trainerStatus.LastUpdatedTime)
+		s.WithTrainerStatus(ts)
+	}
+	return s
 }
