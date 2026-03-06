@@ -37,7 +37,7 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
-func TestJax(t *testing.T) {
+func TestJAXEnforceMLPolicy(t *testing.T) {
 	cases := map[string]struct {
 		info              *runtime.Info
 		trainJob          *trainer.TrainJob

@@ -41,7 +41,7 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
-func TestTorch(t *testing.T) {
+func TestTorchEnforceMLPolicy(t *testing.T) {
 	cases := map[string]struct {
 		info              *runtime.Info
 		trainJob          *trainer.TrainJob
@@ -1396,7 +1396,7 @@ func TestTorch(t *testing.T) {
 	}
 }
 
-func TestValidate(t *testing.T) {
+func TestTorchValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info
 		oldObj       *trainer.TrainJob
