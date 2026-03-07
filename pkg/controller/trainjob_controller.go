@@ -117,9 +117,14 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := r.runtimes[runtimeRefGK]
 	if !ok {
-		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
-	} else if !trainjob.IsTrainJobFinished(&trainJob) {
+		if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
+			return ctrl.Result{}, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob))
+		}
+		return ctrl.Result{}, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
+	}
+
+	if !trainjob.IsTrainJobFinished(&trainJob) {
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
 		if err != nil {
 			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
@@ -136,10 +141,8 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	setSuspendedCondition(&trainJob)
 
-	if runtime != nil {
-		if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
-			err = errors.Join(err, statusErr)
-		}
+	if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
+		err = errors.Join(err, statusErr)
 	}
 
 	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, runtime, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
@@ -180,7 +183,6 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, runtime jobr
 	if trainJob.Spec.ActiveDeadlineSeconds == 0 || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return ctrl.Result{}, nil
 	}
-	log := ctrl.LoggerFrom(ctx)
 	startTime := trainJob.CreationTimestamp.Time
 	suspendedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobSuspended)
 	if suspendedCond != nil && suspendedCond.Status == metav1.ConditionFalse {
@@ -192,17 +194,15 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, runtime jobr
 	deadline := startTime.Add(time.Duration(trainJob.Spec.ActiveDeadlineSeconds) * time.Second)
 	now := time.Now()
 	if now.After(deadline) {
-		log.V(2).Info("TrainJob deadline exceeded, marking as failed",
+		ctrl.LoggerFrom(ctx).V(2).Info("TrainJob deadline exceeded, marking as failed",
 			"activeDeadlineSeconds", trainJob.Spec.ActiveDeadlineSeconds,
 			"startTime", startTime,
 			"deadline", deadline)
 		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
-		if runtime != nil {
-			trainJobCopy := trainJob.DeepCopy()
-			trainJobCopy.Spec.Suspend = ptr.To(true)
-			if suspendErr := r.reconcileObjects(ctx, runtime, trainJobCopy); suspendErr != nil {
-				log.V(2).Info("Failed to suspend JobSet after deadline exceeded", "error", suspendErr)
-			}
+		trainJobCopy := trainJob.DeepCopy()
+		trainJobCopy.Spec.Suspend = ptr.To(true)
+		if suspendErr := r.reconcileObjects(ctx, runtime, trainJobCopy); suspendErr != nil {
+			ctrl.LoggerFrom(ctx).V(2).Info("Failed to suspend JobSet after deadline exceeded", "error", suspendErr)
 		}
 		return ctrl.Result{}, nil
 	}
@@ -210,7 +210,7 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, runtime jobr
 	if requeueAfter <= 0 {
 		requeueAfter = 1 * time.Second
 	}
-	log.V(2).Info("Scheduling deadline check",
+	ctrl.LoggerFrom(ctx).V(2).Info("Scheduling deadline check",
 		"activeDeadlineSeconds", trainJob.Spec.ActiveDeadlineSeconds,
 		"requeueAfter", requeueAfter)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
