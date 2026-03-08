@@ -621,8 +621,8 @@ kubectl run -it --rm debug --image=nicolaka/netshoot --restart=Never -- \
 
 ### API Documentation
 
-- [TrainerClient API Reference](../api-reference/python-sdk/index): Complete SDK documentation
-- [DataCacheDataset API](../api-reference/python-sdk/dataset): Dataset class documentation
+- TrainerClient API Reference: Complete SDK documentation (coming soon)
+- DataCacheDataset API: Dataset class documentation (coming soon)
 
 ### Related Guides
 

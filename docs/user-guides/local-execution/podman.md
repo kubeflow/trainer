@@ -332,6 +332,7 @@ job_id = client.train(
 
 The backend uses IP addresses instead of hostnames for `MASTER_ADDR` to ensure reliable cross-container communication.
 
+(podman-complete-training-example)=
 ## Complete Training Example
 
 Here's a complete example with distributed data parallelism:
@@ -660,8 +661,8 @@ job_id = client.train(
 
 ### API Documentation
 
-- [TrainerClient API Reference](../../api-reference/python-sdk/index): Complete SDK documentation
-- [ContainerBackendConfig API](../../api-reference/python-sdk/backends): Configuration reference
+- TrainerClient API Reference: Complete SDK documentation (coming soon)
+- ContainerBackendConfig API: Configuration reference (coming soon)
 
 ### Related Guides
 
