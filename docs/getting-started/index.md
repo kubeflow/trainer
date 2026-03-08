@@ -191,31 +191,40 @@ for log_line in client.get_job_logs(job_id, follow=True):
 :::::{grid} 1 1 2 2
 :gutter: 3
 
-::::{grid-item-card} PyTorch Guide
-:link: ../user-guides/pytorch
+::::{grid-item-card} User Guides
+:link: ../user-guides/index
 :link-type: doc
 
-Deep dive into PyTorch distributed training with DDP and FSDP
+**Documentation for AI practitioners of Kubeflow Trainer**
+
+Train models with PyTorch, JAX, DeepSpeed, MLX, and use builtin trainers for LLM fine-tuning. Develop locally before deploying to Kubernetes.
 ::::
 
-::::{grid-item-card} JAX Guide
-:link: ../user-guides/jax
+::::{grid-item-card} Operator Guides
+:link: ../operator-guides/index
 :link-type: doc
 
-Train JAX models with distributed parallelism
+**Documentation for cluster operators of Kubeflow Trainer**
+
+Install and configure Kubeflow Trainer, manage runtimes and ML policies, and integrate with job schedulers like Kueue and Volcano.
 ::::
 
-::::{grid-item-card} Local Development
-:link: ../user-guides/local-execution/index
+::::{grid-item-card} Contributor Guides
+:link: ../contributor-guides/index
 :link-type: doc
 
-Run training jobs locally before deploying to Kubernetes
+**Documentation for Kubeflow Trainer contributors**
+
+Learn the architecture, development workflow, and how to contribute code and build custom plugins for Kubeflow Trainer.
 ::::
 
-::::{grid-item-card} Examples Repository
-:link: https://github.com/kubeflow/trainer/tree/master/examples
+::::{grid-item-card} Legacy Kubeflow Training Operator (v1)
+:link: ../legacy-v1/index
+:link-type: doc
 
-Explore complete examples on GitHub
+**Kubeflow Training Operator v1 Documentation**
+
+Archived documentation for the deprecated v1 operator, including user guides, installation, and migration guidance to v2.
 ::::
 
 :::::
