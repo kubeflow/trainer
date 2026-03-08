@@ -108,6 +108,7 @@ job = client.wait_for_job_status(job_id)
 print(f"Job status: {job.status}")
 ```
 
+(local-process-complete-training-example)=
 ### Complete Training Example
 
 Here's a more complete example training a CNN on Fashion-MNIST:
@@ -555,12 +556,12 @@ For multi-node training or container-based workflows, use:
 ### Complete Examples
 
 - **[MNIST Training](https://github.com/kubeflow/trainer/tree/master/examples/pytorch/mnist)**: Complete example with local process backend
-- **Fashion-MNIST CNN**: See the [complete example](#complete-training-example) above
+- **Fashion-MNIST CNN**: See the [complete example](#local-process-complete-training-example) above
 
 ### API Documentation
 
-- [TrainerClient API Reference](../../api-reference/python-sdk/index): Complete SDK documentation
-- [LocalProcessBackendConfig API](../../api-reference/python-sdk/backends): Backend configuration reference
+- TrainerClient API Reference: Complete SDK documentation (coming soon)
+- LocalProcessBackendConfig API: Backend configuration reference (coming soon)
 
 ### Related Guides
 

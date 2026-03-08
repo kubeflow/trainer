@@ -68,6 +68,7 @@ Provides daemonless container execution with enhanced security features.
 
 **Learn more:** [Podman Backend](podman)
 
+(backend-comparison)=
 ## Backend Comparison
 
 | Feature | Local Process | Docker | Podman |
@@ -448,8 +449,8 @@ See individual backend guides for detailed configuration options.
 
 ### API Documentation
 
-- [TrainerClient API Reference](../api-reference/python-sdk/index): Complete SDK documentation
-- [Backend Configuration](../api-reference/python-sdk/backends): Backend configuration reference
+- TrainerClient API Reference: Complete SDK documentation (coming soon)
+- Backend Configuration: Backend configuration reference (coming soon)
 
 ### Backend-Specific Guides
 
@@ -517,9 +518,9 @@ config = ContainerBackendConfig(
 
 See individual backend guides for specific troubleshooting:
 
-- [Local Process Troubleshooting](local-process#troubleshooting)
-- [Docker Troubleshooting](docker#troubleshooting)
-- [Podman Troubleshooting](podman#troubleshooting)
+- [Local Process Troubleshooting](local-process)
+- [Docker Troubleshooting](docker)
+- [Podman Troubleshooting](podman)
 
 ## Next Steps
 

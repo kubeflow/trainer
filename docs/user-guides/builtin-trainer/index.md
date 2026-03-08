@@ -490,8 +490,8 @@ config = TorchTuneConfig(
 ## Next Steps
 
 - **[TorchTune Guide](torchtune)**: Learn how to fine-tune LLMs with TorchTune
-- **[Getting Started](../getting-started/index)**: Set up your environment
-- **[API Reference](../api-reference/python-sdk/index)**: Complete SDK documentation
+- **[Getting Started](../../getting-started/index)**: Set up your environment
+- **API Reference**: Complete SDK documentation (coming soon)
 - **[Examples](https://github.com/kubeflow/trainer/tree/master/examples)**: Browse complete examples
 
 ## FAQ

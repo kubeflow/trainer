@@ -289,6 +289,7 @@ job_id = client.train(
 )
 ```
 
+(docker-complete-training-example)=
 ## Complete Training Example
 
 Here's a complete example training a CNN with data parallelism:
@@ -563,12 +564,12 @@ job_id = client.train(
 ### Complete Examples
 
 - **[MNIST Classification](https://github.com/kubeflow/trainer/tree/master/examples/pytorch/mnist)**: Complete notebook demonstrating Docker backend
-- **Distributed CNN Training**: See [complete example](#complete-training-example) above
+- **Distributed CNN Training**: See [complete example](#docker-complete-training-example) above
 
 ### API Documentation
 
-- [TrainerClient API Reference](../../api-reference/python-sdk/index): Complete SDK documentation
-- [ContainerBackendConfig API](../../api-reference/python-sdk/backends): Backend configuration reference
+- TrainerClient API Reference: Complete SDK documentation (coming soon)
+- ContainerBackendConfig API: Backend configuration reference (coming soon)
 
 ### Related Guides
 
