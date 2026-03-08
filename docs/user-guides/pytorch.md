@@ -1,406 +1,219 @@
-# PyTorch
+# PyTorch Guide
 
-Train PyTorch models at scale with Kubeflow Trainer using distributed data parallel (DDP) and fully sharded data parallel (FSDP) strategies.
-
-## Overview
-
-Kubeflow Trainer provides seamless distributed PyTorch training on Kubernetes with minimal code changes. The `torch-distributed` runtime handles cluster orchestration, networking configuration, and environment setup automatically, allowing you to focus on your model and training logic.
-
-Key features:
-- **Automatic distributed setup**: Environment variables and networking configured automatically
-- **Multiple parallelism strategies**: Support for DDP, FSDP, and custom approaches
-- **GPU and CPU support**: Train on any hardware configuration
-- **Batteries included**: Pre-configured with PyTorch 2.7.1, torchvision, and torchaudio
+This guide describes how to use TrainJob to train or fine-tune AI models with [PyTorch](https://pytorch.org/).
 
 ## Prerequisites
 
-Before following this guide, ensure you have:
+Before exploring this guide, make sure to follow [the Getting Started guide](../getting-started/index)
+to understand the basics of Kubeflow Trainer.
 
-- Completed the [Getting Started](../getting-started/index) guide
-- Access to a Kubernetes cluster with Kubeflow Trainer installed
-- Basic understanding of PyTorch and distributed training concepts
+## PyTorch Distributed Overview
 
-## The torch-distributed Runtime
+PyTorch has the builtin [`torch.distributed` package](https://docs.pytorch.org/docs/stable/distributed.html)
+to perform distributed training, including both data and model parallelism. You can use the Kubeflow
+Python SDK to create your TrainJobs with
+[PyTorch Distributed Data Parallel (DDP)](https://docs.pytorch.org/tutorials/intermediate/ddp_tutorial.html),
+[Fully Sharded Data Parallel (FSDP)](https://docs.pytorch.org/docs/stable/fsdp.html),
+[FSDP2](https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html),
+or any other parallelism algorithm supported by PyTorch.
 
-The `torch-distributed` runtime is a ClusterTrainingRuntime that provides:
+In DDP training, the dataset is sharded across multiple GPUs, with each GPU holding one partition
+of the dataset and a full copy of the model. The gradients are calculated locally on each GPU and
+then synchronized globally to update the model parameters.
 
-- **PyTorch 2.7.1** with torchvision and torchaudio
-- **Automatic environment configuration** for distributed training
-- **Multi-node networking** setup via PyTorch's c10d backend
-- **Flexible device support** (CPU, GPU, or mixed configurations)
+In FSDP training, in addition to DDP, the model gets chopped into slices and assigned to the
+different GPUs. The model is split into shards, each hosted on a different GPU. Gradients and
+parameter updates are computed locally and synchronized globally. FSDP is particularly useful for
+training very large models that cannot fit into the memory of a single GPU.
 
-### Automatic Environment Variables
+## Get PyTorch Runtime Packages
 
-Kubeflow Trainer automatically injects these environment variables into each training process:
+Kubeflow Trainer includes a PyTorch runtime called [`torch-distributed`](https://github.com/kubeflow/trainer/blob/master/manifests/base/runtimes/torch_distributed.yaml),
+which comes with several pre-installed Python packages.
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `WORLD_SIZE` | Total number of processes across all nodes | `4` |
-| `RANK` | Global rank of the current process (0-indexed) | `0`, `1`, `2`, `3` |
-| `LOCAL_RANK` | Local rank within the current node (0-indexed) | `0`, `1` |
-| `MASTER_ADDR` | Address of the rank 0 node | `trainjob-mnist-0.trainjob-mnist` |
-| `MASTER_PORT` | Port for distributed communication | `29500` |
+Run the following command to get a list of the available packages:
 
-You don't need to set these variables manually. They're available to your training code automatically.
+```py
+from kubeflow.trainer import TrainerClient
 
-## Training Function Pattern
+TrainerClient().get_runtime_packages(
+    runtime=TrainerClient().get_runtime("torch-distributed")
+)
+```
 
-To run distributed PyTorch training with Kubeflow Trainer, your training function must follow this pattern:
+You should see the installed packages, for example:
 
-### 1. Import Inside Function Body
+```sh
+Python: 3.11.13 | packaged by conda-forge | (main, Jun  4 2025, 14:48:23) [GCC 13.3.0]
+Package                   Version
+------------------------- ------------
+torch                     2.7.1+cu128
+torchaudio                2.7.1+cu128
+torchelastic              0.2.2
+torchvision               0.22.1+cu128
+...
+```
 
-All imports must be placed inside the function body, not at the module level:
+## PyTorch Distributed Environment
 
-```python
-def train_pytorch():
-    """Train model with PyTorch DDP."""
-    # All imports go here
+Kubeflow Trainer uses the [`torchrun` utility](https://docs.pytorch.org/docs/stable/elastic/run.html)
+to run PyTorch script on every training node. It automatically configures the appropriate distributed
+environment for PyTorch nodes:
+
+- `dist.get_world_size()` - Total number of processes (e.g., GPUs) across all PyTorch nodes.
+- `dist.get_rank()` - Rank of the current process across all PyTorch node.
+- `os.environ["LOCAL_RANK"]` - Rank of the current process within a single PyTorch training node.
+
+You can use these values to, for example, download the dataset only on the node with `local_rank=0`,
+or export your fine-tuned LLM only on the node with `rank=0` (e.g., the master node).
+
+You can access the distributed environment as follows:
+
+```py
+from kubeflow.trainer import TrainerClient, CustomTrainer
+
+def get_torch_dist():
+    import os
     import torch
     import torch.distributed as dist
-    from torch.nn.parallel import DistributedDataParallel as DDP
 
-    # Rest of your training code...
+    device, backend = ("cuda", "nccl") if torch.cuda.is_available() else ("cpu", "gloo")
+    dist.init_process_group(backend=backend)
+
+    print("PyTorch Distributed Environment")
+    print(f"Using device: {device}")
+    print(f"WORLD_SIZE: {dist.get_world_size()}")
+    print(f"RANK: {dist.get_rank()}")
+    print(f"LOCAL_RANK: {os.environ['LOCAL_RANK']}")
+
+# Create the TrainJob.
+job_id = TrainerClient().train(
+    runtime="torch-distributed",
+    trainer=CustomTrainer(
+        func=get_torch_dist,
+        num_nodes=3,
+        resources_per_node={
+            "cpu": 2,
+        },
+    ),
+)
+
+# Wait for TrainJob to complete.
+TrainerClient().wait_for_job_status(job_id)
+
+print("Distributed PyTorch env on node-0")
+print("\n".join(TrainerClient().get_job_logs(name=job_id, step="node-0")))
+
+print("Distributed PyTorch env on node-1")
+print("\n".join(TrainerClient().get_job_logs(name=job_id, step="node-1")))
 ```
+
+You should see the distributed environment across the two training nodes as follows:
+
+```shell
+Distributed PyTorch env on node-0
+PyTorch Distributed Environment
+Using device: cpu
+WORLD_SIZE: 6
+RANK: 0
+LOCAL_RANK: 0
+PyTorch Distributed Environment
+Using device: cpu
+WORLD_SIZE: 6
+RANK: 1
+LOCAL_RANK: 1
+
+Distributed PyTorch env on Node-1
+PyTorch Distributed Environment
+Using device: cpu
+WORLD_SIZE: 6
+RANK: 2
+LOCAL_RANK: 0
+PyTorch Distributed Environment
+Using device: cpu
+WORLD_SIZE: 6
+RANK: 3
+LOCAL_RANK: 1
+```
+
+## Create TrainJob with PyTorch Training
+
+### Configure PyTorch Training Function
+
+You can leverage the `CustomTrainer()` to wrap your PyTorch code inside a function and create a
+TrainJob. This function should handle the end-to-end model training or fine-tuning of a
+pre-trained model.
 
 :::{note}
-This requirement allows the SDK to serialize and transfer your training function to the cluster without dependency conflicts.
+All necessary imports must be included inside the function body so that the TrainJob can recognize
+them on every training node.
 :::
 
-### 2. Initialize Distributed PyTorch
+Your training function might look like this:
 
-Call `dist.init_process_group()` once at the start of your training function:
-
-```python
-def train_pytorch():
+```py
+def fine_tune_qwen():
     import torch
     import torch.distributed as dist
+    from torch.utils.data import DataLoader, DistributedSampler
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+    import boto3
 
-    # Initialize distributed backend
-    # Use NCCL for GPU, Gloo for CPU
-    backend = "nccl" if torch.cuda.is_available() else "gloo"
+    # Setup distributed Torch.
+    device, backend = ("cuda", "nccl") if torch.cuda.is_available() else ("cpu", "gloo")
     dist.init_process_group(backend=backend)
 
-    # Your training code...
-
-    # Clean up at the end
-    dist.destroy_process_group()
-```
-
-### 3. Use Rank Checks for Single-Process Operations
-
-Operations like downloading datasets or printing logs should typically run on rank 0 only:
-
-```python
-def train_pytorch():
-    import torch.distributed as dist
-    from torchvision import datasets
-
-    # Only rank 0 downloads the dataset
-    if dist.get_rank() == 0:
-        datasets.FashionMNIST(root="./data", train=True, download=True)
-
-    # Wait for rank 0 to finish downloading
-    dist.barrier()
-
-    # All ranks can now load the dataset
-    dataset = datasets.FashionMNIST(root="./data", train=True, download=False)
-```
-
-## Distributed Data Parallel (DDP)
-
-DDP is the recommended approach for most distributed training workloads. It replicates your model across all processes and synchronizes gradients during backpropagation.
-
-### Complete DDP Example
-
-Here's a complete example training a CNN on Fashion-MNIST with DDP:
-
-```python
-def train_fashion_mnist_ddp():
-    """Train Fashion-MNIST CNN with PyTorch DDP."""
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
-    import torch.optim as optim
-    import torch.distributed as dist
-    from torch.nn.parallel import DistributedDataParallel as DDP
-    from torchvision import datasets, transforms
-    from torch.utils.data import DataLoader
-    from torch.utils.data.distributed import DistributedSampler
-
-    # Configure device and distributed backend
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    backend = "nccl" if torch.cuda.is_available() else "gloo"
-    dist.init_process_group(backend=backend)
-
-    # Define CNN model
-    class FashionCNN(nn.Module):
-        def __init__(self):
-            super(FashionCNN, self).__init__()
-            self.conv1 = nn.Conv2d(1, 32, 3, 1)
-            self.conv2 = nn.Conv2d(32, 64, 3, 1)
-            self.dropout1 = nn.Dropout(0.25)
-            self.dropout2 = nn.Dropout(0.5)
-            self.fc1 = nn.Linear(9216, 128)
-            self.fc2 = nn.Linear(128, 10)
-
-        def forward(self, x):
-            x = F.relu(self.conv1(x))
-            x = F.relu(self.conv2(x))
-            x = F.max_pool2d(x, 2)
-            x = self.dropout1(x)
-            x = torch.flatten(x, 1)
-            x = F.relu(self.fc1(x))
-            x = self.dropout2(x)
-            return self.fc2(x)
-
-    # Create model and wrap with DDP
-    model = FashionCNN().to(device)
-    model = DDP(model)
-
-    # Prepare dataset with DistributedSampler
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5,), (0.5,))
-    ])
-
-    # Only rank 0 downloads the dataset
-    if dist.get_rank() == 0:
-        datasets.FashionMNIST(
-            root="./data",
-            train=True,
-            download=True,
-            transform=transform
-        )
-    dist.barrier()
-
-    # All ranks load the dataset
-    train_dataset = datasets.FashionMNIST(
-        root="./data",
-        train=True,
-        download=False,
-        transform=transform
-    )
-
-    # DistributedSampler ensures each process gets a unique subset
-    sampler = DistributedSampler(
-        train_dataset,
-        num_replicas=dist.get_world_size(),
-        rank=dist.get_rank(),
-        shuffle=True
-    )
-
+    # Configure the dataset and dataloader.
+    dataset = ...
     train_loader = DataLoader(
-        train_dataset,
-        batch_size=64,
-        sampler=sampler,
-        num_workers=2,
-        pin_memory=True
+        dataset, batch_size=128, sampler=DistributedSampler(dataset)
     )
+    # Configure the pre-trained model and tokenizer.
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-32B")
+    model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-32B")
 
-    # Training setup
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    criterion = nn.CrossEntropyLoss()
-
-    # Training loop
-    model.train()
-    for epoch in range(5):
-        # Set epoch for proper shuffling
-        sampler.set_epoch(epoch)
-
-        epoch_loss = 0.0
-        for batch_idx, (data, target) in enumerate(train_loader):
-            data, target = data.to(device), target.to(device)
-
-            optimizer.zero_grad()
-            output = model(data)
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
-
-            epoch_loss += loss.item()
-
-            if batch_idx % 100 == 0 and dist.get_rank() == 0:
-                print(f"Epoch {epoch}, Batch {batch_idx}, Loss: {loss.item():.4f}")
-
-        # Print epoch summary on rank 0
-        if dist.get_rank() == 0:
-            avg_loss = epoch_loss / len(train_loader)
-            print(f"Epoch {epoch} completed. Average Loss: {avg_loss:.4f}")
-
-    # Save model checkpoint (rank 0 only)
+    # Configure the PyTorch training loop.
+    for epoch in range(10):
+        for batch_idx, batch in enumerate(train_loader):
+            output = model(...)
+            model.backward(output.loss)
+            model.step()
+            ...
     if dist.get_rank() == 0:
-        torch.save(model.state_dict(), "fashion_mnist_model.pth")
-        print("Training completed. Model saved.")
-
-    dist.destroy_process_group()
+        # Export your model to the object storage (e.g. S3)
+        boto3.upload_file()
 ```
 
-### Launching DDP Training
+### Create a TrainJob
 
-Use the TrainerClient SDK to launch your DDP training job:
+After configuring the PyTorch training function, use the `train()` API to create TrainJob:
 
 ```python
-from kubeflow.trainer import TrainerClient, CustomTrainer
-
-client = TrainerClient()
-
-job_id = client.train(
+job_id = TrainerClient().train(
+    runtime=TrainerClient().get_runtime("torch-distributed"),
     trainer=CustomTrainer(
-        func=train_fashion_mnist_ddp,
-        num_nodes=4,
+        func=fine_tune_qwen,
+        num_nodes=2,
         resources_per_node={
-            "cpu": 4,
-            "memory": "16Gi",
-            "gpu": 1,  # One GPU per node
+            "gpu": 4
         },
+        # These packages will be installed on every training node.
+        packages_to_install=["transformers>=4.53.0", "boto3"],
     )
 )
-
-print(f"Training job created: {job_id}")
 ```
 
-This will launch 4 processes (one per node), each with 1 GPU. DDP will synchronize gradients across all 4 GPUs.
+### Get the TrainJob Results
 
-## Fully Sharded Data Parallel (FSDP)
+You can use the `get_job_logs()` API to see your TrainJob logs:
 
-FSDP is ideal for training large models that don't fit in a single GPU's memory. It shards model parameters, gradients, and optimizer states across all GPUs.
-
-### When to Use FSDP
-
-Use FSDP when:
-- Your model is too large to fit on a single GPU
-- You want to train larger models with limited GPU memory
-- You need better memory efficiency than DDP
-
-### FSDP Example
-
-```python
-def train_large_model_fsdp():
-    """Train large model with PyTorch FSDP."""
-    import torch
-    import torch.nn as nn
-    import torch.distributed as dist
-    from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
-    from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
-
-    # Initialize distributed training
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dist.init_process_group(backend="nccl")
-
-    # Create your large model
-    model = YourLargeModel().to(device)
-
-    # Wrap with FSDP
-    # Auto-wrap policy shards layers above a certain parameter count
-    auto_wrap_policy = size_based_auto_wrap_policy(
-        min_num_params=1e8  # Shard layers with 100M+ parameters
-    )
-
-    model = FSDP(
-        model,
-        auto_wrap_policy=auto_wrap_policy,
-        device_id=torch.cuda.current_device(),
-    )
-
-    # Training loop (similar to DDP)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-    for epoch in range(num_epochs):
-        for batch in train_loader:
-            optimizer.zero_grad()
-            loss = model(batch)
-            loss.backward()
-            optimizer.step()
-
-    dist.destroy_process_group()
+```py
+print("\n".join(TrainerClient().get_job_logs(name=job_id)))
 ```
 
-:::{tip}
-FSDP requires more careful configuration than DDP. See the [PyTorch FSDP documentation](https://pytorch.org/docs/stable/fsdp.html) for advanced options like mixed precision, activation checkpointing, and custom wrapping policies.
-:::
+## Next Steps
 
-## SDK Integration
-
-The TrainerClient provides a Pythonic interface for managing distributed training:
-
-```python
-from kubeflow.trainer import TrainerClient, CustomTrainer
-
-client = TrainerClient()
-
-# List available runtimes
-for runtime in client.list_runtimes():
-    print(f"Runtime: {runtime.name}")
-
-# Launch training job
-job_id = client.train(
-    trainer=CustomTrainer(
-        func=train_fashion_mnist_ddp,
-        num_nodes=8,
-        resources_per_node={
-            "cpu": 8,
-            "memory": "32Gi",
-            "gpu": 2,
-        },
-    )
-)
-
-# Monitor job status
-job = client.get_job(name=job_id)
-print(f"Job Status: {job.status}")
-
-for step in job.steps:
-    print(f"  Step: {step.name}")
-    print(f"    Status: {step.status}")
-    print(f"    Devices: {step.device} x {step.device_count}")
-
-# Stream training logs
-for log_line in client.get_job_logs(job_id, follow=True):
-    print(log_line)
-```
-
-## Examples and Resources
-
-### Complete Examples
-
-- **[PyTorch MNIST Classification](https://github.com/kubeflow/trainer/tree/master/examples/pytorch/image-classification)**: Complete example with Fashion-MNIST dataset
-- **DistilBERT Fine-tuning**: Fine-tune transformer models with distributed training (coming soon)
-
-### API Documentation
-
-- [TrainerClient API Reference](../api-reference/python-sdk/index): Complete SDK documentation
-- [TrainJob CRD Reference](../api-reference/crd-types/trainjob): TrainJob specification details
-
-### Related Guides
-
-- [Getting Started](../getting-started/index): Initial setup and first training job
-- [Local Execution](local-execution/index): Test training locally before deploying to Kubernetes
-- [DeepSpeed](deepspeed): Large-scale training with DeepSpeed ZeRO optimization
-
-## Troubleshooting
-
-### Common Issues
-
-**Import errors with `CustomTrainer`:**
-
-Ensure all imports are inside your training function body, not at the module level.
-
-**NCCL timeout errors:**
-
-Increase timeout or check network connectivity between nodes:
-
-```python
-import os
-os.environ["NCCL_TIMEOUT"] = "1800"  # 30 minutes
-```
-
-**Out of memory (OOM) errors:**
-
-- Reduce batch size
-- Use gradient accumulation
-- Switch from DDP to FSDP
-- Enable mixed precision training with `torch.cuda.amp`
-
-**Uneven workload distribution:**
-
-Ensure you're using `DistributedSampler` and calling `sampler.set_epoch(epoch)` in your training loop.
+- Check out [the PyTorch MNIST example](https://github.com/kubeflow/trainer/blob/master/examples/pytorch/image-classification/mnist.ipynb).
+- Follow [the PyTorch fine-tuning example](https://github.com/kubeflow/trainer/blob/master/examples/pytorch/question-answering/fine-tune-distilbert.ipynb)
+ using the pre-trained DistilBERT model.
+- Learn more about `TrainerClient()` APIs [in the Kubeflow SDK](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/api/trainer_client.py).

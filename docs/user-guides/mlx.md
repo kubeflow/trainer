@@ -1,601 +1,266 @@
-# MLX
+# MLX Guide
 
-Train and fine-tune AI models on Apple Silicon with MLX, Apple's NumPy-like array framework optimized for Metal GPUs.
-
-## Overview
-
-MLX is Apple's machine learning framework designed for Apple Silicon, providing a NumPy-like API with automatic differentiation and GPU acceleration. Kubeflow Trainer enables distributed MLX training on Kubernetes clusters with Apple Silicon nodes, making it easy to scale your MLX workloads.
-
-Key features:
-- **Composable function transformations**: Automatic differentiation, vectorization, and computation graph optimization
-- **Lazy computation**: Arrays materialize only when needed for memory efficiency
-- **Multi-device support**: Seamless operation across CPUs and GPUs
-- **Unified memory**: Efficient data sharing between CPU and GPU on Apple Silicon
-- **Distributed training**: Data parallelism with gradient averaging across multiple devices
+This guide describes how to use TrainJob to train or fine-tune AI models with [MLX](https://ml-explore.github.io/mlx/build/html/index.html).
 
 ## Prerequisites
 
-Before following this guide, ensure you have:
+Before exploring this guide, make sure to follow [the Getting Started guide](../getting-started/index)
+to understand the basics of Kubeflow Trainer.
 
-- Completed the [Getting Started](../getting-started/index) guide
-- Access to a Kubernetes cluster with Apple Silicon nodes (M1, M2, M3, or M4)
-- Basic understanding of MLX and distributed training concepts
-- MLX-compatible hardware for local development (optional)
+## MLX Distributed Overview
 
-:::{note}
-While MLX is optimized for Apple Silicon GPUs, you can develop on Apple Silicon locally and then deploy to GPU clusters for training, evaluating the results back on your local machine.
-:::
+MLX is a NumPy-like array framework designed for efficient and flexible machine learning, created by
+Apple machine learning researchers. The main differences between MLX and NumPy are:
 
-## The mlx-distributed Runtime
+- **Composable function transformations:** MLX has composable function transformations for automatic
+ differentiation, automatic vectorization, and computation graph optimization.
 
-Kubeflow Trainer provides the `mlx-distributed` ClusterTrainingRuntime that uses MPI backend to coordinate distributed MLX training across multiple nodes.
+- **Lazy computation:** Computations in MLX are lazy. Arrays are only materialized when needed.
 
-### Runtime Features
+- **Multi-device:** Operations can run on any of the supported devices (CPU, GPU, etc.)
 
-- **Automatic distributed initialization**: MLX distributed setup handled automatically
-- **Data parallelism support**: Dataset sharding across devices with gradient averaging
-- **CUDA runtime support**: Pre-installed CUDA drivers and `mlx[cuda]` package for GPU clusters
-- **Flexible deployment**: Train on GPU clusters, evaluate on Apple Silicon locally
+In Kubeflow Trainer, MLX distributed training is supported via the MPI backend which enables:
 
-### Automatic Environment Variables
+- **Data Parallelism**: The dataset is sharded across multiple devices, with each device processing
+ a partition of the data and maintaining a copy of the model.
+- **Gradient Averaging**: Gradients are computed locally and then averaged across all processes
+ using efficient communication primitives like `all_sum()`.
+- **Automatic Process Management**: MLX handles process initialization and communication setup
+ through the `mlx.distributed` module.
 
-The runtime provides access to distributed configuration:
+## MLX with CUDA Backend
 
-| Variable/Function | Description | Example |
-|-------------------|-------------|---------|
-| `mx.distributed.init()` | Initialize distributed environment | Called automatically |
-| `mx.distributed.size()` | Total number of processes | `4` |
-| `mx.distributed.rank()` | Current process rank (0-indexed) | `0`, `1`, `2`, `3` |
+Kubeflow Trainer includes an MLX runtime called [`mlx-distributed`](https://github.com/kubeflow/trainer/blob/master/manifests/base/runtimes/mlx_distributed.yaml).
+This runtime installs the CUDA driver and `mlx[cuda]` package to enable MLX on distributed GPUs.
+Currently, you can't use this runtime for non-GPU TrainJobs.
 
-## Training Function Pattern
+This setup is especially powerful: you can train or fine-tune models on a GPU cluster and then
+seamlessly evaluate them locally on an Apple silicon machine like in
+[this MNIST example](https://github.com/kubeflow/trainer/tree/master/examples/mlx/image-classification/mnist.ipynb).
 
-To run MLX training with Kubeflow Trainer, follow this pattern:
+## Get MLX Runtime Packages
 
-### 1. Import Inside Function Body
+MLX runtime comes with several pre-installed Python packages.
 
-All imports must be placed inside the function body:
+Run the following command to get a list of the available packages:
 
-```python
-def train_mlx_model():
-    """Train model with MLX distributed."""
-    # All imports go here
-    import mlx.core as mx
-    import mlx.nn as nn
-    import mlx.optimizers as optim
-    from mlx.utils import tree_flatten
+```py
+from kubeflow.trainer import TrainerClient
 
-    # Rest of your training code...
+TrainerClient().get_runtime_packages(
+    runtime=TrainerClient().get_runtime("mlx-distributed")
+)
 ```
 
-:::{note}
-This requirement allows the SDK to serialize and transfer your training function to the cluster without dependency conflicts.
-:::
+You should see the installed packages, for example:
 
-### 2. Initialize Distributed MLX
-
-MLX handles distributed initialization automatically through the `mlx.distributed` module:
-
-```python
-def train_mlx_model():
-    import mlx.core as mx
-    import mlx.distributed as dist
-
-    # Initialize distributed environment (if not already initialized)
-    if not dist.is_available():
-        raise RuntimeError("MLX distributed is not available")
-
-    # Get distributed info
-    world_size = dist.size()
-    rank = dist.rank()
-
-    print(f"Process {rank}/{world_size} initialized")
-
-    # Your training code...
+```sh
+Python: 3.10.12 (main, May 27 2025, 17:12:29) [GCC 11.4.0]
+Package                Version
+---------------------- -----------
+...
+mlx                    0.28.0
+mlx-cuda               0.28.0
+mlx-data               0.1.0
+mlx-lm                 0.26.3
+...
 ```
 
-### 3. Use Gradient Averaging
+## MLX Distributed Environment
 
-Synchronize gradients across processes using `nn.average_gradients()`:
+Kubeflow Trainer uses the MPI-based runtime and [`mpirun` launcher](https://ml-explore.github.io/mlx/build/html/usage/distributed.html#installing-mpi)
+to run MLX scripts on every training node. It automatically creates the OpenMPI hostfile to ensure
+MLX can discover all MPI nodes, starts the OpenSSH server on the worker nodes, and configures
+the distributed MLX environment:
 
-```python
-def train_mlx_model():
-    import mlx.core as mx
-    import mlx.nn as nn
-    import mlx.distributed as dist
+- `mx.distributed.size()` - Total number of processes across all MLX nodes.
+- `mx.distributed.rank()` - Rank of the current process across all MLX nodes.
 
-    # ... model and optimizer setup ...
+You can use these values to, for example, load different data shards on each process,
+or evaluate your fine-tuned model only on the process with `rank=0` (e.g., the master process).
 
-    # Training step
-    def train_step(model, batch):
-        def loss_fn(model):
-            logits = model(batch["input"])
-            return nn.losses.cross_entropy(logits, batch["target"])
+You can access the distributed environment as follows:
 
-        # Compute loss and gradients
-        loss, grads = nn.value_and_grad(model, loss_fn)(model)
-
-        # Average gradients across all processes
-        grads = nn.average_gradients(grads)
-
-        return loss, grads
-
-    # Training loop
-    for batch in train_loader:
-        loss, grads = train_step(model, batch)
-        optimizer.update(model, grads)
-        mx.eval(model.parameters())
-```
-
-## Complete MLX Training Example
-
-Here's a complete example fine-tuning a Llama model with MLX:
-
-```python
-def finetune_llama_mlx():
-    """Fine-tune Llama model with MLX distributed training."""
-    import mlx.core as mx
-    import mlx.nn as nn
-    import mlx.optimizers as optim
-    import mlx.distributed as dist
-    from mlx_lm import load, generate
-    from mlx_lm.utils import load_dataset
-    from mlx.utils import tree_flatten
-    import numpy as np
-
-    # Get distributed info
-    world_size = dist.size()
-    rank = dist.rank()
-
-    if rank == 0:
-        print(f"Starting distributed training with {world_size} processes")
-
-    # Load model and tokenizer
-    model_name = "mlx-community/Llama-3.2-1B-Instruct-4bit"
-    if rank == 0:
-        print(f"Loading model: {model_name}")
-
-    model, tokenizer = load(model_name)
-
-    # Prepare dataset
-    if rank == 0:
-        print("Loading dataset...")
-
-    # Load and shard dataset across processes
-    dataset = load_dataset("wikitext", "wikitext-2-raw-v1", split="train")
-
-    # Shard dataset - each process gets a subset
-    dataset_size = len(dataset)
-    shard_size = dataset_size // world_size
-    start_idx = rank * shard_size
-    end_idx = start_idx + shard_size if rank < world_size - 1 else dataset_size
-    local_dataset = dataset[start_idx:end_idx]
-
-    if rank == 0:
-        print(f"Dataset sharded: {shard_size} samples per process")
-
-    # Tokenize dataset
-    def tokenize_batch(examples):
-        return tokenizer(
-            examples["text"],
-            max_length=512,
-            truncation=True,
-            padding="max_length",
-        )
-
-    tokenized_dataset = [
-        tokenize_batch({"text": item["text"]})
-        for item in local_dataset
-    ]
-
-    # Training configuration
-    learning_rate = 1e-5
-    num_epochs = 3
-    batch_size = 4
-
-    # Setup optimizer (LoRA parameters only)
-    trainable_params = [
-        (name, param) for name, param in model.named_parameters()
-        if "lora" in name
-    ]
-
-    if rank == 0:
-        print(f"Trainable parameters: {len(trainable_params)}")
-
-    optimizer = optim.Adam(learning_rate=learning_rate)
-
-    # Training function with gradient averaging
-    def train_step(model, batch):
-        def loss_fn(model):
-            input_ids = mx.array(batch["input_ids"])
-            labels = mx.array(batch["labels"])
-
-            logits = model(input_ids)
-            return nn.losses.cross_entropy(logits, labels, reduction="mean")
-
-        # Compute loss and gradients
-        loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
-        loss, grads = loss_and_grad_fn(model)
-
-        # Average gradients across all processes
-        grads = nn.average_gradients(grads)
-
-        return loss, grads
-
-    # Training loop
-    if rank == 0:
-        print(f"Starting training for {num_epochs} epochs...")
-
-    global_step = 0
-
-    for epoch in range(num_epochs):
-        epoch_loss = 0.0
-        num_batches = 0
-
-        # Create batches from local dataset
-        num_local_batches = len(tokenized_dataset) // batch_size
-
-        for batch_idx in range(num_local_batches):
-            start = batch_idx * batch_size
-            end = start + batch_size
-
-            batch = {
-                "input_ids": [
-                    tokenized_dataset[i]["input_ids"]
-                    for i in range(start, end)
-                ],
-                "labels": [
-                    tokenized_dataset[i]["input_ids"]
-                    for i in range(start, end)
-                ]
-            }
-
-            # Forward and backward pass
-            loss, grads = train_step(model, batch)
-
-            # Update model
-            optimizer.update(model, grads)
-
-            # Ensure arrays are evaluated
-            mx.eval(model.parameters())
-
-            # Accumulate loss
-            epoch_loss += loss.item()
-            num_batches += 1
-            global_step += 1
-
-            # Log progress (rank 0 only)
-            if batch_idx % 50 == 0 and rank == 0:
-                print(f"Epoch {epoch}, Step {global_step}, "
-                      f"Batch {batch_idx}/{num_local_batches}, "
-                      f"Loss: {loss.item():.4f}")
-
-        # Print epoch summary (rank 0 only)
-        if rank == 0:
-            avg_loss = epoch_loss / num_batches
-            print(f"Epoch {epoch} completed. Average Loss: {avg_loss:.4f}")
-
-    # Save model (rank 0 only)
-    if rank == 0:
-        print("Saving fine-tuned model...")
-        model.save_weights("./mlx_model_weights.npz")
-        print("Training completed successfully!")
-
-    # Cleanup
-    dist.finalize()
-```
-
-## Launching MLX Training with SDK
-
-Use the TrainerClient SDK to launch your MLX training job:
-
-```python
+```py
 from kubeflow.trainer import TrainerClient, CustomTrainer
 
-client = TrainerClient()
-
-job_id = client.train(
-    trainer=CustomTrainer(
-        func=finetune_llama_mlx,
-        num_nodes=4,
-        resources_per_node={
-            "cpu": 8,
-            "memory": "32Gi",
-            "gpu": 1,  # Apple Silicon GPU or CUDA GPU
-        },
-        packages_to_install=[
-            "mlx>=0.15.0",
-            "mlx-lm",
-            "transformers",
-            "datasets",
-        ],
-    ),
-    runtime="mlx-distributed"
-)
-
-print(f"MLX training job created: {job_id}")
-
-# Monitor training logs
-for log_line in client.get_job_logs(job_id, follow=True):
-    print(log_line)
-```
-
-This launches a distributed MLX training job across 4 nodes, automatically handling distributed initialization and gradient averaging.
-
-## Data Parallelism with MLX
-
-MLX distributed training uses data parallelism where:
-
-1. Each device maintains a complete copy of the model
-2. Dataset is sharded across devices
-3. Each device computes gradients on its data shard
-4. Gradients are averaged using `all_sum()` collective operation
-5. Model parameters are updated with averaged gradients
-
-### Manual Dataset Sharding
-
-```python
-def shard_dataset(dataset, world_size, rank):
-    """Shard dataset across distributed processes."""
-    dataset_size = len(dataset)
-    shard_size = dataset_size // world_size
-
-    start_idx = rank * shard_size
-    end_idx = start_idx + shard_size if rank < world_size - 1 else dataset_size
-
-    return dataset[start_idx:end_idx]
-
-# In your training function
-import mlx.distributed as dist
-
-world_size = dist.size()
-rank = dist.rank()
-
-local_dataset = shard_dataset(full_dataset, world_size, rank)
-```
-
-### Gradient Averaging Pattern
-
-```python
-import mlx.nn as nn
-import mlx.distributed as dist
-
-def distributed_train_step(model, batch, optimizer):
-    """Training step with gradient averaging."""
-
-    def loss_fn(model):
-        predictions = model(batch["input"])
-        return nn.losses.cross_entropy(predictions, batch["target"])
-
-    # Compute gradients locally
-    loss, grads = nn.value_and_grad(model, loss_fn)(model)
-
-    # Average gradients across all processes using all-reduce
-    grads = nn.average_gradients(grads)
-
-    # Update model with averaged gradients
-    optimizer.update(model, grads)
-
-    return loss
-```
-
-## MLX with LoRA Fine-tuning
-
-MLX provides excellent support for parameter-efficient fine-tuning with LoRA (Low-Rank Adaptation):
-
-```python
-def finetune_with_lora():
-    """Fine-tune model using LoRA with MLX."""
+def get_mlx_dist():
     import mlx.core as mx
-    import mlx.nn as nn
-    from mlx_lm import load
-    from mlx_lm.tuner.lora import apply_lora_layers
 
-    # Load base model
-    model, tokenizer = load("mlx-community/Llama-3.2-1B-Instruct")
+    # Initialize MLX distributed backend.
+    dist = mx.distributed.init()
 
-    # Apply LoRA layers
-    lora_config = {
-        "rank": 8,
-        "alpha": 16,
-        "dropout": 0.1,
-        "target_modules": ["q_proj", "v_proj"]
-    }
+    print("MLX Distributed Environment")
+    print(f"WORLD_SIZE: {dist.size()}")
+    print(f"RANK: {dist.rank()}")
+    print(f"Device: {mx.default_device()}")
 
-    model = apply_lora_layers(model, **lora_config)
-
-    # Freeze base model parameters
-    for name, param in model.named_parameters():
-        if "lora" not in name:
-            param.requires_grad = False
-
-    # Train only LoRA parameters
-    # ... training loop ...
-```
-
-## Cross-Platform Training
-
-One powerful feature of MLX is the ability to train on GPU clusters and evaluate locally:
-
-```python
-# Train on GPU cluster with CUDA runtime
-job_id = client.train(
+# Create the TrainJob on 3 nodes.
+job_id = TrainerClient().train(
+    runtime="mlx-distributed",
     trainer=CustomTrainer(
-        func=finetune_llama_mlx,
-        num_nodes=4,
-        resources_per_node={"gpu": "1"},
-    ),
-    runtime="mlx-distributed"  # Uses mlx[cuda] on GPU clusters
-)
-
-# Wait for training to complete
-client.wait_for_job_status(job_id)
-
-# Download weights to local Apple Silicon machine
-# (implement your own download logic)
-
-# Evaluate locally on M3 MacBook
-import mlx.core as mx
-from mlx_lm import load, generate
-
-model, tokenizer = load("mlx-community/Llama-3.2-1B-Instruct")
-model.load_weights("./mlx_model_weights.npz")
-
-response = generate(
-    model,
-    tokenizer,
-    prompt="What is machine learning?",
-    max_tokens=100
-)
-print(response)
-```
-
-## SDK Integration
-
-The TrainerClient provides comprehensive job management:
-
-```python
-from kubeflow.trainer import TrainerClient, CustomTrainer
-
-client = TrainerClient()
-
-# List available runtimes
-for runtime in client.list_runtimes():
-    if "mlx" in runtime.name:
-        print(f"MLX Runtime: {runtime.name}")
-
-# Launch training
-job_id = client.train(
-    trainer=CustomTrainer(
-        func=finetune_llama_mlx,
-        num_nodes=2,
+        func=get_mlx_dist,
+        num_nodes=3,
         resources_per_node={
-            "cpu": 4,
-            "memory": "16Gi",
             "gpu": 1,
         },
     ),
-    runtime="mlx-distributed"
 )
 
-# Monitor job status
-job = client.get_job(name=job_id)
-print(f"Job Status: {job.status}")
+# Wait for TrainJob to complete.
+TrainerClient().wait_for_job_status(job_id)
 
-# Stream logs from specific node
-for log_line in client.get_job_logs(job_id, node_index=0, follow=True):
-    print(log_line)
 
-# Wait for completion
-final_job = client.wait_for_job_status(job_id)
-print(f"Training completed with status: {final_job.status}")
+# Since we launch MLX with `mpirun`, all logs should be consumed from the node-0.
+print("\n".join(TrainerClient().get_job_logs(name=job_id)))
 ```
 
-## Examples and Resources
+You should see the distributed environment as follows:
 
-### Complete Examples
-
-- **[MLX Llama Fine-tuning](https://github.com/kubeflow/trainer/tree/master/examples/mlx)**: Complete notebook demonstrating Llama model fine-tuning with MLX
-- **MLX Image Classification**: Vision model training with MLX (coming soon)
-
-### API Documentation
-
-- [TrainerClient API Reference](../api-reference/python-sdk/index): Complete SDK documentation
-- [MLX Documentation](https://ml-explore.github.io/mlx/): Official MLX framework documentation
-- [MLX LM](https://github.com/ml-explore/mlx-examples/tree/main/llms): MLX language model examples
-
-### Related Guides
-
-- [Getting Started](../getting-started/index): Initial setup and first training job
-- [PyTorch Distributed](pytorch): PyTorch distributed training patterns
-- [Local Execution](local-execution/index): Test MLX training locally
-
-## Troubleshooting
-
-### Common Issues
-
-**MLX not available error:**
-
-Ensure MLX is installed in your training environment:
-
-```python
-trainer = CustomTrainer(
-    func=finetune_llama_mlx,
-    packages_to_install=["mlx>=0.15.0", "mlx-lm"],
-    # ... other params
-)
+```shell
+MLX Distributed Environment
+WORLD_SIZE: 3
+RANK: 0
+Device: Device(gpu, 0)
 ```
 
-**Out of memory on Apple Silicon:**
+## Fine-Tune LLM with MLX and TrainJob
 
-MLX uses unified memory on Apple Silicon. To reduce memory usage:
+The following sections describe how to fine-tune Llama using MLX and Kubeflow Trainer.
 
-- Reduce batch size
-- Use gradient accumulation
-- Enable quantization (4-bit or 8-bit)
-- Use LoRA for parameter-efficient fine-tuning
+### Configure MLX Training Function
 
-```python
-# Load quantized model
-from mlx_lm import load
+You can leverage [the `mlx-lm` library](https://github.com/ml-explore/mlx-lm?tab=readme-ov-file) to
+fine-tune and evaluate LLMs. It provides builtin functions for rapid fine-tuning with Low-Rank
+Adaptation (LoRA) as well as full model fine-tuning, with support for quantized models.
 
-model, tokenizer = load(
-    "mlx-community/Llama-3.2-1B-Instruct-4bit",
-    quantize=True
-)
-```
+Wrap your MLX code inside a function and create a TrainJob with the `CustomTrainer()`. Your function
+should handle the end-to-end MLX script including distributed fine-tuning and model evaluation.
 
-**Gradient averaging fails:**
+:::{note}
+All necessary imports must be included inside the function body so that the TrainJob can recognize
+them on every training node.
+:::
 
-Ensure all processes call `average_gradients()` at the same time:
+Your training function might look like this:
 
-```python
-# Correct: All processes call average_gradients
-grads = nn.average_gradients(grads)
-
-# Incorrect: Only rank 0 calls it
-if rank == 0:
-    grads = nn.average_gradients(grads)  # Will hang!
-```
-
-**Metal GPU not detected:**
-
-Verify Metal support on your system:
-
-```python
-import mlx.core as mx
-
-# Check available devices
-print(f"Metal GPU available: {mx.metal.is_available()}")
-
-# Set default device
-mx.set_default_device(mx.gpu)
-```
-
-**Import errors with mlx-lm:**
-
-Ensure all MLX dependencies are imported inside the training function:
-
-```python
-def train():
-    # Correct: All imports inside function
+```py
+def fine_tune_llama():
+    import types
+    import os
     import mlx.core as mx
-    from mlx_lm import load, generate
+    from mlx_lm.lora import train_model, CONFIG_DEFAULTS
+    from mlx_lm.tuner.datasets import load_dataset
+    from mlx_lm.utils import load
+    from mlx_lm.generate import generate
 
-    # Training code...
+    # Set parameters for the mlx-lm.
+    args = types.SimpleNamespace()
+    args.model = "meta-llama/Llama-3.2-3B-Instruct"
+    args.data = "mlx-community/WikiSQL"
+    args.train = True
 
-# Incorrect: Imports at module level
-# import mlx.core as mx  # Don't do this!
+    # Set defaults for other required parameters.
+    for k, v in CONFIG_DEFAULTS.items():
+        if not hasattr(args, k):
+            setattr(args, k, v)
+
+    # Load pre-trained model and dataset, set your HF token.
+    os.environ["HF_TOKEN"] = "<YOUR_HF_TOKEN>"  # Replace with your Hugging Face token.
+    model, tokenizer = load(args.model)
+    train_set, valid_set, _ = load_dataset(args, tokenizer)
+
+    # Start the Llama distributed fine-tuning.
+    train_model(args, model, train_set, valid_set)
+
+    # Evaluate the fine-tuned adapter.
+    dist = mx.distributed.init(strict=True, backend="mpi")
+    if dist.rank() == 0:
+        finetuned_model, finetuned_tokenizer = load(
+            args.model, adapter_path=args.adapter_path
+        )
+        # Pass prompt to the fine-tuned LLM.
+        print(
+            generate(
+                model=finetuned_model,
+                tokenizer=finetuned_tokenizer,
+                prompt="What is SQL?",
+                max_tokens=1000,
+            )
+        )
 ```
 
-**CUDA runtime issues on GPU clusters:**
+### Create a TrainJob
 
-The `mlx-distributed` runtime includes `mlx[cuda]` for GPU clusters. If you encounter CUDA errors:
+After configuring the MLX training function, use the `train()` API to create a TrainJob:
 
 ```python
-# Check CUDA availability
-import mlx.core as mx
-print(f"CUDA available: {mx.cuda.is_available()}")
+from kubeflow.trainer import TrainerClient, CustomTrainer
 
-# Explicitly use CUDA device
-mx.set_default_device(mx.Device(mx.gpu, 0))
+job_id = TrainerClient().train(
+    runtime="mlx-distributed",
+    trainer=CustomTrainer(
+        func=fine_tune_llama,
+        num_nodes=2,
+        resources_per_node={
+            "gpu": 1,
+        },
+    ),
+)
 ```
+
+### Get the TrainJob Results
+
+You can use the `get_job_logs()` API to see your TrainJob logs:
+
+```py
+print("\n".join(TrainerClient().get_job_logs(name=job_id)))
+```
+
+:::{note}
+Since MLX training is launched via the mpirun command, all logs can be collected from
+node-0, which acts as the OpenMPI launcher.
+:::
+
+You should see the fine-tuning results as follows:
+
+```shell
+Trainable parameters: 0.041% (1.311M/3212.750M)
+Starting training..., iters: 1000
+Node 0 of 2
+Node 1 of 2
+Calculating loss...: 100%|██████████| 25/25 [00:28<00:00,  1.13s/it]
+Calculating loss...: 100%|██████████| 25/25 [00:28<00:00,  1.13s/it]
+Iter 1: Val loss 2.935, Val took 28.274s
+Iter 10: Train loss 2.687, Learning Rate 1.000e-05, It/sec 0.051, Tokens/sec 16.150, Trained Tokens 3137, Peak mem 8.008 GB
+Iter 20: Train loss 2.010, Learning Rate 1.000e-05, It/sec 7.467, Tokens/sec 2425.386, Trained Tokens 6385, Peak mem 8.034 GB
+Iter 30: Train loss 1.746, Learning Rate 1.000e-05, It/sec 7.789, Tokens/sec 2425.490, Trained Tokens 9499, Peak mem 8.469 GB
+Iter 40: Train loss 1.737, Learning Rate 1.000e-05, It/sec 7.643, Tokens/sec 2533.776, Trained Tokens 12814, Peak mem 8.469 GB
+...
+
+SQL (Structured Query Language) is a programming language designed for managing and manipulating data stored in relational database management systems (RDBMS).
+```
+
+## Gradient Averaging Patterns
+
+MLX provides efficient gradient averaging utilities:
+
+```py
+# Method 1: Using mx.distributed.all_sum directly.
+averaged_grad = mx_dist.all_sum(gradient) / mx_dist.size()
+
+# Method 2: Using mlx.nn.average_gradients (recommended).
+import mlx.nn as nn
+gradients = {"layer1": grad1, "layer2": grad2}
+averaged_gradients = nn.average_gradients(gradients)
+```
+
+For more information, check the [official MLX guides](https://ml-explore.github.io/mlx/build/html/usage/distributed.html#utilizing-nn-average-gradients).
+
+## Next Steps
+
+- Check out [the distributed MNIST example with MLX](https://github.com/kubeflow/trainer/tree/master/examples/mlx/image-classification/mnist.ipynb).
+- Follow [the complete example](https://github.com/kubeflow/trainer/tree/master/examples/mlx/language-modeling/fine-tune-llama.ipynb)
+ to fine-tune Llama3.2 with MLX and Kubeflow Trainer.
+- Explore [the official MLX documentation](https://ml-explore.github.io/mlx/build/html/index.html).
+- Learn more about `TrainerClient()` APIs [in the Kubeflow SDK](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/api/trainer_client.py).
