@@ -1,657 +1,231 @@
-# TorchTune
+# TorchTune BuiltinTrainer
 
-Fine-tune large language models with Meta's TorchTune framework using configuration-driven training on Kubernetes.
-
-## Overview
-
-TorchTune is Meta's PyTorch-native library for fine-tuning large language models. Kubeflow Trainer provides builtin trainer support for TorchTune, enabling you to fine-tune LLMs with simple configuration instead of writing custom training code.
-
-Key features:
-- **Configuration-driven**: Specify hyperparameters and datasets without writing training loops
-- **LoRA/PEFT support**: Parameter-efficient fine-tuning for memory efficiency
-- **Multiple model families**: Pre-configured runtimes for Llama, Qwen, and other models
-- **Automated setup**: Model and dataset initialization handled automatically
-- **Production-ready**: Optimized training configurations and checkpointing
+This guide describes how to fine-tune LLMs using `BuiltinTrainer` and `TorchTuneConfig`. `TorchTuneConfig` leverages [TorchTune](https://github.com/pytorch/torchtune) to streamline LLMs fine-tuning on Kubernetes. To understand the concept of `BuiltinTrainer`, see the [overview guide](index).
 
 :::{note}
-Multi-node fine-tuning with TorchTune is not currently supported. However, LoRA (PEFT) fine-tuning is fully supported starting from Kubeflow Trainer V2.1.0 and SDK v0.2.0.
+The supported model list can be seen in [this directory](https://github.com/kubeflow/trainer/tree/master/manifests/base/runtimes/torchtune). It's worth noticing that we do not support multi-node fine-tuning with TorchTune. However, **LoRA (PEFT) fine-tuning is supported** starting from Kubeflow Trainer V2.1.0 and SDK v0.2.0.
+
+If you want to learn more about TorchTune BuiltinTrainer, please refer to [KEP-2401](https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2) in Kubeflow Trainer.
 :::
 
 ## Prerequisites
 
-Before following this guide, ensure you have:
+Before exploring this guide, make sure to follow [the Getting Started guide](https://www.kubeflow.org/docs/components/trainer/getting-started/) to understand the basics of Kubeflow Trainer.
 
-- Completed the [Getting Started](../../getting-started/index) guide
-- Access to a Kubernetes cluster with Kubeflow Trainer installed
-- HuggingFace account and access token for model downloads
-- Basic understanding of LLM fine-tuning concepts
+```Python
+# Get torchtune-llama3.2-1b TorchTune runtime.
+from kubeflow.trainer import *
 
-## Supported Models
-
-Kubeflow Trainer provides pre-configured runtimes for multiple model families. Each runtime is optimized for a specific model architecture.
-
-### Available Runtimes
-
-List available TorchTune runtimes:
-
-```python
-from kubeflow.trainer import TrainerClient
-
+# List all TorchTune runtimes
 client = TrainerClient()
-
-# Find TorchTune runtimes
-for runtime in client.list_runtimes():
-    if runtime.name.startswith("torchtune"):
-        print(f"Runtime: {runtime.name}")
+for r in TrainerClient().list_runtimes():
+    if r.name.startswith("torchtune"):
+        print(r)
 ```
 
-Common runtimes include:
-- `torchtune-llama3.2-1b`: Llama 3.2 1B model
-- `torchtune-llama3.2-3b`: Llama 3.2 3B model
-- `torchtune-llama3.1-8b`: Llama 3.1 8B model
-- `torchtune-qwen2.5-1.5b`: Qwen 2.5 1.5B model
+Output:
 
-See the [examples directory](https://github.com/kubeflow/trainer/tree/master/examples) for the complete list of supported models.
+```sh
+Runtime(name='torchtune-llama3.2-1b', trainer=Trainer(trainer_type=<TrainerType.BUILTIN_TRAINER: 'BuiltinTrainer'>, framework=<Framework.TORCHTUNE: 'torchtune'>, entrypoint=['tune', 'run'], accelerator='Unknown', accelerator_count='2.0'), pretrained_model=None)
+Runtime(name='torchtune-llama3.2-3b', trainer=Trainer(trainer_type=<TrainerType.BUILTIN_TRAINER: 'BuiltinTrainer'>, framework=<Framework.TORCHTUNE: 'torchtune'>, entrypoint=['tune', 'run'], accelerator='Unknown', accelerator_count='2.0'), pretrained_model=None)
+```
 
-## Quick Start
+## Fine-Tune LLM with TorchTune BuiltinTrainer
 
-Here's a minimal example to fine-tune Llama 3.2 1B on the Alpaca dataset:
+The guide below shows how to fine-tune Llama-3.2-1B-Instruct with alpaca dataset by BuiltinTrainer.
+
+### Use TorchTune BuiltinTrainer with train() API
+
+You need to provide the following parameters to use TorchTune BuiltinTrainer with `train()` API:
+
+- Reference to existing Runtimes.
+- Initializer parameters.
+- Trainer configuration.
+
+Kubeflow TrainJob will train the model using the referenced TorchTune runtime `torchtune-llama3.2-1b`.
+
+For example, you can use the `train()` API to fine-tune the Llama-3.2-1B-Instruct model using the alpaca dataset from HuggingFace with the code below (need 2 GPUs):
 
 ```python
-from kubeflow.trainer import (
-    TrainerClient,
-    BuiltinTrainer,
-    TorchTuneConfig,
-    LoraConfig,
-    TorchTuneInstructDataset,
-    DataFormat,
-    Initializer,
-    HuggingFaceModelInitializer,
-    HuggingFaceDatasetInitializer,
-)
-
-client = TrainerClient()
-
-job_id = client.train(
+job_name = client.train(
     runtime="torchtune-llama3.2-1b",
-
-    # Initialize model and dataset
     initializer=Initializer(
         model=HuggingFaceModelInitializer(
             storage_uri="hf://meta-llama/Llama-3.2-1B-Instruct",
-            access_token="<YOUR_HF_TOKEN>"
-        ),
-        dataset=HuggingFaceDatasetInitializer(
-            storage_uri="hf://tatsu-lab/alpaca/data",
+            access_token="<YOUR_HF_TOKEN>"  # Replace with your Hugging Face token
         )
     ),
-
-    # Configure training
     trainer=BuiltinTrainer(
         config=TorchTuneConfig(
-            batch_size=16,
-            epochs=10,
-            peft_config=LoraConfig(
-                lora_rank=8,
-                lora_alpha=16,
-            ),
             dataset_preprocess_config=TorchTuneInstructDataset(
                 source=DataFormat.PARQUET,
             ),
-            resources_per_node={"gpu": 1},
         )
     )
 )
-
-print(f"Training job started: {job_id}")
 ```
 
-## Configuration Components
+### Watch the TrainJob Logs
 
-### 1. Model Initialization
+We can use the `get_job_logs()` API to get the TrainJob logs.
 
-Specify where to load the pre-trained model from:
-
-```python
-from kubeflow.trainer import HuggingFaceModelInitializer, Initializer
-
-# From HuggingFace Hub
-model_init = HuggingFaceModelInitializer(
-    storage_uri="hf://meta-llama/Llama-3.2-1B-Instruct",
-    access_token="<YOUR_HF_TOKEN>"
-)
-
-# Use in initializer
-initializer = Initializer(model=model_init)
-```
-
-**Storage URI format:**
-- `hf://<org>/<repo>` - Download entire repository
-- `hf://<org>/<repo>/path/to/file` - Download specific file or directory
-
-**Access token:**
-- Required for gated models (Llama, Qwen, etc.)
-- Get token from [HuggingFace Settings](https://huggingface.co/settings/tokens)
-
-### 2. Dataset Initialization
-
-Specify where to load training data from:
+#### Dataset Initializer
 
 ```python
-from kubeflow.trainer import HuggingFaceDatasetInitializer
-
-# From HuggingFace Hub
-dataset_init = HuggingFaceDatasetInitializer(
-    storage_uri="hf://tatsu-lab/alpaca/data",
-    access_token="<YOUR_HF_TOKEN>"  # Optional for public datasets
-)
-
-# Use in initializer
-initializer = Initializer(
-    model=model_init,
-    dataset=dataset_init
-)
-```
-
-**Storage URI examples:**
-- `hf://tatsu-lab/alpaca/data` - Specific directory in repository
-- `hf://tatsu-lab/alpaca/data/train.parquet` - Specific file
-
-The storage URI must specify the exact path to your data files (directories or individual files are supported).
-
-### 3. TorchTune Configuration
-
-Configure training hyperparameters and behavior:
-
-```python
-from kubeflow.trainer import (
-    TorchTuneConfig,
-    LoraConfig,
-    TorchTuneInstructDataset,
-    DataFormat,
-    DataType,
-    Loss,
-)
-
-config = TorchTuneConfig(
-    # Data type for training
-    dtype=DataType.BF16,  # or DataType.FP16, DataType.FP32
-
-    # Training hyperparameters
-    batch_size=16,
-    epochs=10,
-
-    # Loss function
-    loss=Loss.CEWithChunkedOutputLoss,  # Memory-efficient cross-entropy
-
-    # Number of nodes (always 1 for TorchTune)
-    num_nodes=1,
-
-    # LoRA configuration
-    peft_config=LoraConfig(
-        lora_rank=8,
-        lora_alpha=16,
-        lora_dropout=0.1,
-    ),
-
-    # Dataset preprocessing
-    dataset_preprocess_config=TorchTuneInstructDataset(
-        source=DataFormat.PARQUET,
-        split="train[:95%]",
-        train_on_input=True,
-        new_system_prompt="You are a helpful AI assistant.",
-        column_map={"input": "question", "output": "answer"},
-    ),
-
-    # Resource allocation
-    resources_per_node={"gpu": 1, "cpu": 8, "memory": "32Gi"},
-)
-```
-
-### TorchTuneConfig Parameters
-
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `dtype` | DataType | Training precision (BF16/FP16/FP32) | BF16 |
-| `batch_size` | int | Batch size per GPU | 8 |
-| `epochs` | int | Number of training epochs | 1 |
-| `loss` | Loss | Loss function | CEWithChunkedOutputLoss |
-| `num_nodes` | int | Number of nodes (must be 1) | 1 |
-| `peft_config` | LoraConfig | LoRA configuration | None |
-| `dataset_preprocess_config` | TorchTuneInstructDataset | Dataset preprocessing | Required |
-| `resources_per_node` | dict | Resource requests | `{"gpu": 1}` |
-
-### LoRA Configuration
-
-Configure parameter-efficient fine-tuning:
-
-```python
-from kubeflow.trainer import LoraConfig
-
-lora = LoraConfig(
-    lora_rank=8,          # Rank of LoRA matrices (4, 8, 16, 32)
-    lora_alpha=16,        # LoRA scaling factor (typically 2x rank)
-    lora_dropout=0.1,     # Dropout for LoRA layers
-)
-```
-
-**LoRA parameter guidelines:**
-
-| Model Size | Recommended Rank | Recommended Alpha | Memory Usage |
-|------------|------------------|-------------------|--------------|
-| 1B - 3B | 8 | 16 | Low |
-| 7B - 13B | 16 | 32 | Medium |
-| 30B+ | 32 | 64 | Higher |
-
-Higher rank = more parameters to train = better quality but more memory.
-
-### Dataset Preprocessing Configuration
-
-Configure how TorchTune processes your dataset:
-
-```python
-from kubeflow.trainer import TorchTuneInstructDataset, DataFormat
-
-dataset_config = TorchTuneInstructDataset(
-    # Data format
-    source=DataFormat.PARQUET,  # or DataFormat.JSON
-
-    # Dataset split
-    split="train[:95%]",  # Use first 95% for training
-
-    # Training behavior
-    train_on_input=True,  # Include input in loss calculation
-
-    # System prompt
-    new_system_prompt="You are a helpful AI assistant specialized in Python.",
-
-    # Column mapping
-    column_map={
-        "input": "question",      # Map 'question' column to 'input'
-        "output": "answer",       # Map 'answer' column to 'output'
-        "instruction": "system",  # Map 'system' column to 'instruction'
-    },
-)
-```
-
-**Dataset format requirements:**
-
-Your dataset should contain columns for:
-- `input` or `instruction`: The prompt or instruction
-- `output` or `response`: The expected completion
-
-If your columns have different names, use `column_map` to map them.
-
-## Complete Training Example
-
-Here's a complete example fine-tuning Llama 3.2 1B with custom configuration:
-
-```python
-from kubeflow.trainer import (
-    TrainerClient,
-    BuiltinTrainer,
-    TorchTuneConfig,
-    LoraConfig,
-    TorchTuneInstructDataset,
-    DataFormat,
-    DataType,
-    Loss,
-    Initializer,
-    HuggingFaceModelInitializer,
-    HuggingFaceDatasetInitializer,
-)
 from kubeflow.trainer.constants import constants
 
-# Initialize client
-client = TrainerClient()
+print("\n".join(client.get_job_logs(job_name, step=constants.DATASET_INITIALIZER)))
+```
 
-# Configure model initialization
-model_init = HuggingFaceModelInitializer(
-    storage_uri="hf://meta-llama/Llama-3.2-1B-Instruct",
-    access_token="<YOUR_HF_TOKEN>"
+Output:
+
+```sh
+2025-07-02T08:24:01Z INFO     [__main__.py:16] Starting dataset initialization
+2025-07-02T08:24:01Z INFO     [huggingface.py:28] Downloading dataset: tatsu-lab/alpaca
+2025-07-02T08:24:01Z INFO     [huggingface.py:29] ----------------------------------------
+Fetching 3 files: 100%|██████████| 3/3 [00:01<00:00,  1.82it/s]
+2025-07-02T08:24:04Z INFO     [huggingface.py:40] Dataset has been downloaded
+```
+
+#### Model Initializer
+
+```python
+print("\n".join(client.get_job_logs(job_name, step=constants.MODEL_INITIALIZER)))
+```
+
+Output:
+
+```sh
+2025-07-02T08:24:23Z INFO     [__main__.py:16] Starting pre-trained model initialization
+2025-07-02T08:24:23Z INFO     [huggingface.py:26] Downloading model: meta-llama/Llama-3.2-1B-Instruct
+2025-07-02T08:24:23Z INFO     [huggingface.py:27] ----------------------------------------
+Fetching 8 files: 100%|██████████| 8/8 [01:02<00:00,  7.87s/it]
+2025-07-02T08:25:27Z INFO     [huggingface.py:43] Model has been downloaded
+```
+
+#### Training Node
+
+```python
+print("\n".join(client.get_job_logs(job_name)))
+```
+
+Output:
+
+```sh
+INFO:torchtune.utils._logging:Running FullFinetuneRecipeDistributed with resolved config:
+
+<Complete TorchTune config used by `tune run` command>
+
+DEBUG:torchtune.utils._logging:Setting manual seed to local seed 3686749453. Local seed is seed + rank = 3686749453 + 0
+Writing logs to /workspace/output/logs/log_1751444966.txt
+INFO:torchtune.utils._logging:Distributed training is enabled. Instantiating model and loading checkpoint on Rank 0 ...
+INFO:torchtune.utils._logging:Instantiating model and loading checkpoint took 17.31 secs
+INFO:torchtune.utils._logging:Memory stats after model init:
+	GPU peak memory allocation: 2.33 GiB
+	GPU peak memory reserved: 2.34 GiB
+	GPU peak memory active: 2.33 GiB
+/opt/conda/lib/python3.11/site-packages/torch/distributed/distributed_c10d.py:4631: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user.
+  warnings.warn(  # warn only once
+INFO:torchtune.utils._logging:Optimizer is initialized.
+INFO:torchtune.utils._logging:Loss is initialized.
+Generating train split: 52002 examples [00:00, 192755.58 examples/s]
+INFO:torchtune.utils._logging:No learning rate scheduler configured. Using constant learning rate.
+WARNING:torchtune.utils._logging: Profiling disabled.
+INFO:torchtune.utils._logging: Profiler config after instantiation: {'enabled': False}
+1|1625|Loss: 1.5839784145355225: 100%|██████████| 1625/1625 [21:54<00:00,  1.23it/s]INFO:torchtune.utils._logging:Saving checkpoint. This may take some time. Retrieving full model state dict...
+INFO:torchtune.utils._logging:Getting full model state dict took 1.69 secs
+INFO:torchtune.utils._logging:Model checkpoint of size 2.30 GiB saved to /workspace/output/epoch_0/model-00001-of-00001.safetensors
+INFO:torchtune.utils._logging:Saving final epoch checkpoint.
+INFO:torchtune.utils._logging:The full model checkpoint, including all weights and configurations, has been saved successfully.You can now use this checkpoint for further training or inference.
+INFO:torchtune.utils._logging:Saving checkpoint took 6.64 secs
+1|1625|Loss: 1.5839784145355225: 100%|██████████| 1625/1625 [22:01<00:00,  1.23it/s]
+Running with torchrun...
+```
+
+### Get the Fine-Tuned Model
+
+After TrainJob completes the fine-tuning task, the fine-tuned model will be stored into the `/workspace/output` directory. The TrainJob automatically creates and manages a PVC to store the model and dataset, which can be shared across Pods. You can access the fine-tuned model in another Pod by mounting the same PVC under `/ `, where you'll find the output in `/ /output`.
+
+## Parameters
+
+### Runtime
+
+For TorchTune BuiltinTrainer, you can just find the runtime you want in the [manifest folder](https://github.com/kubeflow/trainer/tree/master/manifests/base/runtimes/torchtune), and get it using `get_runtime`. Like:
+
+```python
+runtime=client.get_runtime("torchtune-llama3.2-1b")
+```
+
+### Initializer
+
+We'll use parameters in [Initializer](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py#L227-L239) to download dataset and model from remote storage.
+
+#### Dataset Initializer
+
+Currently, we only support downloading datasets from HuggingFace by defining [`HuggingFaceDatasetInitializer`](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py#L212-L217):
+
+:::{note}
+For `storage_uri` in Dataset Initializer, you need to specify **the exact path to data files**. This means you need to set it to `hf:// / /path/to/data/files`.
+
+Currently, we support:
+
+1. Data Directory: Use all data files under this directory. For example, `hf://tatsu-lab/alpaca/data` uses all data files under the `/data` directory of `tatsu-lab/alpaca` repo in HuggingFace.
+2. Single Data File: Use the single data file given the path. For example, `hf://tatsu-lab/alpaca/data/xxx.parquet` uses the single `/data/xxx.parquet` data file of `tatsu-lab/alpaca` repo in HuggingFace.
+
+:::
+
+#### Model Initializer
+
+Currently, we only support downloading models from HuggingFace by defining [`HuggingFaceModelInitializer`](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py#L220-L224):
+
+#### Example Usage
+
+```python
+initializer=Initializer(
+    dataset=HuggingFaceDatasetInitializer(
+        storage_uri="hf://tatsu-lab/alpaca/data",
+        access_token="<YOUR_HF_TOKEN>"  # Replace with your Hugging Face token
+    ),
+    model=HuggingFaceModelInitializer(
+        storage_uri="hf://meta-llama/Llama-3.2-1B-Instruct",
+        access_token="<YOUR_HF_TOKEN>"  # Replace with your Hugging Face token
+    )
 )
+```
 
-# Configure dataset initialization
-dataset_init = HuggingFaceDatasetInitializer(
-    storage_uri="hf://tatsu-lab/alpaca/data",
-)
+### TorchTune BuiltinTrainer
 
-# Configure LoRA
-lora_config = LoraConfig(
-    lora_rank=8,
-    lora_alpha=16,
-    lora_dropout=0.1,
-)
+#### Description
 
-# Configure dataset preprocessing
-dataset_config = TorchTuneInstructDataset(
-    source=DataFormat.PARQUET,
-    split="train[:95%]",
-    train_on_input=True,
-    new_system_prompt="You are a helpful AI assistant.",
-    column_map={
-        "input": "instruction",
-        "output": "output",
-    },
-)
+The `TorchTuneConfig` class is used for configuring TorchTune BuiltinTrainer that already includes the fine-tuning logic. You can find the API definition [here](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py#L78-L106).
 
-# Configure training
-trainer_config = TorchTuneConfig(
+#### Example Usage
+
+```python
+torchtune_config = TorchTuneConfig(
     dtype=DataType.BF16,
     batch_size=10,
     epochs=10,
     loss=Loss.CEWithChunkedOutputLoss,
     num_nodes=1,
-    peft_config=lora_config,
-    dataset_preprocess_config=dataset_config,
-    resources_per_node={
-        "gpu": 1,
-        "cpu": 8,
-        "memory": "32Gi",
-    },
-)
-
-# Launch training
-job_id = client.train(
-    runtime="torchtune-llama3.2-1b",
-    initializer=Initializer(
-        model=model_init,
-        dataset=dataset_init,
-    ),
-    trainer=BuiltinTrainer(config=trainer_config)
-)
-
-print(f"Training job started: {job_id}")
-
-# Monitor initialization
-print("\nDataset initialization logs:")
-for log in client.get_job_logs(job_id, step=constants.DATASET_INITIALIZER):
-    print(log)
-
-print("\nModel initialization logs:")
-for log in client.get_job_logs(job_id, step=constants.MODEL_INITIALIZER):
-    print(log)
-
-# Monitor training
-print("\nTraining logs:")
-for log in client.get_job_logs(job_id, follow=True):
-    print(log)
-
-# Wait for completion
-final_job = client.wait_for_job_status(job_id)
-print(f"\nTraining completed with status: {final_job.status}")
-```
-
-## Monitoring Training
-
-### View Initialization Logs
-
-Monitor dataset and model initialization:
-
-```python
-from kubeflow.trainer.constants import constants
-
-# Dataset initialization
-print("Dataset initialization:")
-for log in client.get_job_logs(job_id, step=constants.DATASET_INITIALIZER):
-    print(log)
-
-# Model initialization
-print("\nModel initialization:")
-for log in client.get_job_logs(job_id, step=constants.MODEL_INITIALIZER):
-    print(log)
-```
-
-### View Training Logs
-
-Stream training progress in real-time:
-
-```python
-# Follow training logs
-for log in client.get_job_logs(job_id, follow=True):
-    print(log)
-
-# Or get all logs at once
-logs = client.get_job_logs(job_id)
-for log in logs:
-    print(log)
-```
-
-### Check Job Status
-
-Monitor job progress:
-
-```python
-# Get current status
-job = client.get_job(name=job_id)
-print(f"Status: {job.status}")
-print(f"Steps:")
-for step in job.steps:
-    print(f"  {step.name}: {step.status}")
-
-# Wait for completion
-final_job = client.wait_for_job_status(
-    job_id,
-    timeout=3600  # Wait up to 1 hour
-)
-print(f"Final status: {final_job.status}")
-```
-
-## Accessing Fine-tuned Models
-
-After training completes, your fine-tuned model is saved to `/workspace/output` in a persistent volume claim.
-
-### Retrieve Model Weights
-
-The PVC is shared across all pods in the TrainJob. To access your model:
-
-1. **Find the PVC name:**
-
-```bash
-kubectl get pvc -l trainjob-name=<job-name>
-```
-
-2. **Create a pod to access the PVC:**
-
-```bash
-kubectl run access-model --rm -it --image=python:3.11 \
-  --overrides='
-{
-  "spec": {
-    "containers": [{
-      "name": "access-model",
-      "image": "python:3.11",
-      "command": ["/bin/bash"],
-      "volumeMounts": [{
-        "mountPath": "/workspace",
-        "name": "workspace"
-      }]
-    }],
-    "volumes": [{
-      "name": "workspace",
-      "persistentVolumeClaim": {
-        "claimName": "<pvc-name>"
-      }
-    }]
-  }
-}'
-
-# Inside the pod
-ls /workspace/output
-# Copy model files or upload to storage
-```
-
-3. **Download model files:**
-
-You can copy files out using `kubectl cp`:
-
-```bash
-kubectl cp access-model:/workspace/output ./local-output
-```
-
-## Advanced Configuration
-
-### Multiple Datasets
-
-Train on multiple datasets by concatenating them:
-
-```python
-# This requires preprocessing the datasets first
-# Combine datasets before passing to HuggingFaceDatasetInitializer
-```
-
-### Custom System Prompts
-
-Customize the system prompt for instruction tuning:
-
-```python
-dataset_config = TorchTuneInstructDataset(
-    source=DataFormat.PARQUET,
-    new_system_prompt="You are a Python expert. Provide concise, accurate answers.",
-)
-```
-
-### Validation Split
-
-Use part of your data for validation:
-
-```python
-dataset_config = TorchTuneInstructDataset(
-    source=DataFormat.PARQUET,
-    split="train[:80%]",  # Use 80% for training
-)
-
-# Validation requires custom implementation
-```
-
-### Higher Precision Training
-
-Use FP32 for higher precision (slower, more memory):
-
-```python
-config = TorchTuneConfig(
-    dtype=DataType.FP32,
-    batch_size=4,  # Reduce batch size for FP32
-    # ... other config
-)
-```
-
-### Resource Optimization
-
-Optimize GPU memory usage:
-
-```python
-config = TorchTuneConfig(
-    dtype=DataType.BF16,  # Use BF16 for memory efficiency
-    batch_size=8,         # Reduce batch size if OOM
     peft_config=LoraConfig(
-        lora_rank=4,      # Lower rank = less memory
-        lora_alpha=8,
+        lora_rank=8,
+        lora_alpha=16,
+        lora_dropout=0.1,
     ),
-    resources_per_node={
-        "gpu": 1,
-        "memory": "24Gi",  # Adjust based on GPU VRAM
-    },
+    dataset_preprocess_config=TorchTuneInstructDataset(
+        source=DataFormat.PARQUET,
+        split="train[:95%]",
+        train_on_input=True,
+        new_system_prompt="You are an AI assistant. ",
+        column_map={"input": "incorrect", "output": "correct"},
+    ),
+    resources_per_node={"gpu": 1},
 )
 ```
 
-## Examples and Resources
+## Next Steps
 
-### Complete Examples
+- Run the example to [fine-tune the Llama-3.2-1B-Instruct LLM](https://github.com/kubeflow/trainer/blob/master/examples/torchtune/llama3_2/alpaca-trainjob-yaml.ipynb)
 
-- **[Llama 3.2 1B Fine-tuning](https://github.com/kubeflow/trainer/tree/master/examples/builtin-trainer/torchtune-llama3.2-1b)**: Complete notebook with Alpaca dataset
-- **[Qwen 2.5 Fine-tuning](https://github.com/kubeflow/trainer/tree/master/examples/builtin-trainer/torchtune-qwen2.5-1.5b)**: Qwen model fine-tuning example
-
-### API Documentation
-
-- [TrainerClient API Reference](../../api-reference/python-sdk/index): Complete SDK documentation
-- [TorchTune Documentation](https://pytorch.org/torchtune/): Official TorchTune documentation
-
-### Related Guides
-
-- [Builtin Trainer Overview](index): Understanding builtin trainers
-- [Getting Started](../../getting-started/index): Initial setup
-- [Custom Trainer](../../getting-started/index): Writing custom training functions
-
-## Troubleshooting
-
-### Common Issues
-
-**HuggingFace authentication fails:**
-
-Ensure your access token has the correct permissions:
-
-```python
-# Verify token works
-from huggingface_hub import login
-login(token="<YOUR_HF_TOKEN>")
-```
-
-**Out of memory errors:**
-
-Reduce memory usage:
-
-- Decrease batch size: `batch_size=4`
-- Use lower LoRA rank: `lora_rank=4`
-- Use BF16: `dtype=DataType.BF16`
-- Reduce model size (use smaller model variant)
-
-**Dataset column mapping errors:**
-
-Verify your dataset columns match the configuration:
-
-```python
-# Check dataset structure
-from datasets import load_dataset
-ds = load_dataset("tatsu-lab/alpaca")
-print(ds["train"].column_names)
-
-# Update column_map accordingly
-dataset_config = TorchTuneInstructDataset(
-    column_map={"input": "actual_column_name"},
-)
-```
-
-**Model download fails:**
-
-For gated models (Llama, Qwen):
-1. Request access on HuggingFace
-2. Wait for approval
-3. Use access token with read permissions
-
-**Training logs show no progress:**
-
-Check initialization logs first:
-
-```python
-# Dataset init logs
-logs = client.get_job_logs(job_id, step=constants.DATASET_INITIALIZER)
-print("\n".join(logs))
-
-# Model init logs
-logs = client.get_job_logs(job_id, step=constants.MODEL_INITIALIZER)
-print("\n".join(logs))
-```
-
-**Job stays in pending state:**
-
-Check resource availability:
-
-```bash
-# Check if GPU nodes are available
-kubectl get nodes -l nvidia.com/gpu.present=true
-
-# Check resource requests
-kubectl describe trainjob <job-name>
-```
-
-## Limitations
-
-Current limitations of TorchTune builtin trainer:
-
-- **Single-node only**: Multi-node training not supported
-- **LoRA only**: Full fine-tuning not supported
-- **Limited customization**: Can't modify training script
-- **Predefined models**: Only models with pre-configured runtimes
-
-For advanced use cases requiring customization, use [CustomTrainer](../../getting-started/index) instead.
+- Check out the example to [fine-tune the Qwen-2.5-1.5B LLM](https://github.com/kubeflow/trainer/blob/master/examples/torchtune/qwen2_5/qwen2.5-1.5B-with-alpaca.ipynb)
