@@ -144,7 +144,7 @@ hr {
     color: var(--color-foreground-primary);
 }
 
-/* Feature list styling */
+/* Feature list styling (content area only, not sidebar) */
 .document ul {
     list-style: none;
     padding-left: 0;
@@ -162,4 +162,46 @@ hr {
     left: 0;
     color: var(--color-brand-primary);
     font-weight: bold;
+}
+
+/* Sidebar: reduce left whitespace */
+.sidebar-tree .reference {
+    padding: 0.35rem 0.75rem;
+}
+
+.sidebar-tree ul ul {
+    margin-left: 0.625rem;
+}
+
+.sidebar-tree .toctree-l1 > a,
+.sidebar-tree .toctree-l1 > .reference {
+    font-weight: 600;
+}
+
+.sidebar-tree .toctree-l2 > a,
+.sidebar-tree .toctree-l2 > .reference,
+.sidebar-tree .toctree-l3 > a,
+.sidebar-tree .toctree-l3 > .reference {
+    font-weight: 400;
+    font-size: 0.9rem;
+}
+
+/* Sidebar: highlight the current (active) page in blue */
+.sidebar-tree li.current-page > .reference {
+    color: var(--color-brand-primary) !important;
+    font-weight: 700;
+    border-left: 3px solid var(--color-brand-primary);
+    padding-left: calc(0.75rem - 3px);
+    background-color: rgba(50, 108, 229, 0.08);
+    border-radius: 0 4px 4px 0;
+}
+
+body[data-theme="dark"] .sidebar-tree li.current-page > .reference {
+    background-color: rgba(91, 157, 241, 0.1);
+}
+
+/* Parent section containing the current page gets a subtle blue tint */
+.sidebar-tree li.toctree-l1.current.has-children > .reference {
+    color: var(--color-brand-primary) !important;
+    font-weight: 700;
 }
