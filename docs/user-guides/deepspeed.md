@@ -1,556 +1,317 @@
-# DeepSpeed
+# DeepSpeed Guide
 
-Train and fine-tune large-scale AI models efficiently with DeepSpeed's ZeRO optimization on Kubernetes using Kubeflow Trainer.
-
-## Overview
-
-DeepSpeed is a deep learning optimization library that makes distributed training and inference easy, efficient, and effective. Kubeflow Trainer integrates DeepSpeed to enable scalable model training and fine-tuning on Kubernetes clusters with optimized memory usage and training throughput.
-
-Key features:
-- **ZeRO (Zero Redundancy Optimizer)**: Distributes optimizer states, gradients, and parameters across data-parallel processes
-- **3D Parallelism**: Combines data, model, and pipeline parallelism for training massive models
-- **Mixed Precision Training**: Supports FP16 and BF16 formats for faster training
-- **Gradient Compression**: Reduces communication overhead in distributed training
+This guide describes how to use TrainJob to train or fine-tune AI models with [DeepSpeed](https://www.deepspeed.ai/).
 
 ## Prerequisites
 
-Before following this guide, ensure you have:
+Before exploring this guide, make sure to follow [the Getting Started guide](../getting-started/index)
+to understand the basics of Kubeflow Trainer.
 
-- Completed the [Getting Started](../getting-started/index) guide
-- Access to a Kubernetes cluster with Kubeflow Trainer installed
-- Basic understanding of distributed training concepts
-- Multiple GPUs for optimal DeepSpeed performance
+## DeepSpeed Overview
 
-## ZeRO Optimization Stages
+DeepSpeed is a deep learning optimization library that makes distributed training and inference easy,
+efficient, and effective. DeepSpeed includes features such as:
 
-DeepSpeed's ZeRO optimizer provides four stages of optimization, each with different memory efficiency and communication trade-offs:
+- **ZeRO (Zero Redundancy Optimizer)**: Reduces memory consumption by partitioning optimizer states,
+ gradients, and parameters across data-parallel processes.
+- **3D Parallelism**: Combines data parallelism, model parallelism, and pipeline parallelism for
+ training extremely large models.
+- **Mixed Precision Training**: Supports FP16 and BF16 training to accelerate training and reduce
+ memory usage.
+- **Gradient Compression**: Reduces communication overhead through gradient compression techniques.
 
-### Stage 0: Disabled
-Standard data parallel training without ZeRO optimizations. Each GPU maintains complete copies of model parameters, gradients, and optimizer states.
+ZeRO has three stages:
 
-**Use when:**
-- Your model fits comfortably in a single GPU
-- You prioritize simplicity over memory efficiency
+- **ZeRO Stage 0**: Disabled (equivalent to standard data parallel training).
+- **ZeRO Stage 1**: Partitions optimizer states across processes.
+- **ZeRO Stage 2**: Partitions optimizer states and gradients across processes.
+- **ZeRO Stage 3**: Partitions optimizer states, gradients, and model parameters across processes.
 
-### Stage 1: Optimizer State Partitioning
-Partitions optimizer states (e.g., Adam's momentum and variance) across data-parallel processes.
+## Get DeepSpeed Runtime Packages
 
-**Memory savings:** ~4x reduction in optimizer memory
-**Use when:**
-- Model fits in GPU memory but optimizer states are large
-- Training medium-sized models with minimal communication overhead
+Kubeflow Trainer includes a DeepSpeed runtime called [`deepspeed-distributed`](https://github.com/kubeflow/trainer/blob/master/manifests/base/runtimes/deepspeed_distributed.yaml),
+which comes with the several pre-installed Python packages.
 
-### Stage 2: Gradient + Optimizer State Partitioning
-Partitions both optimizer states and gradients across processes. Gradients are reduced and partitioned during backpropagation.
+Run the following command to get a list of the available packages:
 
-**Memory savings:** ~8x reduction in optimizer and gradient memory
-**Use when:**
-- Model parameters fit in GPU but gradients and optimizer states don't
-- Training large models that exceed single-GPU capacity
+```py
+from kubeflow.trainer import TrainerClient
 
-### Stage 3: Parameter + Gradient + Optimizer State Partitioning
-Partitions model parameters, gradients, and optimizer states across all processes. Parameters are gathered just-in-time during forward and backward passes.
-
-**Memory savings:** Linear with number of GPUs (e.g., 64x with 64 GPUs)
-**Use when:**
-- Training very large models (billions of parameters)
-- Model parameters don't fit in a single GPU even without gradients/optimizer
-- You have sufficient inter-GPU bandwidth
-
-:::{note}
-Higher ZeRO stages provide better memory efficiency but increase communication overhead. Choose the lowest stage that fits your memory constraints.
-:::
-
-## The deepspeed-distributed Runtime
-
-Kubeflow Trainer provides the `deepspeed-distributed` ClusterTrainingRuntime that uses MPI-based launchers to coordinate DeepSpeed training across multiple nodes.
-
-### Automatic Environment Variables
-
-The runtime automatically configures your distributed environment:
-
-| Variable | Description | Access Method |
-|----------|-------------|---------------|
-| `WORLD_SIZE` | Total number of GPUs/processes | `dist.get_world_size()` |
-| `RANK` | Global rank of current process | `dist.get_rank()` |
-| `LOCAL_RANK` | Local rank within current node | `os.environ["LOCAL_RANK"]` |
-| `MASTER_ADDR` | Address of rank 0 node | Automatically set |
-| `MASTER_PORT` | Port for communication | Automatically set |
-
-You don't need to manually configure these variables. DeepSpeed and PyTorch distributed will use them automatically.
-
-## Training Function Pattern
-
-To run DeepSpeed training with Kubeflow Trainer, follow this pattern:
-
-### 1. Import Inside Function Body
-
-All imports must be placed inside the function body:
-
-```python
-def train_with_deepspeed():
-    """Train model with DeepSpeed ZeRO-2."""
-    # All imports go here
-    import torch
-    import deepspeed
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-
-    # Rest of your training code...
+TrainerClient().get_runtime_packages(
+    runtime=TrainerClient().get_runtime("deepspeed-distributed")
+)
 ```
 
-:::{note}
-This requirement allows the SDK to serialize and transfer your training function to the cluster without dependency conflicts.
-:::
+You should see the installed packages, for example:
 
-### 2. Create DeepSpeed Configuration
+```sh
+Python: 3.10.12 (main, May 27 2025, 17:12:29) [GCC 11.4.0]
 
-Define your DeepSpeed configuration as a Python dictionary:
+Package            Version
+------------------ -----------
+...
+datasets           4.0.0
+deepspeed          0.17.4
+dill               0.3.8
+...
+```
 
-```python
-def train_with_deepspeed():
+## DeepSpeed Distributed Environment
+
+Kubeflow Trainer uses the MPI-based runtime and [`mpirun` launcher](https://www.deepspeed.ai/getting-started/#mpi-and-azureml-compatibility)
+to run DeepSpeed scripts on every training node. It automatically creates the OpenMPI hostfile
+to ensure DeepSpeed can discover all MPI nodes, starts the OpenSSH server on the worker nodes,
+and configures the distributed DeepSpeed environment:
+
+- `dist.get_world_size()` - Total number of processes (e.g., GPUs) across all DeepSpeed nodes.
+- `dist.get_rank()` - Rank of the current process across all DeepSpeed nodes.
+- `os.environ["LOCAL_RANK"]` - Rank of the current process within a single DeepSpeed training node.
+
+You can use these values to, for example, download the dataset only on the node with `local_rank=0`,
+or export your fine-tuned LLM only on the node with `rank=0` (e.g., the master node).
+
+You can access the distributed environment as follows:
+
+```py
+from kubeflow.trainer import TrainerClient, CustomTrainer
+
+def get_deepspeed_dist():
+    import os
+    import torch.distributed as dist
     import deepspeed
 
+    device = "cuda"
+    dist_backend = "nccl"
+    deepspeed.init_distributed(dist_backend=dist_backend)
+
+    print("DeepSpeed Distributed Environment")
+    print(f"Using device: {device}")
+    print(f"WORLD_SIZE: {dist.get_world_size()}")
+    print(f"RANK: {dist.get_rank()}")
+    print(f"LOCAL_RANK: {os.environ['LOCAL_RANK']}")
+
+
+# Create the TrainJob.
+job_id = TrainerClient().train(
+    runtime="deepspeed-distributed",
+    trainer=CustomTrainer(func=get_deepspeed_dist),
+)
+
+# Wait for TrainJob to complete.
+TrainerClient().wait_for_job_status(job_id)
+
+# Since we launch DeepSpeed with `mpirun`, all logs should be consumed from the node-0.
+print("\n".join(TrainerClient().get_job_logs(name=job_id)))
+```
+
+You should see the distributed environment across the two training nodes as follows:
+
+```shell
+[2025-08-15 17:46:46,463] [INFO] [comm.py:891:mpi_discovery] Discovered MPI settings of world_rank=0, local_rank=0, world_size=4, master_addr=..., master_port=...
+[2025-08-15 17:46:46,463] [INFO] [comm.py:891:mpi_discovery] Discovered MPI settings of world_rank=1, local_rank=1, world_size=4, master_addr=..., master_port=...
+[2025-08-15 17:46:46,463] [INFO] [comm.py:852:init_distributed] Initializing TorchBackend in DeepSpeed with backend nccl
+[2025-08-15 17:46:46,463] [INFO] [comm.py:891:mpi_discovery] Discovered MPI settings of world_rank=2, local_rank=0, world_size=4, master_addr=..., master_port=...
+[2025-08-15 17:46:46,463] [INFO] [comm.py:891:mpi_discovery] Discovered MPI settings of world_rank=3, local_rank=1, world_size=4, master_addr=..., master_port=...
+DeepSpeed Distributed Environment
+Using device: cuda
+WORLD_SIZE: 4
+RANK: 1
+LOCAL_RANK: 1
+DeepSpeed Distributed Environment
+Using device: cuda
+WORLD_SIZE: 4
+RANK: 3
+LOCAL_RANK: 1
+DeepSpeed Distributed Environment
+Using device: cuda
+WORLD_SIZE: 4
+RANK: 0
+LOCAL_RANK: 0
+DeepSpeed Distributed Environment
+Using device: cuda
+WORLD_SIZE: 4
+RANK: 2
+LOCAL_RANK: 0
+...
+```
+
+## Create TrainJob with DeepSpeed Training
+
+### Configure DeepSpeed Training Function
+
+You can leverage the `CustomTrainer()` to wrap your DeepSpeed code inside a function and create a
+TrainJob. This function should handle the end-to-end model training or fine-tuning of a
+pre-trained model with DeepSpeed optimization.
+
+:::{note}
+All necessary imports must be included inside the function body so that the TrainJob can recognize
+them on every training node.
+:::
+
+Your training function might look like this:
+
+```py
+def fine_tune_t5_deepspeed():
+    import os
+    import torch.distributed as dist
+    from torch.utils.data import DataLoader
+    from torch.utils.data.distributed import DistributedSampler
+    from transformers import T5Tokenizer, T5ForConditionalGeneration
+    import deepspeed
+    import boto3
+
+    # Initialize DeepSpeed distributed training
+    deepspeed.init_distributed(dist_backend="nccl")
+
+    # DeepSpeed Configuration.
     ds_config = {
-        "train_micro_batch_size_per_gpu": 4,
+        # Train batch size = micro batch size * gradient steps * GPUs (e.g. 2 x 1 x 4 = 8).
+        "train_micro_batch_size_per_gpu": 2,
         "gradient_accumulation_steps": 1,
         "optimizer": {
             "type": "AdamW",
             "params": {
-                "lr": 3e-5,
-                "betas": [0.9, 0.999],
+                "lr": 3e-4,
+                "betas": [0.9, 0.95],
                 "eps": 1e-8,
-                "weight_decay": 0.01
-            }
+                "weight_decay": 0.1,
+            },
         },
-        "fp16": {
-            "enabled": True,
-            "loss_scale": 0,
-            "initial_scale_power": 16,
-            "loss_scale_window": 1000,
-            "hysteresis": 2,
-            "min_loss_scale": 1
-        },
+        # "fp16": {"enabled": True}, # If your GPU (e.g. V100) doesn't support bf16, use fp16.
+        "bf16": {"enabled": True},  # Enable mixed precision.
         "zero_optimization": {
             "stage": 2,
-            "offload_optimizer": {
-                "device": "cpu",
-                "pin_memory": True
-            },
             "allgather_partitions": True,
-            "allgather_bucket_size": 2e8,
-            "reduce_scatter": True,
-            "reduce_bucket_size": 2e8,
+            "allgather_bucket_size": 5e8,
             "overlap_comm": True,
-            "contiguous_gradients": True
-        }
-    }
-```
-
-### 3. Initialize DeepSpeed Engine
-
-Replace your standard optimizer and model initialization with DeepSpeed:
-
-```python
-def train_with_deepspeed():
-    import torch
-    import deepspeed
-    from transformers import AutoModelForCausalLM
-
-    # Load model
-    model = AutoModelForCausalLM.from_pretrained("gpt2")
-
-    # DeepSpeed configuration (from above)
-    ds_config = {...}
-
-    # Initialize DeepSpeed engine
-    # DeepSpeed automatically handles distributed initialization
-    model_engine, optimizer, _, _ = deepspeed.initialize(
-        model=model,
-        model_parameters=model.parameters(),
-        config=ds_config
-    )
-
-    # Training loop using model_engine instead of model
-    for epoch in range(num_epochs):
-        for batch in train_loader:
-            loss = model_engine(batch)
-            model_engine.backward(loss)
-            model_engine.step()
-```
-
-## Complete DeepSpeed Training Example
-
-Here's a complete example fine-tuning a transformer model with DeepSpeed ZeRO-2:
-
-```python
-def train_gpt2_deepspeed():
-    """Fine-tune GPT-2 with DeepSpeed ZeRO-2 optimization."""
-    import os
-    import torch
-    import deepspeed
-    from transformers import AutoModelForCausalLM, AutoTokenizer, default_data_collator
-    from datasets import load_dataset
-    from torch.utils.data import DataLoader
-
-    # Get distributed rank
-    local_rank = int(os.environ.get("LOCAL_RANK", 0))
-    rank = int(os.environ.get("RANK", 0))
-    world_size = int(os.environ.get("WORLD_SIZE", 1))
-
-    # DeepSpeed configuration with ZeRO-2
-    ds_config = {
-        "train_micro_batch_size_per_gpu": 4,
-        "gradient_accumulation_steps": 2,
-        "optimizer": {
-            "type": "AdamW",
-            "params": {
-                "lr": 3e-5,
-                "betas": [0.9, 0.999],
-                "eps": 1e-8,
-                "weight_decay": 0.01
-            }
-        },
-        "scheduler": {
-            "type": "WarmupLR",
-            "params": {
-                "warmup_min_lr": 0,
-                "warmup_max_lr": 3e-5,
-                "warmup_num_steps": 100
-            }
-        },
-        "fp16": {
-            "enabled": True,
-            "loss_scale": 0,
-            "initial_scale_power": 16,
-            "loss_scale_window": 1000,
-            "hysteresis": 2,
-            "min_loss_scale": 1
-        },
-        "zero_optimization": {
-            "stage": 2,
-            "offload_optimizer": {
-                "device": "cpu",
-                "pin_memory": True
-            },
-            "allgather_partitions": True,
-            "allgather_bucket_size": 2e8,
             "reduce_scatter": True,
-            "reduce_bucket_size": 2e8,
-            "overlap_comm": True,
-            "contiguous_gradients": True
+            "reduce_bucket_size": 5e8,
+            "contiguous_gradients": True,
         },
-        "gradient_clipping": 1.0,
-        "steps_per_print": 100,
-        "wall_clock_breakdown": False
     }
 
-    # Load model and tokenizer
-    model_name = "gpt2"
-    if rank == 0:
-        print(f"Loading model: {model_name}")
+    # Configure the pre-trained model and tokenizer.
+    model = T5ForConditionalGeneration.from_pretrained("t5-base")
+    tokenizer = T5Tokenizer.from_pretrained("t5-base")
 
-    model = AutoModelForCausalLM.from_pretrained(model_name)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    tokenizer.pad_token = tokenizer.eos_token
-
-    # Prepare dataset
-    if rank == 0:
-        print("Loading dataset...")
-
-    dataset = load_dataset("wikitext", "wikitext-2-raw-v1", split="train")
-
-    def tokenize_function(examples):
-        return tokenizer(
-            examples["text"],
-            padding="max_length",
-            truncation=True,
-            max_length=512,
-            return_tensors="pt"
-        )
-
-    tokenized_dataset = dataset.map(
-        tokenize_function,
-        batched=True,
-        remove_columns=dataset.column_names
-    )
-
-    # Create dataloader
+    # Configure the dataset and dataloader.
+    dataset = wikihow(tokenizer)
     train_loader = DataLoader(
-        tokenized_dataset,
-        batch_size=4,
-        collate_fn=default_data_collator,
-        shuffle=True
+        dataset, batch_size=16, sampler=DistributedSampler(dataset)
     )
 
-    # Initialize DeepSpeed
-    model_engine, optimizer, _, lr_scheduler = deepspeed.initialize(
+    # Initialize DeepSpeed engine.
+    model, _, _, _ = deepspeed.initialize(
         model=model,
+        config=ds_config,
         model_parameters=model.parameters(),
-        config=ds_config
     )
 
-    # Training loop
-    num_epochs = 3
-    if rank == 0:
-        print(f"Starting training for {num_epochs} epochs...")
-
-    model_engine.train()
-    global_step = 0
-
-    for epoch in range(num_epochs):
-        epoch_loss = 0.0
-        num_batches = 0
-
+    # Start DeepSpeed training loop.
+    for epoch in range(10):
         for batch_idx, batch in enumerate(train_loader):
-            # Move batch to device
-            input_ids = batch["input_ids"].to(model_engine.local_rank)
-            attention_mask = batch["attention_mask"].to(model_engine.local_rank)
-            labels = input_ids.clone()
-
-            # Forward pass
-            outputs = model_engine(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                labels=labels
-            )
+            for key in batch.keys():
+                batch[key] = batch[key].to(os.environ["LOCAL_RANK"])
+            outputs = model(batch)
             loss = outputs.loss
 
-            # Backward pass
-            model_engine.backward(loss)
-            model_engine.step()
+            model.backward(loss)
+            model.step()
 
-            epoch_loss += loss.item()
-            num_batches += 1
-            global_step += 1
+            if batch_idx % 100 == 0:
+                print(f"Epoch: {epoch}, Batch: {batch_idx}, Loss: {loss.item()}")
 
-            # Log progress
-            if batch_idx % 100 == 0 and rank == 0:
-                print(f"Epoch {epoch}, Step {global_step}, Batch {batch_idx}, Loss: {loss.item():.4f}")
-
-        # Print epoch summary
-        if rank == 0:
-            avg_loss = epoch_loss / num_batches
-            print(f"Epoch {epoch} completed. Average Loss: {avg_loss:.4f}")
-
-    # Save model checkpoint (rank 0 only)
-    if rank == 0:
-        print("Saving model checkpoint...")
-        model_engine.save_checkpoint("./checkpoints", tag="final")
-        print("Training completed successfully!")
+    if dist.get_rank() == 0:
+        # Export your model to the object storage (e.g. S3)
+        boto3.upload_file()
 ```
 
-## Launching DeepSpeed Training with SDK
+### Create a TrainJob
 
-Use the TrainerClient SDK to launch your DeepSpeed training job:
+After configuring the DeepSpeed training function, use the `train()` API to create TrainJob:
 
 ```python
 from kubeflow.trainer import TrainerClient, CustomTrainer
 
-client = TrainerClient()
-
-job_id = client.train(
+job_id = TrainerClient().train(
+    runtime="deepspeed-distributed",
     trainer=CustomTrainer(
-        func=train_gpt2_deepspeed,
-        num_nodes=4,
+        func=fine_tune_t5_deepspeed,
+        # These packages will be installed on every training node.
+        packages_to_install=["boto3"],
+        num_nodes=2,
         resources_per_node={
-            "cpu": 8,
-            "memory": "32Gi",
-            "gpu": 2,  # 2 GPUs per node = 8 total GPUs
+            "gpu": 2,
         },
-        packages_to_install=["deepspeed", "transformers", "datasets"],
-    ),
-    runtime="deepspeed-distributed"
-)
-
-print(f"DeepSpeed training job created: {job_id}")
-
-# Stream training logs
-for log_line in client.get_job_logs(job_id, follow=True):
-    print(log_line)
-```
-
-This launches a distributed DeepSpeed training job across 4 nodes with 2 GPUs each (8 GPUs total), automatically handling all distributed setup.
-
-## Advanced DeepSpeed Configuration
-
-### ZeRO-3 Configuration
-
-For training very large models that don't fit in single GPU memory:
-
-```python
-ds_config = {
-    "train_micro_batch_size_per_gpu": 1,
-    "gradient_accumulation_steps": 4,
-    "optimizer": {
-        "type": "AdamW",
-        "params": {"lr": 3e-5}
-    },
-    "bf16": {
-        "enabled": True
-    },
-    "zero_optimization": {
-        "stage": 3,
-        "offload_optimizer": {
-            "device": "cpu",
-            "pin_memory": True
-        },
-        "offload_param": {
-            "device": "cpu",
-            "pin_memory": True
-        },
-        "overlap_comm": True,
-        "contiguous_gradients": True,
-        "sub_group_size": 1e9,
-        "reduce_bucket_size": "auto",
-        "stage3_prefetch_bucket_size": "auto",
-        "stage3_param_persistence_threshold": "auto",
-        "stage3_max_live_parameters": 1e9,
-        "stage3_max_reuse_distance": 1e9,
-        "stage3_gather_16bit_weights_on_model_save": True
-    }
-}
-```
-
-### Activation Checkpointing
-
-Save memory by recomputing activations during backward pass:
-
-```python
-ds_config = {
-    # ... other config ...
-    "activation_checkpointing": {
-        "partition_activations": True,
-        "cpu_checkpointing": True,
-        "contiguous_memory_optimization": True,
-        "number_checkpoints": None,
-        "synchronize_checkpoint_boundary": False,
-        "profile": False
-    }
-}
-```
-
-### Communication Optimization
-
-Optimize gradient communication patterns:
-
-```python
-ds_config = {
-    # ... other config ...
-    "zero_optimization": {
-        "stage": 2,
-        "allgather_partitions": True,
-        "allgather_bucket_size": 5e8,
-        "reduce_scatter": True,
-        "reduce_bucket_size": 5e8,
-        "overlap_comm": True,
-        "contiguous_gradients": True
-    },
-    "communication_data_type": "fp16"  # or "bf16"
-}
-```
-
-## Monitoring and Debugging
-
-### Enable Detailed Logging
-
-```python
-ds_config = {
-    # ... other config ...
-    "steps_per_print": 10,
-    "wall_clock_breakdown": True,
-    "dump_state": True
-}
-```
-
-### Monitor Memory Usage
-
-```python
-def train_with_monitoring():
-    import deepspeed
-    import torch
-
-    # ... initialization code ...
-
-    for batch in train_loader:
-        loss = model_engine(batch)
-        model_engine.backward(loss)
-        model_engine.step()
-
-        # Print memory stats periodically
-        if model_engine.global_steps % 100 == 0:
-            allocated = torch.cuda.memory_allocated() / 1024**3
-            reserved = torch.cuda.memory_reserved() / 1024**3
-            print(f"GPU Memory: {allocated:.2f}GB allocated, {reserved:.2f}GB reserved")
-```
-
-## Examples and Resources
-
-### Complete Examples
-
-- **[DeepSpeed T5 Fine-tuning](https://github.com/kubeflow/trainer/tree/master/examples/deepspeed)**: Complete notebook demonstrating T5 fine-tuning with DeepSpeed ZeRO-2
-- **GPT-2 Training**: Large language model training with ZeRO-3 optimization
-
-### API Documentation
-
-- [TrainerClient API Reference](../api-reference/python-sdk/index): Complete SDK documentation
-- [DeepSpeed Configuration Guide](https://www.deepspeed.ai/docs/config-json/): Official DeepSpeed configuration reference
-
-### Related Guides
-
-- [Getting Started](../getting-started/index): Initial setup and first training job
-- [PyTorch Distributed](pytorch): Standard PyTorch distributed training
-- [Local Execution](local-execution/index): Test DeepSpeed training locally
-
-## Troubleshooting
-
-### Common Issues
-
-**DeepSpeed initialization fails:**
-
-Ensure DeepSpeed is installed in your training environment:
-
-```python
-trainer = CustomTrainer(
-    func=train_with_deepspeed,
-    packages_to_install=["deepspeed==0.14.0"],
-    # ... other params
+    )
 )
 ```
 
-**Out of memory errors:**
+### Get the TrainJob Results
 
-- Increase `gradient_accumulation_steps` to reduce memory per step
-- Enable CPU offloading for optimizer and parameters
-- Reduce `train_micro_batch_size_per_gpu`
-- Use a higher ZeRO stage (2 → 3)
+You can use the `get_job_logs()` API to see your TrainJob logs:
 
-**Slow training speed:**
-
-- Disable CPU offloading if you have sufficient GPU memory
-- Increase bucket sizes for better communication efficiency
-- Enable `overlap_comm` to overlap communication and computation
-- Use `bf16` instead of `fp16` on supported hardware (A100+)
-
-**NCCL timeout errors:**
-
-Increase NCCL timeout for large models or slow networks:
-
-```python
-def train_with_deepspeed():
-    import os
-    os.environ["NCCL_TIMEOUT"] = "3600"  # 1 hour
-
-    # ... rest of training code
+```py
+print("\n".join(TrainerClient().get_job_logs(name=job_id)))
 ```
 
-**Checkpoint loading fails:**
+:::{note}
+Since DeepSpeed training is launched via the mpirun command, all logs can be collected from
+node-0, which acts as the OpenMPI launcher.
+:::
 
-Ensure you're loading checkpoints with the same ZeRO stage:
+## DeepSpeed Configuration
 
-```python
-# Save checkpoint
-model_engine.save_checkpoint("./checkpoints")
+DeepSpeed uses a JSON configuration file to specify training parameters, optimization settings,
+and memory management options. Learn more about it in
+[the DeepSpeed documentation](https://www.deepspeed.ai/docs/config-json/).
 
-# Load checkpoint later with same ZeRO stage config
-_, client_state = model_engine.load_checkpoint("./checkpoints")
+Key configuration sections include:
+
+### Basic Training Configuration
+
+```json
+{
+  "train_batch_size": 128,
+  "train_micro_batch_size_per_gpu": 16,
+  "gradient_accumulation_steps": 8,
+  "steps_per_print": 100
+}
 ```
+
+### ZeRO Configuration
+
+```json
+{
+  "zero_optimization": {
+    "stage": 2,
+    "allgather_partitions": true,
+    "allgather_bucket_size": 5e8,
+    "overlap_comm": true,
+    "reduce_scatter": true,
+    "reduce_bucket_size": 5e8,
+    "contiguous_gradients": true,
+    "cpu_offload": false
+  }
+}
+```
+
+### Mixed Precision Training
+
+```json
+{
+  "fp16": {
+    "enabled": true,
+    "loss_scale": 0,
+    "loss_scale_window": 1000,
+    "hysteresis": 2,
+    "min_loss_scale": 1
+  }
+}
+```
+
+## Next Steps
+
+- Check out [the DeepSpeed T5 example](https://github.com/kubeflow/trainer/blob/master/examples/deepspeed/text-summarization/T5-Fine-Tuning.ipynb).
+- Learn more about `TrainerClient()` APIs [in the Kubeflow SDK](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/api/trainer_client.py).
+- Explore [DeepSpeed documentation](https://www.deepspeed.ai/) for advanced configuration options.

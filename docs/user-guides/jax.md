@@ -1,463 +1,320 @@
-# JAX
+# JAX Guide
 
-Train JAX models with distributed parallelism using Kubeflow Trainer's seamless multi-process orchestration.
+This guide describes how to use TrainJob to train or fine-tune AI models with
+[JAX](https://jax.readthedocs.io/).
 
-## Overview
-
-Kubeflow Trainer provides first-class support for distributed JAX training on Kubernetes. The `jax-distributed` runtime handles cluster coordination, networking setup, and environment configuration automatically, enabling you to scale JAX workloads across multiple nodes effortlessly.
-
-Key features:
-- **Automatic multi-process setup**: JAX distributed environment configured automatically
-- **Official NVIDIA containers**: Pre-built images with JAX, Flax, and Optax
-- **Flexible parallelism**: Support for pmap, pjit, and shard_map
-- **GPU and CPU support**: Train on any hardware (TPU not supported)
+---
 
 ## Prerequisites
 
-Before following this guide, ensure you have:
+Before exploring this guide, make sure to follow
+[the Getting Started guide](index)
+to understand the basics of Kubeflow Trainer.
 
-- Completed the [Getting Started](../getting-started/index) guide
-- Access to a Kubernetes cluster with Kubeflow Trainer installed
-- Familiarity with JAX and distributed training concepts
+---
 
-## The jax-distributed Runtime
+## JAX Overview
 
-The `jax-distributed` runtime is a ClusterTrainingRuntime that provides:
+JAX supports distributed and parallel computation through its
+[`jax.distributed`](https://jax.readthedocs.io/en/latest/jax.distributed.html)
+module and Single Program, Multiple Data (SPMD) primitives such as `pmap`, `pjit`, and `shard_map`.
+These APIs allow you to scale JAX workloads across multiple devices
+and multiple nodes.
 
-- **Official NVIDIA JAX containers** with pre-installed JAX, Flax, and Optax
-- **Automatic networking configuration** for multi-process communication
-- **One Pod = One JAX process** architecture for simplicity
-- **GPU and CPU support** (TPU not supported due to backend conflicts)
+Kubeflow Trainer integrates with JAX by:
+- Typically launching one worker Pod per JAX process (runtime dependent).
+- Injecting the required JAX distributed environment variables.
+- Providing consistent process indexing for distributed execution.
 
-### Architecture
-
-Unlike PyTorch's process-per-GPU model, JAX uses a **one-process-per-pod** architecture:
-
-- Each Kubernetes Pod runs a single JAX process
-- JAX automatically discovers and uses all GPUs within a Pod
-- Processes communicate via JAX's distributed runtime
-
-### Automatic Environment Variables
-
-Kubeflow Trainer automatically configures these environment variables for JAX distributed training:
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `JAX_NUM_PROCESSES` | Total number of JAX processes across all nodes | `4` |
-| `JAX_PROCESS_ID` | Global process index (zero-based) | `0`, `1`, `2`, `3` |
-| `JAX_COORDINATOR_ADDRESS` | Network address of the primary process (process 0) | `trainjob-mnist-0.trainjob-mnist:1234` |
-
-These variables are used internally by `jax.distributed.initialize()` to establish multi-process communication.
-
-## Training Function Pattern
-
-To run distributed JAX training with Kubeflow Trainer, follow this pattern:
-
-### 1. Import Inside Function Body
-
-All imports must be inside your training function:
-
-```python
-def train_jax():
-    """Train model with JAX distributed."""
-    # All imports go here
-    import jax
-    import jax.numpy as jnp
-    from flax import linen as nn
-
-    # Rest of your training code...
-```
+With Kubeflow Trainer, you can run:
+- Multi-process CPU training
+- Multi-GPU training using CUDA-enabled JAX
+- Data-parallel and model-parallel JAX workloads
 
 :::{note}
-This requirement allows the TrainerClient SDK to serialize your function and transfer it to the cluster.
+The JAX runtime currently supports CPU and GPU workloads only.
+
+TPU workloads are not supported because installing both `jax[cuda]`
+and `jax[tpu]` in the same image leads to backend and plugin conflicts.
+A separate TPU-specific runtime is required.
 :::
 
-### 2. Initialize JAX Distributed
+---
 
-Call `jax.distributed.initialize()` once at the start of your training function:
+## JAX Runtime in Kubeflow Trainer
+
+Kubeflow Trainer provides a built-in JAX distributed runtime named
+`jax-distributed`.
+
+This runtime:
+- Uses the official NVIDIA JAX container image
+- Requires no manual configuration of networking
+
+Internally, the runtime maps:
+- One Kubernetes Pod → one JAX process
+- Multiple devices per Pod → local JAX devices
+
+---
+
+## Get JAX Runtime Packages
+
+Kubeflow Trainer includes a JAX runtime that uses the official
+NVIDIA JAX container image. This runtime provides native CPU and GPU
+support and comes with a curated set of pre-installed packages.
+
+Run the following command to inspect the runtime packages:
 
 ```python
-def train_jax():
-    import jax
-    import jax.distributed
+from kubeflow.trainer import TrainerClient
 
-    # Initialize JAX distributed runtime
-    # This MUST be called before any JAX operations
-    jax.distributed.initialize()
+TrainerClient().get_runtime_packages(
+   runtime="jax-distributed"
+)
 
-    # Now you can use JAX distributed operations
-    process_id = jax.process_index()
-    num_processes = jax.process_count()
-
-    print(f"Process {process_id} of {num_processes} initialized")
-
-    # Your training code...
 ```
+You should see the installed packages, for example:
+
+```sh
+Python: 3.10.12 (main, Feb 25 2026, 20:34:29) [GCC 11.4.0]
+
+Package            Version
+------------------ -----------
+...
+Flax                 0.11.2
+jax                  0.7.2
+optax                0.2.4
+...
+```
+## JAX Distributed Environment
+
+Your training script must explicitly initialize the JAX distributed runtime before performing any JAX computation.
+
+
+```python
+from kubeflow.trainer import TrainerClient, CustomTrainer
+
+
+def get_jax_dist():
+    import os
+    import jax
+    import jax.distributed as dist
+
+    # Initialize distributed JAX.
+    dist.initialize(
+        coordinator_address=os.environ["JAX_COORDINATOR_ADDRESS"],
+        num_processes=int(os.environ["JAX_NUM_PROCESSES"]),
+        process_id=int(os.environ["JAX_PROCESS_ID"]),
+    )
+
+    print("JAX Distributed Environment")
+    print(f"Local devices: {jax.local_devices()}")
+    print(f"Global device count: {jax.device_count()}")
+
+    import jax.numpy as jnp
+
+    x = jnp.ones((4,))
+    y = jax.pmap(lambda v: v * jax.process_index())(x)
+
+    print("PMAP result:", y)
+
+
+client = TrainerClient()
+
+# Create TrainJob
+job_id = client.train(
+    runtime=client.get_runtime("jax-distributed"),
+    trainer=CustomTrainer(func=get_jax_dist),
+)
+
+# Wait until completion
+client.wait_for_job_status(job_id)
+
+# Logs are aggregated from node-0
+print("\n".join(client.get_job_logs(name=job_id)))
+```
+
+### Environment Variables Injected by the JAX Runtime
+
+The jax-distributed runtime injects environment variables such as
+
+| Variable | Description |
+|--------|-------------|
+| `JAX_NUM_PROCESSES` | Total number of JAX processes |
+| `JAX_PROCESS_ID` | Global process index (0-based) |
+| `JAX_COORDINATOR_ADDRESS` | Address of the coordinator (process 0) |
+
+---
+
+### Parallelism with JAX Primitives
+
+Once initialized, you can use JAX SPMD primitives normally:
+
+- `pmap` — data-parallel execution
+- `pjit` — explicit global sharding
+- `shard_map` — low-level SPMD control
+
+Kubeflow Trainer does not alter JAX semantics, it only provides the distributed execution environment.
 
 :::{warning}
-`jax.distributed.initialize()` must be called **before** any JAX computations. Calling it after JAX operations will raise an error.
+All processes must call **jax.distributed.initialize()** exactly once
+and before any JAX computation. Failure to do so may result in deadlocks.
 :::
 
-### 3. Use Process Index for Single-Process Operations
+---
 
-Similar to PyTorch's rank checks, use `jax.process_index()` for operations that should run on a single process:
+### Scaling Semantics
 
-```python
-def train_jax():
-    import jax
+In the JAX runtime:
 
-    jax.distributed.initialize()
+- `num_nodes` controls the number of worker Pods
+- Typically one primary JAX process per worker Pod, depending on runtime implementation.
+- All Pods run identical code
 
-    # Only process 0 downloads the dataset
-    if jax.process_index() == 0:
-        download_dataset()
+Results:
 
-    # Wait for process 0 to finish
-    jax.experimental.multihost_utils.sync_global_devices("download_complete")
+- 2 Pods
+- 2 JAX processes
+- Enabling a single global SPMD execution across processes.
 
-    # All processes can now load the dataset
-    dataset = load_dataset()
-```
+---
 
-## Parallelism Strategies
+## Creating a TrainJob Example with Python SDK
 
-JAX provides multiple approaches to distributed parallelism. Choose based on your model architecture and scaling needs.
-
-### pmap: Data Parallel Execution
-
-`pmap` (parallel map) is the simplest approach for data parallelism. It replicates your model across all devices and processes different data batches in parallel.
-
-**When to use:**
-- Standard data-parallel training
-- Model fits comfortably on a single device
-- You want the simplest distributed setup
-
-**Example:**
-
-```python
-import jax
-import jax.numpy as jnp
-from flax import linen as nn
-
-# Define model
-class SimpleCNN(nn.Module):
-    @nn.compact
-    def __call__(self, x):
-        x = nn.Conv(features=32, kernel_size=(3, 3))(x)
-        x = nn.relu(x)
-        x = nn.avg_pool(x, window_shape=(2, 2), strides=(2, 2))
-        x = x.reshape((x.shape[0], -1))
-        x = nn.Dense(features=10)(x)
-        return x
-
-# Replicate parameters across devices
-params = replicate_across_devices(initial_params)
-
-# Training step (runs on all devices in parallel)
-@jax.pmap
-def train_step(params, batch):
-    def loss_fn(params):
-        logits = model.apply(params, batch['image'])
-        return jnp.mean((logits - batch['label']) ** 2)
-
-    loss, grads = jax.value_and_grad(loss_fn)(params)
-    # Gradients are automatically averaged across devices
-    return loss, grads
-```
-
-### pjit: Explicit Global Sharding
-
-`pjit` (partitioned jit) allows fine-grained control over how arrays are sharded across devices. It's ideal for large models that need model parallelism.
-
-**When to use:**
-- Large models that don't fit on a single device
-- You need model parallelism (sharding weights across devices)
-- You want explicit control over sharding strategies
-
-**Example:**
-
-```python
-import jax
-from jax.experimental import mesh_utils
-from jax.sharding import Mesh, PartitionSpec as P
-
-# Create device mesh for sharding
-devices = mesh_utils.create_device_mesh((4,))  # 4-way data parallelism
-mesh = Mesh(devices, axis_names=('data',))
-
-# Define sharding strategy
-with mesh:
-    # Shard data batch across devices
-    sharded_batch = jax.device_put(batch, P('data'))
-
-    # Replicate model parameters (not sharded)
-    replicated_params = jax.device_put(params, P())
-
-    @jax.jit
-    def train_step(params, batch):
-        # Training logic here
-        return updated_params
-```
-
-### shard_map: Low-Level SPMD Control
-
-`shard_map` provides the most control for Single Program Multiple Data (SPMD) parallelism.
-
-**When to use:**
-- You need full control over computation and communication patterns
-- Implementing custom parallelism strategies
-- Advanced use cases beyond pmap and pjit
-
-## Complete MNIST Example with Flax
-
-Here's a complete example training a CNN on MNIST with JAX distributed:
+Kubeflow Trainer provides a Python SDK that allows you to
+programmatically create and submit TrainJobs without writing YAML.
 
 ```python
 def train_mnist_jax():
-    """Train MNIST CNN with JAX and Flax using distributed training."""
+    import os
     import jax
     import jax.numpy as jnp
-    import jax.distributed
+    import jax.distributed as dist
     import optax
     from flax import linen as nn
     from flax.training import train_state
     import tensorflow_datasets as tfds
 
-    # Initialize JAX distributed (MUST be first)
-    jax.distributed.initialize()
+    # Initialize distributed JAX
+    dist.initialize(
+        num_processes=int(os.environ["JAX_NUM_PROCESSES"]),
+        process_id=int(os.environ["JAX_PROCESS_ID"]),
+        coordinator_address=os.environ["JAX_COORDINATOR_ADDRESS"],
+    )
 
-    process_id = jax.process_index()
-    num_processes = jax.process_count()
-    print(f"JAX process {process_id} of {num_processes} started")
+    process_index = jax.process_index()
+    local_device_count = jax.local_device_count()
 
-    # Define CNN model with Flax
-    class MNISTNet(nn.Module):
+    print("Process:", process_index)
+    print("Global devices:", jax.device_count())
+    print("Local devices:", jax.local_devices())
+
+    # Model definition
+    class CNN(nn.Module):
         @nn.compact
         def __call__(self, x):
             x = nn.Conv(features=32, kernel_size=(3, 3))(x)
             x = nn.relu(x)
-            x = nn.avg_pool(x, window_shape=(2, 2), strides=(2, 2))
-            x = nn.Conv(features=64, kernel_size=(3, 3))(x)
-            x = nn.relu(x)
-            x = nn.avg_pool(x, window_shape=(2, 2), strides=(2, 2))
+            x = nn.avg_pool(x, (2, 2), (2, 2))
             x = x.reshape((x.shape[0], -1))
-            x = nn.Dense(features=128)(x)
+            x = nn.Dense(128)(x)
             x = nn.relu(x)
-            x = nn.Dense(features=10)(x)
+            x = nn.Dense(10)(x)
             return x
 
-    # Load MNIST dataset
-    # Only process 0 downloads
-    if process_id == 0:
-        print("Downloading MNIST dataset...")
-        ds_builder = tfds.builder('mnist')
-        ds_builder.download_and_prepare()
+    # Dataset
+    ds = tfds.load("mnist", split="train", as_supervised=True)
 
-    # Synchronize all processes
-    jax.experimental.multihost_utils.sync_global_devices("dataset_download")
+    def preprocess(image, label):
+        image = jnp.array(image, dtype=jnp.float32) / 255.0
+        image = jnp.expand_dims(image, -1)
+        return image, label
 
-    # All processes load the dataset
-    ds = tfds.load('mnist', split='train', shuffle_files=True)
+    ds = ds.map(preprocess).batch(128).prefetch(1)
+    ds = tfds.as_numpy(ds)
 
-    # Preprocess dataset
-    def preprocess(sample):
-        image = sample['image'].astype(jnp.float32) / 255.0
-        label = sample['label']
-        return {'image': image, 'label': label}
-
-    ds = ds.map(preprocess)
-    ds = ds.batch(64)
-    ds = ds.prefetch(10)
-
-    # Initialize model and optimizer
-    model = MNISTNet()
+    # Training setup
+    model = CNN()
     rng = jax.random.PRNGKey(0)
-    sample_input = jnp.ones([1, 28, 28, 1])
-    params = model.init(rng, sample_input)
 
-    optimizer = optax.adam(learning_rate=0.001)
+    params = model.init(rng, jnp.ones([1, 28, 28, 1]))["params"]
 
-    # Create training state
-    class TrainState(train_state.TrainState):
-        pass
+    tx = optax.adam(1e-3)
 
-    state = TrainState.create(
+    state = train_state.TrainState.create(
         apply_fn=model.apply,
         params=params,
-        tx=optimizer,
+        tx=tx,
     )
 
-    # Replicate state across all local devices
-    num_devices = jax.local_device_count()
+    # replicate state across local devices
     state = jax.device_put_replicated(state, jax.local_devices())
 
-    # Define training step with pmap
+    # Training step
+    def loss_fn(params, batch):
+        images, labels = batch
+        logits = model.apply({"params": params}, images)
+        onehot = jax.nn.one_hot(labels, 10)
+        loss = optax.softmax_cross_entropy(logits, onehot).mean()
+        return loss
+
+    grad_fn = jax.value_and_grad(loss_fn)
+
     @jax.pmap
     def train_step(state, batch):
-        def loss_fn(params):
-            logits = state.apply_fn(params, batch['image'])
-            one_hot = jax.nn.one_hot(batch['label'], 10)
-            loss = jnp.mean(optax.softmax_cross_entropy(logits, one_hot))
-            return loss
-
-        loss, grads = jax.value_and_grad(loss_fn)(state.params)
-        # Average gradients across devices
-        grads = jax.lax.pmean(grads, axis_name='batch')
+        loss, grads = grad_fn(state.params, batch)
         state = state.apply_gradients(grads=grads)
         return state, loss
 
     # Training loop
-    num_epochs = 5
-    for epoch in range(num_epochs):
-        epoch_loss = 0.0
-        num_batches = 0
-
-        for batch in tfds.as_numpy(ds):
-            # Reshape batch for pmap (devices, batch_per_device, ...)
-            batch_images = batch['image'].reshape(
-                (num_devices, -1, 28, 28, 1)
+    for epoch in range(5):
+        for images, labels in ds:
+            # shard batch per device
+            images = images.reshape(
+                (local_device_count, -1, 28, 28, 1)
             )
-            batch_labels = batch['label'].reshape((num_devices, -1))
+            labels = labels.reshape(
+                (local_device_count, -1)
+            )
 
-            pmap_batch = {
-                'image': batch_images,
-                'label': batch_labels,
-            }
+            state, loss = train_step(state, (images, labels))
 
-            state, loss = train_step(state, pmap_batch)
-
-            # Aggregate loss from all devices
-            loss_value = jnp.mean(loss)
-            epoch_loss += loss_value
-            num_batches += 1
-
-            if num_batches % 100 == 0 and process_id == 0:
-                print(f"Epoch {epoch}, Batch {num_batches}, Loss: {loss_value:.4f}")
-
-        # Print epoch summary
-        if process_id == 0:
-            avg_loss = epoch_loss / num_batches
-            print(f"Epoch {epoch} completed. Average Loss: {avg_loss:.4f}")
-
-    # Save model (process 0 only)
-    if process_id == 0:
-        # Extract params from first device replica
-        final_params = jax.tree_util.tree_map(lambda x: x[0], state.params)
-        print("Training completed!")
-
-    print(f"Process {process_id} finished training")
+        if process_index == 0:
+            print(f"Epoch {epoch}, Loss: {loss.mean()}")
 ```
 
-## SDK Integration
+### Create a TrainJob
 
-Launch JAX training jobs using the TrainerClient:
+- After defining the training function, create a TrainJob using the SDK.
 
 ```python
 from kubeflow.trainer import TrainerClient, CustomTrainer
 
-client = TrainerClient()
-
-# Launch distributed JAX training
-job_id = client.train(
+job_id = TrainerClient().train(
+    runtime=TrainerClient().get_runtime("jax-distributed"),
     trainer=CustomTrainer(
         func=train_mnist_jax,
-        num_nodes=4,  # 4 JAX processes
+        packages_to_install=[
+            "tensorflow-datasets",
+            "flax",
+            "optax",
+        ],
+        num_nodes=2,
         resources_per_node={
-            "cpu": 8,
-            "memory": "32Gi",
-            "gpu": 2,  # Each process will use 2 GPUs
+            "gpu": 1,
         },
-    )
+    ),
 )
-
-print(f"JAX training job created: {job_id}")
-
-# Monitor training progress
-for log_line in client.get_job_logs(job_id, follow=True):
-    print(log_line)
 ```
 
-### Multi-Process Configuration
 
-JAX processes are configured via `num_nodes`:
-
-- `num_nodes=1`: Single process, all local GPUs
-- `num_nodes=4`: 4 processes, distributed across nodes
-- `num_nodes=8`: 8 processes for large-scale training
-
-Each process will automatically discover and use all GPUs allocated to its Pod.
-
-## Examples and Resources
-
-### Complete Examples
-
-- **[JAX MNIST Classification](https://github.com/kubeflow/trainer/blob/master/examples/jax/image-classification/mnist.ipynb)**: Interactive notebook with complete MNIST training example
-
-### API Documentation
-
-- [TrainerClient API Reference](../api-reference/python-sdk/index): Complete SDK documentation
-- [TrainJob CRD Reference](../api-reference/crd-types/trainjob): TrainJob specification details
-
-### Related Guides
-
-- [Getting Started](../getting-started/index): Initial setup and first training job
-- [PyTorch Guide](pytorch): Distributed PyTorch training with DDP and FSDP
-- [Local Execution](local-execution/index): Test JAX training locally before deploying
-
-### External Resources
-
-- [JAX Documentation](https://jax.readthedocs.io/): Official JAX documentation
-- [Flax Documentation](https://flax.readthedocs.io/): Neural network library for JAX
-- [JAX Distributed Guide](https://jax.readthedocs.io/en/latest/multi_process.html): Multi-process JAX training
-
-## Troubleshooting
-
-### Common Issues
-
-**Import errors with `CustomTrainer`:**
-
-Ensure all imports are inside your training function body, not at the module level.
-
-**JAX distributed initialization fails:**
-
-Verify that `jax.distributed.initialize()` is called before any JAX operations:
-
+### Get the TrainJob Results
 ```python
-def train_jax():
-    import jax
-    import jax.distributed
-
-    # MUST be first
-    jax.distributed.initialize()
-
-    # Now safe to use JAX
-    devices = jax.devices()
+print("\n".join(TrainerClient().get_job_logs(name=job_id)))
 ```
+---
 
-**Process hanging or timeout:**
 
-Check that all processes reach synchronization barriers:
+## Next Steps
 
-```python
-# All processes must call this
-jax.experimental.multihost_utils.sync_global_devices("checkpoint")
-```
-
-**Out of memory errors:**
-
-- Reduce batch size per device
-- Use gradient accumulation
-- Enable mixed precision with `jax.default_matmul_precision('tensorfloat32')`
-- Shard large model parameters with pjit
-
-**TPU backend not available:**
-
-TPU is not supported with the `jax-distributed` runtime due to backend conflicts. Use GPU or CPU configurations instead.
-
-**Uneven device utilization:**
-
-JAX automatically balances computation across devices within a process. If you see imbalance:
-
-1. Ensure data batches are evenly divisible by device count
-2. Use `pmap` with proper batch sharding
-3. Check that `jax.local_device_count()` matches your GPU allocation
+- Check out [the MNIST JAX example](https://github.com/kubeflow/trainer/blob/master/examples/jax/image-classification/mnist.ipynb).
+- Learn more about `TrainerClient()` APIs [in the Kubeflow SDK](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/api/trainer_client.py).
