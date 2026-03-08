@@ -1,32 +1,18 @@
-# Training Runtimes
+# Runtime Guide
 
-Training runtimes are template configurations managed by platform administrators that define how training jobs execute in Kubernetes. They serve as reusable blueprints that separate infrastructure concerns from training code.
+This guide gives an overview for TrainingRuntime and ClusterTrainingRuntime.
 
-## Overview
+Runtimes are template configurations or blueprints that are managed by platform administrators and
+used by TrainJob to launch the desired training job.
 
-A runtime defines:
-- **ML framework configuration** - PyTorch, DeepSpeed, JAX, MLX settings
-- **Job structure** - How pods are organized and orchestrated
-- **Resource templates** - Default resource allocations and constraints
-- **Environment setup** - Container configurations, volume mounts, init containers
+## What is ClusterTrainingRuntime
 
-Runtimes enable platform teams to standardize training infrastructure while allowing data scientists to focus on model development.
+The ClusterTrainingRuntime is a cluster-scoped API that allows platform administrators to manage
+templates for TrainJobs. ClusterTrainingRuntime can be deployed across the entire Kubernetes cluster
+and reused by AI practitioners in their TrainJobs. It simplifies the process of running training
+jobs by providing standardized blueprints and ready-to-use environments.
 
-## Runtime Types
-
-Kubeflow Trainer provides two types of runtime resources:
-
-### ClusterTrainingRuntime
-
-Cluster-scoped runtimes available across all namespaces in the cluster.
-
-**Use cases:**
-- Organization-wide standard configurations
-- Centralized control of training infrastructure
-- Shared runtimes across multiple teams
-- Enforcing company policies and best practices
-
-**Example:**
+### Example of ClusterTrainingRuntime
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
@@ -45,900 +31,150 @@ spec:
       replicatedJobs:
         - name: node
           template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
             spec:
               template:
                 spec:
                   containers:
-                    - name: trainer
-                      env:
-                        - name: NCCL_DEBUG
-                          value: INFO
+                    - name: node
+                      image: pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
 ```
 
-:::{tip}
-Use `ClusterTrainingRuntime` for organization-wide standards that should be available to all teams.
-:::
+In the runtime specification, platform administrators define a reusable template with the
+appropriate configuration for distributed training. A TrainJob references this runtime
+via the `RuntimeRef` API, which links to its `APIGroup`, `Kind` and `Name`. This allows the TrainJob
+to adopt the runtime's configuration, enabling consistent and modular training setups.
 
-### TrainingRuntime
+```yaml
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: example-train-job
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    name: torch-distributed
+    kind: ClusterTrainingRuntime
+```
 
-Namespace-scoped runtimes available only within a specific namespace.
+## What is TrainingRuntime
 
-**Use cases:**
-- Team-specific customizations
-- Experimental configurations
-- Namespace-isolated environments
-- Per-project runtime variations
+The TrainingRuntime is a namespace-scoped API that allows platform administrators to manage
+templates for TrainJobs per namespace. It is ideal for teams or projects that need their own
+customized training setups for each Kubernetes namespace, offering flexibility for
+decentralized control.
 
-**Example:**
+### Example of TrainingRuntime
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainingRuntime
 metadata:
-  name: custom-pytorch
-  namespace: ml-team
+  name: pytorch-team-runtime
+  namespace: team-a
   labels:
     trainer.kubeflow.org/framework: torch
-    team: ml-team
 spec:
   mlPolicy:
     numNodes: 1
     torch:
-      numProcPerNode: gpu
+      numProcPerNode: auto
   template:
     spec:
       replicatedJobs:
         - name: node
           template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
             spec:
               template:
                 spec:
                   containers:
-                    - name: trainer
-                      resources:
-                        requests:
-                          cpu: "4"
-                          memory: "16Gi"
+                    - name: node
+                      image: pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
 ```
 
 :::{note}
-When referencing a `TrainingRuntime` from a TrainJob, both resources must be in the same namespace.
+When referencing TrainingRuntime, the Kubernetes namespace must be the same as the TrainJob's namespace
 :::
 
-## Comparison
-
-| Aspect | ClusterTrainingRuntime | TrainingRuntime |
-|--------|------------------------|-----------------|
-| **Scope** | Cluster-wide | Namespace-scoped |
-| **Visibility** | All namespaces | Single namespace |
-| **Use Case** | Standardized templates | Team customizations |
-| **Management** | Centralized | Decentralized |
-| **Access Control** | Cluster admin | Namespace admin |
-| **Best For** | Production standards | Experimentation |
-
-## Required Labels
-
-Every runtime must include the framework label for SDK compatibility:
-
-```yaml
-metadata:
-  labels:
-    trainer.kubeflow.org/framework: <framework-name>
-```
-
-Valid framework values:
-- `torch` - PyTorch distributed training
-- `deepspeed` - DeepSpeed training
-- `mlx` - MLX (Apple Silicon) training
-- `jax` - JAX distributed training
-- `torchtune` - TorchTune fine-tuning
-
-This label enables the Kubeflow Python SDK to automatically discover and select appropriate runtimes for built-in trainers.
-
-## Runtime Structure
-
-A runtime consists of two main sections:
-
-### 1. ML Policy
-
-Defines ML-specific configuration:
-
-```yaml
-spec:
-  mlPolicy:
-    numNodes: 2  # Default number of nodes
-    torch:       # Framework-specific settings
-      numProcPerNode: auto
-```
-
-See [ML Policies](ml-policy) for detailed configuration options.
-
-### 2. Template
-
-Defines the JobSet template structure:
-
-```yaml
-spec:
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                metadata:
-                  labels:
-                    trainer.kubeflow.org/job-role: trainer
-                spec:
-                  containers:
-                    - name: trainer
-                      # Container configuration
-```
-
-## Built-in Runtimes
-
-Kubeflow Trainer provides several pre-configured cluster runtimes:
-
-### torch-distributed
-
-PyTorch distributed training with torchrun:
-
-```bash
-kubectl get clustertrainingruntime torch-distributed -o yaml
-```
-
-**Features:**
-- Automatic distributed setup
-- GPU/CPU detection
-- NCCL backend for GPUs
-- Gloo backend for CPUs
-
-**Usage:**
-
-```yaml
-spec:
-  runtimeRef:
-    name: torch-distributed
-  trainer:
-    numNodes: 4
-```
-
-### deepspeed-distributed
-
-DeepSpeed training with MPI backend:
-
-```bash
-kubectl get clustertrainingruntime deepspeed-distributed -o yaml
-```
-
-**Features:**
-- MPI-based communication
-- SSH authentication
-- ZeRO optimization support
-- Multi-node coordination
-
-**Usage:**
-
-```yaml
-spec:
-  runtimeRef:
-    name: deepspeed-distributed
-  trainer:
-    numNodes: 8
-```
-
-### mlx-distributed
-
-MLX training for Apple Silicon:
-
-```bash
-kubectl get clustertrainingruntime mlx-distributed -o yaml
-```
-
-**Features:**
-- Apple Silicon optimization
-- Metal GPU support
-- Unified memory architecture
-
-**Usage:**
-
-```yaml
-spec:
-  runtimeRef:
-    name: mlx-distributed
-  trainer:
-    numNodes: 2
-```
-
-### jax-distributed
-
-JAX distributed training:
-
-```bash
-kubectl get clustertrainingruntime jax-distributed -o yaml
-```
-
-**Features:**
-- JAX distributed runtime
-- TPU and GPU support
-- XLA compilation
-
-### torchtune-llama
-
-TorchTune fine-tuning for Llama models:
-
-```bash
-kubectl get clustertrainingruntime torchtune-llama3.2-1b -o yaml
-kubectl get clustertrainingruntime torchtune-llama3.2-3b -o yaml
-```
-
-**Features:**
-- Pre-configured for Llama fine-tuning
-- Memory-efficient training
-- LoRA and QLoRA support
-
-## Creating Custom Runtimes
-
-### Basic Custom Runtime
-
-Create a simple PyTorch runtime with custom settings:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: pytorch-custom
-  labels:
-    trainer.kubeflow.org/framework: torch
-    company.com/gpu-type: a100
-spec:
-  mlPolicy:
-    numNodes: 1
-    torch:
-      numProcPerNode: auto
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                metadata:
-                  labels:
-                    trainer.kubeflow.org/job-role: trainer
-                spec:
-                  containers:
-                    - name: trainer
-                      env:
-                        - name: NCCL_DEBUG
-                          value: INFO
-                        - name: NCCL_IB_DISABLE
-                          value: "0"
-                      volumeMounts:
-                        - name: shm
-                          mountPath: /dev/shm
-                  volumes:
-                    - name: shm
-                      emptyDir:
-                        medium: Memory
-                        sizeLimit: 8Gi
-```
-
-### Runtime with Init Containers
-
-Add initialization steps before training:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: torch-with-init
-  labels:
-    trainer.kubeflow.org/framework: torch
-spec:
-  mlPolicy:
-    numNodes: 1
-    torch:
-      numProcPerNode: auto
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  initContainers:
-                    - name: setup
-                      image: busybox
-                      command:
-                        - sh
-                        - -c
-                        - |
-                          echo "Preparing environment..."
-                          mkdir -p /workspace/checkpoints
-                      volumeMounts:
-                        - name: workspace
-                          mountPath: /workspace
-                  containers:
-                    - name: trainer
-                      volumeMounts:
-                        - name: workspace
-                          mountPath: /workspace
-                  volumes:
-                    - name: workspace
-                      emptyDir: {}
-```
-
-### Runtime with Resource Defaults
-
-Set default resource requests and limits:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: torch-gpu-a100
-  labels:
-    trainer.kubeflow.org/framework: torch
-    gpu.type: a100
-spec:
-  mlPolicy:
-    numNodes: 1
-    torch:
-      numProcPerNode: gpu
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: trainer
-                      resources:
-                        requests:
-                          cpu: "8"
-                          memory: "64Gi"
-                          nvidia.com/gpu: "1"
-                        limits:
-                          cpu: "16"
-                          memory: "128Gi"
-                          nvidia.com/gpu: "1"
-```
-
-### Runtime with Node Affinity
-
-Target specific node types:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: torch-gpu-node
-  labels:
-    trainer.kubeflow.org/framework: torch
-spec:
-  mlPolicy:
-    numNodes: 1
-    torch:
-      numProcPerNode: auto
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  affinity:
-                    nodeAffinity:
-                      requiredDuringSchedulingIgnoredDuringExecution:
-                        nodeSelectorTerms:
-                          - matchExpressions:
-                              - key: node.kubernetes.io/instance-type
-                                operator: In
-                                values:
-                                  - p4d.24xlarge
-                                  - p5.48xlarge
-                  tolerations:
-                    - key: nvidia.com/gpu
-                      operator: Exists
-                      effect: NoSchedule
-                  containers:
-                    - name: trainer
-```
-
-### Multi-Container Runtime
-
-Include sidecar containers:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: torch-with-sidecar
-  labels:
-    trainer.kubeflow.org/framework: torch
-spec:
-  mlPolicy:
-    numNodes: 1
-    torch:
-      numProcPerNode: auto
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: trainer
-                      ports:
-                        - containerPort: 29500
-                          name: master
-                    - name: metrics-exporter
-                      image: prom/node-exporter:latest
-                      ports:
-                        - containerPort: 9100
-                          name: metrics
-```
-
-## Referencing Runtimes from TrainJobs
-
-### ClusterTrainingRuntime Reference
-
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainJob
 metadata:
-  name: my-training-job
+  name: example-train-job
+  namespace: team-a # Only accessible to the namespace for which it is defined
 spec:
   runtimeRef:
     apiGroup: trainer.kubeflow.org
-    kind: ClusterTrainingRuntime
-    name: torch-distributed
-  trainer:
-    numNodes: 4
-    image: pytorch/pytorch:2.5.1
-    command: ["torchrun", "train.py"]
-```
-
-### TrainingRuntime Reference
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: TrainJob
-metadata:
-  name: my-training-job
-  namespace: ml-team
-spec:
-  runtimeRef:
-    apiGroup: trainer.kubeflow.org
+    name: pytorch-team-runtime
     kind: TrainingRuntime
-    name: custom-pytorch
-  trainer:
-    numNodes: 2
-    image: pytorch/pytorch:2.5.1
-    command: ["torchrun", "train.py"]
 ```
 
-:::{important}
-The TrainJob and TrainingRuntime must be in the same namespace when using namespace-scoped runtimes.
-:::
+## Framework Label Requirement
 
-## Runtime Overrides
-
-TrainJobs can override specific runtime settings:
-
-### Override Resources
+Every deployed runtime must have the label `trainer.kubeflow.org/framework` to ensure that
+the Kubeflow SDK can recognize it, for example:
 
 ```yaml
-spec:
-  runtimeRef:
-    name: torch-distributed
-  trainer:
-    numNodes: 4
-    image: pytorch/pytorch:2.5.1
-    command: ["torchrun", "train.py"]
-    resourcesPerNode:  # Overrides runtime defaults
-      requests:
-        cpu: "8"
-        memory: "32Gi"
-      limits:
-        nvidia.com/gpu: "2"
+trainer.kubeflow.org/framework: deepspeed
 ```
 
-### Override ML Policy
+The Kubeflow SDK uses this label to determine the appropriate configuration for the supported
+BuiltinTrainers.
 
-```yaml
-spec:
-  runtimeRef:
-    name: torch-distributed
-  mlPolicy:  # Overrides runtime ML policy
-    torch:
-      numProcPerNode: 2  # Instead of auto
-  trainer:
-    numNodes: 4
-    image: pytorch/pytorch:2.5.1
-    command: ["torchrun", "train.py"]
-```
+Check [the Builtin Trainer guide](../user-guides/builtin-trainer/index) to understand what is CustomTrainer and BuiltinTrainer.
 
-## Runtime Discovery
+## Supported Runtimes
 
-### List All Runtimes
+Kubeflow Trainer community maintains
+[several ClusterTrainingRuntimes](https://github.com/kubeflow/trainer/tree/master/manifests/base/runtimes)
+to help AI practitioners quickly experiment with Kubeflow Trainer, and to enable
+platform administrators to extend these runtimes to fit their specific requirements.
 
-```bash
-# Cluster-scoped runtimes
-kubectl get clustertrainingruntimes
+The following runtimes are supported for CustomTrainer:
 
-# Namespace-scoped runtimes
-kubectl get trainingruntimes -n <namespace>
+| Runtime Name | ML Framework |
+| --------------------- | ------------------------------------------------------------- |
+| torch-distributed | [PyTorch](https://docs.pytorch.org/docs/stable/index.html) |
+| deepspeed-distributed | [DeepSpeed](https://www.deepspeed.ai/) |
+| mlx-distributed | [MLX](https://ml-explore.github.io/mlx/build/html/index.html) |
 
-# All runtimes across namespaces
-kubectl get trainingruntimes -A
-```
+The following runtimes are supported for TorchTune BuiltinTrainer:
 
-### Filter by Labels
+| Runtime Name | Pre-trained LLM |
+| --------------------- | --------------- |
+| torchtune-llama3.2-1b | Llama 3.2 (1B) |
+| torchtune-llama3.2-3b | Llama 3.2 (3B) |
 
-```bash
-# Find PyTorch runtimes
-kubectl get clustertrainingruntimes -l trainer.kubeflow.org/framework=torch
+### Runtime Deprecation Policy
 
-# Find GPU-specific runtimes
-kubectl get clustertrainingruntimes -l gpu.type=a100
-```
+As ML frameworks evolve over time, the Kubeflow community may decide to deprecate
+certain supported ClusterTrainingRuntimes. To avoid breaking existing users, we follow a deprecation
+policy before removing any runtime.
 
-### Using Python SDK
+A supported ClusterTrainingRuntime may be marked as deprecated and is eligible for removal starting
+from **two minor releases** after its deprecation.
 
-```python
-from kubeflow.trainer import TrainerClient
+These measures are taken to inform users about runtime deprecation:
 
-client = TrainerClient()
+- Add the following label to the deprecated runtime:
 
-# List all available runtimes
-for runtime in client.list_runtimes():
-    print(f"Runtime: {runtime.name}")
-    print(f"  Framework: {runtime.framework}")
-    print(f"  Scope: {runtime.scope}")
-```
+  ```yaml
+  trainer.kubeflow.org/support: "deprecated"
+  ```
 
-## Runtime Versioning
-
-### Version Labeling
-
-Label runtimes with version information:
-
-```yaml
-metadata:
-  name: torch-distributed-v2
-  labels:
-    trainer.kubeflow.org/framework: torch
-    version: "2.0"
-    pytorch.version: "2.5.1"
-    cuda.version: "12.4"
-```
-
-### Runtime Updates
-
-When updating runtimes, create new versions instead of modifying existing ones:
-
-```yaml
-# Old version - keep for compatibility
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: torch-distributed-v1
-  labels:
-    trainer.kubeflow.org/framework: torch
-    version: "1.0"
-
----
-# New version - add new features
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: torch-distributed-v2
-  labels:
-    trainer.kubeflow.org/framework: torch
-    version: "2.0"
-```
-
-This allows gradual migration of training jobs.
-
-## Deprecation Policy
-
-Deprecated runtimes are marked with a label:
-
-```yaml
-metadata:
-  labels:
-    trainer.kubeflow.org/support: "deprecated"
-```
-
-Deprecated runtimes are eligible for removal **starting from two minor releases** after deprecation.
-
-**Example timeline:**
-- Runtime deprecated in v2.1.0
-- Can be removed starting from v2.3.0
-- Users should migrate to newer runtimes
-
-## Best Practices
-
-### 1. Use Descriptive Names
-
-```yaml
-# Good
-name: torch-distributed-a100-optimized
-
-# Bad
-name: runtime1
-```
-
-### 2. Add Comprehensive Labels
-
-```yaml
-labels:
-  trainer.kubeflow.org/framework: torch
-  gpu.type: a100
-  network.type: infiniband
-  environment: production
-  team: ml-platform
-  version: "2.0"
-```
-
-### 3. Document Runtime Purpose
-
-```yaml
-metadata:
-  name: torch-distributed-production
-  annotations:
-    description: "Production PyTorch runtime with A100 optimizations"
-    usage: "For large-scale distributed training on 8+ nodes"
-    maintainer: "ml-platform@company.com"
-```
-
-### 4. Set Resource Defaults
-
-Always provide reasonable defaults:
-
-```yaml
-spec:
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: trainer
-                      resources:
-                        requests:
-                          cpu: "4"
-                          memory: "16Gi"
-```
-
-### 5. Enable Observability
-
-Include monitoring and logging:
-
-```yaml
-spec:
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: trainer
-                      env:
-                        - name: NCCL_DEBUG
-                          value: INFO
-                    - name: metrics-sidecar
-                      image: prom/node-exporter
-```
-
-### 6. Use Shared Memory for Multi-GPU
-
-```yaml
-spec:
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  volumes:
-                    - name: dshm
-                      emptyDir:
-                        medium: Memory
-                  containers:
-                    - name: trainer
-                      volumeMounts:
-                        - name: dshm
-                          mountPath: /dev/shm
-```
-
-### 7. Implement Health Checks
-
-```yaml
-spec:
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: trainer
-                      livenessProbe:
-                        exec:
-                          command:
-                            - python
-                            - -c
-                            - "import torch; print(torch.cuda.is_available())"
-                        initialDelaySeconds: 30
-                        periodSeconds: 60
-```
-
-## Validation
-
-Runtimes are validated on creation and update. Common validation errors:
-
-### Missing Required Labels
-
-```
-Error: missing required label trainer.kubeflow.org/framework
-```
-
-**Solution:** Add the framework label:
-
-```yaml
-metadata:
-  labels:
-    trainer.kubeflow.org/framework: torch
-```
-
-### Invalid ML Policy
-
-```
-Error: numNodes must be >= 1
-```
-
-**Solution:** Set valid numNodes:
-
-```yaml
-spec:
-  mlPolicy:
-    numNodes: 1  # Must be positive
-```
-
-### Missing Container Name
-
-```
-Error: container name must be "trainer" for training pods
-```
-
-**Solution:** Use correct container name:
-
-```yaml
-containers:
-  - name: trainer  # Required name
-```
-
-## Troubleshooting
-
-### Runtime Not Found
-
-```bash
-# Check if runtime exists
-kubectl get clustertrainingruntime <name>
-kubectl get trainingruntime <name> -n <namespace>
-
-# Check TrainJob events
-kubectl describe trainjob <job-name>
-```
-
-### Runtime Validation Failed
-
-View detailed error messages:
-
-```bash
-kubectl describe clustertrainingruntime <name>
-```
-
-Check the status conditions for validation errors.
-
-### Jobs Not Using Updated Runtime
-
-Existing TrainJobs continue using the runtime configuration from creation time. To use updated runtime:
-
-1. Delete and recreate the TrainJob
-2. Or create a new runtime version and update the TrainJob's `runtimeRef`
-
-## Advanced Patterns
-
-### Multi-Framework Runtime
-
-Support multiple execution modes:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: flexible-runtime
-  labels:
-    trainer.kubeflow.org/framework: torch
-spec:
-  mlPolicy:
-    numNodes: 1
-    torch:
-      numProcPerNode: auto
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: trainer
-                      env:
-                        - name: TRAINING_FRAMEWORK
-                          value: pytorch  # Can be changed per job
-```
-
-### Runtime with Persistent Storage
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: ClusterTrainingRuntime
-metadata:
-  name: torch-with-pvc
-spec:
-  mlPolicy:
-    numNodes: 1
-    torch:
-      numProcPerNode: auto
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          template:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: trainer
-                      volumeMounts:
-                        - name: training-data
-                          mountPath: /data
-                        - name: checkpoints
-                          mountPath: /checkpoints
-                  volumes:
-                    - name: training-data
-                      persistentVolumeClaim:
-                        claimName: training-data-pvc
-                    - name: checkpoints
-                      persistentVolumeClaim:
-                        claimName: checkpoints-pvc
-```
+- Document the deprecation as **a breaking change** in Kubeflow Trainer release notes.
+- Show a warning from the Kubeflow Trainer validation webhook when:
+  - A deprecated runtime is deployed on a Kubernetes cluster.
+  - A TrainJob is created which references a deprecated runtime.
+- Display a warning in the Kubeflow SDK when a deprecated runtime is listed or referenced.
 
 ## Next Steps
 
-- **Configure ML Policies** - See [ML Policies](ml-policy) for framework-specific settings
-- **Customize Job Templates** - See [Job Templates](job-template) for advanced JobSet configurations
-- **Override Pod Templates** - See [Pod Templates](pod-template) for per-pod customizations
-- **Set Up Scheduling** - See [Job Scheduling](job-scheduling/index) for gang scheduling integration
+- Learn how to configure [job scheduling in Kubeflow Trainer](job-scheduling/index).
+- Explore how to set up [MLPolicy in runtime](ml-policy).
+- See how to define [Job Template in runtimes](job-template).

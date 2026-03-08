@@ -1,625 +1,132 @@
-# Pod Template Overrides
+# PodTemplate Overrides
 
-Pod template overrides allow you to customize specific pods within a TrainJob, providing fine-grained control over individual training nodes.
+This guide describes how to use
+[the `PodTemplateOverrides` API](https://pkg.go.dev/github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1#PodTemplateOverrides)
+in the Kubeflow TrainJob.
 
-## Overview
+Before exploring this guide, make sure to follow [the Runtime guide](runtime)
+to understand the basics of Kubeflow Trainer Runtimes.
 
-While Training Runtimes define default pod configurations, `podTemplateOverrides` in TrainJob specifications enable:
+## PodTemplateOverrides Overview
 
-- **Per-node customization** - Different configurations for specific replicas
-- **Resource heterogeneity** - Varied resource allocations across nodes
-- **Specialized configurations** - Custom environment variables, volumes, or affinity rules
-- **Role-specific settings** - Different settings for master vs worker nodes
-
-## Basic Structure
-
-Pod template overrides are specified in the TrainJob:
+The `PodTemplateOverrides` API allows you to customize Pod templates for specific jobs in your
+TrainJob without modifying the TrainingRuntime. This is useful when you need to apply job-specific
+configurations such as custom service accounts, node selectors, tolerations, or additional volumes.
+Platform admins can also leverage custom admission mutating webhooks to configure TrainJob overrides
+by using this API.
 
 ```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: TrainJob
-metadata:
-  name: custom-training
-spec:
-  runtimeRef:
-    name: torch-distributed
-  trainer:
-    numNodes: 4
-    image: pytorch/pytorch:2.5.1
-    command: ["torchrun", "train.py"]
-  podTemplateOverrides:
-    - targetReplicatedJob: node
-      replicaIndex: 0
-      podTemplateSpec:
-        spec:
-          # Custom pod spec for replica 0
+podTemplateOverrides:
+  - targetJobs:
+      - name: node
+    spec:
+      serviceAccountName: custom-sa
+      nodeSelector:
+        accelerator: nvidia-tesla-v100
 ```
 
-## Override Fields
+## Configuration Options
 
-### targetReplicatedJob
+The `PodTemplateOverrides` API supports various configuration options to customize Pod behavior.
+You can specify multiple overrides in the array, with later entries taking precedence over earlier ones.
+The overrides are applied in the following priority order: TrainJob (e.g. ML policy) > PodTemplateOverrides[n] > PodTemplateOverrides[n-1] > ... > PodTemplateOverrides[0] > TrainingRuntime, where n is the number of PodTemplateOverrides.
 
-Name of the replicated job to target (from runtime template).
+### TargetJobs
 
-**Type:** String
-**Required:** Yes
+Specifies which jobs in the TrainingRuntime to apply the overrides to. Common target job names include:
 
-**Example:**
+- `node` - The main training node job
+- `dataset-initializer` - The dataset initialization job
+- `model-initializer` - The model initialization job
+
+### Metadata Overrides
+
+Override or merge Pod metadata such as labels and annotations:
+
 ```yaml
-targetReplicatedJob: node  # Target the "node" replicated job
+podTemplateOverrides:
+  - targetJobs:
+      - name: node
+    metadata:
+      labels:
+        team: ml-platform
+      annotations:
+        monitoring: enabled
 ```
 
-### replicaIndex
+### Spec Overrides
 
-Index of the specific replica to override (0-indexed).
+The `spec` field supports overriding various Pod specification fields including:
 
-**Type:** Integer
-**Required:** No (if omitted, applies to all replicas)
-
-**Example:**
-```yaml
-replicaIndex: 0  # Override only the first replica (rank 0)
-```
-
-### podTemplateSpec
-
-Kubernetes PodTemplateSpec with customizations.
-
-**Type:** PodTemplateSpec
-**Required:** Yes
+- **serviceAccountName** - Override the service account
+- **nodeSelector** - Select specific nodes for placement
+- **affinity** - Define Pod affinity and anti-affinity rules
+- **tolerations** - Allow Pods to schedule on nodes with matching taints
+- **volumes** - Add or override volume configurations
+- **containers** - Override environment variables and volume mounts
+- **schedulingGates** - Control when Pods are scheduled
+- **imagePullSecrets** - Specify secrets for pulling private images
 
 ## Common Use Cases
 
-### 1. Different Resources for Master Node
+The following examples demonstrate practical scenarios where PodTemplateOverrides can be used to customize training job behavior for specific requirements.
 
-Allocate more memory to the master node:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: TrainJob
-metadata:
-  name: pytorch-master-custom
-spec:
-  runtimeRef:
-    name: torch-distributed
-  trainer:
-    numNodes: 4
-    image: pytorch/pytorch:2.5.1
-    command: ["torchrun", "train.py"]
-    resourcesPerNode:
-      limits:
-        memory: "16Gi"
-        nvidia.com/gpu: "1"
-  podTemplateOverrides:
-    - targetReplicatedJob: node
-      replicaIndex: 0  # Master node
-      podTemplateSpec:
-        spec:
-          containers:
-            - name: trainer
-              resources:
-                limits:
-                  memory: "32Gi"  # 2x memory for master
-                  nvidia.com/gpu: "1"
-```
-
-### 2. Custom Environment Variables
-
-Add debugging variables to a specific node:
+### Custom Service Account and Node Selection
 
 ```yaml
 podTemplateOverrides:
-  - targetReplicatedJob: node
-    replicaIndex: 0
-    podTemplateSpec:
-      spec:
-        containers:
-          - name: trainer
-            env:
-              - name: NCCL_DEBUG
-                value: INFO
-              - name: TORCH_DISTRIBUTED_DEBUG
-                value: DETAIL
-              - name: PYTORCH_CUDA_ALLOC_CONF
-                value: max_split_size_mb:512
+  - targetJobs:
+      - name: node
+    spec:
+      serviceAccountName: ml-training-sa
+      nodeSelector:
+        accelerator: nvidia-tesla-v100
+        node-pool: gpu-training
 ```
 
-### 3. Node Affinity and Tolerations
-
-Place specific replicas on particular nodes:
+### Adding Persistent Storage
 
 ```yaml
 podTemplateOverrides:
-  - targetReplicatedJob: node
-    replicaIndex: 0
-    podTemplateSpec:
-      spec:
-        affinity:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: node.kubernetes.io/instance-type
-                      operator: In
-                      values:
-                        - p4d.24xlarge
-        tolerations:
-          - key: nvidia.com/gpu
-            operator: Exists
-            effect: NoSchedule
+  - targetJobs:
+      - name: node
+    spec:
+      volumes:
+        - name: training-data
+          persistentVolumeClaim:
+            claimName: ml-team-training-pvc
+      containers:
+        - name: trainer
+          volumeMounts:
+            - name: training-data
+              mountPath: /workspace/data
 ```
 
-### 4. Additional Volume Mounts
-
-Mount extra volumes for specific nodes:
+### Tolerations for Specialized Hardware
 
 ```yaml
 podTemplateOverrides:
-  - targetReplicatedJob: node
-    replicaIndex: 0
-    podTemplateSpec:
-      spec:
-        volumes:
-          - name: checkpoint-storage
-            persistentVolumeClaim:
-              claimName: checkpoint-pvc
-        containers:
-          - name: trainer
-            volumeMounts:
-              - name: checkpoint-storage
-                mountPath: /checkpoints
+  - targetJobs:
+      - name: node
+    spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: training-workload
+          operator: Equal
+          value: high-priority
+          effect: NoSchedule
 ```
 
-### 5. Custom Init Containers
+## Restrictions
 
-Add initialization for specific nodes:
+You cannot set environment variables for the following special containers using `PodTemplateOverrides`:
 
-```yaml
-podTemplateOverrides:
-  - targetReplicatedJob: node
-    replicaIndex: 0
-    podTemplateSpec:
-      spec:
-        initContainers:
-          - name: download-checkpoint
-            image: amazon/aws-cli:latest
-            command:
-              - sh
-              - -c
-              - |
-                aws s3 sync s3://my-bucket/checkpoints /checkpoints
-            volumeMounts:
-              - name: checkpoints
-                mountPath: /checkpoints
-            env:
-              - name: AWS_REGION
-                value: us-west-2
-        volumes:
-          - name: checkpoints
-            emptyDir: {}
-```
+- `node` - Use the `Trainer` API instead
+- `dataset-initializer` - Use the `Initializer.Dataset` API instead
+- `model-initializer` - Use the `Initializer.Model` API instead
 
-### 6. Sidecar Containers
+For these containers, use the appropriate dedicated APIs in the TrainJob specification.
 
-Add monitoring sidecars to specific nodes:
-
-```yaml
-podTemplateOverrides:
-  - targetReplicatedJob: node
-    replicaIndex: 0
-    podTemplateSpec:
-      spec:
-        containers:
-          - name: trainer
-            # Main container config
-
-          - name: nvidia-dcgm-exporter
-            image: nvcr.io/nvidia/k8s/dcgm-exporter:latest
-            ports:
-              - containerPort: 9400
-                name: metrics
-            securityContext:
-              capabilities:
-                add: ["SYS_ADMIN"]
-```
-
-## Complete Examples
-
-### Example 1: Heterogeneous GPU Training
-
-Different GPU types across nodes:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: TrainJob
-metadata:
-  name: mixed-gpu-training
-spec:
-  runtimeRef:
-    name: torch-distributed
-  trainer:
-    numNodes: 4
-    image: pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
-    command: ["torchrun", "train.py"]
-    resourcesPerNode:
-      limits:
-        nvidia.com/gpu: "1"
-
-  # Node 0-1: A100 GPUs (high memory)
-  podTemplateOverrides:
-    - targetReplicatedJob: node
-      replicaIndex: 0
-      podTemplateSpec:
-        spec:
-          affinity:
-            nodeAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                nodeSelectorTerms:
-                  - matchExpressions:
-                      - key: gpu.type
-                        operator: In
-                        values: ["a100"]
-          containers:
-            - name: trainer
-              resources:
-                limits:
-                  memory: "80Gi"
-                  nvidia.com/gpu: "1"
-
-    - targetReplicatedJob: node
-      replicaIndex: 1
-      podTemplateSpec:
-        spec:
-          affinity:
-            nodeAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                nodeSelectorTerms:
-                  - matchExpressions:
-                      - key: gpu.type
-                        operator: In
-                        values: ["a100"]
-          containers:
-            - name: trainer
-              resources:
-                limits:
-                  memory: "80Gi"
-                  nvidia.com/gpu: "1"
-
-    # Node 2-3: V100 GPUs (standard memory)
-    - targetReplicatedJob: node
-      replicaIndex: 2
-      podTemplateSpec:
-        spec:
-          affinity:
-            nodeAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                nodeSelectorTerms:
-                  - matchExpressions:
-                      - key: gpu.type
-                        operator: In
-                        values: ["v100"]
-          containers:
-            - name: trainer
-              resources:
-                limits:
-                  memory: "32Gi"
-                  nvidia.com/gpu: "1"
-
-    - targetReplicatedJob: node
-      replicaIndex: 3
-      podTemplateSpec:
-        spec:
-          affinity:
-            nodeAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                nodeSelectorTerms:
-                  - matchExpressions:
-                      - key: gpu.type
-                        operator: In
-                        values: ["v100"]
-          containers:
-            - name: trainer
-              resources:
-                limits:
-                  memory: "32Gi"
-                  nvidia.com/gpu: "1"
-```
-
-### Example 2: Master Node with Checkpointing
-
-Only the master node saves checkpoints:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: TrainJob
-metadata:
-  name: pytorch-checkpointing
-spec:
-  runtimeRef:
-    name: torch-distributed
-  trainer:
-    numNodes: 4
-    image: pytorch/pytorch:2.5.1
-    command:
-      - torchrun
-      - train.py
-      - --checkpoint-dir
-      - /checkpoints
-
-  podTemplateOverrides:
-    - targetReplicatedJob: node
-      replicaIndex: 0  # Master saves checkpoints
-      podTemplateSpec:
-        spec:
-          volumes:
-            - name: checkpoint-storage
-              persistentVolumeClaim:
-                claimName: training-checkpoints
-          containers:
-            - name: trainer
-              volumeMounts:
-                - name: checkpoint-storage
-                  mountPath: /checkpoints
-              env:
-                - name: SAVE_CHECKPOINTS
-                  value: "true"
-                - name: CHECKPOINT_INTERVAL
-                  value: "100"
-```
-
-### Example 3: Debug Mode for Specific Node
-
-Enable debugging on one node:
-
-```yaml
-apiVersion: trainer.kubeflow.org/v1alpha1
-kind: TrainJob
-metadata:
-  name: debug-training
-spec:
-  runtimeRef:
-    name: torch-distributed
-  trainer:
-    numNodes: 2
-    image: pytorch/pytorch:2.5.1
-    command: ["torchrun", "train.py"]
-
-  podTemplateOverrides:
-    - targetReplicatedJob: node
-      replicaIndex: 0
-      podTemplateSpec:
-        spec:
-          containers:
-            - name: trainer
-              env:
-                - name: NCCL_DEBUG
-                  value: INFO
-                - name: TORCH_DISTRIBUTED_DEBUG
-                  value: DETAIL
-                - name: TORCH_SHOW_CPP_STACKTRACES
-                  value: "1"
-                - name: PYTHONUNBUFFERED
-                  value: "1"
-              command:
-                - python
-                - -m
-                - debugpy
-                - --listen
-                - 0.0.0.0:5678
-                - -m
-                - torch.distributed.run
-                - train.py
-              ports:
-                - containerPort: 5678
-                  name: debugpy
-```
-
-## Merge Behavior
-
-Pod template overrides are **merged** with the runtime template, not replaced.
-
-### Merge Strategy
-
-- **Primitive values** (strings, numbers): Override replaces runtime value
-- **Maps/Objects**: Deep merge (keys are merged recursively)
-- **Lists**: Override replaces entire list
-
-**Example:**
-
-**Runtime template:**
-```yaml
-spec:
-  containers:
-    - name: trainer
-      env:
-        - name: VAR1
-          value: "from-runtime"
-      resources:
-        limits:
-          memory: "16Gi"
-```
-
-**Override:**
-```yaml
-podTemplateSpec:
-  spec:
-    containers:
-      - name: trainer
-        env:
-          - name: VAR2
-            value: "from-override"
-        resources:
-          limits:
-            cpu: "8"
-```
-
-**Effective result:**
-```yaml
-spec:
-  containers:
-    - name: trainer
-      env:
-        - name: VAR2  # Override replaces entire env list
-          value: "from-override"
-      resources:
-        limits:
-          memory: "16Gi"  # From runtime
-          cpu: "8"        # From override (merged)
-```
-
-:::{warning}
-Environment variables and volume mount lists are **replaced**, not merged. Include all required variables in overrides.
-:::
-
-## Validation
-
-### Common Validation Errors
-
-**Invalid replica index:**
-```
-Error: replicaIndex 5 exceeds numNodes 4
-```
-
-**Solution:** Ensure replica index is less than numNodes.
-
-**Target job not found:**
-```
-Error: replicatedJob "worker" not found in runtime template
-```
-
-**Solution:** Use correct replicated job name from runtime.
-
-**Container name mismatch:**
-```
-Error: container "pytorch" not found, expected "trainer"
-```
-
-**Solution:** Match container names from runtime template.
-
-## Best Practices
-
-### 1. Minimize Overrides
-
-Use overrides sparingly for special cases only:
-
-```yaml
-# Good: Override only when necessary
-podTemplateOverrides:
-  - targetReplicatedJob: node
-    replicaIndex: 0  # Only master node
-
-# Avoid: Overriding every replica
-podTemplateOverrides:
-  - targetReplicatedJob: node
-    replicaIndex: 0
-  - targetReplicatedJob: node
-    replicaIndex: 1
-  # ... etc (consider creating a custom runtime instead)
-```
-
-### 2. Document Override Reasons
-
-```yaml
-podTemplateOverrides:
-  - targetReplicatedJob: node
-    replicaIndex: 0
-    # Reason: Master node requires more memory for gradient aggregation
-    podTemplateSpec:
-      spec:
-        containers:
-          - name: trainer
-            resources:
-              limits:
-                memory: "64Gi"
-```
-
-### 3. Use Labels for Identification
-
-```yaml
-podTemplateOverrides:
-  - targetReplicatedJob: node
-    replicaIndex: 0
-    podTemplateSpec:
-      metadata:
-        labels:
-          role: master
-          debug: enabled
-```
-
-### 4. Test with Small Node Counts
-
-Validate overrides with minimal replicas first:
-
-```yaml
-trainer:
-  numNodes: 2  # Test with 2 nodes first
-podTemplateOverrides:
-  - replicaIndex: 0
-    # Test override logic
-```
-
-### 5. Use Override Templates
-
-Create reusable override patterns:
-
-```yaml
-# Common pattern for master node
-podTemplateOverrides:
-  - targetReplicatedJob: node
-    replicaIndex: 0
-    podTemplateSpec: &master-config
-      spec:
-        containers:
-          - name: trainer
-            resources:
-              limits:
-                memory: "64Gi"
-```
-
-## Troubleshooting
-
-### Override Not Applied
-
-**Check TrainJob status:**
-```bash
-kubectl describe trainjob <job-name>
-```
-
-Look for validation errors in events.
-
-**Verify pod configuration:**
-```bash
-kubectl get pod <pod-name> -o yaml
-```
-
-Compare with expected override values.
-
-### Wrong Pod Affected
-
-**Check replica index:**
-```bash
-# List pods with indices
-kubectl get pods -l trainer.kubeflow.org/job-name=<job-name> \
-  --sort-by=.metadata.name
-```
-
-Pods are typically named `<job-name>-node-<index>-0-<hash>`.
-
-### Resource Conflicts
-
-**Check resource requests vs limits:**
-```yaml
-resources:
-  requests:
-    memory: "32Gi"
-  limits:
-    memory: "16Gi"  # ERROR: limit < request
-```
-
-**Solution:** Ensure limits >= requests.
-
-## Next Steps
-
-- [Job Templates](job-template) - Configure JobSet structure
-- [Training Runtimes](runtime) - Define base runtime templates
-- [ML Policies](ml-policy) - Configure ML-specific settings
+Users also can't override `command`, `args`, `image`, and `resources` for the Trainer container in the `node` replicatedJob using `PodTemplateOverrides`.

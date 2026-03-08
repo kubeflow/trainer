@@ -1,99 +1,83 @@
-# Job Templates
+# Job Template
 
-Job templates define how Kubeflow Trainer orchestrates training workloads using JobSet specifications. They control the structure, dependencies, and execution patterns of training jobs.
+This guide describes how to configure
+[the `Template` API](https://pkg.go.dev/github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1#JobSetTemplateSpec)
+in the Kubeflow Trainer Runtimes.
 
-## Overview
+Before exploring this guide, make sure to follow [the Runtime guide](runtime)
+to understand the basics of Kubeflow Trainer Runtimes.
 
-Job templates in Kubeflow Trainer use the [JobSet API](https://github.com/kubernetes-sigs/jobset) to coordinate multiple replicated jobs. The Trainer controller generates JobSet instances based on:
+## Template Overview
 
-- TrainJob specification
-- TrainingRuntime template
-- ML policy configuration
-- Dataset and model initializers
+The `Template` API defines [the JobSet template](https://jobset.sigs.k8s.io/docs/overview/) used
+to orchestrate resources for a TrainJob. Kubeflow Trainer controller
+manager creates the appropriate JobSet based on the TrainJob specification, the `Template`,
+and additional runtime configurations such as `PodGroupPolicy` and `MLPolicy`.
 
-## JobSet Structure
-
-A runtime's template defines one or more replicated jobs:
-
-```yaml
-spec:
-  template:
-    spec:
-      replicatedJobs:
-        - name: node
-          replicas: 1  # Overridden by ML policy numNodes
-          template:
-            spec:
-              completions: 1
-              parallelism: 1
-              template:
-                metadata:
-                  labels:
-                    trainer.kubeflow.org/job-role: trainer
-                spec:
-                  restartPolicy: Never
-                  containers:
-                    - name: trainer
-                      image: pytorch/pytorch:2.5.1
-                      command: ["torchrun", "train.py"]
-```
-
-## Required Ancestor Labels
-
-Each replicated job must include an ancestor label for value injection:
-
-### Trainer Jobs
+For each `ReplicatedJobs`, you can provide detailed settings, like
+[the Job specification](https://kubernetes.io/docs/concepts/workloads/controllers/job/),
+container image, commands, and resource requirements:
 
 ```yaml
-metadata:
-  labels:
-    trainer.kubeflow.org/trainjob-ancestor-step: trainer
+template:
+  spec:
+    replicatedJobs:
+      - name: node
+        template:
+          spec:
+            template:
+              spec:
+                containers:
+                  - name: node
+                    image: pytorch/pytorch:1.9.0-cuda11.1-cudnn8-runtime
+                    command: ["python", "/path/to/train.py"]
+                    resources:
+                      requests:
+                        cpu: "2"
+                        memory: "4Gi"
+                      limits:
+                        nvidia.com/gpu: "1"
 ```
 
-This label enables the controller to inject values from the TrainJob's `trainer` section into the corresponding replicated job.
+### Ancestor Label Requirement
 
-### Dataset Initializers
+When defining `ReplicatedJobs` such as `dataset-initializer`, `model-initializer`, and `node`,
+it is important to ensure that each job template includes the appropriate ancestor labels.
+These labels are used by the Kubeflow Trainer controller to inject values from the parent
+TrainJob into the corresponding `ReplicatedJob`:
 
-```yaml
-metadata:
-  labels:
-    trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
-```
+- Values from [the TrainJob's `.spec.trainer`](https://pkg.go.dev/github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1#Trainer)
 
-Used for jobs that initialize datasets before training.
+  ```yaml
+  trainer.kubeflow.org/trainjob-ancestor-step: trainer
+  ```
 
-### Model Initializers
+- Values from [the TrainJob's `.spec.initializer.dataset`](https://pkg.go.dev/github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1#DatasetInitializer)
 
-```yaml
-metadata:
-  labels:
-    trainer.kubeflow.org/trainjob-ancestor-step: model-initializer
-```
+  ```yaml
+  trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
+  ```
 
-Used for jobs that download or prepare models before training.
+- Values from [the TrainJob's `.spec.initializer.model`](https://pkg.go.dev/github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1#ModelInitializer)
 
-## Complete Runtime Example
+  ```yaml
+  trainer.kubeflow.org/trainjob-ancestor-step: model-initializer
+  ```
 
-Here's a complete runtime with dataset initializer, model initializer, and trainer:
+The complete example might look as follows:
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
-  name: torch-with-initializers
+  name: example-runtime
   labels:
-    trainer.kubeflow.org/framework: torch
+    trainer.kubeflow.org/framework: mlx
 spec:
-  mlPolicy:
-    numNodes: 1
-    torch:
-      numProcPerNode: auto
   template:
     spec:
       replicatedJobs:
-        # Dataset Initializer
         - name: dataset-initializer
-          replicas: 1
           template:
             metadata:
               labels:
@@ -101,21 +85,13 @@ spec:
             spec:
               template:
                 spec:
-                  restartPolicy: Never
                   containers:
                     - name: dataset-initializer
-                      image: kubeflow/dataset-initializer:latest
-                      volumeMounts:
-                        - name: dataset
-                          mountPath: /data
-                  volumes:
-                    - name: dataset
-                      persistentVolumeClaim:
-                        claimName: shared-dataset
-
-        # Model Initializer
+                      image: ghcr.io/kubeflow/trainer/dataset-initializer
         - name: model-initializer
-          replicas: 1
+          dependsOn:
+            - name: dataset-initializer
+              status: Complete
           template:
             metadata:
               labels:
@@ -123,20 +99,13 @@ spec:
             spec:
               template:
                 spec:
-                  restartPolicy: Never
                   containers:
                     - name: model-initializer
-                      image: kubeflow/model-initializer:latest
-                      volumeMounts:
-                        - name: model
-                          mountPath: /model
-                  volumes:
-                    - name: model
-                      persistentVolumeClaim:
-                        claimName: shared-model
-
-        # Training Job
-        - name: node
+                      image: ghcr.io/kubeflow/trainer/model-initializer
+        - name: launcher
+          dependsOn:
+            - name: model-initializer
+              status: Complete
           template:
             metadata:
               labels:
@@ -144,289 +113,29 @@ spec:
             spec:
               template:
                 spec:
-                  restartPolicy: OnFailure
                   containers:
-                    - name: trainer
-                      volumeMounts:
-                        - name: dataset
-                          mountPath: /data
-                          readOnly: true
-                        - name: model
-                          mountPath: /model
-                          readOnly: true
-                  volumes:
-                    - name: dataset
-                      persistentVolumeClaim:
-                        claimName: shared-dataset
-                    - name: model
-                      persistentVolumeClaim:
-                        claimName: shared-model
-```
-
-## Job Dependencies
-
-JobSet supports dependencies between replicated jobs using `successPolicy`:
-
-```yaml
-spec:
-  template:
-    spec:
-      successPolicy:
-        operator: All
-        targetReplicatedJobs:
-          - trainer
-      replicatedJobs:
-        - name: dataset-initializer
-          # Runs first
-        - name: trainer
-          # Runs after dataset-initializer completes
-```
-
-## Resource Configuration
-
-### Per-Container Resources
-
-```yaml
-replicatedJobs:
-  - name: node
-    template:
-      spec:
-        template:
-          spec:
-            containers:
-              - name: trainer
-                resources:
-                  requests:
-                    cpu: "4"
-                    memory: "16Gi"
-                    nvidia.com/gpu: "1"
-                  limits:
-                    cpu: "8"
-                    memory: "32Gi"
-                    nvidia.com/gpu: "1"
-```
-
-### Shared Volumes
-
-```yaml
-spec:
-  template:
-    spec:
-      replicatedJobs:
+                    - name: node
+                      image: ghcr.io/kubeflow/trainer/mlx-runtime
+                      securityContext:
+                        runAsUser: 1000
         - name: node
           template:
             spec:
               template:
                 spec:
-                  volumes:
-                    - name: dshm
-                      emptyDir:
-                        medium: Memory
-                        sizeLimit: 8Gi
-                    - name: dataset
-                      persistentVolumeClaim:
-                        claimName: training-data
                   containers:
-                    - name: trainer
-                      volumeMounts:
-                        - name: dshm
-                          mountPath: /dev/shm
-                        - name: dataset
-                          mountPath: /data
+                    - name: node
+                      image: ghcr.io/kubeflow/trainer/mlx-runtime
+                      securityContext:
+                        runAsUser: 1000
+                      command:
+                        - /usr/sbin/sshd
+                      args:
+                        - -De
+                        - -f
+                        - /home/mpiuser/.sshd_config
+                      readinessProbe:
+                        tcpSocket:
+                          port: 2222
+                        initialDelaySeconds: 5
 ```
-
-## Advanced Patterns
-
-### Multi-Role Training
-
-Define separate launcher and worker roles:
-
-```yaml
-spec:
-  template:
-    spec:
-      replicatedJobs:
-        - name: launcher
-          replicas: 1
-          template:
-            metadata:
-              labels:
-                trainer.kubeflow.org/job-role: launcher
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: launcher
-                      command: ["mpirun", "-np", "4", "python", "train.py"]
-
-        - name: worker
-          replicas: 4
-          template:
-            metadata:
-              labels:
-                trainer.kubeflow.org/job-role: worker
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: worker
-                      command: ["sleep", "infinity"]
-```
-
-### Init Containers
-
-```yaml
-replicatedJobs:
-  - name: node
-    template:
-      spec:
-        template:
-          spec:
-            initContainers:
-              - name: setup
-                image: busybox
-                command:
-                  - sh
-                  - -c
-                  - |
-                    echo "Preparing environment..."
-                    mkdir -p /workspace/logs
-                volumeMounts:
-                  - name: workspace
-                    mountPath: /workspace
-            containers:
-              - name: trainer
-                volumeMounts:
-                  - name: workspace
-                    mountPath: /workspace
-            volumes:
-              - name: workspace
-                emptyDir: {}
-```
-
-### Sidecar Containers
-
-```yaml
-replicatedJobs:
-  - name: node
-    template:
-      spec:
-        template:
-          spec:
-            containers:
-              - name: trainer
-                ports:
-                  - containerPort: 29500
-                    name: master
-
-              - name: metrics-exporter
-                image: prom/node-exporter:latest
-                ports:
-                  - containerPort: 9100
-                    name: metrics
-
-              - name: log-shipper
-                image: fluent/fluent-bit:latest
-                volumeMounts:
-                  - name: logs
-                    mountPath: /logs
-                    readOnly: true
-            volumes:
-              - name: logs
-                emptyDir: {}
-```
-
-## Best Practices
-
-### 1. Use Restart Policies Appropriately
-
-```yaml
-# Training pods - retry on failure
-spec:
-  restartPolicy: OnFailure
-
-# Initializer pods - don't retry
-spec:
-  restartPolicy: Never
-```
-
-### 2. Set Resource Limits
-
-```yaml
-resources:
-  requests:
-    cpu: "4"
-    memory: "16Gi"
-  limits:
-    cpu: "8"
-    memory: "32Gi"
-```
-
-### 3. Use Labels for Organization
-
-```yaml
-metadata:
-  labels:
-    trainer.kubeflow.org/job-role: trainer
-    app.kubernetes.io/component: training
-    app.kubernetes.io/part-of: ml-pipeline
-```
-
-### 4. Configure Shared Memory
-
-```yaml
-volumes:
-  - name: dshm
-    emptyDir:
-      medium: Memory
-      sizeLimit: 8Gi
-```
-
-### 5. Add Health Checks
-
-```yaml
-containers:
-  - name: trainer
-    livenessProbe:
-      exec:
-        command:
-          - python
-          - -c
-          - "import torch; assert torch.cuda.is_available()"
-      initialDelaySeconds: 60
-      periodSeconds: 30
-```
-
-## Troubleshooting
-
-### Jobs Not Starting
-
-Check the JobSet status:
-
-```bash
-kubectl get jobset -l trainer.kubeflow.org/trainjob-name=<job-name>
-kubectl describe jobset <jobset-name>
-```
-
-### Pods Pending
-
-```bash
-kubectl get pods -l trainer.kubeflow.org/job-name=<job-name>
-kubectl describe pod <pod-name>
-```
-
-Look for resource constraints or scheduling issues.
-
-### Wrong Number of Replicas
-
-Verify ML policy configuration:
-
-```bash
-kubectl get trainjob <job-name> -o jsonpath='{.spec.trainer.numNodes}'
-```
-
-## Next Steps
-
-- [ML Policies](ml-policy) - Configure ML-specific settings
-- [Pod Templates](pod-template) - Override pod configurations
-- [Training Runtimes](runtime) - Complete runtime definitions
