@@ -226,6 +226,32 @@ PAPERMILL_TIMEOUT=900
 test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
 	NOTEBOOK_INPUT=$(NOTEBOOK_INPUT) NOTEBOOK_OUTPUT=$(NOTEBOOK_OUTPUT) PAPERMILL_PARAMS="$(PAPERMILL_PARAMS)" PAPERMILL_TIMEOUT=$(PAPERMILL_TIMEOUT) ./hack/e2e-run-notebook.sh
 
+##@ Documentation
+
+.PHONY: docs
+docs: ## Build HTML documentation locally
+	cd docs && $(MAKE) html
+
+.PHONY: docs-linkcheck
+docs-linkcheck: ## Check all links in documentation
+	cd docs && $(MAKE) linkcheck
+
+.PHONY: docs-api-reference
+docs-api-reference: ## Generate CRD API reference documentation
+	@echo "Generating CRD API reference (crddoc)"
+	@# TODO: Install and run crddoc when ready
+	@# For now, create placeholder files to avoid breaking the build
+	@mkdir -p docs/api-reference/crd-types
+	@echo "CRD API reference generation not yet implemented" > docs/api-reference/crd-types/.placeholder
+
+.PHONY: docs-clean
+docs-clean: ## Remove documentation build artifacts
+	cd docs && $(MAKE) clean
+
+.PHONY: docs-serve
+docs-serve: ## Build and serve documentation locally with live reload
+	cd docs && $(MAKE) serve
+
 ##@ Helm
 
 TARGET_BRANCH ?= master
