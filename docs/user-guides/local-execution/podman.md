@@ -657,7 +657,7 @@ job_id = client.train(
 ### Complete Examples
 
 - **[MNIST Classification](https://github.com/kubeflow/trainer/tree/master/examples/pytorch/mnist)**: Complete notebook with Podman backend
-- **Distributed CNN Training**: See [complete example](#complete-training-example) above
+- **Distributed CNN Training**: See [complete example](#podman-complete-training-example) above
 
 ### API Documentation
 
