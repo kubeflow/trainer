@@ -21,43 +21,20 @@ set -o nounset
 set -o pipefail
 set -x
 
-# ---------------------------------------------------------
-# 1. Parse Arguments
-# ---------------------------------------------------------
-GPU_CLUSTER=false
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --gpu-cluster)
-      GPU_CLUSTER=true
-      shift
-      ;;
-    *)
-      shift
-      ;;
-  esac
-done
-
 # Source container runtime utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/scripts/container-runtime.sh"
 source "${SCRIPT_DIR}/scripts/load-image-to-kind.sh"
 
+# Setup container runtime
 setup_container_runtime
 
 # Configure variables.
+KIND=${KIND:-./bin/kind}
 K8S_VERSION=${K8S_VERSION:-1.32.0}
 KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
 NAMESPACE="kubeflow-system"
 TIMEOUT="5m"
-
-if [ "$GPU_CLUSTER" = true ]; then
-  CLUSTER_NAME="kind-gpu"
-  GPU_OPERATOR_VERSION="v25.3.2"
-  NVKIND_BIN="/root/go/bin/nvkind"
-else
-  CLUSTER_NAME="kind"
-  KIND=${KIND:-./bin/kind}
-fi
 
 # Kubeflow Trainer images.
 # TODO (andreyvelich): Support initializers images.
@@ -67,80 +44,12 @@ CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CONTROLLER_MA
 echo "Build Kubeflow Trainer images"
 ${CONTAINER_RUNTIME} build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
 
-if [ "$GPU_CLUSTER" = true ]; then
-  DATASET_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/dataset-initializer"
-  DATASET_INITIALIZER_CI_IMAGE="${DATASET_INITIALIZER_CI_IMAGE_NAME}:${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
-  ${CONTAINER_RUNTIME} build . -f cmd/initializers/dataset/Dockerfile -t ${DATASET_INITIALIZER_CI_IMAGE}
-
-  MODEL_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/model-initializer"
-  MODEL_INITIALIZER_CI_IMAGE="${MODEL_INITIALIZER_CI_IMAGE_NAME}:${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
-  ${CONTAINER_RUNTIME} build . -f cmd/initializers/model/Dockerfile -t ${MODEL_INITIALIZER_CI_IMAGE}
-
-  TRAINER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/torchtune-trainer"
-  TRAINER_CI_IMAGE="${TRAINER_CI_IMAGE_NAME}:${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
-  ${CONTAINER_RUNTIME} build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_CI_IMAGE}
-fi
-
-# Create Cluster & Configure Environment
-if [ "$GPU_CLUSTER" = true ]; then
-  # Configure NVIDIA runtime.
-  sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
-  sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
-  sudo systemctl restart docker
-
-  # Create a Kind cluster with GPU support.
-  sudo "$NVKIND_BIN" cluster create --name "${CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
-  sudo "$NVKIND_BIN" cluster print-gpus
-
-  # Make kubeconfig available to non-root user
-  mkdir -p "$HOME/.kube"
-  sudo cp /root/.kube/config "$HOME/.kube/config"
-  sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
-  export KUBECONFIG="$HOME/.kube/config"
-else
-  echo "Create standard Kind cluster"
-  ${KIND} create cluster --name "${CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
-fi
-
-# Install GPU Operator (GPU Only)
-if [ "$GPU_CLUSTER" = true ]; then
-  echo "Installing NVIDIA GPU Operator"
-  kubectl create ns gpu-operator
-  kubectl label --overwrite ns gpu-operator pod-security.kubernetes.io/enforce=privileged
-
-  export HELM_CONFIG_HOME="$HOME/.config/helm"
-  export HELM_CACHE_HOME="$HOME/.cache/helm"
-  export HELM_DATA_HOME="$HOME/.local/share/helm"
-  mkdir -p "$HELM_CONFIG_HOME" "$HELM_CACHE_HOME" "$HELM_DATA_HOME"
-
-  helm repo add nvidia https://helm.ngc.nvidia.com/nvidia && helm repo update
-  helm install --wait --generate-name \
-    -n gpu-operator --create-namespace \
-    nvidia/gpu-operator \
-    --version="${GPU_OPERATOR_VERSION}" \
-    --set driver.enabled=false
-
-  # Validation steps
-  kubectl get ns gpu-operator --show-labels | grep pod-security.kubernetes.io/enforce=privileged
-  helm list -n gpu-operator
-  kubectl get pods -n gpu-operator -o name | while read pod; do
-    kubectl wait --for=condition=Ready --timeout=180s "$pod" -n gpu-operator || echo "$pod failed to become Ready"
-  done
-  kubectl get nodes -o=custom-columns=NAME:.metadata.name,GPU:'.status.allocatable.nvidia\.com/gpu'
-fi
+echo "Create Kind cluster and load Kubeflow Trainer images"
+${KIND} create cluster --image "${KIND_NODE_VERSION}"
 
 # Load Trainer controller manager image in KinD
-echo "Load Kubeflow Trainer images"
-load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${CLUSTER_NAME}"
+load_image_to_kind ${CONTROLLER_MANAGER_CI_IMAGE}
 
-if [ "$GPU_CLUSTER" = true ]; then
-  echo "Load Kubeflow Trainer initializers images"
-  load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
-  load_image_to_kind "${MODEL_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
-  load_image_to_kind "${TRAINER_CI_IMAGE}" "${CLUSTER_NAME}"
-fi
-
-# Deploy Control Plane
 echo "Deploy Kubeflow Trainer control plane"
 E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
 mkdir -p "${E2E_MANIFESTS_DIR}"
@@ -176,41 +85,12 @@ print_cluster_info() {
 }
 
 # TODO (andreyvelich): Currently, we print manager logs due to flaky test.
-# Deploy Runtimes
-if [ "$GPU_CLUSTER" = true ]; then
-  E2E_RUNTIMES_DIR="artifacts/e2e/runtimes"
-  mkdir -p "${E2E_RUNTIMES_DIR}"
-  cat <<EOF >"${E2E_RUNTIMES_DIR}/kustomization.yaml"
-    apiVersion: kustomize.config.k8s.io/v1beta1
-    kind: Kustomization
-    resources:
-    - ../../../manifests/overlays/runtimes
-    images:
-    - name: "${DATASET_INITIALIZER_CI_IMAGE_NAME}"
-      newTag: "${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
-    - name: "${MODEL_INITIALIZER_CI_IMAGE_NAME}"
-      newTag: "${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
-    - name: "${TRAINER_CI_IMAGE_NAME}"
-      newTag: "${CONTROLLER_MANAGER_CI_IMAGE_TAG}"
-EOF
-  kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
-    kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
-      print_cluster_info &&
-      exit 1
-  )
-
-  # hotfix: patch CRDs to run on GPU nodes
-  echo "Patch CRDs to run on GPU nodes"
-  kubectl get clustertrainingruntimes -o json | jq '
-    .items[].spec.template.spec.replicatedJobs[].template.spec.template.spec.runtimeClassName = "nvidia"
-  ' | kubectl apply -f -
-else
-  kubectl apply --server-side -k manifests/overlays/runtimes || (
-    kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
-      print_cluster_info &&
-      exit 1
-  )
-fi
+echo "Deploy Kubeflow Trainer runtimes"
+kubectl apply --server-side -k manifests/overlays/runtimes || (
+  kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
+    print_cluster_info &&
+    exit 1
+)
 
 # hotfix(jaiakash) - skip pre-load due to kind failure
 # # TODO (andreyvelich): We should build runtime images before adding them.
