@@ -2,14 +2,13 @@ name: E2E Tests
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, labeled]
 
 permissions:
   contents: read
   pull-requests: read
 
 jobs:
-  e2e-test:
+  cpu-e2e-test:
     name: CPU E2E Test
     runs-on: oracle-vm-16cpu-64gb-x86-64
     env:
@@ -78,6 +77,7 @@ jobs:
 
   gpu-e2e-test:
     name: GPU E2E Test
+    timeout-minutes: 120
     runs-on:
       labels: oracle-vm-gpu-a10-2
       group: GPUs
@@ -115,8 +115,10 @@ jobs:
           pip install git+https://github.com/kubeflow/sdk.git@main
 
       - name: Setup GPU cluster with nvkind
+        env:
+          GPU_CLUSTER: "true"
         run: |
-          make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
+          make test-e2e-setup-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
 
       - name: Run e2e test on GPU cluster
         run: |
@@ -126,7 +128,7 @@ jobs:
 
       - name: Upload Artifacts to GitHub
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: gpu-${{ matrix.kubernetes-version }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
