@@ -42,7 +42,18 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+
+	_ "embed"
 )
+
+//go:embed templates/broker.toml
+var brokerTemplate string
+
+//go:embed templates/entrypoint.sh
+var entrypointTemplate string
+
+//go:embed templates/init.sh
+var initTemplate string
 
 // We can customize not easily exposed MiniCluster attributes with envars
 var (
@@ -352,34 +363,8 @@ func generateBrokerConfig(
 	defaultBind := "tcp://" + networkDevice + ":%p"
 	defaultConnect := "tcp://%h" + fmt.Sprintf(".%s:", fqdn) + "%p"
 
-	// The Flux broker configuration for the Flux Framework HPC cluster
-	template := `[access]
-allow-guest-user = true
-allow-root-owner = true
-
-# Point to resource definition generated with flux-R(1).
-[resource]
-path = "/mnt/flux/config/etc/flux/system/R"
-
-[bootstrap]
-curve_cert = "/mnt/flux/config/etc/curve/curve.cert"
-default_port = 8050
-default_bind = "%s"
-default_connect = "%s"
-hosts = [
-{ host="%s"},
-]
-
-[archive]
-dbpath = "/mnt/flux/config/var/lib/flux/job-archive.sqlite"
-period = "1m"
-busytimeout = "50s"
-
-[sched-fluxion-qmanager]
-queue-policy = "%s"
-`
 	return fmt.Sprintf(
-		template,
+		brokerTemplate,
 		defaultBind,
 		defaultConnect,
 		hosts,
@@ -438,151 +423,7 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 		tasks = fmt.Sprintf("%s -g %d", tasks, gpus)
 	}
 
-	// TODO we can set strict mode as an option
-	script := `#!/bin/sh
-
-fluxuser=$(whoami)
-fluxuid=$(id -u $fluxuser)
-
-# Ensure spack view is on the path, wherever it is mounted
-viewbase="/mnt/flux"
-viewroot=${viewbase}/view
-configroot=${viewbase}/config
-software="${viewbase}/software"
-viewbin="${viewroot}/bin"
-fluxpath=${viewbin}/flux
-
-# Important to add AFTER in case software in container duplicated (e.g., Python)
-export PATH=$PATH:${viewbin}
-
-# Copy mount software to /opt/software
-cp -R ${viewbase}/software/* /opt/software/
-
-# Flux should use the Python with its install
-foundroot=$(find $viewroot -maxdepth 2 -type d -path $viewroot/lib/python3\*) > /dev/null 2>&1
-pythonversion=$(basename ${foundroot})
-pythonversion=${viewroot}/bin/${pythonversion}
-echo "Python version: $pythonversion"
-echo "Python root: $foundroot"
-
-# If we found the right python, ensure it's linked (old link does not work)
-if [[ -f "${pythonversion}" ]]; then
-   rm -rf $viewroot/bin/python3
-   rm -rf $viewroot/bin/python
-   ln -s ${pythonversion} $viewroot/lib/python  || true
-   ln -s ${pythonversion} $viewroot/lib/python3 || true
-fi
-
-# Ensure we have flux's python on the path
-export PYTHONPATH=${PYTHONPATH:-""}:${foundroot}/site-packages
-export FLUX_RC_EXTRA=$viewroot/etc/flux/rc1.d
-
-# Write a script to load fluxion
-cat <<EOT >> /tmp/load-fluxion.sh
-flux module remove sched-simple
-flux module load sched-fluxion-resource
-flux module load sched-fluxion-qmanager
-EOT
-mv /tmp/load-fluxion.sh ${viewbase}/load-fluxion.sh
-
-# Write an easy file we can source for the environment
-cat <<EOT >> /tmp/flux-view.sh
-#!/bin/bash
-export PATH=$PATH
-export PYTHONPATH=$PYTHONPATH
-export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-""}:$viewroot/lib
-export fluxsocket=local://${configroot}/run/flux/local
-EOT
-mv /tmp/flux-view.sh ${viewbase}/flux-view.sh
-
-# Variables we can use again
-cfg="${configroot}/etc/flux/config"
-command="$@"
-
-# Copy mounted curve to expected location
-curvepath=/mnt/flux/config/etc/curve/curve.cert
-cp /curve/curve.cert ${curvepath}
-
-# Remove group and other read
-chmod o-r ${curvepath}
-chmod g-r ${curvepath}
-chown -R ${fluxuid} ${curvepath}
-
-# Generate host resources
-hosts=$(cat ${configroot}/etc/flux/system/hostlist)
-flux R encode --hosts=${hosts} --local > /tmp/R
-mv /tmp/R ${configroot}/etc/flux/system/R
-
-# Put the state directory in /var/lib on shared view
-export STATE_DIR=${configroot}/var/lib/flux
-export FLUX_OUTPUT_DIR=/tmp/fluxout
-mkdir -p ${STATE_DIR} ${FLUX_OUTPUT_DIR}
-
-# Main host <name>-0 and the fully qualified domain name
-mainHost="%s"
-workdir=$(pwd)
-
-# Make cron.d directory
-mkdir -p ${configroot}/etc/flux/system/cron.d
-brokerOptions="-Scron.directory=${configroot}/etc/flux/system/cron.d \
-  -Stbon.fanout=256 \
-  -Srundir=${configroot}/run/flux  \
-  -Sstatedir=${STATE_DIR} -Slocal-uri=local://$configroot/run/flux/local \
-  -Slog-stderr-level=0  \
-  -Slog-stderr-mode=local"
-
-# Run an interactive cluster, giving no command to flux start
-run_interactive_cluster() {
-    echo "🌀 flux broker --config-path ${cfg} ${brokerOptions}"
-    flux broker --config-path ${cfg} ${brokerOptions}
-}
-
-# Start flux with the original entrypoint
-if [ "$(hostname)" = "${mainHost}" ]; then
-
-  echo "Command provided is: ${command}"
-  if [ -z "${command}" ]; then
-    run_interactive_cluster
-  else
-
-    # If tasks are == 0, then only define nodes
-    flags="%s  "
-    echo "Flags for flux are ${flags}"
-    echo "🌀 flux start  -o --config ${cfg} ${brokerOptions} flux submit ${flags} --quiet --watch ${command}"
-	flux start  -o --config ${cfg} ${brokerOptions} flux run ${flags} ${command}
-  fi
-
-# Block run by workers
-else
-
-    # We basically sleep/wait until the lead broker is ready
-    echo "🌀 flux start  -o --config ${configroot}/etc/flux/config ${brokerOptions}"
-
-    # We can keep trying forever, don't care if worker is successful or not
-    # Unless retry count is set, in which case we stop after retries
-    while true
-    do
-        flux start -o --config ${configroot}/etc/flux/config ${brokerOptions}
-        retval=$?
-        if [[ "${retval}" -eq 0 ]] || [[ "false" == "true" ]]; then
-             echo "The follower worker exited cleanly. Goodbye!"
-             break
-        fi
-        echo "Return value for follower worker is ${retval}"
-        echo "😪 Sleeping 15s to try again..."
-        sleep 15
-    done
-fi
-
-# Marker of completion, if needed
-touch $viewbase/flux-operator-complete.txt
-`
-
-	return fmt.Sprintf(
-		script,
-		mainHost,
-		tasks,
-	)
+	return fmt.Sprintf(entrypointTemplate, mainHost, tasks)
 }
 
 // generateInitEntrypoint generates the flux entrypoint to prepare flux
@@ -596,80 +437,14 @@ func generateInitEntrypoint(
 	// github.com:converged-computing/flux-views.git
 	fluxRoot := "/opt/view"
 	mainHost := fmt.Sprintf("%s-0", trainJob.Name)
+	size := *trainJob.Spec.Trainer.NumNodes
 
 	// Generate hostlists. The hostname (prefix) is the trainJob Name
-	// We need the initial jobset size, and container command
-	size := *trainJob.Spec.Trainer.NumNodes
+	// We need the initial jobset size, and container command	size := *trainJob.Spec.Trainer.NumNodes
 	hosts := generateHostlist(trainJob.Name, size)
 	brokerConfig := generateBrokerConfig(trainJob, hosts, settings)
-	setup := `#!/bin/sh
-fluxroot=%s
-mainHost=%s
 
-# We need to "install" config assets separately. We may not have write to /opt/view.
-installRoot=/mnt/flux/config
-echo "Hello I am hostname $(hostname) running setup."
-
-# Always use verbose, no reason to not here
-echo "Flux install root: ${fluxroot}"
-export fluxroot
-
-# Add flux to the path (if using view)
-export PATH=/opt/view/bin:$PATH
-
-# If the view doesn't exist, ensure basic paths do
-mkdir -p $fluxroot/bin
-
-# Cron directory
-mkdir -p $installRoot/etc/flux/system/cron.d
-mkdir -p $installRoot/var/lib/flux
-
-# These actions need to happen on all hosts
-mkdir -p $installRoot/etc/flux/system
-hosts="%s"
-
-# Echo hosts here in case the main container needs to generate
-echo "${hosts}" > ${installRoot}/etc/flux/system/hostlist
-
-# Write the broker configuration
-mkdir -p ${installRoot}/etc/flux/config
-cat <<EOT >> ${installRoot}/etc/flux/config/broker.toml
-%s
-EOT
-
-echo
-echo "🐸 Broker Configuration"
-cat ${installRoot}/etc/flux/config/broker.toml
-
-# The rundir needs to be created first, and owned by user flux
-# Along with the state directory and curve certificate
-mkdir -p ${installRoot}/run/flux ${installRoot}/etc/curve
-
-viewroot=/mnt/flux
-mkdir -p $viewroot/view
-
-# Now prepare to copy finished spack view over
-echo "Moving content from /opt/view to be in shared volume at $viewroot"
-# Note that /opt/view is a symlink to here
-view=$(ls /opt/views/._view/)
-view="/opt/views/._view/${view}"
-
-# We have to move both of these paths - spack makes link to /opt/software
-# /opt/software will need to be restored in application container
-cp -R ${view}/* $viewroot/view
-cp -R /opt/software $viewroot/
-
-# This is a marker to indicate the copy is done
-touch $viewroot/flux-operator-done.txt
-echo "Application is done."
-`
-	return fmt.Sprintf(
-		setup,
-		fluxRoot,
-		mainHost,
-		hosts,
-		brokerConfig,
-	)
+	return fmt.Sprintf(initTemplate, fluxRoot, mainHost, hosts, brokerConfig)
 }
 
 // generateHostlist for a specific size given a host prefix and a size
@@ -714,6 +489,7 @@ func encodeZ85(data []byte) string {
 
 // buildCurveSecret generates a cluster wide curve certificate for flux
 func (f *Flux) buildCurveSecret(trainJob *trainer.TrainJob) (*corev1ac.SecretApplyConfiguration, error) {
+
 	// Generate a deterministic Secret Key from the UID
 	secretSeed := sha256.Sum256([]byte(trainJob.UID))
 
