@@ -75,9 +75,6 @@ var (
 		"FLUX_QUEUE_POLICY":   constants.FluxQueuePolicy,
 		// Extra flux or broker options can be added as needed.
 	}
-
-	// Persist throughput, and can be inspected / use by other controllers
-	AnnotationOriginalCommand = "flux.kubeflow.org/original-command"
 )
 
 var _ framework.CustomValidationPlugin = (*Flux)(nil)
