@@ -183,6 +183,8 @@ type Initializer struct {
 // which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
 type DatasetInitializer struct {
 	// storageUri is the URI for the dataset provider.
+	// Should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path)
+    // +kubebuilder:validation:Pattern=`^[a-zA-Z0-9+\-]+://.+|^/.*$`
 	// +optional
 	StorageUri *string `json:"storageUri,omitempty"`
 
@@ -291,6 +293,7 @@ type PodTemplateOverride struct {
 type PodTemplateOverrideTargetJob struct {
 	// name is the target training job name for which the PodTemplateSpec is overridden.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
 	// +required
 	Name string `json:"name,omitempty"`
 }
