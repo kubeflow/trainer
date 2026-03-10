@@ -77,40 +77,37 @@ table.docutils td {
     margin: 2rem 0;
 }
 
-.doc-card {
+a.doc-card {
     border: 1px solid var(--color-foreground-border);
     border-radius: 8px;
     padding: 1.5rem;
     transition: all 0.2s ease;
     background-color: var(--color-background-secondary);
+    text-decoration: none;
+    display: block;
 }
 
-.doc-card:hover {
+a.doc-card:hover {
     border-color: var(--color-brand-primary);
     box-shadow: 0 4px 12px rgba(50, 108, 229, 0.15);
     transform: translateY(-2px);
+    text-decoration: none;
 }
 
-body[data-theme="dark"] .doc-card:hover {
+body[data-theme="dark"] a.doc-card:hover {
     box-shadow: 0 4px 12px rgba(91, 157, 241, 0.2);
 }
 
-.doc-card a.reference {
+a.doc-card strong {
     font-size: 1.25rem;
     font-weight: 600;
     color: var(--color-brand-primary);
-    text-decoration: none;
     display: block;
     margin-bottom: 0.5rem;
 }
 
-.doc-card a.reference:hover {
-    text-decoration: underline;
-}
-
-.doc-card .line-block {
+a.doc-card p {
     margin: 0;
-    padding: 0;
     color: var(--color-foreground-secondary);
     font-size: 0.95rem;
     line-height: 1.5;
