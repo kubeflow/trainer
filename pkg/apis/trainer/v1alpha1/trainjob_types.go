@@ -184,7 +184,7 @@ type Initializer struct {
 type DatasetInitializer struct {
 	// storageUri is the URI for the dataset provider.
 	// Should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path)
-    // +kubebuilder:validation:Pattern=`^[a-zA-Z0-9+\-]+://.+|^/.*$`
+    // +kubebuilder:validation:Pattern=`^([A-Za-z][A-Za-z0-9+.-]*://.+|/.*)$`
 	// +optional
 	StorageUri *string `json:"storageUri,omitempty"`
 
