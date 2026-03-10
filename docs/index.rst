@@ -8,32 +8,34 @@ Kubeflow Trainer
 Quick Links
 -----------
 
-.. container:: doc-cards
+.. raw:: html
 
-   .. container:: doc-card
-
-      :doc:`overview/index`
-         **Overview** - Learn about Kubeflow Trainer, who it's for, and why you should use it
-
-   .. container:: doc-card
-
-      :doc:`getting-started/index`
-         **Get started** with Kubeflow Trainer - Installation, first TrainJob, and quickstart tutorials
-
-   .. container:: doc-card
-
-      :doc:`user-guides/index`
-         **User Guides** - Documentation for AI practitioners and ML engineers using Kubeflow Trainer for distributed training
-
-   .. container:: doc-card
-
-      :doc:`operator-guides/index`
-         **Operator Guides** - Documentation for platform administrators deploying and managing Kubeflow Trainer
-
-   .. container:: doc-card
-
-      :doc:`contributor-guides/index`
-         **Contributor Guides** - Architecture, development workflow, and how to extend Kubeflow Trainer
+   <div class="doc-cards">
+     <a class="doc-card" href="overview/index.html">
+       <strong>Overview</strong>
+       <p>Learn about Kubeflow Trainer, who it's for, and why you should use it</p>
+     </a>
+     <a class="doc-card" href="getting-started/index.html">
+       <strong>Getting Started</strong>
+       <p>Installation, first TrainJob, and quickstart tutorials</p>
+     </a>
+     <a class="doc-card" href="user-guides/index.html">
+       <strong>User Guides</strong>
+       <p>Documentation for AI practitioners and ML engineers using Kubeflow Trainer</p>
+     </a>
+     <a class="doc-card" href="operator-guides/index.html">
+       <strong>Operator Guides</strong>
+       <p>Documentation for platform administrators deploying and managing Kubeflow Trainer</p>
+     </a>
+     <a class="doc-card" href="contributor-guides/index.html">
+       <strong>Contributor Guides</strong>
+       <p>Architecture, development workflow, and how to extend Kubeflow Trainer</p>
+     </a>
+     <a class="doc-card" href="api-reference/index.html">
+       <strong>API Reference</strong>
+       <p>CRD types, Python SDK, and complete API documentation</p>
+     </a>
+   </div>
 
 ----
 
@@ -41,6 +43,7 @@ Quick Links
    :hidden:
    :maxdepth: 3
 
+   Home <self>
    overview/index
    getting-started/index
    user-guides/index
@@ -55,9 +58,3 @@ Community & Support
 - **GitHub Repository**: `kubeflow/trainer <https://github.com/kubeflow/trainer>`_
 - **Slack**: `#kubeflow-training <https://kubeflow.slack.com/messages/kubeflow-training>`_
 - **Mailing List**: `kubeflow-discuss@googlegroups.com <https://groups.google.com/forum/#!forum/kubeflow-discuss>`_
-
-Indices and tables
-------------------
-
-* :ref:`genindex`
-* :ref:`search`
