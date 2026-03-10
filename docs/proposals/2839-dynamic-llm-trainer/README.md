@@ -22,13 +22,13 @@
     - [How TorchTune Is Wired Today](#how-torchtune-is-wired-today)
     - [SDK Coupling](#sdk-coupling)
     - [Why This Must Change](#why-this-must-change)
+  - [Relationship to KEP-285 (Specialized Trainer Abstractions)](#relationship-to-kep-285-specialized-trainer-abstractions)
   - [High-Level Design](#high-level-design)
     - [Architecture Overview](#architecture-overview)
     - [Component Interaction Flow](#component-interaction-flow)
     - [What Changes vs What Stays](#what-changes-vs-what-stays)
   - [Design Details](#design-details)
     - [Python SDK: `LLMBackend` Interface](#python-sdk-llmbackend-interface)
-    - [Python SDK: Backend Registry](#python-sdk-backend-registry)
     - [Python SDK: `TRLConfig`](#python-sdk-trlconfig)
     - [Python SDK: Integration into `KubernetesBackend`](#python-sdk-integration-into-kubernetesbackend)
     - [Go Control Plane: `LLMBackendStrategy` Interface](#go-control-plane-llmbackendstrategy-interface)
@@ -49,7 +49,10 @@
 Decouple the `BuiltinTrainer` from TorchTune by introducing a pluggable `LLMBackend`
 interface in the SDK and a corresponding `LLMBackendStrategy` in the Go control plane.
 TorchTune becomes the first backend implementation (preserving backward compatibility),
-and TRL is added as the first new backend with SFT/DPO support.
+and TRL is added as the first new backend with SFT/DPO support. Config-driven backends
+sit alongside [KEP-285](https://github.com/kubeflow/sdk/pull/308)'s function-based
+trainers as Tier 2 extensions; see
+[Relationship to KEP-285](#relationship-to-kep-285-specialized-trainer-abstractions).
 
 This builds on [KEP-2401](../2401-llm-trainer-v2/README.md) and the community consensus
 on "Plan 3" in [#2752](https://github.com/kubeflow/trainer/issues/2752).
@@ -58,14 +61,12 @@ TorchTune stopped adding features in July 2025
 
 ## Goals
 
-1. Define an `LLMBackend` abstract interface in the Python SDK.
-2. Implement a backend registry with `@register_backend` decorator.
-3. Refactor `TorchTuneConfig` to implement `LLMBackend` with zero breaking changes.
-4. Implement `TRLConfig` backend supporting SFT and DPO.
-5. Create TRL container image and `ClusterTrainingRuntime` manifests.
-6. Generalize the Go Torch plugin to dispatch via `LLMBackendStrategy` instead of
+1. Define an `LLMBackend` abstract interface in the Python SDK for config-driven trainers.
+2. Refactor `TorchTuneConfig` to implement `LLMBackend` with zero breaking changes.
+3. Implement `TRLConfig` backend supporting SFT and DPO.
+4. Create TRL container image and `ClusterTrainingRuntime` manifests.
+5. Generalize the Go Torch plugin to dispatch via `LLMBackendStrategy` instead of
    hardcoded TorchTune command-sniffing.
-7. Support external (out-of-tree) backend registration.
 
 ## Non-Goals
 
@@ -130,6 +131,29 @@ abstraction — adding a new backend means modifying this function and the type 
 
 ---
 
+## Relationship to KEP-285 (Specialized Trainer Abstractions)
+
+[KEP-285](https://github.com/kubeflow/sdk/pull/308) introduces a `BaseTrainer` ABC for
+function-based trainers (`TorchTrainer`, `JAXTrainer`, etc.) and a `RuntimeConfig`
+dataclass. This KEP is complementary — it addresses **config-driven trainers** where the
+framework's own CLI is the entrypoint (e.g., `trl sft ...`, `tune run ...`), not a
+user-supplied Python function.
+
+In KEP-285's terminology, `LLMBackend` implementations are **Tier 2 config-driven
+trainers**. If KEP-285 merges first, `LLMBackend` configs can be passed through
+KEP-285's `TorchTrainer` instead of `BuiltinTrainer` — the interface is the same
+(`command` class var / `to_args()`), only the entry point changes.
+
+**Shared design points**:
+
+- Both use `trainer.kubeflow.org/framework` as the dispatch key — KEP-285 for SDK
+  runtime auto-discovery, this KEP for Go strategy dispatch.
+- Both KEPs are compatible with either keeping or deprecating `BuiltinTrainer`.
+- If the framework label is promoted to a Runtime API spec field (as discussed in the
+  KEP-285 review), both KEPs benefit with no changes.
+
+---
+
 ## High-Level Design
 
 ### Architecture Overview
@@ -145,11 +169,11 @@ controllers, no changes to the plugin framework itself.
                    │  TorchTune   │                  │  LLMBackend  │
                    │  Config      │                  │  (abstract)  │
                    └──────┬───────┘                  └──────┬───────┘
-                          │                                 │
-                          │ to_args()                        │ to_command() / to_args()
-                          ▼                                 ▼
-                   get_args_using_                   backend.to_command()
-                   torchtune_config()                backend.to_args()
+                           │                                 │
+                           │ to_args()                       │ config.command / to_args()
+                           ▼                                 ▼
+                    get_args_using_                   config.command
+                    torchtune_config()                config.to_args()
                           │                                 │
                           │ creates TrainJob CR              │ creates TrainJob CR
                           ▼                                 ▼
@@ -184,8 +208,8 @@ End-to-end for a TRL SFT job:
        trainer_type=TRLTrainerType.SFT, ...)))
 
 2. SDK:  TRLConfig.validate() → ok
-         TRLConfig.to_command() → ("trl",)
-         TRLConfig.to_args()   → ["sft", "--model_name_or_path", "/workspace/model", ...]
+         TRLConfig.command   → ("trl",)
+         TRLConfig.to_args() → ["sft", "--model_name_or_path", "/workspace/model", ...]
          Build TrainJob CR with:
            runtimeRef: { name: "trl-llama3.2-1b" }
            trainer: { command: ["trl"], args: ["sft", ...] }
@@ -222,7 +246,6 @@ End-to-end for a TRL SFT job:
 | SDK `BuiltinTrainer` | **Widen** | `TorchTuneConfig` → `LLMBackend` |
 | SDK `TorchTuneConfig` | **Implement** | Implements `LLMBackend` (backward compatible) |
 | SDK `TRLConfig` | **New** | New backend class |
-| SDK registry | **New** | `@register_backend` decorator |
 | Container images | **New** | `trl-trainer` image |
 | ClusterTrainingRuntimes | **New** | TRL-specific runtime manifests |
 
@@ -233,40 +256,31 @@ End-to-end for a TRL SFT job:
 ### Python SDK: `LLMBackend` Interface
 
 Today `BuiltinTrainer.config` is typed as `TorchTuneConfig` directly. This introduces an
-abstract base class that every backend must implement.
+abstract base class that every config-driven backend must implement.
 
 ```python
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import ClassVar
 
 
 class LLMBackend(ABC):
-    """Abstract base for all LLM training backends.
+    """Abstract base for config-driven LLM training backends.
 
     Each implementation translates its config into a (command, args) pair
     that the Kubernetes backend writes into the TrainJob CR.
     """
 
-    @abstractmethod
-    def to_command(self) -> tuple[str, ...]:
-        """Return the container entrypoint command.
+    # Subclasses set this to their CLI entrypoint, e.g. ("tune", "run") or ("trl",)
+    command: ClassVar[tuple[str, ...]]
 
-        Examples:
-            TorchTune: ("tune", "run")
-            TRL:       ("trl",)
-        """
-        ...
+    # Common fields shared by all backends
+    num_nodes: int | None = None
+    resources_per_node: dict | None = None
 
     @abstractmethod
     def to_args(self, initializer: "Initializer | None" = None) -> list[str]:
-        """Return the CLI arguments for the entrypoint.
-
-        Args:
-            initializer: Optional initializer config for resolving dataset/model paths.
-
-        Returns:
-            List of string arguments (e.g. ["sft", "--model_name_or_path", "/workspace/model"]).
-        """
+        """Return CLI arguments for the entrypoint."""
         ...
 
     @abstractmethod
@@ -289,17 +303,14 @@ class BuiltinTrainer:
 ```python
 @dataclass
 class TorchTuneConfig(LLMBackend):
+    command = ("tune", "run")
+
     dtype: DataType | None = None
     batch_size: int | None = None
     epochs: int | None = None
     loss: Loss | None = None
-    num_nodes: int | None = None
     peft_config: LoraConfig | None = None
     dataset_preprocess_config: TorchTuneInstructDataset | None = None
-    resources_per_node: dict | None = None
-
-    def to_command(self) -> tuple[str, ...]:
-        return ("tune", "run")
 
     def to_args(self, initializer=None) -> list[str]:
         # Existing get_args_using_torchtune_config() logic moves here
@@ -307,51 +318,6 @@ class TorchTuneConfig(LLMBackend):
 
     def validate(self) -> None:
         ...
-```
-
-### Python SDK: Backend Registry
-
-A decorator-based registry enables out-of-tree backends (community requirement from #2752):
-
-```python
-_BACKEND_REGISTRY: dict[str, type[LLMBackend]] = {}
-
-
-def register_backend(name: str):
-    """Register an LLMBackend implementation under a framework name.
-
-    Usage:
-        @register_backend("trl")
-        class TRLConfig(LLMBackend):
-            ...
-    """
-    def decorator(cls: type[LLMBackend]) -> type[LLMBackend]:
-        if not issubclass(cls, LLMBackend):
-            raise TypeError(f"{cls.__name__} must subclass LLMBackend")
-        _BACKEND_REGISTRY[name] = cls
-        return cls
-    return decorator
-
-
-def get_backend(name: str) -> type[LLMBackend]:
-    """Look up a registered backend by name."""
-    if name not in _BACKEND_REGISTRY:
-        raise KeyError(
-            f"Unknown backend '{name}'. Registered: {list(_BACKEND_REGISTRY)}"
-        )
-    return _BACKEND_REGISTRY[name]
-```
-
-Built-in backends register themselves at import time:
-
-```python
-@register_backend("torchtune")
-class TorchTuneConfig(LLMBackend):
-    ...
-
-@register_backend("trl")
-class TRLConfig(LLMBackend):
-    ...
 ```
 
 ### Python SDK: `TRLConfig`
@@ -369,7 +335,6 @@ class TRLTrainerType(Enum):
 
 
 @dataclass
-@register_backend("trl")
 class TRLConfig(LLMBackend):
     """TRL LLM Trainer configuration.
 
@@ -377,8 +342,6 @@ class TRLConfig(LLMBackend):
         trainer_type: Training algorithm (SFT, DPO, KTO, GRPO).
         model_name_or_path: HuggingFace model ID or local path.
         dataset_name: HuggingFace dataset ID or local path.
-        num_nodes: Number of training nodes.
-        resources_per_node: Resource requirements dict.
         learning_rate: Learning rate.
         num_train_epochs: Number of training epochs.
         per_device_train_batch_size: Batch size per device.
@@ -391,11 +354,11 @@ class TRLConfig(LLMBackend):
         extra_args: Additional CLI arguments passed through verbatim.
     """
 
+    command = ("trl",)
+
     trainer_type: TRLTrainerType = TRLTrainerType.SFT
     model_name_or_path: str | None = None
     dataset_name: str | None = None
-    num_nodes: int | None = None
-    resources_per_node: dict | None = None
     learning_rate: float | None = None
     num_train_epochs: int | None = None
     per_device_train_batch_size: int | None = None
@@ -406,9 +369,6 @@ class TRLConfig(LLMBackend):
     lora_alpha: int | None = None
     lora_target_modules: str | None = None
     extra_args: dict[str, str] | None = None
-
-    def to_command(self) -> tuple[str, ...]:
-        return ("trl",)
 
     def to_args(self, initializer=None) -> list[str]:
         args = [self.trainer_type.value]  # subcommand: "sft", "dpo", etc.
@@ -461,7 +421,7 @@ class TRLConfig(LLMBackend):
 ### Python SDK: Integration into `KubernetesBackend`
 
 The current `get_trainer_cr_from_builtin_trainer()` hardcodes `isinstance(trainer.config, TorchTuneConfig)`.
-This changes to use the `LLMBackend` interface:
+This changes to use the `LLMBackend` interface directly:
 
 ```python
 # backends/kubernetes/utils.py (modified)
@@ -472,18 +432,15 @@ def get_trainer_cr_from_builtin_trainer(
     initializer: types.Initializer | None = None,
 ) -> models.TrainerV1alpha1Trainer:
     config = trainer.config
-    if not isinstance(config, LLMBackend):
-        raise ValueError(f"BuiltinTrainer config must implement LLMBackend, got: {type(config)}")
-
     config.validate()
 
     trainer_cr = models.TrainerV1alpha1Trainer()
-    if hasattr(config, "num_nodes") and config.num_nodes:
+    if config.num_nodes:
         trainer_cr.num_nodes = config.num_nodes
-    if hasattr(config, "resources_per_node") and config.resources_per_node:
+    if config.resources_per_node:
         trainer_cr.resources_per_node = get_resources_per_node(config.resources_per_node)
 
-    trainer_cr.command = list(config.to_command())
+    trainer_cr.command = list(config.command)
     trainer_cr.args = config.to_args(initializer)
     return trainer_cr
 ```
@@ -854,7 +811,8 @@ client.train(
 |------|------------|
 | TRL CLI changes across versions | Pin version range in requirements.txt; version compat tests |
 | TRL uses accelerate, not torchrun, for distributed | TRLStrategy injects both `PET_*` and standard env vars; accelerate reads `MASTER_ADDR`, `MASTER_PORT`, `WORLD_SIZE`, `RANK`; validated in E2E |
-| Multi-node TRL untested at scale | Phase 1 scoped to single-node multi-GPU; multi-node added in Phase 2 with dedicated E2E |
+| Multi-node TRL untested at scale | Initial implementation scoped to single-node multi-GPU; multi-node validated with dedicated E2E before GA |
 | SDK type widening affects static analysis | TorchTuneConfig is a subtype of LLMBackend; passes type checks |
 | Scope creep from adding backends | Scoped to TorchTune + TRL only |
 | `trainer.kubeflow.org/framework` label not a Go constant | KEP adds `RuntimeFrameworkLabel` constant; existing manifests already use the label |
+| KEP-285 `BaseTrainer` hierarchy merges before this KEP | `LLMBackend` is a separate ABC for config-driven trainers; if `BuiltinTrainer` is deprecated, `LLMBackend` implementations migrate to a config-driven Tier 2 trainer with minimal changes |
