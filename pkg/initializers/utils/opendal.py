@@ -1,5 +1,6 @@
 """OpenDAL utilities."""
 
+import fnmatch
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -80,7 +81,7 @@ class S3Storage(OpenDALStorage):
 
                 key = entry.path
                 if ignore_patterns:
-                    if key.endswith(tuple(ignore_patterns)):
+                    if any(fnmatch.fnmatch(key, p) for p in ignore_patterns):
                         logging.info(f"Skipping ignored file: {key}")
                         continue
 
