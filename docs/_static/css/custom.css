@@ -161,6 +161,68 @@ hr {
     font-weight: bold;
 }
 
+/* Widen the content area to reduce whitespace */
+@media (min-width: 67em) {
+    .content {
+        width: 54em;
+        padding: 0 2em;
+    }
+
+    body.sidebar-collapsed .content {
+        width: 70em;
+        max-width: 100%;
+    }
+}
+
+/* Sidebar: YouTube-style collapse toggle */
+@media (min-width: 67em) {
+    .sidebar-drawer {
+        transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                    min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+    }
+
+    body.sidebar-collapsed .sidebar-drawer {
+        width: 0 !important;
+        min-width: 0 !important;
+    }
+
+    .sidebar-toggle-btn {
+        position: fixed;
+        top: 0.65rem;
+        left: 0.65rem;
+        z-index: 100;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        color: var(--color-foreground-muted);
+        padding: 0;
+        line-height: 1;
+        transition: background 0.15s, color 0.15s;
+    }
+
+    .sidebar-toggle-btn:hover {
+        color: var(--color-foreground-primary);
+        background: rgba(128, 128, 128, 0.15);
+    }
+
+    .sidebar-toggle-btn:active {
+        background: rgba(128, 128, 128, 0.25);
+    }
+}
+
+@media (max-width: 66.99em) {
+    .sidebar-toggle-btn {
+        display: none !important;
+    }
+}
+
 /* Sidebar: reduce left whitespace */
 .sidebar-tree .reference {
     padding: 0.35rem 0.75rem;
