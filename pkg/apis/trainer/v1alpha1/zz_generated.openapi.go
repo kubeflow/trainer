@@ -1385,7 +1385,6 @@ func schema_pkg_apis_trainer_v1alpha1_ReplicatedJobPatch(ref common.ReferenceCal
 					"name": {
 						SchemaProps: spec.SchemaProps{
 							Description: "name is the name of the replicated job to patch.",
-							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1415,7 +1414,6 @@ func schema_pkg_apis_trainer_v1alpha1_RuntimePatch(ref common.ReferenceCallback)
 					"manager": {
 						SchemaProps: spec.SchemaProps{
 							Description: "manager indicates who owns this patch entry. It can be set by the user, external controllers, or admission webhooks to track ownership and avoid conflicts. For example, Kueue sets this field to \"kueue.x-k8s.io/manager\".",
-							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},

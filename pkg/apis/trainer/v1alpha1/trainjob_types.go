@@ -261,7 +261,7 @@ type RuntimePatch struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +required
-	Manager string `json:"manager"`
+	Manager string `json:"manager,omitempty"`
 
 	// time is the timestamp of when this patch was last written.
 	// Set by the Trainer admission webhook on each create or update. Used for observability only,
@@ -309,7 +309,7 @@ type ReplicatedJobPatch struct {
 	// name is the name of the replicated job to patch.
 	// +kubebuilder:validation:MinLength=1
 	// +required
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
 
 	// template patches the Job template for this replicated job.
 	// +optional

@@ -14358,8 +14358,7 @@
         "properties": {
           "name": {
             "description": "name is the name of the replicated job to patch.",
-            "type": "string",
-            "default": ""
+            "type": "string"
           },
           "template": {
             "description": "template patches the Job template for this replicated job.",
@@ -14380,8 +14379,7 @@
         "properties": {
           "manager": {
             "description": "manager indicates who owns this patch entry. It can be set by the user, external controllers, or admission webhooks to track ownership and avoid conflicts. For example, Kueue sets this field to \"kueue.x-k8s.io/manager\".",
-            "type": "string",
-            "default": ""
+            "type": "string"
           },
           "time": {
             "description": "time is the timestamp of when this patch was last written. Set by the Trainer admission webhook on each create or update. Used for observability only, not used as a list map key.",
