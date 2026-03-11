@@ -86,7 +86,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 				Suspend(true).
 				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
 				RuntimePatches([]trainer.RuntimePatch{{
-					Manager: "test-manager",
+					Manager: "test.io/manager",
 					TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 						Template: &trainer.JobSetTemplatePatch{
 							Metadata: &metav1.ObjectMeta{
@@ -211,7 +211,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 				ginkgo.By("Updating suspended TrainJob node selector")
 				updatedSelector := map[string]string{"updated": "selector"}
 				runtimePatches := []trainer.RuntimePatch{{
-					Manager: "test-manager",
+					Manager: "test.io/manager",
 					TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 						Template: &trainer.JobSetTemplatePatch{
 							Metadata: &metav1.ObjectMeta{
@@ -806,7 +806,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Obj()).
 					RuntimePatches([]trainer.RuntimePatch{
 						{
-							Manager: "test-manager",
+							Manager: "test.io/manager",
 							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 								Template: &trainer.JobSetTemplatePatch{
 									Spec: &trainer.JobSetSpecPatch{

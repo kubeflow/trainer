@@ -393,6 +393,18 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create trainJob with invalid RuntimePatches manager",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "invalid-runtimepatches-manager").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "kueue.k8s.io/",
+							},
+						}).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
 		)
 		ginkgo.DescribeTable("Defaulting TrainJob on creation", func(trainJob func() *trainer.TrainJob, wantTrainJob func() *trainer.TrainJob) {
 			created := trainJob()
@@ -525,7 +537,7 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						Suspend(true).
 						RuntimePatches([]trainer.RuntimePatch{
 							{
-								Manager: "test-manager",
+								Manager: "test.io/manager",
 								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 									Template: &trainer.JobSetTemplatePatch{
 										Spec: &trainer.JobSetSpecPatch{

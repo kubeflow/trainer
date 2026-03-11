@@ -544,7 +544,7 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -558,7 +558,7 @@ func TestValidate(t *testing.T) {
 				field.Invalid(runtimePatchesPath,
 					[]trainer.RuntimePatch{
 						{
-							Manager: "test-manager",
+							Manager: "test.io/manager",
 							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 								Template: &trainer.JobSetTemplatePatch{
 									Spec: &trainer.JobSetSpecPatch{
@@ -599,7 +599,7 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -626,7 +626,7 @@ func TestValidate(t *testing.T) {
 				field.Invalid(runtimePatchesPath,
 					[]trainer.RuntimePatch{
 						{
-							Manager: "test-manager",
+							Manager: "test.io/manager",
 							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 								Template: &trainer.JobSetTemplatePatch{
 									Spec: &trainer.JobSetSpecPatch{
@@ -680,7 +680,7 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -707,7 +707,7 @@ func TestValidate(t *testing.T) {
 				field.Invalid(runtimePatchesPath,
 					[]trainer.RuntimePatch{
 						{
-							Manager: "test-manager",
+							Manager: "test.io/manager",
 							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 								Template: &trainer.JobSetTemplatePatch{
 									Spec: &trainer.JobSetSpecPatch{
@@ -761,7 +761,7 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -796,7 +796,7 @@ func TestValidate(t *testing.T) {
 				field.Invalid(runtimePatchesPath,
 					[]trainer.RuntimePatch{
 						{
-							Manager: "test-manager",
+							Manager: "test.io/manager",
 							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 								Template: &trainer.JobSetTemplatePatch{
 									Spec: &trainer.JobSetSpecPatch{
@@ -859,7 +859,7 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -911,7 +911,7 @@ func TestValidate(t *testing.T) {
 			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -936,7 +936,7 @@ func TestValidate(t *testing.T) {
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -989,7 +989,7 @@ func TestValidate(t *testing.T) {
 				Suspend(false).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1015,7 +1015,7 @@ func TestValidate(t *testing.T) {
 				Suspend(false).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1070,7 +1070,7 @@ func TestValidate(t *testing.T) {
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1096,7 +1096,7 @@ func TestValidate(t *testing.T) {
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1166,7 +1166,7 @@ func TestValidate(t *testing.T) {
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1192,7 +1192,7 @@ func TestValidate(t *testing.T) {
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1279,7 +1279,7 @@ func TestValidate(t *testing.T) {
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1305,7 +1305,7 @@ func TestValidate(t *testing.T) {
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1394,7 +1394,7 @@ func TestValidate(t *testing.T) {
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1420,7 +1420,7 @@ func TestValidate(t *testing.T) {
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1494,7 +1494,7 @@ func TestValidate(t *testing.T) {
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -1520,7 +1520,7 @@ func TestValidate(t *testing.T) {
 				Suspend(true).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager",
+						Manager: "test.io/manager",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{

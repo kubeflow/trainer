@@ -74,7 +74,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				UID("uid").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
 				RuntimePatches([]trainer.RuntimePatch{{
-					Manager: "test-manager",
+					Manager: "test.io/manager",
 					TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 						Template: &trainer.JobSetTemplatePatch{
 							Metadata: &metav1.ObjectMeta{

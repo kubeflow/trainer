@@ -304,7 +304,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
-						Manager: "test-manager-one",
+						Manager: "test.io/manager-one",
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -357,7 +357,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 					gotTrainJob := &trainer.TrainJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
 					g.Expect(gotTrainJob.Spec.RuntimePatches).Should(gomega.HaveLen(2))
-					g.Expect(gotTrainJob.Spec.RuntimePatches[0].Manager).To(gomega.Equal("test-manager-one"))
+					g.Expect(gotTrainJob.Spec.RuntimePatches[0].Manager).To(gomega.Equal("test.io/manager-one"))
 					g.Expect(gotTrainJob.Spec.RuntimePatches[1].Manager).To(gomega.Equal("kueue.k8s.io/manager"))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
