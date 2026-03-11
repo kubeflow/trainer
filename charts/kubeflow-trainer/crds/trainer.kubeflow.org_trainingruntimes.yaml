@@ -94,6 +94,7 @@ spec:
                         description: |-
                           sshAuthMountPath is the directory where SSH keys are mounted.
                           Defaults to /root/.ssh.
+                        maxLength: 4096
                         type: string
                     type: object
                   numNodes:

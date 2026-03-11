@@ -79,6 +79,7 @@ type ControllerWebhook struct {
 	// host is the hostname that the webhook server binds to.
 	// It is used to set webhook.Server.Host.
 	// Defaults to "" (all interfaces).
+	// +kubebuilder:validation:MaxLength=253
 	// +optional
 	Host *string `json:"host,omitempty"`
 }
@@ -93,6 +94,7 @@ type ControllerMetrics struct {
 	// +optional
 	// +kubebuilder:default=":8443"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	BindAddress string `json:"bindAddress,omitempty"`
 
 	// secureServing determines if the metrics endpoint should be served securely via HTTPS.
@@ -112,6 +114,7 @@ type ControllerHealth struct {
 	// +optional
 	// +kubebuilder:default=":8081"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	HealthProbeBindAddress string `json:"healthProbeBindAddress,omitempty"`
 
 	// readinessEndpointName is the name for the readiness endpoint.
@@ -119,6 +122,7 @@ type ControllerHealth struct {
 	// +optional
 	// +kubebuilder:default="readyz"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
 	ReadinessEndpointName string `json:"readinessEndpointName,omitempty"`
 
 	// livenessEndpointName is the name for the liveness endpoint.
@@ -126,6 +130,7 @@ type ControllerHealth struct {
 	// +optional
 	// +kubebuilder:default="healthz"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
 	LivenessEndpointName string `json:"livenessEndpointName,omitempty"`
 }
 
@@ -163,6 +168,7 @@ type CertManagement struct {
 	// +optional
 	// +kubebuilder:default="kubeflow-trainer-controller-manager"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	WebhookServiceName string `json:"webhookServiceName,omitempty"`
 
 	// webhookSecretName is the name of the Secret used to store the CA and server certificates.
@@ -170,6 +176,7 @@ type CertManagement struct {
 	// +optional
 	// +kubebuilder:default="kubeflow-trainer-webhook-cert"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	WebhookSecretName string `json:"webhookSecretName,omitempty"`
 }
 

@@ -114,6 +114,7 @@ type TrainJobSpec struct {
 	// Patches are keyed by manager to provide clear ownership and avoid conflicts between controllers.
 	// +listType=map
 	// +listMapKey=manager
+	// +kubebuilder:validation:MaxItems=16
 	// +optional
 	RuntimePatches []RuntimePatch `json:"runtimePatches,omitempty"`
 
@@ -130,6 +131,7 @@ type TrainJobSpec struct {
 	// with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.
 	// +kubebuilder:default="trainer.kubeflow.org/trainjob-controller"
 	// +kubebuilder:validation:XValidation:rule="self in ['trainer.kubeflow.org/trainjob-controller', 'kueue.x-k8s.io/multikueue']", message="ManagedBy must be trainer.kubeflow.org/trainjob-controller or kueue.x-k8s.io/multikueue if set"
+	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	ManagedBy *string `json:"managedBy,omitempty"`
@@ -141,18 +143,21 @@ type RuntimeRef struct {
 	// When namespaced-scoped TrainingRuntime is used, the TrainJob must have
 	// the same namespace as the deployed runtime.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	// +required
 	Name string `json:"name,omitempty"`
 
 	// apiGroup of the runtime being referenced.
 	// Defaults to `trainer.kubeflow.org`.
 	// +kubebuilder:default="trainer.kubeflow.org"
+	// +kubebuilder:validation:MaxLength=253
 	// +optional
 	APIGroup *string `json:"apiGroup,omitempty"`
 
 	// kind of the runtime being referenced.
 	// Defaults to ClusterTrainingRuntime.
 	// +kubebuilder:default="ClusterTrainingRuntime"
+	// +kubebuilder:validation:MaxLength=253
 	// +optional
 	Kind *string `json:"kind,omitempty"`
 }
@@ -174,6 +179,7 @@ type Initializer struct {
 // which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
 type DatasetInitializer struct {
 	// storageUri is the URI for the dataset provider.
+	// +kubebuilder:validation:MaxLength=2048
 	// +optional
 	StorageUri *string `json:"storageUri,omitempty"`
 
@@ -181,6 +187,7 @@ type DatasetInitializer struct {
 	// These values will be merged with the TrainingRuntime's dataset initializer environments.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
@@ -195,6 +202,7 @@ type DatasetInitializer struct {
 // which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
 type ModelInitializer struct {
 	// storageUri is the URI for the model provider.
+	// +kubebuilder:validation:MaxLength=2048
 	// +optional
 	StorageUri *string `json:"storageUri,omitempty"`
 
@@ -202,6 +210,7 @@ type ModelInitializer struct {
 	// These values will be merged with the TrainingRuntime's model initializer environments.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
@@ -216,16 +225,21 @@ type ModelInitializer struct {
 // which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: trainer`
 type Trainer struct {
 	// image is the container image for the training container.
+	// +kubebuilder:validation:MaxLength=500
 	// +optional
 	Image *string `json:"image,omitempty"`
 
 	// command for the entrypoint of the training container.
 	// +listType=atomic
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:items:MaxLength=65536
 	// +optional
 	Command []string `json:"command,omitempty"`
 
 	// args for the entrypoint for the training container.
 	// +listType=atomic
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:items:MaxLength=65536
 	// +optional
 	Args []string `json:"args,omitempty"`
 
@@ -233,6 +247,7 @@ type Trainer struct {
 	// These values will be merged with the TrainingRuntime's trainer environments.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
@@ -259,6 +274,7 @@ type RuntimePatch struct {
 	// controllers, or admission webhooks to track ownership and avoid conflicts.
 	// For example, Kueue sets this field to "kueue.x-k8s.io/manager".
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +required
 	Manager string `json:"manager,omitempty"`
@@ -300,6 +316,7 @@ type JobSetSpecPatch struct {
 	// replicatedJobs defines per-job patches, keyed by job name.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=100
 	// +optional
 	ReplicatedJobs []ReplicatedJobPatch `json:"replicatedJobs,omitempty"`
 }
@@ -308,6 +325,7 @@ type JobSetSpecPatch struct {
 type ReplicatedJobPatch struct {
 	// name is the name of the replicated job to patch.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	// +required
 	Name string `json:"name,omitempty"`
 
@@ -350,6 +368,7 @@ type PodTemplatePatch struct {
 // PodSpecPatch contains the Pod spec fields that managers are permitted to patch.
 type PodSpecPatch struct {
 	// serviceAccountName patches the service account for the Pods in the target job templates.
+	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
@@ -357,6 +376,7 @@ type PodSpecPatch struct {
 	// volumes patches the Pod's volumes.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
@@ -364,6 +384,7 @@ type PodSpecPatch struct {
 	// initContainers patches the init containers in the target job templates.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=64
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	InitContainers []ContainerPatch `json:"initContainers,omitempty"`
@@ -371,6 +392,7 @@ type PodSpecPatch struct {
 	// containers patches specific containers in the target job templates.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=64
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	Containers []ContainerPatch `json:"containers,omitempty"`
@@ -378,6 +400,7 @@ type PodSpecPatch struct {
 	// imagePullSecrets patches the image pull secrets for the Pods in the target job templates.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=64
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
 	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
@@ -398,6 +421,7 @@ type PodSpecPatch struct {
 
 	// tolerations patches the Pod's tolerations.
 	// +listType=atomic
+	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
@@ -405,6 +429,7 @@ type PodSpecPatch struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=16
 	// +optional
 	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
 }
@@ -413,6 +438,7 @@ type PodSpecPatch struct {
 type ContainerPatch struct {
 	// name for the container. Runtime must have this container.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	// +required
 	Name string `json:"name,omitempty"`
 
@@ -422,12 +448,14 @@ type ContainerPatch struct {
 	// `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
 	// volumeMounts are the volumes to mount into the container's filesystem.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 
@@ -444,11 +472,13 @@ type TrainJobStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=type
+	// +kubebuilder:validation:MaxItems=8
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// jobsStatus tracks the child Jobs in TrainJob.
 	// +listType=map
 	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=100
 	// +optional
 	JobsStatus []JobStatus `json:"jobsStatus,omitempty"`
 }
@@ -456,6 +486,7 @@ type TrainJobStatus struct {
 type JobStatus struct {
 	// name of the child Job.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	// +required
 	Name string `json:"name,omitempty"`
 
