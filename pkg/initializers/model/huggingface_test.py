@@ -15,7 +15,7 @@ from pkg.initializers.model.huggingface import HuggingFace
             {"storage_uri": "hf://model/path", "access_token": "test_token"},
             {
                 "storage_uri": "hf://model/path",
-                "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
+                "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
                 "access_token": "test_token",
             },
         ),
@@ -24,7 +24,7 @@ from pkg.initializers.model.huggingface import HuggingFace
             {"storage_uri": "hf://model/path"},
             {
                 "storage_uri": "hf://model/path",
-                "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
+                "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
                 "access_token": None,
             },
         ),
@@ -50,7 +50,7 @@ def test_load_config(test_name, test_config, expected):
             {
                 "config": {
                     "storage_uri": "hf://username/model-name",
-                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
+                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
                     "access_token": "test_token",
                 },
                 "should_login": True,
@@ -62,7 +62,7 @@ def test_load_config(test_name, test_config, expected):
             {
                 "config": {
                     "storage_uri": "hf://org/model-v1",
-                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
+                    "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
                     "access_token": None,
                 },
                 "should_login": False,
