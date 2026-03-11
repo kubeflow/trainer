@@ -56,5 +56,7 @@ Community & Support
 -------------------
 
 - **GitHub Repository**: `kubeflow/trainer <https://github.com/kubeflow/trainer>`_
-- **Slack**: `#kubeflow-training <https://kubeflow.slack.com/messages/kubeflow-training>`_
-- **Mailing List**: `kubeflow-discuss@googlegroups.com <https://groups.google.com/forum/#!forum/kubeflow-discuss>`_
+- **Slack**: `#kubeflow-trainer <https://app.slack.com/client/T08PSQ7BQ/C0742LDFZ4K>`_ on `CNCF Slack <https://slack.cncf.io/>`_
+- **Mailing List**: `kubeflow-discuss <https://groups.google.com/g/kubeflow-discuss>`_
+- **Trainer & Katib Meeting**: `Meeting Notes <https://bit.ly/2PWVCkV>`_ · `Recordings <https://www.youtube.com/playlist?list=PLmzRWLV1CK_xAiAY-3Vw94lrUs4xeNZ3j>`_
+- **Community Calendar**: `View all Kubeflow meetings <https://zoom-lfx.platform.linuxfoundation.org/meetings/kubeflow>`_ · `Add to calendar (iCal) <https://webcal.prod.itx.linuxfoundation.org/lfx/a092M00001LkNgVQAV>`_
