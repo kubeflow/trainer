@@ -45,6 +45,7 @@ html_theme = "furo"
 html_title = "Kubeflow Trainer"
 html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
+html_js_files = ["js/external-links.js", "js/sidebar-toggle.js"]
 
 # Furo theme options
 html_theme_options = {
@@ -78,6 +79,7 @@ myst_enable_extensions = [
     "substitution",  # Variable substitution
     "tasklist",  # Task lists [ ] [x]
 ]
+myst_links_external_new_tab = True
 
 # -- Mermaid configuration ---------------------------------------------------
 mermaid_version = "11.5.0"  # Use specific version for reproducibility
