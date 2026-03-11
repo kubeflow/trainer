@@ -20,7 +20,7 @@ import json
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_initializer import TrainerV1alpha1Initializer
-from kubeflow_trainer_api.models.trainer_v1alpha1_pod_template_override import TrainerV1alpha1PodTemplateOverride
+from kubeflow_trainer_api.models.trainer_v1alpha1_runtime_patch import TrainerV1alpha1RuntimePatch
 from kubeflow_trainer_api.models.trainer_v1alpha1_runtime_ref import TrainerV1alpha1RuntimeRef
 from kubeflow_trainer_api.models.trainer_v1alpha1_trainer import TrainerV1alpha1Trainer
 from typing import Optional, Set
@@ -30,15 +30,13 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
     """
     TrainJobSpec represents specification of the desired TrainJob.
     """ # noqa: E501
-    annotations: Optional[Dict[str, StrictStr]] = Field(default=None, description="annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
     initializer: Optional[TrainerV1alpha1Initializer] = Field(default=None, description="initializer defines the configuration of the initializer.")
-    labels: Optional[Dict[str, StrictStr]] = Field(default=None, description="labels to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
     managed_by: Optional[StrictStr] = Field(default=None, description="managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.", alias="managedBy")
-    pod_template_overrides: Optional[List[TrainerV1alpha1PodTemplateOverride]] = Field(default=None, description="podTemplateOverrides define the PodTemplateOverrides for the training runtime. When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.", alias="podTemplateOverrides")
+    runtime_patches: Optional[List[TrainerV1alpha1RuntimePatch]] = Field(default=None, description="runtimePatches defines custom patches applied to the TrainJob's Runtime. Patches are keyed by manager to provide clear ownership and avoid conflicts between controllers.", alias="runtimePatches")
     runtime_ref: TrainerV1alpha1RuntimeRef = Field(description="runtimeRef is the reference to the training runtime.", alias="runtimeRef")
     suspend: Optional[StrictBool] = Field(default=None, description="suspend defines whether to suspend the running TrainJob.")
     trainer: Optional[TrainerV1alpha1Trainer] = Field(default=None, description="trainer defines the configuration of the trainer.")
-    __properties: ClassVar[List[str]] = ["annotations", "initializer", "labels", "managedBy", "podTemplateOverrides", "runtimeRef", "suspend", "trainer"]
+    __properties: ClassVar[List[str]] = ["initializer", "managedBy", "runtimePatches", "runtimeRef", "suspend", "trainer"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -82,13 +80,13 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of initializer
         if self.initializer:
             _dict['initializer'] = self.initializer.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of each item in pod_template_overrides (list)
+        # override the default output from pydantic by calling `to_dict()` of each item in runtime_patches (list)
         _items = []
-        if self.pod_template_overrides:
-            for _item_pod_template_overrides in self.pod_template_overrides:
-                if _item_pod_template_overrides:
-                    _items.append(_item_pod_template_overrides.to_dict())
-            _dict['podTemplateOverrides'] = _items
+        if self.runtime_patches:
+            for _item_runtime_patches in self.runtime_patches:
+                if _item_runtime_patches:
+                    _items.append(_item_runtime_patches.to_dict())
+            _dict['runtimePatches'] = _items
         # override the default output from pydantic by calling `to_dict()` of runtime_ref
         if self.runtime_ref:
             _dict['runtimeRef'] = self.runtime_ref.to_dict()
@@ -107,11 +105,9 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "annotations": obj.get("annotations"),
             "initializer": TrainerV1alpha1Initializer.from_dict(obj["initializer"]) if obj.get("initializer") is not None else None,
-            "labels": obj.get("labels"),
             "managedBy": obj.get("managedBy"),
-            "podTemplateOverrides": [TrainerV1alpha1PodTemplateOverride.from_dict(_item) for _item in obj["podTemplateOverrides"]] if obj.get("podTemplateOverrides") is not None else None,
+            "runtimePatches": [TrainerV1alpha1RuntimePatch.from_dict(_item) for _item in obj["runtimePatches"]] if obj.get("runtimePatches") is not None else None,
             "runtimeRef": TrainerV1alpha1RuntimeRef.from_dict(obj["runtimeRef"]) if obj.get("runtimeRef") is not None else None,
             "suspend": obj.get("suspend"),
             "trainer": TrainerV1alpha1Trainer.from_dict(obj["trainer"]) if obj.get("trainer") is not None else None
