@@ -21,35 +21,35 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
-// ContainerOverrideApplyConfiguration represents a declarative configuration of the ContainerOverride type for use
+// ContainerPatchApplyConfiguration represents a declarative configuration of the ContainerPatch type for use
 // with apply.
 //
-// ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
-type ContainerOverrideApplyConfiguration struct {
-	// name for the container. TrainingRuntime must have this container.
+// ContainerPatch represents parameters that can be patched using PodSpecPatch.
+type ContainerPatchApplyConfiguration struct {
+	// name for the container. Runtime must have this container.
 	Name *string `json:"name,omitempty"`
 	// env is the list of environment variables to set in the container.
-	// These values will be merged with the TrainingRuntime's environments.
+	// These values will be merged with the Runtime's environments.
 	// These values can't be set for container with the name: `node`, `dataset-initializer`, or
 	// `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.
 	Env []v1.EnvVarApplyConfiguration `json:"env,omitempty"`
 	// volumeMounts are the volumes to mount into the container's filesystem.
 	VolumeMounts []v1.VolumeMountApplyConfiguration `json:"volumeMounts,omitempty"`
-	// securityContext overrides the container's security context.
+	// securityContext patches the container's security context.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 }
 
-// ContainerOverrideApplyConfiguration constructs a declarative configuration of the ContainerOverride type for use with
+// ContainerPatchApplyConfiguration constructs a declarative configuration of the ContainerPatch type for use with
 // apply.
-func ContainerOverride() *ContainerOverrideApplyConfiguration {
-	return &ContainerOverrideApplyConfiguration{}
+func ContainerPatch() *ContainerPatchApplyConfiguration {
+	return &ContainerPatchApplyConfiguration{}
 }
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *ContainerOverrideApplyConfiguration) WithName(value string) *ContainerOverrideApplyConfiguration {
+func (b *ContainerPatchApplyConfiguration) WithName(value string) *ContainerPatchApplyConfiguration {
 	b.Name = &value
 	return b
 }
@@ -57,7 +57,7 @@ func (b *ContainerOverrideApplyConfiguration) WithName(value string) *ContainerO
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
-func (b *ContainerOverrideApplyConfiguration) WithEnv(values ...*v1.EnvVarApplyConfiguration) *ContainerOverrideApplyConfiguration {
+func (b *ContainerPatchApplyConfiguration) WithEnv(values ...*v1.EnvVarApplyConfiguration) *ContainerPatchApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithEnv")
@@ -70,7 +70,7 @@ func (b *ContainerOverrideApplyConfiguration) WithEnv(values ...*v1.EnvVarApplyC
 // WithVolumeMounts adds the given value to the VolumeMounts field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumeMounts field.
-func (b *ContainerOverrideApplyConfiguration) WithVolumeMounts(values ...*v1.VolumeMountApplyConfiguration) *ContainerOverrideApplyConfiguration {
+func (b *ContainerPatchApplyConfiguration) WithVolumeMounts(values ...*v1.VolumeMountApplyConfiguration) *ContainerPatchApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithVolumeMounts")
@@ -83,7 +83,7 @@ func (b *ContainerOverrideApplyConfiguration) WithVolumeMounts(values ...*v1.Vol
 // WithSecurityContext sets the SecurityContext field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SecurityContext field is set to the value of the last call.
-func (b *ContainerOverrideApplyConfiguration) WithSecurityContext(value corev1.SecurityContext) *ContainerOverrideApplyConfiguration {
+func (b *ContainerPatchApplyConfiguration) WithSecurityContext(value corev1.SecurityContext) *ContainerPatchApplyConfiguration {
 	b.SecurityContext = &value
 	return b
 }

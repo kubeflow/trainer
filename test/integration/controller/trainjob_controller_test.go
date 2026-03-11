@@ -85,8 +85,17 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 			trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
 				Suspend(true).
 				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
-				SpecLabel("testingKey", "testingVal").
-				SpecAnnotation("testingKey", "testingVal").
+				RuntimePatches([]trainer.RuntimePatch{{
+					Manager: "test-manager",
+					TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+						Template: &trainer.JobSetTemplatePatch{
+							Metadata: &metav1.ObjectMeta{
+								Labels:      map[string]string{"testingKey": "testingVal"},
+								Annotations: map[string]string{"testingKey": "testingVal"},
+							},
+						},
+					},
+				}}).
 				Trainer(
 					testingutil.MakeTrainJobTrainerWrapper().
 						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
@@ -201,22 +210,35 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 
 				ginkgo.By("Updating suspended TrainJob node selector")
 				updatedSelector := map[string]string{"updated": "selector"}
-				podTemplateOverrides := []trainer.PodTemplateOverride{
-					{
-						TargetJobs: []trainer.PodTemplateOverrideTargetJob{
-							{
-								Name: "node",
+				runtimePatches := []trainer.RuntimePatch{{
+					Manager: "test-manager",
+					TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+						Template: &trainer.JobSetTemplatePatch{
+							Metadata: &metav1.ObjectMeta{
+								Labels:      map[string]string{"testingKey": "testingVal"},
+								Annotations: map[string]string{"testingKey": "testingVal"},
+							},
+							Spec: &trainer.JobSetSpecPatch{
+								ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+									Name: "node",
+									Template: &trainer.JobTemplatePatch{
+										Spec: &trainer.JobSpecPatch{
+											Template: &trainer.PodTemplatePatch{
+												Spec: &trainer.PodSpecPatch{
+													NodeSelector: updatedSelector,
+												},
+											},
+										},
+									},
+								}},
 							},
 						},
-						Spec: &trainer.PodTemplateSpecOverride{
-							NodeSelector: updatedSelector,
-						},
 					},
-				}
+				}}
 
 				gomega.Eventually(func(g gomega.Gomega) {
 					g.Expect(k8sClient.Get(ctx, trainJobKey, trainJob)).Should(gomega.Succeed())
-					trainJob.Spec.PodTemplateOverrides = podTemplateOverrides
+					trainJob.Spec.RuntimePatches = runtimePatches
 					g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
@@ -773,7 +795,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 
-			ginkgo.It("Should succeed to create TrainJob with PodTemplateOverrides", func() {
+			ginkgo.It("Should succeed to create TrainJob with RuntimePatches", func() {
 				ginkgo.By("Creating Torch TrainingRuntime and TrainJob")
 				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
 					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
@@ -782,34 +804,49 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 							Env([]corev1.EnvVar{{Name: "TRAIN_JOB", Value: "value"}}...).
 							Obj()).
-					PodTemplateOverrides([]trainer.PodTemplateOverride{
+					RuntimePatches([]trainer.RuntimePatch{
 						{
-							TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
-							Metadata: &metav1.ObjectMeta{
-								Labels: map[string]string{
-									"override-label-key": "override-label-value",
-									"custom-label":       "custom-value",
-								},
-								Annotations: map[string]string{
-									"override-annotation-key": "override-annotation-value",
-									"custom-annotation":       "custom-annotation-value",
-								},
-							},
-							Spec: &trainer.PodTemplateSpecOverride{
-								ServiceAccountName: ptr.To("override-sa"),
-								InitContainers: []trainer.ContainerOverride{
-									{
-										Name: "override-init-container",
-										Env: []corev1.EnvVar{
-											{
-												Name:  "INIT_ENV",
-												Value: "override_init",
+							Manager: "test-manager",
+							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+								Template: &trainer.JobSetTemplatePatch{
+									Spec: &trainer.JobSetSpecPatch{
+										ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+											Name: constants.Node,
+											Template: &trainer.JobTemplatePatch{
+												Spec: &trainer.JobSpecPatch{
+													Template: &trainer.PodTemplatePatch{
+														Metadata: &metav1.ObjectMeta{
+															Labels: map[string]string{
+																"override-label-key": "override-label-value",
+																"custom-label":       "custom-value",
+															},
+															Annotations: map[string]string{
+																"override-annotation-key": "override-annotation-value",
+																"custom-annotation":       "custom-annotation-value",
+															},
+														},
+														Spec: &trainer.PodSpecPatch{
+															ServiceAccountName: ptr.To("override-sa"),
+															InitContainers: []trainer.ContainerPatch{
+																{
+																	Name: "override-init-container",
+																	Env: []corev1.EnvVar{
+																		{
+																			Name:  "INIT_ENV",
+																			Value: "override_init",
+																		},
+																		{
+																			Name:  "NEW_VALUE",
+																			Value: "from_overrides",
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
 											},
-											{
-												Name:  "NEW_VALUE",
-												Value: "from_overrides",
-											},
-										},
+										}},
 									},
 								},
 							},

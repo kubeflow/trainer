@@ -298,38 +298,67 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 		})
 	})
 
-	ginkgo.When("Creating a TrainJob with PodTemplateOverrides", func() {
-		ginkgo.It("should allow the user to set the manager field and default to 'Unknown' if empty", func() {
+	ginkgo.When("Creating a TrainJob with RuntimePatches", func() {
+		ginkgo.It("should preserve user-provided manager fields", func() {
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
-				PodTemplateOverrides([]trainer.PodTemplateOverride{
+				RuntimePatches([]trainer.RuntimePatch{
 					{
-						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
-						Spec: &trainer.PodTemplateSpecOverride{
-							ServiceAccountName: ptr.To("test-sa-1"),
+						Manager: "test-manager-one",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														ServiceAccountName: ptr.To("test-sa-1"),
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
 						},
 					},
 					{
-						Manager:    ptr.To("kueue.k8s.io/manager"),
-						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
-						Spec: &trainer.PodTemplateSpecOverride{
-							ServiceAccountName: ptr.To("test-sa-2"),
+						Manager: "kueue.k8s.io/manager",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														ServiceAccountName: ptr.To("test-sa-2"),
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
 						},
 					},
 				}).
 				Obj()
 
-			ginkgo.By("Create a TrainJob with PodTemplateOverrides", func() {
+			ginkgo.By("Create a TrainJob with RuntimePatches", func() {
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 			})
 
-			ginkgo.By("Verify manager field preserves user input and defaults to 'Unknown' if empty", func() {
+			ginkgo.By("Verify manager fields are preserved", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
-					g.Expect(gotTrainJob.Spec.PodTemplateOverrides).Should(gomega.HaveLen(2))
-					g.Expect(*gotTrainJob.Spec.PodTemplateOverrides[0].Manager).To(gomega.Equal("trainer.kubeflow.org/unknown"))
-					g.Expect(*gotTrainJob.Spec.PodTemplateOverrides[1].Manager).To(gomega.Equal("kueue.k8s.io/manager"))
+					g.Expect(gotTrainJob.Spec.RuntimePatches).Should(gomega.HaveLen(2))
+					g.Expect(gotTrainJob.Spec.RuntimePatches[0].Manager).To(gomega.Equal("test-manager-one"))
+					g.Expect(gotTrainJob.Spec.RuntimePatches[1].Manager).To(gomega.Equal("kueue.k8s.io/manager"))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 		})

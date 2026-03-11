@@ -330,53 +330,69 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						Obj()
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("Should succeed to create trainJob with podTemplateOverrides containing duplicate targetJob",
+			ginkgo.Entry("Should succeed to create trainJob with runtimePatches containing two replicated job patches",
 				func() *trainer.TrainJob {
-					return testingutil.MakeTrainJobWrapper(ns.Name, "duplicated-podspecoverrides-target-jobs").
+					return testingutil.MakeTrainJobWrapper(ns.Name, "two-rjob-patches").
 						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
-						PodTemplateOverrides([]trainer.PodTemplateOverride{
+						RuntimePatches([]trainer.RuntimePatch{
 							{
-								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
-								Spec: &trainer.PodTemplateSpecOverride{
-									ServiceAccountName: ptr.To("custom-sa"),
+								Manager: "manager-one",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: "node",
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																ServiceAccountName: ptr.To("custom-sa"),
+															},
+														},
+													},
+												},
+											}},
+										},
+									},
 								},
 							},
 							{
-								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
-								Spec: &trainer.PodTemplateSpecOverride{
-									ServiceAccountName: ptr.To("custom-sa-two"),
+								Manager: "manager-two",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: "node",
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																ServiceAccountName: ptr.To("custom-sa-two"),
+															},
+														},
+													},
+												},
+											}},
+										},
+									},
 								},
 							},
 						}).
 						Obj()
 				},
 				gomega.Succeed()),
-			ginkgo.Entry("Should succeed to create trainJob with valid PodTemplateOverrides.Manager",
+			ginkgo.Entry("Should succeed to create trainJob with valid RuntimePatches manager",
 				func() *trainer.TrainJob {
-					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-podtemplateoverrides-manager").
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-runtimepatches-manager").
 						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
-						PodTemplateOverrides([]trainer.PodTemplateOverride{
+						RuntimePatches([]trainer.RuntimePatch{
 							{
-								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
-								Manager:    ptr.To("kueue.k8s.io/manager"),
+								Manager: "kueue.k8s.io/manager",
 							},
 						}).
 						Obj()
 				},
 				gomega.Succeed()),
-			ginkgo.Entry("Should fail to create trainJob with invalid PodTemplateOverrides.Manager",
-				func() *trainer.TrainJob {
-					return testingutil.MakeTrainJobWrapper(ns.Name, "invalid-podtemplateoverrides-manager").
-						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
-						PodTemplateOverrides([]trainer.PodTemplateOverride{
-							{
-								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
-								Manager:    ptr.To("kueue.k8s.io/"),
-							},
-						}).
-						Obj()
-				},
-				testingutil.BeForbiddenError()),
 		)
 		ginkgo.DescribeTable("Defaulting TrainJob on creation", func(trainJob func() *trainer.TrainJob, wantTrainJob func() *trainer.TrainJob) {
 			created := trainJob()
@@ -395,31 +411,6 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						ManagedBy("kueue.x-k8s.io/multikueue").
 						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "testing").
 						Suspend(false).
-						Obj()
-				}),
-			ginkgo.Entry("Should succeed to default PodTemplateOverrides.Manager='trainer.kubeflow.org/unknown'",
-				func() *trainer.TrainJob {
-					return testingutil.MakeTrainJobWrapper(ns.Name, "null-podtemplateoverrides-manager").
-						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
-						PodTemplateOverrides([]trainer.PodTemplateOverride{
-							{
-								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
-							},
-						}).
-						Suspend(true).
-						Obj()
-				},
-				func() *trainer.TrainJob {
-					return testingutil.MakeTrainJobWrapper(ns.Name, "null-podtemplateoverrides-manager").
-						ManagedBy("trainer.kubeflow.org/trainjob-controller").
-						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
-						PodTemplateOverrides([]trainer.PodTemplateOverride{
-							{
-								TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: "node"}},
-								Manager:    ptr.To("trainer.kubeflow.org/unknown"),
-							},
-						}).
-						Suspend(true).
 						Obj()
 				}),
 			ginkgo.Entry("Should succeed to default managedBy=trainer.kubeflow.org/trainjob-controller",
@@ -527,29 +518,38 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 					return job
 				},
 				testingutil.BeInvalidError()),
-			ginkgo.Entry("Should succeed to update podTemplateOverride when suspend is true",
+			ginkgo.Entry("Should succeed to update runtimePatches when suspend is true",
 				func() *trainer.TrainJob {
-					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-trainer").
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-runtimepatches").
 						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
 						Suspend(true).
-						PodTemplateOverrides(
-							[]trainer.PodTemplateOverride{
-								{
-									TargetJobs: []trainer.PodTemplateOverrideTargetJob{
-										{
-											Name: "node",
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "test-manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: "node",
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																NodeSelector: map[string]string{"test": "test"},
+															},
+														},
+													},
+												},
+											}},
 										},
-									},
-									Spec: &trainer.PodTemplateSpecOverride{
-										NodeSelector: map[string]string{"test": "test"},
 									},
 								},
 							},
-						).
+						}).
 						Obj()
 				},
 				func(job *trainer.TrainJob) *trainer.TrainJob {
-					job.Spec.PodTemplateOverrides[0].Spec.NodeSelector = map[string]string{"allow": "update"}
+					job.Spec.RuntimePatches[0].TrainingRuntimeSpec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec.NodeSelector = map[string]string{"allow": "update"}
 					return job
 				},
 				gomega.Succeed()),

@@ -150,7 +150,7 @@ func TestNotifyTrainJobUpdate_ClusterTrainingRuntimeReconciler(t *testing.T) {
 				Obj(),
 			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
-				SpecLabel("key", "value").
+				RuntimePatches([]trainer.RuntimePatch{{Manager: "test"}}).
 				Obj(),
 			wantEvent: event.TypedGenericEvent[iter.Seq[types.NamespacedName]]{
 				Object: func(yield func(types.NamespacedName) bool) {
@@ -164,7 +164,7 @@ func TestNotifyTrainJobUpdate_ClusterTrainingRuntimeReconciler(t *testing.T) {
 				Obj(),
 			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				SpecLabel("key", "value").
+				RuntimePatches([]trainer.RuntimePatch{{Manager: "test"}}).
 				Obj(),
 		},
 		"CREATE Event: runtimeRef is ClusterTrainingRuntime": {
