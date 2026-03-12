@@ -57,7 +57,7 @@ spec:
                 minimum: 1
                 type: integer
                 x-kubernetes-validations:
-                - message: activeDeadlineSeconds is immutable
+                - message: field is immutable
                   rule: self == oldSelf
               annotations:
                 additionalProperties:

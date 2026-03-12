@@ -363,4 +363,29 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 			})
 		})
 	})
+
+	ginkgo.When("Creating a TrainJob with Resource Timeouts", func() {
+		ginkgo.It("should fail the TrainJob with DeadlineExceeded when active timeout expires", func() {
+			deadline := int64(10)
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-deadline-job").
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
+				ActiveDeadlineSeconds(deadline).
+				Obj()
+
+			trainJob.Spec.Trainer = &trainer.Trainer{
+				Image:   ptr.To("busybox"),
+				Command: []string{"/bin/sh", "-c", "sleep 600"},
+			}
+			gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+			trainJobKey := client.ObjectKeyFromObject(trainJob)
+
+			ginkgo.By("Waiting for TrainJob to fail due to deadline")
+			gomega.Eventually(func(g gomega.Gomega) {
+				gotTrainJob := &trainer.TrainJob{}
+				g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+				g.Expect(gotTrainJob.Status.Conditions).Should(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
+			}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+		})
+	})
 })

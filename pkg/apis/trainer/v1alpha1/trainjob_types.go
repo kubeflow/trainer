@@ -135,7 +135,7 @@ type TrainJobSpec struct {
 	// Failed with reason: DeadlineExceeded.
 	// +optional
 	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="activeDeadlineSeconds is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="field is immutable"
 	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds,omitempty"`
 
 	// managedBy is used to indicate the controller or entity that manages a TrainJob.

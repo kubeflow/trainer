@@ -1441,7 +1441,7 @@ alpha-node-0-1.alpha slots=8
 			})
 		})
 
-		ginkgo.Context("Lifecycle management: Deadline", func() {
+		ginkgo.Context("Integration tests for the TrainJob Timeouts", func() {
 
 			ginkgo.It("Should fail TrainJob with DeadlineExceeded when ActiveDeadlineSeconds expires", func() {
 				// We must create the referenced ClusterTrainingRuntime so the webhook passes
