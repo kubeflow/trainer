@@ -336,7 +336,7 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
 						RuntimePatches([]trainer.RuntimePatch{
 							{
-								Manager: "manager-one",
+								Manager: "acme.io/manager-one",
 								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 									Template: &trainer.JobSetTemplatePatch{
 										Spec: &trainer.JobSetSpecPatch{
@@ -357,7 +357,7 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 								},
 							},
 							{
-								Manager: "manager-two",
+								Manager: "acme.io/manager-two",
 								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 									Template: &trainer.JobSetTemplatePatch{
 										Spec: &trainer.JobSetSpecPatch{
