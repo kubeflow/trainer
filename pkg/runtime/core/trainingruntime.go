@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"maps"
 
-	corev1 "k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -207,47 +207,30 @@ func (r *TrainingRuntime) mergeRuntimePatches(trainJob *trainer.TrainJob, jobSet
 			continue
 		}
 		for _, rJobPatch := range runtimePatch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
-			if rJobPatch.Template == nil || rJobPatch.Template.Spec == nil || rJobPatch.Template.Spec.Template == nil {
+			if rJobPatch.Template == nil {
 				continue
 			}
 			for i, job := range jobSetTemplateSpec.Spec.ReplicatedJobs {
 				if job.Name != rJobPatch.Name {
 					continue
 				}
-				podTemplatePatch := map[string]any{}
-				if rJobPatch.Template.Spec.Template.Metadata != nil {
-					metadata := map[string]any{}
-					if rJobPatch.Template.Spec.Template.Metadata.Labels != nil {
-						metadata["labels"] = rJobPatch.Template.Spec.Template.Metadata.Labels
-					}
-					if rJobPatch.Template.Spec.Template.Metadata.Annotations != nil {
-						metadata["annotations"] = rJobPatch.Template.Spec.Template.Metadata.Annotations
-					}
-					if len(metadata) > 0 {
-						podTemplatePatch["metadata"] = metadata
-					}
-				}
-				if rJobPatch.Template.Spec.Template.Spec != nil {
-					podTemplatePatch["spec"] = rJobPatch.Template.Spec.Template.Spec
-				}
-
-				source, err := json.Marshal(job.Template.Spec.Template)
+				source, err := json.Marshal(job.Template)
 				if err != nil {
 					return err
 				}
-				patch, err := json.Marshal(podTemplatePatch)
+				patch, err := json.Marshal(rJobPatch.Template)
 				if err != nil {
 					return err
 				}
-				merged, err := strategicpatch.StrategicMergePatch(source, patch, corev1.PodTemplateSpec{})
+				merged, err := strategicpatch.StrategicMergePatch(source, patch, batchv1.JobTemplateSpec{})
 				if err != nil {
 					return err
 				}
-				mergedTemplate := corev1.PodTemplateSpec{}
+				mergedTemplate := batchv1.JobTemplateSpec{}
 				if err := json.Unmarshal(merged, &mergedTemplate); err != nil {
 					return err
 				}
-				jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template = mergedTemplate
+				jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template = mergedTemplate
 			}
 		}
 	}

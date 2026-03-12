@@ -832,6 +832,9 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 										{
 											Name: constants.DatasetInitializer,
 											Template: &trainer.JobTemplatePatch{
+												Metadata: &metav1.ObjectMeta{
+													Labels: map[string]string{"job-k1": "job-v1"},
+												},
 												Spec: &trainer.JobSpecPatch{
 													Template: &trainer.PodTemplatePatch{
 														Metadata: &metav1.ObjectMeta{
@@ -856,6 +859,9 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 										{
 											Name: constants.Node,
 											Template: &trainer.JobTemplatePatch{
+												Metadata: &metav1.ObjectMeta{
+													Labels: map[string]string{"job-k2": "job-v2"},
+												},
 												Spec: &trainer.JobSpecPatch{
 													Template: &trainer.PodTemplatePatch{
 														Metadata: &metav1.ObjectMeta{
@@ -884,8 +890,10 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					InitContainer(constants.Node, "override-init-container", "test:runtime").
 					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 					Container(constants.Node, "override-container", "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					ReplicatedJobLabel("job-k1", "job-v1", constants.DatasetInitializer).
 					PodLabelForJobs("k1", "v1", constants.DatasetInitializer).
 					PodAnnotationForJobs("a1", "v1", constants.DatasetInitializer).
+					ReplicatedJobLabel("job-k2", "job-v2", constants.Node).
 					PodLabelForJobs("k2", "v2", constants.Node).
 					PodAnnotationForJobs("a2", "v2", constants.Node).
 					Obj(),
