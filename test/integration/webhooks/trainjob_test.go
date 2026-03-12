@@ -468,6 +468,26 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 		)
 	})
 
+	ginkgo.When("Defaulting RuntimePatch.Time on creation", func() {
+		ginkgo.It("Should set Time on each RuntimePatch when creating a TrainJob", func() {
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "time-defaulting").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+				RuntimePatches([]trainer.RuntimePatch{
+					{Manager: "acme.io/manager-one"},
+					{Manager: "acme.io/manager-two"},
+				}).
+				Obj()
+			gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			gomega.Eventually(func(g gomega.Gomega) {
+				got := &trainer.TrainJob{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), got)).Should(gomega.Succeed())
+				g.Expect(got.Spec.RuntimePatches).Should(gomega.HaveLen(2))
+				g.Expect(got.Spec.RuntimePatches[0].Time).ShouldNot(gomega.BeNil())
+				g.Expect(got.Spec.RuntimePatches[1].Time).ShouldNot(gomega.BeNil())
+			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+		})
+	})
+
 	ginkgo.When("Updating TrainJob", func() {
 		ginkgo.DescribeTable("Validate TrainJob on update", func(old func() *trainer.TrainJob, new func(*trainer.TrainJob) *trainer.TrainJob, errorMatcher gomega.OmegaMatcher) {
 			oldTrainJob := old()
