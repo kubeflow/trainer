@@ -80,6 +80,12 @@ Additional talks:
 Please check [the official Kubeflow Trainer documentation](https://www.kubeflow.org/docs/components/trainer/getting-started)
 to install and get started with Kubeflow Trainer.
 
+Additional user guides and examples:
+
+- [PyTorch examples](./examples/pytorch/README.md)
+- [XGBoost runtime user guide](./docs/user-guides/xgboost/README.md)
+- [Distributed XGBoost example notebook](./examples/xgboost/distributed-training/xgboost-distributed.ipynb)
+
 ## Community
 
 The following links provide information on how to get involved in the community:
