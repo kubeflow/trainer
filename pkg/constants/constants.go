@@ -33,6 +33,10 @@ const (
 	// JobSetKind is the Kind name for the JobSet.
 	JobSetKind string = "JobSet"
 
+	// LabelTrainJobName is the label set on pods to identify the owning TrainJob.
+	// This is used by the preemption restart feature to find pods belonging to a TrainJob.
+	LabelTrainJobName string = "trainer.kubeflow.org/trainjob-name"
+
 	// LabelTrainJobAncestor is the label to identify relationship between
 	// TrainJob and Pod template in the Runtime. The following labels are supported:
 	// trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer  - trainJob.spec.initializer.dataset
