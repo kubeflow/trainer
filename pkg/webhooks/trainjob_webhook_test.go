@@ -18,10 +18,15 @@ package webhooks
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	admissionv1 "k8s.io/api/admission/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
@@ -32,6 +37,206 @@ import (
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
+
+func TestDefault(t *testing.T) {
+	oldTime := metav1.NewTime(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+
+	cases := map[string]struct {
+		oldObj   *trainer.TrainJob
+		newObj   *trainer.TrainJob
+		wantTime func(patches []trainer.RuntimePatch)
+	}{
+		"CREATE: all patches get timestamped": {
+			newObj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				RuntimePatches([]trainer.RuntimePatch{
+					{Manager: "acme.io/one"},
+					{Manager: "acme.io/two"},
+				}).Obj(),
+			wantTime: func(patches []trainer.RuntimePatch) {
+				for _, p := range patches {
+					if p.Time == nil {
+						t.Errorf("patch %q: expected Time to be set, got nil", p.Manager)
+					}
+				}
+			},
+		},
+		"UPDATE, patch unchanged: Time preserved": {
+			oldObj: func() *trainer.TrainJob {
+				obj := testingutil.MakeTrainJobWrapper("default", "test").
+					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+					RuntimePatches([]trainer.RuntimePatch{
+						{
+							Manager: "acme.io/one",
+							Time:    &oldTime,
+							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+								Template: &trainer.JobSetTemplatePatch{
+									Spec: &trainer.JobSetSpecPatch{
+										ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+											Name: "node",
+											Template: &trainer.JobTemplatePatch{
+												Spec: &trainer.JobSpecPatch{
+													Template: &trainer.PodTemplatePatch{
+														Spec: &trainer.PodSpecPatch{
+															ServiceAccountName: ptr.To("sa"),
+														},
+													},
+												},
+											},
+										}},
+									},
+								},
+							},
+						},
+					}).Obj()
+				return obj
+			}(),
+			newObj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				RuntimePatches([]trainer.RuntimePatch{
+					{
+						Manager: "acme.io/one",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: "node",
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														ServiceAccountName: ptr.To("sa"),
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+				}).Obj(),
+			wantTime: func(patches []trainer.RuntimePatch) {
+				if !patches[0].Time.Equal(&oldTime) {
+					t.Errorf("expected Time to be preserved as %v, got %v", oldTime, patches[0].Time)
+				}
+			},
+		},
+		"UPDATE, patch changed: Time updated": {
+			oldObj: func() *trainer.TrainJob {
+				obj := testingutil.MakeTrainJobWrapper("default", "test").
+					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+					RuntimePatches([]trainer.RuntimePatch{
+						{
+							Manager: "acme.io/one",
+							Time:    &oldTime,
+							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+								Template: &trainer.JobSetTemplatePatch{
+									Spec: &trainer.JobSetSpecPatch{
+										ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+											Name: "node",
+											Template: &trainer.JobTemplatePatch{
+												Spec: &trainer.JobSpecPatch{
+													Template: &trainer.PodTemplatePatch{
+														Spec: &trainer.PodSpecPatch{
+															ServiceAccountName: ptr.To("old-sa"),
+														},
+													},
+												},
+											},
+										}},
+									},
+								},
+							},
+						},
+					}).Obj()
+				return obj
+			}(),
+			newObj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				RuntimePatches([]trainer.RuntimePatch{
+					{
+						Manager: "acme.io/one",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: "node",
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														ServiceAccountName: ptr.To("new-sa"),
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+				}).Obj(),
+			wantTime: func(patches []trainer.RuntimePatch) {
+				if patches[0].Time == nil {
+					t.Fatal("expected Time to be set, got nil")
+				}
+				if patches[0].Time.Equal(&oldTime) {
+					t.Errorf("expected Time to be updated, but it was preserved as %v", oldTime)
+				}
+			},
+		},
+		"UPDATE, new patch added alongside unchanged patch": {
+			oldObj: func() *trainer.TrainJob {
+				obj := testingutil.MakeTrainJobWrapper("default", "test").
+					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+					RuntimePatches([]trainer.RuntimePatch{
+						{Manager: "acme.io/existing", Time: &oldTime},
+					}).Obj()
+				return obj
+			}(),
+			newObj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				RuntimePatches([]trainer.RuntimePatch{
+					{Manager: "acme.io/existing"},
+					{Manager: "acme.io/new"},
+				}).Obj(),
+			wantTime: func(patches []trainer.RuntimePatch) {
+				if !patches[0].Time.Equal(&oldTime) {
+					t.Errorf("existing patch: expected Time preserved as %v, got %v", oldTime, patches[0].Time)
+				}
+				if patches[1].Time == nil {
+					t.Error("new patch: expected Time to be set, got nil")
+				}
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			operation := admissionv1.Create
+			req := admissionv1.AdmissionRequest{}
+			if tc.oldObj != nil {
+				operation = admissionv1.Update
+				raw, err := json.Marshal(tc.oldObj)
+				if err != nil {
+					t.Fatal(err)
+				}
+				req.OldObject = apiruntime.RawExtension{Raw: raw}
+			}
+			req.Operation = operation
+			ctx = admission.NewContextWithRequest(ctx, admission.Request{AdmissionRequest: req})
+
+			defaulter := &TrainJobDefaulter{}
+			if err := defaulter.Default(ctx, tc.newObj); err != nil {
+				t.Fatalf("Default returned unexpected error: %v", err)
+			}
+			tc.wantTime(tc.newObj.Spec.RuntimePatches)
+		})
+	}
+}
 
 func TestValidateCreate(t *testing.T) {
 	cases := map[string]struct {
