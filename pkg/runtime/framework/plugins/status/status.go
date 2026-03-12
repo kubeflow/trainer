@@ -40,9 +40,9 @@ const (
 	Name = "Status"
 
 	// Environment variable names
-	envNameStatusURL = "KUBEFLOW_TRAINER_STATUS_URL"
-	envNameCACert    = "KUBEFLOW_TRAINER_STATUS_CA_CERT"
-	envNameToken     = "KUBEFLOW_TRAINER_STATUS_TOKEN"
+	envNameStatusURL = "KUBEFLOW_TRAINER_STATUS_SERVER_URL"
+	envNameCACert    = "KUBEFLOW_TRAINER_STATUS_SERVER_CA_CERT"
+	envNameToken     = "KUBEFLOW_TRAINER_STATUS_SERVER_TOKEN"
 
 	// Volume and mount configuration
 	configMountPath = "/var/run/secrets/kubeflow/trainer"

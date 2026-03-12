@@ -169,6 +169,16 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// If the update request is empty (no trainer status), return success without applying
+	if updateRequest.TrainerStatus == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(updateRequest); err != nil {
+			s.log.Error(err, "Failed to write response", "namespace", namespace, "name", trainJobName)
+		}
+		return
+	}
+
 	var trainJob = trainerv1alpha1ac.TrainJob(trainJobName, namespace).WithStatus(toApplyConfig(updateRequest))
 
 	if err := s.client.Status().Apply(r.Context(), trainJob, client.ForceOwnership, client.FieldOwner("trainer-status")); err != nil {

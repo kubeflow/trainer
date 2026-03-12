@@ -322,9 +322,9 @@ Users will need to instrument their train jobs so that they periodically send tr
 
 To make it easier for training pods to update the training status, if the feature gate is enabled the control plane will inject the following environment variables into all containers of all pods of the training job:
 ```shell
-KUBEFLOW_TRAINER_STATUS_URL=https://kubeflow-trainer-controller-manager.kubeflow:8082/apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status
-KUBEFLOW_TRAINER_STATUS_CA_CERT=/var/run/secrets/kubeflow/trainer/ca.crt
-KUBEFLOW_TRAINER_STATUS_TOKEN=/var/run/secrets/kubeflow/trainer/token
+KUBEFLOW_TRAINER_STATUS_SERVER_URL=https://kubeflow-trainer-controller-manager.kubeflow:8082/apis/trainer.kubeflow.org/v1alpha1/namespaces/{namespace}/trainjobs/{name}/status
+KUBEFLOW_TRAINER_STATUS_SERVER_CA_CERT=/var/run/secrets/kubeflow/trainer/ca.crt
+KUBEFLOW_TRAINER_STATUS_SERVER_TOKEN=/var/run/secrets/kubeflow/trainer/token
 ```
 
 These environment variables make it easy for any pod to report the runtime code for submitting status updates, e.g.:
@@ -335,9 +335,9 @@ import ssl
 
 def update_training_status(payload):
     try:
-        url = os.environ["KUBEFLOW_TRAINER_STATUS_URL"]
-        ca_file = os.environ["KUBEFLOW_TRAINER_STATUS_CA_CERT"]
-        token = open(os.environ["KUBEFLOW_TRAINER_STATUS_TOKEN"]).read()
+        url = os.environ["KUBEFLOW_TRAINER_STATUS_SERVER_URL"]
+        ca_file = os.environ["KUBEFLOW_TRAINER_STATUS_SERVER_CA_CERT"]
+        token = open(os.environ["KUBEFLOW_TRAINER_STATUS_SERVER_TOKEN"]).read()
         ssl_context = ssl.create_default_context(cafile=ca_file)
         req = request.Request(url, data=payload, headers={"Authorization": f"Bearer {token}"})
         request.urlopen(req, ssl_context=ssl_context)

@@ -9,9 +9,9 @@ account token from environment variables injected by the Status plugin, then sen
 a single status update with test metrics to verify the TrainJob status is updated.
 
 Environment variables required:
-- KUBEFLOW_TRAINER_STATUS_URL: HTTPS URL for the status server endpoint
-- KUBEFLOW_TRAINER_STATUS_CA_CERT: Path to CA certificate file for TLS verification
-- KUBEFLOW_TRAINER_STATUS_TOKEN: Path to service account token file for authentication
+- KUBEFLOW_TRAINER_STATUS_SERVER_URL: HTTPS URL for the status server endpoint
+- KUBEFLOW_TRAINER_STATUS_SERVER_CA_CERT: Path to CA certificate file for TLS verification
+- KUBEFLOW_TRAINER_STATUS_SERVER_TOKEN: Path to service account token file for authentication
 """
 
 import json
@@ -20,9 +20,9 @@ import ssl
 from datetime import datetime, timezone
 from urllib import error, request
 
-url = os.environ["KUBEFLOW_TRAINER_STATUS_URL"]
-ca_file = os.environ["KUBEFLOW_TRAINER_STATUS_CA_CERT"]
-token = open(os.environ["KUBEFLOW_TRAINER_STATUS_TOKEN"]).read().strip()
+url = os.environ["KUBEFLOW_TRAINER_STATUS_SERVER_URL"]
+ca_file = os.environ["KUBEFLOW_TRAINER_STATUS_SERVER_CA_CERT"]
+token = open(os.environ["KUBEFLOW_TRAINER_STATUS_SERVER_TOKEN"]).read().strip()
 ssl_context = ssl.create_default_context(cafile=ca_file)
 
 # Send a single status update
