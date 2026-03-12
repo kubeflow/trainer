@@ -96,7 +96,7 @@ kubectl apply --server-side -k manifests/overlays/runtimes || (
 
 # hotfix(jaiakash) - skip pre-load due to kind failure
 # # TODO (andreyvelich): We should build runtime images before adding them.
-# TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+# TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
 # DEEPSPEED_RUNTIME_IMAGE=ghcr.io/kubeflow/trainer/deepspeed-runtime:latest
 # JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
 

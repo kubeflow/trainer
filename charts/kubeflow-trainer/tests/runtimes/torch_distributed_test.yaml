@@ -75,4 +75,4 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.containers[0].image
-          value: pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+          value: pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
