@@ -306,10 +306,17 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 
 	// TODO (andreyvelich): Refactor the builder with wrappers for PodSpec.
 	// TODO: Once we remove deprecated runtime.Info.Trainer, we should remove JobSet Builder with DeprecatedTrainer().
+	// Merge scheduler pod labels with the TrainJob name label for preemption restart support.
+	podLabels := maps.Clone(info.Scheduler.PodLabels)
+	if podLabels == nil {
+		podLabels = make(map[string]string)
+	}
+	podLabels[constants.LabelTrainJobName] = trainJob.Name
+
 	jobSet := jobSetBuilder.
 		Initializer(trainJob).
 		Trainer(info, trainJob).
-		PodLabels(info.Scheduler.PodLabels).
+		PodLabels(podLabels).
 		PodAnnotations(info.Scheduler.PodAnnotations).
 		Suspend(trainJob.Spec.Suspend).
 		Build().

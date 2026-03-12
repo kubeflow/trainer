@@ -43,7 +43,9 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/util/preemption"
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
@@ -88,6 +90,7 @@ func NewTrainJobReconciler(client client.Client, recorder events.EventRecorder, 
 	}
 }
 
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;watch;update;patch
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;watch;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=get;list;watch;update;patch
@@ -118,6 +121,16 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
 	} else if !trainjob.IsTrainJobFinished(&trainJob) {
+		// Handle preempted pods: when the PreemptionRestart feature gate is enabled,
+		// detect pods that have been preempted by the scheduler and delete them so
+		// they can be recreated by the JobSet controller.
+		if features.Enabled(features.PreemptionRestart) {
+			if preemptErr := r.handlePreemptedPods(ctx, &trainJob); preemptErr != nil {
+				log.Error(preemptErr, "Failed to handle preempted pods")
+				err = errors.Join(err, preemptErr)
+			}
+		}
+
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
 		if err != nil {
 			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
@@ -254,4 +267,104 @@ func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controll
 		}
 	}
 	return b.Complete(r)
+}
+
+// handlePreemptedPods lists all pods owned by the TrainJob and deletes any that have been
+// preempted by the scheduler (indicated by DisruptionTarget condition with reason
+// PreemptionByScheduler). This allows the JobSet controller to recreate the pods,
+// effectively restarting the preempted replicas instead of marking the job as failed.
+//
+// The max preemption restart limit is enforced via the PreemptionRestartCountAnnotation
+// on the TrainJob. If the limit is exceeded, preempted pods are not deleted and the
+// job is allowed to fail naturally.
+func (r *TrainJobReconciler) handlePreemptedPods(ctx context.Context, trainJob *trainer.TrainJob) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	// List all pods owned by this TrainJob.
+	var podList corev1.PodList
+	if err := r.client.List(ctx, &podList,
+		client.InNamespace(trainJob.Namespace),
+		client.MatchingLabels{
+			constants.LabelTrainJobName: trainJob.Name,
+		},
+	); err != nil {
+		return fmt.Errorf("listing pods for TrainJob: %w", err)
+	}
+
+	preemptedPods := preemption.FilterPreemptedPods(podList.Items)
+	if len(preemptedPods) == 0 {
+		return nil
+	}
+
+	log.V(1).Info("Detected preempted pods", "count", len(preemptedPods))
+
+	// Check the preemption restart count against the max limit.
+	currentRestartCount := getTrainJobPreemptionRestartCount(trainJob)
+	maxRestarts := int32(preemption.DefaultMaxPreemptionRestarts)
+	if maxRestarts > 0 && currentRestartCount >= maxRestarts {
+		log.Info("TrainJob has exceeded max preemption restarts, allowing failure",
+			"currentRestarts", currentRestartCount, "maxRestarts", maxRestarts)
+		r.recorder.Eventf(trainJob, nil, corev1.EventTypeWarning, "PreemptionRestartLimitExceeded", "Reconciling",
+			"TrainJob %s/%s exceeded max preemption restarts (%d), allowing job to fail",
+			trainJob.Namespace, trainJob.Name, maxRestarts)
+		return nil
+	}
+
+	// Delete preempted pods so they can be recreated by the JobSet controller.
+	var errs []error
+	for i := range preemptedPods {
+		pod := &preemptedPods[i]
+		log.Info("Deleting preempted pod for recreation",
+			"pod", klog.KObj(pod), "restartCount", currentRestartCount+1)
+		if err := r.client.Delete(ctx, pod); client.IgnoreNotFound(err) != nil {
+			errs = append(errs, fmt.Errorf("deleting preempted pod %s: %w", pod.Name, err))
+			continue
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	// Update the preemption restart count annotation on the TrainJob.
+	if err := incrementTrainJobPreemptionRestartCount(ctx, r.client, trainJob); err != nil {
+		return fmt.Errorf("updating preemption restart count: %w", err)
+	}
+
+	r.recorder.Eventf(trainJob, nil, corev1.EventTypeWarning, "PreemptedPodsDeleted", "Reconciling",
+		"Deleted %d preempted pod(s) for TrainJob %s/%s (restart %d/%d)",
+		len(preemptedPods), trainJob.Namespace, trainJob.Name, currentRestartCount+1, maxRestarts)
+
+	return nil
+}
+
+// getTrainJobPreemptionRestartCount returns the current preemption restart count
+// from the TrainJob's annotations.
+func getTrainJobPreemptionRestartCount(trainJob *trainer.TrainJob) int32 {
+	if trainJob.Annotations == nil {
+		return 0
+	}
+	val, ok := trainJob.Annotations[preemption.PreemptionRestartCountAnnotation]
+	if !ok {
+		return 0
+	}
+	count, err := fmt.Sscanf(val, "%d")
+	if err != nil || count == 0 {
+		return 0
+	}
+	var result int32
+	fmt.Sscanf(val, "%d", &result)
+	return result
+}
+
+// incrementTrainJobPreemptionRestartCount increments the preemption restart count
+// annotation on the TrainJob.
+func incrementTrainJobPreemptionRestartCount(ctx context.Context, c client.Client, trainJob *trainer.TrainJob) error {
+	patch := client.MergeFrom(trainJob.DeepCopy())
+	currentCount := getTrainJobPreemptionRestartCount(trainJob)
+	if trainJob.Annotations == nil {
+		trainJob.Annotations = make(map[string]string)
+	}
+	trainJob.Annotations[preemption.PreemptionRestartCountAnnotation] = fmt.Sprintf("%d", currentCount+1)
+	return c.Patch(ctx, trainJob, patch)
 }

@@ -30,13 +30,25 @@ func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultFeatureGates))
 }
 
+const (
+	// PreemptionRestart enables automatic Pod recreation when preempted by scheduler.
+	// When enabled, pods preempted by Volcano or other schedulers (indicated by
+	// DisruptionTarget condition with reason PreemptionByScheduler) will be automatically
+	// deleted and recreated instead of counting as permanent failures.
+	// This is useful for Volcano gang-scheduling scenarios where low-priority jobs
+	// may be reclaimed to make room for higher-priority jobs.
+	PreemptionRestart featuregate.Feature = "PreemptionRestart"
+)
+
 // defaultFeatureGates consists of all known Trainer-specific feature keys.
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Trainer binaries.
 //
 // Entries are separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
-var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}
+var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	PreemptionRestart: {Default: false, PreRelease: featuregate.Alpha},
+}
 
 func SetFeatureGateDuringTest(tb testing.TB, f featuregate.Feature, value bool) {
 	featuregatetesting.SetFeatureGateDuringTest(tb, utilfeature.DefaultFeatureGate, f, value)
