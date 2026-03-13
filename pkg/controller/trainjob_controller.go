@@ -107,7 +107,6 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log.V(2).Info("Reconciling TrainJob")
 
 	var err error
-
 	// Keep track of the origin TrainJob status
 	prevTrainJob := trainJob.DeepCopy()
 
@@ -118,14 +117,9 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := r.runtimes[runtimeRefGK]
 	if !ok {
+		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
-		if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
-			return ctrl.Result{}, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob))
-		}
-		return ctrl.Result{}, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
-	}
-
-	if !trainjob.IsTrainJobFinished(&trainJob) {
+	} else if !trainjob.IsTrainJobFinished(&trainJob) {
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
 		if err != nil {
 			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
