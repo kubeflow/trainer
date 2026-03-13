@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -145,7 +146,7 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		err = errors.Join(err, statusErr)
 	}
 
-	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, runtime, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
+	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
 		if deadlineErr != nil {
 			err = errors.Join(err, deadlineErr)
 		}
@@ -179,7 +180,7 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 	return nil
 }
 
-func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) (ctrl.Result, error) {
+func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
 	if trainJob.Spec.ActiveDeadlineSeconds == 0 || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return ctrl.Result{}, nil
 	}
@@ -199,10 +200,11 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, runtime jobr
 			"startTime", startTime,
 			"deadline", deadline)
 		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
-		trainJobCopy := trainJob.DeepCopy()
-		trainJobCopy.Spec.Suspend = ptr.To(true)
-		if suspendErr := r.reconcileObjects(ctx, runtime, trainJobCopy); suspendErr != nil {
-			ctrl.LoggerFrom(ctx).V(2).Info("Failed to suspend JobSet after deadline exceeded", "error", suspendErr)
+		jobSet := &jobsetv1alpha2.JobSet{
+			ObjectMeta: metav1.ObjectMeta{Name: trainJob.Name, Namespace: trainJob.Namespace},
+		}
+		if err := client.IgnoreNotFound(r.client.Delete(ctx, jobSet)); err != nil {
+			ctrl.LoggerFrom(ctx).V(2).Info("Failed to delete JobSet after deadline exceeded", "error", err)
 		}
 		return ctrl.Result{}, nil
 	}

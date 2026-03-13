@@ -1464,11 +1464,9 @@ alpha-node-0-1.alpha slots=8
 					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
-				ginkgo.By("Ensuring the underlying JobSet is suspended")
+				ginkgo.By("Ensuring the underlying JobSet is deleted")
 				gomega.Eventually(func(g gomega.Gomega) {
-					jobSet := &jobsetv1alpha2.JobSet{}
-					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
-					g.Expect(ptr.Deref(jobSet.Spec.Suspend, false)).To(gomega.BeTrue())
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(testingutil.BeNotFoundError())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 
@@ -1547,11 +1545,9 @@ alpha-node-0-1.alpha slots=8
 					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
-				ginkgo.By("Ensuring the underlying JobSet is suspended")
+				ginkgo.By("Ensuring the underlying JobSet is deleted")
 				gomega.Eventually(func(g gomega.Gomega) {
-					jobSet := &jobsetv1alpha2.JobSet{}
-					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
-					g.Expect(ptr.Deref(jobSet.Spec.Suspend, false)).To(gomega.BeTrue())
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(testingutil.BeNotFoundError())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 		})

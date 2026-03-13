@@ -70,7 +70,7 @@ var _ framework.CustomValidationPlugin = (*JobSet)(nil)
 
 const Name = constants.JobSetKind
 
-// +kubebuilder:rbac:groups=jobset.x-k8s.io,resources=jobsets,verbs=create;get;list;watch;update;patch
+// +kubebuilder:rbac:groups=jobset.x-k8s.io,resources=jobsets,verbs=create;delete;get;list;watch;update;patch
 
 func New(ctx context.Context, client client.Client, _ client.FieldIndexer) (framework.Plugin, error) {
 	return &JobSet{
