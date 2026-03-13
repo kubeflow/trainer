@@ -428,7 +428,8 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 
 	// Resource file for cluster includes GPUs or not
 	// flux R encode --hosts=${hosts} --cores=0-1 --gpu=0
-	Rspec := fmt.Sprintf("--cores=0-%d", tasks-1)
+	coreSpec := generateRange(int32(tasks), 0)
+	Rspec := fmt.Sprintf("--cores=%s", coreSpec)
 	if gpus > 0 {
 		flags = fmt.Sprintf("%s -g %d", flags, gpus)
 		gpuSpec := generateRange(int32(gpus), 0)
