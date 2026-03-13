@@ -10,4 +10,4 @@ RUN apt update && apt-get install -y --no-install-recommends build-essential \
 COPY cmd/trainers/torchtune/requirements.txt .
 
 # Install the needed packages
-RUN pip install -r requirements.txt
+RUN pip install --break-system-packages -r requirements.txt

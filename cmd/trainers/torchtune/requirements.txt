@@ -1,4 +1,4 @@
-torchao==0.15.0
+torchao==0.16.0
 torchtune==0.6.1
 bitsandbytes>=0.41.1
 kagglehub>=0.4.0
