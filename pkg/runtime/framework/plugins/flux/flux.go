@@ -202,6 +202,7 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 					*corev1ac.VolumeMount().WithName(constants.FluxSpackViewVolumeName).WithMountPath(constants.FluxSpackViewVolumePath),
 					*corev1ac.VolumeMount().WithName(configMapName).WithMountPath(constants.FluxConfigVolumeName).WithReadOnly(true),
 					*corev1ac.VolumeMount().WithName(constants.FluxCurveVolumeName).WithMountPath(constants.FluxCurveVolumePath).WithReadOnly(true),
+					*corev1ac.VolumeMount().WithName(constants.FluxMemoryVolumeName).WithMountPath(constants.FluxMemoryVolumePath).WithReadOnly(true),
 				)
 			}
 		}
@@ -430,12 +431,8 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	Rspec := fmt.Sprintf("--cores=0-%d", tasks-1)
 	if gpus > 0 {
 		flags = fmt.Sprintf("%s -g %d", flags, gpus)
-		gpus = gpus - 1
-		if gpus == 0 {
-			Rspec = fmt.Sprintf("%s --gpu=0", Rspec)
-		} else {
-			Rspec = fmt.Sprintf("%s --gpu=0-%d", Rspec, gpus)
-		}
+		gpuSpec := generateRange(int32(gpus), 0)
+		Rspec = fmt.Sprintf("%s --gpu=%s", Rspec, gpuSpec)
 	}
 	return fmt.Sprintf(entrypointTemplate, Rspec, mainHost, flags)
 }
