@@ -247,8 +247,6 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 	ginkgo.When("Creating TrainJob to perform XGBoost workload", func() {
 		// Verify the `xgboost-distributed` ClusterTrainingRuntime.
 		ginkgo.It("should create TrainJob with XGBoost runtime reference", func() {
-			// TODO (krishna-kg732): Remove this skip once the xgboost-runtime image is published to GHCR.
-			ginkgo.Skip("xgboost-runtime image not yet published to GHCR")
 			// Create a TrainJob.
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-xgboost").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), xgboostRuntime).
