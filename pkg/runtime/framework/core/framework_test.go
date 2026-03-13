@@ -900,6 +900,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithName(constants.MPISSHAuthVolumeName).
 														WithSecret(corev1ac.SecretVolumeSource().
 															WithSecretName(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix)).
+															WithDefaultMode(0640).
 															WithItems(
 																corev1ac.KeyToPath().
 																	WithKey(corev1.SSHAuthPrivateKey).
@@ -974,6 +975,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithName(constants.MPISSHAuthVolumeName).
 														WithSecret(corev1ac.SecretVolumeSource().
 															WithSecretName(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix)).
+															WithDefaultMode(0640).
 															WithItems(
 																corev1ac.KeyToPath().
 																	WithKey(corev1.SSHAuthPrivateKey).
@@ -1084,6 +1086,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
@@ -1141,6 +1144,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
@@ -2193,7 +2197,10 @@ test-job-node-0-1.test-job slots=1
 		cmpopts.SortSlices(func(a, b apiruntime.Object) bool {
 			return a.GetObjectKind().GroupVersionKind().String() < b.GetObjectKind().GroupVersionKind().String()
 		}),
+		// Compare MPI Secret data contents, but ignore DefaultMode differences on Secret volumes,
+		// which are validated more directly in MPI-specific tests.
 		cmp.Comparer(testingutil.MPISecretDataComparer),
+		cmpopts.IgnoreFields(corev1.SecretVolumeSource{}, "DefaultMode"),
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

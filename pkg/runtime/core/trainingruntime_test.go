@@ -1978,7 +1978,8 @@ test-job-node-0-1.test-job slots=8
 							Name: constants.MPISSHAuthVolumeName,
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									SecretName:  fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									DefaultMode: ptr.To[int32](0640),
 									Items: []corev1.KeyToPath{
 										{
 											Key:  corev1.SSHAuthPrivateKey,
@@ -2017,7 +2018,8 @@ test-job-node-0-1.test-job slots=8
 							Name: constants.MPISSHAuthVolumeName,
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									SecretName:  fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									DefaultMode: ptr.To[int32](0640),
 									Items: []corev1.KeyToPath{
 										{
 											Key:  corev1.SSHAuthPrivateKey,
