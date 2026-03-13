@@ -106,7 +106,7 @@ func TestValidateCreate(t *testing.T) {
 				clientBuilder = clientBuilder.WithObjects(tc.clusterTrainingRuntime)
 			}
 
-			runtimes, err := runtimecore.New(context.Background(), clientBuilder.Build(), testingutil.AsIndex(clientBuilder), testingutil.NewConfig())
+			runtimes, err := runtimecore.New(context.Background(), clientBuilder.Build(), testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
