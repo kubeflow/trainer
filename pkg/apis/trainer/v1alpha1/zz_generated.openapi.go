@@ -50,6 +50,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicy":                         schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicySource":                   schema_pkg_apis_trainer_v1alpha1_MLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource":                schema_pkg_apis_trainer_v1alpha1_MPIMLPolicySource(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Metric":                           schema_pkg_apis_trainer_v1alpha1_Metric(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ModelInitializer":                 schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicy":                   schema_pkg_apis_trainer_v1alpha1_PodGroupPolicy(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicySource":             schema_pkg_apis_trainer_v1alpha1_PodGroupPolicySource(ref),
@@ -64,10 +65,12 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobSpec":                     schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobStatus":                   schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Trainer":                          schema_pkg_apis_trainer_v1alpha1_Trainer(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus":                    schema_pkg_apis_trainer_v1alpha1_TrainerStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntime":                  schema_pkg_apis_trainer_v1alpha1_TrainingRuntime(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeList":              schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeList(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeSpec":              schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeSpecPatch":         schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpecPatch(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.UpdateTrainJobStatusRequest":      schema_pkg_apis_trainer_v1alpha1_UpdateTrainJobStatusRequest(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.VolcanoPodGroupPolicySource":      schema_pkg_apis_trainer_v1alpha1_VolcanoPodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.XGBoostMLPolicySource":            schema_pkg_apis_trainer_v1alpha1_XGBoostMLPolicySource(ref),
 		v2.ContainerResourceMetricSource{}.OpenAPIModelName():                                       schema_k8sio_api_autoscaling_v2_ContainerResourceMetricSource(ref),
@@ -1065,6 +1068,33 @@ func schema_pkg_apis_trainer_v1alpha1_MPIMLPolicySource(ref common.ReferenceCall
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_Metric(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is a user-defined label for the metric, e.g. \"loss\", \"eval_accuracy\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "value of the metric. Values must be serialized as a string.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "value"},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -1715,11 +1745,17 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref common.ReferenceCallbac
 							},
 						},
 					},
+					"trainerStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.\n\nThis field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).\n\nThis is an alpha feature and requires enabling the TrainJobProgress feature gate.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobStatus", metav1.Condition{}.OpenAPIModelName()},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobStatus", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus", metav1.Condition{}.OpenAPIModelName()},
 	}
 }
 
@@ -1824,6 +1860,60 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 		},
 		Dependencies: []string{
 			corev1.EnvVar{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_TrainerStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TrainerStatus represents the latest known runtime status of the Trainer step of the TrainJob.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"progressPercentage": {
+						SchemaProps: spec.SchemaProps{
+							Description: "progressPercentage gives an estimate of how complete the TrainJob is as a percentage. The value will be between 0 and 100, or empty if unknown.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"estimatedRemainingSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "estimatedRemainingSeconds gives the estimated remaining training time in seconds before the train job is completed. The value will be empty if it is unknown.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"metrics": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "metrics contains the current metrics for the model.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Metric"),
+									},
+								},
+							},
+						},
+					},
+					"lastUpdatedTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "lastUpdatedTime is the timestamp when the runtime status was observed.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Metric", metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -1973,6 +2063,27 @@ func schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpecPatch(ref common.Refere
 		},
 		Dependencies: []string{
 			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplatePatch"},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_UpdateTrainJobStatusRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UpdateTrainJobStatusRequest contains the current runtime status (e.g. progress and metrics) for the different stages of the TrainJob.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"trainerStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.\n\nThis field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).\n\nThis is an alpha feature and requires enabling the TrainJobProgress feature gate.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus"},
 	}
 }
 

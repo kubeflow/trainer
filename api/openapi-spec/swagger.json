@@ -14122,6 +14122,23 @@
           }
         }
       },
+      "trainer.v1alpha1.Metric": {
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "description": "name is a user-defined label for the metric, e.g. \"loss\", \"eval_accuracy\".",
+            "type": "string"
+          },
+          "value": {
+            "description": "value of the metric. Values must be serialized as a string.",
+            "type": "string"
+          }
+        }
+      },
       "trainer.v1alpha1.ModelInitializer": {
         "description": "ModelInitializer represents the desired configuration to initialize pre-trained model. The ModelInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
         "type": "object",
@@ -14601,6 +14618,14 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
+          },
+          "trainerStatus": {
+            "description": "trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.\n\nThis field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).\n\nThis is an alpha feature and requires enabling the TrainJobProgress feature gate.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainerStatus"
+              }
+            ]
           }
         }
       },
@@ -14663,6 +14688,43 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.TrainerStatus": {
+        "description": "TrainerStatus represents the latest known runtime status of the Trainer step of the TrainJob.",
+        "type": "object",
+        "properties": {
+          "estimatedRemainingSeconds": {
+            "description": "estimatedRemainingSeconds gives the estimated remaining training time in seconds before the train job is completed. The value will be empty if it is unknown.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastUpdatedTime": {
+            "description": "lastUpdatedTime is the timestamp when the runtime status was observed.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ]
+          },
+          "metrics": {
+            "description": "metrics contains the current metrics for the model.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.Metric"
+                }
+              ]
+            },
+            "x-kubernetes-list-type": "atomic"
+          },
+          "progressPercentage": {
+            "description": "progressPercentage gives an estimate of how complete the TrainJob is as a percentage. The value will be between 0 and 100, or empty if unknown.",
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -14776,6 +14838,20 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobSetTemplatePatch"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.UpdateTrainJobStatusRequest": {
+        "description": "UpdateTrainJobStatusRequest contains the current runtime status (e.g. progress and metrics) for the different stages of the TrainJob.",
+        "type": "object",
+        "properties": {
+          "trainerStatus": {
+            "description": "trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.\n\nThis field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).\n\nThis is an alpha feature and requires enabling the TrainJobProgress feature gate.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainerStatus"
               }
             ]
           }

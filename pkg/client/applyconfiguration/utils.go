@@ -54,6 +54,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.JobStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobTemplatePatch"):
 		return &trainerv1alpha1.JobTemplatePatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Metric"):
+		return &trainerv1alpha1.MetricApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MLPolicy"):
 		return &trainerv1alpha1.MLPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MLPolicySource"):
