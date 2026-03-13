@@ -31,14 +31,13 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
     TrainJobSpec represents specification of the desired TrainJob.
     """ # noqa: E501
     active_deadline_seconds: Optional[StrictInt] = Field(default=None, description="activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob start time (which resets on resume from suspension) that the TrainJob may be active before the system tries to terminate it. Value must be a positive integer. Once reached, all running Pods are terminated and the TrainJob status becomes Failed with reason: DeadlineExceeded.", alias="activeDeadlineSeconds")
-    annotations: Optional[Dict[str, StrictStr]] = Field(default=None, description="annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.")
     initializer: Optional[TrainerV1alpha1Initializer] = Field(default=None, description="initializer defines the configuration of the initializer.")
     managed_by: Optional[StrictStr] = Field(default=None, description="managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.", alias="managedBy")
     runtime_patches: Optional[List[TrainerV1alpha1RuntimePatch]] = Field(default=None, description="runtimePatches defines custom patches applied to the TrainJob's Runtime. Patches are keyed by manager to provide clear ownership and avoid conflicts between controllers.", alias="runtimePatches")
     runtime_ref: TrainerV1alpha1RuntimeRef = Field(description="runtimeRef is the reference to the training runtime.", alias="runtimeRef")
     suspend: Optional[StrictBool] = Field(default=None, description="suspend defines whether to suspend the running TrainJob.")
     trainer: Optional[TrainerV1alpha1Trainer] = Field(default=None, description="trainer defines the configuration of the trainer.")
-    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "annotations", "initializer", "managedBy", "runtimePatches", "runtimeRef", "suspend", "trainer"]
+    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "initializer", "managedBy", "runtimePatches", "runtimeRef", "suspend", "trainer"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -108,7 +107,6 @@ class TrainerV1alpha1TrainJobSpec(BaseModel):
 
         _obj = cls.model_validate({
             "activeDeadlineSeconds": obj.get("activeDeadlineSeconds"),
-            "annotations": obj.get("annotations"),
             "initializer": TrainerV1alpha1Initializer.from_dict(obj["initializer"]) if obj.get("initializer") is not None else None,
             "managedBy": obj.get("managedBy"),
             "runtimePatches": [TrainerV1alpha1RuntimePatch.from_dict(_item) for _item in obj["runtimePatches"]] if obj.get("runtimePatches") is not None else None,

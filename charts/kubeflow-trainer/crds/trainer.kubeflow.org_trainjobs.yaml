@@ -59,13 +59,6 @@ spec:
                 x-kubernetes-validations:
                 - message: field is immutable
                   rule: self == oldSelf
-              annotations:
-                additionalProperties:
-                  type: string
-                description: |-
-                  annotations to apply for the derivative JobSet and Jobs.
-                  They will be merged with the TrainingRuntime values.
-                type: object
               initializer:
                 description: initializer defines the configuration of the initializer.
                 properties:

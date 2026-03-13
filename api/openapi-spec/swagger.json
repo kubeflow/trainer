@@ -14515,14 +14515,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "annotations": {
-            "description": "annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.",
-            "type": "object",
-            "additionalProperties": {
-              "type": "string",
-              "default": ""
-            }
-          },
           "initializer": {
             "description": "initializer defines the configuration of the initializer.",
             "allOf": [
