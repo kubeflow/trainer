@@ -141,16 +141,10 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
-		if deadlineErr != nil {
-			err = errors.Join(err, deadlineErr)
-		}
 		if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
 			return deadlineResult, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
 		}
-		if deadlineResult.RequeueAfter > 0 {
-			return deadlineResult, nil
-		}
-		return deadlineResult, err
+		return deadlineResult, errors.Join(err, deadlineErr)
 	}
 
 	if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
