@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package status
+package trainjobstatus
 
 import (
 	"context"
@@ -32,12 +32,12 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
-	statusserver "github.com/kubeflow/trainer/v2/pkg/status"
+	"github.com/kubeflow/trainer/v2/pkg/statusserver"
 	utilruntime "github.com/kubeflow/trainer/v2/pkg/util/runtime"
 )
 
 const (
-	Name = "Status"
+	Name = "TrainJobStatus"
 
 	// Environment variable names
 	envNameStatusURL = "KUBEFLOW_TRAINER_STATUS_SERVER_URL"

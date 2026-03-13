@@ -35,7 +35,7 @@ const (
 	// kep: https://github.com/kubeflow/trainer/blob/main/docs/proposals/2779-trainjob-progress/README.md
 	//
 	// Enables status server allowing TrainJob pods to update their status.
-	TrainJobRuntimeStatus featuregate.Feature = "TrainJobRuntimeStatus"
+	TrainJobStatus featuregate.Feature = "TrainJobStatus"
 )
 
 // defaultFeatureGates consists of all known Trainer-specific feature keys.
@@ -45,7 +45,7 @@ const (
 // Entries are separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	TrainJobRuntimeStatus: {Default: false, PreRelease: featuregate.Alpha},
+	TrainJobStatus: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func SetFeatureGateDuringTest(tb testing.TB, f featuregate.Feature, value bool) {
