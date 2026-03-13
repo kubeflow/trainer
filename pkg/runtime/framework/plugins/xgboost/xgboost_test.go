@@ -201,7 +201,7 @@ func TestXGBoostValidate(t *testing.T) {
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
 			cliBuilder := utiltesting.NewClientBuilder()
-			p, err := New(ctx, cliBuilder.Build(), nil)
+			p, err := New(ctx, cliBuilder.Build(), nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize XGBoost plugin: %v", err)
 			}
@@ -931,7 +931,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
 			cliBuilder := utiltesting.NewClientBuilder()
-			p, err := New(ctx, cliBuilder.Build(), nil)
+			p, err := New(ctx, cliBuilder.Build(), nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize XGBoost plugin: %v", err)
 			}

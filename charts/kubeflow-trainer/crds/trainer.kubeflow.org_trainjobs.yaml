@@ -5981,17 +5981,20 @@ spec:
                         name:
                           description: name is a user-defined label for the metric,
                             e.g. "loss", "eval_accuracy".
+                          maxLength: 64
                           minLength: 1
                           type: string
                         value:
                           description: value of the metric. Values must be serialized
                             as a string.
+                          maxLength: 64
                           minLength: 1
                           type: string
                       required:
                       - name
                       - value
                       type: object
+                    maxItems: 256
                     type: array
                     x-kubernetes-list-type: atomic
                   progressPercentage:

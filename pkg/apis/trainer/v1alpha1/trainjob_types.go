@@ -567,6 +567,7 @@ type TrainerStatus struct {
 
 	// metrics contains the current metrics for the model.
 	//
+	// +kubebuilder:validation:MaxItems=256
 	// +listType=atomic
 	// +optional
 	Metrics []Metric `json:"metrics,omitempty"`
@@ -579,11 +580,13 @@ type TrainerStatus struct {
 type Metric struct {
 	// name is a user-defined label for the metric, e.g. "loss", "eval_accuracy".
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=64
 	// +required
 	Name string `json:"name,omitempty"`
 
 	// value of the metric. Values must be serialized as a string.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=64
 	// +required
 	Value string `json:"value,omitempty"`
 }
