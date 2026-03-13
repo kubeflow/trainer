@@ -13,7 +13,7 @@ jobs:
     name: GPU E2E Test
     timeout-minutes: 120
     runs-on:
-      labels: oracle-vm-gpu-a10-2
+      labels: oracle-vm-gpu-a10-1
       group: GPUs
 
     env:
