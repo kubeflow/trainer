@@ -112,11 +112,11 @@ func (p *Status) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 }
 
 func (p *Status) createEnvVars(trainJob *trainer.TrainJob) ([]corev1ac.EnvVarApplyConfiguration, error) {
-	if p.cfg.TrainJobStatusServer.Port == nil {
+	if p.cfg.StatusServer.Port == nil {
 		return nil, fmt.Errorf("missing status server port")
 	}
 	// TODO: consider renaming the CertManagement.WebhookServiceName name?
-	svc := fmt.Sprintf("https://%s.%s.svc:%d", p.cfg.CertManagement.WebhookServiceName, utilruntime.GetOperatorNamespace(), *p.cfg.TrainJobStatusServer.Port)
+	svc := fmt.Sprintf("https://%s.%s.svc:%d", p.cfg.CertManagement.WebhookServiceName, utilruntime.GetOperatorNamespace(), *p.cfg.StatusServer.Port)
 	path := statusserver.StatusUrl(trainJob.Namespace, trainJob.Name)
 	statusURL := svc + path
 

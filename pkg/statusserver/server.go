@@ -64,7 +64,7 @@ var (
 )
 
 // NewServer creates a new Server for collecting runtime status updates.
-func NewServer(c client.Client, cfg *configapi.TrainJobStatusServer, tlsConfig *tls.Config, authorizer TokenAuthorizer) (*Server, error) {
+func NewServer(c client.Client, cfg *configapi.StatusServer, tlsConfig *tls.Config, authorizer TokenAuthorizer) (*Server, error) {
 	if cfg == nil || cfg.Port == nil {
 		return nil, fmt.Errorf("cfg info is required")
 	}

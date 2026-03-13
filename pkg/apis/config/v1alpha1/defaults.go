@@ -61,16 +61,16 @@ func SetDefaults_Configuration(cfg *Configuration) {
 	if cfg.ClientConnection.Burst == nil {
 		cfg.ClientConnection.Burst = ptr.To[int32](100)
 	}
-	if cfg.TrainJobStatusServer == nil {
-		cfg.TrainJobStatusServer = &TrainJobStatusServer{}
+	if cfg.StatusServer == nil {
+		cfg.StatusServer = &StatusServer{}
 	}
-	if cfg.TrainJobStatusServer.Port == nil {
-		cfg.TrainJobStatusServer.Port = ptr.To[int32](10443)
+	if cfg.StatusServer.Port == nil {
+		cfg.StatusServer.Port = ptr.To[int32](10443)
 	}
-	if cfg.TrainJobStatusServer.QPS == nil {
-		cfg.TrainJobStatusServer.QPS = ptr.To[float32](5)
+	if cfg.StatusServer.QPS == nil {
+		cfg.StatusServer.QPS = ptr.To[float32](5)
 	}
-	if cfg.TrainJobStatusServer.Burst == nil {
-		cfg.TrainJobStatusServer.Burst = ptr.To[int32](10)
+	if cfg.StatusServer.Burst == nil {
+		cfg.StatusServer.Burst = ptr.To[int32](10)
 	}
 }

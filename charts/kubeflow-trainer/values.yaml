@@ -138,7 +138,7 @@ manager:
       # webhookServiceName and webhookSecretName are auto-generated if not specified
       webhookServiceName: ""
       webhookSecretName: ""
-    trainJobStatusServer:
+    statusServer:
       # -- Port that the TrainJob status server serves on.
       port: 10443
       # -- QPS rate limit for the TrainJob Status Server api client

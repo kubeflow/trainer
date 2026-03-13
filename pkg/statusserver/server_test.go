@@ -49,7 +49,7 @@ func (f fakeAuthorizer) Authorize(_ context.Context, _, _, _ string) (bool, erro
 	return f.authorized, nil
 }
 
-func newTestServer(t *testing.T, cfg *configapi.TrainJobStatusServer, authorizer TokenAuthorizer, objs ...client.Object) *httptest.Server {
+func newTestServer(t *testing.T, cfg *configapi.StatusServer, authorizer TokenAuthorizer, objs ...client.Object) *httptest.Server {
 	t.Helper()
 
 	fakeClient := utiltesting.NewClientBuilder().
@@ -117,7 +117,7 @@ func TestServerErrorResponses(t *testing.T) {
 			}
 			ts := newTestServer(
 				t,
-				&configapi.TrainJobStatusServer{Port: ptr.To[int32](8080)},
+				&configapi.StatusServer{Port: ptr.To[int32](8080)},
 				fakeAuthorizer{authorized: tc.authorized},
 				existingTrainJob,
 			)
