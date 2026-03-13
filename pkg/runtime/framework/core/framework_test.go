@@ -177,8 +177,7 @@ func TestNew(t *testing.T) {
 				})
 			}
 			clientBuilder := testingutil.NewClientBuilder()
-			cfg := testingutil.NewConfig()
-			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), cfg)
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), nil)
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}
@@ -337,9 +336,8 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 			clientBuilder := testingutil.NewClientBuilder()
-			cfg := testingutil.NewConfig()
 
-			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), cfg)
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -433,9 +431,8 @@ func TestRunEnforcePodGroupPolicyPlugins(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 			clientBuilder := testingutil.NewClientBuilder()
-			cfg := testingutil.NewConfig()
 
-			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), cfg)
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -474,9 +471,8 @@ func TestRunCustomValidationPlugins(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 			clientBuildr := testingutil.NewClientBuilder()
-			cfg := testingutil.NewConfig()
 
-			fwk, err := New(ctx, clientBuildr.Build(), tc.registry, testingutil.AsIndex(clientBuildr), cfg)
+			fwk, err := New(ctx, clientBuildr.Build(), tc.registry, testingutil.AsIndex(clientBuildr), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2207,9 +2203,8 @@ test-job-node-0-1.test-job slots=1
 
 			clientBuilder := testingutil.NewClientBuilder()
 			c := clientBuilder.Build()
-			cfg := testingutil.NewConfig()
 
-			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder), cfg)
+			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2297,9 +2292,8 @@ func TestWatchExtensionPlugins(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 			clientBuilder := testingutil.NewClientBuilder()
-			cfg := testingutil.NewConfig()
 
-			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), cfg)
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2533,9 +2527,7 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 			}
 			c := clientBuilder.Build()
 
-			cfg := testingutil.NewConfig()
-
-			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder), cfg)
+			fwk, err := New(ctx, c, tc.registry, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
 				if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 					t.Errorf("Unexpected error (-want,+got):\n%s", diff)
@@ -2651,8 +2643,7 @@ func TestPodNetworkPlugins(t *testing.T) {
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
 			cliBuilder := testingutil.NewClientBuilder()
-			cfg := testingutil.NewConfig()
-			fwk, err := New(ctx, cliBuilder.Build(), tc.registry, testingutil.AsIndex(cliBuilder), cfg)
+			fwk, err := New(ctx, cliBuilder.Build(), tc.registry, testingutil.AsIndex(cliBuilder), nil)
 			if err != nil {
 				t.Fatal(err)
 			}

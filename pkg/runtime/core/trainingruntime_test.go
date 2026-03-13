@@ -2107,9 +2107,7 @@ test-job-node-0-1.test-job slots=8
 			}
 			c := clientBuilder.Build()
 
-			cfg := testingutil.NewConfig()
-
-			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), cfg)
+			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
 				t.Fatal(err)
 			}

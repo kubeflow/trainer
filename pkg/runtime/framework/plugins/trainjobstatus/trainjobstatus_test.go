@@ -32,6 +32,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
@@ -266,7 +267,17 @@ func TestEnforceMLPolicy(t *testing.T) {
 			t.Cleanup(cancel)
 
 			cli := utiltesting.NewClientBuilder().Build()
-			cfg := utiltesting.NewConfig()
+			cfg := &configapi.Configuration{
+				CertManagement: &configapi.CertManagement{
+					WebhookServiceName: "kubeflow-trainer-controller-manager",
+					WebhookSecretName:  "kubeflow-trainer-webhook-cert",
+				},
+				StatusServer: &configapi.StatusServer{
+					Port:  ptr.To[int32](10443),
+					QPS:   ptr.To[float32](5),
+					Burst: ptr.To[int32](10),
+				},
+			}
 
 			p, err := New(ctx, cli, nil, cfg)
 			if err != nil {
@@ -448,7 +459,17 @@ func TestBuild(t *testing.T) {
 			b := utiltesting.NewClientBuilder().WithObjects(tc.objs...)
 			cli := b.Build()
 
-			cfg := utiltesting.NewConfig()
+			cfg := &configapi.Configuration{
+				CertManagement: &configapi.CertManagement{
+					WebhookServiceName: "kubeflow-trainer-controller-manager",
+					WebhookSecretName:  "kubeflow-trainer-webhook-cert",
+				},
+				StatusServer: &configapi.StatusServer{
+					Port:  ptr.To[int32](10443),
+					QPS:   ptr.To[float32](5),
+					Burst: ptr.To[int32](10),
+				},
+			}
 
 			p, err := New(ctx, cli, nil, cfg)
 			if err != nil {
