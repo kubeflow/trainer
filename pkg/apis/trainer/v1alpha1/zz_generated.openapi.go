@@ -1370,6 +1370,13 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecPatch(ref common.ReferenceCallback)
 							},
 						},
 					},
+					"terminationGracePeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "terminationGracePeriodSeconds patches the termination grace period for Pods in the target job templates. This allows users to configure sufficient time for checkpoint saving on TrainJob completion or node drain.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 			},
 		},
