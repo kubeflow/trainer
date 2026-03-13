@@ -33,7 +33,7 @@ if [ ! -f "${VERSION_FILE}" ]; then
   echo "Missing VERSION file at ${VERSION_FILE}"
   exit 1
 fi
-API_VERSION=$(sed 's/^v//' "${VERSION_FILE}")
+API_VERSION=$(sed -e 's/^v//' -e 's/-rc\.\([0-9]*\)/rc\1/' "${VERSION_FILE}")
 API_OUTPUT_PATH="api/python_api"
 PKG_ROOT="${API_OUTPUT_PATH}/kubeflow_trainer_api"
 
