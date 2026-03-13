@@ -27,7 +27,7 @@ class TrainerV1alpha1UpdateTrainJobStatusRequest(BaseModel):
     """
     UpdateTrainJobStatusRequest contains the current runtime status (e.g. progress and metrics) for the different stages of the TrainJob.
     """ # noqa: E501
-    trainer_status: Optional[TrainerV1alpha1TrainerStatus] = Field(default=None, description="trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.  This field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).  This is an alpha feature and requires enabling the TrainJobProgress feature gate.", alias="trainerStatus")
+    trainer_status: Optional[TrainerV1alpha1TrainerStatus] = Field(default=None, description="trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.  This field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).  This is an alpha feature and requires enabling the TrainJobStatus feature gate.", alias="trainerStatus")
     __properties: ClassVar[List[str]] = ["trainerStatus"]
 
     model_config = ConfigDict(

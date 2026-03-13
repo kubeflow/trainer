@@ -505,7 +505,7 @@ type TrainJobStatus struct {
 	// status, or if no status has been observed yet (for example,
 	// immediately after the TrainJob is created).
 	//
-	// This is an alpha feature and requires enabling the TrainJobProgress feature gate.
+	// This is an alpha feature and requires enabling the TrainJobStatus feature gate.
 	// +optional
 	TrainerStatus *TrainerStatus `json:"trainerStatus,omitempty"`
 }
@@ -602,7 +602,7 @@ type UpdateTrainJobStatusRequest struct {
 	// status, or if no status has been observed yet (for example,
 	// immediately after the TrainJob is created).
 	//
-	// This is an alpha feature and requires enabling the TrainJobProgress feature gate.
+	// This is an alpha feature and requires enabling the TrainJobStatus feature gate.
 	// +optional
 	TrainerStatus *TrainerStatus `json:"trainerStatus,omitempty"`
 }

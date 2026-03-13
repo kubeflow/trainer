@@ -40,7 +40,8 @@ type projectedServiceAccountTokenAuthorizer struct {
 
 var _ TokenAuthorizer = &projectedServiceAccountTokenAuthorizer{}
 
-// projectedToken is the set of claims of
+// projectedToken is the decoded JWT claims of a k8s projected service account token.
+// Note: we only decode the subset of claims we actually need.
 type projectedToken struct {
 	Issuer     string `json:"iss"`
 	Kubernetes struct {

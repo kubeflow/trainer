@@ -1747,7 +1747,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref common.ReferenceCallbac
 					},
 					"trainerStatus": {
 						SchemaProps: spec.SchemaProps{
-							Description: "trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.\n\nThis field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).\n\nThis is an alpha feature and requires enabling the TrainJobProgress feature gate.",
+							Description: "trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.\n\nThis field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).\n\nThis is an alpha feature and requires enabling the TrainJobStatus feature gate.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus"),
 						},
 					},
@@ -2075,7 +2075,7 @@ func schema_pkg_apis_trainer_v1alpha1_UpdateTrainJobStatusRequest(ref common.Ref
 				Properties: map[string]spec.Schema{
 					"trainerStatus": {
 						SchemaProps: spec.SchemaProps{
-							Description: "trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.\n\nThis field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).\n\nThis is an alpha feature and requires enabling the TrainJobProgress feature gate.",
+							Description: "trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.\n\nThis field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).\n\nThis is an alpha feature and requires enabling the TrainJobStatus feature gate.",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus"),
 						},
 					},
