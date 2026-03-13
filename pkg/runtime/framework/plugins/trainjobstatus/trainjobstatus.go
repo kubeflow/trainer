@@ -33,7 +33,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	"github.com/kubeflow/trainer/v2/pkg/statusserver"
-	utilruntime "github.com/kubeflow/trainer/v2/pkg/util/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/util/cert"
 )
 
 const (
@@ -116,7 +116,7 @@ func (p *Status) createEnvVars(trainJob *trainer.TrainJob) ([]corev1ac.EnvVarApp
 		return nil, fmt.Errorf("missing status server port")
 	}
 	// TODO: consider renaming the CertManagement.WebhookServiceName name?
-	svc := fmt.Sprintf("https://%s.%s.svc:%d", p.cfg.CertManagement.WebhookServiceName, utilruntime.GetOperatorNamespace(), *p.cfg.StatusServer.Port)
+	svc := fmt.Sprintf("https://%s.%s.svc:%d", p.cfg.CertManagement.WebhookServiceName, cert.GetOperatorNamespace(), *p.cfg.StatusServer.Port)
 	path := statusserver.StatusUrl(trainJob.Namespace, trainJob.Name)
 	statusURL := svc + path
 
@@ -176,7 +176,7 @@ func (p *Status) buildStatusServerCaCrtConfigMap(ctx context.Context, trainJob *
 	// Get the CA cert from the webhook secret
 	secret := &corev1.Secret{}
 	secretKey := client.ObjectKey{
-		Namespace: utilruntime.GetOperatorNamespace(),
+		Namespace: cert.GetOperatorNamespace(),
 		Name:      p.cfg.CertManagement.WebhookSecretName,
 	}
 
