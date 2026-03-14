@@ -148,6 +148,17 @@ func main() {
 		setupLog.Error(err, "Could not initialize runtimes")
 		os.Exit(1)
 	}
+
+	// Register status server before goroutine starts and before mgr.Start().
+	// AddHealthzCheck/AddReadyzCheck return errors if called after the manager
+	// has already started, which is what was happening when this was inside
+	// the setupManagerComponents goroutine.
+	if features.Enabled(features.TrainJobStatus) {
+		if err := statusserver.SetupServer(mgr, cfg.StatusServer, enableHTTP2); err != nil {
+			setupLog.Error(err, "Could not create runtime status server")
+			os.Exit(1)
+		}
+	}
 	// Set up controllers and other components using goroutines to start the manager quickly.
 	go setupManagerComponents(mgr, runtimes, &cfg, certsReady, enableHTTP2)
 
@@ -170,13 +181,6 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 	if failedWebhook, err := webhooks.Setup(mgr, runtimes); err != nil {
 		setupLog.Error(err, "Could not create webhook", "webhook", failedWebhook)
 		os.Exit(1)
-	}
-
-	if features.Enabled(features.TrainJobStatus) {
-		if err := statusserver.SetupServer(mgr, cfg.StatusServer, enableHTTP2); err != nil {
-			setupLog.Error(err, "Could not create runtime status server")
-			os.Exit(1)
-		}
 	}
 }
 
