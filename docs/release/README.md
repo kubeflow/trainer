@@ -84,7 +84,7 @@ cherry pick your changes from the `master` branch and submit a PR.
    For example:
 
    ```
-   VERSION=v2.2.0-rc.0
+   v2.2.0-rc.0
    ```
 
 1. Update the image tag in Kubeflow Trainer manifests:
