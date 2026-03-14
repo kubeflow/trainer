@@ -154,3 +154,32 @@ func TestServerErrorResponses(t *testing.T) {
 		})
 	}
 }
+
+func TestServerCheck(t *testing.T) {
+	srv, err := NewServer(
+		nil,
+		&configapi.StatusServer{Port: ptr.To[int32](8080)},
+		&tls.Config{},
+		fakeAuthorizer{},
+	)
+	if err != nil {
+		t.Fatalf("NewServer() error: %v", err)
+	}
+
+	// Before ready: Check should return error
+	if err := srv.Check(nil); err == nil {
+		t.Error("Check() = nil, want error before server is ready")
+	}
+
+	// After marking ready: Check should return nil
+	srv.ready.Store(true)
+	if err := srv.Check(nil); err != nil {
+		t.Errorf("Check() = %v, want nil after server is ready", err)
+	}
+
+	// After marking not ready: Check should return error again
+	srv.ready.Store(false)
+	if err := srv.Check(nil); err == nil {
+		t.Error("Check() = nil, want error after server marked not ready")
+	}
+}
