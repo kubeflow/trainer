@@ -170,7 +170,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	
+
 	// Set up controllers and other components using goroutines to start the manager quickly.
 	go setupManagerComponents(mgr, runtimes, &cfg, certsReady, enableHTTP2, &statusServerReady)
 
