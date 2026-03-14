@@ -41,7 +41,7 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
-func TestTorch(t *testing.T) {
+func TestTorchEnforceMLPolicy(t *testing.T) {
 	cases := map[string]struct {
 		info              *runtime.Info
 		trainJob          *trainer.TrainJob
@@ -1374,7 +1374,7 @@ func TestTorch(t *testing.T) {
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
 			cliBuilder := utiltesting.NewClientBuilder()
-			p, err := New(ctx, cliBuilder.Build(), nil)
+			p, err := New(ctx, cliBuilder.Build(), nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize Torch plugin: %v", err)
 			}
@@ -1396,7 +1396,7 @@ func TestTorch(t *testing.T) {
 	}
 }
 
-func TestValidate(t *testing.T) {
+func TestTorchValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info
 		oldObj       *trainer.TrainJob
@@ -1682,7 +1682,7 @@ func TestValidate(t *testing.T) {
 			var cancel func()
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
-			p, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil)
+			p, err := New(ctx, utiltesting.NewClientBuilder().Build(), nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize Torch plugin: %v", err)
 			}

@@ -17,23 +17,20 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_apis_meta_v1_object_meta import IoK8sApimachineryPkgApisMetaV1ObjectMeta
-from kubeflow_trainer_api.models.trainer_v1alpha1_pod_template_override_target_job import TrainerV1alpha1PodTemplateOverrideTargetJob
-from kubeflow_trainer_api.models.trainer_v1alpha1_pod_template_spec_override import TrainerV1alpha1PodTemplateSpecOverride
+from kubeflow_trainer_api.models.trainer_v1alpha1_pod_spec_patch import TrainerV1alpha1PodSpecPatch
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1PodTemplateOverride(BaseModel):
+class TrainerV1alpha1PodTemplatePatch(BaseModel):
     """
-    PodTemplateOverride represents a custom PodTemplateSpec override that will be applied to the TrainJob's training runtime.
+    PodTemplatePatch defines patches for a Pod template within a Job.
     """ # noqa: E501
-    manager: Optional[StrictStr] = Field(default=None, description="manager indicates which controller created this PodTemplateOverride object. It can be used by external controllers or admission webhooks to track ownership and avoid conflicts with other controllers. For example, Kueue sets this field to \"kueue.k8s.io/manager\". Defaults to `trainer.kubeflow.org/unknown`")
-    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="metadata overrides the Pod template metadata. These values will be merged with the TrainingRuntime's Pod template metadata.")
-    spec: Optional[TrainerV1alpha1PodTemplateSpecOverride] = Field(default=None, description="spec overrides the Pod template spec. These values will be merged with the TrainingRuntime's Pod template spec.")
-    target_jobs: List[TrainerV1alpha1PodTemplateOverrideTargetJob] = Field(description="targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.", alias="targetJobs")
-    __properties: ClassVar[List[str]] = ["manager", "metadata", "spec", "targetJobs"]
+    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="metadata patches the Pod template metadata. Only labels and annotations are allowed.")
+    spec: Optional[TrainerV1alpha1PodSpecPatch] = Field(default=None, description="spec patches the Pod spec with the fields managers are permitted to set.")
+    __properties: ClassVar[List[str]] = ["metadata", "spec"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -53,7 +50,7 @@ class TrainerV1alpha1PodTemplateOverride(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodTemplateOverride from a JSON string"""
+        """Create an instance of TrainerV1alpha1PodTemplatePatch from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -80,18 +77,11 @@ class TrainerV1alpha1PodTemplateOverride(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of spec
         if self.spec:
             _dict['spec'] = self.spec.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of each item in target_jobs (list)
-        _items = []
-        if self.target_jobs:
-            for _item_target_jobs in self.target_jobs:
-                if _item_target_jobs:
-                    _items.append(_item_target_jobs.to_dict())
-            _dict['targetJobs'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodTemplateOverride from a dict"""
+        """Create an instance of TrainerV1alpha1PodTemplatePatch from a dict"""
         if obj is None:
             return None
 
@@ -99,10 +89,8 @@ class TrainerV1alpha1PodTemplateOverride(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "manager": obj.get("manager"),
             "metadata": IoK8sApimachineryPkgApisMetaV1ObjectMeta.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
-            "spec": TrainerV1alpha1PodTemplateSpecOverride.from_dict(obj["spec"]) if obj.get("spec") is not None else None,
-            "targetJobs": [TrainerV1alpha1PodTemplateOverrideTargetJob.from_dict(_item) for _item in obj["targetJobs"]] if obj.get("targetJobs") is not None else None
+            "spec": TrainerV1alpha1PodSpecPatch.from_dict(obj["spec"]) if obj.get("spec") is not None else None
         })
         return _obj
 

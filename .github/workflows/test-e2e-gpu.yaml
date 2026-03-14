@@ -11,6 +11,7 @@ permissions:
 jobs:
   gpu-e2e-test:
     name: GPU E2E Test
+    timeout-minutes: 120
     runs-on:
       labels: oracle-vm-gpu-a10-2
       group: GPUs
@@ -61,7 +62,7 @@ jobs:
 
       - name: Upload Artifacts to GitHub
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.kubernetes-version }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*

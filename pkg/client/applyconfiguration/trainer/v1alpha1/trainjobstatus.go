@@ -29,6 +29,16 @@ type TrainJobStatusApplyConfiguration struct {
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 	// jobsStatus tracks the child Jobs in TrainJob.
 	JobsStatus []JobStatusApplyConfiguration `json:"jobsStatus,omitempty"`
+	// trainerStatus contains the latest observed runtime status of the
+	// Trainer step of the TrainJob. It reflects progress, remaining time,
+	// metrics, and the last update timestamp.
+	//
+	// This field is nil if the TrainJob does not report trainer-level
+	// status, or if no status has been observed yet (for example,
+	// immediately after the TrainJob is created).
+	//
+	// This is an alpha feature and requires enabling the TrainJobStatus feature gate.
+	TrainerStatus *TrainerStatusApplyConfiguration `json:"trainerStatus,omitempty"`
 }
 
 // TrainJobStatusApplyConfiguration constructs a declarative configuration of the TrainJobStatus type for use with
@@ -60,5 +70,13 @@ func (b *TrainJobStatusApplyConfiguration) WithJobsStatus(values ...*JobStatusAp
 		}
 		b.JobsStatus = append(b.JobsStatus, *values[i])
 	}
+	return b
+}
+
+// WithTrainerStatus sets the TrainerStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TrainerStatus field is set to the value of the last call.
+func (b *TrainJobStatusApplyConfiguration) WithTrainerStatus(value *TrainerStatusApplyConfiguration) *TrainJobStatusApplyConfiguration {
+	b.TrainerStatus = value
 	return b
 }

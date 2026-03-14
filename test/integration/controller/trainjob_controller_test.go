@@ -85,8 +85,17 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 			trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
 				Suspend(true).
 				RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
-				SpecLabel("testingKey", "testingVal").
-				SpecAnnotation("testingKey", "testingVal").
+				RuntimePatches([]trainer.RuntimePatch{{
+					Manager: "test.io/manager",
+					TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+						Template: &trainer.JobSetTemplatePatch{
+							Metadata: &metav1.ObjectMeta{
+								Labels:      map[string]string{"testingKey": "testingVal"},
+								Annotations: map[string]string{"testingKey": "testingVal"},
+							},
+						},
+					},
+				}}).
 				Trainer(
 					testingutil.MakeTrainJobTrainerWrapper().
 						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
@@ -201,22 +210,35 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 
 				ginkgo.By("Updating suspended TrainJob node selector")
 				updatedSelector := map[string]string{"updated": "selector"}
-				podTemplateOverrides := []trainer.PodTemplateOverride{
-					{
-						TargetJobs: []trainer.PodTemplateOverrideTargetJob{
-							{
-								Name: "node",
+				runtimePatches := []trainer.RuntimePatch{{
+					Manager: "test.io/manager",
+					TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+						Template: &trainer.JobSetTemplatePatch{
+							Metadata: &metav1.ObjectMeta{
+								Labels:      map[string]string{"testingKey": "testingVal"},
+								Annotations: map[string]string{"testingKey": "testingVal"},
+							},
+							Spec: &trainer.JobSetSpecPatch{
+								ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+									Name: "node",
+									Template: &trainer.JobTemplatePatch{
+										Spec: &trainer.JobSpecPatch{
+											Template: &trainer.PodTemplatePatch{
+												Spec: &trainer.PodSpecPatch{
+													NodeSelector: updatedSelector,
+												},
+											},
+										},
+									},
+								}},
 							},
 						},
-						Spec: &trainer.PodTemplateSpecOverride{
-							NodeSelector: updatedSelector,
-						},
 					},
-				}
+				}}
 
 				gomega.Eventually(func(g gomega.Gomega) {
 					g.Expect(k8sClient.Get(ctx, trainJobKey, trainJob)).Should(gomega.Succeed())
-					trainJob.Spec.PodTemplateOverrides = podTemplateOverrides
+					trainJob.Spec.RuntimePatches = runtimePatches
 					g.Expect(k8sClient.Update(ctx, trainJob)).Should(gomega.Succeed())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
@@ -773,7 +795,7 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 
-			ginkgo.It("Should succeed to create TrainJob with PodTemplateOverrides", func() {
+			ginkgo.It("Should succeed to create TrainJob with RuntimePatches", func() {
 				ginkgo.By("Creating Torch TrainingRuntime and TrainJob")
 				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
 					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
@@ -782,34 +804,49 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
 							Env([]corev1.EnvVar{{Name: "TRAIN_JOB", Value: "value"}}...).
 							Obj()).
-					PodTemplateOverrides([]trainer.PodTemplateOverride{
+					RuntimePatches([]trainer.RuntimePatch{
 						{
-							TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
-							Metadata: &metav1.ObjectMeta{
-								Labels: map[string]string{
-									"override-label-key": "override-label-value",
-									"custom-label":       "custom-value",
-								},
-								Annotations: map[string]string{
-									"override-annotation-key": "override-annotation-value",
-									"custom-annotation":       "custom-annotation-value",
-								},
-							},
-							Spec: &trainer.PodTemplateSpecOverride{
-								ServiceAccountName: ptr.To("override-sa"),
-								InitContainers: []trainer.ContainerOverride{
-									{
-										Name: "override-init-container",
-										Env: []corev1.EnvVar{
-											{
-												Name:  "INIT_ENV",
-												Value: "override_init",
+							Manager: "test.io/manager",
+							TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+								Template: &trainer.JobSetTemplatePatch{
+									Spec: &trainer.JobSetSpecPatch{
+										ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+											Name: constants.Node,
+											Template: &trainer.JobTemplatePatch{
+												Spec: &trainer.JobSpecPatch{
+													Template: &trainer.PodTemplatePatch{
+														Metadata: &metav1.ObjectMeta{
+															Labels: map[string]string{
+																"override-label-key": "override-label-value",
+																"custom-label":       "custom-value",
+															},
+															Annotations: map[string]string{
+																"override-annotation-key": "override-annotation-value",
+																"custom-annotation":       "custom-annotation-value",
+															},
+														},
+														Spec: &trainer.PodSpecPatch{
+															ServiceAccountName: ptr.To("override-sa"),
+															InitContainers: []trainer.ContainerPatch{
+																{
+																	Name: "override-init-container",
+																	Env: []corev1.EnvVar{
+																		{
+																			Name:  "INIT_ENV",
+																			Value: "override_init",
+																		},
+																		{
+																			Name:  "NEW_VALUE",
+																			Value: "from_overrides",
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
 											},
-											{
-												Name:  "NEW_VALUE",
-												Value: "from_overrides",
-											},
-										},
+										}},
 									},
 								},
 							},
@@ -1400,6 +1437,117 @@ alpha-node-0-1.alpha slots=8
 							Suspended: ptr.To(int32(0)),
 						},
 					}))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
+
+		ginkgo.Context("Integration tests for the TrainJob Timeouts", func() {
+
+			ginkgo.It("Should fail TrainJob with DeadlineExceeded when ActiveDeadlineSeconds expires", func() {
+				// We must create the referenced ClusterTrainingRuntime so the webhook passes
+				runtime := testingutil.MakeClusterTrainingRuntimeWrapper("mock-mpi").Obj()
+				gomega.Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, runtime))).Should(gomega.Succeed())
+
+				deadline := int64(1)
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
+					ActiveDeadlineSeconds(deadline).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Waiting for TrainJob to fail due to deadline")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Ensuring the underlying JobSet is deleted")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(testingutil.BeNotFoundError())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should not fail TrainJob if ActiveDeadlineSeconds is not exceeded", func() {
+				// We must create the referenced ClusterTrainingRuntime so the webhook passes
+				runtime := testingutil.MakeClusterTrainingRuntimeWrapper("mock-mpi").Obj()
+				gomega.Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, runtime))).Should(gomega.Succeed())
+
+				deadline := int64(3600)
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-not-exceeded-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
+					ActiveDeadlineSeconds(deadline).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Ensuring TrainJob does not fail immediately")
+				gomega.Consistently(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).ShouldNot(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should not start deadline timer if TrainJob is suspended", func() {
+				// We must create the referenced ClusterTrainingRuntime so the webhook passes
+				runtime := testingutil.MakeClusterTrainingRuntimeWrapper("mock-mpi").Obj()
+				gomega.Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, runtime))).Should(gomega.Succeed())
+
+				deadline := int64(1)
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-suspended-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
+					ActiveDeadlineSeconds(deadline).
+					Suspend(true).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Ensuring TrainJob does not fail while suspended")
+				gomega.Consistently(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).ShouldNot(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should reset deadline timer upon resume", func() {
+				// We must create the referenced ClusterTrainingRuntime so the webhook passes
+				runtime := testingutil.MakeClusterTrainingRuntimeWrapper("mock-mpi").Obj()
+				gomega.Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, runtime))).Should(gomega.Succeed())
+
+				deadline := int64(2)
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "deadline-resume-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "mock-mpi").
+					ActiveDeadlineSeconds(deadline).
+					Suspend(true).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+
+				ginkgo.By("Resuming TrainJob")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					gotTrainJob.Spec.Suspend = ptr.To(false)
+					g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Waiting for TrainJob to fail after resumed duration")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Ensuring the underlying JobSet is deleted")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(testingutil.BeNotFoundError())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 		})

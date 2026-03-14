@@ -32,3 +32,7 @@ spec:
     port: 443
     protocol: TCP
     targetPort: webhook
+  - name: status-server
+    port: 10443
+    targetPort: status-server
+    protocol: TCP

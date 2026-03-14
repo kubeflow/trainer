@@ -7,12 +7,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	"github.com/kubeflow/trainer/v2/test/util"
+
+	_ "embed"
 )
 
 const (
@@ -21,6 +24,9 @@ const (
 	jaxRuntime       = "jax-distributed"
 	xgboostRuntime   = "xgboost-distributed"
 )
+
+//go:embed testdata/status_update.py
+var statusUpdateScript string
 
 var _ = ginkgo.Describe("TrainJob e2e", func() {
 	// Each test runs in a separate namespace.
@@ -298,39 +304,158 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 		})
 	})
 
-	ginkgo.When("Creating a TrainJob with PodTemplateOverrides", func() {
-		ginkgo.It("should allow the user to set the manager field and default to 'Unknown' if empty", func() {
+	ginkgo.When("Creating a TrainJob with RuntimePatches", func() {
+		ginkgo.It("should preserve user-provided manager fields", func() {
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
-				PodTemplateOverrides([]trainer.PodTemplateOverride{
+				RuntimePatches([]trainer.RuntimePatch{
 					{
-						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
-						Spec: &trainer.PodTemplateSpecOverride{
-							ServiceAccountName: ptr.To("test-sa-1"),
+						Manager: "test.io/manager-one",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														ServiceAccountName: ptr.To("test-sa-1"),
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
 						},
 					},
 					{
-						Manager:    ptr.To("kueue.k8s.io/manager"),
-						TargetJobs: []trainer.PodTemplateOverrideTargetJob{{Name: constants.Node}},
-						Spec: &trainer.PodTemplateSpecOverride{
-							ServiceAccountName: ptr.To("test-sa-2"),
+						Manager: "kueue.k8s.io/manager",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														ServiceAccountName: ptr.To("test-sa-2"),
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
 						},
 					},
 				}).
 				Obj()
 
-			ginkgo.By("Create a TrainJob with PodTemplateOverrides", func() {
+			ginkgo.By("Create a TrainJob with RuntimePatches", func() {
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 			})
 
-			ginkgo.By("Verify manager field preserves user input and defaults to 'Unknown' if empty", func() {
+			ginkgo.By("Verify manager fields are preserved", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
-					g.Expect(gotTrainJob.Spec.PodTemplateOverrides).Should(gomega.HaveLen(2))
-					g.Expect(*gotTrainJob.Spec.PodTemplateOverrides[0].Manager).To(gomega.Equal("trainer.kubeflow.org/unknown"))
-					g.Expect(*gotTrainJob.Spec.PodTemplateOverrides[1].Manager).To(gomega.Equal("kueue.k8s.io/manager"))
+					g.Expect(gotTrainJob.Spec.RuntimePatches).Should(gomega.HaveLen(2))
+					g.Expect(gotTrainJob.Spec.RuntimePatches[0].Manager).To(gomega.Equal("test.io/manager-one"))
+					g.Expect(gotTrainJob.Spec.RuntimePatches[1].Manager).To(gomega.Equal("kueue.k8s.io/manager"))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
+	})
+
+	ginkgo.When("Creating a TrainJob with Resource Timeouts", func() {
+		ginkgo.It("should fail the TrainJob with DeadlineExceeded when active timeout expires", func() {
+			deadline := int64(10)
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-deadline-job").
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
+				ActiveDeadlineSeconds(deadline).
+				Obj()
+
+			trainJob.Spec.Trainer = &trainer.Trainer{
+				Image:   ptr.To("busybox"),
+				Command: []string{"/bin/sh", "-c", "sleep 600"},
+			}
+			gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+			trainJobKey := client.ObjectKeyFromObject(trainJob)
+
+			ginkgo.By("Waiting for TrainJob to fail due to deadline")
+			gomega.Eventually(func(g gomega.Gomega) {
+				gotTrainJob := &trainer.TrainJob{}
+				g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+				g.Expect(gotTrainJob.Status.Conditions).Should(gomega.ContainElement(gomega.HaveField("Reason", trainer.TrainJobDeadlineExceededReason)))
+			}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+
+			ginkgo.By("Ensuring the underlying JobSet is deleted")
+			gomega.Eventually(func(g gomega.Gomega) {
+				g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(testingutil.BeNotFoundError())
+			}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+		})
+	})
+
+	ginkgo.When("Creating TrainJob with runtime status server instrumentation", func() {
+		ginkgo.It("should inject runtime configuration which allows the runtime status endpoint to be called", func() {
+			// Create a TrainJob that sends a single runtime status update and exits
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-runtime-status").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
+				Trainer(&trainer.Trainer{
+					Command: []string{"python3", "-c"},
+					Args:    []string{statusUpdateScript},
+				}).
+				Obj()
+
+			ginkgo.By("Create a TrainJob that will call the runtime-status endpoint", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Verify trainerStatus is updated with runtime status information", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+
+					// Verify trainerStatus is not nil
+					g.Expect(gotTrainJob.Status.TrainerStatus).ShouldNot(gomega.BeNil())
+
+					// Verify progress percentage
+					g.Expect(gotTrainJob.Status.TrainerStatus.ProgressPercentage).ShouldNot(gomega.BeNil())
+					g.Expect(*gotTrainJob.Status.TrainerStatus.ProgressPercentage).Should(gomega.Equal(int32(42)))
+
+					// Verify estimated remaining seconds
+					g.Expect(gotTrainJob.Status.TrainerStatus.EstimatedRemainingSeconds).ShouldNot(gomega.BeNil())
+					g.Expect(*gotTrainJob.Status.TrainerStatus.EstimatedRemainingSeconds).Should(gomega.Equal(int32(120)))
+
+					// Verify metrics
+					g.Expect(gotTrainJob.Status.TrainerStatus.Metrics).Should(gomega.HaveLen(2))
+					g.Expect(gotTrainJob.Status.TrainerStatus.Metrics[0].Name).Should(gomega.Equal("loss"))
+					g.Expect(gotTrainJob.Status.TrainerStatus.Metrics[0].Value).Should(gomega.Equal("0.123"))
+					g.Expect(gotTrainJob.Status.TrainerStatus.Metrics[1].Name).Should(gomega.Equal("accuracy"))
+					g.Expect(gotTrainJob.Status.TrainerStatus.Metrics[1].Value).Should(gomega.Equal("0.95"))
+
+					// Verify lastUpdatedTime is set
+					g.Expect(gotTrainJob.Status.TrainerStatus.LastUpdatedTime.IsZero()).Should(gomega.BeFalse())
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
+						{
+							Type:    trainer.TrainJobComplete,
+							Status:  metav1.ConditionTrue,
+							Reason:  jobsetconsts.AllJobsCompletedReason,
+							Message: jobsetconsts.AllJobsCompletedMessage,
+						},
+					}, util.IgnoreConditions))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 		})
 	})

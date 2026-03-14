@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetapply "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -89,7 +90,7 @@ type Flux struct {
 	scheme *apiruntime.Scheme
 }
 
-func New(_ context.Context, client client.Client, _ client.FieldIndexer) (framework.Plugin, error) {
+func New(_ context.Context, client client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
 	return &Flux{
 		client: client,
 		scheme: client.Scheme(),

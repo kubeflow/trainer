@@ -27,17 +27,17 @@ type TrainJobSpecApplyConfiguration struct {
 	Initializer *InitializerApplyConfiguration `json:"initializer,omitempty"`
 	// trainer defines the configuration of the trainer.
 	Trainer *TrainerApplyConfiguration `json:"trainer,omitempty"`
-	// labels to apply for the derivative JobSet and Jobs.
-	// They will be merged with the TrainingRuntime values.
-	Labels map[string]string `json:"labels,omitempty"`
-	// annotations to apply for the derivative JobSet and Jobs.
-	// They will be merged with the TrainingRuntime values.
-	Annotations map[string]string `json:"annotations,omitempty"`
-	// podTemplateOverrides define the PodTemplateOverrides for the training runtime.
-	// When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.
-	PodTemplateOverrides []PodTemplateOverrideApplyConfiguration `json:"podTemplateOverrides,omitempty"`
+	// runtimePatches defines custom patches applied to the TrainJob's Runtime.
+	// Patches are keyed by manager to provide clear ownership and avoid conflicts between controllers.
+	RuntimePatches []RuntimePatchApplyConfiguration `json:"runtimePatches,omitempty"`
 	// suspend defines whether to suspend the running TrainJob.
 	Suspend *bool `json:"suspend,omitempty"`
+	// activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob
+	// start time (which resets on resume from suspension) that the TrainJob may be active
+	// before the system tries to terminate it. Value must be a positive integer.
+	// Once reached, all running Pods are terminated and the TrainJob status becomes
+	// Failed with reason: DeadlineExceeded.
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 	// managedBy is used to indicate the controller or entity that manages a TrainJob.
 	// The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or
 	// `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which
@@ -77,43 +77,15 @@ func (b *TrainJobSpecApplyConfiguration) WithTrainer(value *TrainerApplyConfigur
 	return b
 }
 
-// WithLabels puts the entries into the Labels field in the declarative configuration
+// WithRuntimePatches adds the given value to the RuntimePatches field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the Labels field,
-// overwriting an existing map entries in Labels field with the same key.
-func (b *TrainJobSpecApplyConfiguration) WithLabels(entries map[string]string) *TrainJobSpecApplyConfiguration {
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
-	}
-	for k, v := range entries {
-		b.Labels[k] = v
-	}
-	return b
-}
-
-// WithAnnotations puts the entries into the Annotations field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the Annotations field,
-// overwriting an existing map entries in Annotations field with the same key.
-func (b *TrainJobSpecApplyConfiguration) WithAnnotations(entries map[string]string) *TrainJobSpecApplyConfiguration {
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
-	}
-	for k, v := range entries {
-		b.Annotations[k] = v
-	}
-	return b
-}
-
-// WithPodTemplateOverrides adds the given value to the PodTemplateOverrides field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the PodTemplateOverrides field.
-func (b *TrainJobSpecApplyConfiguration) WithPodTemplateOverrides(values ...*PodTemplateOverrideApplyConfiguration) *TrainJobSpecApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the RuntimePatches field.
+func (b *TrainJobSpecApplyConfiguration) WithRuntimePatches(values ...*RuntimePatchApplyConfiguration) *TrainJobSpecApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
-			panic("nil value passed to WithPodTemplateOverrides")
+			panic("nil value passed to WithRuntimePatches")
 		}
-		b.PodTemplateOverrides = append(b.PodTemplateOverrides, *values[i])
+		b.RuntimePatches = append(b.RuntimePatches, *values[i])
 	}
 	return b
 }
@@ -123,6 +95,14 @@ func (b *TrainJobSpecApplyConfiguration) WithPodTemplateOverrides(values ...*Pod
 // If called multiple times, the Suspend field is set to the value of the last call.
 func (b *TrainJobSpecApplyConfiguration) WithSuspend(value bool) *TrainJobSpecApplyConfiguration {
 	b.Suspend = &value
+	return b
+}
+
+// WithActiveDeadlineSeconds sets the ActiveDeadlineSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ActiveDeadlineSeconds field is set to the value of the last call.
+func (b *TrainJobSpecApplyConfiguration) WithActiveDeadlineSeconds(value int64) *TrainJobSpecApplyConfiguration {
+	b.ActiveDeadlineSeconds = &value
 	return b
 }
 

@@ -101,7 +101,7 @@ func (f *Framework) RunManager(cfg *rest.Config, startControllers bool) (context
 	})
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), "failed to create manager")
 
-	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer())
+	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer(), nil)
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
 	gomega.ExpectWithOffset(1, runtimes).NotTo(gomega.BeNil())
 

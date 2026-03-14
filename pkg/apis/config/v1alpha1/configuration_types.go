@@ -60,6 +60,10 @@ type Configuration struct {
 	// +optional
 	ClientConnection *ClientConnection `json:"clientConnection,omitempty"`
 
+	// statusServer provides configuration options for the Runtime Status Server.
+	// +optional
+	StatusServer *StatusServer `json:"statusServer,omitempty"`
+
 	// featureGates is a map of feature names to bools that allows to override the
 	// default enablement status of a feature.
 	// +optional
@@ -79,6 +83,7 @@ type ControllerWebhook struct {
 	// host is the hostname that the webhook server binds to.
 	// It is used to set webhook.Server.Host.
 	// Defaults to "" (all interfaces).
+	// +kubebuilder:validation:MaxLength=253
 	// +optional
 	Host *string `json:"host,omitempty"`
 }
@@ -93,6 +98,7 @@ type ControllerMetrics struct {
 	// +optional
 	// +kubebuilder:default=":8443"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	BindAddress string `json:"bindAddress,omitempty"`
 
 	// secureServing determines if the metrics endpoint should be served securely via HTTPS.
@@ -112,6 +118,7 @@ type ControllerHealth struct {
 	// +optional
 	// +kubebuilder:default=":8081"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=255
 	HealthProbeBindAddress string `json:"healthProbeBindAddress,omitempty"`
 
 	// readinessEndpointName is the name for the readiness endpoint.
@@ -119,6 +126,7 @@ type ControllerHealth struct {
 	// +optional
 	// +kubebuilder:default="readyz"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
 	ReadinessEndpointName string `json:"readinessEndpointName,omitempty"`
 
 	// livenessEndpointName is the name for the liveness endpoint.
@@ -126,6 +134,7 @@ type ControllerHealth struct {
 	// +optional
 	// +kubebuilder:default="healthz"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
 	LivenessEndpointName string `json:"livenessEndpointName,omitempty"`
 }
 
@@ -163,6 +172,7 @@ type CertManagement struct {
 	// +optional
 	// +kubebuilder:default="kubeflow-trainer-controller-manager"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	WebhookServiceName string `json:"webhookServiceName,omitempty"`
 
 	// webhookSecretName is the name of the Secret used to store the CA and server certificates.
@@ -170,6 +180,7 @@ type CertManagement struct {
 	// +optional
 	// +kubebuilder:default="kubeflow-trainer-webhook-cert"
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	WebhookSecretName string `json:"webhookSecretName,omitempty"`
 }
 
@@ -187,5 +198,27 @@ type ClientConnection struct {
 	// Defaults to 100.
 	// +optional
 	// +kubebuilder:default=100
+	Burst *int32 `json:"burst,omitempty"`
+}
+
+type StatusServer struct {
+	// port is the port that the status server serves at.
+	// Defaults to 10443.
+	// +optional
+	// +kubebuilder:default=10443
+	Port *int32 `json:"port,omitempty"`
+
+	// qps controls the number of queries per second allowed for the status server's
+	// Kubernetes client before client-side throttling.
+	// Defaults to 5.
+	// +optional
+	// +kubebuilder:default=5
+	QPS *float32 `json:"qps,omitempty"`
+
+	// burst allows extra queries to accumulate when the status server client is not
+	// using its full QPS allocation.
+	// Defaults to 10.
+	// +optional
+	// +kubebuilder:default=10
 	Burst *int32 `json:"burst,omitempty"`
 }

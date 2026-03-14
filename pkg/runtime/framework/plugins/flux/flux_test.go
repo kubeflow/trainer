@@ -106,7 +106,7 @@ func TestFlux(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			cli := utiltesting.NewClientBuilder().Build()
-			p, _ := New(ctx, cli, nil)
+			p, _ := New(ctx, cli, nil, nil)
 
 			err := p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(tc.info, tc.trainJob)
 			if err != nil {
@@ -176,7 +176,7 @@ func TestValidate(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			p, _ := New(ctx, utiltesting.NewClientBuilder().Build(), nil)
+			p, _ := New(ctx, utiltesting.NewClientBuilder().Build(), nil, nil)
 
 			_, errs := p.(framework.CustomValidationPlugin).Validate(ctx, tc.info, nil, tc.newObj)
 			if len(errs) > 0 {

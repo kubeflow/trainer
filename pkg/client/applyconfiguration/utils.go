@@ -32,8 +32,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	// Group=trainer.kubeflow.org, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithKind("ClusterTrainingRuntime"):
 		return &trainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("ContainerOverride"):
-		return &trainerv1alpha1.ContainerOverrideApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ContainerPatch"):
+		return &trainerv1alpha1.ContainerPatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("CoschedulingPodGroupPolicySource"):
 		return &trainerv1alpha1.CoschedulingPodGroupPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("DatasetInitializer"):
@@ -42,10 +42,20 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.FluxMLPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Initializer"):
 		return &trainerv1alpha1.InitializerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JobSetSpecPatch"):
+		return &trainerv1alpha1.JobSetSpecPatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JobSetTemplatePatch"):
+		return &trainerv1alpha1.JobSetTemplatePatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobSetTemplateSpec"):
 		return &trainerv1alpha1.JobSetTemplateSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JobSpecPatch"):
+		return &trainerv1alpha1.JobSpecPatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobStatus"):
 		return &trainerv1alpha1.JobStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("JobTemplatePatch"):
+		return &trainerv1alpha1.JobTemplatePatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Metric"):
+		return &trainerv1alpha1.MetricApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MLPolicy"):
 		return &trainerv1alpha1.MLPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MLPolicySource"):
@@ -58,20 +68,26 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.PodGroupPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("PodGroupPolicySource"):
 		return &trainerv1alpha1.PodGroupPolicySourceApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("PodTemplateOverride"):
-		return &trainerv1alpha1.PodTemplateOverrideApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("PodTemplateOverrideTargetJob"):
-		return &trainerv1alpha1.PodTemplateOverrideTargetJobApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("PodTemplateSpecOverride"):
-		return &trainerv1alpha1.PodTemplateSpecOverrideApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("PodSpecPatch"):
+		return &trainerv1alpha1.PodSpecPatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("PodTemplatePatch"):
+		return &trainerv1alpha1.PodTemplatePatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ReplicatedJobPatch"):
+		return &trainerv1alpha1.ReplicatedJobPatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RuntimePatch"):
+		return &trainerv1alpha1.RuntimePatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimeRef"):
 		return &trainerv1alpha1.RuntimeRefApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Trainer"):
 		return &trainerv1alpha1.TrainerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TrainerStatus"):
+		return &trainerv1alpha1.TrainerStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntime"):
 		return &trainerv1alpha1.TrainingRuntimeApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntimeSpec"):
 		return &trainerv1alpha1.TrainingRuntimeSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntimeSpecPatch"):
+		return &trainerv1alpha1.TrainingRuntimeSpecPatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJob"):
 		return &trainerv1alpha1.TrainJobApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobSpec"):

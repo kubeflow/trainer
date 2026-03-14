@@ -125,6 +125,15 @@ cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
   images:
   - name: "${CONTROLLER_MANAGER_CI_IMAGE_NAME}"
     newTag: "${CI_IMAGE_TAG}"
+  patches:
+  - patch: |-
+      # enable feature flags
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --feature-gates=TrainJobStatus=true
+    target:
+      kind: Deployment
+      name: kubeflow-trainer-controller-manager
 EOF
 
 kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
@@ -182,7 +191,7 @@ kubectl get clustertrainingruntimes -o json | jq '
 
 # hotfix(jaiakash) - skip pre-load due to kind failure
 # # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
-# TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+# TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
 # ${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
 # load_image_to_kind ${TORCH_RUNTIME_IMAGE} ${GPU_CLUSTER_NAME}
 

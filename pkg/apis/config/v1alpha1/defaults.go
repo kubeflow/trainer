@@ -61,4 +61,16 @@ func SetDefaults_Configuration(cfg *Configuration) {
 	if cfg.ClientConnection.Burst == nil {
 		cfg.ClientConnection.Burst = ptr.To[int32](100)
 	}
+	if cfg.StatusServer == nil {
+		cfg.StatusServer = &StatusServer{}
+	}
+	if cfg.StatusServer.Port == nil {
+		cfg.StatusServer.Port = ptr.To[int32](10443)
+	}
+	if cfg.StatusServer.QPS == nil {
+		cfg.StatusServer.QPS = ptr.To[float32](5)
+	}
+	if cfg.StatusServer.Burst == nil {
+		cfg.StatusServer.Burst = ptr.To[int32](10)
+	}
 }

@@ -13721,15 +13721,15 @@
           }
         }
       },
-      "trainer.v1alpha1.ContainerOverride": {
-        "description": "ContainerOverride represents parameters that can be overridden using PodSpecOverrides.",
+      "trainer.v1alpha1.ContainerPatch": {
+        "description": "ContainerPatch represents parameters that can be patched using PodSpecPatch.",
         "type": "object",
         "required": [
           "name"
         ],
         "properties": {
           "env": {
-            "description": "env is the list of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. These values can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.",
+            "description": "env is the list of environment variables to set in the container. These values will be merged with the Runtime's environments. These values can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.",
             "type": "array",
             "items": {
               "default": {},
@@ -13745,11 +13745,11 @@
             "x-kubernetes-list-type": "map"
           },
           "name": {
-            "description": "name for the container. TrainingRuntime must have this container.",
+            "description": "name for the container. Runtime must have this container.",
             "type": "string"
           },
           "securityContext": {
-            "description": "securityContext overrides the container's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+            "description": "securityContext patches the container's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
             "allOf": [
               {
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.SecurityContext"
@@ -13856,6 +13856,50 @@
         "description": "JAXMLPolicySource represents a jax runtime configuration.",
         "type": "object"
       },
+      "trainer.v1alpha1.JobSetSpecPatch": {
+        "description": "JobSetSpecPatch defines allowed patches for the JobSet spec.",
+        "type": "object",
+        "properties": {
+          "replicatedJobs": {
+            "description": "replicatedJobs defines per-job patches, keyed by job name.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.ReplicatedJobPatch"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          }
+        }
+      },
+      "trainer.v1alpha1.JobSetTemplatePatch": {
+        "description": "JobSetTemplatePatch defines patches for the JobSet template. It mirrors JobSetTemplateSpec but only exposes metadata and restricted spec fields.",
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "description": "metadata patches the JobSet object metadata. Only labels and annotations are allowed.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "description": "spec patches the JobSet spec with restricted fields.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.JobSetSpecPatch"
+              }
+            ]
+          }
+        }
+      },
       "trainer.v1alpha1.JobSetTemplateSpec": {
         "description": "JobSetTemplateSpec represents a template of the desired JobSet.",
         "type": "object",
@@ -13875,6 +13919,20 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/jobset.v1alpha2.JobSetSpec"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.JobSpecPatch": {
+        "description": "JobSpecPatch defines allowed patches for the Job spec.",
+        "type": "object",
+        "properties": {
+          "template": {
+            "description": "template patches the Pod template for this Job.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.PodTemplatePatch"
               }
             ]
           }
@@ -13919,6 +13977,28 @@
             "description": "suspended is the number of child Jobs which are in a suspended state.",
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "trainer.v1alpha1.JobTemplatePatch": {
+        "description": "JobTemplatePatch defines patches for a Job template within a replicated job.",
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "description": "metadata patches the Job template metadata. Only labels and annotations are allowed.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "description": "spec patches the Job spec with restricted fields.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.JobSpecPatch"
+              }
+            ]
           }
         }
       },
@@ -14042,6 +14122,23 @@
           }
         }
       },
+      "trainer.v1alpha1.Metric": {
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "description": "name is a user-defined label for the metric, e.g. \"loss\", \"eval_accuracy\".",
+            "type": "string"
+          },
+          "value": {
+            "description": "value of the metric. Values must be serialized as a string.",
+            "type": "string"
+          }
+        }
+      },
       "trainer.v1alpha1.ModelInitializer": {
         "description": "ModelInitializer represents the desired configuration to initialize pre-trained model. The ModelInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
         "type": "object",
@@ -14120,66 +14217,12 @@
           }
         }
       },
-      "trainer.v1alpha1.PodTemplateOverride": {
-        "description": "PodTemplateOverride represents a custom PodTemplateSpec override that will be applied to the TrainJob's training runtime.",
-        "type": "object",
-        "required": [
-          "targetJobs"
-        ],
-        "properties": {
-          "manager": {
-            "description": "manager indicates which controller created this PodTemplateOverride object. It can be used by external controllers or admission webhooks to track ownership and avoid conflicts with other controllers. For example, Kueue sets this field to \"kueue.k8s.io/manager\". Defaults to `trainer.kubeflow.org/unknown`",
-            "type": "string"
-          },
-          "metadata": {
-            "description": "metadata overrides the Pod template metadata. These values will be merged with the TrainingRuntime's Pod template metadata.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
-              }
-            ]
-          },
-          "spec": {
-            "description": "spec overrides the Pod template spec. These values will be merged with the TrainingRuntime's Pod template spec.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.PodTemplateSpecOverride"
-              }
-            ]
-          },
-          "targetJobs": {
-            "description": "targetJobs is the list of replicated jobs in the training runtime template to apply the overrides.",
-            "type": "array",
-            "items": {
-              "default": {},
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/trainer.v1alpha1.PodTemplateOverrideTargetJob"
-                }
-              ]
-            },
-            "x-kubernetes-list-type": "atomic"
-          }
-        }
-      },
-      "trainer.v1alpha1.PodTemplateOverrideTargetJob": {
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "properties": {
-          "name": {
-            "description": "name is the target training job name for which the PodTemplateSpec is overridden.",
-            "type": "string"
-          }
-        }
-      },
-      "trainer.v1alpha1.PodTemplateSpecOverride": {
-        "description": "PodTemplateSpecOverride represents the spec overrides for Pod template.",
+      "trainer.v1alpha1.PodSpecPatch": {
+        "description": "PodSpecPatch contains the Pod spec fields that managers are permitted to patch.",
         "type": "object",
         "properties": {
           "affinity": {
-            "description": "affinity overrides for the Pod's affinity.",
+            "description": "affinity patches the Pod's scheduling affinity.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Affinity"
@@ -14187,13 +14230,13 @@
             ]
           },
           "containers": {
-            "description": "containers overrides for the containers in the target job templates.",
+            "description": "containers patches specific containers in the target job templates.",
             "type": "array",
             "items": {
               "default": {},
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/trainer.v1alpha1.ContainerOverride"
+                  "$ref": "#/components/schemas/trainer.v1alpha1.ContainerPatch"
                 }
               ]
             },
@@ -14203,7 +14246,7 @@
             "x-kubernetes-list-type": "map"
           },
           "imagePullSecrets": {
-            "description": "imagePullSecrets overrides the image pull secrets for the Pods in the target job templates.",
+            "description": "imagePullSecrets patches the image pull secrets for the Pods in the target job templates.",
             "type": "array",
             "items": {
               "default": {},
@@ -14219,13 +14262,13 @@
             "x-kubernetes-list-type": "map"
           },
           "initContainers": {
-            "description": "initContainers overrides the init container in the target job templates.",
+            "description": "initContainers patches the init containers in the target job templates.",
             "type": "array",
             "items": {
               "default": {},
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/trainer.v1alpha1.ContainerOverride"
+                  "$ref": "#/components/schemas/trainer.v1alpha1.ContainerPatch"
                 }
               ]
             },
@@ -14235,7 +14278,7 @@
             "x-kubernetes-list-type": "map"
           },
           "nodeSelector": {
-            "description": "nodeSelector overrides the node selector to place Pod on the specific node.",
+            "description": "nodeSelector patches the node selector to place Pods on specific nodes.",
             "type": "object",
             "additionalProperties": {
               "type": "string",
@@ -14243,7 +14286,7 @@
             }
           },
           "schedulingGates": {
-            "description": "schedulingGates overrides the scheduling gates of the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/",
+            "description": "schedulingGates patches the scheduling gates for the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/",
             "type": "array",
             "items": {
               "default": {},
@@ -14259,7 +14302,7 @@
             "x-kubernetes-list-type": "map"
           },
           "securityContext": {
-            "description": "securityContext overrides the Pod's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
+            "description": "securityContext patches the Pod's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
             "allOf": [
               {
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PodSecurityContext"
@@ -14267,11 +14310,11 @@
             ]
           },
           "serviceAccountName": {
-            "description": "serviceAccountName overrides the service account.",
+            "description": "serviceAccountName patches the service account for the Pods in the target job templates.",
             "type": "string"
           },
           "tolerations": {
-            "description": "tolerations overrides the Pod's tolerations.",
+            "description": "tolerations patches the Pod's tolerations.",
             "type": "array",
             "items": {
               "default": {},
@@ -14284,7 +14327,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "volumes": {
-            "description": "volumes overrides the Pod's volumes.",
+            "description": "volumes patches the Pod's volumes.",
             "type": "array",
             "items": {
               "default": {},
@@ -14298,6 +14341,78 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
+          }
+        }
+      },
+      "trainer.v1alpha1.PodTemplatePatch": {
+        "description": "PodTemplatePatch defines patches for a Pod template within a Job.",
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "description": "metadata patches the Pod template metadata. Only labels and annotations are allowed.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "description": "spec patches the Pod spec with the fields managers are permitted to set.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.PodSpecPatch"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.ReplicatedJobPatch": {
+        "description": "ReplicatedJobPatch defines patches for a specific replicated job within the JobSet.",
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "description": "name is the name of the replicated job to patch.",
+            "type": "string"
+          },
+          "template": {
+            "description": "template patches the Job template for this replicated job.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.JobTemplatePatch"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.RuntimePatch": {
+        "description": "RuntimePatch represents a custom patch applied to the TrainJob's training runtime template. Patches are keyed by manager to provide clear ownership and avoid conflicts between controllers.",
+        "type": "object",
+        "required": [
+          "manager"
+        ],
+        "properties": {
+          "manager": {
+            "description": "manager indicates who owns this patch entry. It can be set by the user, external controllers, or admission webhooks to track ownership and avoid conflicts. For example, Kueue sets this field to \"kueue.x-k8s.io/manager\".",
+            "type": "string"
+          },
+          "time": {
+            "description": "time is the timestamp of when this patch was last written. Set by the Trainer admission webhook on each create or update. Used for observability only, not used as a list map key.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ]
+          },
+          "trainingRuntimeSpec": {
+            "description": "trainingRuntimeSpec defines allowed patches for ClusterTrainingRuntime or TrainingRuntime-based jobs.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainingRuntimeSpecPatch"
+              }
+            ]
           }
         }
       },
@@ -14412,13 +14527,10 @@
           "runtimeRef"
         ],
         "properties": {
-          "annotations": {
-            "description": "annotations to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.",
-            "type": "object",
-            "additionalProperties": {
-              "type": "string",
-              "default": ""
-            }
+          "activeDeadlineSeconds": {
+            "description": "activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob start time (which resets on resume from suspension) that the TrainJob may be active before the system tries to terminate it. Value must be a positive integer. Once reached, all running Pods are terminated and the TrainJob status becomes Failed with reason: DeadlineExceeded.",
+            "type": "integer",
+            "format": "int64"
           },
           "initializer": {
             "description": "initializer defines the configuration of the initializer.",
@@ -14428,30 +14540,25 @@
               }
             ]
           },
-          "labels": {
-            "description": "labels to apply for the derivative JobSet and Jobs. They will be merged with the TrainingRuntime values.",
-            "type": "object",
-            "additionalProperties": {
-              "type": "string",
-              "default": ""
-            }
-          },
           "managedBy": {
             "description": "managedBy is used to indicate the controller or entity that manages a TrainJob. The value must be either an empty, `trainer.kubeflow.org/trainjob-controller` or `kueue.x-k8s.io/multikueue`. The built-in TrainJob controller reconciles TrainJob which don't have this field at all or the field value is the reserved string `trainer.kubeflow.org/trainjob-controller`, but delegates reconciling TrainJobs with a 'kueue.x-k8s.io/multikueue' to the Kueue. The field is immutable.",
             "type": "string"
           },
-          "podTemplateOverrides": {
-            "description": "podTemplateOverrides define the PodTemplateOverrides for the training runtime. When multiple overrides apply to the same targetJob, later entries in the slice override earlier field values.",
+          "runtimePatches": {
+            "description": "runtimePatches defines custom patches applied to the TrainJob's Runtime. Patches are keyed by manager to provide clear ownership and avoid conflicts between controllers.",
             "type": "array",
             "items": {
               "default": {},
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/trainer.v1alpha1.PodTemplateOverride"
+                  "$ref": "#/components/schemas/trainer.v1alpha1.RuntimePatch"
                 }
               ]
             },
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-map-keys": [
+              "manager"
+            ],
+            "x-kubernetes-list-type": "map"
           },
           "runtimeRef": {
             "description": "runtimeRef is the reference to the training runtime.",
@@ -14511,6 +14618,14 @@
               "name"
             ],
             "x-kubernetes-list-type": "map"
+          },
+          "trainerStatus": {
+            "description": "trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.\n\nThis field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).\n\nThis is an alpha feature and requires enabling the TrainJobStatus feature gate.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainerStatus"
+              }
+            ]
           }
         }
       },
@@ -14573,6 +14688,43 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.TrainerStatus": {
+        "description": "TrainerStatus represents the latest known runtime status of the Trainer step of the TrainJob.",
+        "type": "object",
+        "properties": {
+          "estimatedRemainingSeconds": {
+            "description": "estimatedRemainingSeconds gives the estimated remaining training time in seconds before the train job is completed. The value will be empty if it is unknown.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastUpdatedTime": {
+            "description": "lastUpdatedTime is the timestamp when the runtime status was observed.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+              }
+            ]
+          },
+          "metrics": {
+            "description": "metrics contains the current metrics for the model.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.Metric"
+                }
+              ]
+            },
+            "x-kubernetes-list-type": "atomic"
+          },
+          "progressPercentage": {
+            "description": "progressPercentage gives an estimate of how complete the TrainJob is as a percentage. The value will be between 0 and 100, or empty if unknown.",
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -14672,6 +14824,34 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobSetTemplateSpec"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.TrainingRuntimeSpecPatch": {
+        "description": "TrainingRuntimeSpecPatch mirrors TrainingRuntimeSpec but only exposes the fields managers are permitted to patch.",
+        "type": "object",
+        "properties": {
+          "template": {
+            "description": "template patches the JobSet template.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.JobSetTemplatePatch"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.UpdateTrainJobStatusRequest": {
+        "description": "UpdateTrainJobStatusRequest contains the current runtime status (e.g. progress and metrics) for the different stages of the TrainJob.",
+        "type": "object",
+        "properties": {
+          "trainerStatus": {
+            "description": "trainerStatus contains the latest observed runtime status of the Trainer step of the TrainJob. It reflects progress, remaining time, metrics, and the last update timestamp.\n\nThis field is nil if the TrainJob does not report trainer-level status, or if no status has been observed yet (for example, immediately after the TrainJob is created).\n\nThis is an alpha feature and requires enabling the TrainJobStatus feature gate.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainerStatus"
               }
             ]
           }

@@ -239,6 +239,7 @@ type MPIMLPolicySource struct {
 	// sshAuthMountPath is the directory where SSH keys are mounted.
 	// Defaults to /root/.ssh.
 	// +kubebuilder:default=/root/.ssh
+	// +kubebuilder:validation:MaxLength=4096
 	// +optional
 	SSHAuthMountPath *string `json:"sshAuthMountPath,omitempty"`
 

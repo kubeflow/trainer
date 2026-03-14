@@ -16,23 +16,33 @@
 
 package v1alpha1
 
-// PodTemplateOverrideTargetJobApplyConfiguration represents a declarative configuration of the PodTemplateOverrideTargetJob type for use
+// MetricApplyConfiguration represents a declarative configuration of the Metric type for use
 // with apply.
-type PodTemplateOverrideTargetJobApplyConfiguration struct {
-	// name is the target training job name for which the PodTemplateSpec is overridden.
+type MetricApplyConfiguration struct {
+	// name is a user-defined label for the metric, e.g. "loss", "eval_accuracy".
 	Name *string `json:"name,omitempty"`
+	// value of the metric. Values must be serialized as a string.
+	Value *string `json:"value,omitempty"`
 }
 
-// PodTemplateOverrideTargetJobApplyConfiguration constructs a declarative configuration of the PodTemplateOverrideTargetJob type for use with
+// MetricApplyConfiguration constructs a declarative configuration of the Metric type for use with
 // apply.
-func PodTemplateOverrideTargetJob() *PodTemplateOverrideTargetJobApplyConfiguration {
-	return &PodTemplateOverrideTargetJobApplyConfiguration{}
+func Metric() *MetricApplyConfiguration {
+	return &MetricApplyConfiguration{}
 }
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *PodTemplateOverrideTargetJobApplyConfiguration) WithName(value string) *PodTemplateOverrideTargetJobApplyConfiguration {
+func (b *MetricApplyConfiguration) WithName(value string) *MetricApplyConfiguration {
 	b.Name = &value
+	return b
+}
+
+// WithValue sets the Value field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Value field is set to the value of the last call.
+func (b *MetricApplyConfiguration) WithValue(value string) *MetricApplyConfiguration {
+	b.Value = &value
 	return b
 }

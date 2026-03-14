@@ -18,16 +18,18 @@ import re  # noqa: F401
 import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow_trainer_api.models.trainer_v1alpha1_job_template_patch import TrainerV1alpha1JobTemplatePatch
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1PodTemplateOverrideTargetJob(BaseModel):
+class TrainerV1alpha1ReplicatedJobPatch(BaseModel):
     """
-    TrainerV1alpha1PodTemplateOverrideTargetJob
+    ReplicatedJobPatch defines patches for a specific replicated job within the JobSet.
     """ # noqa: E501
-    name: StrictStr = Field(description="name is the target training job name for which the PodTemplateSpec is overridden.")
-    __properties: ClassVar[List[str]] = ["name"]
+    name: StrictStr = Field(description="name is the name of the replicated job to patch.")
+    template: Optional[TrainerV1alpha1JobTemplatePatch] = Field(default=None, description="template patches the Job template for this replicated job.")
+    __properties: ClassVar[List[str]] = ["name", "template"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -47,7 +49,7 @@ class TrainerV1alpha1PodTemplateOverrideTargetJob(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodTemplateOverrideTargetJob from a JSON string"""
+        """Create an instance of TrainerV1alpha1ReplicatedJobPatch from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -68,11 +70,14 @@ class TrainerV1alpha1PodTemplateOverrideTargetJob(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of template
+        if self.template:
+            _dict['template'] = self.template.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1PodTemplateOverrideTargetJob from a dict"""
+        """Create an instance of TrainerV1alpha1ReplicatedJobPatch from a dict"""
         if obj is None:
             return None
 
@@ -80,7 +85,8 @@ class TrainerV1alpha1PodTemplateOverrideTargetJob(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "name": obj.get("name")
+            "name": obj.get("name"),
+            "template": TrainerV1alpha1JobTemplatePatch.from_dict(obj["template"]) if obj.get("template") is not None else None
         })
         return _obj
 

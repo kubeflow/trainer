@@ -63,6 +63,15 @@ cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
   images:
   - name: "${CONTROLLER_MANAGER_CI_IMAGE_NAME}"
     newTag: "${CI_IMAGE_TAG}"
+  patches:
+  - patch: |-
+      # enable feature flags
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --feature-gates=TrainJobStatus=true
+    target:
+      kind: Deployment
+      name: kubeflow-trainer-controller-manager
 EOF
 
 kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
@@ -96,7 +105,7 @@ kubectl apply --server-side -k manifests/overlays/runtimes || (
 
 # hotfix(jaiakash) - skip pre-load due to kind failure
 # # TODO (andreyvelich): We should build runtime images before adding them.
-# TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+# TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
 # DEEPSPEED_RUNTIME_IMAGE=ghcr.io/kubeflow/trainer/deepspeed-runtime:latest
 # JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
 

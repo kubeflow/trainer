@@ -37,7 +37,7 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
-func TestJax(t *testing.T) {
+func TestJAXEnforceMLPolicy(t *testing.T) {
 	cases := map[string]struct {
 		info              *runtime.Info
 		trainJob          *trainer.TrainJob
@@ -337,7 +337,7 @@ func TestJax(t *testing.T) {
 			ctx, cancel = context.WithCancel(ctx)
 			t.Cleanup(cancel)
 			cliBuilder := utiltesting.NewClientBuilder()
-			p, err := New(ctx, cliBuilder.Build(), nil)
+			p, err := New(ctx, cliBuilder.Build(), nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize JAX plugin: %v", err)
 			}

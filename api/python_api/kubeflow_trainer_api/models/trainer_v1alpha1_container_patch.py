@@ -25,13 +25,13 @@ from kubeflow_trainer_api.models.io_k8s_api_core_v1_volume_mount import IoK8sApi
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1ContainerOverride(BaseModel):
+class TrainerV1alpha1ContainerPatch(BaseModel):
     """
-    ContainerOverride represents parameters that can be overridden using PodSpecOverrides.
+    ContainerPatch represents parameters that can be patched using PodSpecPatch.
     """ # noqa: E501
-    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="env is the list of environment variables to set in the container. These values will be merged with the TrainingRuntime's environments. These values can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.")
-    name: StrictStr = Field(description="name for the container. TrainingRuntime must have this container.")
-    security_context: Optional[IoK8sApiCoreV1SecurityContext] = Field(default=None, description="securityContext overrides the container's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/", alias="securityContext")
+    env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="env is the list of environment variables to set in the container. These values will be merged with the Runtime's environments. These values can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.")
+    name: StrictStr = Field(description="name for the container. Runtime must have this container.")
+    security_context: Optional[IoK8sApiCoreV1SecurityContext] = Field(default=None, description="securityContext patches the container's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/", alias="securityContext")
     volume_mounts: Optional[List[IoK8sApiCoreV1VolumeMount]] = Field(default=None, description="volumeMounts are the volumes to mount into the container's filesystem.", alias="volumeMounts")
     __properties: ClassVar[List[str]] = ["env", "name", "securityContext", "volumeMounts"]
 
@@ -53,7 +53,7 @@ class TrainerV1alpha1ContainerOverride(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1ContainerOverride from a JSON string"""
+        """Create an instance of TrainerV1alpha1ContainerPatch from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -95,7 +95,7 @@ class TrainerV1alpha1ContainerOverride(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1ContainerOverride from a dict"""
+        """Create an instance of TrainerV1alpha1ContainerPatch from a dict"""
         if obj is None:
             return None
 

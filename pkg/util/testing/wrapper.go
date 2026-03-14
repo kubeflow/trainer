@@ -611,19 +611,8 @@ func (t *TrainJobWrapper) UID(uid string) *TrainJobWrapper {
 	return t
 }
 
-func (t *TrainJobWrapper) SpecLabel(key, value string) *TrainJobWrapper {
-	if t.Spec.Labels == nil {
-		t.Spec.Labels = make(map[string]string, 1)
-	}
-	t.Spec.Labels[key] = value
-	return t
-}
-
-func (t *TrainJobWrapper) SpecAnnotation(key, value string) *TrainJobWrapper {
-	if t.Spec.Annotations == nil {
-		t.Spec.Annotations = make(map[string]string, 1)
-	}
-	t.Spec.Annotations[key] = value
+func (t *TrainJobWrapper) ActiveDeadlineSeconds(deadline int64) *TrainJobWrapper {
+	t.Spec.ActiveDeadlineSeconds = deadline
 	return t
 }
 
@@ -651,8 +640,8 @@ func (t *TrainJobWrapper) Trainer(trainer *trainer.Trainer) *TrainJobWrapper {
 	return t
 }
 
-func (t *TrainJobWrapper) PodTemplateOverrides(podTemplateOverrides []trainer.PodTemplateOverride) *TrainJobWrapper {
-	t.Spec.PodTemplateOverrides = podTemplateOverrides
+func (t *TrainJobWrapper) RuntimePatches(patches []trainer.RuntimePatch) *TrainJobWrapper {
+	t.Spec.RuntimePatches = patches
 	return t
 }
 

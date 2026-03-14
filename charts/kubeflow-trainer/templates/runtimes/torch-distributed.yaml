@@ -39,5 +39,5 @@ spec:
                 spec:
                   containers:
                     - name: node
-                      image: pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+                      image: pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
 {{- end }}
