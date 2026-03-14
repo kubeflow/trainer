@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -56,6 +57,7 @@ type Server struct {
 	httpServer *http.Server
 	client     client.Client
 	authorizer TokenAuthorizer
+	ready      atomic.Bool
 }
 
 var (
@@ -120,7 +122,9 @@ func (s *Server) Start(ctx context.Context) error {
 	// Handle graceful shutdown in background
 	serverShutdown := make(chan struct{})
 	go func() {
+		defer close(serverShutdown)
 		<-ctx.Done()
+		s.ready.Store(false)
 		s.log.Info("Shutting down runtime status server")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
@@ -129,11 +133,12 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}()
 
+	s.ready.Store(true)
+	defer s.ready.Store(false)
 	s.log.Info("Starting runtime status server with TLS", "address", s.httpServer.Addr)
 	if err := s.httpServer.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("runtime status server failed: %w", err)
 	}
-
 	<-serverShutdown
 	return nil
 }
@@ -141,6 +146,14 @@ func (s *Server) Start(ctx context.Context) error {
 func (s *Server) NeedLeaderElection() bool {
 	// server needs to run on all replicas
 	return false
+}
+
+// Check implements healthz.Checker and returns an error if the status server is not ready.
+func (s *Server) Check(_ *http.Request) error {
+	if !s.ready.Load() {
+		return fmt.Errorf("runtime status server is not ready")
+	}
+	return nil
 }
 
 // handleTrainJobRuntimeStatus handles POST requests to update TrainJob status.

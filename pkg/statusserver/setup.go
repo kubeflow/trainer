@@ -22,6 +22,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
@@ -47,6 +48,12 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, enableHTTP2 bool
 	server, err := NewServer(cli, cfg, tlsConfig, authorizer)
 	if err != nil {
 		return err
+	}
+	if err := mgr.AddHealthzCheck("status-server", healthz.Ping); err != nil {
+		return fmt.Errorf("failed to add status server healthz check: %w", err)
+	}
+	if err := mgr.AddReadyzCheck("status-server", healthz.Checker(server.Check)); err != nil {
+		return fmt.Errorf("failed to add status server readyz check: %w", err)
 	}
 	return mgr.Add(server)
 }
