@@ -88,11 +88,20 @@ mkdir -p "$HELM_CONFIG_HOME" "$HELM_CACHE_HOME" "$HELM_DATA_HOME"
 
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia && helm repo update
 
+# Configure GPU time slicing with 3 replicas per GPU.
+kubectl create -n gpu-operator -f ./hack/gpu-time-slicing.yml
+
 helm install --wait --generate-name \
   -n gpu-operator --create-namespace \
   nvidia/gpu-operator \
   --version="${GPU_OPERATOR_VERSION}" \
-  --set driver.enabled=false
+  --set driver.enabled=false \
+  --set devicePlugin.config.name=gpu-time-slicing-config
+
+# Patch cluster to use the time slicing configuration.
+kubectl patch clusterpolicies.nvidia.com/cluster-policy \
+  -n gpu-operator --type merge \
+  -p '{"spec": {"devicePlugin": {"config": {"name": "gpu-time-slicing-config", "default": "any"}}}}'
 
 # Validation steps for GPU operator installation
 kubectl get ns gpu-operator
