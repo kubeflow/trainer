@@ -88,7 +88,7 @@ mkdir -p "$HELM_CONFIG_HOME" "$HELM_CACHE_HOME" "$HELM_DATA_HOME"
 
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia && helm repo update
 
-# Configure GPU time slicing with 3 replicas per GPU.
+# Configure GPU time slicing for GPU.
 kubectl create -n gpu-operator -f ./hack/gpu-time-slicing.yml
 
 helm install --wait --generate-name \
