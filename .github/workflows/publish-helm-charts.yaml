@@ -6,6 +6,11 @@ on:
       - master
     tags:
       - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   CHART_PATH: charts/kubeflow-trainer

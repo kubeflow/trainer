@@ -8,6 +8,7 @@ on:
     tags:
       - "v*"
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build-and-publish:
@@ -16,7 +17,7 @@ jobs:
     runs-on: oracle-vm-16cpu-64gb-x86-64
 
     env:
-      SHOULD_PUBLISH: ${{ github.event_name == 'push' }}
+      SHOULD_PUBLISH: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
 
     strategy:
       fail-fast: false
