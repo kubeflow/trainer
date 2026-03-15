@@ -79,6 +79,9 @@ func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj
 		if slices.Equal(newObj.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
 			_, torchTuneErrs := validateTorchTune(runtimeInfo, newObj)
 			allErrs = append(allErrs, torchTuneErrs...)
+		} else if slices.Equal(newObj.Spec.Trainer.Command, constants.UnslothEntrypoint) {
+			_, unslothErrs := validateUnsloth(runtimeInfo, newObj)
+			allErrs = append(allErrs, unslothErrs...)
 		}
 	}
 	return nil, allErrs
@@ -147,7 +150,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 					WithName(constants.TorchEnvMasterPort).
 					WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
 			)
-		} else {
+		} else if slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
 			// Mutate trainer command for torchtune.
 			// Ref: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2#complement-torch-plugin
 			// 1. Add rendezvous backend arg for torchtune.
@@ -171,6 +174,9 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			newCommand = append(newCommand, extractOverridesFromRuntime(info)...)
 
 			trainJob.Spec.Trainer.Command = append(trainJob.Spec.Trainer.Command, newCommand...)
+		} else if slices.Equal(trainJob.Spec.Trainer.Command, constants.UnslothEntrypoint) {
+			// Mutate trainer command for unsloth.
+			trainJob.Spec.Trainer.Command = buildUnslothCommand(info, trainJob)
 		}
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
