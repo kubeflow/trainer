@@ -60,7 +60,6 @@ cherry pick your changes from the `master` branch and submit a PR.
 ### Create release branch
 
 1. Depends on what version you want to release,
-
    - Major or Minor version - Use the GitHub UI to create a release branch from `master` and name
      the release branch `release-X.Y`
    - Patch version - You don't need to create a new release branch.
@@ -78,17 +77,32 @@ cherry pick your changes from the `master` branch and submit a PR.
    git rebase upstream/release-X.Y
    ```
 
-### Release Kubeflow Trainer API Modules
+### Release Kubeflow Trainer API Models and Images
 
-1. Update the `API_VERSION` in [the `gen-api.sh` file](../../hack/python-api/gen-api.sh).
-
-   You must follow this semantic `X.Y.ZrcN` for the RC or `X.Y.Z` for the public release.
+1. Update the `VERSION` in [the `VERSION` file](../../VERSION).
 
    For example:
 
-   ```sh
-   API_VERSION = "2.1.0rc0"
    ```
+   v2.2.0-rc.0
+   ```
+
+1. Update the image tag in Kubeflow Trainer manifests:
+   - [manager](../../manifests/overlays/manager/kustomization.yaml)
+   - [runtimes](../../manifests/overlays/runtimes/kustomization.yaml)
+   - [data-cache](../../manifests/overlays/data-cache/kustomization.yaml)
+   - `CACHE_IMAGE` in [the torch-distributed-with-cache runtime](../../manifests/base/runtimes/data-cache/torch_distributed_with_cache.yaml)
+
+   The image tags must be equal to the release version, for example: `newTag: v2.0.0-rc.1`
+
+   Additionally, update the public ConfigMap version used by the manager overlay:
+   - In `manifests/overlays/manager/kustomization.yaml`, set the `kubeflow_trainer_version` literal
+     under `configMapGenerator` to the release version with `v` prefix (for example,
+     `kubeflow_trainer_version=v2.0.0-rc.1`). Update this value whenever cutting a new release.
+
+1. Update the [Helm charts](../../charts/kubeflow-trainer/Chart.yaml) version.
+
+   Ensure that the version number does not include the `v` prefix.
 
 1. Generate and publish the Kubeflow Trainer Python API models:
 
@@ -101,29 +115,7 @@ cherry pick your changes from the `master` branch and submit a PR.
    cd ../..
    ```
 
-### Release Kubeflow Trainer images
-
-1. Update the image tag in Kubeflow Trainer manifests:
-
-   - [manager](../../manifests/overlays/manager/kustomization.yaml)
-   - [runtimes](../../manifests/overlays/runtimes/kustomization.yaml)
-   - [data-cache](../../manifests/overlays/data-cache/kustomization.yaml)
-   - `CACHE_IMAGE` in [the torch-distributed-with-cache runtime](../../manifests/base/runtimes/data-cache/torch_distributed_with_cache.yaml)
-
-    The image tags must be equal to the release version, for example: `newTag: v2.0.0-rc.1`
-
-    Additionally, update the public ConfigMap version used by the manager overlay:
-
-    - In `manifests/overlays/manager/kustomization.yaml`, set the `kubeflow_trainer_version` literal
-       under `configMapGenerator` to the release version with `v` prefix (for example,
-       `kubeflow_trainer_version=v2.0.0-rc.1`). Update this value whenever cutting a new release.
-
-1. Update the [Helm charts](../../charts/kubeflow-trainer/Chart.yaml) version.
-
-   Ensure that the version number does not include the `v` prefix.
-
 1. Commit your changes, tag the commit, and push it to upstream.
-
    - For the RC tag run the following:
 
    ```sh
@@ -143,6 +135,8 @@ cherry pick your changes from the `master` branch and submit a PR.
    ```
 
 For example, check [this release commit](https://github.com/kubeflow/trainer/commit/332ad3939a000ecf837a37ecb1a56e3b0494562c).
+
+1. Update the VERSION file in the master branch.
 
 ### Verify the image publish
 
