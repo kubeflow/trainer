@@ -1545,10 +1545,11 @@ func TestTorchValidate(t *testing.T) {
 						Env(
 							[]corev1.EnvVar{
 								{
-									// PET_MASTER_ADDR is a torchrun reserved env.
-									// Setting it alongside the TorchTune entrypoint
-									// causes a cross-plugin conflict since TorchTune
-									// manages its own rendezvous via --rdzv_endpoint.
+									// PET_MASTER_ADDR is one of the torchrun rendezvous envs.
+									// Setting PET_MASTER_ADDR (and similarly PET_MASTER_PORT)
+									// alongside a TorchTune entrypoint causes a cross-plugin
+									// conflict because TorchTune configures rendezvous itself
+									// via --rdzv_endpoint.
 									// Ref: pkg/runtime/framework/plugins/torch/torch.go
 									// TODO (andreyvelich): extend this check once the
 									// multi-backend BuiltinTrainer plugin registry (#2752)
