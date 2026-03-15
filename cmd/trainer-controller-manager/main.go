@@ -21,7 +21,6 @@ import (
 	"flag"
 	"net/http"
 	"os"
-	"sync/atomic"
 
 	zaplog "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -150,29 +149,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Register status server before goroutine starts and before mgr.Start().
-	// AddHealthzCheck/AddReadyzCheck return errors if called after the manager
-	// has already started, which is what was happening when this was inside
-	// the setupManagerComponents goroutine.
-	var statusServerReady atomic.Bool
 	if features.Enabled(features.TrainJobStatus) {
-		if err := mgr.AddHealthzCheck("status-server", healthz.Ping); err != nil {
-			setupLog.Error(err, "unable to set up status server health check")
-			os.Exit(1)
-		}
-		if err := mgr.AddReadyzCheck("status-server", func(_ *http.Request) error {
-			if !statusServerReady.Load() {
-				return errors.New("status server is not ready")
-			}
-			return nil
-		}); err != nil {
-			setupLog.Error(err, "unable to set up status server ready check")
+		if err := statusserver.RegisterProbes(mgr, cfg.StatusServer); err != nil {
+			setupLog.Error(err, "unable to register status server probes")
 			os.Exit(1)
 		}
 	}
 
 	// Set up controllers and other components using goroutines to start the manager quickly.
-	go setupManagerComponents(mgr, runtimes, &cfg, certsReady, enableHTTP2, &statusServerReady)
+	go setupManagerComponents(mgr, runtimes, &cfg, certsReady, enableHTTP2)
+
 
 	setupLog.Info("Starting manager")
 	if err = mgr.Start(ctx); err != nil {
@@ -181,7 +167,7 @@ func main() {
 	}
 }
 
-func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, cfg *configapi.Configuration, certsReady <-chan struct{}, enableHTTP2 bool, statusServerReady *atomic.Bool) {
+func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, cfg *configapi.Configuration, certsReady <-chan struct{}, enableHTTP2 bool) {
 	setupLog.Info("Waiting for certificate generation to complete")
 	<-certsReady
 	setupLog.Info("Certs ready")
@@ -199,7 +185,6 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 			setupLog.Error(err, "Could not create runtime status server")
 			os.Exit(1)
 		}
-		statusServerReady.Store(true)
 	}
 }
 

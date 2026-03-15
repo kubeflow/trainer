@@ -23,8 +23,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
-	"sync/atomic"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -32,12 +32,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	trainerv1alpha1ac "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 )
+
 
 const (
 	shutdownTimeout = 5 * time.Second
@@ -57,8 +59,8 @@ type Server struct {
 	httpServer *http.Server
 	client     client.Client
 	authorizer TokenAuthorizer
-	ready      atomic.Bool
 }
+
 
 var (
 	_ manager.Runnable               = &Server{}
@@ -124,7 +126,6 @@ func (s *Server) Start(ctx context.Context) error {
 	go func() {
 		defer close(serverShutdown)
 		<-ctx.Done()
-		s.ready.Store(false)
 		s.log.Info("Shutting down runtime status server")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
@@ -133,8 +134,6 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}()
 
-	s.ready.Store(true)
-	defer s.ready.Store(false)
 	s.log.Info("Starting runtime status server with TLS", "address", s.httpServer.Addr)
 	if err := s.httpServer.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("runtime status server failed: %w", err)
@@ -146,14 +145,6 @@ func (s *Server) Start(ctx context.Context) error {
 func (s *Server) NeedLeaderElection() bool {
 	// server needs to run on all replicas
 	return false
-}
-
-// Check implements healthz.Checker and returns an error if the status server is not ready.
-func (s *Server) Check(_ *http.Request) error {
-	if !s.ready.Load() {
-		return fmt.Errorf("runtime status server is not ready")
-	}
-	return nil
 }
 
 // handleTrainJobRuntimeStatus handles POST requests to update TrainJob status.
@@ -224,6 +215,24 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(updateRequest); err != nil {
 		s.log.Error(err, "Failed to write TrainJob status", "namespace", namespace, "name", trainJobName)
+	}
+}
+
+// StartedChecker returns a healthz.Checker that dials the status server over TLS.
+// Returns an error until the server is actively accepting connections.
+func (s *Server) StartedChecker() healthz.Checker {
+	tlsCfg := &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+	return func(_ *http.Request) error {
+		conn, err := tls.DialWithDialer(
+			&net.Dialer{Timeout: 10 * time.Second},
+			"tcp",
+			s.httpServer.Addr,
+			tlsCfg,
+		)
+		if err != nil {
+			return fmt.Errorf("status server not reachable at %s: %w", s.httpServer.Addr, err)
+		}
+		return conn.Close()
 	}
 }
 
