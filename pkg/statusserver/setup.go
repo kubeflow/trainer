@@ -17,11 +17,16 @@ limitations under the License.
 package statusserver
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net"
+	"net/http"
+	"time"
 
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
@@ -49,6 +54,33 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, enableHTTP2 bool
 		return err
 	}
 	return mgr.Add(server)
+}
+
+// RegisterProbes registers the status server with the manager's healthz and readyz probes.
+// Must be called before mgr.Start(). Uses a TLS dial to verify the server is reachable,
+// following the same pattern as the webhook server's StartedChecker.
+func RegisterProbes(mgr ctrl.Manager, cfg *configapi.StatusServer) error {
+	addr := fmt.Sprintf(":%d", *cfg.Port)
+	tlsCfg := &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+	checker := healthz.Checker(func(_ *http.Request) error {
+		conn, err := tls.DialWithDialer(
+			&net.Dialer{Timeout: 10 * time.Second},
+			"tcp",
+			addr,
+			tlsCfg,
+		)
+		if err != nil {
+			return fmt.Errorf("status server not reachable at %s: %w", addr, err)
+		}
+		return conn.Close()
+	})
+	if err := mgr.AddHealthzCheck("status-server", checker); err != nil {
+		return fmt.Errorf("unable to set up status server health check: %w", err)
+	}
+	if err := mgr.AddReadyzCheck("status-server", checker); err != nil {
+		return fmt.Errorf("unable to set up status server ready check: %w", err)
+	}
+	return nil
 }
 
 func createClient(mgr ctrl.Manager, cfg *configapi.StatusServer) (client.Client, error) {
