@@ -40,7 +40,6 @@ import (
 	trainerv1alpha1ac "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 )
 
-
 const (
 	shutdownTimeout = 5 * time.Second
 
@@ -60,7 +59,6 @@ type Server struct {
 	client     client.Client
 	authorizer TokenAuthorizer
 }
-
 
 var (
 	_ manager.Runnable               = &Server{}
