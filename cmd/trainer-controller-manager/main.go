@@ -159,7 +159,6 @@ func main() {
 	// Set up controllers and other components using goroutines to start the manager quickly.
 	go setupManagerComponents(mgr, runtimes, &cfg, certsReady, enableHTTP2)
 
-
 	setupLog.Info("Starting manager")
 	if err = mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "Could not run manager")
