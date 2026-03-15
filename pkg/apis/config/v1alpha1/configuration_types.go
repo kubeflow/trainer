@@ -68,6 +68,10 @@ type Configuration struct {
 	// default enablement status of a feature.
 	// +optional
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
+
+	// tls contains TLS configuration for the controller manager servers.
+	// +optional
+	TLS *TLSOptions `json:"tls,omitempty"`
 }
 
 // ControllerWebhook defines the webhook server for the controller.
@@ -221,4 +225,18 @@ type StatusServer struct {
 	// +optional
 	// +kubebuilder:default=10
 	Burst *int32 `json:"burst,omitempty"`
+}
+
+// TLSOptions contains TLS configuration for the controller manager.
+type TLSOptions struct {
+	// minVersion is the minimum TLS version supported.
+	// Supported values: "1.0", "1.1", "1.2", "1.3".
+	// +optional
+	// +kubebuilder:validation:MaxLength=3
+	MinVersion string `json:"minVersion,omitempty"`
+
+	// cipherSuites is the list of allowed cipher suites.
+	// +optional
+	// +kubebuilder:validation:items:MaxLength=100
+	CipherSuites []string `json:"cipherSuites,omitempty"`
 }

@@ -819,8 +819,12 @@ func TestLoadHTTP2(t *testing.T) {
 			enableHTTP2: true,
 			wantTLSOpts: false,
 		},
+		{
+			name:        "HTTP/2 defaults to disabled",
+			enableHTTP2: false,
+			wantTLSOpts: true,
+		},
 	}
-
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			options, _, err := Load(testScheme, "", tc.enableHTTP2)
