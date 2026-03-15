@@ -12,7 +12,7 @@ jobs:
   gpu-e2e-test:
     name: GPU E2E Test
     runs-on:
-      labels: oracle-vm-gpu-a10-2
+      labels: oracle-vm-gpu-a10-1
       group: GPUs
 
     env:

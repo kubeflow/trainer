@@ -1,0 +1,20 @@
+# With GPU A10-2, the runner were queued for long time due to host capacity limit of CNCF Runner
+# Check for dicussion: https://cloud-native.slack.com/archives/C08P4HUFQ6M/p1773430783406709
+
+# This adds time slicing to A10-1 GPU runners.
+# Time slicing docs: https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-sharing.html#time-slicing-gpus-in-kubernetes
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-time-slicing-config
+data:
+  any: |-
+    version: v1
+    flags:
+      migStrategy: none
+    sharing:
+      timeSlicing:
+        resources:
+        - name: nvidia.com/gpu
+          replicas: 2
