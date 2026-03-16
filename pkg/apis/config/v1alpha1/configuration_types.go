@@ -237,6 +237,7 @@ type TLSOptions struct {
 
 	// cipherSuites is the list of allowed cipher suites.
 	// +optional
+	// +listType=atomic
 	// +kubebuilder:validation:MaxItems=100
 	// +kubebuilder:validation:items:MaxLength=100
 	CipherSuites []string `json:"cipherSuites,omitempty"`
