@@ -236,14 +236,6 @@ docs: ## Build HTML documentation locally
 docs-linkcheck: ## Check all links in documentation
 	cd docs && $(MAKE) linkcheck
 
-.PHONY: docs-api-reference
-docs-api-reference: ## Generate CRD API reference documentation
-	@echo "Generating CRD API reference (crddoc)"
-	@# TODO: Install and run crddoc when ready
-	@# For now, create placeholder files to avoid breaking the build
-	@mkdir -p docs/api-reference/crd-types
-	@echo "CRD API reference generation not yet implemented" > docs/api-reference/crd-types/.placeholder
-
 .PHONY: docs-clean
 docs-clean: ## Remove documentation build artifacts
 	cd docs && $(MAKE) clean
