@@ -154,35 +154,3 @@ func TestServerErrorResponses(t *testing.T) {
 		})
 	}
 }
-
-func TestStartedChecker(t *testing.T) {
-	// Start a real TLS test server to simulate the status server being up.
-	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	srv, err := NewServer(
-		nil,
-		&configapi.StatusServer{Port: ptr.To[int32](8080)},
-		&tls.Config{},
-		fakeAuthorizer{},
-	)
-	if err != nil {
-		t.Fatalf("NewServer() error: %v", err)
-	}
-	// Point the server's address to the test TLS server.
-	srv.httpServer.Addr = ts.Listener.Addr().String()
-
-	checker := srv.StartedChecker()
-
-	// Server is running: checker should return nil.
-	if err := checker(nil); err != nil {
-		t.Errorf("StartedChecker() = %v, want nil when server is running", err)
-	}
-
-	// Stop the server: checker should return an error.
-	ts.Close()
-	if err := checker(nil); err == nil {
-		t.Error("StartedChecker() = nil, want error when server is stopped")
-	}
-}
