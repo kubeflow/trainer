@@ -13,9 +13,6 @@ myst-parser>=3.0.0,<4.0.0
 # Diagram Rendering
 sphinxcontrib-mermaid>=0.9.0,<1.0.0
 
-# API Reference Generation
-sphinx-autoapi>=3.0.0,<4.0.0
-
 # Copy Button for Code Blocks
 sphinx-copybutton>=0.5.2,<1.0.0
 

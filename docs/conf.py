@@ -97,22 +97,6 @@ mermaid.initialize({
 });
 """
 
-# -- AutoAPI configuration ---------------------------------------------------
-# AutoAPI generates Python SDK documentation
-# Note: This assumes the Kubeflow Python SDK source is available
-# If not available, these settings can be commented out until SDK integration
-autoapi_type = "python"
-autoapi_dirs = []  # Will be populated when SDK integration is ready
-autoapi_options = [
-    "members",
-    "undoc-members",
-    "show-inheritance",
-    "show-module-summary",
-    "imported-members",
-]
-autoapi_ignore = ["*/test_*.py", "*/tests/*", "*_test.py"]
-autoapi_add_toctree_entry = False  # We'll manually control toctree
-
 # -- Link checking configuration ---------------------------------------------
 linkcheck_ignore = [
     r"http://localhost:\d+/",  # Ignore localhost links
