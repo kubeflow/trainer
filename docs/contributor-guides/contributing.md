@@ -1,3 +1,1 @@
-# Contributing
-
-(Content to be added)
+# Contributing Guide
