@@ -58,7 +58,7 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.StatusServer, enableHTTP2 bool
 
 // RegisterProbes registers the status server with the manager's healthz and readyz probes.
 // Must be called before mgr.Start(). Uses a TLS dial to verify the server is reachable,
-// following the same pattern as the webhook server's StartedChecker.
+// following the same pattern as the webhook server probe.
 func RegisterProbes(mgr ctrl.Manager, cfg *configapi.StatusServer) error {
 	addr := fmt.Sprintf(":%d", *cfg.Port)
 	tlsCfg := &tls.Config{InsecureSkipVerify: true} //nolint:gosec
