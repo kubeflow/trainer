@@ -1,3 +1,1 @@
-# Community
-
-(Content to be added)
+# Community Guide
