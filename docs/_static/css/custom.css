@@ -77,36 +77,51 @@ table.docutils td {
     margin: 2rem 0;
 }
 
-a.doc-card {
-    border: 1px solid var(--color-foreground-border);
-    border-radius: 8px;
+/* Shared card styles for homepage (.doc-card) and sphinx-design (.sd-card) */
+a.doc-card,
+.sd-card {
+    border: 1px solid var(--color-foreground-border) !important;
+    border-radius: 8px !important;
     padding: 1.5rem;
-    transition: all 0.2s ease;
     background-color: var(--color-background-secondary);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+a.doc-card {
     text-decoration: none;
     display: block;
 }
 
-a.doc-card:hover {
-    border-color: var(--color-brand-primary);
+a.doc-card:hover,
+.sd-card:hover {
+    border-color: var(--color-brand-primary) !important;
     box-shadow: 0 4px 12px rgba(50, 108, 229, 0.15);
     transform: translateY(-2px);
     text-decoration: none;
 }
 
-body[data-theme="dark"] a.doc-card:hover {
+body[data-theme="dark"] a.doc-card,
+body[data-theme="dark"] .sd-card {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+body[data-theme="dark"] a.doc-card:hover,
+body[data-theme="dark"] .sd-card:hover {
     box-shadow: 0 4px 12px rgba(91, 157, 241, 0.2);
 }
 
-a.doc-card strong {
-    font-size: 1.25rem;
+a.doc-card strong,
+.sd-card .sd-card-title {
+    font-size: 1.1rem;
     font-weight: 600;
     color: var(--color-brand-primary);
     display: block;
     margin-bottom: 0.5rem;
 }
 
-a.doc-card p {
+a.doc-card p,
+.sd-card .sd-card-body p {
     margin: 0;
     color: var(--color-foreground-secondary);
     font-size: 0.95rem;
