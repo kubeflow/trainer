@@ -1,52 +1,23 @@
-# Legacy v1 Documentation
+# Legacy Kubeflow Training Operator (v1)
 
-:::{warning}
-**Kubeflow Training Operator v1 is deprecated.**
+Kubeflow Training Operator V1 Documentation
 
-This documentation is for the legacy Kubeflow Training Operator v1, which has been superseded by Kubeflow Trainer v2.
+:::{admonition} Old Version
+:class: warning
+This page is about **Kubeflow Training Operator V1**, for the latest information check
+[the Kubeflow Trainer V2 documentation](../overview/index.md).
 
-**Migration recommended**: See the [Migration Guide](../operator-guides/migration.md) to upgrade from v1 to v2.
+Follow [this guide for migrating to Kubeflow Trainer V2](../operator-guides/migration.md).
 :::
-
-## What Changed in v2?
-
-Kubeflow Trainer v2 introduces:
-
-- **Unified API**: Single `TrainJob` CRD replaces framework-specific CRDs (PyTorchJob, TFJob, etc.)
-- **Extensible Runtime System**: Plugin-based architecture for custom ML policies and schedulers
-- **Local Execution**: Run training jobs locally with Docker, Podman, or process backends
-- **Improved Developer Experience**: Python SDK, auto-generated configs, builtin trainers
-
-## Legacy v1 Documentation
 
 ```{toctree}
 :maxdepth: 1
 :caption: Legacy v1 Guides
 
+overview
 installation
 getting-started
+user-guides/index
+reference/index
+explanation/index
 ```
-
-```{toctree}
-:maxdepth: 1
-:caption: Legacy v1 User Guides
-
-user-guides/pytorch
-user-guides/tensorflow
-user-guides/paddlepaddle
-user-guides/xgboost
-user-guides/jax
-user-guides/mpi
-user-guides/llm-fine-tuning
-```
-
-## Support Policy
-
-Kubeflow Training Operator v1 is in maintenance mode:
-
-- **Security fixes**: Critical security issues will be patched
-- **Bug fixes**: No new bug fixes for v1
-- **New features**: All new development is on v2
-- **End of life**: To be determined
-
-For new deployments, use Kubeflow Trainer v2.

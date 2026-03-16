@@ -1,30 +1,34 @@
 # Contributor Guides
 
-*For contributors who want to extend Kubeflow Trainer or contribute code.*
+*Documentation for Kubeflow Trainer contributors*
 
-This section contains guides for understanding the architecture, development workflow, and how to build custom plugins for Kubeflow Trainer.
+----
 
-## Getting Started as a Contributor
+:::::{grid} 1 1 2 2
+:gutter: 3
+
+::::{grid-item-card} Contributing Guide
+:link: contributing
+:link-type: doc
+
+How to contribute to the Kubeflow Trainer project
+::::
+
+::::{grid-item-card} Community Guide
+:link: community
+:link-type: doc
+
+Join the Kubeflow community, meetings, and communication channels
+::::
+
+:::::
+
+----
 
 ```{toctree}
+:hidden:
 :maxdepth: 1
-:caption: Contributing
 
 contributing
 community
 ```
-
-## Architecture & Design
-
-```{toctree}
-:maxdepth: 1
-:caption: Architecture
-
-architecture
-```
-
-## Development Workflow
-
-- See [Contributing Guide](contributing.md) for development setup
-- Check [Architecture Reference](architecture.md) for system design
-- Join the [Community](community.md) for discussions and support
