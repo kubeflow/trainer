@@ -31,10 +31,6 @@ Quick Links
        <strong>Contributor Guides</strong>
        <p>Architecture, development workflow, and how to extend Kubeflow Trainer</p>
      </a>
-     <a class="doc-card" href="api-reference/index.html">
-       <strong>API Reference</strong>
-       <p>CRD types, Python SDK, and complete API documentation</p>
-     </a>
    </div>
 
 ----
@@ -49,7 +45,6 @@ Quick Links
    user-guides/index
    operator-guides/index
    contributor-guides/index
-   api-reference/index
    legacy-v1/index
 
 Community & Support
