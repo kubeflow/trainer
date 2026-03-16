@@ -233,10 +233,11 @@ type TLSOptions struct {
 	// Supported values: "1.0", "1.1", "1.2", "1.3".
 	// +optional
 	// +kubebuilder:validation:MaxLength=3
-	MinVersion string `json:"minVersion,omitempty"`
+	MinVersion *string `json:"minVersion,omitempty"`
 
 	// cipherSuites is the list of allowed cipher suites.
 	// +optional
+	// +kubebuilder:validation:MaxItems=100
 	// +kubebuilder:validation:items:MaxLength=100
 	CipherSuites []string `json:"cipherSuites,omitempty"`
 }
