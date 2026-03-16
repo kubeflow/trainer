@@ -97,7 +97,20 @@ print_cluster_info() {
 
 # TODO (andreyvelich): Currently, we print manager logs due to flaky test.
 echo "Deploy Kubeflow Trainer runtimes"
-kubectl apply --server-side -k manifests/overlays/runtimes || (
+E2E_RUNTIMES_DIR="artifacts/e2e/runtimes"
+mkdir -p "${E2E_RUNTIMES_DIR}"
+XGBOOST_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/xgboost-runtime"
+cat <<EOF >"${E2E_RUNTIMES_DIR}/kustomization.yaml"
+  apiVersion: kustomize.config.k8s.io/v1beta1
+  kind: Kustomization
+  resources:
+  - ../../../manifests/overlays/runtimes
+  images:
+  - name: "${XGBOOST_RUNTIME_CI_IMAGE_NAME}"
+    newTag: "${CI_IMAGE_TAG}"
+EOF
+
+kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
   kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
     print_cluster_info &&
     exit 1
@@ -122,7 +135,7 @@ kubectl apply --server-side -k manifests/overlays/runtimes || (
 # load_image_to_kind ${JAX_RUNTIME_IMAGE}
 
 # Build and load custom runtime images that are not available in public registries.
-XGBOOST_RUNTIME_CI_IMAGE="ghcr.io/kubeflow/trainer/xgboost-runtime:${CI_IMAGE_TAG}"
+XGBOOST_RUNTIME_CI_IMAGE="${XGBOOST_RUNTIME_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 echo "Build XGBoost runtime image"
 ${CONTAINER_RUNTIME} build . -f cmd/runtimes/xgboost/Dockerfile -t ${XGBOOST_RUNTIME_CI_IMAGE}
 load_image_to_kind ${XGBOOST_RUNTIME_CI_IMAGE}
