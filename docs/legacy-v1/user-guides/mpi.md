@@ -275,3 +275,25 @@ cat examples/pi/pi-intel.yaml
 | mpi_operator_jobs_successful_total | Counter | Counts number of MPI jobs successful | |
 | mpi_operator_jobs_failed_total | Counter | Counts number of MPI jobs failed | |
 | mpi_operator_job_info | Gauge | Information about MPIJob | `launcher`=<launcher-pod-name>, `namespace`=<job-namespace> |
+
+### Join Metrics
+
+With kube-state-metrics, one can join metrics by labels. For example `kube_pod_info * on(pod,namespace) group_left label_replace(mpi_operator_job_infos, "pod", "$0", "launcher", ".*")`
+
+## Docker Images
+
+We push Docker images of the mpioperator on Dockerhub for every release. You can use the following Dockerfile to build the image yourself:
+
+- [mpi-operator](https://github.com/kubeflow/mpi-operator)
+
+Alternative, you can build the image using make:
+
+```bash
+make RELEASE_VERSION=dev IMAGE_NAME=registry.example.com/mpi-operator images
+```
+
+This will produce an image with the tag `registry.example.com/mpi-operator:dev`.
+
+## Contributing
+
+Learn more in [CONTRIBUTING](https://github.com/kubeflow/mpi-operator/blob/master/CONTRIBUTING.md).
