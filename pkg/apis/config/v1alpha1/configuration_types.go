@@ -249,5 +249,6 @@ type TLSOptions struct {
 	// +optional
 	// +listType=atomic
 	// +kubebuilder:validation:MaxItems=10
+	// +kubebuilder:validation:items:MaxLength=32
 	NextProtos []string `json:"nextProtos,omitempty"`
 }
