@@ -24,7 +24,7 @@
   - Integration with OptimizationJob
   - Explore RDMA with AI Schedulers and Data Cache
 - LLM Fine-Tuning Enhancements
-  - Predictive GPU Capacity Planning for TrainJobs
+  - Predictive GPU Capacity Planning for TrainJobs: https://github.com/kubeflow/trainer/issues/3328
   - Build Dynamic BuiltinTrainers and LLM Fine-Tuning Blueprints: https://github.com/kubeflow/trainer/issues/2839
 - New Kubeflow Trainer Runtimes
   - Distributed JAX: https://github.com/kubeflow/trainer/issues/2442
