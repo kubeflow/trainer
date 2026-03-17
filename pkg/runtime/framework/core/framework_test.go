@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,6 +46,7 @@ import (
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
+	applyconfig "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
@@ -2316,19 +2318,16 @@ func newFakeJobsStatusPlugin(context.Context, client.Client, client.FieldIndexer
 const fakeJobsStatusPluginName = "fake-train-job-status"
 
 func (f fakeTrainJobStatusPlugin) Name() string { return fakeJobsStatusPluginName }
-func (f fakeTrainJobStatusPlugin) Status(context.Context, *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
-	return &trainer.TrainJobStatus{
-		JobsStatus: []trainer.JobStatus{
-			{
-				Name:      "fake-job",
-				Ready:     ptr.To(int32(1)),
-				Succeeded: ptr.To(int32(0)),
-				Failed:    ptr.To(int32(0)),
-				Active:    ptr.To(int32(1)),
-				Suspended: ptr.To(int32(0)),
-			},
-		},
-	}, nil
+func (f fakeTrainJobStatusPlugin) Status(context.Context, *trainer.TrainJob) (*applyconfig.TrainJobStatusApplyConfiguration, error) {
+	return applyconfig.TrainJobStatus().
+		WithJobsStatus(applyconfig.JobStatus().
+			WithName("fake-job").
+			WithReady(1).
+			WithSucceeded(0).
+			WithFailed(0).
+			WithActive(1).
+			WithSuspended(0),
+		), nil
 }
 
 func TestTrainJobStatusPlugins(t *testing.T) {
@@ -2337,7 +2336,7 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 		registry   fwkplugins.Registry
 		trainJob   *trainer.TrainJob
 		jobSet     *jobsetv1alpha2.JobSet
-		wantStatus *trainer.TrainJobStatus
+		wantStatus *applyconfig.TrainJobStatusApplyConfiguration
 		wantError  error
 	}{
 		"jobSet has not been finalized, yet": {
@@ -2352,7 +2351,7 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 					Status:  metav1.ConditionFalse,
 				}).
 				Obj(),
-			wantStatus: &trainer.TrainJobStatus{},
+			wantStatus: applyconfig.TrainJobStatus(),
 		},
 		"succeeded to obtain completed terminal condition": {
 			registry: fwkplugins.NewRegistry(),
@@ -2367,17 +2366,14 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 					Status:             metav1.ConditionTrue,
 				}).
 				Obj(),
-			wantStatus: &trainer.TrainJobStatus{
-				Conditions: []metav1.Condition{
-					{
-						Type:               trainer.TrainJobComplete,
-						LastTransitionTime: lastTransitionTime,
-						Message:            jobsetconsts.AllJobsCompletedMessage,
-						Reason:             jobsetconsts.AllJobsCompletedReason,
-						Status:             metav1.ConditionTrue,
-					},
-				},
-			},
+			wantStatus: applyconfig.TrainJobStatus().
+				WithConditions(metav1ac.Condition().
+					WithType(trainer.TrainJobComplete).
+					WithStatus(metav1.ConditionTrue).
+					WithMessage(jobsetconsts.AllJobsCompletedMessage).
+					WithReason(jobsetconsts.AllJobsCompletedReason).
+					WithLastTransitionTime(lastTransitionTime),
+				),
 		},
 		"succeeded to obtain failed terminal condition": {
 			registry: fwkplugins.NewRegistry(),
@@ -2392,17 +2388,14 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 					Status:             metav1.ConditionTrue,
 				}).
 				Obj(),
-			wantStatus: &trainer.TrainJobStatus{
-				Conditions: []metav1.Condition{
-					{
-						Type:               trainer.TrainJobFailed,
-						LastTransitionTime: lastTransitionTime,
-						Message:            jobsetconsts.FailedJobsMessage,
-						Reason:             jobsetconsts.FailedJobsReason,
-						Status:             metav1.ConditionTrue,
-					},
-				},
-			},
+			wantStatus: applyconfig.TrainJobStatus().
+				WithConditions(metav1ac.Condition().
+					WithType(trainer.TrainJobFailed).
+					WithStatus(metav1.ConditionTrue).
+					WithMessage(jobsetconsts.FailedJobsMessage).
+					WithReason(jobsetconsts.FailedJobsReason).
+					WithLastTransitionTime(lastTransitionTime),
+				),
 		},
 		"failed to obtain TrainJob status due to multiple trainJobStatus plugin": {
 			registry: fwkplugins.Registry{
@@ -2417,7 +2410,7 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 				Obj(),
 			jobSet: testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
 				Obj(),
-			wantStatus: &trainer.TrainJobStatus{},
+			wantStatus: applyconfig.TrainJobStatus(),
 		},
 		"succeeded to obtain JobsStatus from JobSet with multiple replicated jobs": {
 			registry: fwkplugins.NewRegistry(),
@@ -2451,34 +2444,30 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 					},
 				}).
 				Obj(),
-			wantStatus: &trainer.TrainJobStatus{
-				JobsStatus: []trainer.JobStatus{
-					{
-						Name:      constants.DatasetInitializer,
-						Ready:     ptr.To(int32(1)),
-						Succeeded: ptr.To(int32(1)),
-						Failed:    ptr.To(int32(0)),
-						Active:    ptr.To(int32(0)),
-						Suspended: ptr.To(int32(0)),
-					},
-					{
-						Name:      constants.ModelInitializer,
-						Ready:     ptr.To(int32(1)),
-						Succeeded: ptr.To(int32(1)),
-						Failed:    ptr.To(int32(0)),
-						Active:    ptr.To(int32(0)),
-						Suspended: ptr.To(int32(0)),
-					},
-					{
-						Name:      constants.Node,
-						Ready:     ptr.To(int32(2)),
-						Succeeded: ptr.To(int32(0)),
-						Failed:    ptr.To(int32(0)),
-						Active:    ptr.To(int32(2)),
-						Suspended: ptr.To(int32(0)),
-					},
-				},
-			},
+			wantStatus: applyconfig.TrainJobStatus().
+				WithJobsStatus(
+					applyconfig.JobStatus().
+						WithName(constants.DatasetInitializer).
+						WithReady(1).
+						WithSucceeded(1).
+						WithFailed(0).
+						WithActive(0).
+						WithSuspended(0),
+					applyconfig.JobStatus().
+						WithName(constants.ModelInitializer).
+						WithReady(1).
+						WithSucceeded(1).
+						WithFailed(0).
+						WithActive(0).
+						WithSuspended(0),
+					applyconfig.JobStatus().
+						WithName(constants.Node).
+						WithReady(2).
+						WithSucceeded(0).
+						WithFailed(0).
+						WithActive(2).
+						WithSuspended(0),
+				),
 		},
 		"succeeded to obtain JobsStatus from JobSet with failed job": {
 			registry: fwkplugins.NewRegistry(),
@@ -2496,18 +2485,16 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 					},
 				}).
 				Obj(),
-			wantStatus: &trainer.TrainJobStatus{
-				JobsStatus: []trainer.JobStatus{
-					{
-						Name:      constants.Node,
-						Ready:     ptr.To(int32(0)),
-						Succeeded: ptr.To(int32(0)),
-						Failed:    ptr.To(int32(1)),
-						Active:    ptr.To(int32(0)),
-						Suspended: ptr.To(int32(0)),
-					},
-				},
-			},
+			wantStatus: applyconfig.TrainJobStatus().
+				WithJobsStatus(
+					applyconfig.JobStatus().
+						WithName(constants.Node).
+						WithReady(0).
+						WithSucceeded(0).
+						WithFailed(1).
+						WithActive(0).
+						WithSuspended(0),
+				),
 		},
 		"failed to obtain JobsStatus due to multiple JobsStatusPlugins": {
 			registry: fwkplugins.Registry{

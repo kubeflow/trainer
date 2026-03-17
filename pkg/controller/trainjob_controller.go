@@ -26,9 +26,9 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -44,6 +44,7 @@ import (
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	applyconfig "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
@@ -107,8 +108,6 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log.V(2).Info("Reconciling TrainJob")
 
 	var err error
-	// Keep track of the origin TrainJob status
-	prevTrainJob := trainJob.DeepCopy()
 
 	// Let's clear the failed condition that could have been set previously.
 	// An external change to the TrainJob spec may transition it out of the Failed state.
@@ -136,21 +135,25 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	setSuspendedCondition(&trainJob)
 
-	if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
+	deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob)
+	if deadlineErr != nil {
+		err = errors.Join(err, deadlineErr)
+	}
+
+	statusApply, statusErr := trainJobStatus(ctx, runtime, &trainJob)
+	if statusErr != nil {
 		err = errors.Join(err, statusErr)
 	}
 
-	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
-		if !equality.Semantic.DeepEqual(&trainJob.Status, &prevTrainJob.Status) {
-			return deadlineResult, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
+	if statusApply != nil {
+		trainJobApply := applyconfig.TrainJob(trainJob.Name, trainJob.Namespace).WithStatus(statusApply)
+		if applyErr := r.client.Status().Apply(ctx, trainJobApply, client.ForceOwnership, client.FieldOwner("trainjob_controller")); applyErr != nil {
+			err = errors.Join(err, applyErr)
 		}
-		return deadlineResult, errors.Join(err, deadlineErr)
 	}
 
-	if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
-		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
-		// for sub-resources. See: https://github.com/kubernetes-sigs/controller-runtime/issues/3183
-		return ctrl.Result{}, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
+	if deadlineResult.RequeueAfter > 0 {
+		return deadlineResult, err
 	}
 	return ctrl.Result{}, err
 }
@@ -276,23 +279,37 @@ func removeFailedCondition(trainJob *trainer.TrainJob) {
 	meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobFailed)
 }
 
-func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
-	deadlineCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
-	if deadlineCond != nil && deadlineCond.Reason != trainer.TrainJobDeadlineExceededReason {
-		deadlineCond = nil
+func trainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) (*applyconfig.TrainJobStatusApplyConfiguration, error) {
+	var statusApply *applyconfig.TrainJobStatusApplyConfiguration
+	var err error
+	if runtime != nil {
+		statusApply, err = runtime.TrainJobStatus(ctx, trainJob)
+	}
+	if statusApply == nil {
+		statusApply = applyconfig.TrainJobStatus()
 	}
 
-	status, err := runtime.TrainJobStatus(ctx, trainJob)
-	if err != nil {
-		return err
+	for _, c := range trainJob.Status.Conditions {
+		exists := false
+		if statusApply.Conditions != nil {
+			for _, ac := range statusApply.Conditions {
+				if ac.Type != nil && *ac.Type == c.Type {
+					exists = true
+					break
+				}
+			}
+		}
+		if !exists {
+			statusApply.WithConditions(metav1ac.Condition().
+				WithType(c.Type).
+				WithStatus(c.Status).
+				WithReason(c.Reason).
+				WithMessage(c.Message).
+				WithLastTransitionTime(c.LastTransitionTime))
+		}
 	}
-	if status != nil {
-		trainJob.Status = *status
-	}
-	if deadlineCond != nil {
-		meta.SetStatusCondition(&trainJob.Status.Conditions, *deadlineCond)
-	}
-	return nil
+
+	return statusApply, err
 }
 
 func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
