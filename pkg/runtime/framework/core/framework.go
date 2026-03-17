@@ -40,9 +40,9 @@ type Framework struct {
 	plugins                      map[string]framework.Plugin
 	enforceMLPlugins             []framework.EnforceMLPolicyPlugin
 	enforcePodGroupPolicyPlugins []framework.EnforcePodGroupPolicyPlugin
+	enforceRuntimeInfoPlugins    []framework.EnforceRuntimeInfoPlugin
 	customValidationPlugins      []framework.CustomValidationPlugin
 	watchExtensionPlugins        []framework.WatchExtensionPlugin
-	podNetworkPlugins            []framework.PodNetworkPlugin
 	componentBuilderPlugins      []framework.ComponentBuilderPlugin
 	trainJobStatusPlugin         framework.TrainJobStatusPlugin
 }
@@ -68,14 +68,14 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 		if p, ok := plugin.(framework.EnforcePodGroupPolicyPlugin); ok {
 			f.enforcePodGroupPolicyPlugins = append(f.enforcePodGroupPolicyPlugins, p)
 		}
+		if p, ok := plugin.(framework.EnforceRuntimeInfoPlugin); ok {
+			f.enforceRuntimeInfoPlugins = append(f.enforceRuntimeInfoPlugins, p)
+		}
 		if p, ok := plugin.(framework.CustomValidationPlugin); ok {
 			f.customValidationPlugins = append(f.customValidationPlugins, p)
 		}
 		if p, ok := plugin.(framework.WatchExtensionPlugin); ok {
 			f.watchExtensionPlugins = append(f.watchExtensionPlugins, p)
-		}
-		if p, ok := plugin.(framework.PodNetworkPlugin); ok {
-			f.podNetworkPlugins = append(f.podNetworkPlugins, p)
 		}
 		if p, ok := plugin.(framework.ComponentBuilderPlugin); ok {
 			f.componentBuilderPlugins = append(f.componentBuilderPlugins, p)
@@ -109,6 +109,18 @@ func (f *Framework) RunEnforcePodGroupPolicyPlugins(info *runtime.Info, trainJob
 	return nil
 }
 
+// RunEnforceRuntimeInfoPlugins runs all plugins that implement EnforceRuntimeInfoPlugin.
+// This replaces RunPodNetworkPlugins and covers all plugins that update runtime.Info
+// without being tied to a specific policy API.
+func (f *Framework) RunEnforceRuntimeInfoPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
+	for _, plugin := range f.enforceRuntimeInfoPlugins {
+		if err := plugin.EnforceRuntimeInfo(info, trainJob); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (f *Framework) RunCustomValidationPlugins(ctx context.Context, info *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var aggregatedWarnings admission.Warnings
 	var aggregatedErrors field.ErrorList
@@ -122,15 +134,6 @@ func (f *Framework) RunCustomValidationPlugins(ctx context.Context, info *runtim
 		}
 	}
 	return aggregatedWarnings, aggregatedErrors
-}
-
-func (f *Framework) RunPodNetworkPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
-	for _, plugin := range f.podNetworkPlugins {
-		if err := plugin.IdentifyPodNetwork(info, trainJob); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {

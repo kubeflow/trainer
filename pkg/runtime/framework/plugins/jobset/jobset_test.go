@@ -319,7 +319,7 @@ func TestJobSet(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
 			}
-			err = p.(framework.PodNetworkPlugin).IdentifyPodNetwork(tc.info, tc.trainJob)
+			err = p.(framework.EnforceRuntimeInfoPlugin).EnforceRuntimeInfo(tc.info, tc.trainJob)
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
@@ -328,7 +328,7 @@ func TestJobSet(t *testing.T) {
 				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
 				utiltesting.PodSetEndpointsCmpOpts,
 			); len(diff) != 0 {
-				t.Errorf("Unexpected Info from IdentifyPodNetwork (-want,+got):\n%s", diff)
+				t.Errorf("Unexpected Info from EnforceRuntimeInfo (-want,+got):\n%s", diff)
 			}
 		})
 	}
