@@ -34,7 +34,7 @@ echo ">> Using ${CODEGEN_PKG}"
 # Generating deepcopy and defaults.
 echo "Generating deepcopy and defaults for Kubeflow Trainer"
 kube::codegen::gen_helpers \
-  --boilerplate "${TRAINER_ROOT}/hack/boilerplate/boilerplate.go.txt" \
+  --boilerplate "${TRAINER_ROOT}/hack/boilerplate/boilerplate.generatego.txt" \
   "${TRAINER_ROOT}/pkg/apis"
 
 # Generate clients.
@@ -57,7 +57,7 @@ done
 
 echo "Generating clients for Kubeflow Trainer"
 kube::codegen::gen_client \
-  --boilerplate "${TRAINER_ROOT}/hack/boilerplate/boilerplate.go.txt" \
+  --boilerplate "${TRAINER_ROOT}/hack/boilerplate/boilerplate.generatego.txt" \
   --output-dir "${TRAINER_ROOT}/pkg/client" \
   --output-pkg "${TRAINER_PKG}/pkg/client" \
   --with-watch \
@@ -86,7 +86,7 @@ EXTRA_PACKAGES=(
 )
 
 go run ${OPENAPI_PKG}/cmd/openapi-gen \
-  --go-header-file "${TRAINER_ROOT}/hack/boilerplate/boilerplate.go.txt" \
+  --go-header-file "${TRAINER_ROOT}/hack/boilerplate/boilerplate.generatego.txt" \
   --output-pkg "${TRAINER_PKG}/pkg/apis/trainer/v1alpha1" \
   --output-dir "${TRAINER_ROOT}/pkg/apis/trainer/v1alpha1" \
   --output-file "zz_generated.openapi.go" \
