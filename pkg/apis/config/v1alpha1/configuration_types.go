@@ -241,4 +241,13 @@ type TLSOptions struct {
 	// +kubebuilder:validation:MaxItems=100
 	// +kubebuilder:validation:items:MaxLength=100
 	CipherSuites []string `json:"cipherSuites,omitempty"`
+
+	// nextProtos is the list of application-level protocols negotiated during
+	// the TLS handshake. Set to ["h2", "http/1.1"] to enable HTTP/2, or omit
+	// to disable it (mitigates CVE-2023-44487 and CVE-2023-39325).
+	// The --enable-http2 CLI flag takes precedence over this field.
+	// +optional
+	// +listType=atomic
+	// +kubebuilder:validation:MaxItems=10
+	NextProtos []string `json:"nextProtos,omitempty"`
 }
