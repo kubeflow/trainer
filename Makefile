@@ -153,9 +153,9 @@ manifests: controller-gen ## Generate manifests.
 
 .PHONY: generate
 generate: go-mod-download manifests helm-docs ## Generate APIs.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.generatego.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/config/v1alpha1/..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.generatego.txt" paths="./pkg/apis/config/v1alpha1/..."
 	CONTAINER_RUNTIME=$(CONTAINER_RUNTIME) hack/python-api/gen-api.sh
 
 .PHONY: go-mod-download
@@ -175,6 +175,10 @@ vet: ## Run go vet against the code.
 golangci-lint: golangci-lint-install golangci-lint-kal ## Run golangci-lint to verify Go files.
 	$(GOLANGCI_LINT) run --timeout 5m ./...
 	$(GOLANGCI_LINT_KAL) run -v --config $(PROJECT_DIR)/.golangci-kal.yml
+
+.PHONY: verify-boilerplate
+verify-boilerplate: ## Verify copyright boilerplate headers in source files.
+	./hack/verify-boilerplate.sh
 
 # Instructions to run tests.
 .PHONY: test
