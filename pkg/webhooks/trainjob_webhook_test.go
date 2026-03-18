@@ -203,7 +203,7 @@ func TestDefault(t *testing.T) {
 				}
 			},
 		},
-		"UPDATE, patch changed with externally-set Time: Time preserved": {
+		"UPDATE, patch changed with pre-existing Time: Time updated": {
 			oldObj: func() *trainer.TrainJob {
 				obj := testingutil.MakeTrainJobWrapper("default", "test").
 					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
@@ -230,8 +230,8 @@ func TestDefault(t *testing.T) {
 					},
 				}).Obj(),
 			wantTime: func(patches []trainer.RuntimePatch) {
-				if !patches[0].Time.Equal(&oldTime) {
-					t.Errorf("expected externally-set Time %v preserved, got %v", oldTime, patches[0].Time)
+				if !patches[0].Time.Equal(&expectedTime) {
+					t.Errorf("expected Time to be updated to %v, got %v", expectedTime, patches[0].Time)
 				}
 			},
 		},
@@ -256,6 +256,30 @@ func TestDefault(t *testing.T) {
 				}
 				if !patches[1].Time.Equal(&expectedTime) {
 					t.Errorf("new patch: expected Time %v, got %v", expectedTime, patches[1].Time)
+				}
+			},
+		},
+		"UPDATE, new patch added with externally-set Time: Time preserved": {
+			oldObj: func() *trainer.TrainJob {
+				obj := testingutil.MakeTrainJobWrapper("default", "test").
+					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+					RuntimePatches([]trainer.RuntimePatch{
+						{Manager: "acme.io/existing", Time: &oldTime},
+					}).Obj()
+				return obj
+			}(),
+			newObj: testingutil.MakeTrainJobWrapper("default", "test").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				RuntimePatches([]trainer.RuntimePatch{
+					{Manager: "acme.io/existing"},
+					{Manager: "acme.io/new", Time: &oldTime},
+				}).Obj(),
+			wantTime: func(patches []trainer.RuntimePatch) {
+				if !patches[0].Time.Equal(&oldTime) {
+					t.Errorf("existing patch: expected Time preserved as %v, got %v", oldTime, patches[0].Time)
+				}
+				if !patches[1].Time.Equal(&oldTime) {
+					t.Errorf("new patch: expected externally-set Time %v preserved, got %v", oldTime, patches[1].Time)
 				}
 			},
 		},
