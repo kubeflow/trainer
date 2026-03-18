@@ -45,13 +45,15 @@ func GetOperatorNamespace() string {
 }
 
 type Config struct {
-	WebhookServiceName       string
-	WebhookSecretName        string
-	WebhookConfigurationName string
+	WebhookServiceName                 string
+	WebhookSecretName                  string
+	ValidatingWebhookConfigurationName string
+	MutatingWebhookConfigurationName   string
 }
 
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups="admissionregistration.k8s.io",resources=validatingwebhookconfigurations,verbs=get;list;watch;update
+//+kubebuilder:rbac:groups="admissionregistration.k8s.io",resources=mutatingwebhookconfigurations,verbs=get;list;watch;update
 
 // ManageCerts creates all certs for webhooks.
 func ManageCerts(mgr ctrl.Manager, cfg Config, setupFinished chan struct{}) error {
@@ -70,10 +72,16 @@ func ManageCerts(mgr ctrl.Manager, cfg Config, setupFinished chan struct{}) erro
 		CAOrganization: caOrganization,
 		DNSName:        dnsName,
 		IsReady:        setupFinished,
-		Webhooks: []cert.WebhookInfo{{
-			Type: cert.Validating,
-			Name: cfg.WebhookConfigurationName,
-		}},
+		Webhooks: []cert.WebhookInfo{
+			{
+				Type: cert.Validating,
+				Name: cfg.ValidatingWebhookConfigurationName,
+			},
+			{
+				Type: cert.Mutating,
+				Name: cfg.MutatingWebhookConfigurationName,
+			},
+		},
 		// When Kubeflow Trainer is running in the leader election mode,
 		// we expect webhook server will run in primary and secondary instance
 		RequireLeaderElection: false,

@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"time"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -304,11 +306,14 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 
 	ginkgo.When("Creating a TrainJob with RuntimePatches", func() {
 		ginkgo.It("should preserve user-provided manager fields", func() {
+			userTime := metav1.NewTime(time.Now().Add(-time.Hour).Truncate(time.Second))
+
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
 				RuntimePatches([]trainer.RuntimePatch{
 					{
 						Manager: "test.io/manager-one",
+						Time:    &userTime,
 						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
 							Template: &trainer.JobSetTemplatePatch{
 								Spec: &trainer.JobSetSpecPatch{
@@ -356,13 +361,131 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 			})
 
-			ginkgo.By("Verify manager fields are preserved", func() {
+			ginkgo.By("Verify user-provided Time is preserved for test.io/manager-one and Time is set for kueue.k8s.io/manager", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
 					g.Expect(gotTrainJob.Spec.RuntimePatches).Should(gomega.HaveLen(2))
 					g.Expect(gotTrainJob.Spec.RuntimePatches[0].Manager).To(gomega.Equal("test.io/manager-one"))
+					g.Expect(gotTrainJob.Spec.RuntimePatches[0].Time).ShouldNot(gomega.BeNil())
+					g.Expect(gotTrainJob.Spec.RuntimePatches[0].Time.Equal(&userTime)).To(gomega.BeTrue())
 					g.Expect(gotTrainJob.Spec.RuntimePatches[1].Manager).To(gomega.Equal("kueue.k8s.io/manager"))
+					g.Expect(gotTrainJob.Spec.RuntimePatches[1].Time).ShouldNot(gomega.BeNil())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
+
+		ginkgo.It("should update Time only for the changed patch on update", func() {
+			userTime := metav1.NewTime(time.Now().Add(-time.Hour).Truncate(time.Second))
+			newPatchTime := metav1.NewTime(time.Now().Add(-30 * time.Minute).Truncate(time.Second))
+
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-update-time").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
+				Suspend(true).
+				RuntimePatches([]trainer.RuntimePatch{
+					{
+						Manager: "test.io/unchanged",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														NodeSelector: map[string]string{"zone": "keep"},
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+					{
+						Manager: "test.io/will-change",
+						Time:    &userTime,
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														NodeSelector: map[string]string{"zone": "old"},
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+				}).
+				Obj()
+
+			ginkgo.By("Create a suspended TrainJob with two RuntimePatches", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			var unchangedTime *metav1.Time
+			ginkgo.By("Record the original Time values and verify user-provided Time is preserved", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Spec.RuntimePatches).Should(gomega.HaveLen(2))
+					g.Expect(gotTrainJob.Spec.RuntimePatches[0].Time).ShouldNot(gomega.BeNil())
+					// User-provided Time for test.io/will-change must be preserved on create.
+					g.Expect(gotTrainJob.Spec.RuntimePatches[1].Time).ShouldNot(gomega.BeNil())
+					g.Expect(gotTrainJob.Spec.RuntimePatches[1].Time.Equal(&userTime)).To(gomega.BeTrue())
+					unchangedTime = gotTrainJob.Spec.RuntimePatches[0].Time.DeepCopy()
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			// metav1.Time serializes to second precision (RFC3339), so we must
+			// wait at least one second to guarantee distinguishable timestamps.
+			time.Sleep(time.Second)
+
+			ginkgo.By("Update the second RuntimePatch and add two new patches", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					gotTrainJob.Spec.RuntimePatches[1].TrainingRuntimeSpec.Template.Spec.ReplicatedJobs[0].
+						Template.Spec.Template.Spec.NodeSelector = map[string]string{"zone": "new"}
+					// New patch without Time: webhook should stamp it.
+					gotTrainJob.Spec.RuntimePatches = append(gotTrainJob.Spec.RuntimePatches, trainer.RuntimePatch{
+						Manager: "test.io/new-no-time",
+					})
+					// New patch with user-provided Time: should be preserved.
+					gotTrainJob.Spec.RuntimePatches = append(gotTrainJob.Spec.RuntimePatches, trainer.RuntimePatch{
+						Manager: "test.io/new-with-time",
+						Time:    &newPatchTime,
+					})
+					g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Verify Time behaviour for all patches after update", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Spec.RuntimePatches).Should(gomega.HaveLen(4))
+					// Unchanged pre-existing patch: Time must be preserved.
+					g.Expect(gotTrainJob.Spec.RuntimePatches[0].Time).ShouldNot(gomega.BeNil())
+					g.Expect(gotTrainJob.Spec.RuntimePatches[0].Time.Equal(unchangedTime)).To(gomega.BeTrue())
+					// Changed pre-existing patch: user-provided Time must be replaced.
+					g.Expect(gotTrainJob.Spec.RuntimePatches[1].Time).ShouldNot(gomega.BeNil())
+					g.Expect(gotTrainJob.Spec.RuntimePatches[1].Time.Equal(&userTime)).To(gomega.BeFalse())
+					// New patch without Time: webhook must stamp it.
+					g.Expect(gotTrainJob.Spec.RuntimePatches[2].Time).ShouldNot(gomega.BeNil())
+					// New patch with user-provided Time: must be preserved.
+					g.Expect(gotTrainJob.Spec.RuntimePatches[3].Time).ShouldNot(gomega.BeNil())
+					g.Expect(gotTrainJob.Spec.RuntimePatches[3].Time.Equal(&newPatchTime)).To(gomega.BeTrue())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 		})
