@@ -1845,7 +1845,7 @@ On the other hand, the Internal APIs are not exposed and could not add any opera
       to any kind of resources like PodSpec.
     - `EnforceMLPolicy`: This configure MachineLearning framework specific parameters (e.x, specified in TrainingRuntime `.spec.mlPolicy`)
       to any kind of resources like PodSpec.
-    - `PodNetwork`: This identifies Pod-to-Pod communication network endpoints for each Pod and stores them to `RuntimeInfo`.
+    - `EnforceRuntimeInfo`: This updates the `RuntimeInfo` object for plugins that are not tied to a specific policy API, such as identifying Pod-to-Pod network endpoints.
     - `ComponentBuilder`: This builds Kubernetes resources leveraging `RuntimeInfo` and `TrainJob`.
       `RuntimeInfo` is abstracted objects extracted from runtimes like TrainingRuntime and ClusterTrainingRuntime.
 - `PostExecution Phase`:
