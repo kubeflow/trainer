@@ -81,10 +81,10 @@ func (d *TrainJobDefaulter) Default(ctx context.Context, trainJob *trainer.Train
 			oldCmp.Time, newCmp.Time = nil, nil
 			if equality.Semantic.DeepEqual(oldCmp, newCmp) {
 				patch.Time = old.Time
-				continue
+			} else {
+				patch.Time = &now
 			}
-		}
-		if patch.Time == nil {
+		} else if patch.Time == nil {
 			patch.Time = &now
 		}
 	}
