@@ -42,6 +42,7 @@ import (
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/apply"
 	applyconfig "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
@@ -93,12 +94,15 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	var err error
+	conditions := currentConditions(&trainJob)
 
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := r.runtimes[runtimeRefGK]
 	if !ok {
 		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
-		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
+		upsertCondition(&trainJob, &conditions, trainer.TrainJobFailed, metav1.ConditionTrue,
+			trainer.TrainJobRuntimeNotSupportedReason, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK),
+		)
 	} else if !trainjob.IsTrainJobFinished(&trainJob) {
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
 		if err != nil {
@@ -114,22 +118,20 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
-	setSuspendedCondition(&trainJob)
+	suspendedCondition(&trainJob, &conditions)
 
 	// The deadline is reconciled before the status is built, so that the Failed condition it
 	// may set is captured in the apply configuration.
-	deadlineResult := r.reconcileDeadline(ctx, &trainJob)
+	deadlineResult := r.reconcileDeadline(ctx, &trainJob, &conditions)
 
-	statusApply, statusErr := trainJobStatus(ctx, runtime, &trainJob)
+	statusApply, statusErr := trainJobStatus(ctx, runtime, &trainJob, conditions)
 	if statusErr != nil {
 		err = errors.Join(err, statusErr)
 	}
 
-	if statusApply != nil {
-		trainJobApply := applyconfig.TrainJob(trainJob.Name, trainJob.Namespace).WithStatus(statusApply)
-		if applyErr := r.client.Status().Apply(ctx, trainJobApply, client.ForceOwnership, client.FieldOwner("trainjob_controller")); applyErr != nil {
-			err = errors.Join(err, applyErr)
-		}
+	trainJobApply := applyconfig.TrainJob(trainJob.Name, trainJob.Namespace).WithStatus(statusApply)
+	if applyErr := r.client.Status().Apply(ctx, trainJobApply, client.ForceOwnership, client.FieldOwner("trainjob_controller")); applyErr != nil {
+		err = errors.Join(err, applyErr)
 	}
 
 	if deadlineResult.RequeueAfter > 0 {
@@ -151,7 +153,7 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 	return nil
 }
 
-func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) ctrl.Result {
+func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob, conditions *[]metav1ac.ConditionApplyConfiguration) ctrl.Result {
 	if trainJob.Spec.ActiveDeadlineSeconds == 0 || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return ctrl.Result{}
 	}
@@ -170,7 +172,8 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 			"activeDeadlineSeconds", trainJob.Spec.ActiveDeadlineSeconds,
 			"startTime", startTime,
 			"deadline", deadline)
-		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
+		upsertCondition(trainJob, conditions, trainer.TrainJobFailed, metav1.ConditionTrue,
+			trainer.TrainJobDeadlineExceededReason, constants.TrainJobDeadlineExceededMessage)
 		jobSet := &jobsetv1alpha2.JobSet{
 			ObjectMeta: metav1.ObjectMeta{Name: trainJob.Name, Namespace: trainJob.Namespace},
 		}
@@ -209,40 +212,66 @@ func (r *TrainJobReconciler) Generic(e event.TypedGenericEvent[*trainer.TrainJob
 	return true
 }
 
-func setSuspendedCondition(trainJob *trainer.TrainJob) {
-	var newCond metav1.Condition
+// suspendedCondition appends the Suspended condition apply configuration if the
+// TrainJob has been suspended at any point.
+func suspendedCondition(trainJob *trainer.TrainJob, conditions *[]metav1ac.ConditionApplyConfiguration) {
 	switch {
 	case ptr.Deref(trainJob.Spec.Suspend, false):
-		newCond = metav1.Condition{
-			Type:    trainer.TrainJobSuspended,
-			Status:  metav1.ConditionTrue,
-			Message: constants.TrainJobSuspendedMessage,
-			Reason:  trainer.TrainJobSuspendedReason,
-		}
+		upsertCondition(trainJob, conditions, trainer.TrainJobSuspended, metav1.ConditionTrue,
+			trainer.TrainJobSuspendedReason, constants.TrainJobSuspendedMessage)
 	case meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobSuspended):
-		newCond = metav1.Condition{
-			Type:    trainer.TrainJobSuspended,
-			Status:  metav1.ConditionFalse,
-			Message: constants.TrainJobResumedMessage,
-			Reason:  trainer.TrainJobResumedReason,
-		}
+		upsertCondition(trainJob, conditions, trainer.TrainJobSuspended, metav1.ConditionFalse,
+			trainer.TrainJobResumedReason, constants.TrainJobResumedMessage)
 	default:
-		return
+		if existing := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobSuspended); existing != nil {
+			upsertCondition(trainJob, conditions, trainer.TrainJobSuspended, existing.Status,
+				existing.Reason, existing.Message)
+		}
 	}
-	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
 }
 
-func setFailedCondition(trainJob *trainer.TrainJob, message, reason string) {
-	newCond := metav1.Condition{
-		Type:    trainer.TrainJobFailed,
-		Status:  metav1.ConditionTrue,
-		Message: message,
-		Reason:  reason,
+// currentConditions initializes the conditions slice with existing conditions
+func currentConditions(trainJob *trainer.TrainJob) []metav1ac.ConditionApplyConfiguration {
+	var conditions []metav1ac.ConditionApplyConfiguration
+	for _, c := range trainJob.Status.Conditions {
+		// This preserves terminal conditions like Complete across reconciles where the runtime
+		// plugin may short-circuit (e.g., JobSet deleted after completion).
+		if c.Type == trainer.TrainJobSuspended {
+			continue
+		}
+		if c.Type == trainer.TrainJobFailed && c.Reason != trainer.TrainJobDeadlineExceededReason {
+			continue
+		}
+		conditions = append(conditions, *metav1ac.Condition().
+			WithType(c.Type).
+			WithStatus(c.Status).
+			WithReason(c.Reason).
+			WithMessage(c.Message).
+			WithLastTransitionTime(c.LastTransitionTime))
 	}
-	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
+	return conditions
 }
 
-func trainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) (*applyconfig.TrainJobStatusApplyConfiguration, error) {
+// upsertCondition adds or replaces a condition in the conditions slice, preserving
+// LastTransitionTime from the existing TrainJob status when the status has not changed.
+func upsertCondition(trainJob *trainer.TrainJob, conditions *[]metav1ac.ConditionApplyConfiguration, condType string, status metav1.ConditionStatus, reason, message string) {
+	ac := metav1ac.Condition().
+		WithType(condType).
+		WithStatus(status).
+		WithReason(reason).
+		WithMessage(message)
+	existing := meta.FindStatusCondition(trainJob.Status.Conditions, condType)
+	if existing != nil && existing.Status == status {
+		ac.WithLastTransitionTime(existing.LastTransitionTime)
+	} else {
+		ac.WithLastTransitionTime(metav1.Now())
+	}
+	apply.UpsertConditions(conditions, *ac)
+}
+
+// trainJobStatus builds the complete status apply configuration by merging the runtime status
+// with the conditions collected during reconciliation.
+func trainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob, conditions []metav1ac.ConditionApplyConfiguration) (*applyconfig.TrainJobStatusApplyConfiguration, error) {
 	var statusApply *applyconfig.TrainJobStatusApplyConfiguration
 	var err error
 	if runtime != nil {
@@ -252,25 +281,8 @@ func trainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *
 		statusApply = applyconfig.TrainJobStatus()
 	}
 
-	for _, c := range trainJob.Status.Conditions {
-		exists := false
-		if statusApply.Conditions != nil {
-			for _, ac := range statusApply.Conditions {
-				if ac.Type != nil && *ac.Type == c.Type {
-					exists = true
-					break
-				}
-			}
-		}
-		if !exists {
-			statusApply.WithConditions(metav1ac.Condition().
-				WithType(c.Type).
-				WithStatus(c.Status).
-				WithReason(c.Reason).
-				WithMessage(c.Message).
-				WithLastTransitionTime(c.LastTransitionTime))
-		}
-	}
+	// Merge conditions into the runtime status, overriding runtime conditions of the same type.
+	apply.UpsertConditions(&statusApply.Conditions, conditions...)
 
 	return statusApply, err
 }
