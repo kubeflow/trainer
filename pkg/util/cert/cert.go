@@ -22,11 +22,12 @@ import (
 	"os"
 	"strings"
 
-	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	cert "github.com/open-policy-agent/cert-controller/pkg/rotator"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
+
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 )
 
 const (
