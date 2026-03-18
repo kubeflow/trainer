@@ -22,11 +22,13 @@ import (
 	"os"
 	"strings"
 
-	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	cert "github.com/open-policy-agent/cert-controller/pkg/rotator"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
+
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	tlsutil "github.com/kubeflow/trainer/v2/pkg/util/tls"
 )
 
 const (
@@ -89,46 +91,10 @@ func ManageCerts(mgr ctrl.Manager, cfg Config, setupFinished chan struct{}) erro
 	})
 }
 
-// parseTLSVersion converts a TLS version string to its uint16 constant.
-// Returns 0 if the version is not recognized.
-func parseTLSVersion(version string) uint16 {
-	switch version {
-	case "1.0":
-		return tls.VersionTLS10
-	case "1.1":
-		return tls.VersionTLS11
-	case "1.2":
-		return tls.VersionTLS12
-	case "1.3":
-		return tls.VersionTLS13
-	default:
-		return 0
-	}
-}
-
-// parseCipherSuiteIDs converts cipher suite name strings to their uint16 IDs.
-// Unrecognized names are silently ignored.
-func parseCipherSuiteIDs(names []string) []uint16 {
-	lookup := make(map[string]uint16, len(tls.CipherSuites())+len(tls.InsecureCipherSuites()))
-	for _, cs := range tls.CipherSuites() {
-		lookup[cs.Name] = cs.ID
-	}
-	for _, cs := range tls.InsecureCipherSuites() {
-		lookup[cs.Name] = cs.ID
-	}
-	ids := make([]uint16, 0, len(names))
-	for _, name := range names {
-		if id, ok := lookup[name]; ok {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
 // SetupTLSConfig creates a TLS config with automatic certificate rotation support.
 // It creates a cert watcher, adds it to the manager, and returns a TLS config
 // that will automatically pick up rotated certificates.
-func SetupTLSConfig(mgr ctrl.Manager, enableHTTP2 bool, tlsOpts *configapi.TLSOptions) (*tls.Config, error) {
+func SetupTLSConfig(mgr ctrl.Manager, tlsOpts *configapi.TLSOptions) (*tls.Config, error) {
 	certWatcher, err := certwatcher.New(certDir+"/tls.crt", certDir+"/tls.key")
 	if err != nil {
 		return nil, fmt.Errorf("error creating cert watcher: %w", err)
@@ -142,24 +108,24 @@ func SetupTLSConfig(mgr ctrl.Manager, enableHTTP2 bool, tlsOpts *configapi.TLSOp
 		GetCertificate: certWatcher.GetCertificate,
 	}
 
-	// Disable HTTP/2 unless explicitly enabled (CVE-2023-44487, CVE-2023-39325)
-	if !enableHTTP2 {
+	if tlsOpts != nil && len(tlsOpts.NextProtos) > 0 {
+		// tlsOpts.NextProtos wins unconditionally when set.
+		tlsConfig.NextProtos = tlsOpts.NextProtos
+	} else {
+		// Disable HTTP/2 by default to mitigate CVE-2023-44487 and CVE-2023-39325.
+		// See: https://github.com/advisories/GHSA-qppj-fm5r-hxr3
+		// See: https://github.com/advisories/GHSA-4374-p667-p6c8
 		tlsConfig.NextProtos = []string{"http/1.1"}
 	}
 
-	// Apply TLS configuration from config file.
-	// The --enable-http2 flag takes precedence over tlsOpts.NextProtos.
 	if tlsOpts != nil {
-		if len(tlsOpts.NextProtos) > 0 && enableHTTP2 {
-			tlsConfig.NextProtos = tlsOpts.NextProtos
-		}
-		if tlsOpts.MinVersion != nil {
-			if v := parseTLSVersion(*tlsOpts.MinVersion); v != 0 {
+		if tlsOpts.MinVersion != "" {
+			if v := tlsutil.ParseTLSVersion(tlsOpts.MinVersion); v != 0 {
 				tlsConfig.MinVersion = v
 			}
 		}
 		if len(tlsOpts.CipherSuites) > 0 {
-			tlsConfig.CipherSuites = parseCipherSuiteIDs(tlsOpts.CipherSuites)
+			tlsConfig.CipherSuites = tlsutil.ParseCipherSuiteIDs(tlsOpts.CipherSuites)
 		}
 	}
 	return tlsConfig, nil

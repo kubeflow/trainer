@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	tlsutil "github.com/kubeflow/trainer/v2/pkg/util/tls"
 )
 
 // fromFile loads configuration from a file.
@@ -39,7 +40,6 @@ func fromFile(path string, scheme *runtime.Scheme, cfg *configapi.Configuration)
 
 	codecs := serializer.NewCodecFactory(scheme, serializer.EnableStrict)
 
-	// Decode the configuration file into the Configuration object
 	if err := runtime.DecodeInto(codecs.UniversalDecoder(), content, cfg); err != nil {
 		return fmt.Errorf("failed to decode config file: %w", err)
 	}
@@ -47,61 +47,28 @@ func fromFile(path string, scheme *runtime.Scheme, cfg *configapi.Configuration)
 	return nil
 }
 
-// parseTLSVersion converts a TLS version string to its uint16 constant.
-// Returns 0 if the version is not recognized.
-func parseTLSVersion(version string) uint16 {
-	switch version {
-	case "1.0":
-		return tls.VersionTLS10
-	case "1.1":
-		return tls.VersionTLS11
-	case "1.2":
-		return tls.VersionTLS12
-	case "1.3":
-		return tls.VersionTLS13
-	default:
-		return 0
-	}
-}
-
-// parseCipherSuiteIDs converts cipher suite name strings to their uint16 IDs.
-// Unrecognized names are silently ignored.
-func parseCipherSuiteIDs(names []string) []uint16 {
-	lookup := make(map[string]uint16, len(tls.CipherSuites())+len(tls.InsecureCipherSuites()))
-	for _, cs := range tls.CipherSuites() {
-		lookup[cs.Name] = cs.ID
-	}
-	for _, cs := range tls.InsecureCipherSuites() {
-		lookup[cs.Name] = cs.ID
-	}
-	ids := make([]uint16, 0, len(names))
-	for _, name := range names {
-		if id, ok := lookup[name]; ok {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
 // addTo applies the configuration to controller runtime Options.
-func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
+func addTo(o *ctrl.Options, cfg *configapi.Configuration) {
 	var tlsOpts []func(*tls.Config)
-	if !enableHTTP2 {
+
+	if cfg.TLS != nil && len(cfg.TLS.NextProtos) > 0 {
+		// cfg.TLS.NextProtos wins unconditionally when set.
+		np := cfg.TLS.NextProtos
+		tlsOpts = append(tlsOpts, func(c *tls.Config) {
+			c.NextProtos = np
+		})
+	} else {
+		// Disable HTTP/2 by default to mitigate CVE-2023-44487 and CVE-2023-39325.
+		// See: https://github.com/advisories/GHSA-qppj-fm5r-hxr3
+		// See: https://github.com/advisories/GHSA-4374-p667-p6c8
 		tlsOpts = append(tlsOpts, func(c *tls.Config) {
 			c.NextProtos = []string{"http/1.1"}
 		})
 	}
-	// Apply TLS configuration from config file.
-	// The --enable-http2 flag takes precedence over cfg.TLS.NextProtos.
+
 	if cfg.TLS != nil {
-		if len(cfg.TLS.NextProtos) > 0 && enableHTTP2 {
-			np := cfg.TLS.NextProtos
-			tlsOpts = append(tlsOpts, func(c *tls.Config) {
-				c.NextProtos = np
-			})
-		}
-		if cfg.TLS.MinVersion != nil {
-			if v := parseTLSVersion(*cfg.TLS.MinVersion); v != 0 {
+		if cfg.TLS.MinVersion != "" {
+			if v := tlsutil.ParseTLSVersion(cfg.TLS.MinVersion); v != 0 {
 				mv := v
 				tlsOpts = append(tlsOpts, func(c *tls.Config) {
 					c.MinVersion = mv
@@ -109,7 +76,7 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 			}
 		}
 		if len(cfg.TLS.CipherSuites) > 0 {
-			if ids := parseCipherSuiteIDs(cfg.TLS.CipherSuites); len(ids) > 0 {
+			if ids := tlsutil.ParseCipherSuiteIDs(cfg.TLS.CipherSuites); len(ids) > 0 {
 				tlsOpts = append(tlsOpts, func(c *tls.Config) {
 					c.CipherSuites = ids
 				})
@@ -123,7 +90,6 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 		TLSOpts:       tlsOpts,
 	}
 
-	// Set webhook server options
 	if cfg.Webhook.Port != nil {
 		webhookOpts := webhook.Options{
 			Port:    int(*cfg.Webhook.Port),
@@ -135,10 +101,8 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 		o.WebhookServer = webhook.NewServer(webhookOpts)
 	}
 
-	// Set health probe bind address
 	o.HealthProbeBindAddress = cfg.Health.HealthProbeBindAddress
 
-	// Set leader election
 	if cfg.LeaderElection != nil {
 		if cfg.LeaderElection.LeaderElect != nil {
 			o.LeaderElection = *cfg.LeaderElection.LeaderElect
@@ -151,7 +115,6 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 		o.RetryPeriod = &cfg.LeaderElection.RetryPeriod.Duration
 	}
 
-	// Set controller concurrency if specified
 	if cfg.Controller != nil && len(cfg.Controller.GroupKindConcurrency) > 0 {
 		if o.Controller.GroupKindConcurrency == nil {
 			o.Controller.GroupKindConcurrency = make(map[string]int)
@@ -163,8 +126,7 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 }
 
 // Load loads configuration from file and returns controller Options and Configuration.
-// If configFile is empty, default configuration is used.
-func Load(scheme *runtime.Scheme, configFile string, enableHTTP2 bool) (ctrl.Options, configapi.Configuration, error) {
+func Load(scheme *runtime.Scheme, configFile string) (ctrl.Options, configapi.Configuration, error) {
 	options := ctrl.Options{
 		Scheme: scheme,
 	}
@@ -172,31 +134,26 @@ func Load(scheme *runtime.Scheme, configFile string, enableHTTP2 bool) (ctrl.Opt
 	cfg := configapi.Configuration{}
 
 	if configFile == "" {
-		// Apply defaults
 		scheme.Default(&cfg)
 	} else {
-		// Load from file
 		if err := fromFile(configFile, scheme, &cfg); err != nil {
 			return options, cfg, err
 		}
 	}
 
-	// Validate configuration
 	if errs := validate(&cfg); len(errs) > 0 {
 		return options, cfg, fmt.Errorf("invalid configuration: %v", errs.ToAggregate())
 	}
 
-	// Apply configuration to options
-	addTo(&options, &cfg, enableHTTP2)
+	addTo(&options, &cfg)
 
 	return options, cfg, nil
 }
 
 // IsCertManagementEnabled returns true if certificate management is enabled.
-// Returns true by default if not explicitly disabled.
 func IsCertManagementEnabled(cfg *configapi.Configuration) bool {
 	if cfg.CertManagement == nil || cfg.CertManagement.Enable == nil {
-		return true // Enabled by default
+		return true
 	}
 	return *cfg.CertManagement.Enable
 }

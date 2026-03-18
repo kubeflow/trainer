@@ -730,7 +730,7 @@ this is not: valid: yaml: content
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			options, cfg, err := Load(testScheme, tc.configFile, false)
+			options, cfg, err := Load(testScheme, tc.configFile)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("Expected error but got none")
@@ -798,45 +798,18 @@ func TestIsCertManagementEnabled(t *testing.T) {
 	}
 }
 
-func TestLoadHTTP2(t *testing.T) {
+func TestLoadTLS(t *testing.T) {
 	testScheme := runtime.NewScheme()
 	if err := configapi.AddToScheme(testScheme); err != nil {
 		t.Fatal(err)
 	}
 
-	testcases := []struct {
-		name        string
-		enableHTTP2 bool
-		wantTLSOpts bool
-	}{
-		{
-			name:        "HTTP/2 disabled sets TLSOpts",
-			enableHTTP2: false,
-			wantTLSOpts: true,
-		},
-		{
-			name:        "HTTP/2 enabled does not set TLSOpts",
-			enableHTTP2: true,
-			wantTLSOpts: false,
-		},
-		{
-			name:        "HTTP/2 defaults to disabled",
-			enableHTTP2: false,
-			wantTLSOpts: true,
-		},
+	// Default load: HTTP/2 must be disabled (TLSOpts set to restrict NextProtos).
+	options, _, err := Load(testScheme, "")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			options, _, err := Load(testScheme, "", tc.enableHTTP2)
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-			if tc.wantTLSOpts && len(options.Metrics.TLSOpts) == 0 {
-				t.Error("Expected TLSOpts to be set for disabling HTTP/2")
-			}
-			if !tc.wantTLSOpts && len(options.Metrics.TLSOpts) > 0 {
-				t.Error("Expected TLSOpts to be empty when HTTP/2 is enabled")
-			}
-		})
+	if len(options.Metrics.TLSOpts) == 0 {
+		t.Error("Expected TLSOpts to be set by default to disable HTTP/2")
 	}
 }

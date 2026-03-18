@@ -227,13 +227,23 @@ type StatusServer struct {
 	Burst *int32 `json:"burst,omitempty"`
 }
 
+const (
+	// TLSVersion10 is the TLS 1.0 version string.
+	TLSVersion10 = "1.0"
+	// TLSVersion11 is the TLS 1.1 version string.
+	TLSVersion11 = "1.1"
+	// TLSVersion12 is the TLS 1.2 version string.
+	TLSVersion12 = "1.2"
+	// TLSVersion13 is the TLS 1.3 version string.
+	TLSVersion13 = "1.3"
+)
+
 // TLSOptions contains TLS configuration for the controller manager.
 type TLSOptions struct {
 	// minVersion is the minimum TLS version supported.
-	// Supported values: "1.0", "1.1", "1.2", "1.3".
 	// +optional
-	// +kubebuilder:validation:MaxLength=3
-	MinVersion *string `json:"minVersion,omitempty"`
+	// +kubebuilder:validation:Enum=1.0;1.1;1.2;1.3
+	MinVersion string `json:"minVersion,omitempty"`
 
 	// cipherSuites is the list of allowed cipher suites.
 	// +optional
@@ -245,7 +255,6 @@ type TLSOptions struct {
 	// nextProtos is the list of application-level protocols negotiated during
 	// the TLS handshake. Set to ["h2", "http/1.1"] to enable HTTP/2, or omit
 	// to disable it (mitigates CVE-2023-44487 and CVE-2023-39325).
-	// The --enable-http2 CLI flag takes precedence over this field.
 	// +optional
 	// +listType=atomic
 	// +kubebuilder:validation:MaxItems=10
