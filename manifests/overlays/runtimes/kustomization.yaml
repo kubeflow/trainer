@@ -6,14 +6,14 @@ resources:
 # Update the Kubeflow LLM Trainer image tag.
 images:
   - name: ghcr.io/kubeflow/trainer/torchtune-trainer
-    newTag: v2.2.0-rc.0
+    newTag: v2.2.0-rc.1
   - name: ghcr.io/kubeflow/trainer/dataset-initializer
-    newTag: v2.2.0-rc.0
+    newTag: v2.2.0-rc.1
   - name: ghcr.io/kubeflow/trainer/model-initializer
-    newTag: v2.2.0-rc.0
+    newTag: v2.2.0-rc.1
   - name: ghcr.io/kubeflow/trainer/mlx-runtime
-    newTag: v2.2.0-rc.0
+    newTag: v2.2.0-rc.1
   - name: ghcr.io/kubeflow/trainer/deepspeed-runtime
-    newTag: v2.2.0-rc.0
+    newTag: v2.2.0-rc.1
   - name: ghcr.io/kubeflow/trainer/xgboost-runtime
-    newTag: v2.2.0-rc.0
+    newTag: v2.2.0-rc.1
