@@ -47,15 +47,74 @@ func fromFile(path string, scheme *runtime.Scheme, cfg *configapi.Configuration)
 	return nil
 }
 
+// parseTLSVersion converts a TLS version string to its uint16 constant.
+// Returns 0 if the version is not recognized.
+func parseTLSVersion(version string) uint16 {
+	switch version {
+	case "1.0":
+		return tls.VersionTLS10
+	case "1.1":
+		return tls.VersionTLS11
+	case "1.2":
+		return tls.VersionTLS12
+	case "1.3":
+		return tls.VersionTLS13
+	default:
+		return 0
+	}
+}
+
+// parseCipherSuiteIDs converts cipher suite name strings to their uint16 IDs.
+// Unrecognized names are silently ignored.
+func parseCipherSuiteIDs(names []string) []uint16 {
+	lookup := make(map[string]uint16, len(tls.CipherSuites())+len(tls.InsecureCipherSuites()))
+	for _, cs := range tls.CipherSuites() {
+		lookup[cs.Name] = cs.ID
+	}
+	for _, cs := range tls.InsecureCipherSuites() {
+		lookup[cs.Name] = cs.ID
+	}
+	ids := make([]uint16, 0, len(names))
+	for _, name := range names {
+		if id, ok := lookup[name]; ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // addTo applies the configuration to controller runtime Options.
 func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
-	// Set metrics server options
 	var tlsOpts []func(*tls.Config)
 	if !enableHTTP2 {
-		// Disable http/2 for security reasons (CVE-2023-44487, CVE-2023-39325)
 		tlsOpts = append(tlsOpts, func(c *tls.Config) {
 			c.NextProtos = []string{"http/1.1"}
 		})
+	}
+	// Apply TLS configuration from config file.
+	// The --enable-http2 flag takes precedence over cfg.TLS.NextProtos.
+	if cfg.TLS != nil {
+		if len(cfg.TLS.NextProtos) > 0 && enableHTTP2 {
+			np := cfg.TLS.NextProtos
+			tlsOpts = append(tlsOpts, func(c *tls.Config) {
+				c.NextProtos = np
+			})
+		}
+		if cfg.TLS.MinVersion != nil {
+			if v := parseTLSVersion(*cfg.TLS.MinVersion); v != 0 {
+				mv := v
+				tlsOpts = append(tlsOpts, func(c *tls.Config) {
+					c.MinVersion = mv
+				})
+			}
+		}
+		if len(cfg.TLS.CipherSuites) > 0 {
+			if ids := parseCipherSuiteIDs(cfg.TLS.CipherSuites); len(ids) > 0 {
+				tlsOpts = append(tlsOpts, func(c *tls.Config) {
+					c.CipherSuites = ids
+				})
+			}
+		}
 	}
 
 	o.Metrics = metricsserver.Options{
