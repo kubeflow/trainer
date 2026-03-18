@@ -1,5 +1,6 @@
 """Tests for OpenDAL utilities."""
 
+import fnmatch
 import os
 import tempfile
 from unittest.mock import MagicMock, Mock, patch
@@ -96,7 +97,7 @@ class TestS3Storage:
                     "data/temp.log": b"log content",
                     "data/cache.tmp": b"cache content",
                 },
-                [".log", ".tmp"],
+                ["*.log", "*.tmp"],
             ),
         ],
     )
@@ -130,7 +131,7 @@ class TestS3Storage:
 
                     # Check if file should be ignored
                     should_ignore = any(
-                        path.endswith(pattern) for pattern in ignore_patterns
+                        fnmatch.fnmatch(path, pattern) for pattern in ignore_patterns
                     )
 
                     if should_ignore:
