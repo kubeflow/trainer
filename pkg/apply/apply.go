@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -72,6 +73,16 @@ func byVolumeName(a, b corev1ac.VolumeApplyConfiguration) bool {
 
 func byVolumeMountPath(a, b corev1ac.VolumeMountApplyConfiguration) bool {
 	return ptr.Equal(a.MountPath, b.MountPath)
+}
+
+func byConditionType(a, b metav1ac.ConditionApplyConfiguration) bool {
+	return ptr.Equal(a.Type, b.Type)
+}
+
+func UpsertConditions(conditions *[]metav1ac.ConditionApplyConfiguration, upConditions ...metav1ac.ConditionApplyConfiguration) {
+	for _, c := range upConditions {
+		upsert(conditions, c, byConditionType)
+	}
 }
 
 type compare[T any] func(T, T) bool
