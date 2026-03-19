@@ -137,6 +137,7 @@ func TestMPI(t *testing.T) {
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
@@ -174,6 +175,7 @@ func TestMPI(t *testing.T) {
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
@@ -274,6 +276,7 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
@@ -311,6 +314,7 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
@@ -411,6 +415,7 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
@@ -448,6 +453,7 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
@@ -579,6 +585,7 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
@@ -624,6 +631,7 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
@@ -707,6 +715,7 @@ trainJob-node-1-0.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
@@ -790,6 +799,7 @@ trainJob-node-1-0.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(0640).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
