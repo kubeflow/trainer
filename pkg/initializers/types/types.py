@@ -28,7 +28,7 @@ class S3DatasetInitializer:
 class HuggingFaceModelInitializer:
     storage_uri: str
     ignore_patterns: Optional[list[str]] = field(
-        default_factory=lambda: ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"]
+        default_factory=lambda: ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"]
     )
     access_token: Optional[str] = None
 
@@ -38,7 +38,7 @@ class HuggingFaceModelInitializer:
 class S3ModelInitializer:
     storage_uri: str
     ignore_patterns: Optional[list[str]] = field(
-        default_factory=lambda: ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"]
+        default_factory=lambda: ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"]
     )
     endpoint: Optional[str] = None
     access_key_id: Optional[str] = None

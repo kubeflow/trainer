@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 tracing = "0.1.41"
-tracing-subscriber = "0.3.22"
+tracing-subscriber = "0.3.23"
 tokio = { version = "1.50.0", features = ["full"] }
 datafusion = "47.0.0"
 arrow = "55.0.0"

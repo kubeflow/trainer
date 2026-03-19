@@ -38,7 +38,7 @@ from pkg.initializers.model.s3 import S3
             {"storage_uri": "s3://models/path"},
             {
                 "storage_uri": "s3://models/path",
-                "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", ".pt", ".pth"],
+                "ignore_patterns": ["*.msgpack", "*.h5", "*.bin", "*.pt", "*.pth"],
                 "endpoint": None,
                 "access_key_id": None,
                 "secret_access_key": None,
