@@ -51,9 +51,12 @@ type EnforceMLPolicyPlugin interface {
 	EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error
 }
 
-type PodNetworkPlugin interface {
+// EnforceRuntimeInfoPlugin is a generic plugin interface for plugins that need
+// to update the runtime.Info object without being tied to a specific policy API
+// (ML policy, pod group policy, etc.).
+type EnforceRuntimeInfoPlugin interface {
 	Plugin
-	IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) error
+	EnforceRuntimeInfo(info *runtime.Info, trainJob *trainer.TrainJob) error
 }
 
 type ComponentBuilderPlugin interface {
