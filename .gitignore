@@ -2,7 +2,9 @@
 # only so we exclude them.
 bin/
 manifests/external-crds/
-
+.specify/
+.claude/
+specs/
 # IDEs
 .vscode/
 __debug_bin
@@ -39,3 +41,6 @@ examples/pytorch/*/data
 
 examples/pytorch/audio-classification/genres_original
 examples/pytorch/audio-classification/output
+
+# Sphinx documentation build artifacts
+docs/_build/
