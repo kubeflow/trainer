@@ -300,4 +300,7 @@ var (
 
 	// TorchTuneImmutableConfigs is the set of immutable configs for the TorchTune Trainer.
 	TorchTuneImmutableConfigs = sets.New(TorchTuneModelOutputDir, TorchTuneTokenizerPath, TorchTuneCheckpointDir, TorchTuneTokenizerMergeFile)
+
+	// UnslothEntrypoint is the entrypoint for the unsloth.
+	UnslothEntrypoint = []string{"unsloth", "finetune"}
 )
