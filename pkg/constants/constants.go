@@ -119,6 +119,10 @@ const (
 	// Path for Flux curve path
 	FluxCurveVolumePath = "/curve"
 
+	// Ensure MPI has full memory of the host
+	FluxMemoryVolumeName = "shared-memory"
+	FluxMemoryVolumePath = "/dev/shm"
+
 	// emptyDir volume using for complete spack view software
 	FluxSpackViewVolumeName = "spack-install"
 

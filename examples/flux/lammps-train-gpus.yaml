@@ -1,0 +1,40 @@
+# This was developed on AWS g4dn.xlarge, Tesla T4 GPUs
+# eksctl create cluster --config-file ./eks-config-gpu.yaml
+# eksctl delete cluster --config-file ./eks-config-gpu.yaml  --wait
+# apiVersion: eksctl.io/v1alpha5
+# kind: ClusterConfig
+# metadata:
+#   name: gpu-cluster
+#   region: us-east-2
+
+# nodeGroups:
+#   - name: hpsf-gpu-workers
+#     instanceType: g4dn.xlarge
+#     minSize: 2
+#     maxSize: 2
+#     desiredCapacity: 2
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: lammps-flux
+spec:
+  # Reference the pre-defined runtime by name
+  runtimeRef:
+    name: flux-runtime
+  trainer:
+    numNodes: 2
+    numProcPerNode: 1
+    image: ghcr.io/flux-framework/tutorials:gpu-lammps-hwloc
+    # You do not need to write "flux run, etc" here. It will be wrapped
+    command: [lmp_gpu, -k, "on", g, "8", "-sf", "kk", "-pk", "kokkos", "cuda/aware", "off", "newton", "on", neigh, half, -in, in.reaxff.hns, -v, "x", "8", -v, "y", "8", -v, z, "16", "-in", in.reaxff.hns, "-nocite"]
+    resourcesPerNode:
+      limits:
+        nvidia.com/gpu: "1"
+      requests:
+        nvidia.com/gpu: "1"
+    env:
+     - name: OMPI_MCA_btl
+       value: tcp,self
+      # This is how we match the view (operating system and version) of the initContainer to install Flux
+     - name: FLUX_VIEW_IMAGE
+       value: ghcr.io/converged-computing/flux-view-ubuntu:tag-jammy
