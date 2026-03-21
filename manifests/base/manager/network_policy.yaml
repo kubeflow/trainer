@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: status-server-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: manager    # selects the controller manager pod (status server)
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          trainer.kubeflow.org/trainjob-namespace: "true"  # only labeled namespaces
+      podSelector:
+        matchLabels:
+          trainer.kubeflow.org/trainjob-ancestor-step: trainer  # only trainer pods
+    ports:
+    - protocol: TCP
+      port: 10443                             # status server port
