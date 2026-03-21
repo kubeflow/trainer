@@ -143,6 +143,12 @@ const (
 	// MPISSHAuthorizedKeys is the file name for authorized keys.
 	MPISSHAuthorizedKeys string = "authorized_keys"
 
+	// MPISSHSecretPrivateKeyFileMode is the mode for the mounted MPI SSH private key (0600: OpenSSH-compatible; not group/other readable).
+	MPISSHSecretPrivateKeyFileMode int32 = 0600
+
+	// MPISSHSecretSharedSSHFileMode is the mode for the mounted MPI SSH public key and authorized_keys files (0644).
+	MPISSHSecretSharedSSHFileMode int32 = 0644
+
 	// MPIHostfilePath is the directory for the MPI hostfile.
 	MPIHostfileDir string = "/etc/mpi"
 
