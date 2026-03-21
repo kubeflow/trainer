@@ -206,12 +206,8 @@ test-rust: ## Run Rust unit test.
 	cargo test --lib --bins --manifest-path ./pkg/data_cache/Cargo.toml
 
 .PHONY: test-e2e-setup-cluster
-test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test.
-	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
-
-.PHONY: test-e2e-setup-gpu-cluster
-test-e2e-setup-gpu-cluster: kind ## Setup Kind cluster for GPU e2e test.
-	KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-gpu-cluster.sh
+test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test. (Set GPU_CLUSTER=true for GPU nodes)
+	GPU_CLUSTER=$(GPU_CLUSTER) KIND=$(KIND) K8S_VERSION=$(K8S_VERSION) ./hack/e2e-setup-cluster.sh
 
 .PHONY: test-e2e
 test-e2e: ginkgo ## Run Go e2e test.

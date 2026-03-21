@@ -114,8 +114,10 @@ jobs:
           pip install git+https://github.com/kubeflow/sdk.git@main
 
       - name: Setup GPU cluster with nvkind
+        env:
+          GPU_CLUSTER: "true"
         run: |
-          make test-e2e-setup-gpu-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
+          make test-e2e-setup-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
 
       - name: Run e2e test on GPU cluster
         run: |
