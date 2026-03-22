@@ -5,17 +5,17 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/component: manager    # selects the controller manager pod (status server)
+      app.kubernetes.io/component: manager
   policyTypes:
   - Ingress
   ingress:
   - from:
     - namespaceSelector:
         matchLabels:
-          trainer.kubeflow.org/trainjob-namespace: "true"  # only labeled namespaces
+          trainer.kubeflow.org/trainjob-namespace: "true"
       podSelector:
         matchLabels:
-          trainer.kubeflow.org/trainjob-ancestor-step: trainer  # only trainer pods
+          trainer.kubeflow.org/trainjob-ancestor-step: trainer
     ports:
     - protocol: TCP
-      port: 10443                             # status server port
+      port: 10443
