@@ -43,8 +43,8 @@ import (
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/statusserver"
-	"github.com/kubeflow/trainer/v2/test/integration/framework"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
+	"github.com/kubeflow/trainer/v2/test/integration/framework"
 )
 
 type mockAuthorizer struct{}
@@ -95,7 +95,7 @@ func findFreePort() (int32, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	return int32(l.Addr().(*net.TCPAddr).Port), nil
 }
 
@@ -162,7 +162,7 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 		gomega.Eventually(func(g gomega.Gomega) {
 			resp, err := httpClient.Get(serverAddr + "/")
 			g.Expect(err).NotTo(gomega.HaveOccurred())
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 		}, 5*time.Second, 100*time.Millisecond).Should(gomega.Succeed())
 
 		ns = &corev1.Namespace{
@@ -176,11 +176,10 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 		gomega.Expect(k8sClient.Delete(context.Background(), ns)).To(gomega.Succeed())
 	})
 
-
-	ginkgo.It("should update the TrainJob status when the request is valid", func() {
+	ginkgo.It("Should update the TrainJob status when the request is valid", func() {
 		const jobName = "valid-trainjob"
-		lastUpdatedTime := metav1.Now()
 
+		ginkgo.By("Creating TrainingRuntime and TrainJob")
 		trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, jobName).Obj()
 		gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).To(gomega.Succeed())
 
@@ -189,16 +188,17 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 			Obj()
 		gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
 
+		ginkgo.By("POSTing a valid status update")
 		resp := postStatus(httpClient, serverAddr, ns.Name, jobName, trainer.UpdateTrainJobStatusRequest{
 			TrainerStatus: &trainer.TrainerStatus{
 				ProgressPercentage: ptr.To(int32(50)),
-				LastUpdatedTime:    lastUpdatedTime,
+				LastUpdatedTime:    metav1.Now(),
 			},
 		})
-		defer resp.Body.Close()
-
+		defer func() { _ = resp.Body.Close() }()
 		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
 
+		ginkgo.By("Checking that the status is persisted on the TrainJob")
 		gomega.Eventually(func(g gomega.Gomega) {
 			updated := &trainer.TrainJob{}
 			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
@@ -211,11 +211,10 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 		}, 5*time.Second, 100*time.Millisecond).Should(gomega.Succeed())
 	})
 
-
-	ginkgo.It("should reject a request whose progressPercentage exceeds 100 with a useful error message", func() {
+	ginkgo.It("Should reject a request with progressPercentage > 100 with a useful error message", func() {
 		const jobName = "invalid-progress-trainjob"
-		lastUpdatedTime := metav1.Now()
 
+		ginkgo.By("Creating TrainingRuntime and TrainJob")
 		trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, jobName).Obj()
 		gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).To(gomega.Succeed())
 
@@ -224,38 +223,37 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 			Obj()
 		gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
 
+		ginkgo.By("POSTing a status update with progressPercentage > 100")
 		resp := postStatus(httpClient, serverAddr, ns.Name, jobName, trainer.UpdateTrainJobStatusRequest{
 			TrainerStatus: &trainer.TrainerStatus{
 				ProgressPercentage: ptr.To(int32(150)), // invalid: > 100
-				LastUpdatedTime:    lastUpdatedTime,
+				LastUpdatedTime:    metav1.Now(),
 			},
 		})
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
+		ginkgo.By("Checking the response contains a useful error message")
 		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusUnprocessableEntity))
-
 		var status metav1.Status
 		gomega.Expect(json.NewDecoder(resp.Body).Decode(&status)).To(gomega.Succeed())
 		gomega.Expect(status.Message).NotTo(gomega.BeEmpty(),
 			"response body should contain a human-readable error message")
 	})
 
-
-	ginkgo.It("should reject an update to a non-existing TrainJob with a useful error message", func() {
-		lastUpdatedTime := metav1.Now()
-
+	ginkgo.It("Should reject an update to a non-existing TrainJob with a useful error message", func() {
+		ginkgo.By("POSTing a status update for a non-existing TrainJob")
 		resp := postStatus(httpClient, serverAddr, ns.Name, "does-not-exist",
 			trainer.UpdateTrainJobStatusRequest{
 				TrainerStatus: &trainer.TrainerStatus{
 					ProgressPercentage: ptr.To(int32(50)),
-					LastUpdatedTime:    lastUpdatedTime,
+					LastUpdatedTime:    metav1.Now(),
 				},
 			},
 		)
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
+		ginkgo.By("Checking the response contains a useful error message")
 		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusNotFound))
-
 		var status metav1.Status
 		gomega.Expect(json.NewDecoder(resp.Body).Decode(&status)).To(gomega.Succeed())
 		gomega.Expect(status.Message).NotTo(gomega.BeEmpty(),
