@@ -45,6 +45,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/statusserver"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	"github.com/kubeflow/trainer/v2/test/integration/framework"
+	"github.com/kubeflow/trainer/v2/test/util"
 )
 
 type mockAuthorizer struct{}
@@ -90,13 +91,25 @@ func generateTestTLSConfig() (*tls.Config, error) {
 }
 
 // findFreePort asks the OS for an available TCP port on loopback.
+// Retries up to maxAttempts times to reduce TOCTOU flakiness.
 func findFreePort() (int32, error) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, err
+	const maxAttempts = 5
+
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		port := int32(l.Addr().(*net.TCPAddr).Port)
+		if err := l.Close(); err != nil {
+			lastErr = err
+			continue
+		}
+		return port, nil
 	}
-	defer func() { _ = l.Close() }()
-	return int32(l.Addr().(*net.TCPAddr).Port), nil
+	return 0, fmt.Errorf("failed to find free port after %d attempts: %w", maxAttempts, lastErr)
 }
 
 // postStatus is a small helper that marshals body and POSTs it to the handler
@@ -115,6 +128,7 @@ func postStatus(httpClient *http.Client, serverAddr, namespace, name string, bod
 var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 	var (
 		serverCancel context.CancelFunc
+		serverErr    chan error
 		httpClient   *http.Client
 		serverAddr   string
 		ns           *corev1.Namespace
@@ -147,13 +161,15 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 
 		var serverCtx context.Context
 		serverCtx, serverCancel = context.WithCancel(ctx)
+		serverErr = make(chan error, 1)
 		go func() {
 			defer ginkgo.GinkgoRecover()
-			_ = server.Start(serverCtx)
+			serverErr <- server.Start(serverCtx)
 		}()
 
 		serverAddr = fmt.Sprintf("https://127.0.0.1:%d", port)
 		httpClient = &http.Client{
+			Timeout: 10 * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // test only
 			},
@@ -163,7 +179,7 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 			resp, err := httpClient.Get(serverAddr + "/")
 			g.Expect(err).NotTo(gomega.HaveOccurred())
 			defer func() { _ = resp.Body.Close() }()
-		}, 5*time.Second, 100*time.Millisecond).Should(gomega.Succeed())
+		}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
 		ns = &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-statusserver-"},
@@ -173,6 +189,14 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 
 	ginkgo.AfterEach(func() {
 		serverCancel()
+		// Drain server error — startup/TLS failures surface here.
+		select {
+		case err := <-serverErr:
+			if err != nil {
+				ginkgo.GinkgoT().Logf("status server exited with error: %v", err)
+			}
+		default:
+		}
 		gomega.Expect(k8sClient.Delete(context.Background(), ns)).To(gomega.Succeed())
 	})
 
@@ -208,7 +232,7 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 			g.Expect(updated.Status.TrainerStatus).NotTo(gomega.BeNil())
 			g.Expect(updated.Status.TrainerStatus.ProgressPercentage).NotTo(gomega.BeNil())
 			g.Expect(*updated.Status.TrainerStatus.ProgressPercentage).To(gomega.Equal(int32(50)))
-		}, 5*time.Second, 100*time.Millisecond).Should(gomega.Succeed())
+		}, util.Timeout, util.Interval).Should(gomega.Succeed())
 	})
 
 	ginkgo.It("Should reject a request with progressPercentage > 100 with a useful error message", func() {
@@ -232,12 +256,12 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 		})
 		defer func() { _ = resp.Body.Close() }()
 
-		ginkgo.By("Checking the response contains a useful error message")
+		ginkgo.By("Checking the response is 422 and the message mentions progressPercentage")
 		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusUnprocessableEntity))
 		var status metav1.Status
 		gomega.Expect(json.NewDecoder(resp.Body).Decode(&status)).To(gomega.Succeed())
-		gomega.Expect(status.Message).NotTo(gomega.BeEmpty(),
-			"response body should contain a human-readable error message")
+		gomega.Expect(status.Message).To(gomega.ContainSubstring("progressPercentage"),
+			"error message should identify the invalid field")
 	})
 
 	ginkgo.It("Should reject an update to a non-existing TrainJob with a useful error message", func() {
@@ -252,11 +276,10 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 		)
 		defer func() { _ = resp.Body.Close() }()
 
-		ginkgo.By("Checking the response contains a useful error message")
+		ginkgo.By("Checking the response is 404 with a train job not found message")
 		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusNotFound))
 		var status metav1.Status
 		gomega.Expect(json.NewDecoder(resp.Body).Decode(&status)).To(gomega.Succeed())
-		gomega.Expect(status.Message).NotTo(gomega.BeEmpty(),
-			"response body should contain a human-readable error message")
+		gomega.Expect(status.Message).To(gomega.Equal("Train job not found"))
 	})
 })
