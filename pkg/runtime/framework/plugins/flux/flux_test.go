@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -93,9 +94,11 @@ func TestFlux(t *testing.T) {
 			wantTTY:            true,
 			wantObjs: []apiruntime.Object{
 				utiltesting.MakeConfigMapWrapper("test-job-flux-entrypoint", metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "test-job"}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "test-uid").
 					Obj(),
 				utiltesting.MakeSecretWrapper("test-job-flux-curve", metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "test-job"}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "test-uid").
 					Obj(),
 			},
@@ -415,6 +418,25 @@ func TestGetOriginalCommand(t *testing.T) {
 			got := getOriginalCommand(tc.trainJob, tc.info)
 			if got != tc.want {
 				t.Errorf("getOriginalCommand() = %q; want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestOwnedByTrainJobPredicate(t *testing.T) {
+	cases := map[string]struct {
+		labels map[string]string
+		want   bool
+	}{
+		"has trainjob-name label": {labels: map[string]string{constants.LabelJobName: "test-job"}, want: true},
+		"missing label":           {labels: map[string]string{}, want: false},
+		"nil labels":              {labels: nil, want: false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Labels: tc.labels}}
+			if got := ownedByTrainJob.Create(event.CreateEvent{Object: cm}); got != tc.want {
+				t.Errorf("ownedByTrainJob.Create() = %v, want %v", got, tc.want)
 			}
 		})
 	}

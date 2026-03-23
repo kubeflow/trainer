@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetapply "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
@@ -239,22 +240,30 @@ func (f *Flux) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.
 	return []apiruntime.ApplyConfiguration{cm, secretApply}, nil
 }
 
+// ownedByTrainJob filters watch events to ConfigMaps and Secrets owned by a TrainJob.
+var ownedByTrainJob = predicate.NewPredicateFuncs(func(obj client.Object) bool {
+	_, ok := obj.GetLabels()[constants.LabelJobName]
+	return ok
+})
+
 func (f *Flux) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	return []runtime.ReconcilerBuilder{
 		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
-			return b.Watches(
+			return b.WatchesMetadata(
 				&corev1.ConfigMap{},
 				handler.EnqueueRequestForOwner(
 					f.client.Scheme(), f.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
 				),
+				builder.WithPredicates(ownedByTrainJob),
 			)
 		},
 		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
-			return b.Watches(
+			return b.WatchesMetadata(
 				&corev1.Secret{},
 				handler.EnqueueRequestForOwner(
 					f.client.Scheme(), f.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
 				),
+				builder.WithPredicates(ownedByTrainJob),
 			)
 		},
 	}
@@ -329,6 +338,9 @@ func (f *Flux) buildInitScriptConfigMap(
 	configMapName := fmt.Sprintf("%s-flux-entrypoint", trainJob.Name)
 
 	cmApply := corev1ac.ConfigMap(configMapName, trainJob.Namespace).
+		WithLabels(map[string]string{
+			constants.LabelJobName: trainJob.Name,
+		}).
 		WithOwnerReferences(metav1ac.OwnerReference().
 			WithAPIVersion(trainer.SchemeGroupVersion.String()).
 			WithKind(trainer.TrainJobKind).
@@ -530,6 +542,9 @@ func (f *Flux) buildCurveSecret(trainJob *trainer.TrainJob) (*corev1ac.SecretApp
 	curveSecretName := fmt.Sprintf("%s-flux-curve", trainJob.Name)
 
 	return corev1ac.Secret(curveSecretName, trainJob.Namespace).
+		WithLabels(map[string]string{
+			constants.LabelJobName: trainJob.Name,
+		}).
 		WithData(map[string][]byte{
 			"curve.cert": []byte(curveContent),
 		}).
