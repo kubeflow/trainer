@@ -84,21 +84,12 @@ def train_pytorch():
         transforms.Normalize((0.5,), (0.5,))
     ])
 
-    # Only rank 0 downloads the dataset
-    if dist.get_rank() == 0:
-        datasets.FashionMNIST(
-            root="./data",
-            train=True,
-            download=True,
-            transform=transform
-        )
-    dist.barrier()
-
-    # All ranks load the dataset
+    # Each pod in a multi-node TrainJob has its own filesystem,
+    # so every rank must download the dataset independently.
     dataset = datasets.FashionMNIST(
         root="./data",
         train=True,
-        download=False,
+        download=True,
         transform=transform
     )
 
