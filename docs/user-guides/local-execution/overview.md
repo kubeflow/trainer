@@ -67,7 +67,7 @@ All backends use the same `TrainerClient` interface, making it easy to progress 
 Complete some quick local testing:
 
 ```python
-from kubeflow.trainer import LocalProcessBackendConfig
+from kubeflow.trainer import TrainerClient, CustomTrainer, LocalProcessBackendConfig
 
 backend_config = LocalProcessBackendConfig()
 client = TrainerClient(backend_config=backend_config)
@@ -81,7 +81,7 @@ job_name = client.train(trainer=trainer)
 Use Docker/Podman for multi-node distributed training:
 
 ```python
-from kubeflow.trainer import ContainerBackendConfig
+from kubeflow.trainer import TrainerClient, CustomTrainer, ContainerBackendConfig
 
 backend_config = ContainerBackendConfig(
     container_runtime="docker",
@@ -97,7 +97,7 @@ job_name = client.train(trainer=trainer)
 Production environment with the Kubernetes backend:
 
 ```python
-from kubeflow.trainer import KubernetesBackendConfig
+from kubeflow.trainer import TrainerClient, CustomTrainer, KubernetesBackendConfig
 
 backend_config = KubernetesBackendConfig(namespace="kubeflow")
 client = TrainerClient(backend_config=backend_config)

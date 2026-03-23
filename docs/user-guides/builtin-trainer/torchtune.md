@@ -144,7 +144,7 @@ Running with torchrun...
 
 ### Get the Fine-Tuned Model
 
-After TrainJob completes the fine-tuning task, the fine-tuned model will be stored into the `/workspace/output` directory. The TrainJob automatically creates and manages a PVC to store the model and dataset, which can be shared across Pods. You can access the fine-tuned model in another Pod by mounting the same PVC under `/ `, where you'll find the output in `/ /output`.
+After TrainJob completes the fine-tuning task, the fine-tuned model will be stored into the `/workspace/output` directory. The TrainJob automatically creates and manages a PVC to store the model and dataset, which can be shared across Pods. You can access the fine-tuned model in another Pod by mounting the same PVC under `/workspace`, where you'll find the output in `/workspace/output`.
 
 ## Parameters
 

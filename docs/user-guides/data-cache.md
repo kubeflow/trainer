@@ -148,7 +148,7 @@ adjust settings for your storage configuration:
 DataCacheInitializer(
     storage_uri="cache://schema_name/table_name",      # Cache storage URI
     metadata_loc="s3a://bucket/path/to/metadata.json", # S3 path to Iceberg metadata
-    iam_role="arn:aws:iam::123456:role/test-role"      # IAM role to access Iceberg table
+    iam_role="arn:aws:iam::123456:role/test-role",     # IAM role to access Iceberg table
     num_data_nodes=4,                                  # Number of data cache nodes.
 )
 ```
