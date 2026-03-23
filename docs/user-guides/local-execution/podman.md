@@ -256,7 +256,7 @@ This approach combines the benefits of DNS (hostname resolution) with the reliab
 
 ## Job Management
 
-For common job management operations (listing jobs, viewing logs, deleting jobs), see the [Job Management section](index) in the overview.
+For common job management operations (listing jobs, viewing logs, deleting jobs), see the [Job Management section](overview.md#job-management) in the overview.
 
 ### Inspecting Containers with Podman CLI
 
@@ -272,7 +272,7 @@ podman --url unix:///tmp/podman.sock logs <job-name>-node-0
 
 ## Working with Runtimes
 
-For information about using runtimes and custom runtime sources, see the [Working with Runtimes section](index) in the overview.
+For information about using runtimes and custom runtime sources, see the [Working with Runtimes section](overview.md#working-with-runtimes) in the overview.
 
 ## Troubleshooting
 
