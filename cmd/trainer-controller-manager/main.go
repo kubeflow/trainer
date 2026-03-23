@@ -24,11 +24,16 @@ import (
 
 	zaplog "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlpkg "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -39,6 +44,7 @@ import (
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/config"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/controller"
 	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
@@ -117,6 +123,20 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
+	// Scope the informer cache to only MPI-owned ConfigMaps and Secrets
+	// to prevent excessive memory consumption on clusters with many unrelated objects.
+	req, err := labels.NewRequirement(constants.LabelMPIJobName, selection.Exists, nil)
+	if err != nil {
+		setupLog.Error(err, "unable to create MPI label requirement")
+		os.Exit(1)
+	}
+	mpiSelector := labels.NewSelector().Add(*req)
+	if options.Cache.ByObject == nil {
+		options.Cache.ByObject = make(map[client.Object]cache.ByObject)
+	}
+	options.Cache.ByObject[&corev1.ConfigMap{}] = cache.ByObject{LabelSelector: mpiSelector}
+	options.Cache.ByObject[&corev1.Secret{}] = cache.ByObject{LabelSelector: mpiSelector}
 
 	setupLog.Info("Creating manager")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)

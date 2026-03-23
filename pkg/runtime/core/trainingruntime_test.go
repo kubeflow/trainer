@@ -1950,6 +1950,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 				Obj(),
 			wantObjs: []runtime.Object{
 				testingutil.MakeConfigMapWrapper(fmt.Sprintf("test-job%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelMPIJobName: "test-job"}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					WithData(map[string]string{
 						constants.MPIHostfileName: `test-job-node-0-0.test-job slots=8
@@ -1958,6 +1959,7 @@ test-job-node-0-1.test-job slots=8
 					}).
 					Obj(),
 				testingutil.MakeSecretWrapper(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelMPIJobName: "test-job"}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					WithImmutable(true).
 					WithData(map[string][]byte{
