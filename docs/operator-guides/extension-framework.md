@@ -6,6 +6,8 @@ This guide describes the Kubeflow Trainer Extension Framework's core concepts an
 
 The Kubeflow Trainer Extension Framework is an internal mechanism that enables flexible expansion of Runtime and TrainJob combinations in the Kubeflow ecosystem. The framework provides extension points and manages component lifecycle through four phases.
 
+![Kubeflow Trainer Extension Framework Architecture](images/KubeflowTrainerExtensionFrameworkOverview.drawio.svg)
+
 ### Purpose and Intended Users
 
 The primary purpose of the Kubeflow Trainer Extension Framework is to provide a flexible and extensible mechanism for managing and executing machine learning training jobs within the Kubeflow Trainer. It is designed for platform administrators who need to extend Kubeflow Trainer with their custom plugins to fit their specific requirements.
@@ -34,6 +36,8 @@ In each phase, there are two types of components:
 
 1. **Internal APIs**: These APIs are used internally by the framework and cannot be extended or modified by the user.
 2. **Extension Points**: These points are exposed to the user and allow for customization through plugins that can be added to the framework.
+
+![Kubeflow Trainer Extension Framework](images/KubeflowTrainerExtensionFramework.drawio.svg)
 
 ## Phase Details
 

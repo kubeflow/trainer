@@ -53,11 +53,11 @@ Define ML-specific policies for training workloads
 Customize job templates for different frameworks
 ::::
 
-::::{grid-item-card} Pod Templates
-:link: pod-template
+::::{grid-item-card} Runtime Patches
+:link: runtime-patches
 :link-type: doc
 
-Override PodTemplate configurations for training pods
+Customize training runtime configuration with RuntimePatches
 ::::
 
 :::::
@@ -94,7 +94,7 @@ migration
 runtime
 ml-policy
 job-template
-pod-template
+runtime-patches
 extension-framework
 job-scheduling/index
 ```
