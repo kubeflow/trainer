@@ -133,9 +133,9 @@ manager:
         clusterTrainingRuntime: 1
     certManagement:
       enable: true
-      # webhookServiceName and webhookSecretName are auto-generated if not specified
-      webhookServiceName: ""
-      webhookSecretName: ""
+      # serviceName and secretName are auto-generated if not specified
+      serviceName: ""
+      secretName: ""
     clientConnection:
       # -- QPS rate limit for the manager's Kubernetes API client. Accepts fractional values (e.g. 0.5).
       qps: 50
