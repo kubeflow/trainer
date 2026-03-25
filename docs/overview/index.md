@@ -13,13 +13,13 @@ Kubeflow Trainer brings **MPI to Kubernetes** for multi-node, multi-GPU distribu
 
 The platform features **distributed data caching** using Apache Arrow and Apache DataFusion for zero-copy tensor streaming directly to GPU nodes, maximizing training performance.
 
-![Kubeflow Trainer Tech Stack](https://www.kubeflow.org/docs/components/trainer/images/trainer-tech-stack.drawio.svg)
+![Kubeflow Trainer Tech Stack](../images/trainer-tech-stack.drawio.svg)
 
 ## Who is This For?
 
 Kubeflow Trainer documentation is organized around three key personas:
 
-![User Personas](https://www.kubeflow.org/docs/components/trainer/images/user-personas.drawio.svg)
+![User Personas](../images/user-personas.drawio.svg)
 
 ### AI Practitioners
 
@@ -81,7 +81,7 @@ First-class support for Kubernetes ecosystem tools:
 - **Coscheduling**: Resource orchestration for distributed jobs
 - **YuniKorn**: Resource scheduling and multi-tenancy
 
-![AI Lifecycle with Kubeflow Trainer](https://www.kubeflow.org/docs/components/trainer/images/ai-lifecycle-trainer.drawio.svg)
+![AI Lifecycle with Kubeflow Trainer](../images/ai-lifecycle-trainer.drawio.svg)
 
 ## Learn More
 
