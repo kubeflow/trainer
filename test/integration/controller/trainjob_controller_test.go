@@ -1031,14 +1031,17 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 												{
 													Key:  corev1.SSHAuthPrivateKey,
 													Path: constants.MPISSHPrivateKeyFile,
+													Mode: ptr.To(constants.MPISSHSecretPrivateKeyFileMode),
 												},
 												{
 													Key:  constants.MPISSHPublicKey,
 													Path: constants.MPISSHPublicKeyFile,
+													Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 												},
 												{
 													Key:  constants.MPISSHPublicKey,
 													Path: constants.MPISSHAuthorizedKeys,
+													Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 												},
 											},
 										},
@@ -1070,14 +1073,17 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 												{
 													Key:  corev1.SSHAuthPrivateKey,
 													Path: constants.MPISSHPrivateKeyFile,
+													Mode: ptr.To(constants.MPISSHSecretPrivateKeyFileMode),
 												},
 												{
 													Key:  constants.MPISSHPublicKey,
 													Path: constants.MPISSHPublicKeyFile,
+													Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 												},
 												{
 													Key:  constants.MPISSHPublicKey,
 													Path: constants.MPISSHAuthorizedKeys,
+													Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 												},
 											},
 										},
