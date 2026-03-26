@@ -40,7 +40,7 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
-func TestEnforceMLPolicy(t *testing.T) {
+func TestEnforceRuntimeInfo(t *testing.T) {
 	cases := map[string]struct {
 		info      *runtime.Info
 		trainJob  *trainer.TrainJob
@@ -284,16 +284,16 @@ func TestEnforceMLPolicy(t *testing.T) {
 				t.Fatalf("Failed to initialize Status plugin: %v", err)
 			}
 
-			err = p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(tc.info, tc.trainJob)
+			err = p.(framework.EnforceRuntimeInfoPlugin).EnforceRuntimeInfo(tc.info, tc.trainJob)
 			if diff := gocmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
-				t.Errorf("Unexpected error from EnforceMLPolicy (-want, +got): %s", diff)
+				t.Errorf("Unexpected error from EnforceRuntimeInfo (-want, +got): %s", diff)
 			}
 
 			if diff := gocmp.Diff(tc.wantInfo, tc.info,
 				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
 				cmpopts.SortMaps(func(a, b int) bool { return a < b }),
 			); len(diff) != 0 {
-				t.Errorf("Unexpected info from EnforceMLPolicy (-want, +got): %s", diff)
+				t.Errorf("Unexpected info from EnforceRuntimeInfo (-want, +got): %s", diff)
 			}
 		})
 	}
