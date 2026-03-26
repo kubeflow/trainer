@@ -1,5 +1,6 @@
 resources:
   - manager.yaml
+  - network_policy.yaml
 
 # Disable hash suffix for predictable ConfigMap names
 generatorOptions:
