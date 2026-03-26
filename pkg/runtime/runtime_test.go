@@ -162,6 +162,8 @@ func TestNewInfo(t *testing.T) {
 					).
 					WithInitContainers(corev1ac.Container().
 						WithName("preparation").
+						WithImage("busybox:latest").
+						WithCommand("/bin/sh", "-c", "echo hello").
 						WithResources(corev1ac.ResourceRequirements().
 							WithRequests(corev1.ResourceList{
 								corev1.ResourceCPU: resource.MustParse("15"),
@@ -321,7 +323,9 @@ func TestNewInfo(t *testing.T) {
 								}},
 							}},
 							InitContainers: []Container{{
-								Name: "preparation",
+								Name:    "preparation",
+								Image:   "busybox:latest",
+								Command: []string{"/bin/sh", "-c", "echo hello"},
 							}},
 							SinglePodRequests: corev1.ResourceList{
 								corev1.ResourceCPU: resource.MustParse("40"),
