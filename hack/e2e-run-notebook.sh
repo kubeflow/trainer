@@ -45,9 +45,9 @@ print_results() {
     if command -v kubectl &> /dev/null && kubectl cluster-info &> /dev/null; then
         # Always show TrainJob status
         kubectl describe trainjob || true
-        kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer || true
+        kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer || exit 1
         # CI clusters can be a bit slower; debug output should not fail the whole run.
-        kubectl wait trainjob --for=condition=Complete --all --timeout 60s || true
+        kubectl wait trainjob --for=condition=Complete --all --timeout 60s || exit 1
 
         # Only check pod logs if pods exist (not for local backends)
         if kubectl get pods -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node --no-headers 2>/dev/null | grep -q .; then
