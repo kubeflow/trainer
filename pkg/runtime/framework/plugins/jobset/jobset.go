@@ -45,6 +45,7 @@ import (
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
+	applyconfig "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
@@ -325,7 +326,7 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 	return []apiruntime.ApplyConfiguration{jobSet}, nil
 }
 
-func (j *JobSet) Status(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
+func (j *JobSet) Status(ctx context.Context, trainJob *trainer.TrainJob) (*applyconfig.TrainJobStatusApplyConfiguration, error) {
 	jobSet := &jobsetv1alpha2.JobSet{}
 	if err := j.client.Get(ctx, client.ObjectKeyFromObject(trainJob), jobSet); err != nil {
 		if apierrors.IsNotFound(err) && trainjob.IsTrainJobFinished(trainJob) {
@@ -335,29 +336,34 @@ func (j *JobSet) Status(ctx context.Context, trainJob *trainer.TrainJob) (*train
 		}
 		return nil, err
 	}
-	status := trainJob.Status.DeepCopy()
+	status := applyconfig.TrainJobStatus()
 
 	if completed := meta.FindStatusCondition(jobSet.Status.Conditions, string(jobsetv1alpha2.JobSetCompleted)); completed != nil && completed.Status == metav1.ConditionTrue {
-		completed.Type = trainer.TrainJobComplete
-		meta.SetStatusCondition(&status.Conditions, *completed)
+		status.WithConditions(metav1ac.Condition().
+			WithType(trainer.TrainJobComplete).
+			WithStatus(metav1.ConditionTrue).
+			WithReason(completed.Reason).
+			WithMessage(completed.Message).
+			WithLastTransitionTime(completed.LastTransitionTime))
 	}
 	if failed := meta.FindStatusCondition(jobSet.Status.Conditions, string(jobsetv1alpha2.JobSetFailed)); failed != nil && failed.Status == metav1.ConditionTrue {
-		failed.Type = trainer.TrainJobFailed
-		meta.SetStatusCondition(&status.Conditions, *failed)
+		status.WithConditions(metav1ac.Condition().
+			WithType(trainer.TrainJobFailed).
+			WithStatus(metav1.ConditionTrue).
+			WithReason(failed.Reason).
+			WithMessage(failed.Message).
+			WithLastTransitionTime(failed.LastTransitionTime))
 	}
 
-	var statuses []trainer.JobStatus
-	for _, status := range jobSet.Status.ReplicatedJobsStatus {
-		statuses = append(statuses, trainer.JobStatus{
-			Name:      status.Name,
-			Ready:     &status.Ready,
-			Succeeded: &status.Succeeded,
-			Failed:    &status.Failed,
-			Active:    &status.Active,
-			Suspended: &status.Suspended,
-		})
+	for _, js := range jobSet.Status.ReplicatedJobsStatus {
+		status.WithJobsStatus(applyconfig.JobStatus().
+			WithName(js.Name).
+			WithReady(js.Ready).
+			WithSucceeded(js.Succeeded).
+			WithFailed(js.Failed).
+			WithActive(js.Active).
+			WithSuspended(js.Suspended))
 	}
-	status.JobsStatus = statuses
 
 	return status, nil
 }
