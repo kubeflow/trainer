@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup CPU Cluster
-        uses: ./.github/workflows/template-setup-cluster
+        uses: ./.github/workflows/template-setup-clusters
         with:
           cluster_type: 'cpu'
           kubernetes_version: ${{ matrix.kubernetes-version }}
@@ -79,7 +79,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup GPU Cluster
-        uses: ./.github/workflows/template-setup-cluster
+        uses: ./.github/workflows/template-setup-clusters
         with:
           cluster_type: 'gpu'
           kubernetes_version: ${{ matrix.kubernetes-version }}
