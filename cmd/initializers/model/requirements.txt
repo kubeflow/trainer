@@ -1,2 +1,2 @@
-huggingface-hub>=0.27.0,<1.7
+huggingface-hub>=0.27.0,<1.8
 opendal>=0.46.0
