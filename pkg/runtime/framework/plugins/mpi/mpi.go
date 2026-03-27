@@ -29,6 +29,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -218,15 +219,14 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 func (m *MPI) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	return []runtime.ReconcilerBuilder{
 		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
-			return b.Watches(
+			return b.WatchesMetadata(
 				&corev1.ConfigMap{},
 				handler.EnqueueRequestForOwner(
 					m.client.Scheme(), m.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
-				),
-			)
+				))
 		},
 		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
-			return b.Watches(
+			return b.WatchesMetadata(
 				&corev1.Secret{},
 				handler.EnqueueRequestForOwner(
 					m.client.Scheme(), m.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
@@ -244,7 +244,9 @@ func (m *MPI) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.T
 	var objects []apiruntime.ApplyConfiguration
 
 	// SSHAuthSecret is immutable.
-	if err := m.client.Get(ctx, client.ObjectKey{Name: sshAuthSecretName(trainJob.Name), Namespace: trainJob.Namespace}, &corev1.Secret{}); err != nil {
+	partialSecret := &metav1.PartialObjectMetadata{}
+	partialSecret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	if err := m.client.Get(ctx, client.ObjectKey{Name: sshAuthSecretName(trainJob.Name), Namespace: trainJob.Namespace}, partialSecret); err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			return nil, err
 		}
@@ -275,6 +277,9 @@ func (m *MPI) buildSSHAuthSecret(trainJob *trainer.TrainJob) (*corev1ac.SecretAp
 		return nil, err
 	}
 	return corev1ac.Secret(sshAuthSecretName(trainJob.Name), trainJob.Namespace).
+		WithLabels(map[string]string{
+			constants.LabelMPIJobName: trainJob.Name,
+		}).
 		WithType(corev1.SecretTypeSSHAuth).
 		WithData(map[string][]byte{
 			corev1.SSHAuthPrivateKey:  privatePEM,
@@ -310,6 +315,9 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 		}
 	}
 	return corev1ac.ConfigMap(fmt.Sprintf("%s%s", trainJob.Name, constants.MPIHostfileConfigMapSuffix), trainJob.Namespace).
+		WithLabels(map[string]string{
+			constants.LabelMPIJobName: trainJob.Name,
+		}).
 		WithData(map[string]string{
 			constants.MPIHostfileName: hostFile.String(),
 		}).

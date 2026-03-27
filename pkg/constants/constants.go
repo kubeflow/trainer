@@ -43,6 +43,9 @@ const (
 	// LabelSupport indicates support status for a runtime, e.g. "deprecated".
 	LabelSupport string = "trainer.kubeflow.org/support"
 
+	// LabelMPIJobName is the label to identify MPI-owned ConfigMap and Secret resources.
+	LabelMPIJobName string = "trainer.kubeflow.org/trainjob-name"
+
 	// SupportDeprecated indicates the runtime is deprecated when used with LabelSupport.
 	SupportDeprecated string = "deprecated"
 

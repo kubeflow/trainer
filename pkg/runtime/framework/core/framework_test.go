@@ -1297,6 +1297,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 					}).
 					Obj(),
 				testingutil.MakeSecretWrapper(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelMPIJobName: "test-job"}).
 					WithImmutable(true).
 					WithType(corev1.SecretTypeSSHAuth).
 					WithData(map[string][]byte{
@@ -1306,6 +1307,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					Obj(),
 				testingutil.MakeConfigMapWrapper(fmt.Sprintf("test-job%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelMPIJobName: "test-job"}).
 					WithData(map[string]string{
 						constants.MPIHostfileName: `test-job-launcher-0-0.test-job slots=1
 test-job-node-0-0.test-job slots=1
