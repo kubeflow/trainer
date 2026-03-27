@@ -24,32 +24,14 @@ jobs:
         kubernetes-version: ["1.32.3", "1.33.1", "1.34.0", "1.35.0"]
 
     steps:
-      - name: Check out code
+      - name: Checkout repository for local actions
         uses: actions/checkout@v6
+
+      - name: Setup CPU Cluster
+        uses: ./.github/workflows/template-setup-clusters
         with:
-          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: 3.12
-
-      - name: Install dependencies
-        run: |
-          echo "Install Papermill"
-          pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
-
-          echo "Install Kubeflow SDK with Docker support for local Notebooks"
-          pip install "kubeflow[docker] @ git+https://github.com/kubeflow/sdk.git@main"
-
-      - name: Setup cluster
-        run: |
-          make test-e2e-setup-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
+          cluster_type: 'cpu'
+          kubernetes_version: ${{ matrix.kubernetes-version }}
 
       - name: Run e2e with Go
         run: |
@@ -93,32 +75,14 @@ jobs:
         kubernetes-version: ["1.33.1"]
 
     steps:
-      - name: Check out code
+      - name: Checkout repository for local actions
         uses: actions/checkout@v6
+
+      - name: Setup GPU Cluster
+        uses: ./.github/workflows/template-setup-clusters
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: 3.11
-
-      - name: Install dependencies
-        run: |
-          pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
-          pip install git+https://github.com/kubeflow/sdk.git@main
-
-      - name: Setup GPU cluster with nvkind
-        env:
-          GPU_CLUSTER: "true"
-        run: |
-          make test-e2e-setup-cluster K8S_VERSION=${{ matrix.kubernetes-version }}
+          cluster_type: 'gpu'
+          kubernetes_version: ${{ matrix.kubernetes-version }}
 
       - name: Run e2e test on GPU cluster
         run: |
