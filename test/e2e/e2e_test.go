@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"time"
+	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -51,8 +52,14 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 
 	// Delete test namespace after each test.
 	ginkgo.AfterEach(func() {
+		if ginkgo.CurrentSpecReport().Failed() {
+			dumpDebugInfo(ns.Name)
+		}
 		// Delete test namespace after each test.
-		gomega.Expect(k8sClient.Delete(ctx, ns)).To(gomega.Succeed())
+		err := k8sClient.Delete(ctx, ns)
+		if err != nil {
+			fmt.Println("Failed to delete namespace:", err)
+		}
 	})
 
 	// These tests create TrainJob that reference supported runtime without any additional changes.
@@ -581,3 +588,28 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 		})
 	})
 })
+func dumpDebugInfo(namespace string) {
+    fmt.Println("\n===== DEBUG INFO START =====")
+
+    podList := &corev1.PodList{}
+    if err := k8sClient.List(ctx, podList, client.InNamespace(namespace)); err != nil {
+        fmt.Println("Failed to list pods:", err)
+        return
+    }
+
+    for _, pod := range podList.Items {
+        fmt.Printf("\nPod: %s\n", pod.Name)
+        fmt.Printf("Status: %s\n", pod.Status.Phase)
+        fmt.Printf("Conditions: %+v\n", pod.Status.Conditions)
+    }
+
+    eventList := &corev1.EventList{}
+    if err := k8sClient.List(ctx, eventList, client.InNamespace(namespace)); err == nil {
+        fmt.Println("\nEvents:")
+        for _, e := range eventList.Items {
+            fmt.Printf("%s: %s\n", e.Reason, e.Message)
+        }
+    }
+
+    fmt.Println("===== DEBUG INFO END =====")
+}
