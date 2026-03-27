@@ -1,0 +1,47 @@
+name: 'Setup E2E Cluster'
+description: 'Checks out code, sets up Go and Python, installs dependencies, and creates a Kind cluster'
+
+inputs:
+  cluster_type:
+    description: 'Type of cluster to setup (cpu or gpu)'
+    required: false
+    default: 'cpu'
+  kubernetes_version:
+    description: 'Kubernetes version for the cluster'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check out code
+      uses: actions/checkout@v6
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
+
+    - name: Setup Go
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
+
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: 3.11
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        echo "Install Papermill"
+        pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
+
+        echo "Install Kubeflow SDK with Docker support for local Notebooks"
+        pip install "kubeflow[docker] @ git+https://github.com/kubeflow/sdk.git@main"
+
+    - name: Setup cluster
+      shell: bash
+      env:
+        # Dynamically evaluate the GPU_CLUSTER flag based on the input
+        GPU_CLUSTER: ${{ inputs.cluster_type == 'gpu' && 'true' || 'false' }}
+      run: |
+        make test-e2e-setup-cluster K8S_VERSION=${{ inputs.kubernetes_version }}
