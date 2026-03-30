@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	// TrainJobKind is the Kind name for the TrainJob.
+	// TrainJobKind is the Kind name for the TrainJob.x
 	TrainJobKind string = "TrainJob"
 )
 
