@@ -152,31 +152,6 @@ entrypoint.
 | **Function-based** (KEP-285) | User's Python `train()` function | Package user code into a container | TorchTrainer, JAXTrainer |
 | **Config-driven** (This KEP) | Framework's own CLI binary | Translate config fields into CLI args | TorchTuneTrainer, TRLTrainer |
 
-```
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │                    TrainerClient.train(trainer=...)                  │
-  │                         Unified API Entry Point                     │
-  └────────────┬──────────────────────────┬─────────────────────────────┘
-               │                          │
-               ▼                          ▼
-  ┌────────────────────────┐  ┌──────────────────────────────┐
-  │  BaseTrainer (ABC)     │  │  LLMTrainer (ABC)            │
-  │  ──────────────────    │  │  ────────────────────        │
-  │  KEP-285               │  │  This KEP                    │
-  │  Function-based        │  │  Config-driven               │
-  │                        │  │                              │
-  │  get_train_func()      │  │  command: ClassVar            │
-  │  get_train_func_args() │  │  to_args() → CLI args        │
-  │  get_framework_args()  │  │  validate()                  │
-  │  validate_runtime()    │  │  validate_runtime()          │
-  ├────────────────────────┤  ├──────────────────────────────┤
-  │ ┌──────┐  ┌──────────┐│  │ ┌──────────────┐ ┌─────────┐│
-  │ │Torch │  │JAX       ││  │ │TorchTune     │ │TRL      ││
-  │ │Train.│  │Trainer   ││  │ │Trainer       │ │Trainer  ││
-  │ └──────┘  └──────────┘│  │ └──────────────┘ └─────────┘│
-  └────────────────────────┘  └──────────────────────────────┘
-```
-
 These are architecturally distinct:
 - Function-based trainers need `get_train_func()`, `get_train_func_args()`,
   `packages_to_install` — concepts that don't apply to config-driven trainers.
@@ -309,199 +284,135 @@ similarly sniffs the entrypoint to decide whether to run `validateTorchTune()`.
 The change is a **localized refactor** of two coupling points. No new CRDs, no new
 controllers, no changes to the plugin framework itself.
 
-```
-                      BEFORE                              AFTER
-                 ┌──────────────┐                  ┌──────────────┐
-  SDK            │BuiltinTrainer│                  │BuiltinTrainer│
-                 │ config:      │                  │ config:      │
-                 │  TorchTune   │                  │  Config      │
-                 │  Config      │                  │  Trainer     │
-                 └──────┬───────┘                  └──────┬───────┘
-                         │                                 │
-                         │ hardcoded                        │ config.command
-                         │ get_args_using_                  │ config.to_args()
-                         │ torchtune_config()               │
-                         ▼                                 ▼
-                  creates TrainJob CR               creates TrainJob CR
-                         │                                 │
-  ┌────────────────────────────────────────────────────────────────────┐
-  │                       Kubernetes API                               │
-  └──────────────────────────┬─────────────────────────────────────────┘
-                             │
-  Go                         ▼
-  Torch        ┌─────────────────────────────┐
-  Plugin       │ EnforceMLPolicy()            │
-               │                              │
-   BEFORE:     │ if cmd == ["tune","run"]:    │
-               │   → TorchTune branch         │
-               │ else:                        │
-               │   → torchrun branch          │
-               │                              │
-   AFTER:      │ label = info.Labels          │
-               │   [framework]                │
-               │ if strategy = strategies     │
-               │   [label]:                   │
-               │   → strategy.Enforce()       │
-               │ else:                        │
-               │   → default torchrun         │
-               └─────────────────────────────┘
-```
-
-### End-to-End System Architecture
-
-The following diagram shows how a TRL training job flows through the entire system,
-from the data scientist's Python call to pods running on Kubernetes:
+#### Before vs After
 
 ```
-  Data Scientist
-       │
-       │  client.train(trainer=TRLTrainer(SFT, lr=2e-5, ...))
-       ▼
-  ┌──────────────────────────────────────────────────────────────────┐
-  │                     Python SDK                                   │
-  │                                                                  │
-  │  TrainerClient.train(trainer=...)                                │
-  │       │                                                          │
-  │       ├─ Is it LLMTrainer?  ──yes──► Auto-discover runtime       │
-  │       │  (or BaseTrainer,            by framework label          │
-  │       │   CustomTrainer, etc.)       "trl" → trl-llama3.2-1b    │
-  │       │                                                          │
-  │       ▼                                                          │
-  │  trainer.validate()                                              │
-  │  trainer.validate_runtime(runtime)                               │
-  │       │                                                          │
-  │       ▼                                                          │
-  │  KubernetesBackend                                               │
-  │  ┌─────────────────────────────────────────────────────────┐     │
-  │  │ command = list(trainer.command)     → ["trl"]           │     │
-  │  │ args    = trainer.to_args(init)     → ["sft", "--m..."] │     │
-  │  │ Build TrainJob CR with runtimeRef                       │     │
-  │  └─────────────────────────────────────────────────────────┘     │
-  └──────────────────────────────┬───────────────────────────────────┘
-                                 │  POST TrainJob CR
-                                 ▼
-  ┌──────────────────────────────────────────────────────────────────┐
-  │                     Kubernetes API Server                        │
-  │                                                                  │
-  │  Webhook Validation                                              │
-  │  ┌──────────────────────────────────────────────────────────┐    │
-  │  │ Torch Plugin .Validate()                                 │    │
-  │  │   label = runtime.Labels["trainer.kubeflow.org/framework"]│   │
-  │  │   strategies["trl"] → TRLStrategy.Validate()             │    │
-  │  └──────────────────────────────────────────────────────────┘    │
-  └──────────────────────────────┬───────────────────────────────────┘
+  BEFORE (hardcoded)                          AFTER (pluggable)
+  ══════════════════                          ═════════════════
+
+  ┌─────────────────────┐                    ┌─────────────────────┐
+  │    Python SDK        │                    │    Python SDK        │
+  │                      │                    │                      │
+  │  BuiltinTrainer      │                    │  BuiltinTrainer      │
+  │   config:            │                    │   config:            │
+  │    TorchTuneConfig   │ ← only option      │    LLMTrainer (ABC)  │ ← pluggable
+  │                      │                    │    ├─ TorchTuneTrainer│
+  │  get_args_using_     │                    │    └─ TRLTrainer      │
+  │  torchtune_config()  │ ← hardcoded        │                      │
+  └──────────┬───────────┘                    │  config.command       │
+             │                                │  config.to_args()     │ ← generic
+  ───────────┼────────────                    └──────────┬───────────┘
+             │ TrainJob CR                               │ TrainJob CR
+  ┌──────────▼───────────┐                    ┌──────────▼───────────┐
+  │    Go Torch Plugin   │                    │    Go Torch Plugin   │
+  │                      │                    │                      │
+  │  if cmd == ["tune",  │                    │  label = info.Labels │
+  │    "run"]:           │                    │    ["framework"]     │
+  │    → TorchTune       │ ← cmd sniffing     │  strategies[label]   │
+  │  else:               │                    │    .EnforceCommand() │ ← label dispatch
+  │    → torchrun        │                    │                      │
+  └──────────────────────┘                    └──────────────────────┘
+```
+
+#### SDK Type Hierarchy
+
+```
+   ┌──────────────────────────────────────────────────────────────────────────┐
+   │                     TrainerClient.train(trainer=...)                      │
+   │                                                                          │
+   │  Accepts ANY of these — unified API, separate abstractions:              │
+   └──┬────────────┬────────────────┬────────────────────┬───────────────────┘
+      │            │                │                    │
+      ▼            ▼                ▼                    ▼
+   BaseTrainer   LLMTrainer     CustomTrainer       BuiltinTrainer
+   (KEP-285)     (This KEP)     (existing)          (existing)
+   func-based    config-driven   user function       wraps LLMTrainer
+      │            │
+      │            ├── TorchTuneTrainer
+      │            │   command: ("tune", "run")
+      │            │   framework: torchtune
+      │            │
+      │            └── TRLTrainer
+      │                command: ("trl",)
+      │                framework: trl
+      │
+      ├── TorchTrainer
+      │   func: user train()
+      │   framework: torch
+      │
+      └── JAXTrainer
+          func: user train()
+          framework: jax
+```
+
+#### End-to-End Flow: TRL SFT Job
+
+```
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  DATA SCIENTIST                                                      │
+  │                                                                      │
+  │  client.train(                                                       │
+  │    trainer=TRLTrainer(trainer_type=SFT, learning_rate=2e-5, ...),    │
+  │    initializer=Initializer(model=HF("llama-3.2-1b"), dataset=...)    │
+  │  )                                                                   │
+  └──────────────────────────────┬───────────────────────────────────────┘
                                  │
                                  ▼
-  ┌──────────────────────────────────────────────────────────────────┐
-  │                  TrainJob Controller (Go)                        │
-  │                                                                  │
-  │  Torch Plugin .EnforceMLPolicy()                                 │
-  │  ┌──────────────────────────────────────────────────────────┐    │
-  │  │                                                          │    │
-  │  │  1. Common (all frameworks):                             │    │
-  │  │     inject PET_NNODES, PET_NPROC_PER_NODE, PET_NODE_RANK│    │
-  │  │                                                          │    │
-  │  │  2. Strategy dispatch:                                   │    │
-  │  │     label "trl" → TRLStrategy.EnforceCommand()           │    │
-  │  │       ├─ MASTER_ADDR = <headless-svc>                    │    │
-  │  │       ├─ MASTER_PORT = 29500                             │    │
-  │  │       ├─ WORLD_SIZE  = numNodes * numProcPerNode         │    │
-  │  │       └─ RANK        = JOB_COMPLETION_INDEX              │    │
-  │  │                                                          │    │
-  │  │  3. Add container port 29500                             │    │
-  │  └──────────────────────────────────────────────────────────┘    │
-  │                                                                  │
-  │  SSA Apply → JobSet → ReplicatedJobs                             │
-  └──────────────────────────────┬───────────────────────────────────┘
-                                 │
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  PYTHON SDK                                                          │
+  │                                                                      │
+  │  1. Auto-discover runtime: list_runtimes()                           │
+  │     → filter by label trainer.kubeflow.org/framework: trl            │
+  │     → selects "trl-llama3.2-1b"                                      │
+  │                                                                      │
+  │  2. TRLTrainer.validate() → ok                                       │
+  │                                                                      │
+  │  3. Build TrainJob CR:                                               │
+  │     command: ["trl"]           ← from TRLTrainer.command             │
+  │     args: ["sft", "--model_name_or_path", "/workspace/model", ...]   │
+  │                                ← from TRLTrainer.to_args()           │
+  │     runtimeRef: "trl-llama3.2-1b"                                    │
+  └──────────────────────────────┬───────────────────────────────────────┘
+                                 │ kubectl apply
                                  ▼
-  ┌──────────────────────────────────────────────────────────────────┐
-  │                     Kubernetes Pods                               │
-  │                                                                  │
-  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-  │  │ dataset-init     │  │ model-init       │  │ trainer (node)  │  │
-  │  │ ─────────────    │  │ ─────────────    │  │ ─────────────── │  │
-  │  │ Download dataset │→ │ Download model   │→ │ trl sft \       │  │
-  │  │ from HF Hub      │  │ from HF Hub      │  │   --model ...   │  │
-  │  │                  │  │                   │  │   --dataset ... │  │
-  │  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-  └──────────────────────────────────────────────────────────────────┘
-```
-
-### Go Torch Plugin: Strategy Dispatch
-
-The core of the Go-side refactor — replacing command-sniffing with label-based
-dispatch:
-
-```
-                    EnforceMLPolicy(info, trainJob)
-                              │
-                              ▼
-                   ┌─────────────────────┐
-                   │   Common Path       │
-                   │   (all frameworks)  │
-                   │                     │
-                   │   PET_NNODES        │
-                   │   PET_NPROC_PER_NODE│
-                   │   PET_NODE_RANK     │
-                   └──────────┬──────────┘
-                              │
-                              ▼
-               info.Labels["trainer.kubeflow.org/framework"]
-                              │
-            ┌─────────────────┼─────────────────┐
-            │                 │                 │
-            ▼                 ▼                 ▼
-    label="torchtune"   label="trl"      label="torch"
-            │                 │            (or unknown)
-            ▼                 ▼                 │
-  ┌─────────────────┐ ┌─────────────────┐      │
-  │TorchTuneStrategy│ │ TRLStrategy     │      │
-  │                 │ │                 │      │
-  │ rdzv_endpoint   │ │ MASTER_ADDR    │      ▼
-  │ recipe selection│ │ MASTER_PORT    │ ┌──────────┐
-  │ config overrides│ │ WORLD_SIZE     │ │ Default  │
-  │ immutable args  │ │ RANK           │ │ torchrun │
-  └─────────────────┘ └─────────────────┘ └──────────┘
-```
-
-### Component Interaction Flow
-
-End-to-end for a TRL SFT job:
-
-```
-1. User: TrainerClient.train(
-       trainer=TRLTrainer(trainer_type=SFT, ...),
-       runtime="trl-llama3.2-1b")
-
-   -- OR with auto-discovery --
-
-   User: TrainerClient.train(
-       trainer=TRLTrainer(trainer_type=SFT, ...))
-       # SDK finds runtime with label trainer.kubeflow.org/framework: trl
-
-2. SDK:  TRLTrainer.validate() → ok
-         TRLTrainer.command   → ("trl",)
-         TRLTrainer.to_args() → ["sft", "--model_name_or_path", ...]
-         Build TrainJob CR with:
-           runtimeRef: { name: "trl-llama3.2-1b" }
-           trainer: { command: ["trl"], args: ["sft", ...] }
-
-3. K8s:  Webhook validates TrainJob
-         Torch plugin Validate() → label=trl → TRLStrategy.Validate()
-
-4. Go:   TrainJob controller reconciles:
-         Torch EnforceMLPolicy():
-           a) Common: set PET_NNODES, PET_NPROC_PER_NODE, PET_NODE_RANK
-           b) Label "trl" → TRLStrategy.EnforceCommand():
-              inject PET_MASTER_ADDR, PET_MASTER_PORT
-              inject MASTER_ADDR, MASTER_PORT, WORLD_SIZE, RANK
-           c) Add container port
-
-5. K8s:  Controller SSA → JobSet → ReplicatedJobs → Pods
-         Init: dataset-initializer downloads dataset
-         Init: model-initializer downloads model
-         Main: trl sft --model_name_or_path /workspace/model ...
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  KUBERNETES API SERVER                                               │
+  │                                                                      │
+  │  Webhook → Torch plugin Validate()                                   │
+  │    → label "trl" → TRLStrategy.Validate() → ok                      │
+  └──────────────────────────────┬───────────────────────────────────────┘
+                                 │ reconcile
+                                 ▼
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  GO TORCH PLUGIN — EnforceMLPolicy()                                 │
+  │                                                                      │
+  │  Common (all frameworks):                                            │
+  │    PET_NNODES=1, PET_NPROC_PER_NODE=auto, PET_NODE_RANK=...         │
+  │                                                                      │
+  │  Label dispatch:                                                     │
+  │    strategies["trl"] → TRLStrategy.EnforceCommand():                 │
+  │      + PET_MASTER_ADDR=<job>-node-0-0.<job>                          │
+  │      + PET_MASTER_PORT=29500                                         │
+  │      + MASTER_ADDR=<job>-node-0-0.<job>    ← accelerate compat      │
+  │      + MASTER_PORT=29500                                             │
+  │      + WORLD_SIZE=<N>                                                │
+  │      + RANK=<JOB_COMPLETION_INDEX>                                   │
+  └──────────────────────────────┬───────────────────────────────────────┘
+                                 │ SSA
+                                 ▼
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  KUBERNETES PODS                                                     │
+  │                                                                      │
+  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐  │
+  │  │ dataset-init     │  │ model-init       │  │ trainer node        │  │
+  │  │ ──────────────── │  │ ──────────────── │  │ ─────────────────── │  │
+  │  │ hf://tatsu-lab/  │→ │ hf://meta-llama/ │→ │ trl sft \           │  │
+  │  │   alpaca         │  │   Llama-3.2-1B   │  │   --model ...  \    │  │
+  │  │                  │  │                  │  │   --dataset ... \   │  │
+  │  │ /workspace/      │  │ /workspace/      │  │   --bf16            │  │
+  │  │   dataset/       │  │   model/         │  │   --lora_r 16       │  │
+  │  └─────────────────┘  └─────────────────┘  └─────────────────────┘  │
+  └──────────────────────────────────────────────────────────────────────┘
 ```
 
 ### What Changes vs What Stays
