@@ -158,11 +158,11 @@ runtime=client.get_runtime("torchtune-llama3.2-1b")
 
 ### Initializer
 
-We'll use parameters in [Initializer](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py#L227-L239) to download dataset and model from remote storage.
+We'll use parameters in [Initializer](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py) to download dataset and model from remote storage.
 
 #### Dataset Initializer
 
-Currently, we only support downloading datasets from HuggingFace by defining [`HuggingFaceDatasetInitializer`](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py#L212-L217):
+Currently, we only support downloading datasets from HuggingFace by defining [`HuggingFaceDatasetInitializer`](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py):
 
 :::{note}
 For `storage_uri` in Dataset Initializer, you need to specify **the exact path to data files**. This means you need to set it to `hf:// / /path/to/data/files`.
@@ -176,7 +176,7 @@ Currently, we support:
 
 #### Model Initializer
 
-Currently, we only support downloading models from HuggingFace by defining [`HuggingFaceModelInitializer`](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py#L220-L224):
+Currently, we only support downloading models from HuggingFace by defining [`HuggingFaceModelInitializer`](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py):
 
 #### Example Usage
 
@@ -197,7 +197,7 @@ initializer=Initializer(
 
 #### Description
 
-The `TorchTuneConfig` class is used for configuring TorchTune BuiltinTrainer that already includes the fine-tuning logic. You can find the API definition [here](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py#L78-L106).
+The `TorchTuneConfig` class is used for configuring TorchTune BuiltinTrainer that already includes the fine-tuning logic. You can find the API definition [here](https://github.com/kubeflow/sdk/blob/7614d748d3046750a5ae12a55ddac10db9fd8e7d/python/kubeflow/trainer/types/types.py).
 
 #### Example Usage
 

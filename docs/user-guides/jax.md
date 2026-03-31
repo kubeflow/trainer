@@ -8,7 +8,7 @@ This guide describes how to use TrainJob to train or fine-tune AI models with
 ## Prerequisites
 
 Before exploring this guide, make sure to follow
-[the Getting Started guide](index)
+[the Getting Started guide](../getting-started/index.md)
 to understand the basics of Kubeflow Trainer.
 
 ---
