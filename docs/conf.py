@@ -80,6 +80,7 @@ myst_enable_extensions = [
     "tasklist",  # Task lists [ ] [x]
 ]
 myst_links_external_new_tab = True
+myst_heading_anchors = 4
 
 # -- Mermaid configuration ---------------------------------------------------
 mermaid_version = "11.5.0"  # Use specific version for reproducibility
@@ -101,6 +102,10 @@ mermaid.initialize({
 linkcheck_ignore = [
     r"http://localhost:\d+/",  # Ignore localhost links
     r"https://github\.com/.*/pulls/.*",  # GitHub PR links may be private
+    r"https://medium\.com/.*",  # Medium blocks automated link checking (403)
+]
+linkcheck_anchors_ignore = [
+    r"utilizing-nn-average-gradients",  # MLX docs anchor not stable
 ]
 
 # -- Copy button configuration -----------------------------------------------

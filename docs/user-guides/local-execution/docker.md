@@ -191,7 +191,7 @@ job_name = client.train(trainer=trainer)
 
 ## Job Management
 
-For common job management operations (listing jobs, viewing logs, deleting jobs), see the [Job Management section](overview#job-management) in the overview.
+For common job management operations (listing jobs, viewing logs, deleting jobs), see the [Job Management section](overview.md#job-management) in the overview.
 
 ### Inspecting Containers
 
@@ -214,7 +214,7 @@ docker exec -it <job-name>-node-0 /bin/bash
 
 ## Working with Runtimes
 
-For information about using runtimes and custom runtime sources, see the [Working with Runtimes section](overview#working-with-runtimes) in the overview.
+For information about using runtimes and custom runtime sources, see the [Working with Runtimes section](overview.md#working-with-runtimes) in the overview.
 
 ## Troubleshooting
 
