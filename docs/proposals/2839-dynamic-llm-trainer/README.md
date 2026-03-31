@@ -31,7 +31,7 @@
   - [Component Interaction Flow](#component-interaction-flow)
   - [What Changes vs What Stays](#what-changes-vs-what-stays)
 - [Design Details](#design-details)
-  - [Python SDK: ConfigTrainer Base Class](#python-sdk-configtrainer-base-class)
+  - [Python SDK: LLMTrainer Base Class](#python-sdk-configtrainer-base-class)
   - [Python SDK: TorchTuneTrainer (Refactored)](#python-sdk-torchtunetrainer-refactored)
   - [Python SDK: TRLTrainer](#python-sdk-trltrainer)
   - [Python SDK: TrainerClient Integration](#python-sdk-trainerclient-integration)
@@ -63,7 +63,7 @@ This KEP introduces a **pluggable config-driven trainer framework** for LLM fine
 in Kubeflow Trainer. It decouples the SDK and Go control plane from TorchTune by
 introducing:
 
-1. A `ConfigTrainer` ABC in the Python SDK — a **separate abstraction** from KEP-285's
+1. A `LLMTrainer` ABC in the Python SDK — a **separate abstraction** from KEP-285's
    `BaseTrainer`, purpose-built for **config-driven trainers** where the framework's
    own CLI is the entrypoint (e.g., `trl sft ...`, `tune run ...`). Both ABCs are
    accepted through the same `TrainerClient.train(trainer=...)` parameter, giving
@@ -117,9 +117,9 @@ at two coupling points:
 
 ## Goals
 
-1. Define a `ConfigTrainer` ABC in the Python SDK as a separate abstraction for
+1. Define a `LLMTrainer` ABC in the Python SDK as a separate abstraction for
    config-driven LLM trainers, complementing KEP-285's function-based `BaseTrainer`.
-2. Refactor `TorchTuneConfig` into `TorchTuneTrainer` implementing `ConfigTrainer`
+2. Refactor `TorchTuneConfig` into `TorchTuneTrainer` implementing `LLMTrainer`
    with zero breaking changes to existing workflows.
 3. Implement `TRLTrainer` supporting SFT and DPO training algorithms.
 4. Create TRL container image and `ClusterTrainingRuntime` manifests.
@@ -160,7 +160,7 @@ These are architecturally distinct:
 
 ### Why Separate ABCs Instead of a Unified Hierarchy
 
-Placing `ConfigTrainer` under `BaseTrainer` would force config-driven trainers to
+Placing `LLMTrainer` under `BaseTrainer` would force config-driven trainers to
 implement methods that don't apply (`get_train_func()` returning `None`,
 `get_train_func_args()` returning `None`). This violates the
 [Liskov Substitution Principle](https://en.wikipedia.org/wiki/Liskov_substitution_principle)
@@ -174,7 +174,7 @@ Separate ABCs allow each hierarchy to evolve independently:
   generation) without polluting function-based trainers.
 
 ```
-    BaseTrainer (ABC)                    ConfigTrainer (ABC)
+    BaseTrainer (ABC)                    LLMTrainer (ABC)
     ├── get_train_func()                 ├── command (ClassVar)
     ├── get_train_func_args()            ├── to_args()
     ├── get_framework_args()             ├── validate()
@@ -191,7 +191,7 @@ Separate ABCs allow each hierarchy to evolve independently:
     Existing (unchanged, backward compatible):
 
     CustomTrainer          BuiltinTrainer         CustomTrainerContainer
-    (flat dataclass)       (config: ConfigTrainer)  (image-based)
+    (flat dataclass)       (config: LLMTrainer)  (image-based)
 ```
 
 ### Unified API Entry Point
@@ -212,7 +212,7 @@ The `TrainerClient.train()` signature widens to accept both:
 ```python
 def train(
     self,
-    trainer: BaseTrainer | ConfigTrainer | CustomTrainer
+    trainer: BaseTrainer | LLMTrainer | CustomTrainer
            | CustomTrainerContainer | BuiltinTrainer | None = None,
     ...
 )
@@ -373,10 +373,10 @@ End-to-end for a TRL SFT job:
 | Torch plugin (TorchTune path) | **Refactor** | Extract inline code → `TorchTuneStrategy` |
 | Torch plugin (dispatch) | **New** | Label-based strategy lookup replaces command-sniffing |
 | TRL strategy | **New** | `TRLStrategy` for TRL-specific env vars |
-| SDK `BuiltinTrainer` | **Widen** | `TorchTuneConfig` → `ConfigTrainer` |
-| SDK `TorchTuneConfig` | **Refactor** | → `TorchTuneTrainer(ConfigTrainer)`, backward compatible |
+| SDK `BuiltinTrainer` | **Widen** | `TorchTuneConfig` → `LLMTrainer` |
+| SDK `TorchTuneConfig` | **Refactor** | → `TorchTuneTrainer(LLMTrainer)`, backward compatible |
 | SDK `TRLTrainer` | **New** | New config-driven trainer |
-| SDK `TrainerClient.train()` | **Widen** | `trainer=` union accepts `ConfigTrainer` directly |
+| SDK `TrainerClient.train()` | **Widen** | `trainer=` union accepts `LLMTrainer` directly |
 | Container images | **New** | `trl-trainer` image |
 | ClusterTrainingRuntimes | **New** | TRL-specific runtime manifests |
 
@@ -384,9 +384,9 @@ End-to-end for a TRL SFT job:
 
 ## Design Details
 
-### Python SDK: ConfigTrainer Base Class
+### Python SDK: LLMTrainer Base Class
 
-`ConfigTrainer` is a **standalone ABC** purpose-built for config-driven trainers. It
+`LLMTrainer` is a **standalone ABC** purpose-built for config-driven trainers. It
 does not extend `BaseTrainer` — they are separate abstractions for separate patterns.
 
 ```python
@@ -396,7 +396,7 @@ from typing import ClassVar, Optional
 
 
 @dataclass
-class ConfigTrainer(ABC):
+class LLMTrainer(ABC):
     """Base class for config-driven LLM training backends.
 
     Config-driven trainers use the framework's own CLI as the entrypoint
@@ -448,7 +448,7 @@ class ConfigTrainer(ABC):
 
 **Design rationale:**
 
-- `ConfigTrainer` does not inherit from `BaseTrainer` — avoids dead methods
+- `LLMTrainer` does not inherit from `BaseTrainer` — avoids dead methods
   (`get_train_func() → None`) and LSP violations.
 - `supported_frameworks` and `validate_runtime()` mirror KEP-285's pattern for
   runtime auto-discovery, ensuring both ABCs work with the same mechanism.
@@ -456,13 +456,13 @@ class ConfigTrainer(ABC):
 
 ### Python SDK: TorchTuneTrainer (Refactored)
 
-`TorchTuneConfig` is refactored into `TorchTuneTrainer` implementing `ConfigTrainer`.
+`TorchTuneConfig` is refactored into `TorchTuneTrainer` implementing `LLMTrainer`.
 All existing fields are preserved. `TorchTuneConfig` becomes a type alias for backward
 compatibility.
 
 ```python
 @dataclass
-class TorchTuneTrainer(ConfigTrainer):
+class TorchTuneTrainer(LLMTrainer):
     """TorchTune LLM Trainer configuration.
 
     Supports runtimes labeled with trainer.kubeflow.org/framework: torchtune.
@@ -507,7 +507,7 @@ class TRLTrainerType(Enum):
 
 
 @dataclass
-class TRLTrainer(ConfigTrainer):
+class TRLTrainer(LLMTrainer):
     """TRL LLM Trainer configuration.
 
     Supports runtimes labeled with trainer.kubeflow.org/framework: trl.
@@ -598,7 +598,7 @@ class TRLTrainer(ConfigTrainer):
 
 ### Python SDK: TrainerClient Integration
 
-The `TrainerClient.train()` signature widens to accept `ConfigTrainer` directly,
+The `TrainerClient.train()` signature widens to accept `LLMTrainer` directly,
 alongside KEP-285's `BaseTrainer`:
 
 ```python
@@ -611,7 +611,7 @@ class TrainerClient:
         trainer: Optional[
             Union[
                 "BaseTrainer",             # KEP-285: function-based
-                "ConfigTrainer",           # This KEP: config-driven
+                "LLMTrainer",           # This KEP: config-driven
                 "CustomTrainer",           # Existing
                 "CustomTrainerContainer",  # Existing
                 "BuiltinTrainer",          # Existing
@@ -622,21 +622,21 @@ class TrainerClient:
     ) -> str:
 ```
 
-When a `ConfigTrainer` is passed:
+When a `LLMTrainer` is passed:
 
 1. If `runtime` is `None`, the SDK auto-discovers a runtime by matching the
    `trainer.kubeflow.org/framework` label against `supported_frameworks`.
 2. `validate_runtime()` ensures the runtime's framework label matches.
 3. The backend uses `config.command` and `config.to_args()` to build the TrainJob CR.
 
-The backend handler for `ConfigTrainer`:
+The backend handler for `LLMTrainer`:
 
 ```python
-# In KubernetesBackend — unified handler for ConfigTrainer.
+# In KubernetesBackend — unified handler for LLMTrainer.
 
-def get_trainer_cr_from_config_trainer(
+def get_trainer_cr_from_llm_trainer(
     runtime: types.Runtime,
-    trainer: ConfigTrainer,
+    trainer: LLMTrainer,
     initializer: Optional[types.Initializer] = None,
 ) -> models.TrainerV1alpha1Trainer:
     trainer.validate()
@@ -659,14 +659,14 @@ def get_trainer_cr_from_config_trainer(
 | Existing API | Status | Details |
 |-------------|--------|---------|
 | `BuiltinTrainer(config=TorchTuneConfig(...))` | **Works** | `TorchTuneConfig` is an alias for `TorchTuneTrainer` |
-| `BuiltinTrainer(config=TRLTrainer(...))` | **New** | `BuiltinTrainer.config` type widens to `ConfigTrainer` |
-| `client.train(trainer=TRLTrainer(...))` | **New** | `ConfigTrainer` accepted directly in `trainer=` |
+| `BuiltinTrainer(config=TRLTrainer(...))` | **New** | `BuiltinTrainer.config` type widens to `LLMTrainer` |
+| `client.train(trainer=TRLTrainer(...))` | **New** | `LLMTrainer` accepted directly in `trainer=` |
 | `CustomTrainer(func=...)` | **Unchanged** | No modifications |
 | `CustomTrainerContainer(image=...)` | **Unchanged** | No modifications |
 
 The `BuiltinTrainer.config` field type changes from `TorchTuneConfig` to
-`ConfigTrainer`. Since `TorchTuneConfig` is a type alias for `TorchTuneTrainer`
-which extends `ConfigTrainer`, all existing code continues to work.
+`LLMTrainer`. Since `TorchTuneConfig` is a type alias for `TorchTuneTrainer`
+which extends `LLMTrainer`, all existing code continues to work.
 
 ### Go Control Plane: FrameworkStrategy Interface
 
@@ -1107,12 +1107,12 @@ client.train(
 
 ## Alternatives Considered
 
-### 1. ConfigTrainer as a subclass of BaseTrainer (unified hierarchy)
+### 1. LLMTrainer as a subclass of BaseTrainer (unified hierarchy)
 
-Place `ConfigTrainer` under KEP-285's `BaseTrainer` so all trainers share one ABC.
+Place `LLMTrainer` under KEP-285's `BaseTrainer` so all trainers share one ABC.
 
 **Rejected because:**
-- Forces `ConfigTrainer` to implement `get_train_func()` and
+- Forces `LLMTrainer` to implement `get_train_func()` and
   `get_train_func_args()` returning `None` — dead methods that violate LSP.
 - Any code processing `BaseTrainer` must null-check function-based methods,
   adding defensive logic throughout the backend.
@@ -1141,7 +1141,7 @@ KEP-285.
 - The name `LLMBackend` is too narrow — config-driven trainers could extend beyond
   LLM fine-tuning (e.g., XGBoost config-driven training).
 - Didn't address the KEP-285 integration questions raised by maintainers.
-- `ConfigTrainer` better communicates the pattern (config-driven, trainer hierarchy).
+- `LLMTrainer` better communicates the pattern (config-driven, trainer hierarchy).
 
 ---
 
@@ -1150,11 +1150,11 @@ KEP-285.
 This proposal is scoped for 350 hours (GSoC Large) and can be implemented in phases:
 
 **Phase 1: SDK Foundation (Weeks 1-4)**
-- Add `ConfigTrainer` ABC to `kubeflow/sdk`
-- Refactor `TorchTuneConfig` → `TorchTuneTrainer(ConfigTrainer)` with alias
-- Update `KubernetesBackend` to use `ConfigTrainer` interface
-- Widen `BuiltinTrainer.config` type to `ConfigTrainer`
-- Widen `TrainerClient.train()` to accept `ConfigTrainer` directly
+- Add `LLMTrainer` ABC to `kubeflow/sdk`
+- Refactor `TorchTuneConfig` → `TorchTuneTrainer(LLMTrainer)` with alias
+- Update `KubernetesBackend` to use `LLMTrainer` interface
+- Widen `BuiltinTrainer.config` type to `LLMTrainer`
+- Widen `TrainerClient.train()` to accept `LLMTrainer` directly
 - Unit tests for backward compatibility
 - Coordinate with KEP-285 on shared patterns
 
@@ -1186,7 +1186,7 @@ This proposal is scoped for 350 hours (GSoC Large) and can be implemented in pha
 
 ### Unit Tests (SDK)
 
-- `ConfigTrainer` interface compliance for `TorchTuneTrainer` and `TRLTrainer`
+- `LLMTrainer` interface compliance for `TorchTuneTrainer` and `TRLTrainer`
 - `TorchTuneConfig` alias backward compatibility
 - `TRLTrainer.to_args()` produces correct CLI arguments for SFT and DPO
 - `TRLTrainer.validate()` catches invalid configs (e.g., `use_peft=True` without `lora_r`)
@@ -1224,7 +1224,7 @@ This proposal is scoped for 350 hours (GSoC Large) and can be implemented in pha
 | TRL uses accelerate, not torchrun, for distributed | TRLStrategy injects both `PET_*` and standard env vars; validated in E2E |
 | Multi-node TRL untested at scale | Initial scope: single-node multi-GPU; multi-node validated before GA |
 | SDK type widening breaks static analysis | `TorchTuneConfig` alias ensures existing type checks pass |
-| KEP-285 design changes before this KEP lands | `ConfigTrainer` is a separate ABC; no dependency on `BaseTrainer` internals |
+| KEP-285 design changes before this KEP lands | `LLMTrainer` is a separate ABC; no dependency on `BaseTrainer` internals |
 | Scope creep from adding backends | Scoped to TorchTune + TRL only; other backends follow the same pattern |
 | `trainer.kubeflow.org/framework` label not a Go constant | KEP adds `FrameworkLabel` constant; existing manifests already use the label |
 
@@ -1237,7 +1237,7 @@ This proposal is scoped for 350 hours (GSoC Large) and can be implemented in pha
 - **2026-01-08**: @andreyvelich reopened issue, looking for contributors
 - **2026-02-27**: Initial KEP proposal submitted by @NarayanaSabari
 - **2026-03-28**: KEP redesigned to align with KEP-285 BaseTrainer hierarchy
-  (ConfigTrainer as subclass of BaseTrainer)
-- **2026-03-31**: KEP redesigned again based on mentor feedback — ConfigTrainer as
+  (LLMTrainer as subclass of BaseTrainer)
+- **2026-03-31**: KEP redesigned again based on mentor feedback — LLMTrainer as
   separate ABC from BaseTrainer (clean separation of concerns), with unified API
   entry point through TrainerClient.train(trainer=...)
