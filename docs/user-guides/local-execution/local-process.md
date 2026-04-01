@@ -1,654 +1,410 @@
 # Local Process Backend
 
-Execute TrainJobs using native Python processes and virtual environments for the fastest local development iteration.
+How to run TrainJobs with native Python processes and virtual environments
 
 ## Overview
 
-The Local Process Backend executes TrainJobs directly as Python subprocesses using virtual environments. This provides the fastest development experience without container overhead, making it ideal for rapid prototyping and debugging.
+The Local Process Backend allows you to execute TrainJobs directly on your local machine using native Python processes and virtual environments. This backend is ideal for:
 
-Key features:
-- **Zero setup required**: No additional software installation needed
-- **Fast startup**: Training starts in seconds, not minutes
-- **Easy debugging**: Use standard Python debugging tools
-- **Low overhead**: Minimal resource consumption
-- **Native performance**: Direct access to system resources
+- Quick prototyping and development
+- Testing training scripts without container overhead
+- Environments where Docker/Podman is not available
+- Debugging training code locally
 
-## When to Use
+The Local Process Backend creates isolated Python virtual environments for each TrainJob, automatically installs required dependencies, and manages the lifecycle of training processes in background threads with real-time log streaming.
 
-**Use Local Process Backend for:**
-- Quick prototyping and experimentation
-- Debugging training code with Python debuggers
-- Testing training logic before containerization
-- Single-node training scenarios
-- Development on resource-constrained machines
-
-**Don't use Local Process Backend for:**
-- Multi-node distributed training (not supported)
-- Testing container-specific behavior
-- Simulating production environments
-- Scenarios requiring strict isolation
+:::{note}
+Only single-node training is currently supported.
+:::
 
 ## Prerequisites
 
-The Local Process Backend requires minimal setup:
+- Python 3.9 or later
+- pip (Python package installer)
+- **Kubeflow SDK**: Install the base package:
+  ```bash
+  pip install kubeflow
+  ```
+- Sufficient disk space for virtual environments
+- Required Python packages for your training framework (e.g., PyTorch, TensorFlow)
 
-- **Python 3.9+**: Any supported Python version
-- **Kubeflow SDK**: `pip install kubeflow-trainer`
+## Basic Example
 
-That's it! No Docker, Podman, or other container runtimes needed.
-
-## Basic Configuration
-
-The Local Process Backend requires minimal configuration:
-
-```python
-from kubeflow.trainer import TrainerClient, LocalProcessBackendConfig
-
-# Create backend configuration
-backend_config = LocalProcessBackendConfig()
-
-# Initialize client
-client = TrainerClient(backend_config=backend_config)
-```
-
-There are no additional configuration parameters - the backend works out of the box.
-
-## Basic Usage
-
-### Simple Training Example
+Here's a simple example using the Local Process Backend:
 
 ```python
-from kubeflow.trainer import TrainerClient, CustomTrainer, LocalProcessBackendConfig
+from kubeflow.trainer import CustomTrainer, TrainerClient, LocalProcessBackendConfig
 
-def train_simple_model():
-    """Simple training function."""
+def train_model():
     import torch
-    import torch.nn as nn
-    import torch.optim as optim
+    import time
 
     print("Starting training...")
 
-    # Create simple model
-    model = nn.Linear(10, 1)
-    optimizer = optim.SGD(model.parameters(), lr=0.01)
-    criterion = nn.MSELoss()
+    model = torch.nn.Linear(10, 1)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
 
-    # Training loop
-    for epoch in range(10):
-        # Generate random data
-        inputs = torch.randn(32, 10)
-        targets = torch.randn(32, 1)
-
-        # Forward pass
+    for epoch in range(5):
+        loss = torch.nn.functional.mse_loss(
+            model(torch.randn(32, 10)),
+            torch.randn(32, 1)
+        )
         optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, targets)
-
-        # Backward pass
         loss.backward()
         optimizer.step()
 
-        print(f"Epoch {epoch + 1}/10, Loss: {loss.item():.4f}")
+        print(f"Epoch {epoch + 1}/5, Loss: {loss.item():.4f}")
 
     print("Training completed!")
 
-# Configure local process backend
-backend_config = LocalProcessBackendConfig()
+backend_config = LocalProcessBackendConfig(
+    cleanup_venv=True
+)
+
 client = TrainerClient(backend_config=backend_config)
-
-# Launch training
-job_id = client.train(
-    trainer=CustomTrainer(func=train_simple_model)
-)
-
-print(f"Training job: {job_id}")
-
-# Wait for completion
-job = client.wait_for_job_status(job_id)
-print(f"Job status: {job.status}")
-```
-
-(local-process-complete-training-example)=
-### Complete Training Example
-
-Here's a more complete example training a CNN on Fashion-MNIST:
-
-```python
-from kubeflow.trainer import TrainerClient, CustomTrainer, LocalProcessBackendConfig
-
-def train_fashion_mnist():
-    """Train CNN on Fashion-MNIST dataset."""
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
-    import torch.optim as optim
-    from torchvision import datasets, transforms
-    from torch.utils.data import DataLoader
-
-    print("Loading Fashion-MNIST dataset...")
-
-    # Data preparation
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5,), (0.5,))
-    ])
-
-    train_dataset = datasets.FashionMNIST(
-        root="./data",
-        train=True,
-        download=True,
-        transform=transform
-    )
-
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=64,
-        shuffle=True,
-        num_workers=2
-    )
-
-    # Define model
-    class FashionCNN(nn.Module):
-        def __init__(self):
-            super(FashionCNN, self).__init__()
-            self.conv1 = nn.Conv2d(1, 32, 3, 1)
-            self.conv2 = nn.Conv2d(32, 64, 3, 1)
-            self.dropout1 = nn.Dropout(0.25)
-            self.dropout2 = nn.Dropout(0.5)
-            self.fc1 = nn.Linear(9216, 128)
-            self.fc2 = nn.Linear(128, 10)
-
-        def forward(self, x):
-            x = F.relu(self.conv1(x))
-            x = F.relu(self.conv2(x))
-            x = F.max_pool2d(x, 2)
-            x = self.dropout1(x)
-            x = torch.flatten(x, 1)
-            x = F.relu(self.fc1(x))
-            x = self.dropout2(x)
-            return self.fc2(x)
-
-    # Training setup
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-
-    model = FashionCNN().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    criterion = nn.CrossEntropyLoss()
-
-    # Training loop
-    print("Starting training...")
-    num_epochs = 5
-
-    for epoch in range(num_epochs):
-        model.train()
-        epoch_loss = 0.0
-        correct = 0
-        total = 0
-
-        for batch_idx, (data, target) in enumerate(train_loader):
-            data, target = data.to(device), target.to(device)
-
-            optimizer.zero_grad()
-            output = model(data)
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
-
-            epoch_loss += loss.item()
-            _, predicted = torch.max(output.data, 1)
-            total += target.size(0)
-            correct += (predicted == target).sum().item()
-
-            if batch_idx % 100 == 0:
-                print(f"Epoch {epoch + 1}, Batch {batch_idx}, "
-                      f"Loss: {loss.item():.4f}")
-
-        accuracy = 100.0 * correct / total
-        avg_loss = epoch_loss / len(train_loader)
-        print(f"Epoch {epoch + 1}/{num_epochs} completed. "
-              f"Loss: {avg_loss:.4f}, Accuracy: {accuracy:.2f}%")
-
-    # Save model
-    torch.save(model.state_dict(), "fashion_mnist_model.pth")
-    print("Training completed! Model saved to fashion_mnist_model.pth")
-
-# Configure and launch
-backend_config = LocalProcessBackendConfig()
-client = TrainerClient(backend_config=backend_config)
-
-job_id = client.train(
-    trainer=CustomTrainer(func=train_fashion_mnist)
-)
-
-print(f"Training job started: {job_id}")
-
-# Stream logs
-for log in client.get_job_logs(job_id, follow=True):
-    print(log)
-
-# Wait for completion
-job = client.wait_for_job_status(job_id)
-print(f"Training completed with status: {job.status}")
-```
-
-## Virtual Environment Management
-
-The Local Process Backend automatically creates and manages virtual environments for each training job.
-
-### Automatic Virtual Environment Creation
-
-Each job gets its own isolated virtual environment:
-
-```python
-def train_with_dependencies():
-    """Training with specific package versions."""
-    import torch
-    import numpy as np
-    from sklearn.metrics import accuracy_score
-
-    print(f"PyTorch version: {torch.__version__}")
-    print(f"NumPy version: {np.__version__}")
-
-    # Training code...
-
-# Virtual environment is created automatically with these packages
-job_id = client.train(
-    trainer=CustomTrainer(
-        func=train_with_dependencies,
-        # These packages are installed in the virtual environment
-        packages_to_install=["torch>=2.0.0", "scikit-learn"],
-    )
-)
-```
-
-### Package Installation
-
-Specify packages to install in the virtual environment:
-
-```python
-from kubeflow.trainer import CustomTrainer
 
 trainer = CustomTrainer(
     func=train_model,
-    packages_to_install=[
-        "torch==2.7.1",
-        "torchvision",
-        "torchaudio",
-        "transformers>=4.30.0",
-        "datasets",
-        "accelerate",
-    ]
+    num_nodes=1,
 )
 
-job_id = client.train(trainer=trainer)
+job_name = client.train(trainer=trainer)
+print(f"TrainJob started: {job_name}")
+
+job = client.wait_for_job_status(
+    job_name,
+)
+
+print(f"Job completed with status: {job.status}")
 ```
 
-The backend will:
-1. Create a fresh virtual environment
-2. Install specified packages using pip
-3. Execute your training function in that environment
+## Configuration Options
+
+### LocalProcessBackendConfig
+
+The `LocalProcessBackendConfig` class provides configuration options for the Local Process Backend:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `cleanup_venv` | `bool` | `True` | Whether to automatically remove virtual environments after job completion. Set to `False` to preserve environments for debugging. |
+
+**Example:**
+
+```python
+from kubeflow.trainer import LocalProcessBackendConfig
+
+backend_config = LocalProcessBackendConfig(
+    cleanup_venv=False
+)
+```
+
+## Working with Runtimes
+
+The Local Process Backend has a fixed set of built-in runtimes (unlike Container Backends which load runtimes from external sources).
+
+### Supported Runtimes
+
+| Runtime | Framework | Description | Packages |
+|---------|-----------|-------------|----------|
+| `torch-distributed` | PyTorch | PyTorch training with torchrun | `torch` |
 
 ## Job Management
 
-### List Jobs
+For common job management operations (listing jobs, viewing logs, deleting jobs), see the [Job Management section](overview.md#job-management) in the overview.
+
+### Checking Job Status
+
+The Local Process Backend also supports checking detailed job status:
 
 ```python
-# List all jobs
-jobs = client.list_jobs()
-for job in jobs:
-    print(f"Job: {job.name}")
-    print(f"  Status: {job.status}")
-    print(f"  Created: {job.creation_timestamp}")
-```
-
-### View Logs
-
-```python
-# Get all logs
-logs = client.get_job_logs(job_id)
-for log in logs:
-    print(log)
-
-# Follow logs in real-time
-for log in client.get_job_logs(job_id, follow=True):
-    print(log)
-```
-
-### Check Status
-
-```python
-# Get job details
-job = client.get_job(name=job_id)
+job = client.get_job(job_name)
 print(f"Status: {job.status}")
-print(f"Steps:")
-for step in job.steps:
-    print(f"  {step.name}: {step.status}")
+print(f"Created: {job.created}")
+print(f"Completed: {job.completed}")
 ```
 
-### Wait for Completion
+## Advanced Usage
+
+### Custom Training with Dependencies
+
+You can specify additional packages to install in the training environment:
 
 ```python
-from kubeflow.trainer.constants import constants
+from kubeflow.trainer import CustomTrainer, TrainerClient, LocalProcessBackendConfig
 
-# Wait for job to complete
-job = client.wait_for_job_status(
-    job_id,
-    status={constants.TRAINJOB_COMPLETE},
-    timeout=3600  # Wait up to 1 hour
-)
+def train_with_dependencies():
+    import numpy as np
+    import pandas as pd
+    from sklearn.ensemble import RandomForestClassifier
 
-print(f"Final status: {job.status}")
-```
+    print("Training with scikit-learn...")
+    X = np.random.rand(100, 4)
+    y = np.random.randint(0, 2, 100)
 
-### Delete Jobs
+    clf = RandomForestClassifier(n_estimators=10)
+    clf.fit(X, y)
 
-```python
-# Delete specific job
-client.delete_job(job_id)
-
-# Clean up all jobs
-for job in client.list_jobs():
-    client.delete_job(job.name)
-```
-
-## GPU Support
-
-The Local Process Backend supports GPU training with CUDA:
-
-```python
-def train_with_gpu():
-    """Training with GPU acceleration."""
-    import torch
-
-    # Check GPU availability
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-        print(f"Using GPU: {torch.cuda.get_device_name(0)}")
-        print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
-    else:
-        device = torch.device("cpu")
-        print("GPU not available, using CPU")
-
-    # Create model on GPU
-    model = torch.nn.Linear(1000, 10).to(device)
-    optimizer = torch.optim.Adam(model.parameters())
-
-    # Training loop
-    for epoch in range(10):
-        inputs = torch.randn(64, 1000).to(device)
-        targets = torch.randint(0, 10, (64,)).to(device)
-
-        outputs = model(inputs)
-        loss = torch.nn.functional.cross_entropy(outputs, targets)
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        print(f"Epoch {epoch + 1}, Loss: {loss.item():.4f}")
+    print(f"Model accuracy: {clf.score(X, y):.2f}")
 
 backend_config = LocalProcessBackendConfig()
 client = TrainerClient(backend_config=backend_config)
 
-job_id = client.train(
-    trainer=CustomTrainer(
-        func=train_with_gpu,
-        packages_to_install=["torch"],
-    )
+trainer = CustomTrainer(
+    func=train_with_dependencies,
+    packages_to_install=["numpy", "pandas", "scikit-learn"],
+    pip_index_urls=["https://pypi.org/simple"]
+)
+
+job_name = client.train(trainer=trainer)
+```
+
+### Environment Variables
+
+Pass custom environment variables to your TrainJob:
+
+```python
+trainer = CustomTrainer(
+    func=train_model,
+    env={
+        "CUDA_VISIBLE_DEVICES": "0",
+        "OMP_NUM_THREADS": "4",
+        "CUSTOM_VAR": "value"
+    }
 )
 ```
 
-The backend will use GPUs if available on your system.
+### Debugging Failed Jobs
 
-## Debugging
-
-### Using Python Debugger
-
-Since jobs run as local processes, you can use standard Python debugging tools:
+When `cleanup_venv=False`, you can inspect the virtual environment after job failure:
 
 ```python
-def train_with_debugging():
-    """Training with debugging support."""
-    import torch
-    import pdb
-
-    print("Starting training...")
-
-    model = torch.nn.Linear(10, 1)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-
-    for epoch in range(5):
-        inputs = torch.randn(32, 10)
-        targets = torch.randn(32, 1)
-
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = torch.nn.functional.mse_loss(outputs, targets)
-
-        # Set breakpoint for debugging
-        if epoch == 2:
-            pdb.set_trace()
-
-        loss.backward()
-        optimizer.step()
-
-        print(f"Epoch {epoch + 1}, Loss: {loss.item():.4f}")
-
-# Run with debugging
-job_id = client.train(
-    trainer=CustomTrainer(func=train_with_debugging)
-)
-```
-
-### Using Logging
-
-Add detailed logging for troubleshooting:
-
-```python
-def train_with_logging():
-    """Training with detailed logging."""
-    import torch
-    import logging
-
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-    logger = logging.getLogger(__name__)
-
-    logger.info("Starting training...")
-
-    model = torch.nn.Linear(10, 1)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-
-    for epoch in range(5):
-        logger.debug(f"Starting epoch {epoch + 1}")
-
-        inputs = torch.randn(32, 10)
-        targets = torch.randn(32, 1)
-
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = torch.nn.functional.mse_loss(outputs, targets)
-
-        logger.info(f"Epoch {epoch + 1}, Loss: {loss.item():.4f}")
-
-        loss.backward()
-        optimizer.step()
-
-        logger.debug(f"Completed epoch {epoch + 1}")
-
-    logger.info("Training completed!")
-
-job_id = client.train(
-    trainer=CustomTrainer(func=train_with_logging)
-)
-```
-
-## Performance Considerations
-
-### Pros
-
-- **Fastest startup**: No container build or pull time
-- **Direct hardware access**: No virtualization overhead
-- **Simple debugging**: Use standard Python tools
-- **Low resource usage**: No container runtime overhead
-
-### Cons
-
-- **No isolation**: Shares system resources with other processes
-- **No multi-node**: Cannot simulate distributed training
-- **Environment differences**: May behave differently than containerized environments
-- **Package conflicts**: Virtual environment isolation only
-
-### Optimization Tips
-
-**Use for rapid iteration:**
-
-```python
-# Quick experiments with fast iteration
-for lr in [0.001, 0.01, 0.1]:
-    def train_with_lr():
-        import torch
-        model = torch.nn.Linear(10, 1)
-        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
-        # Training loop...
-
-    job_id = client.train(trainer=CustomTrainer(func=train_with_lr))
-    client.wait_for_job_status(job_id)
-    print(f"Completed training with lr={lr}")
-```
-
-**Test before containerization:**
-
-```python
-# 1. Develop with local process
-backend_config = LocalProcessBackendConfig()
+backend_config = LocalProcessBackendConfig(cleanup_venv=False)
 client = TrainerClient(backend_config=backend_config)
-job_id = client.train(trainer=CustomTrainer(func=train))
-client.wait_for_job_status(job_id)
 
-# 2. Test with container
-from kubeflow.trainer import ContainerBackendConfig
-backend_config = ContainerBackendConfig(container_runtime="docker")
-client = TrainerClient(backend_config=backend_config)
-job_id = client.train(trainer=CustomTrainer(func=train))
+trainer = CustomTrainer(func=train_model)
+job_name = client.train(trainer=trainer)
+
+try:
+    job = client.wait_for_job_status(
+        job_name,
+        status={constants.TRAINJOB_COMPLETE, constants.TRAINJOB_FAILED},
+        timeout=300
+    )
+
+    if job.status == constants.TRAINJOB_FAILED:
+        print("Job failed. Logs:")
+        for log_line in client.get_job_logs(job_name):
+            print(log_line, end='')
+
+        print(f"\nVirtual environment preserved for job: {job_name}")
+except Exception as e:
+    print(f"Error: {e}")
+finally:
+    client.delete_job(job_name)
 ```
 
-## Limitations
+## How It Works
 
-Current limitations of the Local Process Backend:
+Understanding the internal workflow helps with debugging and optimization:
 
-- **Single-node only**: Multi-node distributed training not supported
-- **No true isolation**: Uses virtual environments, not containers
-- **Limited environment simulation**: May differ from production containers
-- **No network simulation**: Cannot test multi-node networking
-- **Shared resources**: Competes with other system processes
+### 1. Job Creation
 
-For multi-node training or container-based workflows, use:
-- [Docker Backend](docker): Container-based multi-node support
-- [Podman Backend](podman): Rootless container multi-node support
+- A unique job name is generated (e.g., `a1b2c3d4e5f`)
+- A temporary directory is created: `/tmp/a1b2c3d4e5f_xyz/`
+- A Python virtual environment is set up with isolation
 
-## Examples and Resources
+### 2. Environment Setup
 
-### Complete Examples
+```bash
+python -m venv --without-pip /tmp/a1b2c3d4e5f_xyz/
+source /tmp/a1b2c3d4e5f_xyz/bin/activate
+python -m ensurepip --upgrade --default-pip
+```
 
-- **[MNIST Training](https://github.com/kubeflow/trainer/tree/master/examples/pytorch/mnist)**: Complete example with local process backend
-- **Fashion-MNIST CNN**: See the [complete example](#local-process-complete-training-example) above
+### 3. Package Dependency Resolution
 
-### API Documentation
+The backend implements intelligent package dependency management:
 
-- TrainerClient API Reference: Complete SDK documentation (coming soon)
-- LocalProcessBackendConfig API: Backend configuration reference (coming soon)
+**Package Sources:**
 
-### Related Guides
+When you use a runtime (e.g., `torch-distributed`), the backend installs packages from two sources:
 
-- [Local Execution Overview](index): Overview of all local execution backends
-- [Docker Backend](docker): Container-based development
-- [Podman Backend](podman): Rootless container development
+1. **Runtime packages**: Built-in packages defined by the runtime itself
+   - For Local Process Backend, runtimes are hardcoded in the SDK (see Supported Runtimes)
+   - Example: The `torch-distributed` runtime automatically includes `torch`
+   - Note: Unlike Container Backends which load runtimes from external sources (GitHub/YAML files), Local Process Backend uses a fixed set of runtimes
+2. **Trainer packages**: Additional packages you specify in your `CustomTrainer`
+   - Specified via the `packages_to_install` parameter
+   - Example: `packages_to_install=["pandas", "scikit-learn"]`
+
+**Dependency Resolution Rules:**
+
+When packages from both sources are combined:
+
+1. **Trainer Override**: If you specify a package in `packages_to_install` that also exists in the runtime, your version takes precedence
+2. **Case-Insensitive Matching**: Package names are normalized (PEP 503)
+3. **Duplicate Detection**: Prevents duplicate packages in trainer dependencies
+4. **Order Preservation**: Runtime packages come first, then trainer packages (except where overridden)
+
+**Example:**
+
+```python
+# Runtime packages: ["torch==1.9.0", "numpy"]
+# Trainer packages: ["torch==2.0.0", "scipy"]
+# Result: ["numpy", "torch==2.0.0", "scipy"]
+# torch==2.0.0 from trainer overrides torch==1.9.0 from runtime
+```
+
+### 4. Training Code Preparation
+
+The training function source code is extracted and written to a Python file:
+
+```python
+# Written to: /tmp/a1b2c3d4e5f_xyz/train_a1b2c3d4e5f.py
+
+def train_model():
+    import torch
+    print("Starting PyTorch training...")
+    # ... your code ...
+
+train_model()  # Auto-generated function call
+```
+
+### 5. Execution
+
+For PyTorch framework:
+
+```bash
+/tmp/a1b2c3d4e5f_xyz/bin/torchrun train_a1b2c3d4e5f.py
+```
+
+For other frameworks:
+
+```bash
+/tmp/a1b2c3d4e5f_xyz/bin/python train_a1b2c3d4e5f.py
+```
+
+### 6. Cleanup (Optional)
+
+When `cleanup_venv=True`:
+
+```bash
+rm -rf /tmp/a1b2c3d4e5f_xyz/
+```
+
+## Best Practices
+
+### Perfect For
+
+- **Local Development**: Developing and testing training code
+- **Experimentation**: Quick iteration on training algorithms
+- **CI/CD Pipelines**: Automated testing of TrainJobs
+- **Educational Use**: Learning distributed training concepts
+- **Prototyping**: Validating ideas before cluster deployment
+
+### Not Suitable For
+
+- **Production Training**: Large-scale distributed TrainJobs
+- **Multi-Node Training**: Training across multiple machines
+- **Resource Management**: Fine-grained GPU/memory allocation
+- **Long-Running Jobs**: TrainJobs that run for days/weeks
+- **High Availability**: Mission-critical training pipelines
+
+### General Best Practices
+
+1. **Use for Development**: The Local Process Backend is best suited for development and testing. For production workloads, consider using the Container Backend or Kubernetes Backend.
+2. **Clean Up Resources**: Set `cleanup_venv=True` (default) to avoid filling disk space with virtual environments.
+3. **Test Before Containerizing**: Use the Local Process Backend to quickly validate your training code before moving to containerized environments.
+4. **Monitor Resource Usage**: Since jobs run directly on your machine, monitor CPU, memory, and disk usage to avoid resource exhaustion.
+5. **Specify Dependencies Explicitly**: Use `packages_to_install` to ensure all required packages are installed in the isolated environment.
 
 ## Troubleshooting
 
 ### Common Issues
 
-**Package installation fails:**
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `ValueError: CustomTrainer must be set` | Using BuiltinTrainer | Use CustomTrainer instead |
+| `ValueError: Runtime 'name' not found` | Invalid runtime name | Use `list_runtimes()` to see available options |
+| `ValueError: No python executable found` | Missing Python | Install Python or ensure it's in PATH |
+| `No TrainJob with name 'name'` | Job doesn't exist | Check job name spelling |
 
-Check that pip can access packages:
+### Job Status Flow
 
-```python
-# Test package availability
-trainer = CustomTrainer(
-    func=train,
-    packages_to_install=["torch==2.7.1"],  # Specific version
-)
+```
+Created → Running → Complete
+    ↓       ↓
+  Failed ← Failed
 ```
 
-**Virtual environment creation fails:**
+### Virtual Environment Creation Fails
 
-Ensure Python venv module is available:
+**Problem**: Error creating virtual environment.
+
+**Solution**: Ensure you have sufficient disk space and that Python's `venv` module is installed:
 
 ```bash
-# On Ubuntu/Debian
-sudo apt-get install python3-venv
-
-# On macOS (usually included)
-python3 -m venv --help
+python -m venv --help
 ```
 
-**GPU not detected:**
+### Package Installation Errors
 
-Verify CUDA installation:
+**Problem**: Required packages fail to install in the virtual environment.
+
+**Solution**:
+
+- Check your internet connection
+- Verify that package names are correct
+- Use `packages_to_install` to explicitly specify packages
+- Ensure pip is up to date: `pip install --upgrade pip`
+
+### Jobs Not Cleaning Up
+
+**Problem**: Virtual environments remain after job completion.
+
+**Solution**: Verify that `cleanup_venv=True` in your config, or manually delete jobs:
+
+```python
+client.delete_job(job_name)
+```
+
+### Permission Errors
+
+**Problem**: Permission denied when creating virtual environments.
+
+**Solution**: Ensure you have write permissions to the temp directory. On Unix-like systems, check:
 
 ```bash
-# Check CUDA
-nvidia-smi
-
-# Verify PyTorch CUDA support
-python -c "import torch; print(torch.cuda.is_available())"
+ls -ld /tmp
 ```
 
-**Job output not visible:**
+### Debug Mode
 
-Use `follow=True` to stream logs:
+Enable debug logging for detailed execution information:
 
 ```python
-for log in client.get_job_logs(job_id, follow=True):
-    print(log)
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+backend_config = LocalProcessBackendConfig(cleanup_venv=False)
+client = TrainerClient(backend_config=backend_config)
 ```
 
-**Import errors:**
+## Limitations
 
-Ensure all imports are inside the training function:
+- **Single Machine Only**: Only runs on local machine, no distributed training across multiple nodes. The `num_nodes` parameter is ignored.
+- **CustomTrainer Only**: Does not support BuiltinTrainer configurations.
+- **No GPU Scheduling**: Cannot manage GPU allocation across multiple jobs.
+- **Process Isolation**: Jobs are isolated by virtual environment, not containers.
+- **Limited Scaling**: Not suitable for large-scale production training.
+- **System Dependencies**: Training code must be compatible with your local Python environment and operating system.
 
-```python
-# Correct
-def train():
-    import torch  # Inside function
-    # Training code...
+## Switching Between Backends
 
-# Incorrect
-import torch  # Outside function
-def train():
-    # Training code...
-```
-
-**Job hangs or doesn't complete:**
-
-Check job status and logs:
-
-```python
-job = client.get_job(name=job_id)
-print(f"Status: {job.status}")
-
-logs = client.get_job_logs(job_id)
-print("\n".join(logs))
-```
+For information about switching between Local Process, Container (Docker/Podman), and Kubernetes backends, see the [Switching Between Backends section](overview.md#switching-between-backends) in the overview.
 
 ## Next Steps
 
-- **Try multi-node training**: Move to [Docker Backend](docker) or [Podman Backend](podman)
-- **Test containerization**: Verify your code works in containers before production
-- **Deploy to Kubernetes**: Scale to production with full Kubeflow Trainer
-- **Explore examples**: Browse [example notebooks](https://github.com/kubeflow/trainer/tree/master/examples)
+- Try the [MNIST example notebook](https://github.com/kubeflow/trainer/blob/master/examples/local/local-training-mnist.ipynb) for a complete end-to-end example
+- Learn about the [Container Backend with Docker](docker) for containerized training
+- Learn about the [Container Backend with Podman](podman) for rootless containerized training
