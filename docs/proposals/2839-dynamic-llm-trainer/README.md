@@ -113,6 +113,43 @@ at two coupling points:
   are [asking exactly how config-driven trainers fit in](https://github.com/kubeflow/sdk/pull/308#discussion_r2912976804).
   This KEP provides that answer.
 
+### User Stories
+
+**"I want to do DPO alignment, but Kubeflow only supports SFT via TorchTune."**
+
+A data scientist wants to align a model using preference data (DPO). TorchTune
+doesn't support DPO, and there's no way to plug in TRL without modifying the SDK
+source code. They fall back to raw YAML or leave Kubeflow entirely.
+
+**"I want to use a newer model that TorchTune doesn't have recipes for."**
+
+TorchTune supports 4 models (Llama 3.2 1B/3B, Llama 3.3 70B, Qwen 2.5 1.5B).
+When a user tries a model outside this list, the Go validation rejects it. TRL
+works with any Hugging Face model out of the box.
+
+**"I want to switch from TorchTune to TRL without relearning the SDK."**
+
+A team that started with TorchTune wants to migrate to TRL for its active
+development and broader algorithm support. Today this requires understanding
+`BuiltinTrainer` internals. With this KEP, it's a one-line change:
+`TorchTuneTrainer(...)` → `TRLTrainer(...)`.
+
+### Why TRL as the First New Backend
+
+| | TorchTune | TRL |
+|--|-----------|-----|
+| **Status** | Maintenance mode (July 2025) | Actively maintained by Hugging Face |
+| **Algorithms** | SFT only | SFT, DPO, KTO, GRPO, PPO, RLOO |
+| **Models** | 4 hardcoded models | Any Hugging Face model |
+| **CLI** | `tune run <recipe>` | `trl sft \| dpo \| kto \| grpo` |
+| **Distributed** | torchrun | accelerate (+ torchrun compat) |
+| **PEFT** | Built-in LoRA/QLoRA/DoRA | Via `peft` library (LoRA/QLoRA) |
+| **Community** | ~12k GitHub stars | ~13k GitHub stars, 250+ contributors |
+
+TRL is the most requested alternative in
+[#2839](https://github.com/kubeflow/trainer/issues/2839) and aligns with the
+Hugging Face ecosystem that most Kubeflow users already use for models and datasets.
+
 ---
 
 ## Goals
@@ -434,6 +471,40 @@ controllers, no changes to the plugin framework itself.
 | Container images | **New** | `trl-trainer` image |
 | ClusterTrainingRuntimes | **New** | TRL-specific runtime manifests |
 
+### Refactor Scope: What This Actually Touches
+
+This KEP is designed to be **low-risk and minimal**. Here is the concrete scope:
+
+**Python SDK (kubeflow/sdk) — ~200 lines changed across 3 files:**
+
+| File | Change | Lines |
+|------|--------|-------|
+| `types/types.py` | Add `LLMTrainer` ABC (~30 lines), rename `TorchTuneConfig` class + alias (~5 lines), add `TRLTrainer` (~60 lines) | ~95 new |
+| `backends/kubernetes/utils.py` | Replace `isinstance(config, TorchTuneConfig)` with generic `config.command` / `config.to_args()` | ~20 changed |
+| `api/trainer_client.py` | Widen `trainer=` union type | ~3 changed |
+
+**Go control plane (kubeflow/trainer) — ~150 lines moved, ~100 lines new:**
+
+| File | Change | Lines |
+|------|--------|-------|
+| `torch/strategy.go` | New `FrameworkStrategy` interface | ~15 new |
+| `torch/torchtune_strategy.go` | **Moved** from `torch.go` (no logic change) | ~80 moved |
+| `torch/trl_strategy.go` | New `TRLStrategy` | ~50 new |
+| `torch/torch.go` | Replace if/else with `strategies[label]` lookup | ~10 changed |
+| `constants/constants.go` | Add `FrameworkLabel` constant | 1 new |
+
+**Key point:** The TorchTune code path is **moved, not rewritten**. The
+`TorchTuneStrategy` wraps the exact same functions (`getRecipeAndConfig`,
+`extractOverridesFromRuntime`, `validateTorchTune`) that exist today. Existing
+tests continue to pass without modification.
+
+**New infrastructure:**
+- 1 Dockerfile (~10 lines)
+- 1 ClusterTrainingRuntime manifest (~70 lines YAML)
+- Helm chart additions (~20 lines)
+
+**Total: ~400 lines of new/changed code to unlock every future LLM backend.**
+
 ---
 
 ## Design Details
@@ -602,111 +673,29 @@ class TRLTrainer(LLMTrainer):
     extra_args: Optional[dict[str, str]] = None
 
     def to_args(self, initializer=None) -> list[str]:
-        args = [self.trainer_type.value]  # subcommand: "sft", "dpo", etc.
-
-        # Model path: prefer initializer workspace, fall back to config.
-        model_path = self.model_name_or_path
-        if initializer and initializer.model:
-            model_path = "/workspace/model"
-        if model_path:
-            args.extend(["--model_name_or_path", model_path])
-
-        # Dataset: prefer initializer workspace, fall back to config.
-        dataset = self.dataset_name
-        if initializer and initializer.dataset:
-            dataset = "/workspace/dataset"
-        if dataset:
-            args.extend(["--dataset_name", dataset])
-
-        if self.learning_rate is not None:
-            args.extend(["--learning_rate", str(self.learning_rate)])
-        if self.num_train_epochs is not None:
-            args.extend(["--num_train_epochs", str(self.num_train_epochs)])
-        if self.per_device_train_batch_size is not None:
-            args.extend(["--per_device_train_batch_size",
-                         str(self.per_device_train_batch_size)])
-        if self.gradient_checkpointing:
-            args.append("--gradient_checkpointing")
-        if self.bf16:
-            args.append("--bf16")
-        if self.use_peft:
-            args.append("--use_peft")
-            if self.lora_r is not None:
-                args.extend(["--lora_r", str(self.lora_r)])
-            if self.lora_alpha is not None:
-                args.extend(["--lora_alpha", str(self.lora_alpha)])
-            if self.lora_target_modules:
-                args.extend(["--lora_target_modules", self.lora_target_modules])
-
-        # Pass-through extra args.
-        if self.extra_args:
-            for k, v in self.extra_args.items():
-                args.extend([f"--{k}", v])
-
-        return args
+        # Produces: ["sft", "--model_name_or_path", "/workspace/model", ...]
+        # Prefers initializer workspace paths over config values.
+        # Full implementation in LLD.
+        ...
 
     def validate(self) -> None:
-        if self.use_peft and self.lora_r is None:
-            raise ValueError("lora_r is required when use_peft=True")
+        # e.g., lora_r required when use_peft=True
+        ...
 ```
 
 ### Python SDK: TrainerClient Integration
 
-The `TrainerClient.train()` signature widens to accept `LLMTrainer` directly,
-alongside KEP-285's `BaseTrainer`:
-
-```python
-class TrainerClient:
-
-    def train(
-        self,
-        runtime: Optional[Union[str, "Runtime"]] = None,
-        initializer: Optional["Initializer"] = None,
-        trainer: Optional[
-            Union[
-                "BaseTrainer",             # KEP-285: function-based
-                "LLMTrainer",           # This KEP: config-driven
-                "CustomTrainer",           # Existing
-                "CustomTrainerContainer",  # Existing
-                "BuiltinTrainer",          # Existing
-            ]
-        ] = None,
-        runtime_config: Optional["RuntimeConfig"] = None,  # KEP-285
-        options: Optional[list] = None,
-    ) -> str:
-```
+`TrainerClient.train(trainer=...)` widens to accept `LLMTrainer` directly in the
+union type, alongside `BaseTrainer` (KEP-285), `CustomTrainer`, and `BuiltinTrainer`.
 
 When a `LLMTrainer` is passed:
 
-1. If `runtime` is `None`, the SDK auto-discovers a runtime by matching the
-   `trainer.kubeflow.org/framework` label against `supported_frameworks`.
-2. `validate_runtime()` ensures the runtime's framework label matches.
-3. The backend uses `config.command` and `config.to_args()` to build the TrainJob CR.
-
-The backend handler for `LLMTrainer`:
-
-```python
-# In KubernetesBackend — unified handler for LLMTrainer.
-
-def get_trainer_cr_from_llm_trainer(
-    runtime: types.Runtime,
-    trainer: LLMTrainer,
-    initializer: Optional[types.Initializer] = None,
-) -> models.TrainerV1alpha1Trainer:
-    trainer.validate()
-
-    trainer_cr = models.TrainerV1alpha1Trainer()
-    if trainer.num_nodes:
-        trainer_cr.num_nodes = trainer.num_nodes
-    if trainer.resources_per_node:
-        trainer_cr.resources_per_node = get_resources_per_node(
-            trainer.resources_per_node
-        )
-
-    trainer_cr.command = list(trainer.command)
-    trainer_cr.args = trainer.to_args(initializer)
-    return trainer_cr
-```
+1. **Runtime auto-discovery**: If `runtime` is `None`, the SDK calls
+   `list_runtimes()` and filters by `trainer.kubeflow.org/framework` matching
+   `supported_frameworks`. One match → auto-selected. Multiple → error with list.
+2. **Validation**: `validate_runtime()` ensures the runtime's framework label matches.
+3. **Generic dispatch**: The backend uses `config.command` and `config.to_args()`
+   to build the TrainJob CR — no `isinstance` checks, no framework-specific code paths.
 
 ### Python SDK: Backward Compatibility
 
@@ -802,135 +791,46 @@ environment variables (`MASTER_ADDR`, `MASTER_PORT`, `WORLD_SIZE`, `RANK`) rathe
 than the `PET_*` variants used by torchrun. The strategy injects both sets for
 maximum compatibility.
 
-```go
-// pkg/runtime/framework/plugins/torch/trl_strategy.go
+TRL uses `accelerate` for distributed training, which reads standard env vars
+(`MASTER_ADDR`, `MASTER_PORT`, `WORLD_SIZE`, `RANK`) rather than the `PET_*`
+variants. `TRLStrategy.EnforceCommand()` injects **both sets** for compatibility:
 
-type TRLStrategy struct{}
+| Env Var | Source | Purpose |
+|---------|--------|---------|
+| `PET_MASTER_ADDR` | Existing | torchrun compatibility |
+| `PET_MASTER_PORT` | Existing | torchrun compatibility |
+| `MASTER_ADDR` | **New** | accelerate/TRL |
+| `MASTER_PORT` | **New** | accelerate/TRL |
+| `WORLD_SIZE` | **New** | accelerate/TRL |
+| `RANK` | **New** | From `JOB_COMPLETION_INDEX` |
 
-func (s *TRLStrategy) EnforceCommand(
-    info *runtime.Info,
-    trainJob *trainer.TrainJob,
-    container *runtime.Container,
-) error {
-    trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
-    numNodes := ptr.Deref(
-        ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1,
-    )
-    masterAddr := fmt.Sprintf(
-        "%s-%s-0-0.%s",
-        trainJob.Name, constants.Node, trainJob.Name,
-    )
-    masterPort := fmt.Sprintf("%d", constants.ContainerTrainerPort)
-    worldSize := fmt.Sprintf("%d", numNodes*numProcPerNode)
-
-    // Inject both PET_* (torchrun compat) and standard env vars
-    // (accelerate/TRL).
-    apply.UpsertEnvVars(&container.Env,
-        *corev1ac.EnvVar().
-            WithName(constants.TorchEnvMasterAddr).
-            WithValue(masterAddr),
-        *corev1ac.EnvVar().
-            WithName(constants.TorchEnvMasterPort).
-            WithValue(masterPort),
-        *corev1ac.EnvVar().
-            WithName("MASTER_ADDR").WithValue(masterAddr),
-        *corev1ac.EnvVar().
-            WithName("MASTER_PORT").WithValue(masterPort),
-        *corev1ac.EnvVar().
-            WithName("WORLD_SIZE").WithValue(worldSize),
-        *corev1ac.EnvVar().WithName("RANK").WithValueFrom(
-            corev1ac.EnvVarSource().WithFieldRef(
-                corev1ac.ObjectFieldSelector().WithFieldPath(
-                    constants.JobCompletionIndexFieldPath,
-                ),
-            ),
-        ),
-    )
-    return nil
-}
-
-func (s *TRLStrategy) Validate(
-    runtimeInfo *runtime.Info,
-    trainJob *trainer.TrainJob,
-) (admission.Warnings, field.ErrorList) {
-    // TRL validation is minimal — config is fully constructed by the SDK.
-    return nil, nil
-}
-```
+`TRLStrategy.Validate()` is minimal — TRL config is fully constructed by the SDK,
+so Go-side validation only checks structural constraints.
 
 ### Go Control Plane: Refactored Torch Plugin Dispatch
 
-The `Torch` struct gains a `strategies` map, and `EnforceMLPolicy` dispatches by
-the `trainer.kubeflow.org/framework` label:
+The `Torch` struct gains a `strategies map[string]FrameworkStrategy` and both
+`EnforceMLPolicy` and `Validate` change from command-sniffing to a 3-line
+label lookup:
 
 ```go
-// pkg/runtime/framework/plugins/torch/torch.go (modified)
-
-type Torch struct {
-    strategies map[string]FrameworkStrategy
+// BEFORE (torch.go:149)
+if !slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
+    // torchrun path
+} else {
+    // TorchTune path
 }
 
-func New(
-    ctx context.Context,
-    c client.Client,
-    fi client.FieldIndexer,
-) (framework.Plugin, error) {
-    return &Torch{
-        strategies: map[string]FrameworkStrategy{
-            "torchtune": &TorchTuneStrategy{},
-            "trl":       &TRLStrategy{},
-        },
-    }, nil
+// AFTER
+fw := info.Labels[constants.FrameworkLabel]
+if strategy, ok := t.strategies[fw]; ok {
+    return strategy.EnforceCommand(info, trainJob, trainerContainer)
 }
+// else: default torchrun path (unchanged)
 ```
 
-The dispatch logic in `EnforceMLPolicy` changes from command-sniffing to label
-lookup:
-
-```go
-func (t *Torch) EnforceMLPolicy(
-    info *runtime.Info,
-    trainJob *trainer.TrainJob,
-) error {
-    // ... (existing common logic: numNodes, numProcPerNode, PET_NNODES,
-    //       PET_NPROC_PER_NODE, PET_NODE_RANK — unchanged) ...
-
-    // Label-based dispatch replaces command-sniffing.
-    fw := info.Labels[constants.FrameworkLabel]
-    if strategy, ok := t.strategies[fw]; ok {
-        return strategy.EnforceCommand(info, trainJob, trainerContainer)
-    }
-
-    // Default: standard torchrun path (PET_MASTER_ADDR, PET_MASTER_PORT).
-    apply.UpsertEnvVars(&trainerContainer.Env,
-        *corev1ac.EnvVar().
-            WithName(constants.TorchEnvMasterAddr).WithValue(masterAddr),
-        *corev1ac.EnvVar().
-            WithName(constants.TorchEnvMasterPort).WithValue(masterPort),
-    )
-    return nil
-}
-```
-
-The same pattern applies to `Validate`:
-
-```go
-func (t *Torch) Validate(
-    ctx context.Context,
-    runtimeInfo *runtime.Info,
-    _, newObj *trainer.TrainJob,
-) (admission.Warnings, field.ErrorList) {
-    // ... (existing common validation: numProcPerNode, reserved envs) ...
-
-    fw := runtimeInfo.Labels[constants.FrameworkLabel]
-    if strategy, ok := t.strategies[fw]; ok {
-        warnings, errs := strategy.Validate(runtimeInfo, newObj)
-        allErrs = append(allErrs, errs...)
-        return warnings, allErrs
-    }
-    return nil, allErrs
-}
-```
+New strategies are registered in the constructor — adding a future backend is
+one line: `"unsloth": &UnslothStrategy{}`.
 
 ### Go Control Plane: New Constant
 
