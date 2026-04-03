@@ -36,6 +36,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -55,61 +56,51 @@ func (m *mockAuthorizer) Authorize(_ context.Context, _, _, _ string) (bool, err
 	return true, nil
 }
 
+// findFreePort asks the OS for an available TCP port.
+// The returned port is not held open, so it may be stolen by another process
+// before the server binds — callers should retry on failure (see BeforeEach).
+func findFreePort() (int32, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, fmt.Errorf("failed to find free port: %w", err)
+	}
+	port := int32(l.Addr().(*net.TCPAddr).Port)
+	_ = l.Close()
+	return port, nil
+}
+
+// generateTestTLSConfig generates a fresh self-signed localhost certificate
+// and returns a *tls.Config that uses it.  Generating at runtime avoids
+// shipping checked-in key material and keeps the cert valid for the duration
+// of the test run.
 func generateTestTLSConfig() (*tls.Config, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("generate key: %w", err)
 	}
-
-	tmpl := x509.Certificate{
+	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
-		Subject:      pkix.Name{CommonName: "test-status-server"},
+		Subject:      pkix.Name{CommonName: "localhost"},
+		DNSNames:     []string{"localhost"},
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
 		NotBefore:    time.Now().Add(-time.Hour),
 		NotAfter:     time.Now().Add(time.Hour),
-		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
-		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &key.PublicKey, key)
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
 	if err != nil {
 		return nil, fmt.Errorf("create certificate: %w", err)
 	}
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 	keyDER, err := x509.MarshalECPrivateKey(key)
 	if err != nil {
 		return nil, fmt.Errorf("marshal key: %w", err)
 	}
-
-	cert, err := tls.X509KeyPair(
-		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER}),
-		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}),
-	)
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
-		return nil, fmt.Errorf("build TLS certificate: %w", err)
+		return nil, fmt.Errorf("key pair: %w", err)
 	}
 	return &tls.Config{Certificates: []tls.Certificate{cert}}, nil
-}
-
-// findFreePort asks the OS for an available TCP port on loopback.
-// Retries up to maxAttempts times to reduce TOCTOU flakiness.
-func findFreePort() (int32, error) {
-	const maxAttempts = 5
-
-	var lastErr error
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		l, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		port := int32(l.Addr().(*net.TCPAddr).Port)
-		if err := l.Close(); err != nil {
-			lastErr = err
-			continue
-		}
-		return port, nil
-	}
-	return 0, fmt.Errorf("failed to find free port after %d attempts: %w", maxAttempts, lastErr)
 }
 
 // postStatus is a small helper that marshals body and POSTs it to the handler
@@ -148,16 +139,32 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 		tlsConfig, err := generateTestTLSConfig()
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		port, err := findFreePort()
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-		server, err := statusserver.NewServer(
-			k8sClient,
-			&configapi.StatusServer{Port: ptr.To(port)},
-			tlsConfig,
-			&mockAuthorizer{},
+		// Retry both port selection and server construction together so that a
+		// port stolen between findFreePort and NewServer.Start causes a new
+		// attempt rather than a flaky timeout (TOCTOU mitigation).
+		const maxAttempts = 5
+		var (
+			server  *statusserver.Server
+			port    int32
+			lastErr error
 		)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		for attempt := 0; attempt < maxAttempts; attempt++ {
+			port, lastErr = findFreePort()
+			if lastErr != nil {
+				continue
+			}
+			server, lastErr = statusserver.NewServer(
+				k8sClient,
+				&configapi.StatusServer{Port: ptr.To(port)},
+				tlsConfig,
+				&mockAuthorizer{},
+			)
+			if lastErr == nil {
+				break
+			}
+		}
+		gomega.Expect(lastErr).NotTo(gomega.HaveOccurred(),
+			"failed to create status server after %d attempts", maxAttempts)
 
 		var serverCtx context.Context
 		serverCtx, serverCancel = context.WithCancel(ctx)
@@ -235,6 +242,120 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 		}, util.Timeout, util.Interval).Should(gomega.Succeed())
 	})
 
+	ginkgo.It("Should overwrite existing status, not merge, when posting a new update", func() {
+		const jobName = "overwrite-trainjob"
+
+		ginkgo.By("Creating TrainingRuntime and TrainJob")
+		trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, jobName).Obj()
+		gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).To(gomega.Succeed())
+
+		trainJob := testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+			RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), jobName).
+			Obj()
+		gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
+
+		ginkgo.By("POSTing initial status with progress 30%")
+		resp := postStatus(httpClient, serverAddr, ns.Name, jobName, trainer.UpdateTrainJobStatusRequest{
+			TrainerStatus: &trainer.TrainerStatus{
+				ProgressPercentage: ptr.To(int32(30)),
+				LastUpdatedTime:    metav1.Now(),
+			},
+		})
+		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
+		_ = resp.Body.Close()
+
+		ginkgo.By("Waiting for initial status to be persisted")
+		gomega.Eventually(func(g gomega.Gomega) {
+			updated := &trainer.TrainJob{}
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      jobName,
+				Namespace: ns.Name,
+			}, updated)).To(gomega.Succeed())
+			g.Expect(updated.Status.TrainerStatus).NotTo(gomega.BeNil())
+			g.Expect(updated.Status.TrainerStatus.ProgressPercentage).NotTo(gomega.BeNil())
+			g.Expect(*updated.Status.TrainerStatus.ProgressPercentage).To(gomega.Equal(int32(30)))
+		}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+		// Post a second update that deliberately omits ProgressPercentage.
+		// If the server merges instead of replacing, the old value (30) would
+		// survive — this verifies it does not.
+		ginkgo.By("POSTing a second update that omits ProgressPercentage")
+		resp = postStatus(httpClient, serverAddr, ns.Name, jobName, trainer.UpdateTrainJobStatusRequest{
+			TrainerStatus: &trainer.TrainerStatus{
+				LastUpdatedTime: metav1.Now(),
+				// ProgressPercentage intentionally absent
+			},
+		})
+		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
+		_ = resp.Body.Close()
+
+		ginkgo.By("Verifying ProgressPercentage was removed (status replaced, not merged)")
+		gomega.Eventually(func(g gomega.Gomega) {
+			updated := &trainer.TrainJob{}
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      jobName,
+				Namespace: ns.Name,
+			}, updated)).To(gomega.Succeed())
+			g.Expect(updated.Status.TrainerStatus).NotTo(gomega.BeNil())
+			g.Expect(updated.Status.TrainerStatus.ProgressPercentage).To(gomega.BeNil(),
+				"ProgressPercentage should be removed when absent from the new update")
+		}, util.Timeout, util.Interval).Should(gomega.Succeed())
+	})
+
+	ginkgo.It("Should accept an empty update request but not overwrite existing status", func() {
+		const jobName = "empty-update-trainjob"
+
+		ginkgo.By("Creating TrainingRuntime and TrainJob")
+		trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, jobName).Obj()
+		gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).To(gomega.Succeed())
+
+		trainJob := testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+			RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), jobName).
+			Obj()
+		gomega.Expect(k8sClient.Create(ctx, trainJob)).To(gomega.Succeed())
+
+		ginkgo.By("POSTing initial status with progress 40%")
+		resp := postStatus(httpClient, serverAddr, ns.Name, jobName, trainer.UpdateTrainJobStatusRequest{
+			TrainerStatus: &trainer.TrainerStatus{
+				ProgressPercentage: ptr.To(int32(40)),
+				LastUpdatedTime:    metav1.Now(),
+			},
+		})
+		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
+		_ = resp.Body.Close()
+
+		ginkgo.By("Waiting for initial status to be persisted")
+		gomega.Eventually(func(g gomega.Gomega) {
+			updated := &trainer.TrainJob{}
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      jobName,
+				Namespace: ns.Name,
+			}, updated)).To(gomega.Succeed())
+			g.Expect(updated.Status.TrainerStatus).NotTo(gomega.BeNil())
+			g.Expect(updated.Status.TrainerStatus.ProgressPercentage).NotTo(gomega.BeNil())
+			g.Expect(*updated.Status.TrainerStatus.ProgressPercentage).To(gomega.Equal(int32(40)))
+		}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+		ginkgo.By("POSTing an empty update request")
+		resp = postStatus(httpClient, serverAddr, ns.Name, jobName, trainer.UpdateTrainJobStatusRequest{})
+		defer func() { _ = resp.Body.Close() }()
+		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK))
+
+		ginkgo.By("Verifying the existing status was not removed")
+		// Use Consistently to verify status remains unchanged over a short period
+		gomega.Consistently(func(g gomega.Gomega) {
+			updated := &trainer.TrainJob{}
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      jobName,
+				Namespace: ns.Name,
+			}, updated)).To(gomega.Succeed())
+			g.Expect(updated.Status.TrainerStatus).NotTo(gomega.BeNil())
+			g.Expect(updated.Status.TrainerStatus.ProgressPercentage).NotTo(gomega.BeNil())
+			g.Expect(*updated.Status.TrainerStatus.ProgressPercentage).To(gomega.Equal(int32(40)),
+				"empty update should not remove existing status")
+		}, 2*time.Second, 500*time.Millisecond).Should(gomega.Succeed())
+	})
+
 	ginkgo.It("Should reject a request with progressPercentage > 100 with a useful error message", func() {
 		const jobName = "invalid-progress-trainjob"
 
@@ -256,17 +377,42 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 		})
 		defer func() { _ = resp.Body.Close() }()
 
-		ginkgo.By("Checking the response is 422 and the message mentions progressPercentage")
+		// Verify the response body carries a well-formed Status object with all
+		// expected fields populated.
+		ginkgo.By("Checking the response is 422 with a correctly populated Status object")
 		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusUnprocessableEntity))
-		var status metav1.Status
-		gomega.Expect(json.NewDecoder(resp.Body).Decode(&status)).To(gomega.Succeed())
-		gomega.Expect(status.Message).To(gomega.ContainSubstring("progressPercentage"),
+		var apiStatus metav1.Status
+		gomega.Expect(json.NewDecoder(resp.Body).Decode(&apiStatus)).To(gomega.Succeed())
+		gomega.Expect(apiStatus.Code).To(gomega.Equal(int32(http.StatusUnprocessableEntity)),
+			"Status.Code should match the HTTP status")
+		gomega.Expect(apiStatus.Reason).To(gomega.Equal(metav1.StatusReasonInvalid),
+			"Status.Reason should be Invalid")
+		// Message should name the field, the submitted value, and the maximum.
+		gomega.Expect(apiStatus.Message).To(gomega.ContainSubstring("progressPercentage"),
 			"error message should identify the invalid field")
+		gomega.Expect(apiStatus.Message).To(gomega.ContainSubstring("150"),
+			"error message should mention the submitted value")
+		gomega.Expect(apiStatus.Message).To(gomega.ContainSubstring("100"),
+			"error message should mention the maximum allowed value")
+
+		// Verify the TrainJob status was not mutated by the rejected request.
+		ginkgo.By("Verifying the TrainJob status was not updated after the rejected request")
+		gomega.Consistently(func(g gomega.Gomega) {
+			updated := &trainer.TrainJob{}
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      jobName,
+				Namespace: ns.Name,
+			}, updated)).To(gomega.Succeed())
+			g.Expect(updated.Status.TrainerStatus).To(gomega.BeNil(),
+				"an invalid request must not mutate the TrainJob status")
+		}, 2*time.Second, 500*time.Millisecond).Should(gomega.Succeed())
 	})
 
 	ginkgo.It("Should reject an update to a non-existing TrainJob with a useful error message", func() {
+		const jobName = "does-not-exist"
+
 		ginkgo.By("POSTing a status update for a non-existing TrainJob")
-		resp := postStatus(httpClient, serverAddr, ns.Name, "does-not-exist",
+		resp := postStatus(httpClient, serverAddr, ns.Name, jobName,
 			trainer.UpdateTrainJobStatusRequest{
 				TrainerStatus: &trainer.TrainerStatus{
 					ProgressPercentage: ptr.To(int32(50)),
@@ -278,8 +424,19 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 
 		ginkgo.By("Checking the response is 404 with a train job not found message")
 		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusNotFound))
-		var status metav1.Status
-		gomega.Expect(json.NewDecoder(resp.Body).Decode(&status)).To(gomega.Succeed())
-		gomega.Expect(status.Message).To(gomega.Equal("Train job not found"))
+		var apiStatus metav1.Status
+		gomega.Expect(json.NewDecoder(resp.Body).Decode(&apiStatus)).To(gomega.Succeed())
+		gomega.Expect(apiStatus.Message).To(gomega.Equal("Train job not found"))
+
+		// Confirm the TrainJob truly does not exist — the rejected request must
+		// not have created it as a side-effect.
+		ginkgo.By("Verifying the TrainJob does not exist in the cluster")
+		notFound := &trainer.TrainJob{}
+		err := k8sClient.Get(ctx, types.NamespacedName{
+			Name:      jobName,
+			Namespace: ns.Name,
+		}, notFound)
+		gomega.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue(),
+			"the TrainJob should not exist; a rejected request must not create it")
 	})
 })
