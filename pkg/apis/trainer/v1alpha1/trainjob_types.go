@@ -62,6 +62,8 @@ const (
 
 	// TrainJobFailed means that the actual jobs have failed its execution.
 	TrainJobFailed string = "Failed"
+	// TrainJobRuntimeStatus is a non-terminal condition that surfaces runtime reconciliation errors.
+	TrainJobRuntimeStatus string = "RuntimeStatus"
 )
 
 const (
