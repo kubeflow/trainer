@@ -301,6 +301,79 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					g.Expect(k8sClient.Update(ctx, trainJob)).Should(testingutil.BeInvalidError())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
+			ginkgo.It("Should propagate terminationGracePeriodSeconds from RuntimePatches to JobSet pods", func() {
+				ginkgo.By("Creating a TrainingRuntime and TrainJob with terminationGracePeriodSeconds patch")
+				gracePeriodRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha-grace").
+					RuntimeSpec(
+						testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha-grace").Spec).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									WithNumNodes(1).
+									Obj(),
+							).
+							Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+							Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+							Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+							Obj()).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, gracePeriodRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(gracePeriodRuntime), gracePeriodRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				gracePeriod := int64(300)
+				graceJob := testingutil.MakeTrainJobWrapper(ns.Name, "grace-period-job").
+					Suspend(true).
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha-grace").
+					RuntimePatches([]trainer.RuntimePatch{{
+						Manager: "test.io/manager",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														TerminationGracePeriodSeconds: &gracePeriod,
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					}}).
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Obj()).
+					Obj()
+				graceJobKey := client.ObjectKeyFromObject(graceJob)
+				gomega.Expect(k8sClient.Create(ctx, graceJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking that JobSet node pods have terminationGracePeriodSeconds set to 300")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, graceJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(jobSet).Should(gomega.BeComparableTo(
+						testingutil.MakeJobSetWrapper(ns.Name, graceJobKey.Name).
+							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), graceJobKey.Name, string(graceJob.UID)).
+							Suspend(true).
+							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+							Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+							NumNodes(1).
+							Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+							Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							TerminationGracePeriodSeconds(constants.Node, gracePeriod).
+							Obj(),
+						util.IgnoreObjectMetadata))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
 		})
 
 		ginkgo.Context("Integration tests for the Torch Runtime", func() {
