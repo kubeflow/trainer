@@ -150,6 +150,14 @@ func main() {
 		setupLog.Error(err, "Could not initialize runtimes")
 		os.Exit(1)
 	}
+
+	if features.Enabled(features.TrainJobStatus) {
+		if err := statusserver.RegisterProbes(mgr, cfg.StatusServer); err != nil {
+			setupLog.Error(err, "unable to register status server probes")
+			os.Exit(1)
+		}
+	}
+
 	// Set up controllers and other components using goroutines to start the manager quickly.
 	go setupManagerComponents(mgr, runtimes, &cfg, certsReady, enableHTTP2)
 
@@ -173,7 +181,6 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 		setupLog.Error(err, "Could not create webhook", "webhook", failedWebhook)
 		os.Exit(1)
 	}
-
 	if features.Enabled(features.TrainJobStatus) {
 		if err := statusserver.SetupServer(mgr, cfg.StatusServer, enableHTTP2); err != nil {
 			setupLog.Error(err, "Could not create runtime status server")
