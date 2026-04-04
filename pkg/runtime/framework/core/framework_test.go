@@ -904,13 +904,16 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 															WithItems(
 																corev1ac.KeyToPath().
 																	WithKey(corev1.SSHAuthPrivateKey).
-																	WithPath(constants.MPISSHPrivateKeyFile),
+																	WithPath(constants.MPISSHPrivateKeyFile).
+																	WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 																corev1ac.KeyToPath().
 																	WithKey(constants.MPISSHPublicKey).
-																	WithPath(constants.MPISSHPublicKeyFile),
+																	WithPath(constants.MPISSHPublicKeyFile).
+																	WithMode(constants.MPISSHSecretSharedSSHFileMode),
 																corev1ac.KeyToPath().
 																	WithKey(constants.MPISSHPublicKey).
-																	WithPath(constants.MPISSHAuthorizedKeys),
+																	WithPath(constants.MPISSHAuthorizedKeys).
+																	WithMode(constants.MPISSHSecretSharedSSHFileMode),
 															),
 														),
 													corev1ac.Volume().
@@ -978,13 +981,16 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 															WithItems(
 																corev1ac.KeyToPath().
 																	WithKey(corev1.SSHAuthPrivateKey).
-																	WithPath(constants.MPISSHPrivateKeyFile),
+																	WithPath(constants.MPISSHPrivateKeyFile).
+																	WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 																corev1ac.KeyToPath().
 																	WithKey(constants.MPISSHPublicKey).
-																	WithPath(constants.MPISSHPublicKeyFile),
+																	WithPath(constants.MPISSHPublicKeyFile).
+																	WithMode(constants.MPISSHSecretSharedSSHFileMode),
 																corev1ac.KeyToPath().
 																	WithKey(constants.MPISSHPublicKey).
-																	WithPath(constants.MPISSHAuthorizedKeys),
+																	WithPath(constants.MPISSHAuthorizedKeys).
+																	WithMode(constants.MPISSHSecretSharedSSHFileMode),
 															),
 														),
 												),
@@ -1088,13 +1094,16 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -1145,13 +1154,16 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 							},
@@ -1211,14 +1223,17 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										{
 											Key:  corev1.SSHAuthPrivateKey,
 											Path: constants.MPISSHPrivateKeyFile,
+											Mode: ptr.To(constants.MPISSHSecretPrivateKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHPublicKeyFile,
+											Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHAuthorizedKeys,
+											Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 										},
 									},
 								},
@@ -1252,14 +1267,17 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										{
 											Key:  corev1.SSHAuthPrivateKey,
 											Path: constants.MPISSHPrivateKeyFile,
+											Mode: ptr.To(constants.MPISSHSecretPrivateKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHPublicKeyFile,
+											Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHAuthorizedKeys,
+											Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 										},
 									},
 								},
