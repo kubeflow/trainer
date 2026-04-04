@@ -26,9 +26,9 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -44,6 +44,8 @@ import (
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/apply"
+	applyconfig "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
@@ -107,18 +109,15 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log.V(2).Info("Reconciling TrainJob")
 
 	var err error
-	// Keep track of the origin TrainJob status
-	prevTrainJob := trainJob.DeepCopy()
-
-	// Let's clear the failed condition that could have been set previously.
-	// An external change to the TrainJob spec may transition it out of the Failed state.
-	removeFailedCondition(&trainJob)
+	conditions := currentConditions(&trainJob)
 
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := r.runtimes[runtimeRefGK]
 	if !ok {
 		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
-		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
+		upsertCondition(&trainJob, &conditions, trainer.TrainJobFailed, metav1.ConditionTrue,
+			trainer.TrainJobRuntimeNotSupportedReason, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK),
+		)
 	} else if !trainjob.IsTrainJobFinished(&trainJob) {
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
 		if err != nil {
@@ -134,23 +133,25 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
-	setSuspendedCondition(&trainJob)
+	suspendedCondition(&trainJob, &conditions)
 
-	if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
+	deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob, &conditions)
+	if deadlineErr != nil {
+		err = errors.Join(err, deadlineErr)
+	}
+
+	statusApply, statusErr := trainJobStatus(ctx, runtime, &trainJob, conditions)
+	if statusErr != nil {
 		err = errors.Join(err, statusErr)
 	}
 
-	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
-		if !equality.Semantic.DeepEqual(&trainJob.Status, &prevTrainJob.Status) {
-			return deadlineResult, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
-		}
-		return deadlineResult, errors.Join(err, deadlineErr)
+	trainJobApply := applyconfig.TrainJob(trainJob.Name, trainJob.Namespace).WithStatus(statusApply)
+	if applyErr := r.client.Status().Apply(ctx, trainJobApply, client.ForceOwnership, client.FieldOwner("trainjob_controller")); applyErr != nil {
+		err = errors.Join(err, applyErr)
 	}
 
-	if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
-		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
-		// for sub-resources. See: https://github.com/kubernetes-sigs/controller-runtime/issues/3183
-		return ctrl.Result{}, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
+	if deadlineResult.RequeueAfter > 0 {
+		return deadlineResult, err
 	}
 	return ctrl.Result{}, err
 }
@@ -168,7 +169,7 @@ func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobru
 	return nil
 }
 
-func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob) (ctrl.Result, error) {
+func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *trainer.TrainJob, conditions *[]metav1ac.ConditionApplyConfiguration) (ctrl.Result, error) {
 	if trainJob.Spec.ActiveDeadlineSeconds == 0 || trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false) {
 		return ctrl.Result{}, nil
 	}
@@ -187,7 +188,8 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 			"activeDeadlineSeconds", trainJob.Spec.ActiveDeadlineSeconds,
 			"startTime", startTime,
 			"deadline", deadline)
-		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
+		upsertCondition(trainJob, conditions, trainer.TrainJobFailed, metav1.ConditionTrue,
+			trainer.TrainJobDeadlineExceededReason, constants.TrainJobDeadlineExceededMessage)
 		jobSet := &jobsetv1alpha2.JobSet{
 			ObjectMeta: metav1.ObjectMeta{Name: trainJob.Name, Namespace: trainJob.Namespace},
 		}
@@ -235,64 +237,79 @@ func (r *TrainJobReconciler) notifyWatchers(oldJob, newJob *trainer.TrainJob) {
 	}
 }
 
-func setSuspendedCondition(trainJob *trainer.TrainJob) {
-	var newCond metav1.Condition
+// suspendedCondition appends the Suspended condition apply configuration if the
+// TrainJob has been suspended at any point.
+func suspendedCondition(trainJob *trainer.TrainJob, conditions *[]metav1ac.ConditionApplyConfiguration) {
 	switch {
 	case ptr.Deref(trainJob.Spec.Suspend, false):
-		newCond = metav1.Condition{
-			Type:    trainer.TrainJobSuspended,
-			Status:  metav1.ConditionTrue,
-			Message: constants.TrainJobSuspendedMessage,
-			Reason:  trainer.TrainJobSuspendedReason,
-		}
+		upsertCondition(trainJob, conditions, trainer.TrainJobSuspended, metav1.ConditionTrue,
+			trainer.TrainJobSuspendedReason, constants.TrainJobSuspendedMessage)
 	case meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobSuspended):
-		newCond = metav1.Condition{
-			Type:    trainer.TrainJobSuspended,
-			Status:  metav1.ConditionFalse,
-			Message: constants.TrainJobResumedMessage,
-			Reason:  trainer.TrainJobResumedReason,
-		}
+		upsertCondition(trainJob, conditions, trainer.TrainJobSuspended, metav1.ConditionFalse,
+			trainer.TrainJobResumedReason, constants.TrainJobResumedMessage)
 	default:
-		return
+		if existing := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobSuspended); existing != nil {
+			upsertCondition(trainJob, conditions, trainer.TrainJobSuspended, existing.Status,
+				existing.Reason, existing.Message)
+		}
 	}
-	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
 }
 
-func setFailedCondition(trainJob *trainer.TrainJob, message, reason string) {
-	newCond := metav1.Condition{
-		Type:    trainer.TrainJobFailed,
-		Status:  metav1.ConditionTrue,
-		Message: message,
-		Reason:  reason,
+// currentConditions initializes the conditions slice with existing conditions
+func currentConditions(trainJob *trainer.TrainJob) []metav1ac.ConditionApplyConfiguration {
+	var conditions []metav1ac.ConditionApplyConfiguration
+	for _, c := range trainJob.Status.Conditions {
+		// This preserves terminal conditions like Complete across reconciles where the runtime
+		// plugin may short-circuit (e.g., JobSet deleted after completion).
+		if c.Type == trainer.TrainJobSuspended {
+			continue
+		}
+		if c.Type == trainer.TrainJobFailed && c.Reason != trainer.TrainJobDeadlineExceededReason {
+			continue
+		}
+		conditions = append(conditions, *metav1ac.Condition().
+			WithType(c.Type).
+			WithStatus(c.Status).
+			WithReason(c.Reason).
+			WithMessage(c.Message).
+			WithLastTransitionTime(c.LastTransitionTime))
 	}
-	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
+	return conditions
 }
 
-func removeFailedCondition(trainJob *trainer.TrainJob) {
-	cond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
-	if cond != nil && cond.Reason == trainer.TrainJobDeadlineExceededReason {
-		return
+// upsertCondition adds or replaces a condition in the conditions slice, preserving
+// LastTransitionTime from the existing TrainJob status when the status has not changed.
+func upsertCondition(trainJob *trainer.TrainJob, conditions *[]metav1ac.ConditionApplyConfiguration, condType string, status metav1.ConditionStatus, reason, message string) {
+	ac := metav1ac.Condition().
+		WithType(condType).
+		WithStatus(status).
+		WithReason(reason).
+		WithMessage(message)
+	existing := meta.FindStatusCondition(trainJob.Status.Conditions, condType)
+	if existing != nil && existing.Status == status {
+		ac.WithLastTransitionTime(existing.LastTransitionTime)
+	} else {
+		ac.WithLastTransitionTime(metav1.Now())
 	}
-	meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobFailed)
+	apply.UpsertConditions(conditions, *ac)
 }
 
-func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
-	deadlineCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
-	if deadlineCond != nil && deadlineCond.Reason != trainer.TrainJobDeadlineExceededReason {
-		deadlineCond = nil
+// trainJobStatus builds the complete status apply configuration by merging the runtime status
+// with the conditions collected during reconciliation.
+func trainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob, conditions []metav1ac.ConditionApplyConfiguration) (*applyconfig.TrainJobStatusApplyConfiguration, error) {
+	var statusApply *applyconfig.TrainJobStatusApplyConfiguration
+	var err error
+	if runtime != nil {
+		statusApply, err = runtime.TrainJobStatus(ctx, trainJob)
+	}
+	if statusApply == nil {
+		statusApply = applyconfig.TrainJobStatus()
 	}
 
-	status, err := runtime.TrainJobStatus(ctx, trainJob)
-	if err != nil {
-		return err
-	}
-	if status != nil {
-		trainJob.Status = *status
-	}
-	if deadlineCond != nil {
-		meta.SetStatusCondition(&trainJob.Status.Conditions, *deadlineCond)
-	}
-	return nil
+	// Merge conditions into the runtime status, overriding runtime conditions of the same type.
+	apply.UpsertConditions(&statusApply.Conditions, conditions...)
+
+	return statusApply, err
 }
 
 func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {

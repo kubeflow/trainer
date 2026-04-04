@@ -29,9 +29,10 @@ import (
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	applyconfig "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
-	trainingruntime "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
+	"github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
 
 var (
@@ -74,7 +75,7 @@ func (r *ClusterTrainingRuntime) RuntimeInfo(
 	return r.TrainingRuntime.RuntimeInfo(trainJob, runtimeTemplateSpec, mlPolicy, podGroupPolicy)
 }
 
-func (r *ClusterTrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
+func (r *ClusterTrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *trainer.TrainJob) (*applyconfig.TrainJobStatusApplyConfiguration, error) {
 	return r.TrainingRuntime.TrainJobStatus(ctx, trainJob)
 }
 
