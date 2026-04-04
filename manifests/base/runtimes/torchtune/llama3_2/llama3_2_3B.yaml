@@ -66,6 +66,9 @@ spec:
                 trainer.kubeflow.org/trainjob-ancestor-step: trainer
             spec:
               template:
+                metadata:
+                  labels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
                 spec:
                   containers:
                     - name: node
