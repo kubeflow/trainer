@@ -57,12 +57,24 @@ func TestFlux(t *testing.T) {
 	curveSecretName := "test-job-flux-curve"
 
 	cases := map[string]struct {
+<<<<<<< HEAD
 		info              *runtime.Info
 		trainJob          *trainer.TrainJob
 		wantInfo          *runtime.Info
 		wantObjs          []apiruntime.Object
 		wantMLPolicyError error // kept for MPI parity; Flux currently has no EnforceMLPolicy error paths
 		wantBuildError    error // kept for MPI parity; Flux currently has no Build error paths
+=======
+		info               *runtime.Info
+		trainJob           *trainer.TrainJob
+		wantObjs           []apiruntime.Object
+		wantInitContainers []string
+		wantCommand        []string
+		wantTTY            bool
+		wantInfo           *runtime.Info
+		wantMLPolicyError  error
+		wantBuildError     error
+>>>>>>> 5c105845 (test(flux): assert info state mutations and build errors in TestFlux)
 	}{
 		"no action when flux policy is nil": {
 			info: &runtime.Info{
@@ -72,8 +84,32 @@ func TestFlux(t *testing.T) {
 			wantInfo: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{},
 			},
+<<<<<<< HEAD
+=======
+			wantMLPolicyError: nil,
+			wantBuildError:    nil,
+>>>>>>> 5c105845 (test(flux): assert info state mutations and build errors in TestFlux)
 		},
 		"flux mutations are applied correctly": {
+
+			wantInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{
+							NumProcPerNode: &procs,
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+						},
+					},
+				},
+			},
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: &trainer.MLPolicySource{
@@ -189,9 +225,24 @@ func TestFlux(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			cli := utiltesting.NewClientBuilder().Build()
+<<<<<<< HEAD
 			p, err := New(ctx, cli, nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to initialize Flux plugin: %v", err)
+=======
+			p, _ := New(ctx, cli, nil, nil)
+
+			err := p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(tc.info, tc.trainJob)
+			if diff := gocmp.Diff(tc.wantMLPolicyError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from EnforceMLPolicy (-want, +got): %s", diff)
+			}
+			if diff := gocmp.Diff(tc.wantInfo, tc.info,
+				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+				cmpopts.SortMaps(func(a, b int) bool { return a < b }),
+				utiltesting.PodSetEndpointsCmpOpts,
+			); len(diff) != 0 {
+				t.Errorf("Unexpected info from EnforceMLPolicy (-want, +got): %s", diff)
+>>>>>>> 5c105845 (test(flux): assert info state mutations and build errors in TestFlux)
 			}
 
 			err = p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(tc.info, tc.trainJob)
@@ -206,6 +257,7 @@ func TestFlux(t *testing.T) {
 				}
 			}
 
+<<<<<<< HEAD
 			var objs []apiruntime.ApplyConfiguration
 			objs, err = p.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
 			if diff := gocmp.Diff(tc.wantBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
@@ -218,6 +270,11 @@ func TestFlux(t *testing.T) {
 			typedObjs, err = utiltesting.ToObject(cli.Scheme(), objs...)
 			if err != nil {
 				t.Fatalf("Failed to convert objects: %v", err)
+=======
+			objs, err := p.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
+			if diff := gocmp.Diff(tc.wantBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
+>>>>>>> 5c105845 (test(flux): assert info state mutations and build errors in TestFlux)
 			}
 			if diff := gocmp.Diff(tc.wantObjs, typedObjs, objCmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
