@@ -111,6 +111,8 @@ func TestFlux(t *testing.T) {
 					},
 				},
 			},
+			wantMLPolicyError: nil,
+			wantBuildError:    nil,
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				UID("test-uid").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(2).Obj()).
