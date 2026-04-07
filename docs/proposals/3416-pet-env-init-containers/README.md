@@ -1,8 +1,8 @@
-# KEP-3416: Inject Torch Distributed PET_* Envs into Trainer Init Containers
+# KEP-3416: Inject Torch Distributed `PET_*` Envs into Trainer Init Containers
 
 ## Summary
 
-Torch `EnforceMLPolicy` injects PET_* envs only into trainer main container today. This KEP proposes to inject same PET_* envs into trainer init containers as well.
+Torch `EnforceMLPolicy` injects `PET_*` envs only into trainer main container today. This KEP proposes to inject same `PET_*` envs into trainer init containers as well.
 
 ## Motivation
 
@@ -16,7 +16,7 @@ Current code facts:
 
 ### Goals
 
-- Inject PET_* envs to trainer main container and all trainer init containers.
+- Inject `PET_*` envs to trainer main container and all trainer init containers.
 - Keep one deterministic env source for both container types.
 - Keep scheduler behavior unchanged.
 
@@ -28,7 +28,7 @@ Current code facts:
 
 ## Proposal
 
-Apply PET_* env set to all containers in trainer `PodSet` (`AncestorTrainer`) with same values.
+Apply `PET_*` env set to all containers in trainer `PodSet` (`AncestorTrainer`) with same values.
 
 ## Design Details
 
@@ -38,7 +38,7 @@ Add helper for init-container lookup by podset ancestor and container name, or g
 
 ### Torch plugin changes
 
-In `EnforceMLPolicy`, after PET_* values are computed:
+In `EnforceMLPolicy`, after `PET_*` values are computed:
 
 - Keep existing injection to trainer main container.
 - Add injection to every trainer init container.
@@ -66,7 +66,7 @@ Backward compatible. Jobs without init containers are unchanged.
 ### Unit Tests
 
 - Add torch plugin unit test with trainer `PodSet` containing init containers.
-- Verify PET_* env injection for main and init containers.
+- Verify `PET_*` env injection for main and init containers.
 - Add or extend JobSet Build test to verify init container sync in final JobSet spec.
 
 ## Implementation History
