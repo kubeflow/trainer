@@ -698,6 +698,21 @@ test_data_create_job = [
         ),
     ),
     (
+        "valid flow with empty queue name",
+        {
+            "name": TEST_NAME,
+            "namespace": TEST_NAME,
+            "base_image": TEST_IMAGE,
+            "num_workers": 1,
+            "queue_name": "",
+        },
+        SUCCESS,
+        create_job(
+            num_workers=1,
+            labels=None,
+        ),
+    ),
+    (
         "valid flow with non-existent queue",
         {
             "name": TEST_NAME,
@@ -709,7 +724,7 @@ test_data_create_job = [
         SUCCESS,
         create_job(
             num_workers=1,
-            labels=None,
+            labels={constants.LOCAL_QUEUE_LABEL: "non-existent-queue"},
         ),
     ),
     (
