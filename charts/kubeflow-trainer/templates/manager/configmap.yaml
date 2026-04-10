@@ -60,8 +60,8 @@ data:
     # Certificate management configuration
     certManagement:
       enable: {{ .Values.manager.config.certManagement.enable }}
-      webhookServiceName: {{ if .Values.manager.config.certManagement.webhookServiceName }}{{ .Values.manager.config.certManagement.webhookServiceName }}{{ else }}{{ include "trainer.webhook.service.name" . }}{{ end }}
-      webhookSecretName: {{ if .Values.manager.config.certManagement.webhookSecretName }}{{ .Values.manager.config.certManagement.webhookSecretName }}{{ else }}{{ include "trainer.webhook.secret.name" . }}{{ end }}
+      serviceName: {{ if .Values.manager.config.certManagement.serviceName }}{{ .Values.manager.config.certManagement.serviceName }}{{ else }}{{ include "trainer.webhook.service.name" . }}{{ end }}
+      secretName: {{ if .Values.manager.config.certManagement.secretName }}{{ .Values.manager.config.certManagement.secretName }}{{ else }}{{ include "trainer.webhook.secret.name" . }}{{ end }}
 
     statusServer:
       port: {{ .Values.manager.config.statusServer.port }}
