@@ -431,12 +431,14 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 		// Confirm the TrainJob truly does not exist — the rejected request must
 		// not have created it as a side-effect.
 		ginkgo.By("Verifying the TrainJob does not exist in the cluster")
-		notFound := &trainer.TrainJob{}
-		err := k8sClient.Get(ctx, types.NamespacedName{
-			Name:      jobName,
-			Namespace: ns.Name,
-		}, notFound)
-		gomega.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue(),
-			"the TrainJob should not exist; a rejected request must not create it")
+		gomega.Consistently(func(g gomega.Gomega) {
+			notFound := &trainer.TrainJob{}
+			err := k8sClient.Get(ctx, types.NamespacedName{
+				Name:      jobName,
+				Namespace: ns.Name,
+			}, notFound)
+			g.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue(),
+				"the TrainJob should not exist; a rejected request must not create it")
+		}, 2*time.Second, 500*time.Millisecond).Should(gomega.Succeed())
 	})
 })
