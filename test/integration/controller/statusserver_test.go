@@ -438,7 +438,7 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 				Namespace: ns.Name,
 			}, notFound)
 			g.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue(),
-				"the TrainJob should not exist; a rejected request must not create it")
+				"the TrainJob should not exist; a rejected request must not create")
 		}, 2*time.Second, 500*time.Millisecond).Should(gomega.Succeed())
 	})
 })
