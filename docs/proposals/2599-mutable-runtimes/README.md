@@ -20,11 +20,11 @@ Currently, runtimes are protected by finalizers to prevent deletion while in use
 - **No safe way to update runtimes:** Updating a runtime affects all TrainJobs referencing it because runtimes are fetched during each reconciliation. While implementation-level protections exist (e.g., existing JobSets aren't modified), there are no design-level immutability guarantees. The safest practice becomes creating new runtime objects for each update (e.g., `pytorch-2.0`, `pytorch-2.1`, `pytorch-2.1.1`), leading to a proliferation of nearly-identical runtimes that confuses users.
 - **Finalizers block uninstallation:** If the Trainer controller is uninstalled before all TrainJobs are removed, runtime finalizers become orphaned and cannot be removed. This prevents namespace deletion (stuck in "Terminating") and complicates controller reinstallation.
 
-While the original [Trainer v2 design](../2170-kubeflow-trainer-v2#the-training-runtime-api) anticipated runtimes being immutable with version control, a versioning mechanism has not yet been implemented. Instead, the current finalizer-based approach prevents deletion of runtimes that are referenced but does not provide the intended benefits of versioning.
+While the original [Trainer v2 design](../2170-kubeflow-trainer-v2/README.md#the-training-runtime-api) anticipated runtimes being immutable with version control, a versioning mechanism has not yet been implemented. Instead, the current finalizer-based approach prevents deletion of runtimes that are referenced but does not provide the intended benefits of versioning.
 
-###  Goals
+### Goals
 
-* **Mutable Runtimes**: users and platform admins are able to update, add or remove `TrainingRuntimes` and `ClusterTrainingRuntimes` without impacting existing running or paused Training Job.
+* **Mutable Runtimes**: users and platform admins are able to update, add or remove `TrainingRuntimes` and `ClusterTrainingRuntimes` without impacting existing running or paused `TrainJobs`.
 * **Self-contained TrainJob**: once a TrainJob is created, its configuration is entirely self-contained. It only depends on itself or on resources it has created and owns. It does not depend on any external resources.
 * **Remove finalizer on runtimes**: `TrainingRuntimes` and `ClusterTrainingRuntimes` should no longer need a finalizer.
 
@@ -46,7 +46,7 @@ As a maintainer of Kubeflow Trainer, I want to be able to update or delete the d
 
 ## Design details
 
-We propose making the TrainJob only lookup the runtime configuration on first reconciliation and instead store a "snapshot" of the runtime configuration in a separate object:
+We propose making the TrainJob only look up the runtime configuration on first reconciliation and instead store a "snapshot" of the runtime configuration in a separate object:
 
 * create a new namespaced custom resource `TrainingRuntimeSnapshot` with the same API as the `TrainingRuntime` resource. This is an internal resource and should only be created or updated by the trainer controller. Each `TrainJob` will have one `TrainingRuntimeSnapshot` with the same name and namespace as the `TrainJob`.
 * when a train job is reconciled, the controller first tries to fetch the `TrainingRuntimeSnapshot` for the job. If the snapshot does not exist, it looks up the `(Cluster)TrainingRuntime` referenced by the train job and creates a new `TrainingRuntimeSnapshot` resource. The snapshot resource has the same name and namespace as the `TrainJob`, and the same spec copied from the referenced `(Cluster)TrainingRuntime`.
@@ -88,6 +88,7 @@ rules:
   resources:
   - trainingruntimesnapshots
   verbs:
+  - create
   - get
   - list
   - patch
