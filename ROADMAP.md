@@ -19,6 +19,8 @@
   - Transparent Checkpoint/Restore for GPU-Accelerated TrainJobs: https://github.com/kubeflow/trainer/issues/2245
   - TTLs and ActiveDeadlineSeconds for TrainJobs: https://github.com/kubeflow/trainer/issues/2899
   - Elastic TrainJobs: https://github.com/kubeflow/trainer/issues/2903
+  - Add controller-level Prometheus metrics and ServiceMonitor: https://github.com/kubeflow/trainer/issues/3429
+  - Default Grafana dashboard for Kubeflow Trainer: https://github.com/kubeflow/trainer/issues/3430
 - Distributed Data Cache
   - Tensor caching to accelerate GPU workloads: https://github.com/kubeflow/trainer/issues/3173
   - Integration with OptimizationJob
