@@ -1,13 +1,13 @@
-name: 'Setup E2E Cluster'
-description: 'Checks out code, sets up Go and Python, installs dependencies, and creates a Kind cluster'
+name: Setup E2E Cluster
+description: Checks out code, sets up Go and Python, installs dependencies, and creates a Kind cluster
 
 inputs:
   cluster_type:
-    description: 'Type of cluster to setup (cpu or gpu)'
+    description: Type of cluster to setup (cpu or gpu)
     required: false
-    default: 'cpu'
+    default: cpu
   kubernetes_version:
-    description: 'Kubernetes version for the cluster'
+    description: Kubernetes version for the cluster
     required: true
 
 runs:
@@ -41,7 +41,6 @@ runs:
     - name: Setup cluster
       shell: bash
       env:
-        # Dynamically evaluate the GPU_CLUSTER flag based on the input
-        GPU_CLUSTER: ${{ inputs.cluster_type == 'gpu' && 'true' || 'false' }}
+        CLUSTER_TYPE: ${{ inputs.cluster_type }}
       run: |
         make test-e2e-setup-cluster K8S_VERSION=${{ inputs.kubernetes_version }}
