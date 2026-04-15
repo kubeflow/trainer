@@ -7,9 +7,9 @@ Assisted by Claude Code (Sonnet 4.5)
 
 ## Summary
 
-This document proposes a design to allow Cluster Training Runtimes and Training Runtimes to be fully mutable.
+This KEP proposes making Training Runtimes and Cluster Training Runtimes fully mutable by introducing a `TrainingRuntimeSnapshot` CRD. TrainJobs create a snapshot of their runtime configuration on first reconciliation, ensuring their behaviour remains unchanged regardless of subsequent runtime modifications.
 
-This KEP introduces a new `TrainingRuntimeSnapshot` CRD for containing a point-in-time snapshot of the runtime configuration. TrainJobs create a snapshot of their runtime configuration on first reconciliation, decoupling job execution from runtime changes.
+**Note:** This diverges from the [Trainer v2 design](../2170-kubeflow-trainer-v2/README.md#the-training-runtime-api), which originally proposed making runtimes immutable with version control (see also [#2599](https://github.com/kubeflow/trainer/issues/2599)). Based on operational experience, this KEP takes an alternative approach that eliminates the friction enforced immutability creates for platform administrators.
 
 ## Motivation
 
