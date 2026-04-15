@@ -198,6 +198,19 @@ kubectl get clustertrainingruntimes -o json | jq '
   .items[].spec.template.spec.replicatedJobs[].template.spec.template.spec.runtimeClassName = "nvidia"
 ' | kubectl apply -f -
 
+# hotfix: mount /dev/shm as emptyDir for NCCL shared memory requirements.
+# NCCL proxy service allocates ~33MB per communicator in /dev/shm. The default
+# Kubernetes /dev/shm is 64MB (Docker default), which is insufficient for
+# workloads that create multiple NCCL communicators (e.g. Megatron-Core TP + DP).
+# See: https://github.com/NVIDIA/nccl/issues/525
+echo "Patch CRDs to mount /dev/shm as emptyDir"
+kubectl get clustertrainingruntimes -o json | jq '
+  .items[].spec.template.spec.replicatedJobs[].template.spec.template.spec |= (
+    .volumes = ((.volumes // []) + [{"name": "dshm", "emptyDir": {"medium": "Memory"}}]) |
+    .containers = [.containers[] | .volumeMounts = ((.volumeMounts // []) + [{"name": "dshm", "mountPath": "/dev/shm"}])]
+  )
+' | kubectl apply -f -
+
 # hotfix(jaiakash) - skip pre-load due to kind failure
 # # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
 # TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
