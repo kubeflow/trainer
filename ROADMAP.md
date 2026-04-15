@@ -35,6 +35,7 @@
   frameworks in the Kubeflow Trainer: https://github.com/kubeflow/trainer/issues/2750
 - Kubeflow Trainer UI and TrainJob History Server: https://github.com/kubeflow/trainer/issues/2648
 - Integration with Kubeflow MCP Server: https://github.com/kubeflow/sdk/issues/238
+- Enhance lifecycle management and mutability of Runtimes: https://github.com/kubeflow/trainer/pull/3428
 
 ## 2025
 
