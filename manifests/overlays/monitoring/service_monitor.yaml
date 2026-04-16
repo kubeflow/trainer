@@ -14,7 +14,7 @@
 #
 # ServiceMonitor for the Kubeflow Trainer controller-manager metrics endpoint.
 # Requires the Prometheus Operator (monitoring.coreos.com/v1) to be installed.
-# If Prometheus Operator is not available, remove this resource from kustomization.yaml.
+# Apply this overlay only if Prometheus Operator is available in the cluster.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

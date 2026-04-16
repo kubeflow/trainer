@@ -129,13 +129,13 @@ var (
 		Help:      "Total number of errors encountered during plugin execution.",
 	}, []string{"plugin", "phase"})
 
-	// RuntimesRegistered is a gauge for the number of registered training runtimes by kind.
+	// RuntimesRegistered is a gauge for the number of registered training runtimes by group and kind.
 	RuntimesRegistered = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
 		Subsystem: metricsSubsystem,
 		Name:      "runtimes_registered",
-		Help:      "Number of registered training runtimes by kind.",
-	}, []string{"kind"})
+		Help:      "Number of registered training runtimes by group and kind.",
+	}, []string{"group", "kind"})
 
 	// WebhookValidationTotal is a counter for TrainJob webhook validation calls.
 	WebhookValidationTotal = prometheus.NewCounterVec(prometheus.CounterOpts{

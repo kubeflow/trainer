@@ -21,43 +21,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"k8s.io/utils/ptr"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 )
-
-// newIsolatedRegistry returns a fresh prometheus.Registry with all Trainer metrics registered.
-// Each test should use its own instance to avoid cross-test interference.
-func newIsolatedRegistry(t *testing.T) *prometheus.Registry {
-	t.Helper()
-	reg := prometheus.NewRegistry()
-	collectors := []prometheus.Collector{
-		BuildInfo,
-		TrainJobsCreatedTotal,
-		TrainJobsCompletedTotal,
-		TrainJobsFailedTotal,
-		TrainJobsSuspendedTotal,
-		TrainJobsDeletedTotal,
-		TrainJobsActive,
-		TrainJobDurationSeconds,
-		ReconcileDurationSeconds,
-		PluginExecutionDurationSeconds,
-		PluginExecutionErrorsTotal,
-		RuntimesRegistered,
-		WebhookValidationTotal,
-	}
-	for _, c := range collectors {
-		if err := reg.Register(c); err != nil {
-			// AlreadyRegisteredError is expected in tests that share the global vars.
-			if _, ok := err.(prometheus.AlreadyRegisteredError); !ok {
-				t.Fatalf("failed to register collector: %v", err)
-			}
-		}
-	}
-	return reg
-}
 
 func TestRuntimeKind(t *testing.T) {
 	tests := []struct {
@@ -104,8 +72,6 @@ func TestRuntimeKind(t *testing.T) {
 }
 
 func TestRecordTrainJobCreated(t *testing.T) {
-	newIsolatedRegistry(t)
-
 	RecordTrainJobCreated("test-ns", "ClusterTrainingRuntime")
 
 	if got := testutil.ToFloat64(TrainJobsCreatedTotal.WithLabelValues("test-ns", "ClusterTrainingRuntime")); got != 1 {
@@ -117,8 +83,6 @@ func TestRecordTrainJobCreated(t *testing.T) {
 }
 
 func TestRecordTrainJobDeleted(t *testing.T) {
-	newIsolatedRegistry(t)
-
 	// Use a unique namespace so the active gauge is isolated from other tests.
 	// One Create followed by one Delete should net to zero.
 	RecordTrainJobCreated("test-ns-deleted", "ClusterTrainingRuntime")
@@ -133,8 +97,6 @@ func TestRecordTrainJobDeleted(t *testing.T) {
 }
 
 func TestRecordTrainJobCompleted(t *testing.T) {
-	newIsolatedRegistry(t)
-
 	RecordTrainJobCompleted("test-ns", "ClusterTrainingRuntime", 30*time.Second)
 
 	if got := testutil.ToFloat64(TrainJobsCompletedTotal.WithLabelValues("test-ns", "ClusterTrainingRuntime")); got != 1 {
@@ -147,8 +109,6 @@ func TestRecordTrainJobCompleted(t *testing.T) {
 }
 
 func TestRecordTrainJobFailed(t *testing.T) {
-	newIsolatedRegistry(t)
-
 	RecordTrainJobFailed("test-ns", "ClusterTrainingRuntime", "DeadlineExceeded", 60*time.Second)
 
 	if got := testutil.ToFloat64(TrainJobsFailedTotal.WithLabelValues("test-ns", "ClusterTrainingRuntime", "DeadlineExceeded")); got != 1 {
@@ -161,8 +121,6 @@ func TestRecordTrainJobFailed(t *testing.T) {
 }
 
 func TestRecordTrainJobSuspended(t *testing.T) {
-	newIsolatedRegistry(t)
-
 	RecordTrainJobSuspended("test-ns", "TrainingRuntime")
 
 	if got := testutil.ToFloat64(TrainJobsSuspendedTotal.WithLabelValues("test-ns", "TrainingRuntime")); got != 1 {
@@ -171,8 +129,6 @@ func TestRecordTrainJobSuspended(t *testing.T) {
 }
 
 func TestObserveReconcile(t *testing.T) {
-	newIsolatedRegistry(t)
-
 	ObserveReconcile("trainjob_controller", "success", 5*time.Millisecond)
 	ObserveReconcile("trainjob_controller", "error", 2*time.Millisecond)
 
@@ -183,8 +139,6 @@ func TestObserveReconcile(t *testing.T) {
 }
 
 func TestObservePlugin(t *testing.T) {
-	newIsolatedRegistry(t)
-
 	ObservePlugin("jobset", "build", 1*time.Millisecond, nil)
 	ObservePlugin("torch", "enforce_ml_policy", 2*time.Millisecond, errors.New("plugin error"))
 

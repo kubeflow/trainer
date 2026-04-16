@@ -1,6 +1,5 @@
 resources:
   - manager.yaml
-  - service_monitor.yaml
 
 # Disable hash suffix for predictable ConfigMap names
 generatorOptions:
