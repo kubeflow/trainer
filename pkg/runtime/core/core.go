@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/metrics"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
@@ -55,6 +56,14 @@ func New(ctx context.Context, client client.Client, indexer client.FieldIndexer,
 		}
 	}
 	runtimes = newRuntimes
+	// Record the number of registered runtimes by kind for observability.
+	kindCounts := make(map[string]float64)
+	for key := range newRuntimes {
+		kindCounts[key]++
+	}
+	for kind, count := range kindCounts {
+		metrics.RuntimesRegistered.WithLabelValues(kind).Set(count)
+	}
 	return newRuntimes, nil
 }
 

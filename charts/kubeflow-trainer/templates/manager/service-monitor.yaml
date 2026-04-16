@@ -1,0 +1,51 @@
+{{- /*
+Copyright 2024 The Kubeflow authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/ -}}
+
+{{- if .Values.manager.metrics.serviceMonitor.enabled }}
+{{- if not (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/ServiceMonitor") -}}
+{{- fail "ServiceMonitor requires the monitoring.coreos.com/v1 CRD (Prometheus Operator). Install Prometheus Operator first or set manager.metrics.serviceMonitor.enabled=false." -}}
+{{- end }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "trainer.manager.service.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "trainer.manager.labels" . | nindent 4 }}
+    {{- with .Values.manager.metrics.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "trainer.manager.selectorLabels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  endpoints:
+    - port: monitoring-port
+      path: /metrics
+      scheme: https
+      interval: {{ .Values.manager.metrics.serviceMonitor.interval | default "30s" }}
+      scrapeTimeout: {{ .Values.manager.metrics.serviceMonitor.scrapeTimeout | default "10s" }}
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tlsConfig:
+        {{- if .Values.manager.metrics.serviceMonitor.tlsConfig }}
+        {{- toYaml .Values.manager.metrics.serviceMonitor.tlsConfig | nindent 8 }}
+        {{- else }}
+        insecureSkipVerify: true
+        {{- end }}
+{{- end }}
