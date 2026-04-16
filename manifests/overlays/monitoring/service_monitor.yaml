@@ -24,9 +24,6 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/component: manager
-  namespaceSelector:
-    matchNames:
-      - kubeflow
   endpoints:
     - port: monitoring-port
       path: /metrics
