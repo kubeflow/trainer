@@ -27,6 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	componentconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -793,6 +794,170 @@ func TestIsCertManagementEnabled(t *testing.T) {
 			got := IsCertManagementEnabled(&tc.cfg)
 			if got != tc.want {
 				t.Errorf("IsCertManagementEnabled() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestApplyClientConnection(t *testing.T) {
+	testcases := []struct {
+		name         string
+		cfg          configapi.Configuration
+		initialQPS   float32
+		initialBurst int
+		wantQPS      float32
+		wantBurst    int
+	}{
+		{
+			name:         "nil ClientConnection keeps rest.Config defaults",
+			cfg:          configapi.Configuration{},
+			initialQPS:   5,
+			initialBurst: 10,
+			wantQPS:      5,
+			wantBurst:    10,
+		},
+		{
+			name: "default values override client-go defaults",
+			cfg: configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{
+					QPS:   ptr.To[float32](50),
+					Burst: ptr.To[int32](100),
+				},
+			},
+			initialQPS:   5,
+			initialBurst: 10,
+			wantQPS:      50,
+			wantBurst:    100,
+		},
+		{
+			name: "custom values applied",
+			cfg: configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{
+					QPS:   ptr.To[float32](200),
+					Burst: ptr.To[int32](400),
+				},
+			},
+			wantQPS:   200,
+			wantBurst: 400,
+		},
+		{
+			name: "only QPS set preserves existing burst",
+			cfg: configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{
+					QPS: ptr.To[float32](75),
+				},
+			},
+			initialBurst: 10,
+			wantQPS:      75,
+			wantBurst:    10,
+		},
+		{
+			name: "only burst set preserves existing QPS",
+			cfg: configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{
+					Burst: ptr.To[int32](150),
+				},
+			},
+			initialQPS: 5,
+			wantQPS:    5,
+			wantBurst:  150,
+		},
+		{
+			name: "zero QPS is valid and applied",
+			cfg: configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{
+					QPS:   ptr.To[float32](0),
+					Burst: ptr.To[int32](0),
+				},
+			},
+			initialQPS:   5,
+			initialBurst: 10,
+			wantQPS:      0,
+			wantBurst:    0,
+		},
+		{
+			name: "empty ClientConnection struct preserves existing values",
+			cfg: configapi.Configuration{
+				ClientConnection: &configapi.ClientConnection{},
+			},
+			initialQPS:   5,
+			initialBurst: 10,
+			wantQPS:      5,
+			wantBurst:    10,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			restCfg := &rest.Config{
+				QPS:   tc.initialQPS,
+				Burst: tc.initialBurst,
+			}
+			ApplyClientConnection(restCfg, &tc.cfg)
+			if restCfg.QPS != tc.wantQPS {
+				t.Errorf("QPS = %v, want %v", restCfg.QPS, tc.wantQPS)
+			}
+			if restCfg.Burst != tc.wantBurst {
+				t.Errorf("Burst = %v, want %v", restCfg.Burst, tc.wantBurst)
+			}
+		})
+	}
+}
+
+func TestLoadAndApplyClientConnection(t *testing.T) {
+	testScheme := runtime.NewScheme()
+	if err := configapi.AddToScheme(testScheme); err != nil {
+		t.Fatal(err)
+	}
+
+	tmpDir := t.TempDir()
+
+	customQPSConfig := filepath.Join(tmpDir, "custom-qps.yaml")
+	if err := os.WriteFile(customQPSConfig, []byte(`
+apiVersion: config.trainer.kubeflow.org/v1alpha1
+kind: Configuration
+clientConnection:
+  qps: 100
+  burst: 200
+`), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
+	testcases := []struct {
+		name       string
+		configFile string
+		wantQPS    float32
+		wantBurst  int
+	}{
+		{
+			name:       "default config applies default QPS/burst",
+			configFile: "",
+			wantQPS:    50,
+			wantBurst:  100,
+		},
+		{
+			name:       "custom config applies custom QPS/burst",
+			configFile: customQPSConfig,
+			wantQPS:    100,
+			wantBurst:  200,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, cfg, err := Load(testScheme, tc.configFile, false)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			restCfg := &rest.Config{QPS: 5, Burst: 10}
+			ApplyClientConnection(restCfg, &cfg)
+
+			if restCfg.QPS != tc.wantQPS {
+				t.Errorf("QPS = %v, want %v", restCfg.QPS, tc.wantQPS)
+			}
+			if restCfg.Burst != tc.wantBurst {
+				t.Errorf("Burst = %v, want %v", restCfg.Burst, tc.wantBurst)
 			}
 		})
 	}

@@ -138,6 +138,11 @@ manager:
       # webhookServiceName and webhookSecretName are auto-generated if not specified
       webhookServiceName: ""
       webhookSecretName: ""
+    clientConnection:
+      # -- QPS rate limit for the manager's Kubernetes API client
+      qps: 50
+      # -- Burst rate limit for the manager's Kubernetes API client
+      burst: 100
     statusServer:
       # -- Port that the TrainJob status server serves on.
       port: 10443
