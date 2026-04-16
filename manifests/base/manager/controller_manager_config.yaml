@@ -35,8 +35,8 @@ controller:
 # Certificate management configuration
 certManagement:
   enable: true
-  webhookServiceName: kubeflow-trainer-controller-manager
-  webhookSecretName: kubeflow-trainer-webhook-cert
+  serviceName: kubeflow-trainer-controller-manager
+  secretName: kubeflow-trainer-webhook-cert
 
 # Client connection configuration
 clientConnection:

@@ -269,8 +269,8 @@ func TestEnforceMLPolicy(t *testing.T) {
 			cli := utiltesting.NewClientBuilder().Build()
 			cfg := &configapi.Configuration{
 				CertManagement: &configapi.CertManagement{
-					WebhookServiceName: "kubeflow-trainer-controller-manager",
-					WebhookSecretName:  "kubeflow-trainer-webhook-cert",
+					ServiceName: "kubeflow-trainer-controller-manager",
+					SecretName:  "kubeflow-trainer-webhook-cert",
 				},
 				StatusServer: &configapi.StatusServer{
 					Port:  ptr.To[int32](10443),
@@ -461,8 +461,8 @@ func TestBuild(t *testing.T) {
 
 			cfg := &configapi.Configuration{
 				CertManagement: &configapi.CertManagement{
-					WebhookServiceName: "kubeflow-trainer-controller-manager",
-					WebhookSecretName:  "kubeflow-trainer-webhook-cert",
+					ServiceName: "kubeflow-trainer-controller-manager",
+					SecretName:  "kubeflow-trainer-webhook-cert",
 				},
 				StatusServer: &configapi.StatusServer{
 					Port:  ptr.To[int32](10443),
