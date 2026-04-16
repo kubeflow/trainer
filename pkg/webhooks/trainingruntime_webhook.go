@@ -76,7 +76,7 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 		}
 
 		if labelAncestor, ok := rJob.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestors.Has(labelAncestor) {
-			if rJob.Replicas != 1 {
+			if labelAncestor != constants.AncestorTrainer && rJob.Replicas != 1 {
 				allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasErrorMsg))
 			}
 

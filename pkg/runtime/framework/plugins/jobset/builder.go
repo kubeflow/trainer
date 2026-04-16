@@ -118,9 +118,11 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 			ancestor = jobMetadata.Labels[constants.LabelTrainJobAncestor]
 		}
 		if ancestor == constants.AncestorTrainer {
-			// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
-			// REF: https://github.com/kubeflow/trainer/issues/2318
-			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
+			// Preserve replicas for multi-slice TPU support.
+			// REF: https://github.com/kubeflow/trainer/issues/3407
+			if b.Spec.ReplicatedJobs[i].Replicas == nil {
+				b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
+			}
 			// Update values for the Trainer container.
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
 				if *container.Name == constants.Node {
