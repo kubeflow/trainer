@@ -1524,6 +1524,65 @@ func TestTorchValidate(t *testing.T) {
 				),
 			},
 		},
+			"torchtune entrypoint with reserved torchrun env causes cross-plugin conflict": {
+				info: runtime.NewInfo(
+					runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy().
+							Obj(),
+						).
+						Obj(),
+					),
+				),
+				newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+					Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+						Container(
+							"ghcr.io/kubeflow/trainer/torchtune-trainer",
+							[]string{"tune", "run"},
+							nil,
+							corev1.ResourceList{},
+						).
+						Env(
+							[]corev1.EnvVar{
+								{
+									// PET_MASTER_ADDR is one of the torchrun rendezvous envs.
+									// Setting PET_MASTER_ADDR (and similarly PET_MASTER_PORT)
+									// alongside a TorchTune entrypoint causes a cross-plugin
+									// conflict because TorchTune configures rendezvous itself
+									// via --rdzv_endpoint.
+									// Ref: pkg/runtime/framework/plugins/torch/torch.go
+									// TODO (andreyvelich): extend this check once the
+									// multi-backend BuiltinTrainer plugin registry (#2752)
+									// is implemented.
+									Name:  constants.TorchEnvMasterAddr,
+									Value: "custom-master:29500",
+								},
+							}...,
+						).
+						Obj(),
+					).
+					RuntimeRef(
+						trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+						"torchtune-llama3.2-1b",
+					).
+					Obj(),
+				wantError: field.ErrorList{
+					field.Invalid(
+						field.NewPath("spec").Child("trainer").Child("env"),
+						[]corev1.EnvVar{
+							{
+								Name:  constants.TorchEnvMasterAddr,
+								Value: "custom-master:29500",
+							},
+						},
+						fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", func() []string {
+							torchEnvs := sets.New[string]()
+							torchEnvs.Insert(constants.TorchEnvMasterAddr)
+							return sets.List(torchEnvs)
+						}()),
+					),
+				},
+			},
 		"unsupported pretrained model": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
