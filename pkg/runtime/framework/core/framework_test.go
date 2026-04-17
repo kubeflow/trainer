@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -464,6 +465,18 @@ func TestRunCustomValidationPlugins(t *testing.T) {
 		"an empty registry": {
 			oldObj: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
 			newObj: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+		},
+		"cross-plugin env conflict is detected": {
+			registry: fwkplugins.Registry{
+				"FakeEnvReserverA": newFakeEnvReserverA,
+				"FakeEnvReserverB": newFakeEnvReserverB,
+			},
+			oldObj: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			newObj: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "SHARED_ENV_VAR",
+					`env var "SHARED_ENV_VAR" is reserved by both FakeEnvReserverA and FakeEnvReserverB plugins`),
+			},
 		},
 	}
 	for name, tc := range cases {
@@ -2306,6 +2319,38 @@ func TestWatchExtensionPlugins(t *testing.T) {
 }
 
 type fakeTrainJobStatusPlugin struct{}
+
+type fakeEnvReserverA struct{}
+
+var _ framework.CustomValidationPlugin = (*fakeEnvReserverA)(nil)
+var _ framework.EnvVarsReserverPlugin = (*fakeEnvReserverA)(nil)
+
+func (f *fakeEnvReserverA) Name() string { return "FakeEnvReserverA" }
+func (f *fakeEnvReserverA) Validate(_ context.Context, _ *runtime.Info, _, _ *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	return nil, nil
+}
+func (f *fakeEnvReserverA) ReservedEnvVarNames() sets.Set[string] {
+	return sets.New("SHARED_ENV_VAR")
+}
+func newFakeEnvReserverA(_ context.Context, _ client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
+	return &fakeEnvReserverA{}, nil
+}
+
+type fakeEnvReserverB struct{}
+
+var _ framework.CustomValidationPlugin = (*fakeEnvReserverB)(nil)
+var _ framework.EnvVarsReserverPlugin = (*fakeEnvReserverB)(nil)
+
+func (f *fakeEnvReserverB) Name() string { return "FakeEnvReserverB" }
+func (f *fakeEnvReserverB) Validate(_ context.Context, _ *runtime.Info, _, _ *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	return nil, nil
+}
+func (f *fakeEnvReserverB) ReservedEnvVarNames() sets.Set[string] {
+	return sets.New("SHARED_ENV_VAR")
+}
+func newFakeEnvReserverB(_ context.Context, _ client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
+	return &fakeEnvReserverB{}, nil
+}
 
 var _ framework.TrainJobStatusPlugin = (*fakeTrainJobStatusPlugin)(nil)
 
