@@ -14,6 +14,10 @@
 
 Latest News 🔥
 
+- [2026/03] Kubeflow Trainer v2.2 is officially released with support for JAX and XGBoost
+  Training Runtimes, enhanced observability with metrics propagation to TrainJob status,
+  and Flux Framework integration for HPC and MPI workloads. Check out
+  [the blog post announcement](https://blog.kubeflow.org/kubeflow-trainer-v2.2-release/).
 - [2025/11] Kubeflow Trainer v2.1 is officially released with support of
   [Distributed Data Cache](https://www.kubeflow.org/docs/components/trainer/user-guides/data-cache/),
   topology aware scheduling with Kueue and Volcano, and LLM post-training enhancements. Check out
@@ -73,7 +77,6 @@ Additional talks:
 
 - [From High Performance Computing To AI Workloads on Kubernetes: MPI Runtime in Kubeflow TrainJob](https://youtu.be/Fnb1a5Kaxgo)
 - [Streamline LLM Fine-tuning on Kubernetes With Kubeflow LLM Trainer](https://youtu.be/O7cNlaz3Hqs)
-
 
 ## Getting Started
 
