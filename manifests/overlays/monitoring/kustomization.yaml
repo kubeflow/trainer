@@ -1,0 +1,4 @@
+# Monitoring overlay — apply this only if Prometheus Operator (monitoring.coreos.com/v1) is installed.
+resources:
+  - ../../base/manager
+  - service_monitor.yaml

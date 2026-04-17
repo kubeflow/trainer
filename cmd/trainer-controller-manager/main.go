@@ -21,6 +21,7 @@ import (
 	"flag"
 	"net/http"
 	"os"
+	goruntime "runtime"
 
 	zaplog "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -41,10 +42,12 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/config"
 	"github.com/kubeflow/trainer/v2/pkg/controller"
 	"github.com/kubeflow/trainer/v2/pkg/features"
+	"github.com/kubeflow/trainer/v2/pkg/metrics"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
 	"github.com/kubeflow/trainer/v2/pkg/statusserver"
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
+	"github.com/kubeflow/trainer/v2/pkg/version"
 	"github.com/kubeflow/trainer/v2/pkg/webhooks"
 )
 
@@ -124,6 +127,16 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+
+	metrics.Register()
+	metrics.BuildInfo.WithLabelValues(
+		version.GitVersion,
+		version.GitCommit,
+		version.BuildDate,
+		goruntime.Version(),
+		goruntime.Compiler,
+		goruntime.GOOS+"/"+goruntime.GOARCH,
+	).Set(1)
 
 	certsReady := make(chan struct{})
 	if config.IsCertManagementEnabled(&cfg) {

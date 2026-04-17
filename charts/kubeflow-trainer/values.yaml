@@ -108,6 +108,24 @@ manager:
     seccompProfile:
       type: RuntimeDefault
 
+  # -- Prometheus metrics configuration.
+  metrics:
+    serviceMonitor:
+      # -- Whether to create a Prometheus Operator ServiceMonitor for /metrics.
+      # Requires the monitoring.coreos.com/v1 CRDs (Prometheus Operator) installed.
+      enabled: false
+      # -- Scrape interval.
+      interval: 30s
+      # -- Scrape timeout.
+      scrapeTimeout: 10s
+      # -- Extra labels added to the ServiceMonitor metadata (e.g. release: prometheus)
+      # so that the Prometheus instance selects this monitor.
+      additionalLabels: {}
+      # -- TLS config for the metrics endpoint.
+      # Defaults to insecureSkipVerify: true so the controller-manager's self-signed CA
+      # does not block scrapes. Override with caFile/serverName for production.
+      tlsConfig: {}
+
   # -- Controller manager configuration.
   # This configuration is used to generate the ConfigMap for the controller manager.
   config:

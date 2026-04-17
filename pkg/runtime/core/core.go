@@ -20,9 +20,11 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/metrics"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
@@ -55,6 +57,11 @@ func New(ctx context.Context, client client.Client, indexer client.FieldIndexer,
 		}
 	}
 	runtimes = newRuntimes
+	// Record each registered runtime by group and kind for observability.
+	for key := range newRuntimes {
+		gk := schema.ParseGroupKind(key)
+		metrics.RuntimesRegistered.WithLabelValues(gk.Group, gk.Kind).Set(1)
+	}
 	return newRuntimes, nil
 }
 
