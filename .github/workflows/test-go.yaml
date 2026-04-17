@@ -45,6 +45,9 @@ jobs:
       - name: Check golangci lint
         run: |
           make golangci-lint
+      - name: Check boilerplate headers
+        run: |
+          make verify-boilerplate
   test:
     name: Test
     runs-on: ubuntu-latest
