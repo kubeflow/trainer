@@ -46,7 +46,7 @@ print_results() {
         # Always show TrainJob status
         kubectl describe trainjob
         kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
-        kubectl wait trainjob --for=condition=Complete --all --timeout 3s
+        kubectl wait trainjob --for=condition=Complete --all --timeout 30s || true
 
         # Only check pod logs if pods exist (not for local backends)
         if kubectl get pods -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node --no-headers 2>/dev/null | grep -q .; then

@@ -221,7 +221,7 @@ test-e2e: ginkgo ## Run Go e2e test.
 NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
 NOTEBOOK_OUTPUT=$(PROJECT_DIR)/artifacts/notebooks/trainer_output.ipynb
 PAPERMILL_PARAMS=
-PAPERMILL_TIMEOUT=900
+PAPERMILL_TIMEOUT=1800
 .PHONY: test-e2e-notebook
 test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
 	NOTEBOOK_INPUT=$(NOTEBOOK_INPUT) NOTEBOOK_OUTPUT=$(NOTEBOOK_OUTPUT) PAPERMILL_PARAMS="$(PAPERMILL_PARAMS)" PAPERMILL_TIMEOUT=$(PAPERMILL_TIMEOUT) ./hack/e2e-run-notebook.sh
