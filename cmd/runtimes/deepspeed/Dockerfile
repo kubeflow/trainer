@@ -3,13 +3,9 @@ FROM nvidia/cuda:13.2.0-devel-ubuntu22.04
 
 # Install libraries required for OpenMPI to work. Image installs OpenMPI 5.0.7
 RUN apt update && apt install -y --no-install-recommends \
-    openssh-server openssh-client libcap2-bin \
+    openssh-server openssh-client \
     g++ libopenmpi-dev \
     python3-dev pip && rm -f /usr/bin/python && ln -s /usr/bin/python3 /usr/bin/python && rm -rf /var/lib/apt/lists/*
-
-# Add capability to run sshd as non-root.
-RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/sbin/sshd
-RUN apt remove libcap2-bin -y
 
 # Configure mpiuser and home directory.
 RUN useradd -m mpiuser
