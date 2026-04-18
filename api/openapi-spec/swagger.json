@@ -14313,6 +14313,11 @@
             "description": "serviceAccountName patches the service account for the Pods in the target job templates.",
             "type": "string"
           },
+          "terminationGracePeriodSeconds": {
+            "description": "terminationGracePeriodSeconds patches the termination grace period for Pods in the target job templates. This allows users to configure sufficient time for checkpoint saving on TrainJob completion or node drain.",
+            "type": "integer",
+            "format": "int64"
+          },
           "tolerations": {
             "description": "tolerations patches the Pod's tolerations.",
             "type": "array",

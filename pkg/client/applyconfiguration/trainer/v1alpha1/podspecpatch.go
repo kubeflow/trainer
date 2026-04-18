@@ -48,6 +48,10 @@ type PodSpecPatchApplyConfiguration struct {
 	// schedulingGates patches the scheduling gates for the Pods in the target job templates.
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/
 	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
+	// terminationGracePeriodSeconds patches the termination grace period for Pods
+	// in the target job templates. This allows users to configure sufficient time
+	// for checkpoint saving on TrainJob completion or node drain.
+	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 }
 
 // PodSpecPatchApplyConfiguration constructs a declarative configuration of the PodSpecPatch type for use with
@@ -163,5 +167,13 @@ func (b *PodSpecPatchApplyConfiguration) WithSchedulingGates(values ...corev1.Po
 	for i := range values {
 		b.SchedulingGates = append(b.SchedulingGates, values[i])
 	}
+	return b
+}
+
+// WithTerminationGracePeriodSeconds sets the TerminationGracePeriodSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TerminationGracePeriodSeconds field is set to the value of the last call.
+func (b *PodSpecPatchApplyConfiguration) WithTerminationGracePeriodSeconds(value int64) *PodSpecPatchApplyConfiguration {
+	b.TerminationGracePeriodSeconds = &value
 	return b
 }
