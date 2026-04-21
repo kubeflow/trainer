@@ -41,7 +41,7 @@ scheduling in Kubernetes, with integration planned for:
 
 1. Replace existing Coscheduling or Volcano plugins - this is an additional scheduling option
 1. Support all Workload API features immediately - focus on core gang scheduling first
-1. Support Kubernetes versions < 1.35 - Workload API requires v1.35+
+1. Support Kubernetes versions < 1.35 - Workload API requires v1.36+
 1. Delegate Workload creation to JobSet - the TrainJob controller (as the highest-level controller)
    must create the Workload object
 
@@ -168,6 +168,8 @@ metadata:
   labels:
     trainer.kubeflow.org/framework: deepspeed
 spec:
+  podGroupPolicy:
+    workload: {}
   mlPolicy:
     numNodes: 1
     mpi:
