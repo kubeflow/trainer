@@ -2,7 +2,7 @@
 
 ## Summary
 
-Torch `EnforceMLPolicy` injects `PET_*` envs only into trainer main container today. This KEP proposes to inject same `PET_*` envs into trainer init containers as well.
+Torch `EnforceMLPolicy` injects `PET_*` envs only into trainer main container today. This KEP proposes an opt-in way to inject the same `PET_*` envs into trainer init containers.
 
 ## Motivation
 
@@ -22,22 +22,32 @@ Which envs are needed by preflight:
 - Commonly needed by launch logic: `PET_NNODES`, `PET_NPROC_PER_NODE`.
 - `PET_NODE_RANK` can be read from Pod metadata (`batch.kubernetes.io/job-completion-index`), but the other values are runtime-derived and must still be injected by the plugin.
 
+This KEP does not claim that every preflight check needs all `PET_*` envs.
+The goal is to make the same runtime-computed `PET_*` values available to init containers when users choose to use them.
+
 ### Goals
 
-- Inject `PET_*` envs to trainer main container and all trainer init containers.
+- Keep `PET_*` env injection to trainer main container unchanged.
+- Add opt-in `PET_*` env injection for trainer init containers.
 - Keep one deterministic env source for both container types.
 - Keep scheduler behavior unchanged.
 
 ### Non-Goals
 
 - Change CRD or API schema.
-- Add new user-facing field.
+- Add new CRD or API fields.
 - Change scheduling semantics.
 - Change JobSet network defaults or DNS behavior.
 
 ## Proposal
 
-Apply `PET_*` env set to all containers in trainer `PodSet` (`AncestorTrainer`) with same values.
+Keep existing behavior by default: inject `PET_*` only into trainer main container.
+
+Add annotation-based opt-in for init containers. When enabled, apply the same `PET_*` env set to trainer init containers in `PodSet` (`AncestorTrainer`).
+
+Proposed annotation:
+
+- `trainer.kubeflow.org/pet-init-env-injection: "enabled"`
 
 ## Design Details
 
@@ -50,7 +60,7 @@ Add helper for init-container lookup by podset ancestor and container name, or g
 In `EnforceMLPolicy`, after `PET_*` values are computed:
 
 - Keep existing injection to trainer main container.
-- Add injection to every trainer init container.
+- Add injection to trainer init containers only when the opt-in annotation is enabled.
 - Keep torchtune command mutation scoped to trainer main container only.
 
 ### JobSet plugin changes
@@ -79,7 +89,11 @@ This KEP does not enforce any network setting. Runtime authors and users should 
 
 ### Compatibility
 
-Backward compatible. Jobs without init containers are unchanged.
+Backward compatible by default.
+
+- Existing jobs keep current behavior (main container injection only).
+- Jobs without init containers are unchanged.
+- Init-container injection is enabled only for users who opt in.
 
 ## Test Plan
 
@@ -88,7 +102,8 @@ Backward compatible. Jobs without init containers are unchanged.
 ### Unit Tests
 
 - Add torch plugin unit test with trainer `PodSet` containing init containers.
-- Verify `PET_*` env injection for main and init containers.
+- Verify default behavior: `PET_*` env injection only for main container.
+- Verify opt-in behavior: `PET_*` env injection for main and init containers.
 - Add or extend JobSet Build test to verify init container sync in final JobSet spec.
 
 ## Implementation History
@@ -100,24 +115,20 @@ Backward compatible. Jobs without init containers are unchanged.
 
 ### Alternative 1: Inject only into selected init containers
 
-- **Pros:** Smaller runtime mutation scope.
-- **Cons:** Need selection API/annotation and user education; less predictable behavior.
+- **Pros:** Smaller runtime mutation scope. Also allows mixed sourcing of env values:
+  - `PET_NODE_RANK` from Pod `fieldRef` (`batch.kubernetes.io/job-completion-index`).
+  - `PET_NNODES` or `PET_NPROC_PER_NODE` from user-provided overrides when values are fixed.
+  - `PET_MASTER_ADDR` can be derived from `metadata.annotations['jobset.sigs.k8s.io/jobset-name']` (`$(JOBSET_NAME)-node-0-0.$(JOBSET_NAME)`)
+  - `PET_MASTER_PORT` can be fixed to `29500`, so it may not need explicit injection in some setups.
+- **Cons:** Need clear precedence rules when values are available from multiple sources (plugin injection, metadata-derived values, and user-provided envs). For example, `PET_NNODES` may duplicate `TrainJob.spec.trainer.numNodes`, which can cause configuration drift.
 
-### Alternative 2: Run preflight in main container startup path
+### Alternative 2: Run preflight in main container startup path(entrypoint)
 
 - **Pros:** Works without injecting `PET_*` into init containers.
-- **Cons:** Startup probes and entrypoint checks have different failure behavior from init-container gating, and they still depend on DNS/network settings for `PET_MASTER_ADDR` resolution.
+- **Cons:** Startup probes and entrypoint checks have different failure behavior from init-container gating, and they still depend on DNS/network settings for `PET_MASTER_ADDR` resolution after Pod's ready (without explicit `publishNotReadyAddresses: true` )
+
 
 
 ## Open Questions
 
-Should this KEP include an opt-out switch to inject `PET_*` only into the main container?
-
-- Option A: keep this KEP simple and inject into all init containers by default.
-- Option B: add annotation-based control (for example, `trainer.kubeflow.org/pet-init-env-injection: "false"`).
-
-If annotation-based control is added, rollout and compatibility policy must be explicit:
-
-- Keep current behavior as default first to avoid surprise changes for existing runtimes.
-- Define conflict handling when users already set envs with the same names.
-- Document migration steps if default behavior changes in a future release.
+Should a future KEP change the default from opt-in to opt-out after enough adoption data?
