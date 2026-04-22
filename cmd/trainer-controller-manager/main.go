@@ -119,7 +119,22 @@ func main() {
 	}
 
 	setupLog.Info("Creating manager")
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
+	restCfg := ctrl.GetConfigOrDie()
+	// Apply the Configuration.ClientConnection QPS/Burst to the
+	// manager's rest.Config. Without this, the documented defaults
+	// (QPS=50, Burst=100) from the Configuration API were validated
+	// and defaulted but never wired through, so the manager ran with
+	// the client-go defaults (QPS=5, Burst=10). The status server's
+	// createClient already uses this pattern (#3431).
+	if cfg.ClientConnection != nil {
+		if cfg.ClientConnection.QPS != nil {
+			restCfg.QPS = *cfg.ClientConnection.QPS
+		}
+		if cfg.ClientConnection.Burst != nil {
+			restCfg.Burst = int(*cfg.ClientConnection.Burst)
+		}
+	}
+	mgr, err := ctrl.NewManager(restCfg, options)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
