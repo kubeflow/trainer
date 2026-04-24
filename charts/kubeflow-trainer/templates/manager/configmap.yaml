@@ -65,8 +65,8 @@ data:
 
     # Client connection configuration
     clientConnection:
-      qps: {{ .Values.manager.config.clientConnection.qps | default 50 }}
-      burst: {{ .Values.manager.config.clientConnection.burst | default 100 }}
+      qps: {{ .Values.manager.config.clientConnection.qps }}
+      burst: {{ .Values.manager.config.clientConnection.burst }}
 
     statusServer:
       port: {{ .Values.manager.config.statusServer.port }}

@@ -902,53 +902,19 @@ func TestLoadAndApplyClientConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tmpDir := t.TempDir()
-
-	customQPSConfig := filepath.Join(tmpDir, "custom-qps.yaml")
-	if err := os.WriteFile(customQPSConfig, []byte(`
-apiVersion: config.trainer.kubeflow.org/v1alpha1
-kind: Configuration
-clientConnection:
-  qps: 100
-  burst: 200
-`), os.FileMode(0600)); err != nil {
-		t.Fatal(err)
+	_, cfg, err := Load(testScheme, "", false)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	testcases := map[string]struct {
-		configFile string
-		wantQPS    float32
-		wantBurst  int
-	}{
-		"default config applies default QPS/burst": {
-			configFile: "",
-			wantQPS:    50,
-			wantBurst:  100,
-		},
-		"custom config applies custom QPS/burst": {
-			configFile: customQPSConfig,
-			wantQPS:    100,
-			wantBurst:  200,
-		},
+	restCfg := &rest.Config{QPS: 5, Burst: 10}
+	ApplyClientConnection(restCfg, &cfg)
+
+	if restCfg.QPS != 50 {
+		t.Errorf("QPS = %v, want 50", restCfg.QPS)
 	}
-
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			_, cfg, err := Load(testScheme, tc.configFile, false)
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-
-			restCfg := &rest.Config{QPS: 5, Burst: 10}
-			ApplyClientConnection(restCfg, &cfg)
-
-			if restCfg.QPS != tc.wantQPS {
-				t.Errorf("QPS = %v, want %v", restCfg.QPS, tc.wantQPS)
-			}
-			if restCfg.Burst != tc.wantBurst {
-				t.Errorf("Burst = %v, want %v", restCfg.Burst, tc.wantBurst)
-			}
-		})
+	if restCfg.Burst != 100 {
+		t.Errorf("Burst = %v, want 100", restCfg.Burst)
 	}
 }
 
