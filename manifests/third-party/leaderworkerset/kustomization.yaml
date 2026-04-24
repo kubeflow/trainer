@@ -7,6 +7,11 @@ resources:
 # Transform all namespace references from lws-system to be set by parent overlay
 namespace: kubeflow-system
 
+images:
+  - name: us-central1-docker.pkg.dev/k8s-staging-images/lws/lws
+    newName: registry.k8s.io/lws/lws
+    newTag: v0.8.0
+
 # Add required patches.
 patches:
   # Remove namespace from the LeaderWorkerSet release manifests.
