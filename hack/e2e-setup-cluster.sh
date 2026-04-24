@@ -125,6 +125,7 @@ load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${MODEL_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${TRAINER_CI_IMAGE}" "${CLUSTER_NAME}"
+load_image_to_kind "${XGBOOST_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
 
 print_cluster_info() {
   kubectl version
@@ -254,6 +255,5 @@ fi
 XGBOOST_RUNTIME_CI_IMAGE="${XGBOOST_RUNTIME_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 echo "Build XGBoost runtime image"
 ${CONTAINER_RUNTIME} build . -f cmd/runtimes/xgboost/Dockerfile -t ${XGBOOST_RUNTIME_CI_IMAGE}
-load_image_to_kind "${XGBOOST_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
 
 print_cluster_info
