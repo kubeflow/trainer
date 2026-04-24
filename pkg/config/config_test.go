@@ -800,24 +800,21 @@ func TestIsCertManagementEnabled(t *testing.T) {
 }
 
 func TestApplyClientConnection(t *testing.T) {
-	testcases := []struct {
-		name         string
+	testcases := map[string]struct {
 		cfg          configapi.Configuration
 		initialQPS   float32
 		initialBurst int
 		wantQPS      float32
 		wantBurst    int
 	}{
-		{
-			name:         "nil ClientConnection keeps rest.Config defaults",
+		"nil ClientConnection keeps rest.Config defaults": {
 			cfg:          configapi.Configuration{},
 			initialQPS:   5,
 			initialBurst: 10,
 			wantQPS:      5,
 			wantBurst:    10,
 		},
-		{
-			name: "default values override client-go defaults",
+		"default values override client-go defaults": {
 			cfg: configapi.Configuration{
 				ClientConnection: &configapi.ClientConnection{
 					QPS:   ptr.To[float32](50),
@@ -829,8 +826,7 @@ func TestApplyClientConnection(t *testing.T) {
 			wantQPS:      50,
 			wantBurst:    100,
 		},
-		{
-			name: "custom values applied",
+		"custom values applied": {
 			cfg: configapi.Configuration{
 				ClientConnection: &configapi.ClientConnection{
 					QPS:   ptr.To[float32](200),
@@ -840,8 +836,7 @@ func TestApplyClientConnection(t *testing.T) {
 			wantQPS:   200,
 			wantBurst: 400,
 		},
-		{
-			name: "only QPS set preserves existing burst",
+		"only QPS set preserves existing burst": {
 			cfg: configapi.Configuration{
 				ClientConnection: &configapi.ClientConnection{
 					QPS: ptr.To[float32](75),
@@ -851,8 +846,7 @@ func TestApplyClientConnection(t *testing.T) {
 			wantQPS:      75,
 			wantBurst:    10,
 		},
-		{
-			name: "only burst set preserves existing QPS",
+		"only burst set preserves existing QPS": {
 			cfg: configapi.Configuration{
 				ClientConnection: &configapi.ClientConnection{
 					Burst: ptr.To[int32](150),
@@ -862,8 +856,7 @@ func TestApplyClientConnection(t *testing.T) {
 			wantQPS:    5,
 			wantBurst:  150,
 		},
-		{
-			name: "zero QPS is valid and applied",
+		"zero QPS is valid and applied": {
 			cfg: configapi.Configuration{
 				ClientConnection: &configapi.ClientConnection{
 					QPS:   ptr.To[float32](0),
@@ -875,8 +868,7 @@ func TestApplyClientConnection(t *testing.T) {
 			wantQPS:      0,
 			wantBurst:    0,
 		},
-		{
-			name: "empty ClientConnection struct preserves existing values",
+		"empty ClientConnection struct preserves existing values": {
 			cfg: configapi.Configuration{
 				ClientConnection: &configapi.ClientConnection{},
 			},
@@ -887,8 +879,8 @@ func TestApplyClientConnection(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
 			restCfg := &rest.Config{
 				QPS:   tc.initialQPS,
 				Burst: tc.initialBurst,
@@ -923,28 +915,25 @@ clientConnection:
 		t.Fatal(err)
 	}
 
-	testcases := []struct {
-		name       string
+	testcases := map[string]struct {
 		configFile string
 		wantQPS    float32
 		wantBurst  int
 	}{
-		{
-			name:       "default config applies default QPS/burst",
+		"default config applies default QPS/burst": {
 			configFile: "",
 			wantQPS:    50,
 			wantBurst:  100,
 		},
-		{
-			name:       "custom config applies custom QPS/burst",
+		"custom config applies custom QPS/burst": {
 			configFile: customQPSConfig,
 			wantQPS:    100,
 			wantBurst:  200,
 		},
 	}
 
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
 			_, cfg, err := Load(testScheme, tc.configFile, false)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
