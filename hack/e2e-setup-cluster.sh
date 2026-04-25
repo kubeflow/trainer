@@ -67,6 +67,11 @@ TRAINER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/torchtune-trainer"
 TRAINER_CI_IMAGE="${TRAINER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 ${CONTAINER_RUNTIME} build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_CI_IMAGE}
 
+XGBOOST_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/xgboost-runtime"
+XGBOOST_RUNTIME_CI_IMAGE="${XGBOOST_RUNTIME_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+echo "Build XGBoost runtime image"
+${CONTAINER_RUNTIME} build . -f cmd/runtimes/xgboost/Dockerfile -t ${XGBOOST_RUNTIME_CI_IMAGE}
+
 # ==========================================
 # 2. Create Cluster & Configure Environment
 # ==========================================
@@ -97,11 +102,21 @@ if [ "${CLUSTER_TYPE}" = "gpu" ]; then
   mkdir -p "$HELM_CONFIG_HOME" "$HELM_CACHE_HOME" "$HELM_DATA_HOME"
 
   helm repo add nvidia https://helm.ngc.nvidia.com/nvidia && helm repo update
+
+  # Configure GPU time slicing for GPU.
+  kubectl create -n gpu-operator -f ./hack/gpu-time-slicing.yml
+
   helm install --wait --generate-name \
     -n gpu-operator --create-namespace \
     nvidia/gpu-operator \
     --version="${GPU_OPERATOR_VERSION}" \
-    --set driver.enabled=false
+    --set driver.enabled=false \
+    --set devicePlugin.config.name=gpu-time-slicing-config
+
+  # Patch cluster to use the time slicing configuration.
+  kubectl patch clusterpolicies.nvidia.com/cluster-policy \
+    -n gpu-operator --type merge \
+    -p '{"spec": {"devicePlugin": {"config": {"name": "gpu-time-slicing-config", "default": "any"}}}}'
 
   # Validation steps
   kubectl get ns gpu-operator
@@ -138,8 +153,6 @@ print_cluster_info() {
 # ==========================================
 # 4. Deploy Control Plane & Runtimes
 # ==========================================
-XGBOOST_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/xgboost-runtime"
-
 if [ "${INSTALL_METHOD}" = "kustomize" ]; then
   echo "Deploy Kubeflow Trainer control plane"
   E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
@@ -226,6 +239,15 @@ if [ "${CLUSTER_TYPE}" = "gpu" ]; then
   kubectl get clustertrainingruntimes -o json | jq '
     .items[].spec.template.spec.replicatedJobs[].template.spec.template.spec.runtimeClassName = "nvidia"
   ' | kubectl apply -f -
+
+  # hotfix: mount /dev/shm as emptyDir for NCCL shared memory requirements.
+  echo "Patch CRDs to mount /dev/shm as emptyDir"
+  kubectl get clustertrainingruntimes -o json | jq '
+    .items[].spec.template.spec.replicatedJobs[].template.spec.template.spec |= (
+      .volumes = ((.volumes // []) + [{"name": "dshm", "emptyDir": {"medium": "Memory"}}]) |
+      .containers = [.containers[] | .volumeMounts = ((.volumeMounts // []) + [{"name": "dshm", "mountPath": "/dev/shm"}])]
+    )
+  ' | kubectl apply -f -
 fi
 
 # ==========================================
@@ -250,10 +272,5 @@ fi
 # # Load JAX runtime image in KinD
 # ${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
 # load_image_to_kind ${JAX_RUNTIME_IMAGE} "${CLUSTER_NAME}"
-
-# Build and load custom runtime images that are not available in public registries.
-XGBOOST_RUNTIME_CI_IMAGE="${XGBOOST_RUNTIME_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
-echo "Build XGBoost runtime image"
-${CONTAINER_RUNTIME} build . -f cmd/runtimes/xgboost/Dockerfile -t ${XGBOOST_RUNTIME_CI_IMAGE}
 
 print_cluster_info
