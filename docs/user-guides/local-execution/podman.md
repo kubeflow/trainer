@@ -235,7 +235,7 @@ def test_networking():
     if rank == 0:
         container_name = os.environ.get('HOSTNAME')
         print(f"Rank {rank}: My IP address: {socket.gethostbyname(container_name)}")
-    
+
     if rank != 0:
         import subprocess
         result = subprocess.run(['ping', '-c', '1', master_addr], capture_output=True)
@@ -251,7 +251,7 @@ For a job with `num_nodes=3`, the Podman backend:
 3. Inspects rank-0 container to get its IP address
 4. Sets `MASTER_ADDR` to this IP for all containers
 5. Launches remaining containers (rank 1, 2, ...) connected to the same network
- 
+
 This approach combines the benefits of DNS (hostname resolution) with the reliability of IP addresses for critical communication paths.
 
 ## Job Management
