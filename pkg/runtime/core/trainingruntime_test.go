@@ -19,8 +19,8 @@ package core
 import (
 	"context"
 	"fmt"
-	"testing"
 	"strings"
+	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
