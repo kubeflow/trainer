@@ -176,6 +176,9 @@ const (
 
 	// OpenMPIEnvDefaultSlots is the OpenMPI default number of slots env key.
 	OpenMPIEnvDefaultSlots string = "OMPI_MCA_orte_set_default_slots"
+
+	// OpenMPIEnvBaseEnvList is the OpenMPI base environment list env key.
+	OpenMPIEnvBaseEnvList string = "OMPI_MCA_mca_base_env_list"
 	// Distributed envs for torchrun.
 	// Ref: https://github.com/pytorch/pytorch/blob/3a0d0885171376ed610c8175a19ba40411fc6f3f/torch/distributed/argparse_util.py#L45
 	// TorchEnvNumNodes is the env name for the number of training nodes.

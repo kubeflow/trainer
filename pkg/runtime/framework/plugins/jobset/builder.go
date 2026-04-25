@@ -139,7 +139,7 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 				}
 			}
 		}
-		if ancestor == constants.AncestorTrainer || b.isRunLauncherAsNode(info) && *rJob.Name == constants.Node {
+		if ancestor == constants.AncestorTrainer || *rJob.Name == constants.Node {
 			// TODO (andreyvelich): For MPI we should apply container resources to the Node ReplicatedJob also.
 			// Eventually, we should find better way to propagate resources from TrainJob to JobSet.
 			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
