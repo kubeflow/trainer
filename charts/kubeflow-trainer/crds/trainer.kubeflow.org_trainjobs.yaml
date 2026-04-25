@@ -255,7 +255,7 @@ spec:
                         x-kubernetes-validations:
                         - message: storageUri must be a valid URI (scheme://...) or
                             absolute path (/...)
-                          rule: self.matches('^([A-Za-z][A-Za-z0-9+.-]*://.*|/.*)$')
+                          rule: self == '' || self.matches('^([A-Za-z][A-Za-z0-9+.+-]*://.+|/.*)$')
                     type: object
                   model:
                     description: model defines the configuration for the pre-trained
@@ -450,7 +450,7 @@ spec:
                         x-kubernetes-validations:
                         - message: storageUri must be a valid URI (scheme://...) or
                             absolute path (/...)
-                          rule: self.matches('^([A-Za-z][A-Za-z0-9+.-]*://.*|/.*)$')
+                          rule: self == '' || self.matches('^([A-Za-z][A-Za-z0-9+.+-]*://.+|/.*)$')
                     type: object
                 type: object
                 x-kubernetes-validations:
