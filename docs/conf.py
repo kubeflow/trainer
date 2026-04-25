@@ -2,7 +2,6 @@
 # Kubeflow Trainer Documentation System
 
 import os
-import sys
 
 # -- Project information -----------------------------------------------------
 project = "Kubeflow Trainer"
@@ -35,8 +34,8 @@ exclude_patterns = [
     "*.egg-info",
     "__pycache__",
     "proposals",  # Exclude pre-existing proposals directory
-    "images",     # Exclude pre-existing images directory
-    "release",    # Exclude pre-existing release directory
+    "images",  # Exclude pre-existing images directory
+    "release",  # Exclude pre-existing release directory
     "README.md",  # Exclude pre-existing README
 ]
 
