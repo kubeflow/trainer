@@ -1108,7 +1108,7 @@ func schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref common.ReferenceCallb
 				Properties: map[string]spec.Schema{
 					"storageUri": {
 						SchemaProps: spec.SchemaProps{
-							Description: "storageUri is the URI for the model provider.",
+							Description: "storageUri is the URI for the model provider. Should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path)",
 							Type:        []string{"string"},
 							Format:      "",
 						},
