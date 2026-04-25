@@ -14168,7 +14168,7 @@
             ]
           },
           "storageUri": {
-            "description": "storageUri is the URI for the model provider.",
+            "description": "storageUri is the URI for the model provider. Should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path)",
             "type": "string"
           }
         }

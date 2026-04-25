@@ -219,6 +219,7 @@ type DatasetInitializer struct {
 // which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
 type ModelInitializer struct {
 	// storageUri is the URI for the model provider.
+	// Should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path)
 	// +kubebuilder:validation:XValidation:rule="self.matches('^([A-Za-z][A-Za-z0-9+.-]*://.*|/.*)$')",message="storageUri must be a valid URI (scheme://...) or absolute path (/...)"
 	// +kubebuilder:validation:MaxLength=2048
 	// +optional

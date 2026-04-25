@@ -29,6 +29,7 @@ import (
 // which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`
 type ModelInitializerApplyConfiguration struct {
 	// storageUri is the URI for the model provider.
+	// Should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path)
 	StorageUri *string `json:"storageUri,omitempty"`
 	// env is the list of environment variables to set in the model initializer container.
 	// These values will be merged with the TrainingRuntime's model initializer environments.
