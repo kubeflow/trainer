@@ -118,8 +118,11 @@ func main() {
 		}
 	}
 
-	setupLog.Info("Creating manager")
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
+	restCfg := ctrl.GetConfigOrDie()
+	config.ApplyClientConnection(restCfg, &cfg)
+
+	setupLog.Info("Creating manager", "qps", restCfg.QPS, "burst", restCfg.Burst)
+	mgr, err := ctrl.NewManager(restCfg, options)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
