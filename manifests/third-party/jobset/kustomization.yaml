@@ -4,6 +4,11 @@ kind: Kustomization
 resources:
   - https://github.com/kubernetes-sigs/jobset/releases/download/v0.11.0/manifests.yaml
 
+images:
+  - name: us-central1-docker.pkg.dev/k8s-staging-images/jobset/jobset
+    newName: registry.k8s.io/jobset/jobset
+    newTag: v0.11.0
+
 # Add required patches.
 patches:
   # Remove namespace from the JobSet release manifests.
