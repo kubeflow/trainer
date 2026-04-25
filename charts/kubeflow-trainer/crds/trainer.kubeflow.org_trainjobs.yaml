@@ -247,9 +247,15 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       storageUri:
-                        description: storageUri is the URI for the dataset provider.
+                        description: |-
+                          storageUri is the URI for the dataset provider.
+                          Should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path)
                         maxLength: 2048
                         type: string
+                        x-kubernetes-validations:
+                        - message: storageUri must be a valid URI (scheme://...) or
+                            absolute path (/...)
+                          rule: self.matches('^([A-Za-z][A-Za-z0-9+.-]*://.*|/.*)$')
                     type: object
                   model:
                     description: model defines the configuration for the pre-trained
@@ -439,6 +445,10 @@ spec:
                         description: storageUri is the URI for the model provider.
                         maxLength: 2048
                         type: string
+                        x-kubernetes-validations:
+                        - message: storageUri must be a valid URI (scheme://...) or
+                            absolute path (/...)
+                          rule: self.matches('^([A-Za-z][A-Za-z0-9+.-]*://.*|/.*)$')
                     type: object
                 type: object
                 x-kubernetes-validations:
@@ -531,8 +541,9 @@ spec:
                                       name:
                                         description: name is the name of the replicated
                                           job to patch.
-                                        maxLength: 253
+                                        maxLength: 63
                                         minLength: 1
+                                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                                         type: string
                                       template:
                                         description: template patches the Job template
