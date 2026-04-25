@@ -639,7 +639,7 @@ func schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"storageUri": {
 						SchemaProps: spec.SchemaProps{
-							Description: "storageUri is the URI for the dataset provider.",
+							Description: "storageUri is the URI for the dataset provider. Should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path)",
 							Type:        []string{"string"},
 							Format:      "",
 						},
