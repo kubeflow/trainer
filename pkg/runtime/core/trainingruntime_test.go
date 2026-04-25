@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -2128,19 +2129,38 @@ test-job-node-0-1.test-job slots=8
 		})
 	}
 }
+
 func TestTrainingRuntime_RuntimeInfo_UnsupportedTemplate(t *testing.T) {
-	rt := &TrainingRuntime{}
+	tests := map[string]struct {
+		templateType string
+	}{
+		"invalid template type returns error": {
+			templateType: "invalid-template-type",
+		},
+	}
 
-	trainJob := &trainer.TrainJob{}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Using zero-value TrainingRuntime is safe here because RuntimeInfo
+			// returns early for unsupported template types before accessing internal fields.
+			rt := &TrainingRuntime{}
 
-	_, err := rt.RuntimeInfo(
-		trainJob,
-		"invalid-template-type",
-		nil,
-		nil,
-	)
+			trainJob := &trainer.TrainJob{}
 
-	if err == nil {
-		t.Fatalf("expected error for unsupported runtimeTemplateSpec, got nil")
+			_, err := rt.RuntimeInfo(
+				trainJob,
+				tt.templateType,
+				nil,
+				nil,
+			)
+
+			if err == nil {
+				t.Fatalf("expected error for unsupported runtimeTemplateSpec, got nil")
+			}
+
+			if !strings.Contains(err.Error(), "unsupported runtimeTemplateSpec") {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
 	}
 }
