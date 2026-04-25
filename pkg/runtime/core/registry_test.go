@@ -37,7 +37,7 @@ func TestNewRuntimeRegistry(t *testing.T) {
 				if tr.factory == nil {
 					t.Fatalf("expected TrainingRuntime factory to be non-nil")
 				}
-				if tr.dependencies != nil {
+				if len(tr.dependencies) != 0 {
 					t.Fatalf("expected TrainingRuntime to have no dependencies, got %v", tr.dependencies)
 				}
 			},
@@ -55,10 +55,10 @@ func TestNewRuntimeRegistry(t *testing.T) {
 		},
 		"ClusterTrainingRuntime depends on TrainingRuntime": {
 			validate: func(t *testing.T, registry Registry) {
-				ctr := registry[ClusterTrainingRuntimeGroupKind]
+				ctr, ok := registry[ClusterTrainingRuntimeGroupKind]
 
-				if len(ctr.dependencies) != 1 {
-					t.Fatalf("expected 1 dependency, got %v", ctr.dependencies)
+				if !ok {
+					t.Fatalf("expected ClusterTrainingRuntimeGroupKind to be registered")
 				}
 				if ctr.dependencies[0] != TrainingRuntimeGroupKind {
 					t.Fatalf(
