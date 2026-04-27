@@ -25,6 +25,32 @@ Which envs are needed by preflight:
 This KEP does not claim that every preflight check needs all `PET_*` envs.
 The goal is to make the same runtime-computed `PET_*` values available to init containers when users choose to use them.
 
+### User Stories
+
+- As a platform administrator, I want `PET_*` topology environment variables available in  distributed trainer init containers so preflight checks can validate distributed readiness before expensive training starts.
+- As a job submitter, I want preflight to fail fast with clear, machine-readable reasons (GPU, network, DNS, storage, runtime smoke test) so I can fix issues quickly instead of debugging mid-run failures.
+- As an operator, I want preflight outcomes to map to deterministic actions ( Warning , Retry , Reschedule , Stop ) to avoid inconsistent behavior across clusters.
+- As a runtime engineer, I want early clarify and detect any of unstable problems like ensure cross-pod DNS resolution for MASTER_ADDR to prevent out-of-band communication failures during training.
+
+
+Moreover: 
+- Init-container preflight emits structured results ( json ) and normalized exit codes (example: 0=pass , 10=warning , 20=retryable , 30=fatal ).
+- Preflight covers at least: GPU health, driver/CUDA compatibility, NCCL connectivity, Kubernetes API reachability, storage accessibility, minimal torchrun smoke test, and repeated DNS resolution for MASTER_ADDR .
+
+| ID | Real-World Story (Init-Container Context) | Typical Check in Init Container | Recommended Action | Rationale |
+|----|------------------------------------------|--------------------------------|--------------------|-----------|
+| 1 | GPU missing/unhealthy on a node causes immediate CUDA failures after launch. | `nvidia-smi -L`, DCGM health/diag (or vendor equivalent) | Stop + Reschedule | Node-local hardware issue is unlikely to self-heal in-place. |
+| 2 | Driver/CUDA incompatibility causes runtime crashes despite successful pod startup. | Compare host driver (`nvidia-smi`) vs image CUDA compatibility | Stop | Configuration mismatch; rescheduling usually reproduces same failure class. |
+| 3 | NCCL path is broken across nodes, leading to all-reduce hang/timeout. | `nccl-tests` (small all-reduce) using PET_* topology | Retry once → Reschedule once → Stop | Transient network issues may recover; persistent failures should fail fast. |
+| 4 | API server reachability is intermittent, causing control-plane communication issues. | `curl https://$KUBERNETES_SERVICE_HOST:$PORT/version` | Warning + Retry, then Stop if persistent | Short blips are common; sustained failure is fatal for orchestration. |
+| 5 | Required storage path is not writable/readable, causing checkpoint/data IO failures. | Read/write/delete probe on mounted volumes | Stop for required path; Warning + Degrade for optional cache path | Required IO must be hard-gated; optional paths can fall back. |
+| 6 | Minimal distributed launch fails although single checks pass. | Tiny `torchrun` smoke test (`--nnodes`, `--nproc_per_node`) | Stop + Reschedule once | End-to-end distributed readiness is the final gate before expensive training. |
+| 7 | Cross-pod DNS for `MASTER_ADDR` is unstable; out-of-band runtime communication fails mid-run. | Resolve `MASTER_ADDR` repeatedly (`nslookup` / `getent hosts`) and optional TCP probe | Warning + Degrade if fallback endpoint exists; otherwise Stop | Name resolution instability can silently break runtime coordination later. Ensure `publishNotReadyAddresses=true` when early resolution is required. |
+
+
+
+
+
 ### Goals
 
 - Keep `PET_*` env injection to trainer main container unchanged.
