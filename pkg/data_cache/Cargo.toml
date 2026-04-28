@@ -22,7 +22,7 @@ bincode = "2.0.1"
 hickory-resolver = "0.24.2"
 axum = "0.8"
 tower = "0.5"
-hyper = "1.0"
+hyper = "1.9"
 
 [dev-dependencies]
 tokio = { version = "1.52.1", features = ["full"] }
