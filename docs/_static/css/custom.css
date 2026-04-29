@@ -1,0 +1,290 @@
+/* Custom CSS for Kubeflow Trainer Documentation
+ * Furo theme overrides and Kubeflow branding
+ */
+
+/* Kubeflow brand colors */
+:root {
+    /* Primary Kubernetes/Kubeflow blue */
+    --color-kubeflow-blue: #326CE5;
+    --color-kubeflow-blue-dark: #1a4b99;
+    --color-kubeflow-blue-light: #5B9DF1;
+}
+
+/* Light mode: Use Kubernetes blue for links and accents */
+body[data-theme="light"] {
+    --color-brand-primary: var(--color-kubeflow-blue);
+    --color-brand-content: var(--color-kubeflow-blue);
+}
+
+/* Dark mode: Use lighter blue for better contrast */
+body[data-theme="dark"] {
+    --color-brand-primary: var(--color-kubeflow-blue-light);
+    --color-brand-content: var(--color-kubeflow-blue-light);
+}
+
+/* Code block improvements */
+.highlight {
+    border-radius: 6px;
+}
+
+/* Make copy button more visible */
+button.copybtn {
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+button.copybtn:hover {
+    opacity: 1;
+}
+
+/* Improve table readability */
+table.docutils {
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+table.docutils th {
+    background-color: var(--color-kubeflow-blue);
+    color: white;
+    padding: 0.5rem;
+}
+
+body[data-theme="dark"] table.docutils th {
+    background-color: var(--color-kubeflow-blue-dark);
+}
+
+table.docutils td {
+    padding: 0.5rem;
+    border: 1px solid var(--color-foreground-border);
+}
+
+/* Admonition styling for version notes */
+.admonition.version-note {
+    border-left-color: var(--color-kubeflow-blue);
+}
+
+/* Mermaid diagram container */
+.mermaid {
+    text-align: center;
+    margin: 1.5rem 0;
+}
+
+/* Documentation Cards Layout */
+.doc-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+/* Shared card styles for homepage (.doc-card) and sphinx-design (.sd-card) */
+a.doc-card,
+.sd-card {
+    border: 1px solid var(--color-foreground-border) !important;
+    border-radius: 8px !important;
+    padding: 1.5rem;
+    background-color: var(--color-background-secondary);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+a.doc-card {
+    text-decoration: none;
+    display: block;
+}
+
+a.doc-card:hover,
+.sd-card:hover {
+    border-color: var(--color-brand-primary) !important;
+    box-shadow: 0 4px 12px rgba(50, 108, 229, 0.15);
+    transform: translateY(-2px);
+    text-decoration: none;
+}
+
+body[data-theme="dark"] a.doc-card,
+body[data-theme="dark"] .sd-card {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+body[data-theme="dark"] a.doc-card:hover,
+body[data-theme="dark"] .sd-card:hover {
+    box-shadow: 0 4px 12px rgba(91, 157, 241, 0.2);
+}
+
+a.doc-card strong,
+.sd-card .sd-card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-brand-primary);
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+a.doc-card p,
+.sd-card .sd-card-body p {
+    margin: 0;
+    color: var(--color-foreground-secondary);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* Landing page improvements */
+.document h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--color-foreground-primary);
+}
+
+.document h1 + p {
+    font-size: 1.1rem;
+    color: var(--color-foreground-secondary);
+    margin-bottom: 2rem;
+}
+
+/* Section dividers */
+hr {
+    border: none;
+    border-top: 2px solid var(--color-foreground-border);
+    margin: 2.5rem 0;
+}
+
+/* Improve section headers */
+.document h2 {
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    font-size: 1.75rem;
+    color: var(--color-foreground-primary);
+}
+
+/* Feature list styling (content area only, not sidebar) */
+.document ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.document ul li {
+    padding-left: 1.5rem;
+    position: relative;
+    margin-bottom: 0.75rem;
+}
+
+.document ul li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: var(--color-brand-primary);
+    font-weight: bold;
+}
+
+/* Widen the content area to reduce whitespace */
+@media (min-width: 67em) {
+    .content {
+        width: 54em;
+        padding: 0 2em;
+    }
+
+    body.sidebar-collapsed .content {
+        width: 70em;
+        max-width: 100%;
+    }
+}
+
+/* Sidebar: make it stick while scrolling */
+@media (min-width: 67em) {
+    .sidebar-drawer {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow-y: auto;
+    }
+}
+
+/* Sidebar: YouTube-style collapse toggle */
+@media (min-width: 67em) {
+    .sidebar-drawer {
+        transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                    min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.sidebar-collapsed .sidebar-drawer {
+        width: 0 !important;
+        min-width: 0 !important;
+    }
+
+    .sidebar-toggle-btn {
+        position: fixed;
+        top: 0.65rem;
+        left: 0.65rem;
+        z-index: 100;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        color: var(--color-foreground-muted);
+        padding: 0;
+        line-height: 1;
+        transition: background 0.15s, color 0.15s;
+    }
+
+    .sidebar-toggle-btn:hover {
+        color: var(--color-foreground-primary);
+        background: rgba(128, 128, 128, 0.15);
+    }
+
+    .sidebar-toggle-btn:active {
+        background: rgba(128, 128, 128, 0.25);
+    }
+}
+
+@media (max-width: 66.99em) {
+    .sidebar-toggle-btn {
+        display: none !important;
+    }
+}
+
+/* Sidebar: reduce left whitespace */
+.sidebar-tree .reference {
+    padding: 0.35rem 0.75rem;
+}
+
+.sidebar-tree ul ul {
+    margin-left: 0.625rem;
+}
+
+.sidebar-tree .toctree-l1 > a,
+.sidebar-tree .toctree-l1 > .reference {
+    font-weight: 600;
+}
+
+.sidebar-tree .toctree-l2 > a,
+.sidebar-tree .toctree-l2 > .reference,
+.sidebar-tree .toctree-l3 > a,
+.sidebar-tree .toctree-l3 > .reference {
+    font-weight: 400;
+    font-size: 0.9rem;
+}
+
+/* Sidebar: highlight the current (active) page in blue */
+.sidebar-tree li.current-page > .reference {
+    color: var(--color-brand-primary) !important;
+    font-weight: 700;
+    border-left: 3px solid var(--color-brand-primary);
+    padding-left: calc(0.75rem - 3px);
+    background-color: rgba(50, 108, 229, 0.08);
+    border-radius: 0 4px 4px 0;
+}
+
+body[data-theme="dark"] .sidebar-tree li.current-page > .reference {
+    background-color: rgba(91, 157, 241, 0.1);
+}
+
+/* Parent section containing the current page gets a subtle blue tint */
+.sidebar-tree li.toctree-l1.current.has-children > .reference {
+    color: var(--color-brand-primary) !important;
+    font-weight: 700;
+}
