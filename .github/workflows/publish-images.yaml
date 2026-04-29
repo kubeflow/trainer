@@ -1,6 +1,8 @@
-# Reusable workflow to publish Kubeflow Trainer images.
+# Reusable workflow to build and publish Kubeflow Trainer images.
+# Each invocation builds a single platform natively on the specified runner,
+# pushes by digest (no tag), and uploads the digest as an artifact.
+# The caller workflow assembles the multi-arch manifest in a separate merge job.
 name: Build And Publish Container Images
-description: Build Multiplatform Supporting Container Images
 
 on:
   workflow_call:
@@ -16,7 +18,7 @@ on:
       platforms:
         required: true
         type: string
-        description: "Platforms to build for (e.g., linux/amd64,linux/arm64)"
+        description: "Platforms to build for (e.g., linux/amd64)"
       context:
         required: false
         type: string
@@ -32,12 +34,18 @@ on:
       DOCKERHUB_TOKEN:
         required: true
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-and-publish:
-    name: Build ${{ inputs.component-name }}
+    name: Build ${{ inputs.component-name }} (${{ inputs.runs-on }})
     runs-on: ${{ inputs.runs-on }}
     env:
       SHOULD_PUBLISH: ${{ github.event_name == 'push' }}
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -94,7 +102,7 @@ jobs:
 
       - name: GHCR Login
         if: env.SHOULD_PUBLISH == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -102,34 +110,52 @@ jobs:
 
       - name: Docker Hub Login
         if: env.SHOULD_PUBLISH == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set Up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
-      - name: Add Docker Tags
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ghcr.io/kubeflow/trainer/${{ inputs.component-name }}
-            docker.io/kubeflow/${{ inputs.component-name }}
-          tags: |
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha
-
-      - name: Build and Push
-        uses: docker/build-push-action@v5
+      # Build and push by digest only (no tags). Tags are created in the merge job.
+      - name: Build and Push (by digest)
+        if: env.SHOULD_PUBLISH == 'true'
+        id: build
+        uses: docker/build-push-action@v7
         with:
           platforms: ${{ inputs.platforms }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
-          push: ${{ env.SHOULD_PUBLISH == 'true' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,ignore-error=true
+          cache-from: type=gha,scope=${{ inputs.component-name }}-${{ inputs.runs-on }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.component-name }}-${{ inputs.runs-on }},ignore-error=true
+          outputs: |
+            type=image,name=ghcr.io/kubeflow/trainer/${{ inputs.component-name }},push-by-digest=true,name-canonical=true,push=true
+
+      # On PRs, only validate the build (no push, no digest export).
+      - name: Build (PR validation)
+        if: env.SHOULD_PUBLISH != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          platforms: ${{ inputs.platforms }}
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          push: false
+          cache-from: type=gha,scope=${{ inputs.component-name }}-${{ inputs.runs-on }}
+
+      - name: Export digest
+        if: env.SHOULD_PUBLISH == 'true'
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: env.SHOULD_PUBLISH == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ inputs.component-name }}-${{ inputs.runs-on }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
