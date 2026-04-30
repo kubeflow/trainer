@@ -258,7 +258,7 @@ fi
 # # TODO (andreyvelich): We should build runtime images before adding them.
 # TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
 # DEEPSPEED_RUNTIME_IMAGE=ghcr.io/kubeflow/trainer/deepspeed-runtime:latest
-# JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
+JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
 
 # # Load Torch runtime image in KinD
 # ${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
@@ -270,7 +270,7 @@ fi
 
 # # Pre-pull NVIDIA JAX image for JAX runtime.
 # # Load JAX runtime image in KinD
-# ${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
-# load_image_to_kind ${JAX_RUNTIME_IMAGE} "${CLUSTER_NAME}"
+${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
+load_image_to_kind ${JAX_RUNTIME_IMAGE} "${CLUSTER_NAME}"
 
 print_cluster_info
