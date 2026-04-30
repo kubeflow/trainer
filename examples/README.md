@@ -23,8 +23,8 @@ Ready-to-use YAML examples that can be applied directly with `kubectl`:
 # Multi-node distributed training
 kubectl apply -f yaml/basic/01-multi-node.yaml
 
-# Production with PodSpec overrides
-kubectl apply -f yaml/advanced/01-podspec-overrides.yaml
+# Pod customization with the runtimePatches API
+kubectl apply -f yaml/advanced/01-runtime-patches.yaml
 ```
 
 **[Browse YAML Examples](./yaml/)**

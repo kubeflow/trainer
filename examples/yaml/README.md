@@ -1,63 +1,46 @@
 # Kubeflow Trainer YAML Examples
 
-Standalone YAML examples for Kubeflow Trainer that can be applied directly with `kubectl`.
+Standalone manifests that can be applied directly with `kubectl`. For an end-to-end conceptual walkthrough, see the [Kubeflow Trainer documentation](https://www.kubeflow.org/docs/components/trainer/).
 
 ## Prerequisites
 
 - Kubernetes cluster with Kubeflow Trainer installed
-- `kubectl` configured to access your cluster
-- ClusterTrainingRuntimes installed (included with default Kubeflow Trainer installation)
+- `kubectl` configured against the cluster
+- The default ClusterTrainingRuntimes installed (shipped with Kubeflow Trainer):
 
-Verify installation:
+  ```bash
+  kubectl get clustertrainingruntimes
+  ```
 
-```bash
-kubectl get clustertrainingruntimes
-```
-
-## Directory Structure
-
-```
-yaml/
-├── basic/          # Simple examples for getting started
-└── advanced/       # Advanced configurations (scheduling, overrides, etc.)
-```
-
-## Examples Overview
+## Examples
 
 ### Basic
 
 | File | Description |
 |------|-------------|
-| [`basic/01-multi-node.yaml`](basic/01-multi-node.yaml) | Multi-node distributed training with torch-distributed runtime |
+| [`basic/01-multi-node.yaml`](basic/01-multi-node.yaml) | Multi-node distributed training using the `torch-distributed` runtime |
 
 ### Advanced
 
 | File | Description |
 |------|-------------|
-| [`advanced/01-podspec-overrides.yaml`](advanced/01-podspec-overrides.yaml) | Pod customization with `podTemplateOverrides` |
-| [`advanced/02-kueue-integration.yaml`](advanced/02-kueue-integration.yaml) | Job scheduling with Kueue |
-| [`advanced/03-volcano-integration.yaml`](advanced/03-volcano-integration.yaml) | Gang scheduling with Volcano |
-| [`advanced/04-multi-step.yaml`](advanced/04-multi-step.yaml) | Multi-step pipeline with dataset initialization |
+| [`advanced/01-runtime-patches.yaml`](advanced/01-runtime-patches.yaml) | Pod customization with the `runtimePatches` API (nodeSelector, tolerations, serviceAccountName, labels, annotations) |
+| [`advanced/02-kueue-integration.yaml`](advanced/02-kueue-integration.yaml) | Queue-based scheduling with [Kueue](https://kueue.sigs.k8s.io/) |
+| [`advanced/03-volcano-integration.yaml`](advanced/03-volcano-integration.yaml) | Gang scheduling with [Volcano](https://volcano.sh/) |
+| [`advanced/04-multi-step.yaml`](advanced/04-multi-step.yaml) | Dataset-initializer step running before the trainer |
 
-## Quick Start
+## Quick start
 
 ```bash
-# Apply multi-node example
 kubectl apply -f basic/01-multi-node.yaml
-
-# Check status
-kubectl get trainjobs
-
-# View logs
-kubectl logs -l trainer.kubeflow.org/job-name=multi-node-example
-
-# Clean up
+kubectl get trainjob multi-node-example
+kubectl get pods -l jobset.sigs.k8s.io/jobset-name=multi-node-example
+kubectl logs -l jobset.sigs.k8s.io/jobset-name=multi-node-example
 kubectl delete trainjob multi-node-example
 ```
 
-## Additional Resources
+## See also
 
-- [Kubeflow Trainer Documentation](https://www.kubeflow.org/docs/components/trainer/)
-- [Runtime Guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/)
-- [Job Scheduling Guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/)
-- [Python SDK Examples](../pytorch/)
+- [Runtime guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/)
+- [Job scheduling guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/)
+- [Python SDK examples](../pytorch/)

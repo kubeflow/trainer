@@ -1,0 +1,84 @@
+# Advanced Example 1: Runtime Patches
+#
+# Demonstrates pod customization with the runtimePatches API. Each patch is
+# keyed by a "manager" so users, Kueue, and admission webhooks can each own
+# one entry without conflicting.
+#
+# Notes:
+#   - Resources for training nodes are set via spec.trainer.resourcesPerNode.
+#   - Env vars for the "node" container are set via spec.trainer.env
+#     (RuntimePatches container env is forbidden for the "node",
+#     "dataset-initializer", and "model-initializer" containers).
+#   - runtimePatches expose JobSet metadata, Job metadata, Pod metadata, and
+#     a restricted set of Pod spec fields (serviceAccountName, volumes,
+#     nodeSelector, affinity, tolerations, etc.).
+#
+# Apply: kubectl apply -f 01-runtime-patches.yaml
+# Check: kubectl describe trainjob runtime-patches-example
+# Pods:  kubectl get pods -l jobset.sigs.k8s.io/jobset-name=runtime-patches-example
+# Clean: kubectl delete trainjob runtime-patches-example
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: runtime-patches-example
+  namespace: default
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: torch-distributed
+
+  trainer:
+    numNodes: 2
+    command:
+      - python3
+      - -c
+      - |
+        import os
+        print("Node running with:")
+        print(f"  CUSTOM_VAR:    {os.getenv('CUSTOM_VAR')}")
+        print(f"  TRAINING_MODE: {os.getenv('TRAINING_MODE')}")
+
+    env:
+      - name: CUSTOM_VAR
+        value: "custom-value"
+      - name: TRAINING_MODE
+        value: "distributed"
+      - name: PYTHONUNBUFFERED
+        value: "1"
+
+    resourcesPerNode:
+      requests:
+        cpu: "2"
+        memory: "4Gi"
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+
+  runtimePatches:
+    - manager: example.io/platform-team
+      trainingRuntimeSpec:
+        template:
+          metadata:
+            labels:
+              team: ml-platform
+              cost-center: research
+            annotations:
+              prometheus.io/scrape: "true"
+              prometheus.io/port: "8080"
+          spec:
+            replicatedJobs:
+              - name: node
+                template:
+                  spec:
+                    template:
+                      spec:
+                        serviceAccountName: training-sa
+                        nodeSelector:
+                          node-type: training
+                        tolerations:
+                          - key: training-workload
+                            operator: Equal
+                            value: "true"
+                            effect: NoSchedule

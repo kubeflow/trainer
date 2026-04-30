@@ -6,22 +6,16 @@ Simple examples to get started with Kubeflow Trainer using `kubectl`.
 
 ### Multi-Node Distributed Training (`01-multi-node.yaml`)
 
-Demonstrates multi-node distributed training using the `torch-distributed` ClusterTrainingRuntime.
+Multi-node distributed training on the `torch-distributed` ClusterTrainingRuntime, using the runtime's default PyTorch image. Demonstrates the `PET_*` env vars (`PET_NNODES`, `PET_NPROC_PER_NODE`, `PET_NODE_RANK`, `PET_MASTER_ADDR`, `PET_MASTER_PORT`) injected by the trainer controller for `torchrun`.
 
-**What it shows:**
-- Multi-node configuration with `numNodes`
-- Using the default runtime image (no custom image needed)
-- `PET_*` environment variables set by the trainer controller
-
-**Run it:**
 ```bash
 kubectl apply -f 01-multi-node.yaml
-kubectl get trainjobs multi-node-example
-kubectl logs -l trainer.kubeflow.org/job-name=multi-node-example
+kubectl get trainjob multi-node-example
+kubectl logs -l jobset.sigs.k8s.io/jobset-name=multi-node-example
 kubectl delete trainjob multi-node-example
 ```
 
-## Next Steps
+## Next steps
 
-- Try [advanced examples](../advanced/) for production patterns
-- See the [Kubeflow Trainer docs](https://www.kubeflow.org/docs/components/trainer/) for full documentation
+- [Advanced examples](../advanced/) for production patterns
+- [Kubeflow Trainer documentation](https://www.kubeflow.org/docs/components/trainer/)
