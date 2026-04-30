@@ -174,10 +174,15 @@ func (j *JobSet) checkRuntimePatchesImmutability(ctx context.Context, oldObj, ne
 
 	jobSet := &jobsetv1alpha2.JobSet{}
 	changed := !equality.Semantic.DeepEqual(oldObj.Spec.RuntimePatches, newObj.Spec.RuntimePatches)
-	suspended := ptr.Equal(newObj.Spec.Suspend, ptr.To(true))
+	// Check the old object's suspend state instead of the new one so callers
+	// (e.g. Kueue) can update RuntimePatches and unsuspend the TrainJob in a
+	// single atomic API request. This mirrors the Kubernetes core Job
+	// validation pattern: if it was safe to mutate before, it is safe to
+	// mutate during the suspended -> unsuspended transition.
+	oldSuspended := ptr.Equal(oldObj.Spec.Suspend, ptr.To(true))
 	if changed {
-		if !suspended {
-			allErrs = append(allErrs, field.Forbidden(runtimePatchesPath, "RuntimePatches can only be modified when the TrainJob is suspended"))
+		if !oldSuspended {
+			allErrs = append(allErrs, field.Forbidden(runtimePatchesPath, "RuntimePatches can only be modified when the TrainJob was suspended"))
 		} else if err := j.client.Get(ctx, client.ObjectKeyFromObject(newObj), jobSet); client.IgnoreNotFound(err) != nil {
 			allErrs = append(allErrs, field.InternalError(runtimePatchesPath, err))
 		} else {

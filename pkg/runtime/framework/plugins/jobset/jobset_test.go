@@ -1038,7 +1038,7 @@ func TestValidate(t *testing.T) {
 				}).
 				Obj(),
 			wantError: field.ErrorList{
-				field.Forbidden(runtimePatchesPath, "RuntimePatches can only be modified when the TrainJob is suspended"),
+				field.Forbidden(runtimePatchesPath, "RuntimePatches can only be modified when the TrainJob was suspended"),
 			},
 		},
 		"allow changes to runtimePatches when trainJob is suspended and jobSet does not exist": {
