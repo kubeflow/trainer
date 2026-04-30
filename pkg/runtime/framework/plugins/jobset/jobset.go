@@ -174,14 +174,10 @@ func (j *JobSet) checkRuntimePatchesImmutability(ctx context.Context, oldObj, ne
 
 	jobSet := &jobsetv1alpha2.JobSet{}
 	changed := !equality.Semantic.DeepEqual(oldObj.Spec.RuntimePatches, newObj.Spec.RuntimePatches)
-	// Allow modifying RuntimePatches as long as the TrainJob is suspended at
-	// either side of the update — i.e. block only when the job is staying
-	// fully unsuspended. This lets external controllers (e.g. Kueue) bundle
-	// a RuntimePatches update with toggling spec.suspend in a single atomic
-	// API request, removing the two-step workaround and the race window
-	// between the calls. See kubernetes-sigs/kueue#8296 and the Kubernetes
-	// core Job validation pattern at
-	// https://github.com/kubernetes/kubernetes/blob/86b66f6f333a/pkg/registry/batch/job/strategy.go#L191
+	// Allow modifying RuntimePatches if the TrainJob is suspended before or
+	// after the update (i.e. block only when it stays fully unsuspended).
+	// This lets external controllers (e.g. Kueue) update RuntimePatches and
+	// toggle spec.suspend in a single API request.
 	oldSuspended := ptr.Equal(oldObj.Spec.Suspend, ptr.To(true))
 	newSuspended := ptr.Equal(newObj.Spec.Suspend, ptr.To(true))
 	if changed {
