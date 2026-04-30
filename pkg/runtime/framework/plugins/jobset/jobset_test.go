@@ -1201,6 +1201,86 @@ func TestValidate(t *testing.T) {
 			clientErr: apierrors.NewNotFound(jobsetv1alpha2.Resource("jobset"), ""),
 			wantError: nil,
 		},
+		"allow atomic update: modify runtimePatches and suspend trainJob in a single request": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.Node),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(false).
+				RuntimePatches([]trainer.RuntimePatch{
+					{
+						Manager: "test.io/manager",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														ServiceAccountName: ptr.To("service-account"),
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+				}).
+				Obj(),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Suspend(true).
+				RuntimePatches([]trainer.RuntimePatch{
+					{
+						Manager: "test.io/manager",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														ServiceAccountName: ptr.To("service-account-updated"),
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+				}).
+				Obj(),
+			clientErr: apierrors.NewNotFound(jobsetv1alpha2.Resource("jobset"), ""),
+			wantError: nil,
+		},
 		"allow changes to runtimePatches when trainJob is suspended and jobSet exists but is inactive": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{

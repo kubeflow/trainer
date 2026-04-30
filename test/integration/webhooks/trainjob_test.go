@@ -621,6 +621,42 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 					return job
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should succeed to atomically update runtimePatches and suspend in a single request",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "atomic-suspend-runtimepatches").
+						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Suspend(false).
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "test.io/manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: "node",
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																NodeSelector: map[string]string{"test": "test"},
+															},
+														},
+													},
+												},
+											}},
+										},
+									},
+								},
+							},
+						}).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.Suspend = ptr.To(true)
+					job.Spec.RuntimePatches[0].TrainingRuntimeSpec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec.NodeSelector = map[string]string{"updated": "while-suspending"}
+					return job
+				},
+				gomega.Succeed()),
 		)
 	})
 })
