@@ -116,6 +116,56 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					Obj(),
 			},
 		},
+		"succeeded to build PodGroup and JobSet with multi-slice TPU trainer.": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+				RuntimeSpec(
+					testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+						WithMLPolicy(
+							testingutil.MakeMLPolicyWrapper().
+								WithNumNodes(32).
+								Obj(),
+						).
+						PodGroupPolicyCoschedulingSchedulingTimeout(120).
+						Replicas(4, constants.Node).
+						Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Obj(),
+				).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						NumNodes(32).
+						Obj(),
+				).
+				Obj(),
+			wantObjs: []runtime.Object{
+				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Replicas(4, constants.Node).
+					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					Parallelism(8, constants.Node).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					Completions(8, constants.Node).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+					NumNodes(8).
+					Container(constants.DatasetInitializer, constants.DatasetInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.ModelInitializer, constants.ModelInitializer, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
+					Obj(),
+				testingutil.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "test-job").
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					MinMember(34). // 34 = 8 nodes × 4 slices + 1 DatasetInitializer + 1 ModelInitializer
+					MinResources(corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("34"),
+					}).
+					SchedulingTimeout(120).
+					Obj(),
+			},
+		},
 		"succeeded to build JobSet with NumNodes from the Runtime and container from the TrainJob.": {
 			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
 				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
