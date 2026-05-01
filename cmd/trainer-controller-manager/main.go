@@ -76,14 +76,9 @@ func main() {
 		"The controller will load its initial configuration from this file. "+
 			"Omit this flag to use the default configuration values. "+
 			"Command-line flags override configuration from this file.")
-	// if the enable-http2 flag is false (the default), http/2 should be disabled
-	// due to its vulnerabilities. More specifically, disabling http/2 will
-	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
-	// Rapid Reset CVEs. For more information see:
-	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
-	// - https://github.com/advisories/GHSA-4374-p667-p6c8
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
-		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+		"If set, HTTP/2 will be enabled for the metrics and webhook servers. "+
+			"Disabling HTTP/2 mitigates CVE-2023-44487 and CVE-2023-39325.")
 	flag.StringVar(&featureGates, "feature-gates", "",
 		"A comma-separated list of key=value pairs that describe feature gates. "+
 			"Command-line feature gates override those specified in the config file.")
@@ -175,7 +170,7 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 	}
 
 	if features.Enabled(features.TrainJobStatus) {
-		if err := statusserver.SetupServer(mgr, cfg.StatusServer, enableHTTP2); err != nil {
+		if err := statusserver.SetupServer(mgr, cfg.StatusServer, cfg.TLS, enableHTTP2); err != nil {
 			setupLog.Error(err, "Could not create runtime status server")
 			os.Exit(1)
 		}
