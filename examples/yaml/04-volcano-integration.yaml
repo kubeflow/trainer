@@ -11,7 +11,7 @@
 # Prerequisites:
 #   - Volcano scheduler installed in the cluster
 #
-# Apply: kubectl apply -f 03-volcano-integration.yaml
+# Apply: kubectl apply -f 04-volcano-integration.yaml
 # Check: kubectl get trainjob volcano-example
 # Pods:  kubectl get pods -l jobset.sigs.k8s.io/jobset-name=volcano-example
 # Group: kubectl get podgroup -l jobset.sigs.k8s.io/jobset-name=volcano-example
@@ -52,7 +52,6 @@ apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainJob
 metadata:
   name: volcano-example
-  namespace: default
 spec:
   runtimeRef:
     apiGroup: trainer.kubeflow.org

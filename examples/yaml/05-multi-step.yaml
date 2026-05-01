@@ -9,7 +9,7 @@
 # dataset-initializer container. The dataset is mounted at /workspace/dataset
 # (constants.DatasetMountPath) on both the initializer and trainer pods.
 #
-# Apply: kubectl apply -f 04-multi-step.yaml
+# Apply: kubectl apply -f 05-multi-step.yaml
 # Check: kubectl get trainjob multi-step-example
 # Init logs: kubectl logs -l trainer.kubeflow.org/trainjob-ancestor-step=dataset-initializer -f
 # Train logs: kubectl logs -l trainer.kubeflow.org/trainjob-ancestor-step=trainer -f
@@ -20,7 +20,6 @@ apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainingRuntime
 metadata:
   name: torch-with-dataset-init
-  namespace: default
   labels:
     trainer.kubeflow.org/framework: torch
 spec:
@@ -62,7 +61,6 @@ apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainJob
 metadata:
   name: multi-step-example
-  namespace: default
 spec:
   runtimeRef:
     apiGroup: trainer.kubeflow.org
@@ -108,7 +106,6 @@ spec:
 # kind: Secret
 # metadata:
 #   name: hf-secret
-#   namespace: default
 # type: Opaque
 # stringData:
 #   HF_TOKEN: "your_huggingface_token_here"

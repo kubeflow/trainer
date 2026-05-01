@@ -9,7 +9,7 @@
 #   - A LocalQueue named "training-queue" in the target namespace, backed
 #     by a ClusterQueue with quota
 #
-# Apply: kubectl apply -f 02-kueue-integration.yaml
+# Apply: kubectl apply -f 03-kueue-integration.yaml
 # Check: kubectl get trainjob kueue-example
 # Queue: kubectl get workload -l kueue.x-k8s.io/job-name=kueue-example
 # Pods:  kubectl get pods -l jobset.sigs.k8s.io/jobset-name=kueue-example
@@ -19,7 +19,6 @@ apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainJob
 metadata:
   name: kueue-example
-  namespace: default
   labels:
     # Tells Kueue which LocalQueue to admit this TrainJob into.
     kueue.x-k8s.io/queue-name: training-queue
@@ -65,6 +64,5 @@ spec:
 # kind: LocalQueue
 # metadata:
 #   name: training-queue
-#   namespace: default
 # spec:
 #   clusterQueue: cluster-queue
