@@ -1,0 +1,45 @@
+# Example 1: Multi-Node Distributed Training
+#
+# Multi-node distributed PyTorch training on the default torch-distributed
+# ClusterTrainingRuntime. The trainer is launched with torchrun, which reads
+# the rendezvous info from the PET_* env vars injected by Trainer
+# (PET_NNODES, PET_NPROC_PER_NODE, PET_NODE_RANK, PET_MASTER_ADDR,
+# PET_MASTER_PORT) and exposes WORLD_SIZE / RANK / LOCAL_RANK to each worker.
+#
+# See https://www.kubeflow.org/docs/components/trainer/user-guides/pytorch/#pytorch-distributed-environment
+#
+# Apply: kubectl apply -f 01-multi-node.yaml
+# Check: kubectl get trainjob multi-node-example
+# Logs:  kubectl logs -l jobset.sigs.k8s.io/jobset-name=multi-node-example
+# Clean: kubectl delete trainjob multi-node-example
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: multi-node-example
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: torch-distributed
+
+  trainer:
+    numNodes: 3
+    command:
+      - torchrun
+      - --no-python
+      - python3
+      - -c
+      - |
+        import os
+        import torch
+        import torch.distributed as dist
+
+        device, backend = ("cuda", "nccl") if torch.cuda.is_available() else ("cpu", "gloo")
+        dist.init_process_group(backend=backend)
+
+        print("PyTorch Distributed Environment")
+        print(f"Using device: {device}")
+        print(f"WORLD_SIZE: {dist.get_world_size()}")
+        print(f"RANK: {dist.get_rank()}")
+        print(f"LOCAL_RANK: {os.environ['LOCAL_RANK']}")

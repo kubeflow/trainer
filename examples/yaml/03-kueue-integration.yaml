@@ -1,0 +1,68 @@
+# Advanced Example 2: Kueue Integration
+#
+# Queue-based scheduling and quota management with Kueue. The TrainJob is
+# created suspended; Kueue unsuspends it when its admission check passes
+# and the LocalQueue/ClusterQueue has capacity.
+#
+# Prerequisites:
+#   - Kueue installed in the cluster
+#   - A LocalQueue named "training-queue" in the target namespace, backed
+#     by a ClusterQueue with quota
+#
+# Apply: kubectl apply -f 03-kueue-integration.yaml
+# Check: kubectl get trainjob kueue-example
+# Queue: kubectl get workload -l kueue.x-k8s.io/job-name=kueue-example
+# Pods:  kubectl get pods -l jobset.sigs.k8s.io/jobset-name=kueue-example
+# Clean: kubectl delete trainjob kueue-example
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: kueue-example
+  labels:
+    # Tells Kueue which LocalQueue to admit this TrainJob into.
+    kueue.x-k8s.io/queue-name: training-queue
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: ClusterTrainingRuntime
+    name: torch-distributed
+
+  # Required: Kueue admits the workload by flipping suspend to false.
+  suspend: true
+
+  # Optional: set to "kueue.x-k8s.io/multikueue" to delegate to MultiKueue
+  # for multi-cluster scheduling. Defaults to the built-in trainjob controller.
+  # managedBy: kueue.x-k8s.io/multikueue
+
+  trainer:
+    numNodes: 3
+    image: python:3.11-slim
+    command:
+      - python3
+      - -c
+      - |
+        import time
+        print("Training started via Kueue")
+        for i in range(10):
+            print(f"Step {i + 1}/10")
+            time.sleep(2)
+        print("Training complete")
+
+    resourcesPerNode:
+      requests:
+        cpu: "2"
+        memory: "4Gi"
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+
+---
+# Reference LocalQueue (apply separately if needed):
+#
+# apiVersion: kueue.x-k8s.io/v1beta1
+# kind: LocalQueue
+# metadata:
+#   name: training-queue
+# spec:
+#   clusterQueue: cluster-queue

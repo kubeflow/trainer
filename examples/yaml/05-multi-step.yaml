@@ -1,0 +1,111 @@
+# Advanced Example 4: Multi-Step Training with Dataset Initialization
+#
+# Runs a dataset-initializer Job that downloads a HuggingFace dataset, then
+# a trainer Job that consumes it from a shared volume. The default
+# torch-distributed runtime has no dataset-initializer step, so this example
+# inlines a TrainingRuntime that adds one.
+#
+# spec.initializer.dataset.storageUri populates STORAGE_URI on the
+# dataset-initializer container. The dataset is mounted at /workspace/dataset
+# (constants.DatasetMountPath) on both the initializer and trainer pods.
+#
+# Apply: kubectl apply -f 05-multi-step.yaml
+# Check: kubectl get trainjob multi-step-example
+# Init logs: kubectl logs -l trainer.kubeflow.org/trainjob-ancestor-step=dataset-initializer -f
+# Train logs: kubectl logs -l trainer.kubeflow.org/trainjob-ancestor-step=trainer -f
+# Clean: kubectl delete trainjob multi-step-example && \
+#        kubectl delete trainingruntime torch-with-dataset-init
+
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainingRuntime
+metadata:
+  name: torch-with-dataset-init
+  labels:
+    trainer.kubeflow.org/framework: torch
+spec:
+  mlPolicy:
+    numNodes: 1
+    torch: {}
+  template:
+    spec:
+      replicatedJobs:
+        - name: dataset-initializer
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: dataset-initializer
+                      image: ghcr.io/kubeflow/trainer/dataset-initializer
+        - name: node
+          dependsOn:
+            - name: dataset-initializer
+              status: Complete
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
+
+---
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: multi-step-example
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    kind: TrainingRuntime
+    name: torch-with-dataset-init
+
+  initializer:
+    dataset:
+      # Scheme determines the provider: hf:// for HuggingFace, s3:// for S3.
+      storageUri: hf://tatsu-lab/alpaca
+      # Uncomment to authenticate against private datasets:
+      # secretRef:
+      #   name: hf-secret    # must contain HF_TOKEN
+
+  trainer:
+    numNodes: 2
+    command:
+      - python3
+      - -c
+      - |
+        import os
+        path = "/workspace/dataset"
+        if os.path.exists(path):
+            print(f"Dataset ready at {path} ({len(os.listdir(path))} entries)")
+        else:
+            print(f"Dataset path {path} missing — initializer did not run")
+        for epoch in range(3):
+            print(f"Epoch {epoch + 1}/3")
+        print("Training complete")
+
+    resourcesPerNode:
+      requests:
+        cpu: "2"
+        memory: "4Gi"
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+
+---
+# Reference Secret for private HuggingFace datasets (apply separately):
+#
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: hf-secret
+# type: Opaque
+# stringData:
+#   HF_TOKEN: "your_huggingface_token_here"
