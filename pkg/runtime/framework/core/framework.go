@@ -19,6 +19,7 @@ package core
 import (
 	"context"
 	"errors"
+	"time"
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -27,6 +28,7 @@ import (
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/metrics"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
@@ -93,7 +95,10 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 
 func (f *Framework) RunEnforceMLPolicyPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	for _, plugin := range f.enforceMLPlugins {
-		if err := plugin.EnforceMLPolicy(info, trainJob); err != nil {
+		start := time.Now()
+		err := plugin.EnforceMLPolicy(info, trainJob)
+		metrics.ObservePlugin(plugin.Name(), "enforce_ml_policy", time.Since(start), err)
+		if err != nil {
 			return err
 		}
 	}
@@ -102,7 +107,10 @@ func (f *Framework) RunEnforceMLPolicyPlugins(info *runtime.Info, trainJob *trai
 
 func (f *Framework) RunEnforcePodGroupPolicyPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	for _, plugin := range f.enforcePodGroupPolicyPlugins {
-		if err := plugin.EnforcePodGroupPolicy(info, trainJob); err != nil {
+		start := time.Now()
+		err := plugin.EnforcePodGroupPolicy(info, trainJob)
+		metrics.ObservePlugin(plugin.Name(), "enforce_pod_group_policy", time.Since(start), err)
+		if err != nil {
 			return err
 		}
 	}
@@ -113,7 +121,13 @@ func (f *Framework) RunCustomValidationPlugins(ctx context.Context, info *runtim
 	var aggregatedWarnings admission.Warnings
 	var aggregatedErrors field.ErrorList
 	for _, plugin := range f.customValidationPlugins {
+		start := time.Now()
 		warnings, errs := plugin.Validate(ctx, info, oldObj, newObj)
+		var pluginErr error
+		if len(errs) > 0 {
+			pluginErr = errs.ToAggregate()
+		}
+		metrics.ObservePlugin(plugin.Name(), "validate", time.Since(start), pluginErr)
 		if len(warnings) != 0 {
 			aggregatedWarnings = append(aggregatedWarnings, warnings...)
 		}
@@ -126,7 +140,10 @@ func (f *Framework) RunCustomValidationPlugins(ctx context.Context, info *runtim
 
 func (f *Framework) RunPodNetworkPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	for _, plugin := range f.podNetworkPlugins {
-		if err := plugin.IdentifyPodNetwork(info, trainJob); err != nil {
+		start := time.Now()
+		err := plugin.IdentifyPodNetwork(info, trainJob)
+		metrics.ObservePlugin(plugin.Name(), "pod_network", time.Since(start), err)
+		if err != nil {
 			return err
 		}
 	}
@@ -136,7 +153,9 @@ func (f *Framework) RunPodNetworkPlugins(info *runtime.Info, trainJob *trainer.T
 func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
 	var objs []apiruntime.ApplyConfiguration
 	for _, plugin := range f.componentBuilderPlugins {
+		start := time.Now()
 		components, err := plugin.Build(ctx, info, trainJob)
+		metrics.ObservePlugin(plugin.Name(), "build", time.Since(start), err)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +166,10 @@ func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtim
 
 func (f *Framework) RunTrainJobStatusPlugin(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
 	if f.trainJobStatusPlugin != nil {
-		return f.trainJobStatusPlugin.Status(ctx, trainJob)
+		start := time.Now()
+		status, err := f.trainJobStatusPlugin.Status(ctx, trainJob)
+		metrics.ObservePlugin(f.trainJobStatusPlugin.Name(), "status", time.Since(start), err)
+		return status, err
 	}
 	return nil, nil
 }

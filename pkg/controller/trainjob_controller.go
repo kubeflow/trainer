@@ -45,6 +45,7 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/metrics"
 	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
@@ -98,6 +99,10 @@ func NewTrainJobReconciler(client client.Client, recorder events.EventRecorder, 
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=create;get;list;update
 
 func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	start := time.Now()
+	reconcileResult := "success"
+	defer func() { metrics.ObserveReconcile("trainjob_controller", reconcileResult, time.Since(start)) }()
+
 	var trainJob trainer.TrainJob
 	if err := r.client.Get(ctx, req.NamespacedName, &trainJob); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -136,13 +141,56 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	setSuspendedCondition(&trainJob)
 
+	// Collect pending lifecycle metric callbacks; fired only after a successful status patch
+	// to prevent double-counting when the patch fails and the next reconcile re-detects the transition.
+	var pendingMetrics []func()
+
+	// Detect Suspended: False → True transitions.
+	prevSuspendedCond := meta.FindStatusCondition(prevTrainJob.Status.Conditions, trainer.TrainJobSuspended)
+	currSuspendedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobSuspended)
+	if currSuspendedCond != nil && currSuspendedCond.Status == metav1.ConditionTrue &&
+		(prevSuspendedCond == nil || prevSuspendedCond.Status != metav1.ConditionTrue) {
+		ns, rk := trainJob.Namespace, metrics.RuntimeKind(&trainJob)
+		pendingMetrics = append(pendingMetrics, func() { metrics.RecordTrainJobSuspended(ns, rk) })
+	}
+
 	if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
 		err = errors.Join(err, statusErr)
 	}
 
+	// Detect terminal state transitions.
+	runtimeKind := metrics.RuntimeKind(&trainJob)
+	prevCompleteCond := meta.FindStatusCondition(prevTrainJob.Status.Conditions, trainer.TrainJobComplete)
+	currCompleteCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobComplete)
+	if currCompleteCond != nil && currCompleteCond.Status == metav1.ConditionTrue &&
+		(prevCompleteCond == nil || prevCompleteCond.Status != metav1.ConditionTrue) {
+		ns, rk := trainJob.Namespace, runtimeKind
+		dur := currCompleteCond.LastTransitionTime.Sub(trainJob.CreationTimestamp.Time)
+		pendingMetrics = append(pendingMetrics, func() { metrics.RecordTrainJobCompleted(ns, rk, dur) })
+	}
+
+	prevFailedCond := meta.FindStatusCondition(prevTrainJob.Status.Conditions, trainer.TrainJobFailed)
+	currFailedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
+	if currFailedCond != nil && currFailedCond.Status == metav1.ConditionTrue &&
+		(prevFailedCond == nil || prevFailedCond.Status != metav1.ConditionTrue) {
+		ns, rk, reason := trainJob.Namespace, runtimeKind, currFailedCond.Reason
+		dur := currFailedCond.LastTransitionTime.Sub(trainJob.CreationTimestamp.Time)
+		pendingMetrics = append(pendingMetrics, func() { metrics.RecordTrainJobFailed(ns, rk, reason, dur) })
+	}
+
+	if err != nil {
+		reconcileResult = "error"
+	}
+
 	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
 		if !equality.Semantic.DeepEqual(&trainJob.Status, &prevTrainJob.Status) {
-			return deadlineResult, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
+			patchErr := r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob))
+			if patchErr == nil {
+				for _, fn := range pendingMetrics {
+					fn()
+				}
+			}
+			return deadlineResult, errors.Join(err, patchErr)
 		}
 		return deadlineResult, errors.Join(err, deadlineErr)
 	}
@@ -150,7 +198,13 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
 		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
 		// for sub-resources. See: https://github.com/kubernetes-sigs/controller-runtime/issues/3183
-		return ctrl.Result{}, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
+		patchErr := r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob))
+		if patchErr == nil {
+			for _, fn := range pendingMetrics {
+				fn()
+			}
+		}
+		return ctrl.Result{}, errors.Join(err, patchErr)
 	}
 	return ctrl.Result{}, err
 }
@@ -208,12 +262,14 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 
 func (r *TrainJobReconciler) Create(e event.TypedCreateEvent[*trainer.TrainJob]) bool {
 	r.log.WithValues("trainJob", klog.KObj(e.Object)).Info("TrainJob create event")
+	metrics.RecordTrainJobCreated(e.Object.Namespace, metrics.RuntimeKind(e.Object))
 	defer r.notifyWatchers(nil, e.Object)
 	return true
 }
 
 func (r *TrainJobReconciler) Delete(e event.TypedDeleteEvent[*trainer.TrainJob]) bool {
 	r.log.WithValues("trainJob", klog.KObj(e.Object)).Info("TrainJob delete event")
+	metrics.RecordTrainJobDeleted(e.Object.Namespace, metrics.RuntimeKind(e.Object))
 	defer r.notifyWatchers(e.Object, nil)
 	return true
 }

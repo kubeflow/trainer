@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/metrics"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
@@ -112,12 +113,18 @@ func (w *TrainJobValidator) ValidateCreate(ctx context.Context, obj *trainer.Tra
 	log.V(5).Info("Validating create", "TrainJob", klog.KObj(obj))
 
 	runtimeRefGK := runtime.RuntimeRefToRuntimeRegistryKey(obj.Spec.RuntimeRef)
-	runtime, ok := w.runtimes[runtimeRefGK]
+	rt, ok := w.runtimes[runtimeRefGK]
 	if !ok {
+		metrics.WebhookValidationTotal.WithLabelValues("TrainJob", "create", "error").Inc()
 		return nil, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 	}
-	warnings, errors := runtime.ValidateObjects(ctx, nil, obj)
-	return warnings, errors.ToAggregate()
+	warnings, errs := rt.ValidateObjects(ctx, nil, obj)
+	result := "success"
+	if errs != nil {
+		result = "error"
+	}
+	metrics.WebhookValidationTotal.WithLabelValues("TrainJob", "create", result).Inc()
+	return warnings, errs.ToAggregate()
 }
 
 func (w *TrainJobValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.TrainJob) (admission.Warnings, error) {
@@ -125,12 +132,18 @@ func (w *TrainJobValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *
 	log.V(5).Info("Validating update", "TrainJob", klog.KObj(newObj))
 
 	runtimeRefGK := runtime.RuntimeRefToRuntimeRegistryKey(newObj.Spec.RuntimeRef)
-	runtime, ok := w.runtimes[runtimeRefGK]
+	rt, ok := w.runtimes[runtimeRefGK]
 	if !ok {
+		metrics.WebhookValidationTotal.WithLabelValues("TrainJob", "update", "error").Inc()
 		return nil, fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 	}
-	warnings, errors := runtime.ValidateObjects(ctx, oldObj, newObj)
-	return warnings, errors.ToAggregate()
+	warnings, errs := rt.ValidateObjects(ctx, oldObj, newObj)
+	result := "success"
+	if errs != nil {
+		result = "error"
+	}
+	metrics.WebhookValidationTotal.WithLabelValues("TrainJob", "update", result).Inc()
+	return warnings, errs.ToAggregate()
 }
 
 func (w *TrainJobValidator) ValidateDelete(ctx context.Context, obj *trainer.TrainJob) (admission.Warnings, error) {
