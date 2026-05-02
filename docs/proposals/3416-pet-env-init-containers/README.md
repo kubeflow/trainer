@@ -76,6 +76,9 @@ Proposed annotation:
 
 - `trainer.kubeflow.org/plugin-env-injection-mode: "init-containers"`
 
+In this KEP, only one annotation value is supported: `init-containers`.
+Other values are reserved for future extension and are out of scope for this KEP.
+
 ## Design Details
 
 ### Runtime helper
