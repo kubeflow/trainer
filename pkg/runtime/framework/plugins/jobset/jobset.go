@@ -297,6 +297,26 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 				container.VolumeMounts...,
 			)
 		}
+		for containerIdx, container := range ps.InitContainers {
+			if len(container.Command) > 0 {
+				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Command = container.Command
+			}
+			if container.Image != "" {
+				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Image = &container.Image
+			}
+			apply.UpsertEnvVars(
+				&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Env,
+				container.Env...,
+			)
+			apply.UpsertPort(
+				&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Ports,
+				container.Ports...,
+			)
+			apply.UpsertVolumeMounts(
+				&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].VolumeMounts,
+				container.VolumeMounts...,
+			)
+		}
 	}
 
 	// Init the JobSet apply configuration from the runtime template spec
