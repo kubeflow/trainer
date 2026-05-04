@@ -19,17 +19,18 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_api_resource_quantity import IoK8sApimachineryPkgApiResourceQuantity
 from typing import Optional, Set
 from typing_extensions import Self
 
-class IoK8sApiCoreV1ResourceHealth(BaseModel):
+class IoK8sApiCoreV1NodeAllocatableResourceClaimStatus(BaseModel):
     """
-    ResourceHealth represents the health of a resource. It has the latest device health information. This is a part of KEP https://kep.k8s.io/4680.
+    NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
     """ # noqa: E501
-    health: Optional[StrictStr] = Field(default=None, description="Health of the resource. can be one of:  - Healthy: operates as normal  - Unhealthy: reported unhealthy. We consider this a temporary health issue               since we do not have a mechanism today to distinguish               temporary and permanent issues.  - Unknown: The status cannot be determined.             For example, Device Plugin got unregistered and hasn't been re-registered since.  In future we may want to introduce the PermanentlyUnhealthy Status.")
-    message: Optional[StrictStr] = Field(default=None, description="Message provides human-readable context for Health (e.g. \"ECC error count exceeded threshold\"). This field is populated by the kubelet when ResourceHealthStatusMessage is enabled if the DRA plugin returns a message, and is null otherwise.")
-    resource_id: StrictStr = Field(description="ResourceID is the unique identifier of the resource. See the ResourceID type for more information.", alias="resourceID")
-    __properties: ClassVar[List[str]] = ["health", "message", "resourceID"]
+    containers: Optional[List[StrictStr]] = Field(default=None, description="Containers lists the names of all containers in this pod that reference the claim.")
+    resource_claim_name: StrictStr = Field(description="ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.", alias="resourceClaimName")
+    resources: Dict[str, IoK8sApimachineryPkgApiResourceQuantity] = Field(description="Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.")
+    __properties: ClassVar[List[str]] = ["containers", "resourceClaimName", "resources"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +50,7 @@ class IoK8sApiCoreV1ResourceHealth(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of IoK8sApiCoreV1ResourceHealth from a JSON string"""
+        """Create an instance of IoK8sApiCoreV1NodeAllocatableResourceClaimStatus from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,11 +71,18 @@ class IoK8sApiCoreV1ResourceHealth(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of each value in resources (dict)
+        _field_dict = {}
+        if self.resources:
+            for _key_resources in self.resources:
+                if self.resources[_key_resources]:
+                    _field_dict[_key_resources] = self.resources[_key_resources].to_dict()
+            _dict['resources'] = _field_dict
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of IoK8sApiCoreV1ResourceHealth from a dict"""
+        """Create an instance of IoK8sApiCoreV1NodeAllocatableResourceClaimStatus from a dict"""
         if obj is None:
             return None
 
@@ -82,9 +90,14 @@ class IoK8sApiCoreV1ResourceHealth(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "health": obj.get("health"),
-            "message": obj.get("message"),
-            "resourceID": obj.get("resourceID") if obj.get("resourceID") is not None else ''
+            "containers": obj.get("containers"),
+            "resourceClaimName": obj.get("resourceClaimName") if obj.get("resourceClaimName") is not None else '',
+            "resources": dict(
+                (_k, IoK8sApimachineryPkgApiResourceQuantity.from_dict(_v))
+                for _k, _v in obj["resources"].items()
+            )
+            if obj.get("resources") is not None
+            else None
         })
         return _obj
 
