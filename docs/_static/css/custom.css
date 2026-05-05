@@ -1,253 +1,239 @@
-/* Custom CSS for Kubeflow Trainer Documentation
- * Furo theme overrides and Kubeflow branding
- */
+/* ============================================
+   Kubeflow Trainer Documentation
+   Aligned with Kubeflow SDK visual language
+   ============================================ */
 
-/* Kubeflow brand colors */
+/* ============================================
+   Color Palette
+   ============================================ */
+
 :root {
-    /* Primary Kubernetes/Kubeflow blue */
-    --color-kubeflow-blue: #326CE5;
-    --color-kubeflow-blue-dark: #1a4b99;
-    --color-kubeflow-blue-light: #5B9DF1;
+    --kf-blue: #4299e1;
+    --kf-blue-light: #63b3ed;
+    --kf-blue-dark: #3182ce;
+
+    --kf-heading: #2d3748;
+    --kf-text: #4a5568;
+    --kf-text-light: #718096;
+
+    --kf-bg-subtle: #f7fafc;
+    --kf-border: #e2e8f0;
+
+    --kf-accent: #81e6d9;
 }
 
-/* Light mode: Use Kubernetes blue for links and accents */
-body[data-theme="light"] {
-    --color-brand-primary: var(--color-kubeflow-blue);
-    --color-brand-content: var(--color-kubeflow-blue);
+/* Dark mode overrides */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --kf-blue: #63b3ed;
+        --kf-blue-light: #90cdf4;
+        --kf-blue-dark: #4299e1;
+        --kf-heading: #e2e8f0;
+        --kf-text: #cbd5e0;
+        --kf-text-light: #a0aec0;
+        --kf-bg-subtle: #2d3748;
+        --kf-border: #4a5568;
+    }
 }
 
-/* Dark mode: Use lighter blue for better contrast */
-body[data-theme="dark"] {
-    --color-brand-primary: var(--color-kubeflow-blue-light);
-    --color-brand-content: var(--color-kubeflow-blue-light);
+[data-theme="dark"] {
+    --kf-blue: #63b3ed;
+    --kf-blue-light: #90cdf4;
+    --kf-blue-dark: #4299e1;
+    --kf-heading: #e2e8f0;
+    --kf-text: #cbd5e0;
+    --kf-text-light: #a0aec0;
+    --kf-bg-subtle: #2d3748;
+    --kf-border: #4a5568;
 }
 
-/* Code block improvements */
-.highlight {
-    border-radius: 6px;
+/* ============================================
+   TOP NAVIGATION BAR
+   ============================================ */
+
+.announcement {
+    background: var(--kf-bg-subtle) !important;
+    border-bottom: 1px solid var(--kf-border) !important;
+    padding: 0 !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 100 !important;
 }
 
-/* Make copy button more visible */
-button.copybtn {
-    opacity: 0.6;
-    transition: opacity 0.2s;
+.page {
+    padding-top: 52px !important;
 }
 
-button.copybtn:hover {
-    opacity: 1;
+.sidebar-sticky {
+    top: 52px !important;
 }
 
-/* Improve table readability */
-table.docutils {
-    border-collapse: collapse;
-    margin: 1rem 0;
+.toc-sticky {
+    top: 52px !important;
 }
 
-table.docutils th {
-    background-color: var(--color-kubeflow-blue);
-    color: white;
-    padding: 0.5rem;
+.mobile-header {
+    top: 52px !important;
 }
 
-body[data-theme="dark"] table.docutils th {
-    background-color: var(--color-kubeflow-blue-dark);
+.announcement-content {
+    max-width: none !important;
+    padding: 0 !important;
 }
 
-table.docutils td {
-    padding: 0.5rem;
-    border: 1px solid var(--color-foreground-border);
+.top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0.6rem 1.5rem;
 }
 
-/* Admonition styling for version notes */
-.admonition.version-note {
-    border-left-color: var(--color-kubeflow-blue);
-}
-
-/* Mermaid diagram container */
-.mermaid {
-    text-align: center;
-    margin: 1.5rem 0;
-}
-
-/* Documentation Cards Layout */
-.doc-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.5rem;
-    margin: 2rem 0;
-}
-
-/* Shared card styles for homepage (.doc-card) and sphinx-design (.sd-card) */
-a.doc-card,
-.sd-card {
-    border: 1px solid var(--color-foreground-border) !important;
-    border-radius: 8px !important;
-    padding: 1.5rem;
-    background-color: var(--color-background-secondary);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-a.doc-card {
-    text-decoration: none;
-    display: block;
-}
-
-a.doc-card:hover,
-.sd-card:hover {
-    border-color: var(--color-brand-primary) !important;
-    box-shadow: 0 4px 12px rgba(50, 108, 229, 0.15);
-    transform: translateY(-2px);
-    text-decoration: none;
-}
-
-body[data-theme="dark"] a.doc-card,
-body[data-theme="dark"] .sd-card {
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-}
-
-body[data-theme="dark"] a.doc-card:hover,
-body[data-theme="dark"] .sd-card:hover {
-    box-shadow: 0 4px 12px rgba(91, 157, 241, 0.2);
-}
-
-a.doc-card strong,
-.sd-card .sd-card-title {
-    font-size: 1.1rem;
+.top-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none !important;
+    color: var(--kf-heading) !important;
     font-weight: 600;
-    color: var(--color-brand-primary);
-    display: block;
-    margin-bottom: 0.5rem;
-}
-
-a.doc-card p,
-.sd-card .sd-card-body p {
-    margin: 0;
-    color: var(--color-foreground-secondary);
-    font-size: 0.95rem;
-    line-height: 1.5;
-}
-
-/* Landing page improvements */
-.document h1 {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-    color: var(--color-foreground-primary);
-}
-
-.document h1 + p {
     font-size: 1.1rem;
-    color: var(--color-foreground-secondary);
-    margin-bottom: 2rem;
 }
 
-/* Section dividers */
-hr {
-    border: none;
-    border-top: 2px solid var(--color-foreground-border);
-    margin: 2.5rem 0;
+.top-nav-brand:hover {
+    color: var(--kf-blue) !important;
 }
 
-/* Improve section headers */
-.document h2 {
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    font-size: 1.75rem;
-    color: var(--color-foreground-primary);
+.top-nav-logo {
+    height: 28px;
+    width: auto;
 }
 
-/* Feature list styling (content area only, not sidebar) */
-.document ul {
-    list-style: none;
-    padding-left: 0;
+.top-nav-links {
+    display: flex;
+    gap: 0.5rem;
 }
 
-.document ul li {
-    padding-left: 1.5rem;
-    position: relative;
-    margin-bottom: 0.75rem;
+.top-nav-links a {
+    color: var(--kf-text) !important;
+    text-decoration: none !important;
+    padding: 0.4rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    transition: all 0.15s ease;
 }
 
-.document ul li::before {
-    content: "✓";
-    position: absolute;
-    left: 0;
-    color: var(--color-brand-primary);
-    font-weight: bold;
+.top-nav-links a:hover {
+    color: var(--kf-blue-dark) !important;
+    background: rgba(66, 153, 225, 0.12);
 }
 
-/* Widen the content area to reduce whitespace */
-@media (min-width: 67em) {
-    .content {
-        width: 54em;
-        padding: 0 2em;
+@media (max-width: 768px) {
+    .top-nav-links {
+        display: none;
     }
-
-    body.sidebar-collapsed .content {
-        width: 70em;
-        max-width: 100%;
-    }
-}
-
-/* Sidebar: make it stick while scrolling */
-@media (min-width: 67em) {
-    .sidebar-drawer {
-        position: sticky;
-        top: 0;
-        height: 100vh;
-        overflow-y: auto;
-    }
-}
-
-/* Sidebar: YouTube-style collapse toggle */
-@media (min-width: 67em) {
-    .sidebar-drawer {
-        transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-                    min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    body.sidebar-collapsed .sidebar-drawer {
-        width: 0 !important;
-        min-width: 0 !important;
-    }
-
-    .sidebar-toggle-btn {
-        position: fixed;
-        top: 0.65rem;
-        left: 0.65rem;
-        z-index: 100;
-        width: 36px;
-        height: 36px;
-        display: flex;
-        align-items: center;
+    .top-nav {
         justify-content: center;
-        background: transparent;
-        border: none;
-        border-radius: 50%;
-        cursor: pointer;
-        color: var(--color-foreground-muted);
-        padding: 0;
-        line-height: 1;
-        transition: background 0.15s, color 0.15s;
-    }
-
-    .sidebar-toggle-btn:hover {
-        color: var(--color-foreground-primary);
-        background: rgba(128, 128, 128, 0.15);
-    }
-
-    .sidebar-toggle-btn:active {
-        background: rgba(128, 128, 128, 0.25);
     }
 }
 
-@media (max-width: 66.99em) {
-    .sidebar-toggle-btn {
-        display: none !important;
-    }
+/* Hide logo from sidebar since it's in the navbar */
+.sidebar-brand {
+    display: none !important;
 }
 
-/* Sidebar: reduce left whitespace */
+/* ============================================
+   HEADINGS
+   ============================================ */
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    color: var(--kf-heading);
+}
+
+h1 {
+    font-size: 2rem;
+    border-bottom: 2px solid var(--kf-blue-light);
+    padding-bottom: 0.5rem;
+}
+
+h2 {
+    font-size: 1.4rem;
+    margin-top: 1rem;
+    border-bottom: 1px solid var(--kf-border);
+    padding-bottom: 0.3rem;
+}
+
+h3 {
+    font-size: 1.15rem;
+    color: var(--kf-text);
+}
+
+/* ============================================
+   LINKS
+   ============================================ */
+
+a {
+    color: var(--kf-blue);
+}
+
+a:visited {
+    color: var(--kf-blue);
+}
+
+a:hover {
+    color: var(--kf-blue-dark);
+}
+
+/* ============================================
+   TEXT
+   ============================================ */
+
+p {
+    color: var(--kf-text);
+    line-height: 1.7;
+}
+
+li::marker {
+    color: var(--kf-blue);
+}
+
+/* ============================================
+   SIDEBAR
+   ============================================ */
+
+.sidebar-tree a,
+.sidebar-tree .reference,
+.sidebar-drawer a,
+.toctree-l1 > a,
+.toctree-l2 > a,
+.toctree-l3 > a,
+.caption-text {
+    color: var(--kf-text) !important;
+    transition: color 0.15s;
+}
+
+.sidebar-tree a:hover,
+.sidebar-tree .reference:hover {
+    color: var(--kf-blue) !important;
+}
+
+.sidebar-tree .current > .reference,
+.sidebar-tree .current-page > .reference {
+    color: var(--kf-blue-dark) !important;
+    font-weight: 600;
+}
+
+.sidebar-tree .caption {
+    color: var(--kf-text-light) !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
 .sidebar-tree .reference {
     padding: 0.35rem 0.75rem;
 }
@@ -269,22 +255,279 @@ hr {
     font-size: 0.9rem;
 }
 
-/* Sidebar: highlight the current (active) page in blue */
-.sidebar-tree li.current-page > .reference {
-    color: var(--color-brand-primary) !important;
-    font-weight: 700;
-    border-left: 3px solid var(--color-brand-primary);
-    padding-left: calc(0.75rem - 3px);
-    background-color: rgba(50, 108, 229, 0.08);
-    border-radius: 0 4px 4px 0;
+/* Sidebar: make it stick while scrolling */
+@media (min-width: 67em) {
+    .sidebar-drawer {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow-y: auto;
+    }
 }
 
-body[data-theme="dark"] .sidebar-tree li.current-page > .reference {
-    background-color: rgba(91, 157, 241, 0.1);
+/* ============================================
+   CODE BLOCKS - Dark VS Code style
+   ============================================ */
+
+pre {
+    border-radius: 8px;
+    border: none;
+    background: #1e1e1e !important;
+    padding: 1rem !important;
 }
 
-/* Parent section containing the current page gets a subtle blue tint */
-.sidebar-tree li.toctree-l1.current.has-children > .reference {
-    color: var(--color-brand-primary) !important;
-    font-weight: 700;
+pre code {
+    color: #d4d4d4 !important;
+    background: transparent !important;
+}
+
+.highlight {
+    background: #1e1e1e !important;
+    border-radius: 8px;
+}
+
+.highlight pre {
+    color: #d4d4d4 !important;
+}
+
+.highlight span {
+    color: #d4d4d4;
+}
+
+.highlight-bash .highlight span,
+.highlight-shell .highlight span,
+.highlight-console .highlight span {
+    color: #d4d4d4 !important;
+}
+
+.highlight .k, .highlight .kn, .highlight .kd { color: #569cd6 !important; }
+.highlight .n, .highlight .nn { color: #d4d4d4 !important; }
+.highlight .s, .highlight .s1, .highlight .s2 { color: #ce9178 !important; }
+.highlight .c, .highlight .c1, .highlight .cm { color: #6a9955 !important; }
+.highlight .o { color: #d4d4d4 !important; }
+.highlight .p { color: #d4d4d4 !important; }
+.highlight .mi, .highlight .mf { color: #b5cea8 !important; }
+.highlight .nb, .highlight .bp { color: #4ec9b0 !important; }
+.highlight .nf, .highlight .fm { color: #dcdcaa !important; }
+.highlight .nc { color: #4ec9b0 !important; }
+.highlight .ow { color: #569cd6 !important; }
+.highlight .gp { color: #6a9955 !important; }
+.highlight .w { color: #d4d4d4 !important; }
+
+/* Inline code */
+code {
+    color: var(--kf-heading);
+    background: var(--kf-bg-subtle);
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+/* Copy button */
+button.copybtn {
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+button.copybtn:hover {
+    opacity: 1;
+}
+
+/* ============================================
+   CARDS (homepage + sphinx-design)
+   ============================================ */
+
+.doc-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+a.doc-card,
+.sd-card {
+    border: 1px solid var(--kf-border) !important;
+    border-radius: 8px !important;
+    padding: 1.5rem;
+    background-color: var(--kf-bg-subtle);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    transition: all 0.2s ease;
+}
+
+a.doc-card {
+    text-decoration: none;
+    display: block;
+}
+
+a.doc-card:hover,
+.sd-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: var(--kf-blue-light) !important;
+    transform: translateY(-2px);
+    text-decoration: none;
+}
+
+a.doc-card strong,
+.sd-card .sd-card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--kf-heading);
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+a.doc-card p,
+.sd-card .sd-card-body p {
+    margin: 0;
+    color: var(--kf-text-light);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* ============================================
+   TABLES
+   ============================================ */
+
+table {
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--kf-border);
+}
+
+table.docutils {
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+table.docutils th,
+th {
+    background: var(--kf-bg-subtle);
+    color: var(--kf-text);
+    font-weight: 600;
+    padding: 0.5rem;
+}
+
+table.docutils td {
+    padding: 0.5rem;
+    border: 1px solid var(--kf-border);
+}
+
+/* ============================================
+   ADMONITIONS
+   ============================================ */
+
+.admonition {
+    border-radius: 6px;
+    border: none;
+    border-left: 3px solid var(--kf-blue);
+}
+
+.admonition.tip {
+    background: rgba(129, 230, 217, 0.15);
+    border-left-color: var(--kf-accent);
+}
+
+.admonition.note {
+    background: rgba(66, 153, 225, 0.1);
+}
+
+.admonition.warning {
+    background: rgba(251, 211, 141, 0.2);
+    border-left-color: #f6ad55;
+}
+
+/* ============================================
+   HR / DIVIDERS
+   ============================================ */
+
+hr {
+    border: none;
+    height: 1px;
+    background: var(--kf-border);
+    margin: 2rem 0;
+}
+
+/* ============================================
+   MERMAID DIAGRAMS
+   ============================================ */
+
+.mermaid {
+    text-align: center;
+    margin: 1.5rem 0;
+}
+
+/* ============================================
+   LANDING PAGE
+   ============================================ */
+
+article > section > p:first-of-type {
+    font-size: 1.2rem;
+    color: var(--kf-text);
+}
+
+/* ============================================
+   CONTENT WIDTH
+   ============================================ */
+
+@media (min-width: 67em) {
+    .content {
+        width: 54em;
+        padding: 0 2em;
+    }
+
+    body.sidebar-collapsed .content {
+        width: 70em;
+        max-width: 100%;
+    }
+}
+
+/* ============================================
+   SIDEBAR TOGGLE (YouTube-style collapse)
+   ============================================ */
+
+@media (min-width: 67em) {
+    .sidebar-drawer {
+        transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                    min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.sidebar-collapsed .sidebar-drawer {
+        width: 0 !important;
+        min-width: 0 !important;
+    }
+
+    .sidebar-toggle-btn {
+        position: fixed;
+        top: 56px;
+        left: 0.65rem;
+        z-index: 99;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        color: var(--kf-text-light);
+        padding: 0;
+        line-height: 1;
+        transition: background 0.15s, color 0.15s;
+    }
+
+    .sidebar-toggle-btn:hover {
+        color: var(--kf-heading);
+        background: rgba(128, 128, 128, 0.15);
+    }
+
+    .sidebar-toggle-btn:active {
+        background: rgba(128, 128, 128, 0.25);
+    }
+}
+
+@media (max-width: 66.99em) {
+    .sidebar-toggle-btn {
+        display: none !important;
+    }
 }
