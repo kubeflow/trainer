@@ -305,7 +305,7 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 		switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
 		case trainer.MPIImplementationOpenMPI:
 			for e := range ps.Endpoints {
-				hostFile.WriteString(fmt.Sprintf("%s slots=%d\n", e, slots))
+				fmt.Fprintf(&hostFile, "%s slots=%d\n", e, slots)
 			}
 		}
 	}

@@ -87,7 +87,7 @@ helm: ## Download helm locally if required.
 
 .PHONY: golangci-lint-install
 golangci-lint-install: ## Download golangci-lint locally if required.
-	@GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.1
+	@GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.1
 
 .PHONY: golangci-lint-kal
 golangci-lint-kal: ## Build golangci-lint-kal from custom configuration.
