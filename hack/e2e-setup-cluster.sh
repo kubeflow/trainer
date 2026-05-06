@@ -47,33 +47,16 @@ if [ "${CLUSTER_TYPE}" = "gpu" ]; then
   NVKIND_BIN="/root/go/bin/nvkind"
 fi
 
-# ==========================================
-# 1. Build Images
-# ==========================================
-CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-manager"
-CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
-echo "Build Kubeflow Trainer images"
-${CONTAINER_RUNTIME} build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
-
-DATASET_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/dataset-initializer"
-DATASET_INITIALIZER_CI_IMAGE="${DATASET_INITIALIZER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
-${CONTAINER_RUNTIME} build . -f cmd/initializers/dataset/Dockerfile -t ${DATASET_INITIALIZER_CI_IMAGE}
-
-MODEL_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/model-initializer"
-MODEL_INITIALIZER_CI_IMAGE="${MODEL_INITIALIZER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
-${CONTAINER_RUNTIME} build . -f cmd/initializers/model/Dockerfile -t ${MODEL_INITIALIZER_CI_IMAGE}
-
-TRAINER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/torchtune-trainer"
-TRAINER_CI_IMAGE="${TRAINER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
-${CONTAINER_RUNTIME} build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_CI_IMAGE}
-
-XGBOOST_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/xgboost-runtime"
-XGBOOST_RUNTIME_CI_IMAGE="${XGBOOST_RUNTIME_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
-echo "Build XGBoost runtime image"
-${CONTAINER_RUNTIME} build . -f cmd/runtimes/xgboost/Dockerfile -t ${XGBOOST_RUNTIME_CI_IMAGE}
+print_cluster_info() {
+  kubectl version
+  kubectl cluster-info
+  kubectl get nodes
+  kubectl get pods -n ${NAMESPACE}
+  kubectl describe pod -n ${NAMESPACE}
+}
 
 # ==========================================
-# 2. Create Cluster & Configure Environment
+# 1. Create Cluster & Configure Environment
 # ==========================================
 if [ "${CLUSTER_TYPE}" = "gpu" ]; then
   # Configure NVIDIA runtime.
@@ -128,30 +111,49 @@ if [ "${CLUSTER_TYPE}" = "gpu" ]; then
   kubectl get pods -n gpu-operator
   kubectl get nodes -o=custom-columns=NAME:.metadata.name,GPU:'.status.allocatable.nvidia\.com/gpu'
 else
-  echo "Create Kind cluster and load Kubeflow Trainer images"
+  echo "Create Kind cluster"
   ${KIND} create cluster --name "${CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
 fi
 
 # ==========================================
-# 3. Load Images into Kind
+# 2. Build and Load Images
 # ==========================================
-echo "Load Kubeflow Trainer images"
+CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-manager"
+CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+echo "Build Kubeflow Trainer images"
+${CONTAINER_RUNTIME} build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
+
+DATASET_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/dataset-initializer"
+DATASET_INITIALIZER_CI_IMAGE="${DATASET_INITIALIZER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+${CONTAINER_RUNTIME} build . -f cmd/initializers/dataset/Dockerfile -t ${DATASET_INITIALIZER_CI_IMAGE}
+
+MODEL_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/model-initializer"
+MODEL_INITIALIZER_CI_IMAGE="${MODEL_INITIALIZER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+${CONTAINER_RUNTIME} build . -f cmd/initializers/model/Dockerfile -t ${MODEL_INITIALIZER_CI_IMAGE}
+
+TRAINER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/torchtune-trainer"
+TRAINER_CI_IMAGE="${TRAINER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+${CONTAINER_RUNTIME} build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_CI_IMAGE}
+
+XGBOOST_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/xgboost-runtime"
+XGBOOST_RUNTIME_CI_IMAGE="${XGBOOST_RUNTIME_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+echo "Build XGBoost runtime image"
+${CONTAINER_RUNTIME} build . -f cmd/runtimes/xgboost/Dockerfile -t ${XGBOOST_RUNTIME_CI_IMAGE}
+
+JAX_RUNTIME_IMAGE="nvcr.io/nvidia/jax:25.10-py3"
+echo "Pull JAX runtime image"
+${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
+
+echo "Load Kubeflow Trainer and Runtime images into Kind"
 load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${MODEL_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${TRAINER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${XGBOOST_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
-
-print_cluster_info() {
-  kubectl version
-  kubectl cluster-info
-  kubectl get nodes
-  kubectl get pods -n ${NAMESPACE}
-  kubectl describe pod -n ${NAMESPACE}
-}
+load_image_to_kind "${JAX_RUNTIME_IMAGE}" "${CLUSTER_NAME}"
 
 # ==========================================
-# 4. Deploy Control Plane & Runtimes
+# 3. Deploy Control Plane & Runtimes
 # ==========================================
 if [ "${INSTALL_METHOD}" = "kustomize" ]; then
   echo "Deploy Kubeflow Trainer control plane"
@@ -249,28 +251,5 @@ if [ "${CLUSTER_TYPE}" = "gpu" ]; then
     )
   ' | kubectl apply -f -
 fi
-
-# ==========================================
-# 5. Build and Load Custom Runtimes
-# ==========================================
-# hotfix(jaiakash) - skip pre-load due to kind failure
-# # TODO (andreyvelich): Discuss how we want to pre-load runtime images to the Kind cluster.
-# # TODO (andreyvelich): We should build runtime images before adding them.
-# TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
-# DEEPSPEED_RUNTIME_IMAGE=ghcr.io/kubeflow/trainer/deepspeed-runtime:latest
-JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
-
-# # Load Torch runtime image in KinD
-# ${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
-# load_image_to_kind ${TORCH_RUNTIME_IMAGE} "${CLUSTER_NAME}"
-
-# # Load DeepSpeed runtime image in KinD
-# ${CONTAINER_RUNTIME} pull ${DEEPSPEED_RUNTIME_IMAGE}
-# load_image_to_kind ${DEEPSPEED_RUNTIME_IMAGE} "${CLUSTER_NAME}"
-
-# # Pre-pull NVIDIA JAX image for JAX runtime.
-# # Load JAX runtime image in KinD
-${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
-load_image_to_kind ${JAX_RUNTIME_IMAGE} "${CLUSTER_NAME}"
 
 print_cluster_info
