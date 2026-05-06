@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubeflow Authors.
+Copyright The Kubeflow Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -2124,6 +2125,41 @@ test-job-node-0-1.test-job slots=8
 
 			if diff := cmp.Diff(tc.wantObjs, resultObjs, append(cmpOpts, tc.ObjCmpOpts...)...); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRuntimeInfo(t *testing.T) {
+	tests := map[string]struct {
+		templateType string
+	}{
+		"invalid template type returns error": {
+			templateType: "invalid-template-type",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Using zero-value TrainingRuntime is safe here because RuntimeInfo
+			// returns early for unsupported template types before accessing internal fields.
+			rt := &TrainingRuntime{}
+
+			trainJob := &trainer.TrainJob{}
+
+			_, err := rt.RuntimeInfo(
+				trainJob,
+				tt.templateType,
+				nil,
+				nil,
+			)
+
+			if err == nil {
+				t.Fatalf("expected error for unsupported runtimeTemplateSpec, got nil")
+			}
+
+			if !strings.Contains(err.Error(), "unsupported runtimeTemplateSpec") {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}
