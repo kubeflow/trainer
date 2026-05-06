@@ -21,8 +21,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-INSTALL_METHOD=${INSTALL_METHOD:-kustomize}
-
 # Source container runtime utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/scripts/container-runtime.sh"
@@ -32,6 +30,8 @@ source "${SCRIPT_DIR}/scripts/load-image-to-kind.sh"
 setup_container_runtime
 
 # Configure variables.
+export CLUSTER_TYPE=${CLUSTER_TYPE:-"cpu"}
+INSTALL_METHOD=${INSTALL_METHOD:-kustomize}
 KIND=${KIND:-./bin/kind}
 K8S_VERSION=${K8S_VERSION:-1.32.0}
 KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
@@ -40,7 +40,12 @@ TIMEOUT="5m"
 
 # Tag used for all locally-built CI images.
 CI_IMAGE_TAG="test"
-XGBOOST_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/xgboost-runtime"
+CLUSTER_NAME="kind"
+
+if [ "${CLUSTER_TYPE}" = "gpu" ]; then
+  GPU_OPERATOR_VERSION="v25.3.2"
+  NVKIND_BIN="/root/go/bin/nvkind"
+fi
 
 print_cluster_info() {
   kubectl version
@@ -49,19 +54,107 @@ print_cluster_info() {
   kubectl get pods -n ${NAMESPACE}
   kubectl describe pod -n ${NAMESPACE}
 }
-# Kubeflow Trainer images.
-# TODO (andreyvelich): Support initializers images.
+
+# ==========================================
+# 1. Create Cluster & Configure Environment
+# ==========================================
+if [ "${CLUSTER_TYPE}" = "gpu" ]; then
+  # Configure NVIDIA runtime.
+  sudo nvidia-ctk config --set accept-nvidia-visible-devices-as-volume-mounts=true --in-place
+  sudo nvidia-ctk runtime configure --runtime=docker --set-as-default
+  sudo systemctl restart docker
+
+  # Create a Kind cluster with GPU support.
+  sudo "$NVKIND_BIN" cluster create --name "${CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
+  sudo "$NVKIND_BIN" cluster print-gpus
+
+  # Make kubeconfig available to non-root user
+  mkdir -p "$HOME/.kube"
+  sudo cp /root/.kube/config "$HOME/.kube/config"
+  sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
+  export KUBECONFIG="$HOME/.kube/config"
+
+  # Install gpu-operator to make sure we can run GPU workloads.
+  echo "Installing NVIDIA GPU Operator"
+  kubectl create ns gpu-operator
+  kubectl label --overwrite ns gpu-operator pod-security.kubernetes.io/enforce=privileged
+
+  export HELM_CONFIG_HOME="$HOME/.config/helm"
+  export HELM_CACHE_HOME="$HOME/.cache/helm"
+  export HELM_DATA_HOME="$HOME/.local/share/helm"
+  mkdir -p "$HELM_CONFIG_HOME" "$HELM_CACHE_HOME" "$HELM_DATA_HOME"
+
+  helm repo add nvidia https://helm.ngc.nvidia.com/nvidia && helm repo update
+
+  # Configure GPU time slicing for GPU.
+  kubectl create -n gpu-operator -f ./hack/gpu-time-slicing.yml
+
+  helm install --wait --generate-name \
+    -n gpu-operator --create-namespace \
+    nvidia/gpu-operator \
+    --version="${GPU_OPERATOR_VERSION}" \
+    --set driver.enabled=false \
+    --set devicePlugin.config.name=gpu-time-slicing-config
+
+  # Patch cluster to use the time slicing configuration.
+  kubectl patch clusterpolicies.nvidia.com/cluster-policy \
+    -n gpu-operator --type merge \
+    -p '{"spec": {"devicePlugin": {"config": {"name": "gpu-time-slicing-config", "default": "any"}}}}'
+
+  # Validation steps
+  kubectl get ns gpu-operator
+  kubectl get ns gpu-operator --show-labels | grep pod-security.kubernetes.io/enforce=privileged
+  helm list -n gpu-operator
+  kubectl get pods -n gpu-operator -o name | while read pod; do
+    kubectl wait --for=condition=Ready --timeout=180s "$pod" -n gpu-operator || echo "$pod failed to become Ready"
+  done
+  kubectl get pods -n gpu-operator
+  kubectl get nodes -o=custom-columns=NAME:.metadata.name,GPU:'.status.allocatable.nvidia\.com/gpu'
+else
+  echo "Create Kind cluster"
+  ${KIND} create cluster --name "${CLUSTER_NAME}" --image "${KIND_NODE_VERSION}"
+fi
+
+# ==========================================
+# 2. Build and Load Images
+# ==========================================
 CONTROLLER_MANAGER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/trainer-controller-manager"
 CONTROLLER_MANAGER_CI_IMAGE="${CONTROLLER_MANAGER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 echo "Build Kubeflow Trainer images"
 ${CONTAINER_RUNTIME} build . -f cmd/trainer-controller-manager/Dockerfile -t ${CONTROLLER_MANAGER_CI_IMAGE}
 
-echo "Create Kind cluster and load Kubeflow Trainer images"
-${KIND} create cluster --image "${KIND_NODE_VERSION}"
+DATASET_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/dataset-initializer"
+DATASET_INITIALIZER_CI_IMAGE="${DATASET_INITIALIZER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+${CONTAINER_RUNTIME} build . -f cmd/initializers/dataset/Dockerfile -t ${DATASET_INITIALIZER_CI_IMAGE}
 
-# Load Trainer controller manager image in KinD
-load_image_to_kind ${CONTROLLER_MANAGER_CI_IMAGE}
+MODEL_INITIALIZER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/model-initializer"
+MODEL_INITIALIZER_CI_IMAGE="${MODEL_INITIALIZER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+${CONTAINER_RUNTIME} build . -f cmd/initializers/model/Dockerfile -t ${MODEL_INITIALIZER_CI_IMAGE}
 
+TRAINER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/torchtune-trainer"
+TRAINER_CI_IMAGE="${TRAINER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+${CONTAINER_RUNTIME} build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_CI_IMAGE}
+
+XGBOOST_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/xgboost-runtime"
+XGBOOST_RUNTIME_CI_IMAGE="${XGBOOST_RUNTIME_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+echo "Build XGBoost runtime image"
+${CONTAINER_RUNTIME} build . -f cmd/runtimes/xgboost/Dockerfile -t ${XGBOOST_RUNTIME_CI_IMAGE}
+
+JAX_RUNTIME_IMAGE="nvcr.io/nvidia/jax:25.10-py3"
+echo "Pull JAX runtime image"
+${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
+
+echo "Load Kubeflow Trainer and Runtime images into Kind"
+load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${CLUSTER_NAME}"
+load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
+load_image_to_kind "${MODEL_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
+load_image_to_kind "${TRAINER_CI_IMAGE}" "${CLUSTER_NAME}"
+load_image_to_kind "${XGBOOST_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
+load_image_to_kind "${JAX_RUNTIME_IMAGE}" "${CLUSTER_NAME}"
+
+# ==========================================
+# 3. Deploy Control Plane & Runtimes
+# ==========================================
 if [ "${INSTALL_METHOD}" = "kustomize" ]; then
   echo "Deploy Kubeflow Trainer control plane"
   E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
@@ -86,25 +179,18 @@ if [ "${INSTALL_METHOD}" = "kustomize" ]; then
 EOF
 
   kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
-# TODO (andreyvelich): Currently, we print manager logs due to flaky test.
-echo "Wait for Kubeflow Trainer to be ready"
-(kubectl wait deploy/kubeflow-trainer-controller-manager \
-  --for=condition=available \
-  -n ${NAMESPACE} \
-  --timeout ${TIMEOUT} && \
- kubectl wait pods \
-  --for=condition=ready \
-  -n ${NAMESPACE} \
-  --timeout ${TIMEOUT} \
-  --all) || (
-    echo "Failed to wait until Kubeflow Trainer is ready" &&
-    kubectl get pods -n ${NAMESPACE} &&
-    kubectl describe pods -n ${NAMESPACE} &&
-    exit 1
-)
+
+  echo "Wait for Kubeflow Trainer to be ready"
+  (kubectl wait deploy/kubeflow-trainer-controller-manager --for=condition=available -n ${NAMESPACE} --timeout ${TIMEOUT} &&
+    kubectl wait pods --for=condition=ready -n ${NAMESPACE} --timeout ${TIMEOUT} --all) ||
+    (
+      echo "Failed to wait until Kubeflow Trainer is ready" &&
+        kubectl get pods -n ${NAMESPACE} &&
+        kubectl describe pods -n ${NAMESPACE} &&
+        exit 1
+    )
 
   echo "Deploy Kubeflow Trainer runtimes"
-
   E2E_RUNTIMES_DIR="artifacts/e2e/runtimes"
   mkdir -p "${E2E_RUNTIMES_DIR}"
 
@@ -114,12 +200,21 @@ echo "Wait for Kubeflow Trainer to be ready"
   resources:
   - ../../../manifests/overlays/runtimes
   images:
-  - name: ${XGBOOST_RUNTIME_CI_IMAGE_NAME}
-    newTag: ${CI_IMAGE_TAG}
+  - name: "${XGBOOST_RUNTIME_CI_IMAGE_NAME}"
+    newTag: "${CI_IMAGE_TAG}"
+  - name: "${DATASET_INITIALIZER_CI_IMAGE_NAME}"
+    newTag: "${CI_IMAGE_TAG}"
+  - name: "${MODEL_INITIALIZER_CI_IMAGE_NAME}"
+    newTag: "${CI_IMAGE_TAG}"
+  - name: "${TRAINER_CI_IMAGE_NAME}"
+    newTag: "${CI_IMAGE_TAG}"
 EOF
 
-kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}"
-
+  kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
+    kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
+      print_cluster_info &&
+      exit 1
+  )
 
 elif [ "${INSTALL_METHOD}" = "helm" ]; then
   echo "Skipping Kustomize control plane deployment (Helm will handle control plane)"
@@ -138,31 +233,23 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
     --set controllerManager.image.tag=${CI_IMAGE_TAG} \
     --set manager.config.featureGates.TrainJobStatus=true \
     --wait
-
 fi
 
-# hotfix(jaiakash) - skip pre-load due to kind failure
-# # TODO (andreyvelich): We should build runtime images before adding them.
-# TORCH_RUNTIME_IMAGE=pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
-# DEEPSPEED_RUNTIME_IMAGE=ghcr.io/kubeflow/trainer/deepspeed-runtime:latest
-# JAX_RUNTIME_IMAGE=nvcr.io/nvidia/jax:25.10-py3
+if [ "${CLUSTER_TYPE}" = "gpu" ]; then
+  # hotfix: patch CRDs to run on GPU nodes (Check #3067)
+  echo "Patch CRDs to run on GPU nodes"
+  kubectl get clustertrainingruntimes -o json | jq '
+    .items[].spec.template.spec.replicatedJobs[].template.spec.template.spec.runtimeClassName = "nvidia"
+  ' | kubectl apply -f -
 
-# # Load Torch runtime image in KinD
-# ${CONTAINER_RUNTIME} pull ${TORCH_RUNTIME_IMAGE}
-# load_image_to_kind ${TORCH_RUNTIME_IMAGE}
-
-# # Load DeepSpeed runtime image in KinD
-# ${CONTAINER_RUNTIME} pull ${DEEPSPEED_RUNTIME_IMAGE}
-# load_image_to_kind ${DEEPSPEED_RUNTIME_IMAGE}
-
-# # Load JAX runtime image in KinD
-# ${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
-# load_image_to_kind ${JAX_RUNTIME_IMAGE}
-
-# Build and load custom runtime images that are not available in public registries.
-XGBOOST_RUNTIME_CI_IMAGE="${XGBOOST_RUNTIME_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
-echo "Build XGBoost runtime image"
-${CONTAINER_RUNTIME} build . -f cmd/runtimes/xgboost/Dockerfile -t ${XGBOOST_RUNTIME_CI_IMAGE}
-load_image_to_kind ${XGBOOST_RUNTIME_CI_IMAGE}
+  # hotfix: mount /dev/shm as emptyDir for NCCL shared memory requirements.
+  echo "Patch CRDs to mount /dev/shm as emptyDir"
+  kubectl get clustertrainingruntimes -o json | jq '
+    .items[].spec.template.spec.replicatedJobs[].template.spec.template.spec |= (
+      .volumes = ((.volumes // []) + [{"name": "dshm", "emptyDir": {"medium": "Memory"}}]) |
+      .containers = [.containers[] | .volumeMounts = ((.volumeMounts // []) + [{"name": "dshm", "mountPath": "/dev/shm"}])]
+    )
+  ' | kubectl apply -f -
+fi
 
 print_cluster_info
