@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubeflow Authors.
+Copyright The Kubeflow Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -2130,7 +2130,7 @@ test-job-node-0-1.test-job slots=8
 	}
 }
 
-func TestTrainingRuntime_RuntimeInfo_UnsupportedTemplate(t *testing.T) {
+func TestRuntimeInfo(t *testing.T) {
 	tests := map[string]struct {
 		templateType string
 	}{
