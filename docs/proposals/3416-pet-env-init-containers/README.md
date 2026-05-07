@@ -93,7 +93,8 @@ type TorchMLPolicySource struct {
 type TorchEnvInjection struct {
     // containerTypes lists the container types to inject PET_* envs into.
     // Supported values: "Containers", "InitContainers".
-    // Defaults to ["Containers"] (backward compatible).
+    // When empty or omitted, the behavior is backward compatible:
+    // PET_* envs are injected into main containers only.
     // +optional
     ContainerTypes []ContainerType `json:"containerTypes,omitempty"`
 }
@@ -106,8 +107,15 @@ const (
 )
 ```
 
-In this KEP, only `InitContainers` is implemented for the opt-in path; `Containers` is the
-implicit default (unchanged behavior). Future KEPs can extend the list.
+The following states are equivalent and all result in the backward-compatible default
+(main container injection only):
+
+- `envInjection` is omitted entirely (`EnvInjection == nil`).
+- `envInjection` is present but `containerTypes` is empty or omitted.
+- `containerTypes` explicitly lists only `"Containers"`.
+
+In this KEP, only `"InitContainers"` is the opt-in value that changes behavior.
+Future KEPs can extend the list.
 
 ## Design Details
 
