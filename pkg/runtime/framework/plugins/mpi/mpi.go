@@ -190,6 +190,19 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 				)
 				switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
 				case trainer.MPIImplementationOpenMPI:
+					// Collect all custom environment variable names from the TrainJob to export via SSH.
+					var envNames []string
+					if trainJob.Spec.Trainer != nil {
+						for _, env := range trainJob.Spec.Trainer.Env {
+							// Only include variables with a static Value.
+							// Variables with ValueFrom (e.g. FieldRef, ResourceFieldRef) are pod-specific
+							// and should not be propagated as cluster-wide constants.
+							if env.ValueFrom == nil {
+								envNames = append(envNames, env.Name)
+							}
+						}
+					}
+
 					apply.UpsertEnvVars(
 						&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Env,
 						*corev1ac.EnvVar().
@@ -205,6 +218,23 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 							WithName(constants.OpenMPIEnvKeyRSHArgs).
 							WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 					)
+
+					// Automatically tell OpenMPI to export the custom variables to all nodes.
+					if len(envNames) > 0 {
+						envList := ""
+						for i, name := range envNames {
+							if i > 0 {
+								envList += ";"
+							}
+							envList += name
+						}
+						apply.UpsertEnvVars(
+							&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Env,
+							*corev1ac.EnvVar().
+								WithName(constants.OpenMPIEnvBaseEnvList).
+								WithValue(envList),
+						)
+					}
 				default:
 					return fmt.Errorf("MPI implementation for %v doesn't supported", info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation)
 				}
