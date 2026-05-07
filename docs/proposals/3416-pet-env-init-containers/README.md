@@ -2,7 +2,7 @@
 
 ## Summary
 
-Torch `EnforceMLPolicy` injects `PET_*` envs only into trainer main container today. This KEP proposes an opt-in way to inject the same `PET_*` envs into trainer init containers.
+Torch `EnforceMLPolicy` injects `PET_*` envs only into trainer main container today. This KEP proposes adding an API field in `TorchMLPolicy` to opt-in `PET_*` env injection into trainer init containers.
 
 ## Motivation
 
@@ -54,14 +54,14 @@ Moreover:
 ### Goals
 
 - Keep `PET_*` env injection to trainer main container unchanged.
-- Add opt-in `PET_*` env injection for trainer init containers.
+- Add a type-safe API field in `TorchMLPolicy` to opt-in `PET_*` env injection for trainer init containers.
 - Keep one deterministic env source for both container types.
 - Keep scheduler behavior unchanged.
 
 ### Non-Goals
 
-- Change CRD or API schema.
-- Add new CRD or API fields.
+- Change `PET_*` env injection scope beyond init containers in this KEP.
+- Add user-facing fields to `TrainJob` CRD (deferred to future RuntimePatches discussion).
 - Change scheduling semantics.
 - Change JobSet network defaults or DNS behavior.
 
@@ -69,15 +69,45 @@ Moreover:
 
 Keep existing behavior by default: inject `PET_*` only into trainer main container.
 
-Add annotation-based opt-in for init containers. When enabled, apply the same `PET_*` env set to trainer init containers in `PodSet` (`AncestorTrainer`).
-In this KEP, the annotation controls only Torch plugin env injection behavior.
+Add a new `envInjection` field to `TorchMLPolicySource` in the TrainingRuntime CRD. When configured, apply the same `PET_*` env set to trainer init containers in `PodSet` (`AncestorTrainer`).
 
-Proposed annotation:
+Proposed API:
 
-- `trainer.kubeflow.org/plugin-env-injection-mode: "init-containers"`
+```yaml
+# TrainingRuntime.spec.mlPolicy.torch
+torch:
+  numNodes: 4
+  envInjection:
+    containerTypes:
+    - InitContainers
+```
 
-In this KEP, only one annotation value is supported: `init-containers`.
-Other values are reserved for future extension and are out of scope for this KEP.
+```go
+type TorchMLPolicySource struct {
+    // envInjection specifies which container types receive PET_* env injection.
+    // Defaults to empty (main container only).
+    // +optional
+    EnvInjection *TorchEnvInjection `json:"envInjection,omitempty"`
+}
+
+type TorchEnvInjection struct {
+    // containerTypes lists the container types to inject PET_* envs into.
+    // Supported values: "Containers", "InitContainers".
+    // Defaults to ["Containers"] (backward compatible).
+    // +optional
+    ContainerTypes []ContainerType `json:"containerTypes,omitempty"`
+}
+
+type ContainerType string
+
+const (
+    ContainersContainerType     ContainerType = "Containers"
+    InitContainersContainerType ContainerType = "InitContainers"
+)
+```
+
+In this KEP, only `InitContainers` is implemented for the opt-in path; `Containers` is the
+implicit default (unchanged behavior). Future KEPs can extend the list.
 
 ## Design Details
 
@@ -90,7 +120,7 @@ Add helper for init-container lookup by podset ancestor and container name, or g
 In `EnforceMLPolicy`, after `PET_*` values are computed:
 
 - Keep existing injection to trainer main container.
-- Add injection to trainer init containers only when `trainer.kubeflow.org/plugin-env-injection-mode` is set to `init-containers`.
+- Add injection to trainer init containers only when `TorchMLPolicy.EnvInjection` includes `InitContainers`.
 - Keep torchtune command mutation scoped to trainer main container only.
 
 ### JobSet plugin changes
@@ -133,7 +163,7 @@ Backward compatible by default.
 
 - Add torch plugin unit test with trainer `PodSet` containing init containers.
 - Verify default behavior: `PET_*` env injection only for main container.
-- Verify opt-in behavior: `PET_*` env injection for main and init containers.
+- Verify opt-in behavior: `PET_*` env injection for main and init containers when `EnvInjection` includes `InitContainers`.
 - Add or extend JobSet Build test to verify init container sync in final JobSet spec.
 
 ## Implementation History
@@ -163,8 +193,6 @@ Backward compatible by default.
 
 Should a future KEP change the default from opt-in to opt-out after enough adoption data?
 
-Should this annotation-based control move to a dedicated API field in Torch MLPolicy for better type safety and discoverability?
+Should TrainJob allow overriding `envInjection` via RuntimePatches (for example by extending `TrainingRuntimeSpecPatch`)?
 
-If a dedicated API field is introduced, should TrainJob override be supported via RuntimePatches (for example by extending `TrainingRuntimeSpecPatch`)?
-
-Should future scope include finer-grained targets such as specific replicated jobs and container names?
+Should a future KEP extend `TorchEnvInjection` with finer-grained targets such as specific replicated jobs and container names?
