@@ -34,7 +34,7 @@ import (
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 )
 
-func makeJobSetWithInitializer(ancestor string, containerName string, replicas int32) *jobsetv1alpha2ac.JobSetApplyConfiguration {
+func makeJobSet(ancestor, containerName string, replicas int32, replicatedJobName string) *jobsetv1alpha2ac.JobSetApplyConfiguration {
 	return &jobsetv1alpha2ac.JobSetApplyConfiguration{
 		Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
 			ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
@@ -55,36 +55,7 @@ func makeJobSetWithInitializer(ancestor string, containerName string, replicas i
 							},
 						},
 					},
-					Name:     ptr.To("initializer-job"),
-					Replicas: ptr.To(replicas),
-				},
-			},
-		},
-	}
-}
-
-func makeJobSetWithTrainer(ancestor string, containerName string, replicas int32) *jobsetv1alpha2ac.JobSetApplyConfiguration {
-	return &jobsetv1alpha2ac.JobSetApplyConfiguration{
-		Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
-			ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
-				{
-					Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
-						Spec: &batchv1ac.JobSpecApplyConfiguration{
-							Template: &corev1ac.PodTemplateSpecApplyConfiguration{
-								Spec: &corev1ac.PodSpecApplyConfiguration{
-									Containers: []corev1ac.ContainerApplyConfiguration{
-										*corev1ac.Container().WithName(containerName),
-									},
-								},
-							},
-						},
-						ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
-							Labels: map[string]string{
-								constants.LabelTrainJobAncestor: ancestor,
-							},
-						},
-					},
-					Name:     ptr.To(constants.Node),
+					Name:     ptr.To(replicatedJobName),
 					Replicas: ptr.To(replicas),
 				},
 			},
@@ -99,7 +70,7 @@ func TestBuilderInitializer(t *testing.T) {
 		wantJobSet *jobsetv1alpha2ac.JobSetApplyConfiguration
 	}{
 		"dataset initializer with storageUri and secretRef": {
-			jobSet: makeJobSetWithInitializer(constants.DatasetInitializer, constants.DatasetInitializer, 3),
+			jobSet: makeJobSet(constants.DatasetInitializer, constants.DatasetInitializer, 3, "initializer-job"),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
 					Initializer: &trainer.Initializer{
@@ -157,7 +128,7 @@ func TestBuilderInitializer(t *testing.T) {
 			},
 		},
 		"model initializer with storageUri and secretRef": {
-			jobSet: makeJobSetWithInitializer(constants.ModelInitializer, constants.ModelInitializer, 2),
+			jobSet: makeJobSet(constants.ModelInitializer, constants.ModelInitializer, 2, "initializer-job"),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
 					Initializer: &trainer.Initializer{
@@ -308,7 +279,7 @@ func TestBuilderInitializer(t *testing.T) {
 			},
 		},
 		"dataset initializer without secretRef only injects storageUri": {
-			jobSet: makeJobSetWithInitializer(constants.DatasetInitializer, constants.DatasetInitializer, 2),
+			jobSet: makeJobSet(constants.DatasetInitializer, constants.DatasetInitializer, 2, "initializer-job"),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
 					Initializer: &trainer.Initializer{
@@ -335,6 +306,42 @@ func TestBuilderInitializer(t *testing.T) {
 															Value: ptr.To("s3://bucket/dataset"),
 														},
 													},
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									},
+								},
+							},
+							Name:     ptr.To("initializer-job"),
+							Replicas: ptr.To[int32](1),
+						},
+					},
+				},
+			},
+		},
+		"dataset initializer ancestor with nil Initializer spec sets replicas to 1": {
+			jobSet: makeJobSet(constants.DatasetInitializer, constants.DatasetInitializer, 3, "initializer-job"),
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Initializer: nil,
+				},
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.DatasetInitializer),
 												},
 											},
 										},
@@ -428,7 +435,7 @@ func TestBuilderTrainer(t *testing.T) {
 		wantJobSet *jobsetv1alpha2ac.JobSetApplyConfiguration
 	}{
 		"trainer ancestor with image command and args": {
-			jobSet: makeJobSetWithTrainer(constants.AncestorTrainer, constants.Node, 4),
+			jobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 4, constants.Node),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
 					Trainer: &trainer.Trainer{
@@ -559,7 +566,7 @@ func TestBuilderTrainer(t *testing.T) {
 			},
 		},
 		"trainer ancestor with resourcesPerNode": {
-			jobSet: makeJobSetWithTrainer(constants.AncestorTrainer, constants.Node, 2),
+			jobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 2, constants.Node),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
 					Trainer: &trainer.Trainer{
@@ -616,8 +623,154 @@ func TestBuilderTrainer(t *testing.T) {
 				},
 			},
 		},
+		"trainer ancestor with nil Trainer spec sets replicas to 1": {
+			jobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 5, constants.Node),
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Trainer: nil,
+				},
+			},
+			info: &runtime.Info{},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.Node),
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+							},
+							Name:     ptr.To(constants.Node),
+							Replicas: ptr.To[int32](1),
+						},
+					},
+				},
+			},
+		},
+		"trainer ancestor with MPI runLauncherAsNode composes trainer fields without duplication": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.Node),
+													Env: []corev1ac.EnvVarApplyConfiguration{
+														*corev1ac.EnvVar().WithName("FROM_MPI_TEMPLATE").WithValue("mpi-template"),
+														*corev1ac.EnvVar().WithName("CLASH_KEY").WithValue("from-template"),
+													},
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+							},
+							Name:     ptr.To(constants.Node),
+							Replicas: ptr.To[int32](3),
+						},
+					},
+				},
+			},
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Trainer: &trainer.Trainer{
+						Image:   ptr.To("registry.example/train:combined"),
+						Command: []string{"mpirun"},
+						Env: []corev1.EnvVar{
+							{Name: "CLASH_KEY", Value: "from-trainer"},
+							{Name: "EXTRA_MPI_ENV", Value: "present-once"},
+						},
+						ResourcesPerNode: &corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("48Gi"),
+							},
+						},
+					},
+				},
+			},
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						MPI: &trainer.MPIMLPolicySource{
+							RunLauncherAsNode: ptr.To(true),
+						},
+					},
+				},
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name:    ptr.To(constants.Node),
+													Image:   ptr.To("registry.example/train:combined"),
+													Command: []string{"mpirun"},
+													Env: []corev1ac.EnvVarApplyConfiguration{
+														{
+															Name:  ptr.To("FROM_MPI_TEMPLATE"),
+															Value: ptr.To("mpi-template"),
+														},
+														{
+															Name:  ptr.To("CLASH_KEY"),
+															Value: ptr.To("from-trainer"),
+														},
+														{
+															Name:  ptr.To("EXTRA_MPI_ENV"),
+															Value: ptr.To("present-once"),
+														},
+													},
+													Resources: &corev1ac.ResourceRequirementsApplyConfiguration{
+														Limits: &corev1.ResourceList{
+															corev1.ResourceMemory: resource.MustParse("48Gi"),
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+							},
+							Name:     ptr.To(constants.Node),
+							Replicas: ptr.To[int32](1),
+						},
+					},
+				},
+			},
+		},
 		"non-trainer ancestor is not modified": {
-			jobSet: makeJobSetWithTrainer(constants.DatasetInitializer, constants.Node, 2),
+			jobSet: makeJobSet(constants.DatasetInitializer, constants.Node, 2, constants.Node),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
 					Trainer: &trainer.Trainer{
@@ -627,7 +780,7 @@ func TestBuilderTrainer(t *testing.T) {
 				},
 			},
 			info:       &runtime.Info{},
-			wantJobSet: makeJobSetWithTrainer(constants.DatasetInitializer, constants.Node, 2),
+			wantJobSet: makeJobSet(constants.DatasetInitializer, constants.Node, 2, constants.Node),
 		},
 		"MPI runLauncherAsNode applies resources to node job": {
 			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
@@ -706,6 +859,91 @@ func TestBuilderTrainer(t *testing.T) {
 				},
 			},
 		},
+		"MPI runLauncherAsNode injects Trainer.Env into node container": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.Node),
+													Env: []corev1ac.EnvVarApplyConfiguration{
+														*corev1ac.EnvVar().WithName("MPI_RANK_FILE").WithValue("/etc/mpi/rank"),
+													},
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{},
+								},
+							},
+							Name:     ptr.To(constants.Node),
+							Replicas: ptr.To[int32](2),
+						},
+					},
+				},
+			},
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Trainer: &trainer.Trainer{
+						Env: []corev1.EnvVar{
+							{Name: "WORLD_SIZE_OVERRIDE", Value: "8"},
+						},
+					},
+				},
+			},
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						MPI: &trainer.MPIMLPolicySource{
+							RunLauncherAsNode: ptr.To(true),
+						},
+					},
+				},
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.Node),
+													Env: []corev1ac.EnvVarApplyConfiguration{
+														{
+															Name:  ptr.To("MPI_RANK_FILE"),
+															Value: ptr.To("/etc/mpi/rank"),
+														},
+														{
+															Name:  ptr.To("WORLD_SIZE_OVERRIDE"),
+															Value: ptr.To("8"),
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{},
+								},
+							},
+							Name:     ptr.To(constants.Node),
+							Replicas: ptr.To[int32](2),
+						},
+					},
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -760,6 +998,70 @@ func TestBuilderPodLabels(t *testing.T) {
 								},
 							},
 							Name: ptr.To("worker"),
+						},
+					},
+				},
+			},
+		},
+		"labels applied to every replicated job pod template when multiple replicated jobs exist": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+							Name: ptr.To("worker"),
+						},
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+							Name: ptr.To("launcher"),
+						},
+					},
+				},
+			},
+			labels: map[string]string{
+				"app.kubernetes.io/name": "my-training",
+				"team":                   "ml-platform",
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+											Labels: map[string]string{
+												"app.kubernetes.io/name": "my-training",
+												"team":                   "ml-platform",
+											},
+										},
+									},
+								},
+							},
+							Name: ptr.To("worker"),
+						},
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+											Labels: map[string]string{
+												"app.kubernetes.io/name": "my-training",
+												"team":                   "ml-platform",
+											},
+										},
+									},
+								},
+							},
+							Name: ptr.To("launcher"),
 						},
 					},
 				},
@@ -822,6 +1124,67 @@ func TestBuilderPodAnnotations(t *testing.T) {
 				},
 			},
 		},
+		"annotations applied to every replicated job pod template when multiple replicated jobs exist": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+							Name: ptr.To("worker"),
+						},
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+							Name: ptr.To("launcher"),
+						},
+					},
+				},
+			},
+			annotations: map[string]string{
+				"prometheus.io/scrape": "true",
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+											Annotations: map[string]string{
+												"prometheus.io/scrape": "true",
+											},
+										},
+									},
+								},
+							},
+							Name: ptr.To("worker"),
+						},
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+											Annotations: map[string]string{
+												"prometheus.io/scrape": "true",
+											},
+										},
+									},
+								},
+							},
+							Name: ptr.To("launcher"),
+						},
+					},
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -859,6 +1222,19 @@ func TestBuilderSuspend(t *testing.T) {
 			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
 				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
 					Suspend: ptr.To(false),
+				},
+			},
+		},
+		"suspend set to nil leaves field unset": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					Suspend: ptr.To(true),
+				},
+			},
+			suspend: nil,
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					Suspend: nil,
 				},
 			},
 		},
