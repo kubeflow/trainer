@@ -214,6 +214,99 @@ func TestBuilderInitializer(t *testing.T) {
 				},
 			},
 		},
+		"dataset initializer merges Dataset.Env with storageUri and upserts pre-existing container env": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.DatasetInitializer),
+													Env: []corev1ac.EnvVarApplyConfiguration{
+														*corev1ac.EnvVar().WithName("PRE_EXISTING").WithValue("from-runtime-template"),
+														*corev1ac.EnvVar().WithName("OTHER").WithValue("keep-me"),
+													},
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									},
+								},
+							},
+							Name:     ptr.To("initializer-job"),
+							Replicas: ptr.To[int32](3),
+						},
+					},
+				},
+			},
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Initializer: &trainer.Initializer{
+						Dataset: &trainer.DatasetInitializer{
+							StorageUri: ptr.To("hf://my-org/my-dataset"),
+							Env: []corev1.EnvVar{
+								{Name: "CUSTOM_FROM_USER", Value: "user-value"},
+								{Name: "PRE_EXISTING", Value: "overridden-by-trainjob"},
+							},
+						},
+					},
+				},
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.DatasetInitializer),
+													Env: []corev1ac.EnvVarApplyConfiguration{
+														{
+															Name:  ptr.To("PRE_EXISTING"),
+															Value: ptr.To("overridden-by-trainjob"),
+														},
+														{
+															Name:  ptr.To("OTHER"),
+															Value: ptr.To("keep-me"),
+														},
+														{
+															Name:  ptr.To(jobsetplgconsts.InitializerEnvStorageUri),
+															Value: ptr.To("hf://my-org/my-dataset"),
+														},
+														{
+															Name:  ptr.To("CUSTOM_FROM_USER"),
+															Value: ptr.To("user-value"),
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									},
+								},
+							},
+							Name:     ptr.To("initializer-job"),
+							Replicas: ptr.To[int32](1),
+						},
+					},
+				},
+			},
+		},
 		"dataset initializer without secretRef only injects storageUri": {
 			jobSet: makeJobSetWithInitializer(constants.DatasetInitializer, constants.DatasetInitializer, 2),
 			trainJob: &trainer.TrainJob{
@@ -360,6 +453,93 @@ func TestBuilderTrainer(t *testing.T) {
 													Image:   ptr.To("docker.io/my-org/train:latest"),
 													Command: []string{"torchrun", "--nproc_per_node=4"},
 													Args:    []string{"train.py", "--epochs=10"},
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+							},
+							Name:     ptr.To(constants.Node),
+							Replicas: ptr.To[int32](1),
+						},
+					},
+				},
+			},
+		},
+		"trainer ancestor merges Trainer.Env and upserts duplicate container env keys": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.Node),
+													Env: []corev1ac.EnvVarApplyConfiguration{
+														*corev1ac.EnvVar().WithName("FROM_TEMPLATE").WithValue("template-value"),
+														*corev1ac.EnvVar().WithName("OVERRIDE_ME").WithValue("old-value"),
+													},
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+							},
+							Name:     ptr.To(constants.Node),
+							Replicas: ptr.To[int32](4),
+						},
+					},
+				},
+			},
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Trainer: &trainer.Trainer{
+						Env: []corev1.EnvVar{
+							{Name: "OVERRIDE_ME", Value: "new-value"},
+							{Name: "FROM_TRAINJOB", Value: "extra"},
+						},
+					},
+				},
+			},
+			info: &runtime.Info{},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.Node),
+													Env: []corev1ac.EnvVarApplyConfiguration{
+														{
+															Name:  ptr.To("FROM_TEMPLATE"),
+															Value: ptr.To("template-value"),
+														},
+														{
+															Name:  ptr.To("OVERRIDE_ME"),
+															Value: ptr.To("new-value"),
+														},
+														{
+															Name:  ptr.To("FROM_TRAINJOB"),
+															Value: ptr.To("extra"),
+														},
+													},
 												},
 											},
 										},
