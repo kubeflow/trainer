@@ -78,44 +78,35 @@ Proposed API:
 torch:
   numNodes: 4
   envInjection:
-    containerTypes:
-    - InitContainers
+    initContainers:
+    - preflight-check
+    - nccl-check
 ```
 
 ```go
 type TorchMLPolicySource struct {
-    // envInjection specifies which container types receive PET_* env injection.
+    // envInjection specifies PET_* env injection configuration.
     // Defaults to empty (main container only).
     // +optional
     EnvInjection *TorchEnvInjection `json:"envInjection,omitempty"`
 }
 
 type TorchEnvInjection struct {
-    // containerTypes lists the container types to inject PET_* envs into.
-    // Supported values: "Containers", "InitContainers".
-    // When empty or omitted, the behavior is backward compatible:
-    // PET_* envs are injected into main containers only.
+    // initContainers lists the init container names that should receive PET_* envs.
+    // When empty, no init containers receive PET_* injection.
+    // The main container (node) always receives PET_* envs regardless of this setting.
+    // +listType=set
     // +optional
-    ContainerTypes []ContainerType `json:"containerTypes,omitempty"`
+    InitContainers []string `json:"initContainers,omitempty"`
 }
-
-type ContainerType string
-
-const (
-    ContainersContainerType     ContainerType = "Containers"
-    InitContainersContainerType ContainerType = "InitContainers"
-)
 ```
 
-The following states are equivalent and all result in the backward-compatible default
-(main container injection only):
+The main container `node` is always injected with `PET_*` envs and does NOT need
+to be listed in `initContainers`. This keeps the API minimal and avoids the risk
+of users accidentally omitting the main container.
 
-- `envInjection` is omitted entirely (`EnvInjection == nil`).
-- `envInjection` is present but `containerTypes` is empty or omitted.
-- `containerTypes` explicitly lists only `"Containers"`.
-
-In this KEP, only `"InitContainers"` is the opt-in value that changes behavior.
-Future KEPs can extend the list.
+When `envInjection` is omitted (`EnvInjection == nil`), only the main container
+receives `PET_*` envs (backward-compatible default).
 
 ## Design Details
 
@@ -127,8 +118,8 @@ Add helper for init-container lookup by podset ancestor and container name, or g
 
 In `EnforceMLPolicy`, after `PET_*` values are computed:
 
-- Keep existing injection to trainer main container.
-- Add injection to trainer init containers only when `TorchMLPolicy.EnvInjection` includes `InitContainers`.
+- Keep existing injection to trainer main container (node).
+- For each container name in `TorchMLPolicy.EnvInjection.InitContainers`, find the matching init container in the `AncestorTrainer` PodSet and inject the same `PET_*` envs.
 - Keep torchtune command mutation scoped to trainer main container only.
 
 ### JobSet plugin changes
@@ -170,8 +161,9 @@ Backward compatible by default.
 ### Unit Tests
 
 - Add torch plugin unit test with trainer `PodSet` containing init containers.
-- Verify default behavior: `PET_*` env injection only for main container.
-- Verify opt-in behavior: `PET_*` env injection for main and init containers when `EnvInjection` includes `InitContainers`.
+- Verify default behavior: `PET_*` env injection only for main container (`node`).
+- Verify opt-in behavior: when `envInjection.initContainers` lists specific names, `PET_*` envs are injected into the matching init containers (and always into the main container).
+- Verify that init containers not listed in `envInjection.initContainers` do not receive `PET_*` envs.
 - Add or extend JobSet Build test to verify init container sync in final JobSet spec.
 
 ## Implementation History
@@ -181,26 +173,23 @@ Backward compatible by default.
 
 ## Alternatives
 
-### Alternative 1: Inject only into selected init containers
+### Alternative 1: Inject into all init containers (blanket approach)
 
-- **Pros:** Smaller runtime mutation scope. Also allows mixed sourcing of env values:
-  - `PET_NODE_RANK` from Pod `fieldRef` (`batch.kubernetes.io/job-completion-index`).
-  - `PET_NNODES` or `PET_NPROC_PER_NODE` from user-provided overrides when values are fixed.
-  - `PET_MASTER_ADDR` can be derived from `metadata.annotations['jobset.sigs.k8s.io/jobset-name']` (`$(JOBSET_NAME)-node-0-0.$(JOBSET_NAME)`)
-  - `PET_MASTER_PORT` can be fixed to `29500`, so it may not need explicit injection in some setups.
-- **Cons:** Need clear precedence rules when values are available from multiple sources (plugin injection, metadata-derived values, and user-provided envs). For example, `PET_NNODES` may duplicate `TrainJob.spec.trainer.numNodes`, which can cause configuration drift.
+- **Pros:** Simplest to configure (single boolean/flag). No need to list container names.
+- **Cons:** Pollutes unrelated init containers with `PET_*` envs. Less predictable for users who have multiple init containers with different purposes.
 
-### Alternative 2: Run preflight in main container startup path(entrypoint)
+### Alternative 2: Run preflight in main container startup path (entrypoint)
 
 - **Pros:** Works without injecting `PET_*` into init containers.
-- **Cons:** Startup probes and entrypoint checks have different failure behavior from init-container gating, and they still depend on DNS/network settings for `PET_MASTER_ADDR` resolution after Pod's ready (without explicit `publishNotReadyAddresses: true` )
+- **Cons:** Startup probes and entrypoint checks have different failure behavior from init-container gating, and they still depend on DNS/network settings for `PET_MASTER_ADDR` resolution after Pod's ready (without explicit `publishNotReadyAddresses: true`)
 
+### Alternative 3: Explicit replicatedJobName + containerName targets
 
+- **Pros:** Most granular control; supports injection into non-trainer replicated jobs.
+- **Cons:** Verbose configuration. No known use case for non-trainer replicated jobs today. Would also require validating that the main container is included in the list (otherwise it loses `PET_*` injection), adding API surface complexity.
 
 ## Open Questions
 
 Should a future KEP change the default from opt-in to opt-out after enough adoption data?
 
 Should TrainJob allow overriding `envInjection` via RuntimePatches (for example by extending `TrainingRuntimeSpecPatch`)?
-
-Should a future KEP extend `TorchEnvInjection` with finer-grained targets such as specific replicated jobs and container names?
