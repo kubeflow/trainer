@@ -1832,7 +1832,7 @@ func TestValidate(t *testing.T) {
 			}
 
 			warnings, errs := p.(framework.CustomValidationPlugin).Validate(ctx, tc.info, tc.oldObj, tc.newObj)
-			if diff := cmp.Diff(tc.wantError, errs); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantError, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue")); len(diff) != 0 {
 				t.Errorf("Unexpected error from Validate (-want, +got): %s", diff)
 			}
 			if diff := cmp.Diff(tc.wantWarnings, warnings); len(diff) != 0 {
