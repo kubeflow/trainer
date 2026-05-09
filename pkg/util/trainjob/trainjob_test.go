@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubeflow Authors.
+Copyright The Kubeflow Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,12 +44,37 @@ func TestRuntimeRefIsTrainingRuntime(t *testing.T) {
 			},
 			want: false,
 		},
+		"runtimeRef has wrong APIGroup": {
+			ref: trainer.RuntimeRef{
+				APIGroup: ptr.To("other.group.io"),
+				Kind:     ptr.To(trainer.TrainingRuntimeKind),
+			},
+			want: false,
+		},
+		"runtimeRef has nil APIGroup": {
+			ref: trainer.RuntimeRef{
+				APIGroup: nil,
+				Kind:     ptr.To(trainer.TrainingRuntimeKind),
+			},
+			want: false,
+		},
+		"runtimeRef has nil Kind": {
+			ref: trainer.RuntimeRef{
+				APIGroup: &trainer.GroupVersion.Group,
+				Kind:     nil,
+			},
+			want: false,
+		},
+		"runtimeRef has both nil": {
+			ref:  trainer.RuntimeRef{},
+			want: false,
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			got := RuntimeRefIsTrainingRuntime(tc.ref)
 			if got != tc.want {
-				t.Errorf("Unexpected RuntimeRefIsTrainingRuntime()\ngot: %v, want: %v", got, tc.want)
+				t.Errorf("RuntimeRefIsTrainingRuntime(%v) = %v, want %v", tc.ref, got, tc.want)
 			}
 		})
 	}
@@ -197,7 +222,7 @@ func TestIsTrainJobFinished(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			got := IsTrainJobFinished(tc.trainJob)
 			if got != tc.want {
-				t.Errorf("IsTrainJobFinished() = %v, want %v", got, tc.want)
+				t.Errorf("IsTrainJobFinished(%v) = %v, want %v", tc.trainJob, got, tc.want)
 			}
 		})
 	}
