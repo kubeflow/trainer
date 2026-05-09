@@ -293,6 +293,9 @@ var (
 	// XGBoostReservedEnvNames is XGBoost reserved env names that should not be set by users.
 	XGBoostReservedEnvNames = sets.New(XGBoostEnvTrackerURI, XGBoostEnvTrackerPort, XGBoostEnvTaskID, XGBoostEnvNumWorker)
 
+	// MPIReservedEnvNames is MPI reserved env names that users must not set manually.
+	MPIReservedEnvNames = sets.New(OpenMPIEnvHostFileLocation, OpenMPIEnvKeyRSHArgs, OpenMPIEnvKeepFQDNHostNames, OpenMPIEnvDefaultSlots)
+
 	// ResourceInUseFinalizer is a finalizer for managed resources which is used by other resources.
 	ResourceInUseFinalizer = fmt.Sprintf("%s/resource-in-use", trainer.GroupVersion.Group)
 
