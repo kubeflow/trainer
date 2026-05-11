@@ -58,7 +58,7 @@ We propose making the TrainJob only look up the runtime configuration on first r
 * When a TrainJob is reconciled, the controller first tries to fetch the runtime snapshot ConfigMap for the job. If the snapshot does not exist, the controller looks up the `(Cluster)TrainingRuntime` referenced by the train job and creates a new ConfigMap containing a single data item with key `runtime` and value set to the yaml-formatted representation of the referenced `(Cluster)TrainingRuntime`.
 * The `TrainJob` reconciliation logic uses the runtime configuration contained in the ConfigMap snapshot rather than the current configuration in the `(Cluster)TrainingRuntime`.
 * The reconciliation is otherwise unchanged.
-* The snapshot ConfigMap is automatically deleted when the train job is deleted using an `ownerReference` on the ConfigMap.
+* The snapshot ConfigMap is automatically deleted when the TrainJob is deleted using an `ownerReference` on the ConfigMap.
 
 An example ConfigMap is:
 ```yaml
