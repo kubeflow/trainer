@@ -3,7 +3,6 @@
 ## Authors
 - Rob Bell (Red Hat)
 
-Assisted by Claude Code (Sonnet 4.5)
 
 ## Summary
 
