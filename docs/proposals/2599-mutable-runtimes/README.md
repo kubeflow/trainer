@@ -3,7 +3,6 @@
 ## Authors
 - Rob Bell (Red Hat)
 
-
 ## Summary
 
 This KEP proposes decoupling the lifecycle of TrainingRuntimes and ClusterTrainingRuntimes from the TrainJobs that reference them by introducing a configuration snapshot mechanism. TrainJobs create a snapshot of their runtime configuration on first reconciliation, allowing runtimes to become fully mutable while ensuring TrainJob behaviour remains unchanged.
@@ -54,7 +53,7 @@ As a maintainer of Kubeflow Trainer, I want to be able to update or delete the d
 
 We propose making the TrainJob only look up the runtime configuration on first reconciliation and store a "snapshot" of the runtime configuration in a configmap:
 
-* Create a `ConfigMap` to store the runtime snapshot. This is an internal resource and should only be created or updated by the trainer controller. Each `TrainJob` will have one ConfigMap named `{trainjob-name}-runtime-snapshot` in the same namespace as the `TrainJob`. The ConfigMap would be annotated with the source runtime it was copied from to aid debugging, e.g. `trainer.kubeflow.org/source-runtime: ClusterTrainingRuntime/<runtime-name>` or `trainer.kubeflow.org/source-runtime: TrainingRuntime/<runtime-namespace>/<runtime-name>`.
+* Create a `ConfigMap` to store the runtime snapshot. This is an internal resource and should only be created or updated by the trainer controller. Each `TrainJob` will have one ConfigMap named `{trainjob-name}-runtime-snapshot` in the same namespace as the `TrainJob`.
 * When a TrainJob is reconciled, the controller first tries to fetch the runtime snapshot ConfigMap for the job. If the snapshot does not exist, the controller looks up the `(Cluster)TrainingRuntime` referenced by the train job and creates a new ConfigMap containing a single data item with key `runtime` and value set to the yaml-formatted representation of the referenced `(Cluster)TrainingRuntime`.
 * The `TrainJob` reconciliation logic uses the runtime configuration contained in the ConfigMap snapshot rather than the current configuration in the `(Cluster)TrainingRuntime`.
 * The reconciliation is otherwise unchanged.
