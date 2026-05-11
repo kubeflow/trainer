@@ -3,6 +3,13 @@
 This guide explains how to contribute to the Kubeflow Trainer V2 project.
 For the Kubeflow Trainer documentation, please check [the official Kubeflow documentation](https://www.kubeflow.org/docs/components/trainer/overview/).
 
+## AI Assistant Tooling
+
+The Kubeflow community allows the use of AI assistant tooling for contributions.
+Before using AI agents, please review the
+[Kubeflow AI Policy](https://www.kubeflow.org/docs/about/ai_policy/) to understand
+the guidelines and responsibilities for such contributions.
+
 ## Requirements
 
 - [Go](https://golang.org/) (1.26 or later)
