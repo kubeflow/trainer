@@ -1,6 +1,6 @@
 name: Bug Report
 description: Tell us about a problem you are experiencing with Kubeflow Trainer
-labels: ["kind/bug", "lifecycle/needs-triage"]
+labels: ["kind/bug", "needs-triage"]
 body:
   - type: markdown
     attributes:
