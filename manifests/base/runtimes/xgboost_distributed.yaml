@@ -21,4 +21,4 @@ spec:
                 spec:
                   containers:
                     - name: node
-                      image: ghcr.io/kubeflow/trainer/xgboost-runtime:latest
+                      image: ghcr.io/kubeflow/trainer/xgboost-runtime:v2.2.5
