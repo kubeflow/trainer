@@ -1,5 +1,5 @@
 [project]
-name = "kubeflow_trainer_api"
+name = "krishna_kubeflow_trainer_api"
 dynamic = ["version"]
 requires-python = ">=3.9"
 authors = [
