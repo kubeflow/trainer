@@ -30,7 +30,7 @@ class TrainerV1alpha1DatasetInitializer(BaseModel):
     """ # noqa: E501
     env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="env is the list of environment variables to set in the dataset initializer container. These values will be merged with the TrainingRuntime's dataset initializer environments.")
     secret_ref: Optional[IoK8sApiCoreV1LocalObjectReference] = Field(default=None, description="secretRef is the reference to the secret with credentials to download dataset. Secret must be created in the TrainJob's namespace.", alias="secretRef")
-    storage_uri: Optional[StrictStr] = Field(default=None, description="storageUri is the URI for the dataset provider. Should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path)", alias="storageUri")
+    storage_uri: Optional[StrictStr] = Field(default=None, description="storageUri is the URI for the dataset provider. If set, it may be empty, or it should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path).", alias="storageUri")
     __properties: ClassVar[List[str]] = ["env", "secretRef", "storageUri"]
 
     model_config = ConfigDict(

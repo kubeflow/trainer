@@ -249,12 +249,13 @@ spec:
                       storageUri:
                         description: |-
                           storageUri is the URI for the dataset provider.
-                          Should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path)
+                          If set, it may be empty, or it should be a valid URI format
+                          (e.g., s3://bucket/path, gs://bucket/path, /local/path).
                         maxLength: 2048
                         type: string
                         x-kubernetes-validations:
-                        - message: storageUri must be a valid URI (scheme://...) or
-                            absolute path (/...)
+                        - message: storageUri may be empty, or it must be a valid
+                            URI (scheme://...) or absolute path (/...)
                           rule: self == '' || self.matches('^([A-Za-z][A-Za-z0-9+.+-]*://.+|/.*)$')
                     type: object
                   model:
@@ -444,7 +445,8 @@ spec:
                       storageUri:
                         description: |-
                           storageUri is the URI for the model provider.
-                          Should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path)
+                          If set, it may be empty, or it should be a valid URI format
+                          (e.g., s3://bucket/path, gs://bucket/path, /local/path).
                         maxLength: 2048
                         type: string
                         x-kubernetes-validations:
