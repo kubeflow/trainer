@@ -249,14 +249,14 @@ spec:
                       storageUri:
                         description: |-
                           storageUri is the URI for the dataset provider.
-                          If set, it may be empty, or it should be a valid URI format
-                          (e.g., s3://bucket/path, gs://bucket/path, /local/path).
+                          If set, it may be empty, or it must be a valid URI format
+                          (e.g., s3://bucket/path, gs://bucket/path).
                         maxLength: 2048
                         type: string
                         x-kubernetes-validations:
                         - message: storageUri may be empty, or it must be a valid
-                            URI (scheme://...) or absolute path (/...)
-                          rule: self == '' || self.matches('^([A-Za-z][A-Za-z0-9+.+-]*://.+|/.*)$')
+                            URI (scheme://...)
+                          rule: self == '' || self.matches('^[A-Za-z][A-Za-z0-9+.-]*://.+$')
                     type: object
                   model:
                     description: model defines the configuration for the pre-trained
@@ -445,14 +445,14 @@ spec:
                       storageUri:
                         description: |-
                           storageUri is the URI for the model provider.
-                          If set, it may be empty, or it should be a valid URI format
-                          (e.g., s3://bucket/path, gs://bucket/path, /local/path).
+                          If set, it may be empty, or it must be a valid URI format
+                          (e.g., s3://bucket/path, gs://bucket/path).
                         maxLength: 2048
                         type: string
                         x-kubernetes-validations:
-                        - message: storageUri must be a valid URI (scheme://...) or
-                            absolute path (/...)
-                          rule: self == '' || self.matches('^([A-Za-z][A-Za-z0-9+.+-]*://.+|/.*)$')
+                        - message: storageUri may be empty, or it must be a valid
+                            URI (scheme://...)
+                          rule: self == '' || self.matches('^[A-Za-z][A-Za-z0-9+.-]*://.+$')
                     type: object
                 type: object
                 x-kubernetes-validations:
@@ -545,7 +545,7 @@ spec:
                                       name:
                                         description: name is the name of the replicated
                                           job to patch.
-                                        maxLength: 63
+                                        maxLength: 253
                                         minLength: 1
                                         pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                                         type: string

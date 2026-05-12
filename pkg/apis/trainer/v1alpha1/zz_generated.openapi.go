@@ -639,7 +639,7 @@ func schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"storageUri": {
 						SchemaProps: spec.SchemaProps{
-							Description: "storageUri is the URI for the dataset provider. If set, it may be empty, or it should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path).",
+							Description: "storageUri is the URI for the dataset provider. If set, it may be empty, or it must be a valid URI format (e.g., s3://bucket/path, gs://bucket/path).",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1108,7 +1108,7 @@ func schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref common.ReferenceCallb
 				Properties: map[string]spec.Schema{
 					"storageUri": {
 						SchemaProps: spec.SchemaProps{
-							Description: "storageUri is the URI for the model provider. If set, it may be empty, or it should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path).",
+							Description: "storageUri is the URI for the model provider. If set, it may be empty, or it must be a valid URI format (e.g., s3://bucket/path, gs://bucket/path).",
 							Type:        []string{"string"},
 							Format:      "",
 						},

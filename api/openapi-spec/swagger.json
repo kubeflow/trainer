@@ -13922,7 +13922,7 @@
             ]
           },
           "storageUri": {
-            "description": "storageUri is the URI for the dataset provider. If set, it may be empty, or it should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path).",
+            "description": "storageUri is the URI for the dataset provider. If set, it may be empty, or it must be a valid URI format (e.g., s3://bucket/path, gs://bucket/path).",
             "type": "string"
           }
         }
@@ -14276,7 +14276,7 @@
             ]
           },
           "storageUri": {
-            "description": "storageUri is the URI for the model provider. If set, it may be empty, or it should be a valid URI format (e.g., s3://bucket/path, gs://bucket/path, /local/path).",
+            "description": "storageUri is the URI for the model provider. If set, it may be empty, or it must be a valid URI format (e.g., s3://bucket/path, gs://bucket/path).",
             "type": "string"
           }
         }
