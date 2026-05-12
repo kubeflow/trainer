@@ -547,7 +547,6 @@ spec:
                                           job to patch.
                                         maxLength: 253
                                         minLength: 1
-                                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                                         type: string
                                       template:
                                         description: template patches the Job template
