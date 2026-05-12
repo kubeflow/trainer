@@ -346,7 +346,6 @@ type JobSetSpecPatch struct {
 type ReplicatedJobPatch struct {
 	// name is the name of the replicated job to patch.
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
 	// +kubebuilder:validation:MaxLength=253
 	// +required
 	Name string `json:"name,omitempty"`
