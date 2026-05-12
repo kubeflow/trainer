@@ -1,6 +1,6 @@
 name: Feature Request
 description: Suggest an idea for Kubeflow Trainer
-labels: ["kind/feature", "lifecycle/needs-triage"]
+labels: ["kind/feature", "needs-triage"]
 body:
   - type: markdown
     attributes:
