@@ -247,9 +247,16 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       storageUri:
-                        description: storageUri is the URI for the dataset provider.
+                        description: |-
+                          storageUri is the URI for the dataset provider.
+                          If set, it may be empty, or it must be a valid URI format
+                          (e.g., s3://bucket/path, gs://bucket/path).
                         maxLength: 2048
                         type: string
+                        x-kubernetes-validations:
+                        - message: storageUri may be empty, or it must be a valid
+                            URI (scheme://...)
+                          rule: self == '' || self.matches('^[A-Za-z][A-Za-z0-9+.-]*://.+$')
                     type: object
                   model:
                     description: model defines the configuration for the pre-trained
@@ -436,9 +443,16 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       storageUri:
-                        description: storageUri is the URI for the model provider.
+                        description: |-
+                          storageUri is the URI for the model provider.
+                          If set, it may be empty, or it must be a valid URI format
+                          (e.g., s3://bucket/path, gs://bucket/path).
                         maxLength: 2048
                         type: string
+                        x-kubernetes-validations:
+                        - message: storageUri may be empty, or it must be a valid
+                            URI (scheme://...)
+                          rule: self == '' || self.matches('^[A-Za-z][A-Za-z0-9+.-]*://.+$')
                     type: object
                 type: object
                 x-kubernetes-validations:
