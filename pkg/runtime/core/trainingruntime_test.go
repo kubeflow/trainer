@@ -1984,14 +1984,17 @@ test-job-node-0-1.test-job slots=8
 										{
 											Key:  corev1.SSHAuthPrivateKey,
 											Path: constants.MPISSHPrivateKeyFile,
+											Mode: ptr.To(constants.MPISSHSecretPrivateKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHPublicKeyFile,
+											Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHAuthorizedKeys,
+											Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 										},
 									},
 								},
@@ -2023,14 +2026,17 @@ test-job-node-0-1.test-job slots=8
 										{
 											Key:  corev1.SSHAuthPrivateKey,
 											Path: constants.MPISSHPrivateKeyFile,
+											Mode: ptr.To(constants.MPISSHSecretPrivateKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHPublicKeyFile,
+											Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHAuthorizedKeys,
+											Mode: ptr.To(constants.MPISSHSecretSharedSSHFileMode),
 										},
 									},
 								},

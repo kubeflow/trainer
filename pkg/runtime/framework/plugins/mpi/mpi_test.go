@@ -140,13 +140,16 @@ func TestMPI(t *testing.T) {
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -177,13 +180,16 @@ func TestMPI(t *testing.T) {
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 							},
@@ -277,13 +283,16 @@ trainJob-node-1-1.trainJob slots=1
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -314,13 +323,16 @@ trainJob-node-1-1.trainJob slots=1
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 							},
@@ -414,13 +426,16 @@ trainJob-node-1-1.trainJob slots=1
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -451,13 +466,16 @@ trainJob-node-1-1.trainJob slots=1
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 							},
@@ -582,13 +600,16 @@ trainJob-node-1-1.trainJob slots=1
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -627,13 +648,16 @@ trainJob-node-1-1.trainJob slots=1
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 							},
@@ -710,13 +734,16 @@ trainJob-node-1-0.trainJob slots=1
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -793,13 +820,16 @@ trainJob-node-1-0.trainJob slots=1
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHSecretPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHSecretSharedSSHFileMode),
 										),
 									),
 								*corev1ac.Volume().
