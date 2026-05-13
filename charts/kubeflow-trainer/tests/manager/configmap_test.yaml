@@ -28,29 +28,29 @@ tests:
           path: data["controller_manager_config.yaml"]
           pattern: "port: 9443"
 
-  - it: should use custom webhook service and secret names from config
+  - it: should use custom service and secret names from config
     set:
       manager:
         config:
           certManagement:
-            webhookServiceName: "custom-webhook-service"
-            webhookSecretName: "custom-webhook-secret"
+            serviceName: "custom-webhook-service"
+            secretName: "custom-webhook-secret"
     asserts:
       - matchRegex:
           path: data["controller_manager_config.yaml"]
-          pattern: "webhookServiceName: custom-webhook-service"
+          pattern: "serviceName: custom-webhook-service"
       - matchRegex:
           path: data["controller_manager_config.yaml"]
-          pattern: "webhookSecretName: custom-webhook-secret"
+          pattern: "secretName: custom-webhook-secret"
 
-  - it: should auto-generate webhook service and secret names when not provided
+  - it: should auto-generate service and secret names when not provided
     asserts:
       - matchRegex:
           path: data["controller_manager_config.yaml"]
-          pattern: "webhookServiceName: kubeflow-trainer-controller-manager"
+          pattern: "serviceName: kubeflow-trainer-controller-manager"
       - matchRegex:
           path: data["controller_manager_config.yaml"]
-          pattern: "webhookSecretName: kubeflow-trainer-webhook-cert"
+          pattern: "secretName: kubeflow-trainer-webhook-cert"
 
   - it: should enable leader election by default
     asserts:
