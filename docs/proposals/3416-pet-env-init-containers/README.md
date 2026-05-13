@@ -54,13 +54,12 @@ Moreover:
 ### Goals
 
 - Keep `PET_*` env injection to trainer main container unchanged.
-- Add a type-safe API field in `TorchMLPolicy` to opt-in `PET_*` env injection for trainer init containers.
+- Add a type-safe API field in `TorchMLPolicy` to opt-in `PET_*` env injection for trainer containers.
 - Keep one deterministic env source for both container types.
 - Keep scheduler behavior unchanged.
 
 ### Non-Goals
 
-- Change `PET_*` env injection scope beyond init containers in this KEP.
 - Add user-facing fields to `TrainJob` CRD (deferred to future RuntimePatches discussion).
 - Change scheduling semantics.
 - Change JobSet network defaults or DNS behavior.
@@ -69,7 +68,9 @@ Moreover:
 
 Keep existing behavior by default: inject `PET_*` only into trainer main container.
 
-Add a new `envInjection` field to `TorchMLPolicySource` in the TrainingRuntime CRD. When configured, apply the same `PET_*` env set to trainer init containers in `PodSet` (`AncestorTrainer`).
+Add a new `envInjection` field to `TorchMLPolicySource` in the TrainingRuntime CRD.
+When configured, it applies the same `PET_*` env set to specified containers in the
+target replicated jobs.
 
 Proposed API:
 
