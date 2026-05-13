@@ -56,6 +56,11 @@ type PodNetworkPlugin interface {
 	IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) error
 }
 
+type BuildParallelCountPlugin interface {
+	Plugin
+	BuildParallelCount(info *runtime.Info) error
+}
+
 type ComponentBuilderPlugin interface {
 	Plugin
 	Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error)
