@@ -278,8 +278,22 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 
 	for psIdx, ps := range info.TemplateSpec.PodSets {
 		if ps.Count != nil {
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Parallelism = ps.Count
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Completions = ps.Count
+			rJob := &jobSetSpec.ReplicatedJobs[psIdx]
+			jobMetadata := rJob.Template.ObjectMetaApplyConfiguration
+			isTrainer := jobMetadata != nil && jobMetadata.Labels != nil &&
+				jobMetadata.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer
+			if isTrainer {
+				// For trainer: count = NumNodes, use directly as Parallelism/Completions.
+				rJob.Template.Spec.Parallelism = ps.Count
+				rJob.Template.Spec.Completions = ps.Count
+			} else {
+				// For non-trainer: count = parallelism * replicas.
+				// Parallelism/Completions must be per-replica, not total pod count.
+				replicas := ptr.Deref(rJob.Replicas, 1)
+				perReplica := *ps.Count / replicas
+				rJob.Template.Spec.Parallelism = &perReplica
+				rJob.Template.Spec.Completions = &perReplica
+			}
 		}
 		apply.UpsertVolumes(&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Volumes, ps.Volumes...)
 		for containerIdx, container := range ps.Containers {
