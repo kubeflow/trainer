@@ -327,6 +327,29 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 			WithController(true).
 			WithBlockOwnerDeletion(true))
 
+	// Container images in spec.replicatedJobs are immutable in JobSet.
+	// When resuming a suspended JobSet, omit images from the apply config so SSA
+	// does not attempt to update them. The job resumes with the image it was created with.
+	if oldJobSet != nil &&
+		ptr.Deref(oldJobSet.Spec.Suspend, false) &&
+		!ptr.Deref(trainJob.Spec.Suspend, false) {
+		for i := range jobSet.Spec.ReplicatedJobs {
+			if jobSet.Spec.ReplicatedJobs[i].Template == nil ||
+				jobSet.Spec.ReplicatedJobs[i].Template.Spec == nil ||
+				jobSet.Spec.ReplicatedJobs[i].Template.Spec.Template == nil ||
+				jobSet.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec == nil {
+				continue
+			}
+			podSpec := jobSet.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec
+			for j := range podSpec.Containers {
+				podSpec.Containers[j].Image = nil
+			}
+			for j := range podSpec.InitContainers {
+				podSpec.InitContainers[j].Image = nil
+			}
+		}
+	}
+
 	return []apiruntime.ApplyConfiguration{jobSet}, nil
 }
 

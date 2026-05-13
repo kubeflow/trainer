@@ -1841,3 +1841,153 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+// TestBuild_ResumeOmitsContainerImages verifies that when a suspended JobSet is
+// resumed, container images are omitted from the SSA apply config so that the
+// immutable spec.replicatedJobs field is not updated. The job resumes with the
+// image it was originally created with.
+func TestBuild_ResumeOmitsContainerImages(t *testing.T) {
+	const upgradedImage = "registry.example.com/trainer:v2"
+
+	cases := map[string]struct {
+		existingJobSet  *jobsetv1alpha2.JobSet
+		trainJobSuspend bool
+		wantNilImages   bool
+		wantNilResult   bool
+	}{
+		"suspended JobSet being resumed: images must be nil in apply config": {
+			existingJobSet: &jobsetv1alpha2.JobSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "trainjob", Namespace: metav1.NamespaceDefault},
+				Spec:       jobsetv1alpha2.JobSetSpec{Suspend: ptr.To(true)},
+			},
+			trainJobSuspend: false,
+			wantNilImages:   true,
+		},
+		"no existing JobSet: images present in apply config (creation path)": {
+			existingJobSet:  nil,
+			trainJobSuspend: false,
+			wantNilImages:   false,
+		},
+		"both running: existing guard fires, nil result": {
+			existingJobSet: &jobsetv1alpha2.JobSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "trainjob", Namespace: metav1.NamespaceDefault},
+				Spec:       jobsetv1alpha2.JobSetSpec{Suspend: ptr.To(false)},
+			},
+			trainJobSuspend: false,
+			wantNilResult:   true,
+		},
+		"TrainJob suspended: images present (not a resume)": {
+			existingJobSet: &jobsetv1alpha2.JobSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "trainjob", Namespace: metav1.NamespaceDefault},
+				Spec:       jobsetv1alpha2.JobSetSpec{Suspend: ptr.To(true)},
+			},
+			trainJobSuspend: true,
+			wantNilImages:   false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			clientBuilder := utiltesting.NewClientBuilder()
+			if tc.existingJobSet != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.existingJobSet)
+			}
+			cli := clientBuilder.Build()
+
+			p, err := New(ctx, cli, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+
+			trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainjob").
+				Suspend(tc.trainJobSuspend).
+				RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "runtime").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					Container(upgradedImage, nil, nil, corev1.ResourceList{}).
+					Obj()).
+				Obj()
+
+			info := &runtime.Info{
+				Labels:      map[string]string{},
+				Annotations: map[string]string{},
+				Scheduler:   &runtime.Scheduler{},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:       constants.Node,
+							Containers: []runtime.Container{{Name: constants.Node, Image: upgradedImage}},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().
+														WithName(constants.Node).
+														WithImage(upgradedImage),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			}
+
+			objs, err := p.(framework.ComponentBuilderPlugin).Build(ctx, info, trainJob)
+			if err != nil {
+				t.Fatalf("Unexpected error from Build: %v", err)
+			}
+
+			if tc.wantNilResult {
+				if objs != nil {
+					t.Errorf("Expected nil result (running guard), got %v", objs)
+				}
+				return
+			}
+			if objs == nil || len(objs) == 0 {
+				t.Fatalf("Expected non-nil apply config, got nil")
+			}
+
+			jobSetApply, ok := objs[0].(*jobsetv1alpha2ac.JobSetApplyConfiguration)
+			if !ok {
+				t.Fatalf("Expected *JobSetApplyConfiguration, got %T", objs[0])
+			}
+
+			for _, rJob := range jobSetApply.Spec.ReplicatedJobs {
+				if rJob.Template == nil || rJob.Template.Spec == nil ||
+					rJob.Template.Spec.Template == nil || rJob.Template.Spec.Template.Spec == nil {
+					continue
+				}
+				for _, c := range rJob.Template.Spec.Template.Spec.Containers {
+					if tc.wantNilImages {
+						if c.Image != nil {
+							t.Errorf("Expected nil image for container %s on resume, got %q", *c.Name, *c.Image)
+						}
+					} else {
+						if c.Image == nil {
+							t.Errorf("Expected non-nil image for container %s, got nil", *c.Name)
+						}
+					}
+				}
+				for _, c := range rJob.Template.Spec.Template.Spec.InitContainers {
+					if tc.wantNilImages {
+						if c.Image != nil {
+							t.Errorf("Expected nil image for initContainer %s on resume, got %q", *c.Name, *c.Image)
+						}
+					} else {
+						if c.Image == nil {
+							t.Errorf("Expected non-nil image for initContainer %s, got nil", *c.Name)
+						}
+					}
+				}
+			}
+		})
+	}
+}
