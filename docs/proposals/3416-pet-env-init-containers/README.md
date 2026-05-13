@@ -78,9 +78,9 @@ Proposed API:
 torch:
   numNodes: 4
   envInjection:
-    initContainers:
-    - preflight-check
-    - nccl-check
+    targets:
+    - jobName: "node"
+      containerNames: ["nccl-check"]
 ```
 
 ```go
@@ -92,34 +92,51 @@ type TorchMLPolicySource struct {
 }
 
 type TorchEnvInjection struct {
-    // initContainers lists the init container names that should receive PET_* envs.
-    // When empty, no init containers receive PET_* injection.
-    // The main container (node) always receives PET_* envs regardless of this setting.
-    // +listType=set
+    // targets defines which jobs and containers receive PET_* env injection.
+    // +listType=map
+    // +listMapKey=jobName
     // +optional
-    InitContainers []string `json:"initContainers,omitempty"`
+    Targets []TorchEnvInjectionTarget `json:"targets,omitempty"`
+}
+
+type TorchEnvInjectionTarget struct {
+    // jobName is the name of the target replicated job (e.g. "node").
+    // Using "jobName" rather than "replicatedJobName" keeps the API
+    // future-proof for other CRD types (LWS, Grove, Slurm, etc.).
+    // +kubebuilder:validation:MinLength=1
+    // +required
+    JobName string `json:"jobName"`
+
+    // containerNames lists the container names within the target job
+    // that should receive PET_* envs.
+    // +listType=set
+    // +kubebuilder:validation:MinItems=1
+    // +required
+    ContainerNames []string `json:"containerNames"`
 }
 ```
 
-The main container `node` is always injected with `PET_*` envs and does NOT need
-to be listed in `initContainers`. This keeps the API minimal and avoids the risk
-of users accidentally omitting the main container.
+The main container `node` is always injected with `PET_*` envs regardless of
+`envInjection` settings. It does NOT need to be listed in `containerNames`.
 
-When `envInjection` is omitted (`EnvInjection == nil`), only the main container
-receives `PET_*` envs (backward-compatible default).
+When `envInjection` is omitted (`EnvInjection == nil`) or `targets` is empty,
+only the main container receives `PET_*` envs (backward-compatible default).
 
 ## Design Details
 
 ### Runtime helper
 
-Add helper for init-container lookup by podset ancestor and container name, or generalize existing lookup helper to support both main and init containers.
+Add a helper to find a container by replicated job name and container name,
+supporting both main containers and init containers, or generalize the existing
+lookup helper (e.g., `FindContainerByPodSetAncestorContainerName`) to accept
+a `searchInitContainers` flag.
 
 ### Torch plugin changes
 
 In `EnforceMLPolicy`, after `PET_*` values are computed:
 
 - Keep existing injection to trainer main container (node).
-- For each container name in `TorchMLPolicy.EnvInjection.InitContainers`, find the matching init container in the `AncestorTrainer` PodSet and inject the same `PET_*` envs.
+- For each entry in `TorchMLPolicy.EnvInjection.Targets`, find the PodSet matching `jobName`, then locate each container in `containerNames` (searching both main containers and init containers) and inject the same `PET_*` envs.
 - Keep torchtune command mutation scoped to trainer main container only.
 
 ### JobSet plugin changes
@@ -162,9 +179,8 @@ Backward compatible by default.
 
 - Add torch plugin unit test with trainer `PodSet` containing init containers.
 - Verify default behavior: `PET_*` env injection only for main container (`node`).
-- Verify opt-in behavior: when `envInjection.initContainers` lists specific names, `PET_*` envs are injected into the matching init containers (and always into the main container).
-- Verify that init containers not listed in `envInjection.initContainers` do not receive `PET_*` envs.
-- Add or extend JobSet Build test to verify init container sync in final JobSet spec.
+- Verify opt-in behavior: when `envInjection.targets` lists a `jobName` with `containerNames`, `PET_*` envs are injected into the matching containers (both main and init containers) and always into the main container.
+- Verify that containers not listed in `containerNames` do not receive `PET_*` envs.
 
 ## Implementation History
 
@@ -183,13 +199,15 @@ Backward compatible by default.
 - **Pros:** Works without injecting `PET_*` into init containers.
 - **Cons:** Startup probes and entrypoint checks have different failure behavior from init-container gating, and they still depend on DNS/network settings for `PET_MASTER_ADDR` resolution after Pod's ready (without explicit `publishNotReadyAddresses: true`)
 
-### Alternative 3: Explicit replicatedJobName + containerName targets
+### Alternative 3: Container name list without jobName
 
-- **Pros:** Most granular control; supports injection into non-trainer replicated jobs.
-- **Cons:** Verbose configuration. No known use case for non-trainer replicated jobs today. Would also require validating that the main container is included in the list (otherwise it loses `PET_*` injection), adding API surface complexity.
+- **Pros:** Shorter configuration when all target containers are in the same replicated job.
+- **Cons:** Implicit scoping (always the trainer job) limits future extensibility to other CRDs (LWS, Grove, Slurm) and makes the API less declarative.
 
 ## Open Questions
 
-Should a future KEP change the default from opt-in to opt-out after enough adoption data?
+Should a future KEP support the `jobName` in `torch.envInjection.targets` when the runtime template uses a different CRD (LWS, Grove, Slurm, etc.)?
+
+Should a future KEP allow omitting `jobName` in a target to auto-match all replicated jobs (a "match container name in any job" mode)?
 
 Should TrainJob allow overriding `envInjection` via RuntimePatches (for example by extending `TrainingRuntimeSpecPatch`)?
