@@ -22,10 +22,10 @@ require (
 	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/controller-runtime v0.24.0
-	sigs.k8s.io/jobset v0.11.1
+	sigs.k8s.io/jobset v0.12.0
 	sigs.k8s.io/kind v0.31.0
-	sigs.k8s.io/scheduler-plugins v0.34.4-devel-sg
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.2
+	sigs.k8s.io/scheduler-plugins v0.35.4-devel
+	sigs.k8s.io/structured-merge-diff/v6 v6.4.0
 	volcano.sh/apis v1.13.1-0.20251028070205-46d20c0699e7
 )
 
@@ -68,8 +68,8 @@ require (
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.opentelemetry.io/otel v1.41.0 // indirect
-	go.opentelemetry.io/otel/trace v1.41.0 // indirect
+	go.opentelemetry.io/otel v1.43.0 // indirect
+	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
