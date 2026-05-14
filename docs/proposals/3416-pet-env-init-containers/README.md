@@ -86,7 +86,10 @@ torch:
 
 ```go
 type TorchMLPolicySource struct {
-    // envInjection specifies PET_* env injection configuration.
+    // envInjection configures which additional containers should receive the
+    // PET_* environment variables. By default, the PET_* variables are injected
+    // only into the main "node" container. Use this field to also inject them
+    // into selected sidecar or init containers.
     // Defaults to empty (main container only).
     // +optional
     EnvInjection *EnvInjection `json:"envInjection,omitempty"`
