@@ -81,7 +81,7 @@ torch:
   envInjection:
     targets:
     - jobName: "node"
-      containerNames: ["nccl-check"]
+      containerNames: ["nccl-check", "driver-check"]
 ```
 
 ```go
@@ -89,18 +89,20 @@ type TorchMLPolicySource struct {
     // envInjection specifies PET_* env injection configuration.
     // Defaults to empty (main container only).
     // +optional
-    EnvInjection *TorchEnvInjection `json:"envInjection,omitempty"`
+    EnvInjection *EnvInjection `json:"envInjection,omitempty"`
 }
 
-type TorchEnvInjection struct {
-    // targets defines which jobs and containers receive PET_* env injection.
+// EnvInjection specifies which containers in which jobs receive framework env injection.
+// Defined at the MLPolicy level to allow reuse across policy types in the future.
+type EnvInjection struct {
+    // targets defines which replicated job containers receive PET_* env injection.
     // +listType=map
     // +listMapKey=jobName
     // +optional
-    Targets []TorchEnvInjectionTarget `json:"targets,omitempty"`
+    Targets []EnvInjectionTarget `json:"targets,omitempty"`
 }
 
-type TorchEnvInjectionTarget struct {
+type EnvInjectionTarget struct {
     // jobName is the name of the target replicated job (e.g. "node").
     // Using "jobName" rather than "replicatedJobName" keeps the API
     // future-proof for other CRD types (LWS, Grove, Slurm, etc.).
@@ -137,7 +139,7 @@ a `searchInitContainers` flag.
 In `EnforceMLPolicy`, after `PET_*` values are computed:
 
 - Keep existing injection to trainer main container (node).
-- For each entry in `TorchMLPolicy.EnvInjection.Targets`, find the PodSet matching `jobName`, then locate each container in `containerNames` (searching both main containers and init containers) and inject the same `PET_*` envs.
+- For each entry in `EnvInjection.Targets`, find the PodSet matching `jobName`, then locate each container in `containerNames` (searching both main containers and init containers) and inject the same `PET_*` envs.
 - Keep torchtune command mutation scoped to trainer main container only.
 
 ### JobSet plugin changes
@@ -157,6 +159,8 @@ In `Build`, mirror existing sync logic for `ps.Containers` to `ps.InitContainers
 ### Validation and Safety
 
 Reserved-env validation currently checks only `spec.trainer.env`. This KEP does not expand API validation scope.
+
+At the implementation level, the torch plugin should validate that each container name listed in `containerNames` actually exists in the target replicated job. Missing container names should produce an error to prevent silent misconfiguration.
 
 ### Networking prerequisite for preflight
 
