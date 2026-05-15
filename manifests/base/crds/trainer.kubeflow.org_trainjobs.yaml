@@ -548,6 +548,11 @@ spec:
                                         maxLength: 253
                                         minLength: 1
                                         type: string
+                                        x-kubernetes-validations:
+                                        - message: name must consist of lowercase
+                                            alphanumeric characters or '-', and must
+                                            start and end with an alphanumeric character
+                                          rule: self.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')
                                       template:
                                         description: template patches the Job template
                                           for this replicated job.

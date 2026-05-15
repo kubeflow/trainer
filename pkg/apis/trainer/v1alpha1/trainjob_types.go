@@ -346,6 +346,7 @@ type JobSetSpecPatch struct {
 type ReplicatedJobPatch struct {
 	// name is the name of the replicated job to patch.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:XValidation:rule="self.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')", message="name must consist of lowercase alphanumeric characters or '-', and must start and end with an alphanumeric character"
 	// +kubebuilder:validation:MaxLength=253
 	// +required
 	Name string `json:"name,omitempty"`

@@ -299,6 +299,64 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 				},
 				gomega.Succeed(),
 			),
+			ginkgo.Entry("Should fail with invalid replicated job name",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "test.io/manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{
+												{
+													Name: "-bad-name",
+												},
+											},
+										},
+									},
+								},
+							},
+						}).
+						Obj()
+				},
+				testingutil.BeInvalidError(),
+			),
+
+			ginkgo.Entry("Should succeed with valid replicated job name",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "test.io/manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{
+												{
+													Name: "node",
+													Template: &trainer.JobTemplatePatch{
+														Spec: &trainer.JobSpecPatch{
+															Template: &trainer.PodTemplatePatch{
+																Spec: &trainer.PodSpecPatch{
+																	ServiceAccountName: ptr.To("custom-sa"),
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						}).
+						Obj()
+				},
+				gomega.Succeed(),
+			),
 		)
 		ginkgo.DescribeTable("RFC1035-compliant TrainJob name validation", func(trainJob func() *trainer.TrainJob, errorMatcher gomega.OmegaMatcher) {
 			gomega.Expect(k8sClient.Create(ctx, trainJob())).Should(errorMatcher)
