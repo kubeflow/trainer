@@ -33,7 +33,7 @@ The goal is to make the same runtime-computed `PET_*` values available to init c
 - As a runtime engineer, I want early clarify and detect any of unstable problems like ensure cross-pod DNS resolution for MASTER_ADDR to prevent out-of-band communication failures during training.
 
 
-Moreover: 
+Moreover:
 - Init-container preflight emits structured results ( json ) and normalized exit codes (example: 0=pass , 10=warning , 20=retryable , 30=fatal ).
 - Preflight covers at least: GPU health, driver/CUDA compatibility, NCCL connectivity, Kubernetes API reachability, storage accessibility, minimal torchrun smoke test, and repeated DNS resolution for MASTER_ADDR .
 
