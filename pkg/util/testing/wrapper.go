@@ -1425,6 +1425,16 @@ func (c *ConfigMapWrapper) WithData(data map[string]string) *ConfigMapWrapper {
 	return c
 }
 
+func (c *ConfigMapWrapper) WithLabels(labels map[string]string) *ConfigMapWrapper {
+	if c.Labels == nil {
+		c.Labels = make(map[string]string, len(labels))
+	}
+	for k, v := range labels {
+		c.Labels[k] = v
+	}
+	return c
+}
+
 func (c *ConfigMapWrapper) ControllerReference(gvk schema.GroupVersionKind, name, uid string) *ConfigMapWrapper {
 	c.OwnerReferences = append(c.OwnerReferences, metav1.OwnerReference{
 		APIVersion:         gvk.GroupVersion().String(),
@@ -1471,6 +1481,17 @@ func (s *SecretWrapper) WithData(data map[string][]byte) *SecretWrapper {
 	}
 	for k, v := range data {
 		s.Data[k] = v
+	}
+	return s
+}
+
+
+func (s *SecretWrapper) WithLabels(labels map[string]string) *SecretWrapper {
+	if s.Labels == nil {
+		s.Labels = make(map[string]string, len(labels))
+	}
+	for k, v := range labels {
+		s.Labels[k] = v
 	}
 	return s
 }
