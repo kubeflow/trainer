@@ -523,8 +523,8 @@ type WorkloadPodGroupPolicySource struct {}
 ```
 
 The `WorkloadPodGroupPolicySource` struct is intentionally minimal for the initial implementation.
-The `minCount` for gang scheduling is automatically derived from `mlPolicy.numNodes` or
-`trainJob.spec.trainer.numNodes`.
+The `minCount` for gang scheduling is automatically derived from`trainJob.spec.trainer.numNodes`
+or `mlPolicy.numNodes`.
 
 ### Workload Runtime Plugin
 
