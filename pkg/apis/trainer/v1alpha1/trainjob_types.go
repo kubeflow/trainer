@@ -346,6 +346,7 @@ type JobSetSpecPatch struct {
 type ReplicatedJobPatch struct {
 	// name is the name of the replicated job to patch.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:XValidation:rule="self.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')", message="name must match RFC 1035 DNS label format"
 	// +kubebuilder:validation:MaxLength=253
 	// +required
 	Name string `json:"name,omitempty"`

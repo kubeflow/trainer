@@ -548,6 +548,10 @@ spec:
                                         maxLength: 253
                                         minLength: 1
                                         type: string
+                                        x-kubernetes-validations:
+                                        - message: name must match RFC 1035 DNS label
+                                            format
+                                          rule: self.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')
                                       template:
                                         description: template patches the Job template
                                           for this replicated job.
