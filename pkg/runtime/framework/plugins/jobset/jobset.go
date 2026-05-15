@@ -278,8 +278,27 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 
 	for psIdx, ps := range info.TemplateSpec.PodSets {
 		if ps.Count != nil {
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Parallelism = ps.Count
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Completions = ps.Count
+			rJob := &jobSetSpec.ReplicatedJobs[psIdx]
+			jobMetadata := rJob.Template.ObjectMetaApplyConfiguration
+			isTrainer := jobMetadata != nil && jobMetadata.Labels != nil &&
+				jobMetadata.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer
+			if isTrainer {
+				// For multi-slice trainer: count = numNodes (total across all slices).
+				// Parallelism/Completions must be per-slice = numNodes / replicas.
+				replicas := ptr.Deref(rJob.Replicas, 1)
+				if replicas <= 0 {
+					return nil, fmt.Errorf("trainer replicatedJob %d has invalid replicas %d: must be > 0", psIdx, replicas)
+				}
+				if *ps.Count%replicas != 0 {
+					return nil, fmt.Errorf("trainer numNodes %d must be evenly divisible by replicas %d", *ps.Count, replicas)
+				}
+				perSlice := *ps.Count / replicas
+				rJob.Template.Spec.Parallelism = &perSlice
+				rJob.Template.Spec.Completions = &perSlice
+			} else {
+				rJob.Template.Spec.Parallelism = ps.Count
+				rJob.Template.Spec.Completions = ps.Count
+			}
 		}
 		apply.UpsertVolumes(&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Volumes, ps.Volumes...)
 		for containerIdx, container := range ps.Containers {
