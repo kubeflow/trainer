@@ -109,6 +109,19 @@ manager:
     traffic.sidecar.istio.io/excludeInboundPorts: "9443"
 ```
 
+### Grafana dashboard
+
+The chart can optionally install a default Grafana dashboard (as a ConfigMap) for controller health and TrainJob controller activity.
+This is disabled by default and is intended for clusters that run Grafana with a dashboard sidecar that imports dashboards from labeled ConfigMaps.
+
+```bash
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+  --version 2.1.0 \
+  --set grafanaDashboard.enabled=true
+```
+
+If your Grafana sidecar uses a different label selector, override `grafanaDashboard.labels` accordingly.
+
 ## Values
 
 | Key | Type | Default | Description |
@@ -141,6 +154,10 @@ manager:
 | manager.config.statusServer.qps | int | `5` | QPS rate limit for the TrainJob Status Server api client |
 | manager.config.statusServer.burst | int | `10` | Burst rate limit for the TrainJob Status Server api client |
 | webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
+| grafanaDashboard | object | `{"annotations":{},"enabled":false,"labels":{"grafana_dashboard":"1"}}` |  |
+| grafanaDashboard.enabled | bool | `false` | Whether to install the default Grafana dashboard ConfigMap. This is intended for environments that run Grafana with a dashboard sidecar (ConfigMap import). |
+| grafanaDashboard.labels | object | `{"grafana_dashboard":"1"}` | Labels applied to the dashboard ConfigMap. Set this to match your Grafana sidecar label selector. |
+| grafanaDashboard.annotations | object | `{}` | Optional annotations applied to the dashboard ConfigMap. Example: set a folder via grafana sidecar conventions. |
 | dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |
 | dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency. Set to `false` if LeaderWorkerSet is already installed in the cluster. |
 | dataCache.lws.fullnameOverride | string | `"lws"` | String to fully override LeaderWorkerSet release name. |

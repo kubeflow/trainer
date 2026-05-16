@@ -152,6 +152,20 @@ webhook:
   # Available options are `Ignore` or `Fail`.
   failurePolicy: Fail
 
+grafanaDashboard:
+  # -- Whether to install the default Grafana dashboard ConfigMap.
+  # This is intended for environments that run Grafana with a dashboard sidecar (ConfigMap import).
+  enabled: false
+
+  # -- Labels applied to the dashboard ConfigMap.
+  # Set this to match your Grafana sidecar label selector.
+  labels:
+    grafana_dashboard: "1"
+
+  # -- Optional annotations applied to the dashboard ConfigMap.
+  # Example: set a folder via grafana sidecar conventions.
+  annotations: {}
+
 dataCache:
   # -- Enable/disable data cache support (LWS dependency, ClusterRole).
   # Set to `true` to install data cache components.
