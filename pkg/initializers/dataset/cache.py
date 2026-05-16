@@ -3,7 +3,6 @@ import time
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
-from kubernetes.dynamic.exceptions import ConflictError
 
 import pkg.initializers.types.types as types
 import pkg.initializers.utils.utils as utils
@@ -269,7 +268,7 @@ class CacheInitializer(utils.DatasetProvider):
                 core_v1.create_namespaced_service(namespace=namespace, body=service)
                 logging.info(f"Created Service {service.metadata.name}")
             except ApiException as e:
-                if e is ConflictError:
+                if e.status == 409:
                     logging.info(
                         f"Service {service.metadata.name} already exists, "
                         f"skipping creation"
