@@ -3147,6 +3147,14 @@ spec:
                                                         x-kubernetes-validations:
                                                         - message: field is immutable
                                                           rule: self == oldSelf
+                                                      terminationGracePeriodSeconds:
+                                                        description: |-
+                                                          terminationGracePeriodSeconds patches the termination grace period for Pods
+                                                          in the target job templates. This allows users to configure sufficient time
+                                                          for checkpoint saving on TrainJob completion or node drain.
+                                                        format: int64
+                                                        minimum: 0
+                                                        type: integer
                                                       tolerations:
                                                         description: tolerations patches
                                                           the Pod's tolerations.

@@ -508,6 +508,66 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						Obj()
 				},
 				testingutil.BeForbiddenError()),
+			ginkgo.Entry("Should succeed to create TrainJob with valid terminationGracePeriodSeconds in RuntimePatches",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-termination-grace-period").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "acme.io/manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: constants.Node,
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																TerminationGracePeriodSeconds: ptr.To(int64(300)),
+															},
+														},
+													},
+												},
+											}},
+										},
+									},
+								},
+							},
+						}).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create TrainJob with negative terminationGracePeriodSeconds",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "invalid-termination-grace-period").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "acme.io/manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: constants.Node,
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																TerminationGracePeriodSeconds: ptr.To(int64(-1)),
+															},
+														},
+													},
+												},
+											}},
+										},
+									},
+								},
+							},
+						}).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
 		)
 		ginkgo.DescribeTable("Defaulting TrainJob on creation", func(trainJob func() *trainer.TrainJob, wantTrainJob func() *trainer.TrainJob) {
 			created := trainJob()
