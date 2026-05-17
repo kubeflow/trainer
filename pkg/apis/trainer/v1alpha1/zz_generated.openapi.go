@@ -40,6 +40,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ContainerPatch":                   schema_pkg_apis_trainer_v1alpha1_ContainerPatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource": schema_pkg_apis_trainer_v1alpha1_CoschedulingPodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.DatasetInitializer":               schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EnvInjection":                     schema_pkg_apis_trainer_v1alpha1_EnvInjection(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EnvInjectionTarget":               schema_pkg_apis_trainer_v1alpha1_EnvInjectionTarget(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.FluxMLPolicySource":               schema_pkg_apis_trainer_v1alpha1_FluxMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Initializer":                      schema_pkg_apis_trainer_v1alpha1_Initializer(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource":                schema_pkg_apis_trainer_v1alpha1_JAXMLPolicySource(ref),
@@ -679,6 +681,85 @@ func schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref common.ReferenceCal
 		},
 		Dependencies: []string{
 			corev1.EnvVar{}.OpenAPIModelName(), corev1.LocalObjectReference{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_EnvInjection(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EnvInjection specifies which containers in which jobs receive framework env injection. Defined at the MLPolicy level to allow reuse across policy types in the future.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"targets": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"jobName",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "targets defines which replicated job containers receive PET_* env injection.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EnvInjectionTarget"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EnvInjectionTarget"},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_EnvInjectionTarget(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EnvInjectionTarget specifies a replicated job and the containers within it that should receive PET_* env injection.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"jobName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "jobName is the name of the target replicated job (e.g. \"node\"). Using \"jobName\" rather than \"replicatedJobName\" keeps the API future-proof for other CRD types (LWS, Grove, Slurm, etc.).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"containerNames": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "containerNames lists the container names within the target job that should receive PET_* envs.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"jobName", "containerNames"},
+			},
+		},
 	}
 }
 
@@ -1523,8 +1604,18 @@ func schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref common.ReferenceCa
 			SchemaProps: spec.SchemaProps{
 				Description: "TorchMLPolicySource represents a PyTorch runtime configuration.",
 				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"envInjection": {
+						SchemaProps: spec.SchemaProps{
+							Description: "envInjection configures which additional containers should receive the PET_* environment variables. By default, the PET_* variables are injected only into the main \"node\" container. Use this field to also inject them into selected sidecar or init containers. Defaults to empty (main container only).",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EnvInjection"),
+						},
+					},
+				},
 			},
 		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EnvInjection"},
 	}
 }
 

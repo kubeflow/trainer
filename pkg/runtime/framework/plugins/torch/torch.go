@@ -91,6 +91,10 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		return nil
 	}
 
+	torchPolicy := info.RuntimePolicy.MLPolicySource.Torch
+
+	// Check if using torchtune BEFORE any command modifications.
+
 	// TrainJob contains the actual information for the Trainer.
 	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
 	if trainerPS != nil && trainerPS.Count != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
@@ -120,34 +124,39 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			apply.UpsertEnvVars(&trainerContainer.Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
 		}
 	}
+
+	petEnvs := []corev1ac.EnvVarApplyConfiguration{
+		*corev1ac.EnvVar().
+			WithName(constants.TorchEnvNumNodes).
+			WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
+		*corev1ac.EnvVar().
+			WithName(constants.TorchEnvNumProcPerNode).
+			WithValue(numProcPerNode.String()),
+		*corev1ac.EnvVar().
+			WithName(constants.TorchEnvNodeRank).
+			WithValueFrom(corev1ac.EnvVarSource().
+				WithFieldRef(corev1ac.ObjectFieldSelector().
+					WithFieldPath(constants.JobCompletionIndexFieldPath))),
+	}
+
+	masterEnvVars := []corev1ac.EnvVarApplyConfiguration{
+		*corev1ac.EnvVar().
+			WithName(constants.TorchEnvMasterAddr).
+			WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
+		*corev1ac.EnvVar().
+			WithName(constants.TorchEnvMasterPort).
+			WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+	}
+
+	// Inject PET_* envs into trainer main container (always).
 	if trainerContainer != nil {
 		// Add PyTorch distributed "PET_" values for torchrun and torchtune.
 		// TODO (andreyvelich): We should validate that envs from different plugins don't conflict with each other.
 		// Ref: https://github.com/kubeflow/trainer/pull/2308#discussion_r1823229940
-		apply.UpsertEnvVars(&trainerContainer.Env,
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvNumNodes).
-				WithValue(fmt.Sprintf("%d", ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1))),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvNumProcPerNode).
-				WithValue(numProcPerNode.String()),
-			*corev1ac.EnvVar().
-				WithName(constants.TorchEnvNodeRank).
-				WithValueFrom(corev1ac.EnvVarSource().
-					WithFieldRef(corev1ac.ObjectFieldSelector().
-						WithFieldPath(constants.JobCompletionIndexFieldPath))),
-		)
+		apply.UpsertEnvVars(&trainerContainer.Env, petEnvs...)
 
 		if !slices.Equal(trainJob.Spec.Trainer.Command, constants.TorchTuneEntrypoint) {
-			// Add PET_MASTER_ADDR and PET_MASTER_PORT envs for torchrun.
-			apply.UpsertEnvVars(&trainerContainer.Env,
-				*corev1ac.EnvVar().
-					WithName(constants.TorchEnvMasterAddr).
-					WithValue(fmt.Sprintf("%s-%s-0-0.%s", trainJob.Name, constants.Node, trainJob.Name)),
-				*corev1ac.EnvVar().
-					WithName(constants.TorchEnvMasterPort).
-					WithValue(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
-			)
+			apply.UpsertEnvVars(&trainerContainer.Env, masterEnvVars...)
 		} else {
 			// Mutate trainer command for torchtune.
 			// Ref: https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2#complement-torch-plugin
@@ -175,6 +184,24 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		}
 		// Add container port for the headless service.
 		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
+	}
+
+	// Inject PET_* envs into additional containers specified by envInjection config.
+	// We always inject master envs here because envInjection targets are typically
+	// auxiliary containers (init containers, sidecars) that may need the master
+	// address for preflight checks or coordination, regardless of whether the
+	// main container uses torchtune (which uses command-line rendezvous instead).
+	if torchPolicy.EnvInjection != nil {
+		for _, target := range torchPolicy.EnvInjection.Targets {
+			for _, containerName := range target.ContainerNames {
+				container := info.FindContainerByPodSetName(target.JobName, containerName)
+				if container == nil {
+					continue
+				}
+				apply.UpsertEnvVars(&container.Env, petEnvs...)
+				apply.UpsertEnvVars(&container.Env, masterEnvVars...)
+			}
+		}
 	}
 
 	return nil

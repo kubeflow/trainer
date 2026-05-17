@@ -206,7 +206,43 @@ type MLPolicySource struct {
 }
 
 // TorchMLPolicySource represents a PyTorch runtime configuration.
-type TorchMLPolicySource struct{}
+type TorchMLPolicySource struct {
+	// envInjection configures which additional containers should receive the
+	// PET_* environment variables. By default, the PET_* variables are injected
+	// only into the main "node" container. Use this field to also inject them
+	// into selected sidecar or init containers.
+	// Defaults to empty (main container only).
+	// +optional
+	EnvInjection *EnvInjection `json:"envInjection,omitempty"`
+}
+
+// EnvInjection specifies which containers in which jobs receive framework env injection.
+// Defined at the MLPolicy level to allow reuse across policy types in the future.
+type EnvInjection struct {
+	// targets defines which replicated job containers receive PET_* env injection.
+	// +listType=map
+	// +listMapKey=jobName
+	// +optional
+	Targets []EnvInjectionTarget `json:"targets,omitempty"`
+}
+
+// EnvInjectionTarget specifies a replicated job and the containers within it
+// that should receive PET_* env injection.
+type EnvInjectionTarget struct {
+	// jobName is the name of the target replicated job (e.g. "node").
+	// Using "jobName" rather than "replicatedJobName" keeps the API
+	// future-proof for other CRD types (LWS, Grove, Slurm, etc.).
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	JobName string `json:"jobName"`
+
+	// containerNames lists the container names within the target job
+	// that should receive PET_* envs.
+	// +listType=set
+	// +kubebuilder:validation:MinItems=1
+	// +required
+	ContainerNames []string `json:"containerNames"`
+}
 
 // JAXMLPolicySource represents a jax runtime configuration.
 type JAXMLPolicySource struct{}
