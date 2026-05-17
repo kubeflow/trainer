@@ -222,6 +222,7 @@ type EnvInjection struct {
 	// targets defines which replicated job containers receive PET_* env injection.
 	// +listType=map
 	// +listMapKey=jobName
+	// +kubebuilder:validation:MaxItems=16
 	// +optional
 	Targets []EnvInjectionTarget `json:"targets,omitempty"`
 }
@@ -233,15 +234,18 @@ type EnvInjectionTarget struct {
 	// Using "jobName" rather than "replicatedJobName" keeps the API
 	// future-proof for other CRD types (LWS, Grove, Slurm, etc.).
 	// +kubebuilder:validation:MinLength=1
-	// +required
-	JobName string `json:"jobName"`
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	JobName string `json:"jobName,omitempty"`
 
 	// containerNames lists the container names within the target job
 	// that should receive PET_* envs.
 	// +listType=set
 	// +kubebuilder:validation:MinItems=1
-	// +required
-	ContainerNames []string `json:"containerNames"`
+	// +kubebuilder:validation:MaxItems=8
+	// +kubebuilder:validation:items:MaxLength=63
+	// +optional
+	ContainerNames []string `json:"containerNames,omitempty"`
 }
 
 // JAXMLPolicySource represents a jax runtime configuration.

@@ -18,7 +18,7 @@ import re  # noqa: F401
 import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -26,8 +26,8 @@ class TrainerV1alpha1EnvInjectionTarget(BaseModel):
     """
     EnvInjectionTarget specifies a replicated job and the containers within it that should receive PET_* env injection.
     """ # noqa: E501
-    container_names: List[StrictStr] = Field(description="containerNames lists the container names within the target job that should receive PET_* envs.", alias="containerNames")
-    job_name: StrictStr = Field(description="jobName is the name of the target replicated job (e.g. \"node\"). Using \"jobName\" rather than \"replicatedJobName\" keeps the API future-proof for other CRD types (LWS, Grove, Slurm, etc.).", alias="jobName")
+    container_names: Optional[List[StrictStr]] = Field(default=None, description="containerNames lists the container names within the target job that should receive PET_* envs.", alias="containerNames")
+    job_name: Optional[StrictStr] = Field(default=None, description="jobName is the name of the target replicated job (e.g. \"node\"). Using \"jobName\" rather than \"replicatedJobName\" keeps the API future-proof for other CRD types (LWS, Grove, Slurm, etc.).", alias="jobName")
     __properties: ClassVar[List[str]] = ["containerNames", "jobName"]
 
     model_config = ConfigDict(
@@ -82,7 +82,7 @@ class TrainerV1alpha1EnvInjectionTarget(BaseModel):
 
         _obj = cls.model_validate({
             "containerNames": obj.get("containerNames"),
-            "jobName": obj.get("jobName") if obj.get("jobName") is not None else ''
+            "jobName": obj.get("jobName")
         })
         return _obj
 
