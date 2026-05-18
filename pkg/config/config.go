@@ -134,8 +134,8 @@ func Load(scheme *runtime.Scheme, configFile string, enableHTTP2 bool) (ctrl.Opt
 	return options, cfg, nil
 }
 
-// ApplyClientConnection sets QPS and burst on the given rest.Config
-// from the Configuration's clientConnection settings.
+// ApplyClientConnection copies QPS and burst from cfg.ClientConnection to restCfg.
+// If ClientConnection is nil or individual fields are nil, existing restCfg values are preserved.
 func ApplyClientConnection(restCfg *rest.Config, cfg *configapi.Configuration) {
 	if cfg.ClientConnection != nil {
 		if cfg.ClientConnection.QPS != nil {

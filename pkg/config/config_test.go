@@ -896,27 +896,6 @@ func TestApplyClientConnection(t *testing.T) {
 	}
 }
 
-func TestLoadAndApplyClientConnection(t *testing.T) {
-	testScheme := runtime.NewScheme()
-	if err := configapi.AddToScheme(testScheme); err != nil {
-		t.Fatal(err)
-	}
-
-	_, cfg, err := Load(testScheme, "", false)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	restCfg := &rest.Config{QPS: 5, Burst: 10}
-	ApplyClientConnection(restCfg, &cfg)
-
-	if restCfg.QPS != 50 {
-		t.Errorf("QPS = %v, want 50", restCfg.QPS)
-	}
-	if restCfg.Burst != 100 {
-		t.Errorf("Burst = %v, want 100", restCfg.Burst)
-	}
-}
 
 func TestLoadHTTP2(t *testing.T) {
 	testScheme := runtime.NewScheme()

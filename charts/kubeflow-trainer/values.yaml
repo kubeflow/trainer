@@ -139,7 +139,7 @@ manager:
       webhookServiceName: ""
       webhookSecretName: ""
     clientConnection:
-      # -- QPS rate limit for the manager's Kubernetes API client
+      # -- QPS rate limit for the manager's Kubernetes API client. Accepts fractional values (e.g. 0.5).
       qps: 50
       # -- Burst rate limit for the manager's Kubernetes API client
       burst: 100
