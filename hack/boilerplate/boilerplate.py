@@ -6,7 +6,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,11 +16,14 @@
 
 """Verify boilerplate copyright headers in source files.
 
-This script verifies that all source files have valid copyright headers.
-It follows the Kubernetes approach:
-- Files with years 2024-2025 are allowed (year is stripped during comparison)
-- Files with years 2026+ are rejected (enforces no-year policy for new files)
-- Files without years are preferred (matches template directly)
+Policy:
+  - Files with years 2024-2025 are accepted (the year is stripped during
+    comparison against the year-less template).
+  - Files with year 2026 are rejected unless allowlisted in
+    .boilerplateignore under [year-2026] (these were merged before this
+    enforcement landed).
+  - Files with any other year (2027+, or earlier) are rejected.
+  - New files must use the year-less template directly.
 
 Reference: https://github.com/kubernetes/steering/issues/299
 """
@@ -29,269 +32,194 @@ import argparse
 import glob
 import os
 import re
+import subprocess
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
-# After 2025, new files should not include a year in the copyright header.
-# This aligns with CNCF/LF Legal guidance.
+FIRST_YEAR = 2024
 FINAL_YEAR = 2025
 
-# First year of the project (for year range validation)
-FIRST_YEAR = 2024
-
-# Files that were merged with 2026 copyright before this policy was implemented.
-# These are explicitly allowed to have "Copyright 2026" headers.
-# Any new file must use the year-less format.
-YEAR_2026_ALLOWED_FILES = {
-    "pkg/constants/constants.go",
-    "pkg/runtime/framework/plugins/trainjobstatus/trainjobstatus.go",
-    "pkg/runtime/framework/plugins/trainjobstatus/trainjobstatus_test.go",
-    "pkg/runtime/framework/plugins/xgboost/xgboost.go",
-    "pkg/runtime/framework/plugins/xgboost/xgboost_test.go",
-    "pkg/statusserver/auth.go",
-    "pkg/statusserver/server.go",
-    "pkg/statusserver/server_test.go",
-    "pkg/statusserver/setup.go",
-    "pkg/statusserver/utils.go",
+# Maps file extension (or special basename) to the boilerplate template
+# stem on disk (boilerplate.<stem>.txt). One template is reused across
+# all hash-comment languages.
+EXTENSION_TEMPLATES = {
+    "go": "go",
+    "sh": "sh",
+    "bash": "sh",
+    "py": "sh",
+    "Dockerfile": "sh",
 }
 
-# Files with historical "Copyright The Kubernetes Authors" headers.
-KUBERNETES_AUTHORS_ALLOWED_FILES = {
-    "pkg/features/features.go",
-}
+# Template used for code-generated Go files (DO NOT EDIT). Loaded from
+# disk but only activated when a Go file is detected as generated.
+GENERATED_GO_TEMPLATE = "generatego"
 
-# Hand-written files using non-standard comment format (line comments instead of block).
-# These use // comments but are not auto-generated files.
-LINE_COMMENT_FORMAT_ALLOWED_FILES = {
-    "pkg/apis/trainer/v1alpha1/doc.go",
-}
+# Path patterns skipped during repo-wide scans (not when explicit
+# filenames are passed on the command line).
+SCAN_SKIP_PATTERNS = (
+    "hack/boilerplate/test/",
+    "api/python_api/",
+)
 
-# TODO: Add copyright headers to these files.
-# These files historically don't have copyright headers and should be fixed
-# in a separate PR.
-NO_HEADER_ALLOWED_FILES = {
-    "cmd/data_cache/Dockerfile",
-    "cmd/initializers/dataset/Dockerfile",
-    "cmd/initializers/model/Dockerfile",
-    "cmd/runtimes/deepspeed/Dockerfile",
-    "cmd/runtimes/mlx/Dockerfile",
-    "cmd/runtimes/xgboost/Dockerfile",
-    "cmd/trainer-controller-manager/Dockerfile",
-    "cmd/trainers/torchtune/Dockerfile",
-    "docs/proposals/2432-gpu-testing-on-llm-blueprints/OCI VM/bootstrap.sh",
-    "docs/release/changelog.py",
-    "hack/data_cache/run_with_remote_table.sh",
-    "pkg/initializers/conftest.py",
-    "pkg/initializers/dataset/__init__.py",
-    "pkg/initializers/dataset/__main__.py",
-    "pkg/initializers/dataset/cache.py",
-    "pkg/initializers/dataset/cache_test.py",
-    "pkg/initializers/dataset/huggingface.py",
-    "pkg/initializers/dataset/huggingface_test.py",
-    "pkg/initializers/dataset/main_test.py",
-    "pkg/initializers/dataset/s3.py",
-    "pkg/initializers/dataset/s3_test.py",
-    "pkg/initializers/model/__init__.py",
-    "pkg/initializers/model/__main__.py",
-    "pkg/initializers/model/huggingface.py",
-    "pkg/initializers/model/huggingface_test.py",
-    "pkg/initializers/model/main_test.py",
-    "pkg/initializers/model/s3.py",
-    "pkg/initializers/model/s3_test.py",
-    "pkg/initializers/types/__init__.py",
-    "pkg/initializers/types/types.py",
-    "pkg/initializers/utils/__init__.py",
-    "pkg/initializers/utils/opendal.py",
-    "pkg/initializers/utils/opendal_test.py",
-    "pkg/initializers/utils/utils.py",
-    "pkg/initializers/utils/utils_test.py",
-    "pkg/runtime/framework/plugins/flux/templates/entrypoint.sh",
-    "pkg/runtime/framework/plugins/flux/templates/init.sh",
-    "pkg/runtime/indexer/indexer_test.go",
-    "pkg/statusserver/middleware.go",
-    "pkg/statusserver/middleware_test.go",
-    "pkg/util/trainingruntime/trainingruntime.go",
-    "test/e2e/e2e_test.go",
-    "test/e2e/testdata/status_update.py",
-    "test/integration/initializers/conftest.py",
-    "test/integration/initializers/dataset_test.py",
-    "test/integration/initializers/model_test.py",
-}
-
-
-def get_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description="Verify boilerplate copyright headers")
-    parser.add_argument(
-        "filenames",
-        nargs="*",
-        help="Specific files to check (default: scan entire repo)",
-    )
-    parser.add_argument(
-        "--boilerplate-dir",
-        default=os.path.join(os.path.dirname(__file__)),
-        help="Directory containing boilerplate template files",
-    )
-    parser.add_argument(
-        "--rootdir",
-        default=None,
-        help="Root directory to scan (default: auto-detect git root)",
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Show verbose output including diffs",
-    )
-    return parser.parse_args()
+IGNORE_FILE = ".boilerplateignore"
 
 
 def find_root_dir() -> str:
-    """Find the repository root directory."""
-    # Try to find git root
-    current = os.getcwd()
-    while current != "/":
-        if os.path.isdir(os.path.join(current, ".git")):
-            return current
-        current = os.path.dirname(current)
+    """Resolve the repo root via git, falling back to the cwd."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return os.getcwd()
 
-    # Fall back to current directory
-    return os.getcwd()
+
+def parse_ignore_file(path: str) -> Dict[str, Set[str]]:
+    """Parse a .boilerplateignore file into named sections."""
+    sections: Dict[str, Set[str]] = {}
+    current: Optional[Set[str]] = None
+    if not os.path.isfile(path):
+        return sections
+    with open(path, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("[") and line.endswith("]"):
+                current = sections.setdefault(line[1:-1].strip(), set())
+                continue
+            if current is None:
+                continue
+            current.add(line)
+    return sections
 
 
-def get_refs(boilerplate_dir: str) -> Dict[str, List[str]]:
-    """Load boilerplate templates from the boilerplate directory.
-
-    Returns a dictionary mapping file extensions to template lines.
-    """
-    refs = {}
-
+def load_templates(boilerplate_dir: str) -> Dict[str, List[str]]:
+    """Load boilerplate templates as {stem: [line, ...]}."""
+    templates: Dict[str, List[str]] = {}
     for path in glob.glob(os.path.join(boilerplate_dir, "boilerplate.*.txt")):
-        basename = os.path.basename(path)
-        # Extract extension: boilerplate.go.txt -> go
-        ext = basename.replace("boilerplate.", "").replace(".txt", "")
-
-        with open(path, "r") as f:
-            refs[ext] = f.read().splitlines()
-
-    return refs
+        stem = os.path.basename(path).replace("boilerplate.", "").replace(".txt", "")
+        with open(path, "r", encoding="utf-8") as f:
+            templates[stem] = f.read().splitlines()
+    return templates
 
 
-def get_regexs() -> Dict[str, re.Pattern]:
-    """Compile regex patterns used for validation."""
-    regexs = {}
-
-    # Pattern to match years in the allowed range (will be stripped)
-    # Space before and after ensures we match " 2024 " not "12024"
-    years = "|".join(str(year) for year in range(FIRST_YEAR, FINAL_YEAR + 1))
-    regexs["date"] = re.compile(f"Copyright ({years}) ")
-
-    # Go build constraints (stripped before comparison)
-    regexs["go_build_constraints"] = re.compile(
-        r"^(//(go:build| \+build).*\n)+\n", re.MULTILINE
-    )
-
-    # Shebang lines (stripped before comparison)
-    regexs["shebang"] = re.compile(r"^(#!.*\n)\n*")
-
-    # Pattern to detect any year in copyright (including years > FINAL_YEAR)
-    regexs["any_year"] = re.compile(r"Copyright (\d{4}) ")
-
-    # Pattern to detect generated files
-    regexs["generated"] = re.compile(r"DO NOT EDIT", re.MULTILINE)
-
-    return regexs
+def get_regexes() -> Dict[str, re.Pattern]:
+    return {
+        "any_year": re.compile(r"Copyright (\d{4}) "),
+        "go_build_constraints": re.compile(
+            r"^(//(go:build| \+build).*\n)+\n", re.MULTILINE
+        ),
+        "shebang": re.compile(r"^(#!.*\n)\n*"),
+        "generated": re.compile(r"DO NOT EDIT", re.MULTILINE),
+    }
 
 
-def file_extension(filename: str) -> str:
-    """Extract file extension for template lookup."""
+def template_stem_for(filename: str) -> Optional[str]:
+    """Return the template stem for filename, or None to skip."""
     basename = os.path.basename(filename)
-
-    # Handle special filenames
     if basename == "Dockerfile" or basename.startswith("Dockerfile."):
-        return "Dockerfile"
-    if basename == "Makefile":
-        return "Makefile"
-
-    # Standard extension extraction
-    ext = os.path.splitext(filename)[1].lstrip(".")
-    return ext.lower() if ext else ""
+        return EXTENSION_TEMPLATES.get("Dockerfile")
+    ext = os.path.splitext(filename)[1].lstrip(".").lower()
+    return EXTENSION_TEMPLATES.get(ext)
 
 
-def get_files(
-    rootdir: str,
-    extensions: List[str],
-    filenames: Optional[List[str]] = None,
-) -> List[str]:
-    """Get list of files to check."""
-    # Paths to skip
-    skip_patterns = [
-        "hack/boilerplate/test/",  # Test fixtures with intentional failures
-        "api/python_api/kubeflow_trainer_api/models/",  # Auto-generated with different template
-    ]
+def list_git_files(rootdir: str) -> List[str]:
+    """List files git considers part of the working tree.
 
-    # If specific files provided, use those
+    Includes tracked files plus untracked-not-ignored files, so newly
+    added files are checked but build artifacts and __pycache__ are not.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                rootdir,
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+    return [os.path.join(rootdir, line) for line in result.stdout.splitlines() if line]
+
+
+def collect_files(rootdir: str, filenames: Optional[List[str]]) -> List[str]:
+    """Return the files to check."""
     if filenames:
-        files = []
+        candidates: List[str] = []
         for f in filenames:
             if os.path.isfile(f):
-                files.append(f)
+                candidates.append(f)
             elif os.path.isdir(f):
-                for root, dirs, filelist in os.walk(f):
-                    # Skip directories
-                    dirs[:] = [d for d in dirs if not d.startswith("__")]
-                    for name in filelist:
-                        files.append(os.path.join(root, name))
-        return files
+                for root, _, names in os.walk(f):
+                    for name in names:
+                        candidates.append(os.path.join(root, name))
+        skip_patterns: Tuple[str, ...] = ()
+    else:
+        candidates = list_git_files(rootdir)
+        skip_patterns = SCAN_SKIP_PATTERNS
 
-    # Walk the directory tree
-    files = []
-    for root, dirs, filelist in os.walk(rootdir):
-        # Skip directories in-place
-        dirs[:] = [d for d in dirs if not d.startswith("__")]
+    def keep(path: str) -> bool:
+        if template_stem_for(path) is None:
+            return False
+        normalized = path.replace(os.sep, "/")
+        return not any(p in normalized for p in skip_patterns)
 
-        for name in filelist:
-            filepath = os.path.join(root, name)
-            relpath = os.path.relpath(filepath, rootdir)
+    return sorted(f for f in candidates if keep(f))
 
-            # Check skip patterns
-            if any(pattern in relpath for pattern in skip_patterns):
-                continue
 
-            # Check extension
-            ext = file_extension(filepath)
-            if ext in extensions:
-                files.append(filepath)
-
-    return sorted(files)
+def normalize_year(
+    line: str,
+    regexes: Dict[str, re.Pattern],
+    allow_2026: bool,
+) -> Tuple[Optional[str], Optional[str]]:
+    """Validate and strip the copyright year on a line."""
+    match = regexes["any_year"].search(line)
+    if not match:
+        return line, None
+    year = int(match.group(1))
+    if year < FIRST_YEAR:
+        return (
+            None,
+            f"Year {year} predates the project (earliest allowed: {FIRST_YEAR})",
+        )
+    if year > FINAL_YEAR and not (year == 2026 and allow_2026):
+        return (
+            None,
+            f"Year {year} is not allowed in the copyright header (must be omitted)",
+        )
+    return re.sub(r"Copyright \d{4} ", "Copyright ", line), None
 
 
 def file_passes(
     filename: str,
-    refs: Dict[str, List[str]],
-    regexs: Dict[str, re.Pattern],
+    templates: Dict[str, List[str]],
+    regexes: Dict[str, re.Pattern],
     rootdir: str,
-    verbose: bool = False,
+    ignores: Optional[Dict[str, Set[str]]] = None,
 ) -> Tuple[bool, Optional[str]]:
-    """Check if a file has a valid boilerplate header.
-
-    Returns:
-        Tuple of (passes, error_message)
-    """
-    # Check if file is in any of the allowlists
+    """Check that filename starts with the expected boilerplate header."""
+    ignores = ignores or {}
     relpath = os.path.relpath(filename, rootdir).replace(os.sep, "/")
-    if relpath in KUBERNETES_AUTHORS_ALLOWED_FILES:
+
+    if relpath in ignores.get("kubernetes-authors", set()):
         return True, None
-    if relpath in LINE_COMMENT_FORMAT_ALLOWED_FILES:
-        return True, None
-    if relpath in NO_HEADER_ALLOWED_FILES:
+    if relpath in ignores.get("line-comment", set()):
         return True, None
 
-    ext = file_extension(filename)
-
-    # Check if we have a template for this file type
-    if ext not in refs:
-        # No template for this file type, skip
+    stem = template_stem_for(filename)
+    if stem is None or stem not in templates:
         return True, None
 
     try:
@@ -300,130 +228,113 @@ def file_passes(
     except (IOError, UnicodeDecodeError) as e:
         return False, f"Error reading file: {e}"
 
-    # Check if file is generated (use generatego template for generated Go files)
-    is_generated = regexs["generated"].search(data) is not None
-    if is_generated and ext == "go":
-        ext = "generatego"
-        if ext not in refs:
-            return True, None
+    if (
+        stem == "go"
+        and regexes["generated"].search(data)
+        and GENERATED_GO_TEMPLATE in templates
+    ):
+        stem = GENERATED_GO_TEMPLATE
 
-    ref = refs[ext]
+    ref = templates[stem]
 
-    # Get file lines
+    if stem in ("go", GENERATED_GO_TEMPLATE):
+        data = regexes["go_build_constraints"].sub("", data)
+    if stem == "sh":
+        data = regexes["shebang"].sub("", data)
+
     lines = data.splitlines()
-
-    # Strip Go build constraints
-    if ext in ("go", "generatego"):
-        data_stripped = regexs["go_build_constraints"].sub("", data)
-        lines = data_stripped.splitlines()
-
-    # Strip shebang for shell/python
-    if ext in ("sh", "py", "bash"):
-        data_stripped = regexs["shebang"].sub("", data)
-        lines = data_stripped.splitlines()
-
-    # Check if file is long enough
     if len(lines) < len(ref):
-        return False, "File too short for boilerplate header"
+        return False, "File is shorter than the expected boilerplate header"
 
-    # Get the header portion
-    header = lines[: len(ref)]
+    allow_2026 = relpath in ignores.get("year-2026", set())
+    normalized: List[str] = []
+    for line in lines[: len(ref)]:
+        new_line, err = normalize_year(line, regexes, allow_2026)
+        if err:
+            return False, err
+        normalized.append(new_line)
 
-    normalized_header = []
-    for line in header:
-        # Check for years outside the allowed range first
-        match = regexs["any_year"].search(line)
-        if match:
-            year = int(match.group(1))
-            if year > FINAL_YEAR:
-                # Check if this file is in the 2026 allowlist
-                # (files merged before the no-year policy was implemented)
-                relpath = os.path.relpath(filename, rootdir)
-                # Normalize path separators for comparison
-                relpath = relpath.replace(os.sep, "/")
-                if year == 2026 and relpath in YEAR_2026_ALLOWED_FILES:
-                    # This file is grandfathered, treat 2026 as allowed
-                    pass
-                else:
-                    return (
-                        False,
-                        f"Year {year} in copyright is not allowed (must be omitted)",
-                    )
-
-        # Strip allowed years for comparison (including 2026 for allowlisted files)
-        normalized_line = regexs["date"].sub("Copyright ", line)
-        # Also strip 2026 for allowlisted files
-        normalized_line = re.sub(r"Copyright 2026 ", "Copyright ", normalized_line)
-        normalized_header.append(normalized_line)
-    header = normalized_header
-
-    # Normalize http:// to https:// (both are acceptable for license URL)
-    header = [
-        line.replace("http://www.apache.org", "https://www.apache.org")
-        for line in header
-    ]
-
-    # Compare header with reference
-    if header != ref:
-        if verbose:
-            diff_msg = []
-            for i, (got, want) in enumerate(zip(header, ref)):
-                if got != want:
-                    diff_msg.append(f"  Line {i+1}:")
-                    diff_msg.append(f"    got:  {got!r}")
-                    diff_msg.append(f"    want: {want!r}")
-            return False, "Header mismatch:\n" + "\n".join(diff_msg)
-        return False, "Header does not match boilerplate template"
+    if normalized != ref:
+        return False, "Header does not match the boilerplate template"
 
     return True, None
 
 
+def print_remediation(failed: List[Tuple[str, Optional[str]]]) -> None:
+    print("", file=sys.stderr)
+    print(
+        "Boilerplate header verification failed for the following files:",
+        file=sys.stderr,
+    )
+    print("", file=sys.stderr)
+    for path, err in failed:
+        if err:
+            print(f"  {path}: {err}", file=sys.stderr)
+        else:
+            print(f"  {path}", file=sys.stderr)
+    print("", file=sys.stderr)
+    print("For new files, use the copyright header WITHOUT a year:", file=sys.stderr)
+    print("  Copyright The Kubeflow Authors.", file=sys.stderr)
+    print("", file=sys.stderr)
+    print("See hack/boilerplate/ for the templates.", file=sys.stderr)
+    print(
+        "Reference: https://github.com/kubernetes/steering/issues/299", file=sys.stderr
+    )
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Verify boilerplate copyright headers")
+    parser.add_argument(
+        "filenames",
+        nargs="*",
+        help="Specific files to check (default: all git-tracked files)",
+    )
+    parser.add_argument(
+        "--boilerplate-dir",
+        default=os.path.dirname(os.path.abspath(__file__)),
+        help="Directory containing boilerplate template files",
+    )
+    parser.add_argument(
+        "--rootdir",
+        default=None,
+        help="Root directory to scan (default: auto-detect via git)",
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
-    """Main entry point."""
-    args = get_args()
-
-    # Find root directory
-    if args.rootdir:
-        rootdir = args.rootdir
-    else:
-        rootdir = find_root_dir()
-
-    # Change to root directory for relative path resolution
+    args = parse_args()
+    rootdir = args.rootdir or find_root_dir()
     os.chdir(rootdir)
 
-    # Load templates
-    refs = get_refs(args.boilerplate_dir)
-    if not refs:
+    templates = load_templates(args.boilerplate_dir)
+    if not templates:
         print(
-            f"ERROR: No boilerplate templates found in {args.boilerplate_dir}",
+            f"ERROR: no boilerplate templates found in {args.boilerplate_dir}",
             file=sys.stderr,
         )
         return 1
 
-    # Compile regexes
-    regexs = get_regexs()
+    regexes = get_regexes()
+    ignores = parse_ignore_file(os.path.join(args.boilerplate_dir, IGNORE_FILE))
+    no_header = ignores.get("no-header", set())
 
-    # Get list of files
-    extensions = list(refs.keys())
-
-    # Check all files against templates
-    files = get_files(rootdir, extensions, args.filenames or None)
-
-    # Check each file
-    failed_files = []
-    for filepath in files:
-        passes, error = file_passes(filepath, refs, regexs, rootdir, args.verbose)
+    failed: List[Tuple[str, Optional[str]]] = []
+    for filepath in collect_files(rootdir, args.filenames or None):
+        relpath = os.path.relpath(filepath, rootdir).replace(os.sep, "/")
+        if relpath in no_header:
+            continue
+        passes, error = file_passes(filepath, templates, regexes, rootdir, ignores)
         if not passes:
-            relpath = os.path.relpath(filepath, rootdir)
-            failed_files.append(relpath)
-            if args.verbose and error:
-                print(f"{relpath}: {error}", file=sys.stderr)
+            failed.append((relpath, error))
+            print(relpath)  # stdout stays parseable
 
-    # Output failed files (one per line, for parsing by wrapper script)
-    for f in failed_files:
-        print(f)
+    if failed:
+        print_remediation(failed)
+        return 1
 
-    return 0 if not failed_files else 1
+    print("Boilerplate header verification passed.", file=sys.stderr)
+    return 0
 
 
 if __name__ == "__main__":
