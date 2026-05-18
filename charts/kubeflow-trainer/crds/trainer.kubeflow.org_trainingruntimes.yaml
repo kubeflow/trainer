@@ -141,6 +141,8 @@ spec:
                                   maxLength: 253
                                   minLength: 1
                                   type: string
+                              required:
+                              - jobName
                               type: object
                             maxItems: 16
                             type: array

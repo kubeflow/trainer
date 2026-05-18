@@ -235,7 +235,7 @@ type EnvInjectionTarget struct {
 	// future-proof for other CRD types (LWS, Grove, Slurm, etc.).
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=253
-	// +optional
+	// +required
 	JobName string `json:"jobName,omitempty"`
 
 	// containerNames lists the container names within the target job

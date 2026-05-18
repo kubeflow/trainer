@@ -756,6 +756,7 @@ func schema_pkg_apis_trainer_v1alpha1_EnvInjectionTarget(ref common.ReferenceCal
 						},
 					},
 				},
+				Required: []string{"jobName"},
 			},
 		},
 	}

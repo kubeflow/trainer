@@ -13952,6 +13952,9 @@
       "trainer.v1alpha1.EnvInjectionTarget": {
         "description": "EnvInjectionTarget specifies a replicated job and the containers within it that should receive PET_* env injection.",
         "type": "object",
+        "required": [
+          "jobName"
+        ],
         "properties": {
           "containerNames": {
             "description": "containerNames lists the container names within the target job that should receive PET_* envs.",
