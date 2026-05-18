@@ -178,7 +178,7 @@ golangci-lint: golangci-lint-install golangci-lint-kal ## Run golangci-lint to v
 
 .PHONY: verify-boilerplate
 verify-boilerplate: ## Verify copyright boilerplate headers in source files.
-	./hack/verify-boilerplate.sh
+	python3 hack/boilerplate/boilerplate.py
 
 # Instructions to run tests.
 .PHONY: test
