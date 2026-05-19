@@ -2,7 +2,7 @@
 torch==2.11.0
 # DeepSpeed libraries.
 deepspeed==0.19.0
-mpi4py==4.1.1
+mpi4py==4.1.2
 # HuggingFace libraries.
 datasets==4.8.5
 transformers==5.8.0
