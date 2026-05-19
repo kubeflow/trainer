@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - release-*
     paths:
       - VERSION
 
@@ -233,6 +234,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.branch }}
 
       - name: Generate changelog
         id: changelog

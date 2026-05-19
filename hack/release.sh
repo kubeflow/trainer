@@ -36,6 +36,10 @@ fi
 TAG="v$NEW_VERSION"
 export TAG
 
+MAJOR_VERSION="${NEW_VERSION%%.*}"
+MINOR_VERSION="${NEW_VERSION#*.}"
+MINOR_VERSION="${MINOR_VERSION%%.*}"
+
 REPO_ROOT="$(dirname "$0")/.."
 VERSION_FILE="$REPO_ROOT/VERSION"
 MANIFESTS_DIR="$REPO_ROOT/manifests"
@@ -93,7 +97,8 @@ chart_path.write_text(pattern.sub(f"version: {new_version}", data, count=1))
 PYTHON
 echo "Updated Helm chart version to $NEW_VERSION"
 
-CHANGELOG_PATH="$REPO_ROOT/CHANGELOG.md"
+CHANGELOG_DIR="$REPO_ROOT/CHANGELOG"
+CHANGELOG_PATH="$CHANGELOG_DIR/changelog-${MAJOR_VERSION}.${MINOR_VERSION}.md"
 echo "Generating changelog for $TAG"
 ABSOLUTE_REPO_ROOT="$(cd "$REPO_ROOT" && pwd)"
 if [ -z "${GITHUB_TOKEN:-}" ]; then
@@ -106,6 +111,8 @@ TEMP_FILE=$(mktemp)
 docker run --rm -u "$(id -u):$(id -g)" -v "$ABSOLUTE_REPO_ROOT:/app" \
   -e "GITHUB_TOKEN=$GITHUB_TOKEN" -w /app \
   "ghcr.io/orhun/git-cliff/git-cliff:latest" --unreleased --tag "$TAG" -o - > "$TEMP_FILE"
+
+mkdir -p "$CHANGELOG_DIR"
 
 if [ -f "$CHANGELOG_PATH" ]; then
   sed -i "1 r $TEMP_FILE" "$CHANGELOG_PATH"
