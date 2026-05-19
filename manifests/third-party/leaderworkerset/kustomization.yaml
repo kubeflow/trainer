@@ -10,7 +10,7 @@ namespace: kubeflow-system
 images:
   - name: us-central1-docker.pkg.dev/k8s-staging-images/lws/lws
     newName: registry.k8s.io/lws/lws
-    newTag: v0.8.0
+    newTag: v8.9.1
 
 # Add required patches.
 patches:

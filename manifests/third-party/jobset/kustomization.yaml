@@ -7,7 +7,7 @@ resources:
 images:
   - name: us-central1-docker.pkg.dev/k8s-staging-images/jobset/jobset
     newName: registry.k8s.io/jobset/jobset
-    newTag: v0.11.0
+    newTag: v8.9.1
 
 # Add required patches.
 patches:
