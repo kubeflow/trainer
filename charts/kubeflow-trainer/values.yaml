@@ -51,6 +51,16 @@ manager:
   # -- Number of replicas of manager.
   replicas: 1
 
+  # -- Whether the manager pod should run with host networking.
+  # Useful on clusters where the API server cannot route to pod IPs
+  # (e.g. EKS with a non-VPC-routable CNI), so admission webhooks are reachable.
+  hostNetwork: false
+
+  # -- DNS policy for the manager pod.
+  # When `hostNetwork` is enabled this defaults to `ClusterFirstWithHostNet`
+  # so the pod retains in-cluster DNS resolution. Set explicitly to override.
+  dnsPolicy: ""
+
   # -- Selector labels for the manager Deployment and pods.
   # These labels are used for both `spec.selector.matchLabels` and `spec.template.metadata.labels`.
   # NOTE: Deployment selectors are immutable once created.

@@ -43,6 +43,12 @@ spec:
         {{- $podAnnotations | nindent 8 }}
       {{- end }}
     spec:
+      {{- if .Values.manager.hostNetwork }}
+      hostNetwork: true
+      {{- end }}
+      {{- with .Values.manager.dnsPolicy }}
+      dnsPolicy: {{ . }}
+      {{- end }}
       containers:
       - name: manager
         image: {{ include "trainer.image" . }}
@@ -56,16 +62,19 @@ spec:
 
         ports:
         - name: health
-          containerPort: 8081
+          containerPort: {{ include "trainer.portFromAddress" .Values.manager.config.health.healthProbeBindAddress }}
           protocol: TCP
         - name: metrics
-          containerPort: 8443
+          containerPort: {{ include "trainer.portFromAddress" .Values.manager.config.metrics.bindAddress }}
           protocol: TCP
         - name: webhook
-          containerPort: 9443
+          containerPort: {{ .Values.manager.config.webhook.port }}
+          {{- if .Values.manager.hostNetwork }}
+          hostPort: {{ .Values.manager.config.webhook.port }}
+          {{- end }}
           protocol: TCP
         - name: status-server
-          containerPort: 10443
+          containerPort: {{ .Values.manager.config.statusServer.port }}
           protocol: TCP
 
         {{- with .Values.manager.env }}
