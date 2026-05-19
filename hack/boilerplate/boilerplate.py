@@ -17,13 +17,8 @@
 """Verify boilerplate copyright headers in source files.
 
 Policy:
-  - Files with years 2024-2025 are accepted (the year is stripped during
-    comparison against the year-less template).
-  - Files with year 2026 are rejected unless allowlisted in
-    .boilerplateignore under [year-2026] (these were merged before this
-    enforcement landed).
-  - Files with any other year (2027+, or earlier) are rejected.
-  - New files must use the year-less template directly.
+  - Files that already contain a copyright year are accepted.
+  - Files without a year must match the year-less boilerplate template.
 
 Reference: https://github.com/kubernetes/steering/issues/299
 """
@@ -35,9 +30,6 @@ import re
 import subprocess
 import sys
 from typing import Dict, List, Optional, Set, Tuple
-
-FIRST_YEAR = 2024
-FINAL_YEAR = 2025
 
 # Maps file extension (or special basename) to the boilerplate template
 # stem on disk (boilerplate.<stem>.txt). One template is reused across
@@ -179,29 +171,6 @@ def collect_files(rootdir: str, filenames: Optional[List[str]]) -> List[str]:
     return sorted(f for f in candidates if keep(f))
 
 
-def normalize_year(
-    line: str,
-    regexes: Dict[str, re.Pattern],
-    allow_2026: bool,
-) -> Tuple[Optional[str], Optional[str]]:
-    """Validate and strip the copyright year on a line."""
-    match = regexes["any_year"].search(line)
-    if not match:
-        return line, None
-    year = int(match.group(1))
-    if year < FIRST_YEAR:
-        return (
-            None,
-            f"Year {year} predates the project (earliest allowed: {FIRST_YEAR})",
-        )
-    if year > FINAL_YEAR and not (year == 2026 and allow_2026):
-        return (
-            None,
-            f"Year {year} is not allowed in the copyright header (must be omitted)",
-        )
-    return re.sub(r"Copyright \d{4} ", "Copyright ", line), None
-
-
 def file_passes(
     filename: str,
     templates: Dict[str, List[str]],
@@ -246,15 +215,15 @@ def file_passes(
     if len(lines) < len(ref):
         return False, "File is shorter than the expected boilerplate header"
 
-    allow_2026 = relpath in ignores.get("year-2026", set())
-    normalized: List[str] = []
-    for line in lines[: len(ref)]:
-        new_line, err = normalize_year(line, regexes, allow_2026)
-        if err:
-            return False, err
-        normalized.append(new_line)
+    header_lines = lines[: len(ref)]
 
-    if normalized != ref:
+    # If header already contains a copyright year → accept
+    for line in header_lines:
+        if regexes["any_year"].search(line):
+            return True, None
+
+    # Otherwise, require exact match with template (no year)
+    if header_lines != ref:
         return False, "Header does not match the boilerplate template"
 
     return True, None

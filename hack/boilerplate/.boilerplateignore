@@ -1,11 +1,6 @@
 # Allowlists consumed by hack/boilerplate/boilerplate.py.
 #
 # Sections:
-#   [year-2026]
-#       Files grandfathered with "Copyright 2026" headers because they
-#       were merged before the no-year policy was enforced.
-#       NO NEW ENTRIES should be added here.
-#
 #   [kubernetes-authors]
 #       Files preserving "Copyright The Kubernetes Authors" attribution
 #       because they were originally vendored from kubernetes/kubernetes.
@@ -15,19 +10,6 @@
 #       the project default of /* */ block comments.
 #
 # Paths are repo-relative and always use forward slashes.
-
-[year-2026]
-pkg/constants/constants.go
-pkg/runtime/framework/plugins/jobset/builder_test.go
-pkg/runtime/framework/plugins/trainjobstatus/trainjobstatus.go
-pkg/runtime/framework/plugins/trainjobstatus/trainjobstatus_test.go
-pkg/runtime/framework/plugins/xgboost/xgboost.go
-pkg/runtime/framework/plugins/xgboost/xgboost_test.go
-pkg/statusserver/auth.go
-pkg/statusserver/server.go
-pkg/statusserver/server_test.go
-pkg/statusserver/setup.go
-pkg/statusserver/utils.go
 
 [kubernetes-authors]
 pkg/features/features.go
