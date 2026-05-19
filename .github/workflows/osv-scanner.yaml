@@ -1,0 +1,211 @@
+name: OSV-Scanner Vulnerability Scan
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  osv-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install OSV-Scanner
+        # Bump cadence: check https://github.com/google/osv-scanner/releases monthly
+        # Dependabot cannot bump curl-installed binaries — update version + checksum manually
+        run: |
+          OSV_VERSION="2.3.8"
+          EXPECTED_SHA="bc98e15319ed0d515e3f9235287ba53cdc5535d576d24fd573978ecfe9ab92dc"
+          curl -fsSL "https://github.com/google/osv-scanner/releases/download/v${OSV_VERSION}/osv-scanner_linux_amd64" -o osv-scanner
+          ACTUAL_SHA=$(sha256sum osv-scanner | awk '{print $1}')
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "::error::OSV-Scanner checksum mismatch! Expected ${EXPECTED_SHA}, got ${ACTUAL_SHA}"
+            exit 1
+          fi
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
+
+      - name: Run OSV-Scanner (SARIF for Security Tab)
+        # continue-on-error so a SARIF failure doesn't block the JSON scan + auto-fix below
+        continue-on-error: true
+        run: |
+          rc=0
+          osv-scanner scan \
+            --format sarif \
+            --output osv-results.sarif \
+            -L go.mod || rc=$?
+          # Exit code 1 = vulns found (expected), 0 = clean. Any other code is a real failure.
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+            echo "::error::OSV-Scanner failed with unexpected exit code $rc"
+            exit 1
+          fi
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always() && hashFiles('osv-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: osv-results.sarif
+          category: kubeflow-trainer-osv-scanner
+
+      - name: Run OSV-Scanner (JSON for auto-fix)
+        run: |
+          rc=0
+          osv-scanner scan \
+            --format json \
+            --output osv-results.json \
+            -L go.mod || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+            echo "::error::OSV-Scanner failed with unexpected exit code $rc"
+            exit 1
+          fi
+
+      - name: Process vulnerabilities and apply fixes
+        id: fixer
+        run: |
+          set -euo pipefail
+
+          if [ ! -f osv-results.json ] || [ ! -s osv-results.json ]; then
+            echo "No scan results found."
+            echo "updates_found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Extract fixable vulnerabilities: package name, current version, fix version, advisory ID, URL
+          # Use group_by + last to deduplicate: keep the highest fix version per package+advisory pair
+          FIX_DATA=$(jq -r '
+            [
+              .results[]?.packages[]? |
+              .package as $pkg |
+              .vulnerabilities[]? |
+              . as $vuln |
+              .affected[]? |
+              select(.package.name == $pkg.name) |
+              .ranges[]? |
+              .events[] |
+              select(.fixed != null) |
+              {
+                pkg: $pkg.name,
+                ver: $pkg.version,
+                fix: (.fixed | sub("^v"; "")),
+                id: $vuln.id,
+                url: ($vuln.references[0].url // "https://osv.dev/vulnerability/\($vuln.id)")
+              }
+            ] |
+            .[] |
+            "\(.pkg)|\(.ver)|\(.fix)|\(.id)|\(.url)"
+          ' osv-results.json \
+            | sort -t'|' -k1,1 -k4,4 -k3,3Vr \
+            | awk -F'|' '!seen[$1,$4]++' \
+          )
+
+          if [ -z "$FIX_DATA" ]; then
+            echo "No fixable vulnerabilities found."
+            echo "updates_found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Fixable vulnerabilities found:"
+          echo "$FIX_DATA"
+          echo ""
+
+          rm -f applied_fixes.txt
+
+          while IFS='|' read -r pkg current_ver fix_ver advisory_id advisory_url; do
+            [ -z "$pkg" ] && continue
+
+            echo ""
+            echo "=== Processing: $pkg $current_ver -> $fix_ver ($advisory_id) ==="
+
+            # Snapshot go.mod/go.sum so a failure only reverts this iteration, not prior fixes
+            cp go.mod go.mod.bak
+            cp go.sum go.sum.bak
+
+            echo "Attempting: go get ${pkg}@v${fix_ver}"
+            GET_RC=0
+            go get "${pkg}@v${fix_ver}" 2>&1 || GET_RC=$?
+            if [ "$GET_RC" -ne 0 ]; then
+              echo "::warning::go get failed for $pkg (exit code $GET_RC), skipping"
+              mv go.mod.bak go.mod
+              mv go.sum.bak go.sum
+              continue
+            fi
+
+            TIDY_RC=0
+            go mod tidy 2>&1 || TIDY_RC=$?
+            if [ "$TIDY_RC" -ne 0 ]; then
+              echo "::warning::go mod tidy failed after updating $pkg (exit code $TIDY_RC), skipping"
+              mv go.mod.bak go.mod
+              mv go.sum.bak go.sum
+              continue
+            fi
+
+            rm -f go.mod.bak go.sum.bak
+
+            # Verify the installed version meets the fix
+            INSTALLED_VER=$(go list -m -f '{{.Version}}' "$pkg" | sed 's/^v//' || true)
+            if [ -z "$INSTALLED_VER" ]; then
+              echo "::warning::Could not determine installed version for $pkg after upgrade, recording fix version"
+              INSTALLED_VER="$fix_ver"
+            fi
+
+            echo "Installed version: v${INSTALLED_VER}"
+            printf '%s\n' "- ${pkg}@v${INSTALLED_VER} | [$advisory_id]($advisory_url)" >> applied_fixes.txt
+          done <<< "$FIX_DATA"
+
+          if [ ! -s applied_fixes.txt ]; then
+            echo "No fixes were applied."
+            echo "updates_found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "updates_found=true" >> $GITHUB_OUTPUT
+          {
+            echo "fix_details<<EOF"
+            cat applied_fixes.txt
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        if: steps.fixer.outputs.updates_found == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "fix: nightly automated dependency update for security vulnerabilities"
+          title: "fix: nightly security dependency updates"
+          add-paths: |
+            go.mod
+            go.sum
+          body: |
+            ## Security Update
+
+            This is an automated PR triggered by the nightly OSV-Scanner security scan.
+
+            The following dependencies were updated to resolve known vulnerabilities:
+
+            | Package & Version | Advisory Link |
+            | :--- | :--- |
+            ${{ steps.fixer.outputs.fix_details }}
+
+            **Verification:** Updated via `go get <pkg>@v<version>` and `go mod tidy`.
+
+            > **Note:** This PR was created with `GITHUB_TOKEN`, which does not trigger `pull_request` workflows.
+            > CI checks will not run automatically. Push an empty commit (`git commit --allow-empty -m "trigger CI"`)
+            > to kick off CI before merging.
+            >
+            > **TODO:** Migrate to a GitHub App token via `actions/create-github-app-token` to trigger CI automatically.
+          branch: security-nightly-updates
+          delete-branch: true
+          labels: |
+            "area/security"
