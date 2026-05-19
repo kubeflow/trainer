@@ -203,6 +203,27 @@ finally:
     client.delete_job(job_name)
 ```
 
+## Architecture
+
+The Local Process Backend operates by orchestrating native OS processes. It bypasses container runtimes like Docker, instead managing the lifecycle of your training script through isolated Python Virtual Environments (venvs).
+
+:::{mermaid}
+graph LR
+    User([User Script]) -->|TrainerClient.train| SDK[Kubeflow SDK]
+
+    SDK -->|1. Generate| Script[Bash Script]
+
+    subgraph LocalExec [Single Subprocess]
+        direction TB
+        Script -->|2. Execute| Venv[Create Venv + pip]
+        Venv --> Deps[Install Dependencies]
+        Deps --> Train[Run Entrypoint]
+        Train -.-> Clean[Delete Venv]
+    end
+
+    Train -->|3. Logs| Logs[Stream Logs]
+:::
+
 ## How It Works
 
 Understanding the internal workflow helps with debugging and optimization:

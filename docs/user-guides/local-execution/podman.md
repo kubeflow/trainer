@@ -154,6 +154,30 @@ backend_config = ContainerBackendConfig(
 )
 ```
 
+## Architecture
+
+The Container Backend with Podman uses a local orchestration layer to manage TrainJobs within Podman containers. This ensures environment parity between your local machine and production Kubernetes clusters.
+
+:::{mermaid}
+graph LR
+    User([User Script]) -->|TrainerClient.train| SDK[Kubeflow SDK]
+
+    SDK -->|1. Pull| Image[Podman Image]
+    SDK -->|2. Net| Net[DNS-Enabled Bridge Network]
+    SDK -->|3. Run| Podman[Podman Engine]
+
+    subgraph PodmanEnv [Local Podman Environment]
+        direction TB
+        Podman -->|Spawn| C1[Node 0]
+        Podman -->|Spawn| C2[Node 1]
+        C1 <-->|DDP| C2
+    end
+
+    C1 -->|4. Logs| Logs[Stream Logs]
+    C2 -->|4. Logs| Logs
+    SDK -.->|5. Cleanup| Remove[Remove Containers]
+:::
+
 ## Multi-Node Distributed Training
 
 The Podman backend automatically sets up networking and environment variables for distributed training:

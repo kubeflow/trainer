@@ -11,13 +11,37 @@ The Container Backend with Docker enables you to run distributed TrainJobs in is
 
 The Docker backend uses the adapter pattern to provide a unified interface, making it easy to switch between Docker and Podman without code changes.
 
+## Architecture
+
+The Container Backend with Docker uses a local orchestration layer to manage TrainJobs within Docker containers. This ensures environment parity between your local machine and production Kubernetes clusters.
+
+:::{mermaid}
+graph TD
+    User([User Script]) -->|TrainerClient.train| SDK[Kubeflow SDK]
+
+    SDK -->|1. Pull| Image[Docker Image]
+    SDK -->|2. Net| Net[Bridge Network]
+    SDK -->|3. Run| Daemon[Docker Daemon]
+
+    subgraph DockerEnv [Local Docker Environment]
+        direction LR
+        Daemon -->|Spawn| C1[Node 0]
+        Daemon -->|Spawn| C2[Node 1]
+        C1 <-->|DDP| C2
+    end
+
+    C1 -->|4. Logs| Logs[Stream Logs]
+    C2 -->|4. Logs| Logs
+    SDK -.->|5. Cleanup| Remove[Remove Containers]
+:::
+
 ## Prerequisites
 
 ### Required Software
 
 - **Docker**: Install Docker Desktop (macOS/Windows) or Docker Engine (Linux)
- - macOS/Windows: Download from [docker.com](https://www.docker.com/products/docker-desktop)
- - Linux: Follow [Docker Engine installation guide](https://docs.docker.com/engine/install/)
+- macOS/Windows: Download from [docker.com](https://www.docker.com/products/docker-desktop)
+- Linux: Follow [Docker Engine installation guide](https://docs.docker.com/engine/install/)
 - **Python 3.9+**
 - **Kubeflow SDK**: Install with Docker support:
   ```bash
@@ -101,6 +125,7 @@ print(f"Job completed with status: {job.status}")
 
 ### ContainerBackendConfig
 
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `container_runtime` | `str \| None` | `None` | Force specific runtime: `"docker"`, `"podman"`, or `None` (auto-detect). Use `"docker"` to ensure Docker is used. |
@@ -108,6 +133,7 @@ print(f"Job completed with status: {job.status}")
 | `auto_remove` | `bool` | `True` | Automatically remove containers and networks after job completion or deletion. Set to `False` for debugging. |
 | `container_host` | `str \| None` | `None` | Override Docker daemon connection URL (e.g., `"unix:///var/run/docker.sock"`, `"tcp://192.168.1.100:2375"`). |
 | `runtime_source` | `TrainingRuntimeSource` | GitHub sources | Configuration for training runtime sources. See "Custom Runtime Sources" section below. |
+
 
 ### Configuration Examples
 
@@ -223,6 +249,7 @@ For information about using runtimes and custom runtime sources, see the [Workin
 **Error**: `Error while fetching server API version: ('Connection aborted.', ConnectionRefusedError(61, 'Connection refused'))`
 
 **Solution**:
+
 ```bash
 # macOS/Windows: Start Docker Desktop
 # Linux: Start Docker daemon
@@ -237,6 +264,7 @@ docker ps
 **Error**: `Got permission denied while trying to connect to the Docker daemon socket`
 
 **Solution** (Linux):
+
 ```bash
 # Add your user to docker group
 sudo usermod -aG docker $USER
@@ -250,6 +278,7 @@ newgrp docker
 **Error**: `RuntimeError: No CUDA GPUs are available`
 
 **Solution**:
+
 ```bash
 # 1. Verify NVIDIA drivers on host
 nvidia-smi
@@ -269,6 +298,7 @@ trainer = CustomTrainer(
 **Problem**: Containers remain after job completion
 
 **Solution**:
+
 ```python
 # Ensure auto_remove is enabled
 backend_config = ContainerBackendConfig(
@@ -281,6 +311,7 @@ client.delete_job(job_name)
 ```
 
 Or use Docker CLI:
+
 ```bash
 docker rm -f $(docker ps -aq --filter "label=kubeflow.org/job-name=<job-name>")
 ```
@@ -290,6 +321,7 @@ docker rm -f $(docker ps -aq --filter "label=kubeflow.org/job-name=<job-name>")
 **Error**: `network with name -net already exists`
 
 **Solution**:
+
 ```bash
 # Remove conflicting network
 docker network rm <job-name>-net

@@ -7,44 +7,19 @@
    Color Palette
    ============================================ */
 
-:root {
-    --kf-blue: #4299e1;
-    --kf-blue-light: #63b3ed;
-    --kf-blue-dark: #3182ce;
+body {
+    --kf-blue: var(--color-brand-primary, #2b6cb0);
+    --kf-blue-light: #4299e1;
+    --kf-blue-dark: #2c5282;
 
-    --kf-heading: #2d3748;
-    --kf-text: #4a5568;
-    --kf-text-light: #718096;
+    --kf-heading: var(--color-foreground-primary, #1a202c);
+    --kf-text: var(--color-foreground-secondary, #2d3748);
+    --kf-text-light: var(--color-foreground-muted, #4a5568);
 
-    --kf-bg-subtle: #f7fafc;
-    --kf-border: #e2e8f0;
+    --kf-bg-subtle: var(--color-background-secondary, #f7fafc);
+    --kf-border: var(--color-background-border, #e2e8f0);
 
     --kf-accent: #81e6d9;
-}
-
-/* Dark mode overrides */
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-        --kf-blue: #63b3ed;
-        --kf-blue-light: #90cdf4;
-        --kf-blue-dark: #4299e1;
-        --kf-heading: #e2e8f0;
-        --kf-text: #cbd5e0;
-        --kf-text-light: #a0aec0;
-        --kf-bg-subtle: #2d3748;
-        --kf-border: #4a5568;
-    }
-}
-
-[data-theme="dark"] {
-    --kf-blue: #63b3ed;
-    --kf-blue-light: #90cdf4;
-    --kf-blue-dark: #4299e1;
-    --kf-heading: #e2e8f0;
-    --kf-text: #cbd5e0;
-    --kf-text-light: #a0aec0;
-    --kf-bg-subtle: #2d3748;
-    --kf-border: #4a5568;
 }
 
 /* ============================================
@@ -150,7 +125,6 @@
 
 h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
-    color: var(--kf-heading);
 }
 
 h1 {
@@ -168,7 +142,6 @@ h2 {
 
 h3 {
     font-size: 1.15rem;
-    color: var(--kf-text);
 }
 
 /* ============================================
@@ -191,8 +164,7 @@ a:hover {
    TEXT
    ============================================ */
 
-p {
-    color: var(--kf-text);
+p, li, dd, dt {
     line-height: 1.7;
 }
 
@@ -211,23 +183,23 @@ li::marker {
 .toctree-l2 > a,
 .toctree-l3 > a,
 .caption-text {
-    color: var(--kf-text) !important;
+    color: var(--color-sidebar-link-text, var(--color-foreground-primary)) !important;
     transition: color 0.15s;
 }
 
 .sidebar-tree a:hover,
 .sidebar-tree .reference:hover {
-    color: var(--kf-blue) !important;
+    color: var(--color-sidebar-link-text--top-level, var(--kf-blue)) !important;
 }
 
 .sidebar-tree .current > .reference,
 .sidebar-tree .current-page > .reference {
-    color: var(--kf-blue-dark) !important;
+    color: var(--color-brand-primary, var(--kf-blue)) !important;
     font-weight: 600;
 }
 
 .sidebar-tree .caption {
-    color: var(--kf-text-light) !important;
+    color: var(--color-sidebar-caption-text, var(--color-foreground-muted)) !important;
     font-weight: 600;
     text-transform: uppercase;
     font-size: 0.75rem;
@@ -316,8 +288,8 @@ pre code {
 
 /* Inline code */
 code {
-    color: var(--kf-heading);
-    background: var(--kf-bg-subtle);
+    color: var(--color-foreground-primary, var(--kf-heading));
+    background: var(--color-background-secondary, var(--kf-bg-subtle));
     padding: 0.15em 0.4em;
     border-radius: 3px;
     font-size: 0.9em;
@@ -401,15 +373,16 @@ table.docutils {
 
 table.docutils th,
 th {
-    background: var(--kf-bg-subtle);
-    color: var(--kf-text);
+    background: var(--color-background-secondary, var(--kf-bg-subtle));
+    color: var(--color-foreground-primary, var(--kf-heading));
     font-weight: 600;
     padding: 0.5rem;
 }
 
 table.docutils td {
     padding: 0.5rem;
-    border: 1px solid var(--kf-border);
+    border: 1px solid var(--color-background-border, var(--kf-border));
+    color: var(--color-foreground-primary, var(--kf-heading));
 }
 
 /* ============================================
@@ -454,6 +427,20 @@ hr {
 .mermaid {
     text-align: center;
     margin: 1.5rem 0;
+    padding: 1.5rem 1rem;
+    border: 1px solid var(--kf-border);
+    border-radius: 8px;
+    overflow-x: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="light"]) .mermaid svg {
+        filter: invert(0.85) hue-rotate(180deg);
+    }
+}
+
+body[data-theme="dark"] .mermaid svg {
+    filter: invert(0.85) hue-rotate(180deg);
 }
 
 /* ============================================

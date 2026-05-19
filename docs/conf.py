@@ -51,10 +51,18 @@ html_theme_options = {
     "light_css_variables": {
         "color-brand-primary": "#4299e1",
         "color-brand-content": "#3182ce",
+        "color-foreground-primary": "#1a202c",
+        "color-foreground-secondary": "#2d3748",
+        "color-foreground-muted": "#4a5568",
+        "color-foreground-border": "#e2e8f0",
     },
     "dark_css_variables": {
         "color-brand-primary": "#63b3ed",
         "color-brand-content": "#63b3ed",
+        "color-foreground-primary": "#e2e8f0",
+        "color-foreground-secondary": "#cbd5e0",
+        "color-foreground-muted": "#a0aec0",
+        "color-foreground-border": "#4a5568",
     },
     "sidebar_hide_name": False,
     "navigation_with_keys": True,
@@ -120,17 +128,14 @@ myst_links_external_new_tab = True
 myst_heading_anchors = 4
 
 # -- Mermaid configuration ---------------------------------------------------
-mermaid_version = "11.5.0"  # Use specific version for reproducibility
+mermaid_version = "10.9.1"
+mermaid_d3_zoom = False
 mermaid_init_js = """
 mermaid.initialize({
-    theme: 'base',
-    themeVariables: {
-        primaryColor: '#326CE5',
-        primaryTextColor: '#fff',
-        primaryBorderColor: '#1a4b99',
-        lineColor: '#326CE5',
-        secondaryColor: '#f0f0f0',
-        tertiaryColor: '#fff'
+    startOnLoad: true,
+    theme: 'default',
+    flowchart: {
+        htmlLabels: false
     }
 });
 """
