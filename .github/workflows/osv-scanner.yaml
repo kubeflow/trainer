@@ -161,7 +161,7 @@ jobs:
             fi
 
             echo "Installed version: v${INSTALLED_VER}"
-            printf '%s\n' "- ${pkg}@v${INSTALLED_VER} | [$advisory_id]($advisory_url)" >> applied_fixes.txt
+            printf '%s\n' "| ${pkg}@v${INSTALLED_VER} | [$advisory_id]($advisory_url) |" >> applied_fixes.txt
           done <<< "$FIX_DATA"
 
           if [ ! -s applied_fixes.txt ]; then
@@ -340,13 +340,16 @@ jobs:
             echo ""
             echo "=== Processing: $pkg $current_ver -> $fix_ver ($advisory_id) ==="
 
+            # Escape dots in package name for safe use in grep/sed regex
+            pkg_re=$(echo "$pkg" | sed 's/\./\\./g')
+
             FIXED=false
             for mapping in "${LOCKFILES[@]}"; do
               lockfile="${mapping%%|*}"
               source_file="${mapping##*|}"
 
               # Check if this lockfile contains the vulnerable package (case-insensitive)
-              if ! grep -qi "^${pkg}==" "$lockfile"; then
+              if ! grep -qi "^${pkg_re}==" "$lockfile"; then
                 continue
               fi
 
@@ -358,17 +361,17 @@ jobs:
               # Check if the package is a direct dependency in the source file
               IS_DIRECT=false
               if [[ "$source_file" == *.toml ]]; then
-                grep -qi "\"${pkg}" "$source_file" && IS_DIRECT=true
+                grep -qi "\"${pkg_re}" "$source_file" && IS_DIRECT=true
               else
-                grep -qi "^${pkg}" "$source_file" && IS_DIRECT=true
+                grep -qi "^${pkg_re}" "$source_file" && IS_DIRECT=true
               fi
 
               if [ "$IS_DIRECT" = true ]; then
                 echo "Direct dependency — updating version constraint in $source_file"
                 if [[ "$source_file" == *.toml ]]; then
-                  sed -i -E "s/\"${pkg}[^\"]*\"/\"${pkg}>=${fix_ver}\"/I" "$source_file"
+                  sed -i -E "s/\"${pkg_re}[^\"]*\"/\"${pkg}>=${fix_ver}\"/I" "$source_file"
                 else
-                  sed -i -E "s/^${pkg}.*/${pkg}>=${fix_ver}/I" "$source_file"
+                  sed -i -E "s/^${pkg_re}.*/${pkg}>=${fix_ver}/I" "$source_file"
                 fi
               else
                 echo "Transitive dependency — upgrading via pip-compile"
@@ -376,7 +379,7 @@ jobs:
 
               # Regenerate the lockfile, upgrading the specific package
               COMPILE_RC=0
-              pip-compile "$source_file" -o "$lockfile" --upgrade-package "${pkg}>=${fix_ver}" --quiet 2>&1 || COMPILE_RC=$?
+              pip-compile "$source_file" -o "$lockfile" --upgrade-package "${pkg}>=${fix_ver}" --strip-extras --quiet 2>&1 || COMPILE_RC=$?
               if [ "$COMPILE_RC" -ne 0 ]; then
                 echo "::warning::pip-compile failed for $source_file (exit code $COMPILE_RC), skipping"
                 mv "${lockfile}.bak" "$lockfile"
@@ -385,7 +388,7 @@ jobs:
               fi
 
               # Verify the fix was applied (case-insensitive)
-              INSTALLED_VER=$(grep -i "^${pkg}==" "$lockfile" | sed 's/.*==//' || true)
+              INSTALLED_VER=$(grep -i "^${pkg_re}==" "$lockfile" | sed 's/.*==//' || true)
               if [ -z "$INSTALLED_VER" ]; then
                 echo "::warning::Could not determine installed version for $pkg after upgrade, recording fix version"
                 INSTALLED_VER="$fix_ver"
@@ -394,7 +397,7 @@ jobs:
               rm -f "${lockfile}.bak" "${source_file}.bak"
 
               echo "Installed version: ${INSTALLED_VER}"
-              printf '%s\n' "- ${pkg}==${INSTALLED_VER} | [$advisory_id]($advisory_url)" >> applied_fixes.txt
+              printf '%s\n' "| ${pkg}==${INSTALLED_VER} | [$advisory_id]($advisory_url) |" >> applied_fixes.txt
               FIXED=true
             done
 
