@@ -105,11 +105,12 @@ jobs:
                 url: ($vuln.references[0].url // "https://osv.dev/vulnerability/\($vuln.id)")
               }
             ] |
-            group_by([.pkg, .id]) |
-            map(sort_by(.fix | split(".") | map(tonumber? // 0)) | last) |
             .[] |
             "\(.pkg)|\(.ver)|\(.fix)|\(.id)|\(.url)"
-          ' osv-results.json 2>/dev/null | sort -u)
+          ' osv-results.json 2>/dev/null \
+            | sort -t'|' -k1,1 -k4,4 -k3,3Vr \
+            | awk -F'|' '!seen[$1,$4]++' \
+          )
 
           if [ -z "$FIX_DATA" ]; then
             echo "No fixable vulnerabilities found."
@@ -129,11 +130,17 @@ jobs:
             echo ""
             echo "=== Processing: $pkg $current_ver -> $fix_ver ($advisory_id) ==="
 
+            # Snapshot go.mod/go.sum so a failure only reverts this iteration, not prior fixes
+            cp go.mod go.mod.bak
+            cp go.sum go.sum.bak
+
             echo "Attempting: go get ${pkg}@v${fix_ver}"
             GET_RC=0
             go get "${pkg}@v${fix_ver}" 2>&1 || GET_RC=$?
             if [ "$GET_RC" -ne 0 ]; then
               echo "Warning: go get failed for $pkg (exit code $GET_RC), skipping"
+              mv go.mod.bak go.mod
+              mv go.sum.bak go.sum
               continue
             fi
 
@@ -141,9 +148,12 @@ jobs:
             go mod tidy 2>&1 || TIDY_RC=$?
             if [ "$TIDY_RC" -ne 0 ]; then
               echo "Warning: go mod tidy failed after updating $pkg (exit code $TIDY_RC), skipping"
-              git checkout go.mod go.sum 2>/dev/null
+              mv go.mod.bak go.mod
+              mv go.sum.bak go.sum
               continue
             fi
+
+            rm -f go.mod.bak go.sum.bak
 
             # Verify the installed version meets the fix
             INSTALLED_VER=$(go list -m -f '{{.Version}}' "$pkg" 2>/dev/null | sed 's/^v//')
