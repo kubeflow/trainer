@@ -1711,6 +1711,36 @@ func TestTorchValidate(t *testing.T) {
 				),
 			},
 		},
+		"lora is supported for single-node training in torchtune": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumNodes(int32(1)).
+					Container(
+						"ghcr.io/kubeflow/trainer/torchtune-trainer",
+						[]string{"tune", "run"},
+						[]string{
+							"model.lora_attn_modules=[q_proj, v_proj, output_proj]",
+						},
+						corev1.ResourceList{},
+					).
+					Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.3-70b",
+				).
+				Obj(),
+			wantError: nil,
+		},
 		"immutable runtime config must not be set in trainer args": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
@@ -1744,6 +1774,48 @@ func TestTorchValidate(t *testing.T) {
 					field.NewPath("spec").Child("trainer").Child("args").Index(0),
 					"output_dir=/custom/output",
 					fmt.Sprintf("must not set immutable config %q in trainer args; it is managed by the runtime", "output_dir"),
+				),
+			},
+		},
+		"multiple immutable runtime configs must not be set in trainer args": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumNodes(int32(1)).
+					Container(
+						"ghcr.io/kubeflow/trainer/torchtune-trainer",
+						[]string{"tune", "run"},
+						[]string{
+							"output_dir=custom-output",
+							"tokenizer.path=/some/path",
+						},
+						corev1.ResourceList{},
+					).
+					Obj(),
+				).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					"torchtune-llama3.2-1b",
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("args").Index(0),
+					"output_dir=custom-output",
+					fmt.Sprintf("must not set immutable config %q in trainer args; it is managed by the runtime", "output_dir"),
+				),
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("args").Index(1),
+					"tokenizer.path=/some/path",
+					fmt.Sprintf("must not set immutable config %q in trainer args; it is managed by the runtime", "tokenizer.path"),
 				),
 			},
 		},

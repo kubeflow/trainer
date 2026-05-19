@@ -76,7 +76,7 @@ func validateTorchTune(runtimeInfo *runtime.Info, newObj *trainer.TrainJob) (adm
 	// LoRA fine-tuning is not supported for multi-node training in TorchTune.
 	// getRecipeAndConfig silently falls through to full_finetune_distributed when
 	// numNodes > 1, discarding LoRA args without any user-visible error.
-	if numNodes > 1 && isLoraConfigEnabled(newObj.Spec.Trainer.Args) {
+	if numNodes > 1 && (isLoraConfigEnabled(newObj.Spec.Trainer.Args) || isUseQLoraFinetune(newObj.Spec.Trainer.Args)) {
 		allErrs = append(allErrs, field.Invalid(
 			numNodesRefPath,
 			numNodes,
