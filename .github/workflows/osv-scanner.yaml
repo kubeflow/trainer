@@ -209,3 +209,244 @@ jobs:
           delete-branch: true
           labels: |
             "area/security"
+
+  osv-scan-python:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install OSV-Scanner
+        run: |
+          OSV_VERSION="2.3.8"
+          EXPECTED_SHA="bc98e15319ed0d515e3f9235287ba53cdc5535d576d24fd573978ecfe9ab92dc"
+          curl -fsSL "https://github.com/google/osv-scanner/releases/download/v${OSV_VERSION}/osv-scanner_linux_amd64" -o osv-scanner
+          ACTUAL_SHA=$(sha256sum osv-scanner | awk '{print $1}')
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "::error::OSV-Scanner checksum mismatch! Expected ${EXPECTED_SHA}, got ${ACTUAL_SHA}"
+            exit 1
+          fi
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
+
+      - name: Install pip-tools
+        run: pip install pip-tools
+
+      - name: Run OSV-Scanner (SARIF for Security Tab)
+        continue-on-error: true
+        run: |
+          rc=0
+          osv-scanner scan \
+            --format sarif \
+            --output osv-results-python.sarif \
+            -L cmd/initializers/dataset/requirements-lock.txt \
+            -L cmd/initializers/model/requirements-lock.txt \
+            -L api/python_api/requirements-lock.txt || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+            echo "::error::OSV-Scanner failed with unexpected exit code $rc"
+            exit 1
+          fi
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always() && hashFiles('osv-results-python.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: osv-results-python.sarif
+          category: kubeflow-trainer-osv-scanner-python
+
+      - name: Run OSV-Scanner (JSON for auto-fix)
+        run: |
+          rc=0
+          osv-scanner scan \
+            --format json \
+            --output osv-results-python.json \
+            -L cmd/initializers/dataset/requirements-lock.txt \
+            -L cmd/initializers/model/requirements-lock.txt \
+            -L api/python_api/requirements-lock.txt || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+            echo "::error::OSV-Scanner failed with unexpected exit code $rc"
+            exit 1
+          fi
+
+      - name: Process vulnerabilities and apply fixes
+        id: fixer
+        run: |
+          set -euo pipefail
+
+          if [ ! -f osv-results-python.json ] || [ ! -s osv-results-python.json ]; then
+            echo "No scan results found."
+            echo "updates_found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          FIX_DATA=$(jq -r '
+            [
+              .results[]?.packages[]? |
+              .package as $pkg |
+              .vulnerabilities[]? |
+              . as $vuln |
+              .affected[]? |
+              select(.package.name == $pkg.name) |
+              .ranges[]? |
+              .events[] |
+              select(.fixed != null) |
+              {
+                pkg: $pkg.name,
+                ver: $pkg.version,
+                fix: (.fixed | sub("^v"; "")),
+                id: $vuln.id,
+                url: ($vuln.references[0].url // "https://osv.dev/vulnerability/\($vuln.id)")
+              }
+            ] |
+            .[] |
+            "\(.pkg)|\(.ver)|\(.fix)|\(.id)|\(.url)"
+          ' osv-results-python.json \
+            | sort -t'|' -k1,1 -k4,4 -k3,3Vr \
+            | awk -F'|' '!seen[$1,$4]++' \
+          )
+
+          if [ -z "$FIX_DATA" ]; then
+            echo "No fixable vulnerabilities found."
+            echo "updates_found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Fixable vulnerabilities found:"
+          echo "$FIX_DATA"
+          echo ""
+
+          # Map lockfiles back to their source requirements files
+          LOCKFILES=(
+            "cmd/initializers/dataset/requirements-lock.txt|cmd/initializers/dataset/requirements.txt"
+            "cmd/initializers/model/requirements-lock.txt|cmd/initializers/model/requirements.txt"
+            "api/python_api/requirements-lock.txt|api/python_api/pyproject.toml"
+          )
+
+          rm -f applied_fixes.txt
+
+          while IFS='|' read -r pkg current_ver fix_ver advisory_id advisory_url; do
+            [ -z "$pkg" ] && continue
+
+            echo ""
+            echo "=== Processing: $pkg $current_ver -> $fix_ver ($advisory_id) ==="
+
+            FIXED=false
+            for mapping in "${LOCKFILES[@]}"; do
+              lockfile="${mapping%%|*}"
+              source_file="${mapping##*|}"
+
+              # Check if this lockfile contains the vulnerable package (case-insensitive)
+              if ! grep -qi "^${pkg}==" "$lockfile"; then
+                continue
+              fi
+
+              echo "Found $pkg in $lockfile (source: $source_file)"
+
+              cp "$lockfile" "${lockfile}.bak"
+              cp "$source_file" "${source_file}.bak"
+
+              # Check if the package is a direct dependency in the source file
+              IS_DIRECT=false
+              if [[ "$source_file" == *.toml ]]; then
+                grep -qi "\"${pkg}" "$source_file" && IS_DIRECT=true
+              else
+                grep -qi "^${pkg}" "$source_file" && IS_DIRECT=true
+              fi
+
+              if [ "$IS_DIRECT" = true ]; then
+                echo "Direct dependency — updating version constraint in $source_file"
+                if [[ "$source_file" == *.toml ]]; then
+                  sed -i -E "s/\"${pkg}[^\"]*\"/\"${pkg}>=${fix_ver}\"/I" "$source_file"
+                else
+                  sed -i -E "s/^${pkg}.*/${pkg}>=${fix_ver}/I" "$source_file"
+                fi
+              else
+                echo "Transitive dependency — upgrading via pip-compile"
+              fi
+
+              # Regenerate the lockfile, upgrading the specific package
+              COMPILE_RC=0
+              pip-compile "$source_file" -o "$lockfile" --upgrade-package "${pkg}>=${fix_ver}" --quiet 2>&1 || COMPILE_RC=$?
+              if [ "$COMPILE_RC" -ne 0 ]; then
+                echo "::warning::pip-compile failed for $source_file (exit code $COMPILE_RC), skipping"
+                mv "${lockfile}.bak" "$lockfile"
+                mv "${source_file}.bak" "$source_file"
+                continue
+              fi
+
+              # Verify the fix was applied (case-insensitive)
+              INSTALLED_VER=$(grep -i "^${pkg}==" "$lockfile" | sed 's/.*==//' || true)
+              if [ -z "$INSTALLED_VER" ]; then
+                echo "::warning::Could not determine installed version for $pkg after upgrade, recording fix version"
+                INSTALLED_VER="$fix_ver"
+              fi
+
+              rm -f "${lockfile}.bak" "${source_file}.bak"
+
+              echo "Installed version: ${INSTALLED_VER}"
+              printf '%s\n' "- ${pkg}==${INSTALLED_VER} | [$advisory_id]($advisory_url)" >> applied_fixes.txt
+              FIXED=true
+            done
+
+            if [ "$FIXED" = false ]; then
+              echo "::warning::Could not find $pkg in any lockfile, skipping"
+            fi
+          done <<< "$FIX_DATA"
+
+          if [ ! -s applied_fixes.txt ]; then
+            echo "No fixes were applied."
+            echo "updates_found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "updates_found=true" >> $GITHUB_OUTPUT
+          {
+            echo "fix_details<<EOF"
+            cat applied_fixes.txt
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        if: steps.fixer.outputs.updates_found == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "fix: nightly automated Python dependency update for security vulnerabilities"
+          title: "fix: nightly security Python dependency updates"
+          add-paths: |
+            cmd/initializers/dataset/requirements.txt
+            cmd/initializers/dataset/requirements-lock.txt
+            cmd/initializers/model/requirements.txt
+            cmd/initializers/model/requirements-lock.txt
+            api/python_api/pyproject.toml
+            api/python_api/requirements-lock.txt
+          body: |
+            ## Security Update (Python)
+
+            This is an automated PR triggered by the nightly OSV-Scanner security scan.
+
+            The following Python dependencies were updated to resolve known vulnerabilities:
+
+            | Package & Version | Advisory Link |
+            | :--- | :--- |
+            ${{ steps.fixer.outputs.fix_details }}
+
+            **Verification:** Updated via `pip-compile` lockfile regeneration.
+
+            > **Note:** This PR was created with `GITHUB_TOKEN`, which does not trigger `pull_request` workflows.
+            > CI checks will not run automatically. Push an empty commit (`git commit --allow-empty -m "trigger CI"`)
+            > to kick off CI before merging.
+          branch: security-nightly-python-updates
+          delete-branch: true
+          labels: |
+            "area/security"

@@ -1,0 +1,75 @@
+name: Validate Python Lockfiles
+
+on:
+  pull_request:
+    paths:
+      - 'cmd/initializers/dataset/requirements.txt'
+      - 'cmd/initializers/dataset/requirements-lock.txt'
+      - 'cmd/initializers/model/requirements.txt'
+      - 'cmd/initializers/model/requirements-lock.txt'
+      - 'api/python_api/pyproject.toml'
+      - 'api/python_api/requirements-lock.txt'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate-lockfiles:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-tools
+        run: pip install pip-tools
+
+      - name: Verify lockfiles are in sync
+        run: |
+          set -euo pipefail
+
+          LOCKFILE_PAIRS=(
+            "cmd/initializers/dataset/requirements.txt|cmd/initializers/dataset/requirements-lock.txt"
+            "cmd/initializers/model/requirements.txt|cmd/initializers/model/requirements-lock.txt"
+            "api/python_api/pyproject.toml|api/python_api/requirements-lock.txt"
+          )
+
+          FAILED=false
+
+          for pair in "${LOCKFILE_PAIRS[@]}"; do
+            source_file="${pair%%|*}"
+            lockfile="${pair##*|}"
+
+            echo "=== Checking $source_file -> $lockfile ==="
+
+            pip-compile "$source_file" -o "${lockfile}.check" --quiet 2>&1
+            if ! diff -q "$lockfile" "${lockfile}.check" > /dev/null 2>&1; then
+              echo "::error::$lockfile is out of sync with $source_file. Please run 'pip-compile $source_file -o $lockfile' and commit the changes."
+              diff "$lockfile" "${lockfile}.check" || true
+              FAILED=true
+            else
+              echo "In sync"
+            fi
+
+            rm -f "${lockfile}.check"
+          done
+
+          if [ "$FAILED" = true ]; then
+            echo ""
+            echo "One or more lockfiles are out of sync."
+            echo "To fix, run the following and commit the updated lockfiles:"
+            echo ""
+            echo "  pip install pip-tools"
+            echo "  pip-compile cmd/initializers/dataset/requirements.txt -o cmd/initializers/dataset/requirements-lock.txt"
+            echo "  pip-compile cmd/initializers/model/requirements.txt -o cmd/initializers/model/requirements-lock.txt"
+            echo "  pip-compile api/python_api/pyproject.toml -o api/python_api/requirements-lock.txt"
+            exit 1
+          fi
