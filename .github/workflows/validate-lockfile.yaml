@@ -30,7 +30,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install pip-tools
-        run: pip install pip-tools
+        run: pip install 'pip-tools==7.5.3'
 
       - name: Verify lockfiles are in sync
         run: |

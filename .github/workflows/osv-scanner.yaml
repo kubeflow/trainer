@@ -240,7 +240,7 @@ jobs:
           sudo mv osv-scanner /usr/local/bin/
 
       - name: Install pip-tools
-        run: pip install pip-tools
+        run: pip install 'pip-tools==7.5.3'
 
       - name: Run OSV-Scanner (SARIF for Security Tab)
         continue-on-error: true
