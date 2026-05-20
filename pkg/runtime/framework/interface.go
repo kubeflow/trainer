@@ -52,10 +52,14 @@ type EnforceMLPolicyPlugin interface {
 }
 
 // EnforceRuntimeInfoPlugin is a generic plugin interface for plugins that
-// unconditionally update runtime.Info without being conditional on any specific
-// API field in TrainJob or TrainingRuntime.
-// For policy-driven plugins that activate based on .mlPolicy or .podGroupPolicy,
-// use EnforceMLPolicyPlugin or EnforcePodGroupPolicyPlugin respectively.
+// update runtime.Info independently of any specific policy field on
+// TrainingRuntime (for example, .spec.mlPolicy or .spec.podGroupPolicy).
+// For policy-driven plugins that activate based on .mlPolicy or
+// .podGroupPolicy, use EnforceMLPolicyPlugin or
+// EnforcePodGroupPolicyPlugin respectively.
+// This interface runs after EnforceMLPolicyPlugin and
+// EnforcePodGroupPolicyPlugin, so implementations may rely on runtime.Info
+// fields populated by earlier phases.
 type EnforceRuntimeInfoPlugin interface {
 	Plugin
 	EnforceRuntimeInfo(info *runtime.Info, trainJob *trainer.TrainJob) error

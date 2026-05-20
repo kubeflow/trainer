@@ -109,8 +109,8 @@ func (f *Framework) RunEnforcePodGroupPolicyPlugins(info *runtime.Info, trainJob
 	return nil
 }
 
-// RunEnforceRuntimeInfoPlugins runs all plugins that implement EnforceRuntimeInfoPlugin.
-// It covers all plugins that update runtime.Info without being tied to a specific policy API.
+// RunEnforceRuntimeInfoPlugins runs all plugins that implement
+// EnforceRuntimeInfoPlugin.
 func (f *Framework) RunEnforceRuntimeInfoPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	for _, plugin := range f.enforceRuntimeInfoPlugins {
 		if err := plugin.EnforceRuntimeInfo(info, trainJob); err != nil {
