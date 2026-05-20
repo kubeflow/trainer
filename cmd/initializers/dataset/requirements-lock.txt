@@ -8,7 +8,7 @@ annotated-doc==0.0.4
     # via typer
 anyio==4.13.0
     # via httpx
-certifi==2026.4.22
+certifi==2026.5.20
     # via
     #   httpcore
     #   httpx
