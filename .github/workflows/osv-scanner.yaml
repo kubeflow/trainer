@@ -222,7 +222,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -358,21 +358,13 @@ jobs:
               cp "$lockfile" "${lockfile}.bak"
               cp "$source_file" "${source_file}.bak"
 
-              # Check if the package is a direct dependency in the source file
-              IS_DIRECT=false
-              if [[ "$source_file" == *.toml ]]; then
-                grep -qi "\"${pkg_re}" "$source_file" && IS_DIRECT=true
-              else
-                grep -qi "^${pkg_re}" "$source_file" && IS_DIRECT=true
-              fi
+              # Detect if pkg is a direct dependency and update the constraint in-place.
+              # Uses packaging.requirements.Requirement for exact name matching (no prefix
+              # collision) and specifier intersection (preserves extras and upper bounds).
+              UPDATE_RESULT=$(python3 hack/scripts/update-source-dep.py "$pkg" "$fix_ver" "$source_file")
 
-              if [ "$IS_DIRECT" = true ]; then
-                echo "Direct dependency — updating version constraint in $source_file"
-                if [[ "$source_file" == *.toml ]]; then
-                  sed -i -E "s/\"${pkg_re}[^\"]*\"/\"${pkg}>=${fix_ver}\"/I" "$source_file"
-                else
-                  sed -i -E "s/^${pkg_re}.*/${pkg}>=${fix_ver}/I" "$source_file"
-                fi
+              if [ "$UPDATE_RESULT" = "direct" ]; then
+                echo "Direct dependency — updated version constraint in $source_file"
               else
                 echo "Transitive dependency — upgrading via pip-compile"
               fi
@@ -390,8 +382,9 @@ jobs:
               # Verify the fix was applied (case-insensitive)
               INSTALLED_VER=$(grep -i "^${pkg_re}==" "$lockfile" | sed 's/.*==//' || true)
               if [ -z "$INSTALLED_VER" ]; then
-                echo "::warning::Could not determine installed version for $pkg after upgrade, recording fix version"
-                INSTALLED_VER="$fix_ver"
+                echo "::warning::$pkg not found in $lockfile after pip-compile (may have been removed), skipping"
+                rm -f "${lockfile}.bak" "${source_file}.bak"
+                continue
               fi
 
               rm -f "${lockfile}.bak" "${source_file}.bak"
