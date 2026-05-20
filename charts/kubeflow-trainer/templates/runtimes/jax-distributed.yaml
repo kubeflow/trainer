@@ -39,5 +39,5 @@ spec:
                 spec:
                   containers:
                     - name: node
-                      image: nvcr.io/nvidia/jax:25.10-py3
+                      image: {{ include "trainer.runtimeImage" (list .Values.runtimes.jax.image .) }}
 {{- end }}

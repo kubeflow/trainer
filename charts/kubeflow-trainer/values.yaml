@@ -197,6 +197,13 @@ runtimes:
   torchDistributed:
     # -- Enable deployment of torch-distributed runtime
     enabled: false
+    image:
+      # -- PyTorch runtime image registry
+      registry: docker.io
+      # -- PyTorch runtime image repository
+      repository: pytorch/pytorch
+      # -- PyTorch runtime image tag. Defaults to chart version if empty.
+      tag: "2.10.0-cuda12.8-cudnn9-runtime"
 
   # -- DeepSpeed distributed training runtime
   deepspeedDistributed:
@@ -226,6 +233,13 @@ runtimes:
   jaxDistributed:
     # -- Enable deployment of jax-distributed runtime
     enabled: false
+    image:
+      # -- JAX runtime image registry
+      registry: nvcr.io
+      # -- JAX runtime image repository
+      repository: jax
+      # -- JAX runtime image tag. Defaults to chart version if empty.
+      tag: "25.10-py3"
 
   # -- XGBoost distributed training runtime
   xgboostDistributed:

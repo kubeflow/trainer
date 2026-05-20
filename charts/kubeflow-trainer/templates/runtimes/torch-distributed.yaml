@@ -39,5 +39,5 @@ spec:
                 spec:
                   containers:
                     - name: node
-                      image: pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
+                      image: {{ include "trainer.runtimeImage" (list .Values.runtimes.torchDistributed.image .) }}
 {{- end }}
