@@ -13,4 +13,11 @@
 # limitations under the License.
 
 
+from kubeflow_trainer_api.tpu import get_num_nodes
+
 __version__ = "2.2.0"
+
+__all__ = [
+    "get_num_nodes",
+]
+
