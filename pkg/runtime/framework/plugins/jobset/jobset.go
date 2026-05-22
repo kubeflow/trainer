@@ -237,9 +237,9 @@ func (j *JobSet) IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJ
 	}
 	for rJobIdx, rJob := range spec.ReplicatedJobs {
 		podCount := info.TemplateSpec.PodSets[rJobIdx].Count
-		rJobReplicas := ptr.Deref(rJob.Replicas, 1)
+		rJobReplicas := ptr.Deref(rJob.Replicas, constants.DefaultJobReplicas)
 		info.TemplateSpec.PodSets[rJobIdx].Endpoints = func(yield func(string) bool) {
-			for replicaIdx := range int(rJobReplicas) {
+			for replicaIdx := 0; replicaIdx < int(rJobReplicas); replicaIdx++ {
 				for podIdx := range ptr.Deref(podCount, 1) {
 					endpoint := fmt.Sprintf("%s-%s-%d-%d.%s", trainJob.Name, *rJob.Name, replicaIdx, podIdx, subDomain)
 					if !yield(endpoint) {
