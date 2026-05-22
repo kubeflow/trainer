@@ -236,15 +236,15 @@ func (j *JobSet) IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJ
 		subDomain = *jobSetNet.Subdomain
 	}
 	for rJobIdx, rJob := range spec.ReplicatedJobs {
-		// TODO: Support multiple replicas for replicated Jobs.
-		// REF: https://github.com/kubeflow/trainer/issues/2318
 		podCount := info.TemplateSpec.PodSets[rJobIdx].Count
-		rJobReplicas := constants.DefaultJobReplicas
+		rJobReplicas := ptr.Deref(rJob.Replicas, 1)
 		info.TemplateSpec.PodSets[rJobIdx].Endpoints = func(yield func(string) bool) {
-			for podIdx := range ptr.Deref(podCount, 1) {
-				endpoint := fmt.Sprintf("%s-%s-%d-%d.%s", trainJob.Name, *rJob.Name, rJobReplicas-1, podIdx, subDomain)
-				if !yield(endpoint) {
-					return
+			for replicaIdx := range int(rJobReplicas) {
+				for podIdx := range ptr.Deref(podCount, 1) {
+					endpoint := fmt.Sprintf("%s-%s-%d-%d.%s", trainJob.Name, *rJob.Name, replicaIdx, podIdx, subDomain)
+					if !yield(endpoint) {
+						return
+					}
 				}
 			}
 		}
