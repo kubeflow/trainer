@@ -23,9 +23,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -1837,6 +1839,319 @@ func TestValidate(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantWarnings, warnings); len(diff) != 0 {
 				t.Errorf("Unexpected warnings from Validate (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestBuild(t *testing.T) {
+	cases := map[string]struct {
+		info      *runtime.Info
+		trainJob  *trainer.TrainJob
+		wantObjs  []apiruntime.Object
+		wantError error
+	}{
+		"init containers synced to JobSet replicated jobs": {
+			info: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](2),
+							InitContainers: []runtime.Container{
+								{
+									Name:    "preflight-check",
+									Image:   "preflight:latest",
+									Command: []string{"/bin/sh", "-c"},
+									Env: []corev1ac.EnvVarApplyConfiguration{
+										{Name: ptr.To("PET_NNODES"), Value: ptr.To("2")},
+										{Name: ptr.To("PET_MASTER_ADDR"), Value: ptr.To("test-job-node-0-0.test-job")},
+									},
+								},
+							},
+							Containers: []runtime.Container{
+								{Name: constants.Node, Image: "pytorch:latest"},
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithInitContainers(
+													corev1ac.Container().WithName("preflight-check"),
+												).
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+			wantObjs: []apiruntime.Object{
+				&jobsetv1alpha2.JobSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{APIVersion: trainer.GroupVersion.String(), Kind: trainer.TrainJobKind, Name: "test-job", Controller: ptr.To(true)},
+						},
+					},
+					Spec: jobsetv1alpha2.JobSetSpec{
+						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+							{
+								Name:     constants.Node,
+								Replicas: 0,
+								Template: batchv1.JobTemplateSpec{
+									Spec: batchv1.JobSpec{
+										Parallelism: ptr.To[int32](2),
+										Completions: ptr.To[int32](2),
+										Template: corev1.PodTemplateSpec{
+											Spec: corev1.PodSpec{
+												InitContainers: []corev1.Container{
+													{
+														Name:    "preflight-check",
+														Image:   "preflight:latest",
+														Command: []string{"/bin/sh", "-c"},
+														Env: []corev1.EnvVar{
+															{Name: "PET_NNODES", Value: "2"},
+															{Name: "PET_MASTER_ADDR", Value: "test-job-node-0-0.test-job"},
+														},
+													},
+												},
+												Containers: []corev1.Container{
+													{Name: constants.Node, Image: "pytorch:latest"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"init container with ports and volume mounts synced": {
+			info: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](1),
+							InitContainers: []runtime.Container{
+								{
+									Name:    "nccl-check",
+									Image:   "nccl-test:latest",
+									Command: []string{"/nccl-test"},
+									Ports: []corev1ac.ContainerPortApplyConfiguration{
+										{ContainerPort: ptr.To[int32](8080), Name: ptr.To("http")},
+									},
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										{Name: ptr.To("mount"), MountPath: ptr.To("/data")},
+									},
+								},
+							},
+							Containers: []runtime.Container{
+								{Name: constants.Node, Image: "train:latest"},
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithInitContainers(
+													corev1ac.Container().WithName("nccl-check"),
+												).
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+			wantObjs: []apiruntime.Object{
+				&jobsetv1alpha2.JobSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{APIVersion: trainer.GroupVersion.String(), Kind: trainer.TrainJobKind, Name: "test-job", Controller: ptr.To(true)},
+						},
+					},
+					Spec: jobsetv1alpha2.JobSetSpec{
+						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+							{
+								Name:     constants.Node,
+								Replicas: 0,
+								Template: batchv1.JobTemplateSpec{
+									Spec: batchv1.JobSpec{
+										Parallelism: ptr.To[int32](1),
+										Completions: ptr.To[int32](1),
+										Template: corev1.PodTemplateSpec{
+											Spec: corev1.PodSpec{
+												InitContainers: []corev1.Container{
+													{
+														Name:    "nccl-check",
+														Image:   "nccl-test:latest",
+														Command: []string{"/nccl-test"},
+														Ports:   []corev1.ContainerPort{{Name: "http", ContainerPort: 8080}},
+														VolumeMounts: []corev1.VolumeMount{
+															{Name: "mount", MountPath: "/data"},
+														},
+													},
+												},
+												Containers: []corev1.Container{
+													{Name: constants.Node, Image: "train:latest"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"multiple init containers synced": {
+			info: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](3),
+							InitContainers: []runtime.Container{
+								{Name: "driver-check", Image: "driver:latest", Command: []string{"/check-driver"}},
+								{Name: "nccl-check", Image: "nccl:latest", Command: []string{"/check-nccl"}},
+							},
+							Containers: []runtime.Container{
+								{Name: constants.Node, Image: "train:latest"},
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithInitContainers(
+													corev1ac.Container().WithName("driver-check"),
+													corev1ac.Container().WithName("nccl-check"),
+												).
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+			wantObjs: []apiruntime.Object{
+				&jobsetv1alpha2.JobSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-job",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{APIVersion: trainer.GroupVersion.String(), Kind: trainer.TrainJobKind, Name: "test-job", Controller: ptr.To(true)},
+						},
+					},
+					Spec: jobsetv1alpha2.JobSetSpec{
+						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+							{
+								Name:     constants.Node,
+								Replicas: 0,
+								Template: batchv1.JobTemplateSpec{
+									Spec: batchv1.JobSpec{
+										Parallelism: ptr.To[int32](3),
+										Completions: ptr.To[int32](3),
+										Template: corev1.PodTemplateSpec{
+											Spec: corev1.PodSpec{
+												InitContainers: []corev1.Container{
+													{Name: "driver-check", Image: "driver:latest", Command: []string{"/check-driver"}},
+													{Name: "nccl-check", Image: "nccl:latest", Command: []string{"/check-nccl"}},
+												},
+												Containers: []corev1.Container{
+													{Name: constants.Node, Image: "train:latest"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+			cli := utiltesting.NewClientBuilder().Build()
+			p, err := New(ctx, cli, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+			objs, err := p.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
+			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
+			}
+			typedObjs, err := utiltesting.ToObject(cli.Scheme(), objs...)
+			if err != nil {
+				t.Fatalf("Failed to convert objects: %v", err)
+			}
+			if diff := cmp.Diff(tc.wantObjs, typedObjs,
+				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
+				cmp.Transformer("", func(in jobsetv1alpha2.JobSet) jobsetv1alpha2.JobSet {
+					in.Kind = ""
+					in.APIVersion = ""
+					for i := range in.OwnerReferences {
+						in.OwnerReferences[i].BlockOwnerDeletion = nil
+					}
+					return in
+				}),
+			); len(diff) != 0 {
+				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
 			}
 		})
 	}
