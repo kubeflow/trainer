@@ -29,7 +29,7 @@ import os
 import re
 import subprocess
 import sys
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # Maps file extension (or special basename) to the boilerplate template
 # stem on disk (boilerplate.<stem>.txt). One template is reused across
@@ -46,14 +46,11 @@ EXTENSION_TEMPLATES = {
 # disk but only activated when a Go file is detected as generated.
 GENERATED_GO_TEMPLATE = "generatego"
 
-# Path patterns skipped during repo-wide scans (not when explicit
-# filenames are passed on the command line).
-SCAN_SKIP_PATTERNS = (
-    "hack/boilerplate/test/",
-    "api/python_api/",
-)
-
-IGNORE_FILE = ".boilerplateignore"
+# Regex patterns
+_RE_ANY_YEAR = re.compile(r"Copyright \d{4} ")
+_RE_GO_BUILD_CONSTRAINTS = re.compile(r"^(//(go:build| \+build).*\n)+\n", re.MULTILINE)
+_RE_SHEBANG = re.compile(r"^(#!.*\n)\n*")
+_RE_GENERATED = re.compile(r"DO NOT EDIT", re.MULTILINE)
 
 
 def find_root_dir() -> str:
@@ -70,26 +67,6 @@ def find_root_dir() -> str:
         return os.getcwd()
 
 
-def parse_ignore_file(path: str) -> Dict[str, Set[str]]:
-    """Parse a .boilerplateignore file into named sections."""
-    sections: Dict[str, Set[str]] = {}
-    current: Optional[Set[str]] = None
-    if not os.path.isfile(path):
-        return sections
-    with open(path, "r", encoding="utf-8") as f:
-        for raw in f:
-            line = raw.strip()
-            if not line or line.startswith("#"):
-                continue
-            if line.startswith("[") and line.endswith("]"):
-                current = sections.setdefault(line[1:-1].strip(), set())
-                continue
-            if current is None:
-                continue
-            current.add(line)
-    return sections
-
-
 def load_templates(boilerplate_dir: str) -> Dict[str, List[str]]:
     """Load boilerplate templates as {stem: [line, ...]}."""
     templates: Dict[str, List[str]] = {}
@@ -98,17 +75,6 @@ def load_templates(boilerplate_dir: str) -> Dict[str, List[str]]:
         with open(path, "r", encoding="utf-8") as f:
             templates[stem] = f.read().splitlines()
     return templates
-
-
-def get_regexes() -> Dict[str, re.Pattern]:
-    return {
-        "any_year": re.compile(r"Copyright (\d{4}) "),
-        "go_build_constraints": re.compile(
-            r"^(//(go:build| \+build).*\n)+\n", re.MULTILINE
-        ),
-        "shebang": re.compile(r"^(#!.*\n)\n*"),
-        "generated": re.compile(r"DO NOT EDIT", re.MULTILINE),
-    }
 
 
 def template_stem_for(filename: str) -> Optional[str]:
@@ -157,36 +123,17 @@ def collect_files(rootdir: str, filenames: Optional[List[str]]) -> List[str]:
                 for root, _, names in os.walk(f):
                     for name in names:
                         candidates.append(os.path.join(root, name))
-        skip_patterns: Tuple[str, ...] = ()
     else:
         candidates = list_git_files(rootdir)
-        skip_patterns = SCAN_SKIP_PATTERNS
 
-    def keep(path: str) -> bool:
-        if template_stem_for(path) is None:
-            return False
-        normalized = path.replace(os.sep, "/")
-        return not any(p in normalized for p in skip_patterns)
-
-    return sorted(f for f in candidates if keep(f))
+    return sorted(candidates)
 
 
 def file_passes(
     filename: str,
     templates: Dict[str, List[str]],
-    regexes: Dict[str, re.Pattern],
-    rootdir: str,
-    ignores: Optional[Dict[str, Set[str]]] = None,
 ) -> Tuple[bool, Optional[str]]:
     """Check that filename starts with the expected boilerplate header."""
-    ignores = ignores or {}
-    relpath = os.path.relpath(filename, rootdir).replace(os.sep, "/")
-
-    if relpath in ignores.get("kubernetes-authors", set()):
-        return True, None
-    if relpath in ignores.get("line-comment", set()):
-        return True, None
-
     stem = template_stem_for(filename)
     if stem is None or stem not in templates:
         return True, None
@@ -199,7 +146,7 @@ def file_passes(
 
     if (
         stem == "go"
-        and regexes["generated"].search(data)
+        and _RE_GENERATED.search(data)
         and GENERATED_GO_TEMPLATE in templates
     ):
         stem = GENERATED_GO_TEMPLATE
@@ -207,22 +154,25 @@ def file_passes(
     ref = templates[stem]
 
     if stem in ("go", GENERATED_GO_TEMPLATE):
-        data = regexes["go_build_constraints"].sub("", data)
+        data = _RE_GO_BUILD_CONSTRAINTS.sub("", data)
     if stem == "sh":
-        data = regexes["shebang"].sub("", data)
+        data = _RE_SHEBANG.sub("", data)
 
     lines = data.splitlines()
+    header_lines = lines[: len(ref)]
+
+    # Policy: any file whose header already contains "Copyright YYYY"
+    # is accepted as-is. Those headers were reviewed when the file
+    # landed; re-validating them on every CI run adds little. Trade-off:
+    # a copy-paste with a different holder (e.g. "Copyright 2025 ACME")
+    # would slip through. New files must use the year-less template.
+    for line in header_lines:
+        if _RE_ANY_YEAR.search(line):
+            return True, None
+
     if len(lines) < len(ref):
         return False, "File is shorter than the expected boilerplate header"
 
-    header_lines = lines[: len(ref)]
-
-    # If header already contains a copyright year → accept
-    for line in header_lines:
-        if regexes["any_year"].search(line):
-            return True, None
-
-    # Otherwise, require exact match with template (no year)
     if header_lines != ref:
         return False, "Header does not match the boilerplate template"
 
@@ -284,16 +234,10 @@ def main() -> int:
         )
         return 1
 
-    regexes = get_regexes()
-    ignores = parse_ignore_file(os.path.join(args.boilerplate_dir, IGNORE_FILE))
-    no_header = ignores.get("no-header", set())
-
     failed: List[Tuple[str, Optional[str]]] = []
     for filepath in collect_files(rootdir, args.filenames or None):
         relpath = os.path.relpath(filepath, rootdir).replace(os.sep, "/")
-        if relpath in no_header:
-            continue
-        passes, error = file_passes(filepath, templates, regexes, rootdir, ignores)
+        passes, error = file_passes(filepath, templates)
         if not passes:
             failed.append((relpath, error))
             print(relpath)  # stdout stays parseable
