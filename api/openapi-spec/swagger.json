@@ -13779,7 +13779,11 @@
                   "$ref": "#/components/schemas/trainer.v1alpha1.SettingKV"
                 }
               ]
-            }
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
           }
         }
       },
@@ -14451,7 +14455,8 @@
                   "$ref": "#/components/schemas/trainer.v1alpha1.Objective"
                 }
               ]
-            }
+            },
+            "x-kubernetes-list-type": "atomic"
           },
           "parameters": {
             "type": "array",
@@ -14462,7 +14467,11 @@
                   "$ref": "#/components/schemas/trainer.v1alpha1.Parameter"
                 }
               ]
-            }
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
           },
           "trialConfig": {
             "default": {},
@@ -14508,7 +14517,11 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
                 }
               ]
-            }
+            },
+            "x-kubernetes-list-map-keys": [
+              "type"
+            ],
+            "x-kubernetes-list-type": "map"
           },
           "failed": {
             "type": "integer",
@@ -14838,7 +14851,8 @@
             "items": {
               "type": "string",
               "default": ""
-            }
+            },
+            "x-kubernetes-list-type": "atomic"
           },
           "max": {
             "type": "string"

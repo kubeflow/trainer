@@ -470,6 +470,14 @@ func schema_pkg_apis_trainer_v1alpha1_Algorithm(ref common.ReferenceCallback) co
 						},
 					},
 					"settings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -1371,6 +1379,11 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"objectives": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -1390,6 +1403,14 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 						},
 					},
 					"parameters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -1431,6 +1452,14 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobStatus(ref common.Reference
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
@@ -1921,6 +1950,11 @@ func schema_pkg_apis_trainer_v1alpha1_SearchSpace(ref common.ReferenceCallback) 
 						},
 					},
 					"list": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{

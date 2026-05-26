@@ -36,7 +36,9 @@ type Objective struct {
 // Algorithm defines the optimization algorithm configuration.
 type Algorithm struct {
 	// +kubebuilder:validation:MinLength=1
-	Name     string      `json:"name"`
+	Name string `json:"name"`
+	// +listType=map
+	// +listMapKey=name
 	Settings []SettingKV `json:"settings,omitempty"`
 }
 
@@ -57,6 +59,7 @@ type SearchSpace struct {
 	Max string `json:"max,omitempty"`
 	Min string `json:"min,omitempty"`
 
+	// +listType=atomic
 	// +optional
 	List []string `json:"list,omitempty"`
 }
@@ -110,11 +113,14 @@ type BestTrial struct {
 
 // OptimizationJobSpec defines the desired state of OptimizationJob.
 type OptimizationJobSpec struct {
+	// +listType=atomic
 	// +kubebuilder:validation:MinItems=1
 	Objectives []Objective `json:"objectives"`
 
 	Algorithm Algorithm `json:"algorithm"`
 
+	// +listType=map
+	// +listMapKey=name
 	// +kubebuilder:validation:MinItems=1
 	Parameters []Parameter `json:"parameters"`
 
@@ -128,6 +134,8 @@ type OptimizationJobSpec struct {
 
 // OptimizationJobStatus defines the observed state of OptimizationJob.
 type OptimizationJobStatus struct {
+	// +listType=map
+	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// Counters for Trial states

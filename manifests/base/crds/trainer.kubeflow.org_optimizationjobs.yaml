@@ -59,6 +59,9 @@ spec:
                       - value
                       type: object
                     type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                 required:
                 - name
                 type: object
@@ -80,6 +83,7 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+                x-kubernetes-list-type: atomic
               parameters:
                 items:
                   description: Parameter defines a single hyperparameter and its search
@@ -96,6 +100,7 @@ spec:
                           items:
                             type: string
                           type: array
+                          x-kubernetes-list-type: atomic
                         max:
                           type: string
                         min:
@@ -120,6 +125,9 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               trialConfig:
                 description: TrialConfig controls the orchestration of the trials.
                 properties:
@@ -252,6 +260,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               failed:
                 format: int32
                 minimum: 0
