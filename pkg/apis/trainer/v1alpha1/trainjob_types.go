@@ -453,6 +453,13 @@ type PodSpecPatch struct {
 	// +kubebuilder:validation:MaxItems=16
 	// +optional
 	SchedulingGates []corev1.PodSchedulingGate `json:"schedulingGates,omitempty"`
+
+	// terminationGracePeriodSeconds patches the termination grace period for Pods
+	// in the target job templates.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="field is immutable"
+	// +optional
+	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 }
 
 // ContainerPatch represents parameters that can be patched using PodSpecPatch.

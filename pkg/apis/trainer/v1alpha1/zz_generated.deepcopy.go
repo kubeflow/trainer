@@ -647,6 +647,11 @@ func (in *PodSpecPatch) DeepCopyInto(out *PodSpecPatch) {
 		*out = make([]v1.PodSchedulingGate, len(*in))
 		copy(*out, *in)
 	}
+	if in.TerminationGracePeriodSeconds != nil {
+		in, out := &in.TerminationGracePeriodSeconds, &out.TerminationGracePeriodSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 
