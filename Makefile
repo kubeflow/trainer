@@ -153,9 +153,9 @@ manifests: controller-gen ## Generate manifests.
 
 .PHONY: generate
 generate: go-mod-download manifests helm-docs ## Generate APIs.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.generatego.txt" paths="./pkg/apis/..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/..."
 	hack/update-codegen.sh
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.generatego.txt" paths="./pkg/apis/config/v1alpha1/..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/config/v1alpha1/..."
 	CONTAINER_RUNTIME=$(CONTAINER_RUNTIME) hack/python-api/gen-api.sh
 
 .PHONY: go-mod-download
