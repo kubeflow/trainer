@@ -13759,6 +13759,56 @@
           }
         }
       },
+      "trainer.v1alpha1.Algorithm": {
+        "description": "Algorithm defines the optimization algorithm configuration.",
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": ""
+          },
+          "settings": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.SettingKV"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "trainer.v1alpha1.BestTrial": {
+        "description": "BestTrial tracks the best performing trial. Kept minimal for MVP; users can inspect the specific Trial/TrainJob for exact metrics and settings.",
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": ""
+          },
+          "optimalParameters": {
+            "description": "optimalParameters is a list of the hyperparameter assignments that won.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.ParameterAssignment"
+                }
+              ]
+            },
+            "x-kubernetes-list-type": "atomic"
+          }
+        }
+      },
       "trainer.v1alpha1.ClusterTrainingRuntime": {
         "description": "ClusterTrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced by TrainJob that created in *any* namespace.",
         "type": "object",
@@ -14281,6 +14331,237 @@
           }
         }
       },
+      "trainer.v1alpha1.Objective": {
+        "description": "Objective defines the metric and goal for the OptimizationJob.",
+        "type": "object",
+        "required": [
+          "metric",
+          "direction"
+        ],
+        "properties": {
+          "direction": {
+            "type": "string",
+            "default": ""
+          },
+          "metric": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJob": {
+        "description": "OptimizationJob is the Schema for the optimizationjobs API.",
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJobSpec"
+              }
+            ]
+          },
+          "status": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJobStatus"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobList": {
+        "description": "OptimizationJobList contains a list of OptimizationJob.",
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJob"
+                }
+              ]
+            }
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobSpec": {
+        "description": "OptimizationJobSpec defines the desired state of OptimizationJob.",
+        "type": "object",
+        "required": [
+          "objectives",
+          "algorithm",
+          "parameters",
+          "trialConfig",
+          "trialTemplate"
+        ],
+        "properties": {
+          "algorithm": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.Algorithm"
+              }
+            ]
+          },
+          "objectives": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.Objective"
+                }
+              ]
+            }
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.Parameter"
+                }
+              ]
+            }
+          },
+          "trialConfig": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrialConfig"
+              }
+            ]
+          },
+          "trialTemplate": {
+            "description": "TrialTemplate acts as a generic wrapper for the underlying workload. Parameters are injected via native Kubernetes Environment Variables, replacing regex.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobStatus": {
+        "description": "OptimizationJobStatus defines the observed state of OptimizationJob.",
+        "type": "object",
+        "properties": {
+          "active": {
+            "description": "Counters for Trial states",
+            "type": "integer",
+            "format": "int32"
+          },
+          "bestTrial": {
+            "description": "BestTrial caches the highest performing trial based on the Objective.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.BestTrial"
+              }
+            ]
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+                }
+              ]
+            }
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "succeeded": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "trainer.v1alpha1.Parameter": {
+        "description": "Parameter defines a single hyperparameter and its search space.",
+        "type": "object",
+        "required": [
+          "name",
+          "searchSpace"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": ""
+          },
+          "searchSpace": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.SearchSpace"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.ParameterAssignment": {
+        "description": "ParameterAssignment represents a single hyperparameter and its assigned value.",
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "description": "name is the user-defined label for the parameter (e.g., \"learning_rate\").",
+            "type": "string",
+            "default": ""
+          },
+          "value": {
+            "description": "value of the parameter. Values must be serialized as a string to avoid float precision issues and align with Trainer v2 patterns.",
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
       "trainer.v1alpha1.PodGroupPolicy": {
         "description": "PodGroupPolicy represents a PodGroup configuration for gang-scheduling.",
         "type": "object",
@@ -14542,6 +14823,50 @@
           "name": {
             "description": "name of the runtime being referenced. When namespaced-scoped TrainingRuntime is used, the TrainJob must have the same namespace as the deployed runtime.",
             "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.SearchSpace": {
+        "description": "SearchSpace defines the type and exact boundaries for the algorithm to search.",
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "max": {
+            "type": "string"
+          },
+          "min": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
+      "trainer.v1alpha1.SettingKV": {
+        "description": "SettingKV is a key-value pair for algorithm settings.",
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": ""
+          },
+          "value": {
+            "type": "string",
+            "default": ""
           }
         }
       },
@@ -14948,6 +15273,24 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobSetTemplatePatch"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.TrialConfig": {
+        "description": "TrialConfig controls the orchestration of the trials.",
+        "type": "object",
+        "properties": {
+          "maxFailedTrials": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "numTrials": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "parallelTrials": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

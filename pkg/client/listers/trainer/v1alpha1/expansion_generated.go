@@ -20,6 +20,14 @@ package v1alpha1
 // ClusterTrainingRuntimeLister.
 type ClusterTrainingRuntimeListerExpansion interface{}
 
+// OptimizationJobListerExpansion allows custom methods to be added to
+// OptimizationJobLister.
+type OptimizationJobListerExpansion interface{}
+
+// OptimizationJobNamespaceListerExpansion allows custom methods to be added to
+// OptimizationJobNamespaceLister.
+type OptimizationJobNamespaceListerExpansion interface{}
+
 // TrainJobListerExpansion allows custom methods to be added to
 // TrainJobLister.
 type TrainJobListerExpansion interface{}

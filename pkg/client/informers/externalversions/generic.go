@@ -53,6 +53,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=trainer.kubeflow.org, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("clustertrainingruntimes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Trainer().V1alpha1().ClusterTrainingRuntimes().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("optimizationjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Trainer().V1alpha1().OptimizationJobs().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("trainjobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Trainer().V1alpha1().TrainJobs().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("trainingruntimes"):
