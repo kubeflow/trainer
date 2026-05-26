@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [ -z "$1" ]; then
+if [ -z "${1:-}" ]; then
   echo "Usage: $0 <version>"
   echo "You must follow this format: X.Y.Z or X.Y.Z-rc.N"
   exit 1
@@ -46,6 +46,14 @@ MANIFESTS_DIR="$REPO_ROOT/manifests"
 CHART_DIR="$REPO_ROOT/charts/kubeflow-trainer"
 CHART_FILE="$CHART_DIR/Chart.yaml"
 PYTHON_API_VERSION_FILE="$REPO_ROOT/api/python_api/kubeflow_trainer_api/__init__.py"
+MANAGER_KUSTOMIZATION="$REPO_ROOT/manifests/overlays/manager/kustomization.yaml"
+
+# Portable sed -i: macOS (BSD) sed requires a backup extension with -i.
+if [[ "$(uname)" == "Darwin" ]]; then
+  SED_INPLACE=(sed -i '')
+else
+  SED_INPLACE=(sed -i)
+fi
 
 # Verify tag doesn't already exist
 git fetch --tags
@@ -60,19 +68,23 @@ echo -n "v$NEW_VERSION" > "$VERSION_FILE"
 echo "Updated VERSION file to $NEW_VERSION"
 
 # Update image tags in manifests
-find "$MANIFESTS_DIR" -type f -name '*.yaml' -exec sed -i "s/newTag: .*/newTag: $TAG/" {} +
+find "$MANIFESTS_DIR" -type f -name '*.yaml' -exec "${SED_INPLACE[@]}" "s/newTag: .*/newTag: $TAG/" {} +
 echo "Updated image tags in manifests to $TAG"
 
 echo "Pinning ghcr.io image references in manifests to $TAG"
 CHANGED_FILES=$(grep -REl "ghcr\.io/kubeflow/trainer/[A-Za-z0-9._/-]+:latest" "$MANIFESTS_DIR" || true)
 if [ -n "$CHANGED_FILES" ]; then
   while IFS= read -r f; do
-    sed -i -E "s|(ghcr\.io/kubeflow/trainer/[A-Za-z0-9._/-]+):latest|\\1:${TAG}|g" "$f"
+    "${SED_INPLACE[@]}" -E "s|(ghcr\.io/kubeflow/trainer/[A-Za-z0-9._/-]+):latest|\\1:${TAG}|g" "$f"
     echo "  Updated ${f#$MANIFESTS_DIR/}"
   done <<< "$CHANGED_FILES"
 else
   echo "  No ghcr.io references pinned to :latest found."
 fi
+
+# Update configMapGenerator version in manager overlay
+"${SED_INPLACE[@]}" "s/kubeflow_trainer_version=.*/kubeflow_trainer_version=${TAG}/" "$MANAGER_KUSTOMIZATION"
+echo "Updated configMapGenerator version to $TAG"
 
 if [ ! -f "$CHART_FILE" ]; then
   echo "Helm chart file not found: $CHART_FILE"
@@ -98,7 +110,7 @@ PYTHON
 echo "Updated Helm chart version to $NEW_VERSION"
 
 CHANGELOG_DIR="$REPO_ROOT/CHANGELOG"
-CHANGELOG_PATH="$CHANGELOG_DIR/changelog-${MAJOR_VERSION}.${MINOR_VERSION}.md"
+CHANGELOG_PATH="$CHANGELOG_DIR/CHANGELOG-${MAJOR_VERSION}.${MINOR_VERSION}.md"
 echo "Generating changelog for $TAG"
 ABSOLUTE_REPO_ROOT="$(cd "$REPO_ROOT" && pwd)"
 if [ -z "${GITHUB_TOKEN:-}" ]; then
@@ -109,17 +121,27 @@ fi
 # Generate and prepend new changelog section
 TEMP_FILE=$(mktemp)
 docker run --rm -u "$(id -u):$(id -g)" -v "$ABSOLUTE_REPO_ROOT:/app" \
-  -e "GITHUB_TOKEN=$GITHUB_TOKEN" -w /app \
+  -e "GITHUB_TOKEN=${GITHUB_TOKEN:-}" -w /app \
   "ghcr.io/orhun/git-cliff/git-cliff:latest" --unreleased --tag "$TAG" -o - > "$TEMP_FILE"
+
+# Abort if git-cliff produced empty output.
+if [ ! -s "$TEMP_FILE" ]; then
+  echo "git-cliff produced empty changelog" >&2
+  rm -f "$TEMP_FILE"
+  exit 1
+fi
 
 mkdir -p "$CHANGELOG_DIR"
 
 if [ -f "$CHANGELOG_PATH" ]; then
-  sed -i "1 r $TEMP_FILE" "$CHANGELOG_PATH"
+  # Prepend new section to existing changelog using portable approach.
+  TMP_COMBINED=$(mktemp)
+  cat "$TEMP_FILE" "$CHANGELOG_PATH" > "$TMP_COMBINED"
+  mv "$TMP_COMBINED" "$CHANGELOG_PATH"
 else
-  { echo "# Changelog"; cat "$TEMP_FILE"; } > "$CHANGELOG_PATH"
+  { echo "# Changelog"; echo ""; cat "$TEMP_FILE"; } > "$CHANGELOG_PATH"
 fi
-rm "$TEMP_FILE"
+rm -f "$TEMP_FILE"
 echo "Changelog generated at $CHANGELOG_PATH"
 
 echo "Running make generate"
@@ -127,14 +149,12 @@ make -C "$REPO_ROOT" generate
 echo "Completed make generate"
 
 git add "$VERSION_FILE" "$MANIFESTS_DIR" "$CHART_DIR" "$PYTHON_API_VERSION_FILE" "$CHANGELOG_PATH"
+# Also stage any files modified by make generate (CRDs, OpenAPI specs, Python API models).
+git add -u
 git commit -s -m "Release $TAG"
 
 echo -e "\nRelease commit for $TAG created successfully."
 echo "Next steps:"
 echo "  1. Push your branch to your fork"
-echo "  2. Open a PR:"
-echo "     - For latest minor series: open a PR to 'main' and get it reviewed and merged"
-echo "     - For older minor series patch (e.g. ${MAJOR_VERSION}.${MINOR_VERSION}.Z when main"
-echo "       is at a newer minor): checkout the release-${MAJOR_VERSION}.${MINOR_VERSION} branch,"
-echo "       commit changes, and open a PR to release-${MAJOR_VERSION}.${MINOR_VERSION}"
+echo "  2. Open a PR to 'master' and get it reviewed and merged"
 echo "  3. Once merged, GitHub Actions will create the tag and release"

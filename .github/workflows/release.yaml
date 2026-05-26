@@ -87,6 +87,81 @@ jobs:
           done
           echo "All image tags in manifests match version tag $TAG."
 
+      - name: Check Helm chart version
+        run: |
+          VERSION="${{ steps.vars.outputs.version }}"
+          CHART_VERSION=$(grep -E '^version:' charts/kubeflow-trainer/Chart.yaml | head -n1 | awk '{print $2}')
+          if [ -z "$CHART_VERSION" ]; then
+            echo "Chart version not found in charts/kubeflow-trainer/Chart.yaml"
+            exit 1
+          fi
+          if [ "$CHART_VERSION" != "$VERSION" ]; then
+            echo "Chart version ($CHART_VERSION) does not match VERSION ($VERSION)."
+            exit 1
+          fi
+          echo "Chart version matches VERSION ($VERSION)."
+
+      - name: Check Python API version
+        run: |
+          VERSION="${{ steps.vars.outputs.version }}"
+          # Normalize semver RC format to PEP 440: 2.2.0-rc.1 -> 2.2.0rc1
+          EXPECTED=$(echo "$VERSION" | sed 's/-rc\.\([0-9]*\)/rc\1/')
+          PY_VER=$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path('api/python_api/kubeflow_trainer_api/__init__.py').read_text()
+          m = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
+          if not m:
+              raise SystemExit("__version__ not found")
+          print(m.group(1))
+          PY
+          )
+          echo "Expected: ${EXPECTED}; Package: ${PY_VER}"
+          if [ "$PY_VER" != "$EXPECTED" ]; then
+            echo "Python API version ($PY_VER) does not match expected ($EXPECTED)."
+            exit 1
+          fi
+          echo "Python API version matches."
+
+      - name: Check configMapGenerator version
+        run: |
+          TAG="${{ steps.vars.outputs.tag }}"
+          CM_VERSION=$(grep 'kubeflow_trainer_version=' manifests/overlays/manager/kustomization.yaml | sed 's/.*kubeflow_trainer_version=//')
+          if [ -z "$CM_VERSION" ]; then
+            echo "kubeflow_trainer_version not found in manifests/overlays/manager/kustomization.yaml"
+            exit 1
+          fi
+          if [ "$CM_VERSION" != "$TAG" ]; then
+            echo "configMapGenerator version ($CM_VERSION) does not match tag ($TAG)."
+            exit 1
+          fi
+          echo "configMapGenerator version matches tag ($TAG)."
+
+  tests:
+    needs:
+      - prepare
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run Go unit tests
+        run: make test
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Python unit tests
+        run: make test-python
+
   build_python_api:
     needs:
       - prepare
@@ -106,25 +181,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install build twine
 
-      - name: Verify Python package version matches release
-        run: |
-          EXPECTED="${{ needs.prepare.outputs.version }}"
-          PY_VER=$(python - <<'PY'
-          import re
-          from pathlib import Path
-          text = Path('api/python_api/kubeflow_trainer_api/__init__.py').read_text()
-          m = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
-          if not m:
-              raise SystemExit("__version__ not found")
-          print(m.group(1))
-          PY
-          )
-          echo "Expected: ${EXPECTED}; Package: ${PY_VER}"
-          if [ "$PY_VER" != "$EXPECTED" ]; then
-            echo "Python API version mismatch"
-            exit 1
-          fi
-
       - name: Build Python package
         working-directory: api/python_api
         run: |
@@ -142,6 +198,7 @@ jobs:
     needs:
       - prepare
       - build_python_api
+      - tests
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -160,8 +217,7 @@ jobs:
       - name: Create release branch
         run: |
           BRANCH="${{ needs.prepare.outputs.branch }}"
-          git fetch origin
-          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+          if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null 2>&1; then
             echo "Release branch $BRANCH already exists."
           else
             echo "Creating release branch $BRANCH from $GITHUB_SHA"
@@ -205,8 +261,11 @@ jobs:
     needs:
       - prepare
       - build_python_api
+      - tests
       - create_branch
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     environment:
       name: release
       url: https://pypi.org/project/kubeflow-trainer-api/
@@ -223,7 +282,6 @@ jobs:
         with:
           print-hash: true
           packages-dir: dist/
-          password: ${{ secrets.PYPI_API_TOKEN }}
 
   github_release:
     if: ${{ !cancelled() && !failure() }}
@@ -236,6 +294,8 @@ jobs:
       contents: write
 
     runs-on: ubuntu-latest
+    environment:
+      name: release
 
     steps:
       - name: Checkout
@@ -262,7 +322,8 @@ jobs:
 
       - name: Create and push tag
         run: |
-          git tag -a "${{ needs.prepare.outputs.tag }}" "$GITHUB_SHA" -m "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
+          TAG_SHA=$(git rev-parse HEAD)
+          git tag -a "${{ needs.prepare.outputs.tag }}" "$TAG_SHA" -m "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
           git push origin "${{ needs.prepare.outputs.tag }}"
 
       - name: Create GitHub Release
@@ -271,7 +332,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: "${{ needs.prepare.outputs.tag }}"
           tag_name: ${{ needs.prepare.outputs.tag }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ needs.prepare.outputs.branch }}
           prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
           draft: false
           body_path: ${{ steps.changelog.outputs.changelog }}
