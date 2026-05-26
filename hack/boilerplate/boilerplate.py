@@ -36,6 +36,7 @@ from typing import Dict, List, Optional, Tuple
 # all hash-comment languages.
 EXTENSION_TEMPLATES = {
     "go": "go",
+    "rs": "rs",
     "sh": "sh",
     "bash": "sh",
     "py": "sh",
