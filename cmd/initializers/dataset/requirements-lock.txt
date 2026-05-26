@@ -16,7 +16,7 @@ certifi==2026.5.20
     #   requests
 charset-normalizer==3.4.7
     # via requests
-click==8.4.0
+click==8.4.1
     # via typer
 durationpy==0.10
     # via kubernetes
