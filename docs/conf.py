@@ -44,7 +44,7 @@ html_theme = "furo"
 html_title = "Kubeflow Trainer"
 html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
-html_js_files = ["js/external-links.js", "js/sidebar-toggle.js"]
+html_js_files = ["js/external-links.js", "js/sidebar-toggle.js", "js/landing-page.js"]
 
 # Furo theme options
 html_theme_options = {
