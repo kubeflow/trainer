@@ -54,6 +54,7 @@ HELM_DOCS ?= $(LOCALBIN)/helm-docs
 YQ ?= $(LOCALBIN)/yq
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 GOLANGCI_LINT_KAL ?= $(LOCALBIN)/golangci-lint-kube-api-linter
+LINT_PKG ?= ./...
 KUBE_LINTER ?= $(LOCALBIN)/kube-linter
 
 ##@ General
@@ -192,7 +193,7 @@ vet: ## Run go vet against the code.
 
 .PHONY: golangci-lint
 golangci-lint: golangci-lint-install golangci-lint-kal ## Run golangci-lint to verify Go files.
-	$(GOLANGCI_LINT) run --timeout 5m ./...
+	$(GOLANGCI_LINT) run --timeout 5m $(LINT_PKG)
 	$(GOLANGCI_LINT_KAL) run -v --config $(PROJECT_DIR)/.golangci-kal.yml
 
 .PHONY: verify-boilerplate
