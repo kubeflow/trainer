@@ -58,9 +58,12 @@ This matters for Kubeflow Trainer because:
 ### Non-Goals
 
 1. **PodGroup-level ResourceClaims.** Multi-node topology-aware allocation (e.g., NVL72,
-   ComputeDomains) depends on upstream Kubernetes work (DRAWorkloadResourceClaims feature gate,
-   expected in k8s 1.36+) and the Trainer WAS KEP ([#3219](https://github.com/kubeflow/trainer/pull/3219)).
-   This is deferred to Phase 2.
+   ComputeDomains) requires Trainer's WAS KEP
+   ([#3219](https://github.com/kubeflow/trainer/pull/3219)) to land. The upstream dependency,
+   [KEP-5729](https://github.com/kubernetes/enhancements/issues/5729) (`DRAWorkloadResourceClaims`
+   feature gate), is alpha in Kubernetes 1.36 with beta targeting 1.37. The primary remaining
+   blocker is #3219 on the Trainer side. Phase 1 is independent of both dependencies. This is
+   deferred to Phase 2.
 2. **ComputeDomain integration.** IMEX channel support for NVL72/GB200 multi-node training is
    under active prototyping at [wg-device-management](https://github.com/kubernetes-sigs/wg-device-management/tree/main/topology/gpu)
    and is not ready for Trainer integration.
@@ -296,7 +299,7 @@ with no code changes. The following diagram shows how claims flow from definitio
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│             ClusterTrainingRuntime (template source)                │
+│          ClusterTrainingRuntime (read on first reconciliation)      │
 │                                                                     │
 │  template.spec.replicatedJobs[*].template.spec.template.spec:      │
 │    resourceClaims:                                                  │
@@ -309,10 +312,21 @@ with no code changes. The following diagram shows how claims flow from definitio
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│              mergeRuntimePatches() [runtime/core]                    │
+│        Runtime Snapshot ConfigMap (KEP-2599)                        │
+│                                                                     │
+│  On first reconciliation, the controller snapshots the runtime     │
+│  config into a ConfigMap ({trainjob-name}-runtime-snapshot).        │
+│  All subsequent reconciliations read from this snapshot.            │
+│  Admin updates to the runtime do NOT affect existing TrainJobs.    │
+│  DRA claims in the runtime are frozen at snapshot time.            │
+└───────────────────────────┬─────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              mergeRuntimePatches() [runtime/core]                   │
 │                                                                     │
 │  For each runtimePatch, for each replicatedJob (matched by name):  │
-│    1. JSON-marshal source: batchv1.JobTemplateSpec (from runtime)   │
+│    1. JSON-marshal source: batchv1.JobTemplateSpec (from snapshot)  │
 │    2. JSON-marshal patch:  trainer.JobTemplatePatch (from patches)  │
 │    3. strategicpatch.StrategicMergePatch(source, patch,            │
 │                                         batchv1.JobTemplateSpec{}) │
@@ -349,16 +363,21 @@ Step-by-step:
 1. Admin defines `ClusterTrainingRuntime` with `resourceClaims` in the full `corev1.PodSpec`
    template, and sets container-level `resources.claims` references.
 2. User creates `TrainJob` with `runtimePatches` containing `PodSpecPatch.ResourceClaims`.
-3. Controller calls `mergeRuntimePatches()` in `pkg/runtime/core/trainingruntime.go`:
-   a. JSON-marshals the existing `batchv1.JobTemplateSpec` (from the runtime template).
+3. On first reconciliation, the controller reads the live `ClusterTrainingRuntime` and stores
+   a snapshot in a ConfigMap (`{trainjob-name}-runtime-snapshot`) per
+   [KEP-2599](https://github.com/kubeflow/trainer/pull/3428). All subsequent reconciliations
+   read from this snapshot. Admin updates to the runtime after this point do not affect the
+   TrainJob. DRA claims configured in the runtime are frozen at snapshot time.
+4. Controller calls `mergeRuntimePatches()` in `pkg/runtime/core/trainingruntime.go`:
+   a. JSON-marshals the existing `batchv1.JobTemplateSpec` (from the snapshot).
    b. JSON-marshals the `*trainer.JobTemplatePatch` (from `runtimePatches`). The
       `PodSpecPatch.ResourceClaims` field serializes to the JSON key `resourceClaims`,
       matching `corev1.PodSpec.ResourceClaims`.
    c. Applies `strategicpatch.StrategicMergePatch` on `batchv1.JobTemplateSpec`.
    d. Unmarshals back to the typed struct.
-4. `corev1.PodSpec.ResourceClaims` is a list with `+listMapKey=name`, so strategic merge
+5. `corev1.PodSpec.ResourceClaims` is a list with `+listMapKey=name`, so strategic merge
    patch merges by claim name automatically.
-5. The merged `JobTemplateSpec` flows into the JobSet apply configuration and then to pods.
+6. The merged `JobTemplateSpec` flows into the JobSet apply configuration and then to pods.
 
 **Why no controller changes are needed for the merge path:** The `PodSpecPatch` struct is a
 curated allowlist, a subset of `corev1.PodSpec` fields that users are permitted to override.
@@ -621,9 +640,11 @@ cases := map[string]struct {
 
 #### E2E tests
 
-E2E tests are deferred until a DRA-capable test cluster (with a DRA driver installed) is
-available in CI. The unit and integration tests cover the API surface and merge behavior
-comprehensively.
+E2E tests are deferred until a DRA-capable test cluster is available in CI. When
+implemented, the [dra-example-driver](https://github.com/kubernetes-sigs/dra-example-driver)
+can be used for E2E testing without real GPUs, following the approach used by
+[Kueue](https://github.com/kubernetes-sigs/kueue) for its DRA E2E tests. The unit and
+integration tests cover the API surface and merge behavior comprehensively.
 
 ### Known Limitations
 
@@ -650,6 +671,11 @@ spec:
   trainer:
     numProcPerNode: 4  # Must be set explicitly with DRA
 ```
+
+**Recommended Phase 1 follow-up:** Add a webhook warning (not rejection) when
+`resourceClaims` are present in the merged PodSpec but `numProcPerNode` is not explicitly
+set in the `Trainer` spec. This would catch misconfiguration early at admission time rather
+than causing silent incorrect behavior at runtime.
 
 **Future enhancement:** A follow-up issue should update `GetNumGPUPerNode()` to also inspect
 the merged `PodSpec.ResourceClaims` and cross-reference with the container's
@@ -679,12 +705,15 @@ The `ContainerPatch` struct only exposes `Name`, `Env`, `VolumeMounts`, and
 `runtimePatches`. If a runtime template lacks container claim references, data scientists
 cannot add DRA to that runtime without admin intervention.
 
-**Phase 1 tradeoff:** Platform admins are expected to pre-configure both pod-level claims
-AND container-level references in `ClusterTrainingRuntime` templates. This is consistent
-with the existing model where admins own infrastructure configuration.
+**Phase 1 tradeoff:** Platform admins MUST pre-configure both pod-level
+`spec.resourceClaims` AND container-level `containers[].resources.claims` references in
+`ClusterTrainingRuntime` templates. Both are required; a pod-level claim without a
+matching container-level reference will not make the device available to the container.
+This is consistent with the existing model where admins own infrastructure configuration.
 
 **Future enhancement:** Adding `Resources *corev1.ResourceRequirements` to `ContainerPatch`
-would allow users to self-service container-level claim references.
+would allow users to self-service container-level claim references. This has no dependency
+on WAS or PodGroups and could land as a fast follow-up to Phase 1.
 
 #### ValidateObjects() ignores merge errors (pre-existing issue)
 
@@ -841,9 +870,10 @@ Phase 2 depends on upstream Kubernetes and Trainer changes that are currently in
 
 1. **PodGroup-level ResourceClaims via Workload API.** The
    [DRAWorkloadResourceClaims feature gate](https://github.com/kubernetes/enhancements/issues/5729)
-   (expected in Kubernetes 1.36+) will allow ResourceClaims to be defined at the PodGroup level,
-   enabling shared device allocation across all pods in a training job. This requires the
-   WAS KEP ([#3219](https://github.com/kubeflow/trainer/pull/3219)) to land in Trainer first.
+   is alpha in Kubernetes 1.36 with beta targeting 1.37. The primary Trainer-side blocker is
+   the WAS KEP ([#3219](https://github.com/kubeflow/trainer/pull/3219)). Once #3219 lands,
+   ResourceClaims can be defined at the PodGroup level, enabling shared device allocation
+   across all pods in a training job.
 
 2. **ComputeDomain integration for topology-aware scheduling.** NVIDIA NVL72 and GB200 systems
    require topology-aware multi-node device allocation. The
