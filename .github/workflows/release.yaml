@@ -14,8 +14,6 @@ concurrency:
 
 env:
   SEMVER_PATTERN: '^(v)?([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.([0-9]+))?$'
-  IMAGE_REGISTRY_GITHUB: ghcr.io
-  IMAGE_REGISTRY_DOCKER: docker.io
 
 jobs:
   prepare:
@@ -25,7 +23,6 @@ jobs:
       tag: ${{ steps.vars.outputs.tag }}
       branch: ${{ steps.vars.outputs.branch }}
       is-prerelease: ${{ steps.vars.outputs.is-prerelease }}
-      is-master: ${{ steps.vars.outputs.is-master }}
 
     steps:
       - name: Checkout source code
@@ -51,17 +48,11 @@ jobs:
             IS_PRERELEASE=true
           fi
 
-          IS_MASTER=false
-          if [[ "$GITHUB_REF" == "refs/heads/master" ]]; then
-            IS_MASTER=true
-          fi
-
           echo "Version '${RAW_VERSION}' matches semver pattern."
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "is-prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
-          echo "is-master=${IS_MASTER}" >> $GITHUB_OUTPUT
 
       - name: Ensure tag does not exist
         run: |
@@ -70,22 +61,6 @@ jobs:
             echo "Tag '${{ steps.vars.outputs.tag }}' already exists."
             exit 1
           fi
-
-      - name: Check manifests image tag matches version
-        run: |
-          TAG="${{ steps.vars.outputs.tag }}"
-          MANIFEST_TAGS=$(grep -r 'newTag:' manifests | sed 's/.*newTag:[[:space:]]*//' | tr -d '"' | tr -d "'" | sort | uniq)
-          if [ -z "$MANIFEST_TAGS" ]; then
-              echo "No newTag found in manifests."
-              exit 1
-          fi
-          for t in $MANIFEST_TAGS; do
-              if [ "$t" != "$TAG" ]; then
-                  echo "Image tag in manifests ($t) does not match version tag ($TAG)."
-                  exit 1
-              fi
-          done
-          echo "All image tags in manifests match version tag $TAG."
 
       - name: Check Helm chart version
         run: |
@@ -122,20 +97,6 @@ jobs:
             exit 1
           fi
           echo "Python API version matches."
-
-      - name: Check configMapGenerator version
-        run: |
-          TAG="${{ steps.vars.outputs.tag }}"
-          CM_VERSION=$(grep 'kubeflow_trainer_version=' manifests/overlays/manager/kustomization.yaml | sed 's/.*kubeflow_trainer_version=//')
-          if [ -z "$CM_VERSION" ]; then
-            echo "kubeflow_trainer_version not found in manifests/overlays/manager/kustomization.yaml"
-            exit 1
-          fi
-          if [ "$CM_VERSION" != "$TAG" ]; then
-            echo "configMapGenerator version ($CM_VERSION) does not match tag ($TAG)."
-            exit 1
-          fi
-          echo "configMapGenerator version matches tag ($TAG)."
 
   tests:
     needs:
@@ -193,8 +154,7 @@ jobs:
           name: python-dist-${{ needs.prepare.outputs.version }}
           path: api/python_api/dist/
 
-  create_branch:
-    if: needs.prepare.outputs.is-master == 'true'
+  update_release_branch:
     needs:
       - prepare
       - build_python_api
@@ -214,47 +174,51 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-      - name: Create release branch
+      - name: Create or checkout release branch
         run: |
           BRANCH="${{ needs.prepare.outputs.branch }}"
           if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null 2>&1; then
-            echo "Release branch $BRANCH already exists."
+            echo "Release branch $BRANCH already exists, checking it out."
+            git checkout "$BRANCH"
+            git pull origin "$BRANCH"
           else
             echo "Creating release branch $BRANCH from $GITHUB_SHA"
             git checkout -b "$BRANCH" "$GITHUB_SHA"
-            git push origin "$BRANCH"
           fi
 
-  trigger_builds:
-    needs:
-      - prepare
-      - github_release
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
+      - name: Pin image tags and configMap version on release branch
+        run: |
+          TAG="${{ needs.prepare.outputs.tag }}"
 
-    steps:
-      - name: Trigger image build for release tag
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'build-and-push-images.yaml',
-              ref: '${{ needs.prepare.outputs.tag }}',
-            })
+          # Update newTag in all manifest kustomization files.
+          find manifests -type f -name '*.yaml' -exec sed -i "s/newTag: .*/newTag: $TAG/" {} +
+          echo "Updated image tags in manifests to $TAG"
 
-      - name: Trigger Helm chart publish for release tag
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'publish-helm-charts.yaml',
-              ref: '${{ needs.prepare.outputs.tag }}',
-            })
+          # Pin ghcr.io image references from :latest to the release tag.
+          CHANGED_FILES=$(grep -REl "ghcr\.io/kubeflow/trainer/[A-Za-z0-9._/-]+:latest" manifests || true)
+          if [ -n "$CHANGED_FILES" ]; then
+            while IFS= read -r f; do
+              sed -i -E "s|(ghcr\.io/kubeflow/trainer/[A-Za-z0-9._/-]+):latest|\\1:${TAG}|g" "$f"
+              echo "  Pinned $f"
+            done <<< "$CHANGED_FILES"
+          fi
+
+          # Update configMapGenerator version in manager overlay.
+          sed -i "s/kubeflow_trainer_version=.*/kubeflow_trainer_version=${TAG}/" \
+            manifests/overlays/manager/kustomization.yaml
+          echo "Updated configMapGenerator version to $TAG"
+
+      - name: Commit and push release branch
+        run: |
+          TAG="${{ needs.prepare.outputs.tag }}"
+          BRANCH="${{ needs.prepare.outputs.branch }}"
+          if git diff --quiet; then
+            echo "No manifest changes needed."
+          else
+            git add manifests/
+            git commit -s -m "Pin image tags and configMap version to $TAG"
+          fi
+          git push origin "$BRANCH"
 
   publish_pypi:
     if: ${{ !cancelled() && !failure() }}
@@ -262,7 +226,7 @@ jobs:
       - prepare
       - build_python_api
       - tests
-      - create_branch
+      - update_release_branch
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -287,7 +251,7 @@ jobs:
     if: ${{ !cancelled() && !failure() }}
     needs:
       - prepare
-      - create_branch
+      - update_release_branch
       - publish_pypi
 
     permissions:
@@ -298,7 +262,7 @@ jobs:
       name: release
 
     steps:
-      - name: Checkout
+      - name: Checkout release branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -336,3 +300,34 @@ jobs:
           prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
           draft: false
           body_path: ${{ steps.changelog.outputs.changelog }}
+
+  trigger_builds:
+    needs:
+      - prepare
+      - github_release
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+
+    steps:
+      - name: Trigger image build for release tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-and-push-images.yaml',
+              ref: '${{ needs.prepare.outputs.tag }}',
+            })
+
+      - name: Trigger Helm chart publish for release tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'publish-helm-charts.yaml',
+              ref: '${{ needs.prepare.outputs.tag }}',
+            })
