@@ -23,8 +23,6 @@ inputs:
 runs:
   using: composite
   steps:
-    # This step is a Workaround to avoid the "No space left on device" error.
-    # ref: https://github.com/actions/runner-images/issues/2840
     - name: Remove unnecessary files
       shell: bash
       run: |
@@ -82,8 +80,6 @@ runs:
         images: ${{ inputs.image }}
         tags: |
           type=ref,event=tag
-          type=raw,value=${{ github.ref_name }},enable=${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/') }}
-          type=raw,value=latest,enable={{is_default_branch}}
           type=sha
 
     - name: Build and Push
