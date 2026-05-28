@@ -157,9 +157,10 @@ I want to delegate the configuration of my TrainJob's resource requirements to a
 The platform engineers managing my cluster have already deployed a Kubernetes controller
 which has the id `ai-agent-recommender`.
 
-It is an AI agent powered resource recommender for TrainJobs. They platform engineers 
-provided the AI agent with MCP tools that can interact with the cluster to get more 
-information about it (e.g. the available GPUs, the running workloads, etc).
+It is an AI agent powered resource recommender for TrainJobs. The platform engineers 
+provided the AI agent with Model Context Protocol (MCP) tools that can interact with
+the cluster to get more information about it (e.g. the available GPUs, the running
+workloads, etc).
 
 I write my TrainJob like I usually do and simply add the following annotation to it:
 
@@ -179,7 +180,7 @@ TrainJob's resource requirements and fields that depend on them. I can use
 <!--
 What are the caveats to the proposal?
 What are some important details that didn't come across above?
-Go in to as much detail as necessary here.
+Go into as much detail as necessary here.
 This might be a good place to talk about core concepts and how they relate.
 -->
 
@@ -343,7 +344,7 @@ information to express the idea and why it was not acceptable.
 - **Pros:**
   - **Extensible**: platform engineers can develop and deploy custom plugins without modifying Kubeflow Trainer.
   - **Safe**: Trainer enforces guardrails (timeouts, quota caps) on plugin operations.
-  - **Observable**: `spec.runtimePatches` shows the eact fields that the plugin is mutating,
+  - **Observable**: `spec.runtimePatches` shows the exact fields that the plugin is mutating,
     events and status updates offer an additional layer of visibility into the plugin's actions.
 - **Cons:**
   - **Adds complexity**: requires gating/un-gating mechanism in Trainer to coordinate with admission/scheduling
