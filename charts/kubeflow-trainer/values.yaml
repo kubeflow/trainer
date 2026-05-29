@@ -237,7 +237,7 @@ runtimes:
       # -- JAX runtime image registry
       registry: nvcr.io
       # -- JAX runtime image repository
-      repository: jax
+      repository: nvidia/jax
       # -- JAX runtime image tag. Defaults to chart version if empty.
       tag: "25.10-py3"
 
