@@ -176,6 +176,10 @@ golangci-lint: golangci-lint-install golangci-lint-kal ## Run golangci-lint to v
 	$(GOLANGCI_LINT) run --timeout 5m ./...
 	$(GOLANGCI_LINT_KAL) run -v --config $(PROJECT_DIR)/.golangci-kal.yml
 
+.PHONY: verify-boilerplate
+verify-boilerplate: ## Verify copyright boilerplate headers in source files.
+	python3 hack/boilerplate/boilerplate.py
+
 # Instructions to run tests.
 .PHONY: test
 test: ## Run Go unit test.
