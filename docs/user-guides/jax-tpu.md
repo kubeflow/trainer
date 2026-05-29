@@ -70,10 +70,10 @@ def get_jax_tpu_dist():
 
     # Use local_device_count for the leading axis of the local input to pmap
     x = jnp.ones((jax.local_device_count(),))
-    
+
     # Pass process_index as a sharded argument to ensure SPMD consistency across all processes in the distributed job.
     p_idx = jnp.array([jax.process_index()] * jax.local_device_count())
-    
+
     y = jax.pmap(lambda v, p: v * p)(x, p_idx)
 
     print("PMAP result:", y)
@@ -343,7 +343,7 @@ print("\n".join(client.get_job_logs(name=job_id)))
 
 ### Node Selectors and Topology
 
-When running on GKE, TPUs are managed via specific node pools and you must match the proper `node_selector` and `tolerations` to your TPU node pool labels. 
+When running on GKE, TPUs are managed via specific node pools and you must match the proper `node_selector` and `tolerations` to your TPU node pool labels.
 If you are using [custom ComputeClasses](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/tpus#custom-compute-classes), add the following `node_selector` and `tolerations` to your TPU node pool labels:
 
 | Label | Example Value |

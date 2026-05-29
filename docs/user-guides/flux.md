@@ -1,6 +1,6 @@
 # Flux Guide
 
-This guide describes how to use TrainJob to train or fine-tune AI models with a [Flux Framework](https://flux-framework.org) High Performance Computing (HPC) cluster. 
+This guide describes how to use TrainJob to train or fine-tune AI models with a [Flux Framework](https://flux-framework.org) High Performance Computing (HPC) cluster.
 
 ## Prerequisites
 
@@ -9,21 +9,21 @@ to learn the basics of Kubeflow Trainer.
 
 ## Flux Framework Overview
 
-As AI/ML workloads grow in scale and complexity, they often intersect with the needs of traditional High Performance Computing, which can include topology-aware scheduling, high throughput, and using the low latency Message Passing Interface (MPI). 
+As AI/ML workloads grow in scale and complexity, they often intersect with the needs of traditional High Performance Computing, which can include topology-aware scheduling, high throughput, and using the low latency Message Passing Interface (MPI).
 
-To support these workloads, Kubeflow can be deployed with Flux, an HPC workload manager that offers several important features: 
+To support these workloads, Kubeflow can be deployed with Flux, an HPC workload manager that offers several important features:
 
-* **Robust MPI Bootstrapping:** Flux uses a tree-based overlay network combined with native bootstrapping that works across MPI variants. Bootstrap over SSH requiring a client and server, shared keys, consistent user IDs, and complicated permissions, is not required. 
+* **Robust MPI Bootstrapping:** Flux uses a tree-based overlay network combined with native bootstrapping that works across MPI variants. Bootstrap over SSH requiring a client and server, shared keys, consistent user IDs, and complicated permissions, is not required.
 * **Topology Awareness:** Flux supports workloads that require fine-grained, topology-aware placement for both GPUs and CPUs.
-* **Scheduling Features:** Flux is built with support for custom job queues, graph-based scheduling for complex workflows, and scheduling policies. 
-* **Throughput**: Kubernetes is limited by API interactions, and etcd performance. Throughput in standard Kubernetes clusters can range between 10-100 Pods per second, and it can be much higher for HPC workload managers, especially Flux. In Flux, high throughput is enabled via submitting jobs to a hierarchy of Flux instances. 
+* **Scheduling Features:** Flux is built with support for custom job queues, graph-based scheduling for complex workflows, and scheduling policies.
+* **Throughput**: Kubernetes is limited by API interactions, and etcd performance. Throughput in standard Kubernetes clusters can range between 10-100 Pods per second, and it can be much higher for HPC workload managers, especially Flux. In Flux, high throughput is enabled via submitting jobs to a hierarchy of Flux instances.
 
 The integration of Flux Framework with Kubeflow provides these features, and offers a solution for demanding distributed jobs that require features from High Performance Computing.
 demanding distributed jobs. The Kubeflow Trainer can be deployed with a Flux Policy to execute workloads that use MPI with or without GPUs.
 
 ## Flux Policy Example: LAMMPS
 
-This example demonstrates how to use the **Flux Framework** policy for the Kubeflow Trainer to run distributed HPC workloads. 
+This example demonstrates how to use the **Flux Framework** policy for the Kubeflow Trainer to run distributed HPC workloads.
 
 The Flux plugin automatically handles:
 - Cluster discovery and broker configuration.
