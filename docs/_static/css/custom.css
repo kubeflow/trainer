@@ -254,6 +254,22 @@ li::marker {
     }
 }
 
+.sidebar-sticky {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 52px);
+    overflow: hidden;
+}
+
+.sidebar-search-container {
+    flex-shrink: 0;
+}
+
+.sidebar-scroll {
+    flex: 1;
+    overflow-y: auto;
+}
+
 /* ============================================
    CODE BLOCKS - Dark VS Code style
    ============================================ */

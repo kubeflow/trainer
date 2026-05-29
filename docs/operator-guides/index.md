@@ -78,7 +78,7 @@ Understand the plugin-based extension architecture
 :link: job-scheduling/index
 :link-type: doc
 
-Integrate with Volcano, Kueue, and coscheduling
+Integrate with Volcano, Kueue, Coscheduling, and KAI Scheduler
 ::::
 
 :::::

@@ -143,10 +143,10 @@ runtimePatches:
 
 ### The manager field
 
-The `manager` field identifies who owns a patch entry. It must be a non-empty string of up to 253
-characters (typically a domain-prefixed name such as `kueue.x-k8s.io/manager`). Kubeflow SDK
-automatically sets `manager: trainer.kubeflow.org/kubeflow-sdk` when user sets options. The
-`manager` field is **immutable** after creation.
+The `manager` field identifies who owns a patch entry. It must be a non-empty string of up to
+253 characters (typically a domain-prefixed name such as `kueue.x-k8s.io/manager`). Kubeflow SDK
+automatically sets `manager: trainer.kubeflow.org/kubeflow-sdk` when user sets
+[options](https://sdk.kubeflow.org/en/latest/train/options.html). The `manager` field is **immutable** after creation.
 
 Each `manager` value maps to exactly one entry in the `runtimePatches` list. When a controller
 updates its entry, the previous content is replaced in full. This means controllers cannot
@@ -246,8 +246,10 @@ runtimePatches:
 
 You cannot set environment variables for the following containers via `RuntimePatches`:
 
-- `node` — use the Trainer API instead
-- `dataset-initializer` and `model-initializer` - use the Initializer API instead
+- `node` —
+  use the [`Trainer` API](https://pkg.go.dev/github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1#Trainer) instead
+- `dataset-initializer` and `model-initializer` -
+  use the [`Initializer` API](https://pkg.go.dev/github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1#Initializer) instead
 
 For these containers, the dedicated APIs in the TrainJob `spec` take precedence and are the correct
 way to pass environment variables.

@@ -18,11 +18,25 @@ This section contains guides for running distributed training workloads with var
 Distributed PyTorch training with FSDP, DDP, and more
 ::::
 
+::::{grid-item-card} PyTorch on AMD ROCm
+:link: pytorch-rocm
+:link-type: doc
+
+PyTorch distributed training on AMD ROCm GPUs
+::::
+
 ::::{grid-item-card} JAX
 :link: jax
 :link-type: doc
 
 Distributed JAX training with jax.distributed
+::::
+
+::::{grid-item-card} JAX on TPU
+:link: jax-tpu
+:link-type: doc
+
+JAX distributed training on Google Cloud TPUs
 ::::
 
 ::::{grid-item-card} DeepSpeed
@@ -32,11 +46,32 @@ Distributed JAX training with jax.distributed
 Large-scale training with DeepSpeed ZeRO optimization
 ::::
 
+::::{grid-item-card} XGBoost
+:link: xgboost
+:link-type: doc
+
+Distributed XGBoost training on Kubernetes
+::::
+
+::::{grid-item-card} Megatron
+:link: megatron
+:link-type: doc
+
+Megatron-Core with Tensor Parallelism for large transformers
+::::
+
 ::::{grid-item-card} MLX
 :link: mlx
 :link-type: doc
 
 Training on Apple Silicon with MLX framework
+::::
+
+::::{grid-item-card} Flux
+:link: flux
+:link-type: doc
+
+HPC workloads with Flux Framework integration
 ::::
 
 :::::
@@ -58,6 +93,20 @@ High-performance distributed data caching for training
 :link-type: doc
 
 Pre-built training workflows (TorchTune and more)
+::::
+
+:::::
+
+## Job Lifecycle
+
+:::::{grid} 1 1 2 2
+:gutter: 3
+
+::::{grid-item-card} Configure TrainJob Lifecycle
+:link: trainjob-lifecycle
+:link-type: doc
+
+Active deadlines, suspend/resume for TrainJobs
 ::::
 
 :::::
@@ -104,10 +153,16 @@ Run training jobs as local processes for quick iteration
 :maxdepth: 2
 
 pytorch
+pytorch-rocm
 jax
+jax-tpu
 deepspeed
 mlx
+xgboost
+megatron
+flux
 data-cache
 builtin-trainer/index
 local-execution/index
+trainjob-lifecycle
 ```

@@ -31,6 +31,10 @@ Quick Links
        <strong>Contributor Guides</strong>
        <p>Architecture, development workflow, and how to extend Kubeflow Trainer</p>
      </a>
+     <a class="doc-card" href="legacy-v1/index.html">
+       <strong>Legacy Kubeflow Training Operator (v1)</strong>
+       <p>Kubeflow Training Operator v1 documentation — archived guides, installation, and migration to v2</p>
+     </a>
    </div>
 
 ----

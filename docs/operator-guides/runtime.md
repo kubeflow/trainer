@@ -126,7 +126,7 @@ trainer.kubeflow.org/framework: deepspeed
 The Kubeflow SDK uses this label to determine the appropriate configuration for the supported
 BuiltinTrainers.
 
-Check [the Builtin Trainer guide](../user-guides/builtin-trainer/index) to understand what is CustomTrainer and BuiltinTrainer.
+Check [this guide](../user-guides/builtin-trainer/overview.md) to understand what is CustomTrainer and BuiltinTrainer.
 
 ## Supported Runtimes
 
@@ -175,6 +175,6 @@ These measures are taken to inform users about runtime deprecation:
 
 ## Next Steps
 
-- Learn how to configure [job scheduling in Kubeflow Trainer](job-scheduling/index).
+- Learn how to configure [job scheduling in Kubeflow Trainer](job-scheduling/overview.md).
 - Explore how to set up [MLPolicy in runtime](ml-policy).
 - See how to define [Job Template in runtimes](job-template).

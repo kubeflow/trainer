@@ -10,7 +10,7 @@ If you want to learn more about TorchTune BuiltinTrainer, please refer to [KEP-2
 
 ## Prerequisites
 
-Before exploring this guide, make sure to follow [the Getting Started guide](https://www.kubeflow.org/docs/components/trainer/getting-started/) to understand the basics of Kubeflow Trainer.
+Before exploring this guide, make sure to follow [the Getting Started guide](../../getting-started/index.md) to understand the basics of Kubeflow Trainer.
 
 ```Python
 # Get torchtune-llama3.2-1b TorchTune runtime.

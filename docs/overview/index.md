@@ -73,13 +73,13 @@ Pre-built templates for **generative AI fine-tuning** with TorchTune, supporting
 
 Intelligent data streaming and caching maximize **GPU utilization**, reducing training costs and time. Supports efficient model parallelism with PyTorch FSDP and DeepSpeed ZeRO.
 
-### Native Kubernetes Integrations
+### ☸️ Native Kubernetes Integrations
 
-First-class support for Kubernetes ecosystem tools:
-- **Kueue**: Advanced queue management and fair sharing
-- **Volcano**: Batch scheduling with gang scheduling
-- **Coscheduling**: Resource orchestration for distributed jobs
-- **YuniKorn**: Resource scheduling and multi-tenancy
+Achieve optimal GPU utilization and coordinated scheduling for large-scale AI workloads.
+Kubeflow Trainer seamlessly integrates with Kubernetes ecosystem projects like
+[Kueue](https://kueue.sigs.k8s.io/),
+[Coscheduling](https://github.com/kubernetes-sigs/scheduler-plugins/blob/master/pkg/coscheduling/README.md),
+[Volcano](https://volcano.sh/en/), or [YuniKorn](https://yunikorn.apache.org/docs/).
 
 ![AI Lifecycle with Kubeflow Trainer](../images/ai-lifecycle-trainer.drawio.svg)
 
