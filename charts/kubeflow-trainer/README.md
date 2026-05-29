@@ -157,15 +157,21 @@ manager:
 | runtimes.deepspeedDistributed.image.repository | string | `"kubeflow/trainer/deepspeed-runtime"` | DeepSpeed runtime image repository |
 | runtimes.deepspeedDistributed.image.tag | string | `""` | DeepSpeed runtime image tag. Defaults to chart version if empty. |
 | runtimes.defaultEnabled | bool | `false` | Enable all default runtimes (torch, deepspeed, mlx, jax, torchtune) when set to true. Individual runtime settings will be ignored if this is enabled. |
-| runtimes.jaxDistributed | object | `{"enabled":false}` | JAX distributed training runtime (no custom images required) |
+| runtimes.jaxDistributed | object | `{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/jax-runtime","tag":""}}` | JAX distributed training runtime |
 | runtimes.jaxDistributed.enabled | bool | `false` | Enable deployment of jax-distributed runtime |
+| runtimes.jaxDistributed.image.registry | string | `"ghcr.io"` | JAX runtime image registry |
+| runtimes.jaxDistributed.image.repository | string | `"kubeflow/trainer/jax-runtime"` | JAX runtime image repository |
+| runtimes.jaxDistributed.image.tag | string | `""` | JAX runtime image tag. Defaults to chart version if empty. |
 | runtimes.mlxDistributed | object | `{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}}` | MLX distributed training runtime |
 | runtimes.mlxDistributed.enabled | bool | `false` | Enable deployment of mlx-distributed runtime |
 | runtimes.mlxDistributed.image.registry | string | `"ghcr.io"` | MLX runtime image registry |
 | runtimes.mlxDistributed.image.repository | string | `"kubeflow/trainer/mlx-runtime"` | MLX runtime image repository |
 | runtimes.mlxDistributed.image.tag | string | `""` | MLX runtime image tag. Defaults to chart version if empty. |
-| runtimes.torchDistributed | object | `{"enabled":false}` | PyTorch distributed training runtime (no custom images required) |
+| runtimes.torchDistributed | object | `{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/pytorch-runtime","tag":""}}` | PyTorch distributed training runtime |
 | runtimes.torchDistributed.enabled | bool | `false` | Enable deployment of torch-distributed runtime |
+| runtimes.torchDistributed.image.registry | string | `"ghcr.io"` | PyTorch runtime image registry |
+| runtimes.torchDistributed.image.repository | string | `"kubeflow/trainer/pytorch-runtime"` | PyTorch runtime image repository |
+| runtimes.torchDistributed.image.tag | string | `""` | PyTorch runtime image tag. Defaults to chart version if empty. |
 | runtimes.torchtuneDistributed | object | `{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}}` | TorchTune distributed training runtime |
 | runtimes.torchtuneDistributed.image.registry | string | `"ghcr.io"` | TorchTune runtime image registry |
 | runtimes.torchtuneDistributed.image.repository | string | `"kubeflow/trainer/torchtune-trainer"` | TorchTune runtime image repository |

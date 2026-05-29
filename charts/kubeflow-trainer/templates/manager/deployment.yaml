@@ -46,8 +46,10 @@ spec:
       {{- if .Values.manager.hostNetwork }}
       hostNetwork: true
       {{- end }}
-      {{- with .Values.manager.dnsPolicy }}
-      dnsPolicy: {{ . }}
+      {{- if .Values.manager.dnsPolicy }}
+      dnsPolicy: {{ .Values.manager.dnsPolicy }}
+      {{- else if .Values.manager.hostNetwork }}
+      dnsPolicy: ClusterFirstWithHostNet
       {{- end }}
       containers:
       - name: manager
