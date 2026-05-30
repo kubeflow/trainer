@@ -65,6 +65,35 @@ func TestJAXEnforceMLPolicy(t *testing.T) {
 				),
 			),
 		},
+		"no panic when JAX policy is set but trainer PodSet is absent": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							JAXPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				// Intentionally no trainer PodSet to exercise the nil-guard.
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						Obj()).
+				Obj(),
+			wantInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							JAXPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
+		},
 		"single node JAX training": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(
