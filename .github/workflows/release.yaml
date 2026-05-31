@@ -62,42 +62,6 @@ jobs:
             exit 1
           fi
 
-      - name: Check Helm chart version
-        run: |
-          VERSION="${{ steps.vars.outputs.version }}"
-          CHART_VERSION=$(grep -E '^version:' charts/kubeflow-trainer/Chart.yaml | head -n1 | awk '{print $2}')
-          if [ -z "$CHART_VERSION" ]; then
-            echo "Chart version not found in charts/kubeflow-trainer/Chart.yaml"
-            exit 1
-          fi
-          if [ "$CHART_VERSION" != "$VERSION" ]; then
-            echo "Chart version ($CHART_VERSION) does not match VERSION ($VERSION)."
-            exit 1
-          fi
-          echo "Chart version matches VERSION ($VERSION)."
-
-      - name: Check Python API version
-        run: |
-          VERSION="${{ steps.vars.outputs.version }}"
-          # Normalize semver RC format to PEP 440: 2.2.0-rc.1 -> 2.2.0rc1
-          EXPECTED=$(echo "$VERSION" | sed 's/-rc\.\([0-9]*\)/rc\1/')
-          PY_VER=$(python3 - <<'PY'
-          import re
-          from pathlib import Path
-          text = Path('api/python_api/kubeflow_trainer_api/__init__.py').read_text()
-          m = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", text)
-          if not m:
-              raise SystemExit("__version__ not found")
-          print(m.group(1))
-          PY
-          )
-          echo "Expected: ${EXPECTED}; Package: ${PY_VER}"
-          if [ "$PY_VER" != "$EXPECTED" ]; then
-            echo "Python API version ($PY_VER) does not match expected ($EXPECTED)."
-            exit 1
-          fi
-          echo "Python API version matches."
-
   tests:
     needs:
       - prepare
@@ -126,11 +90,14 @@ jobs:
   build_python_api:
     needs:
       - prepare
+      - update_release_branch
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source code
+      - name: Checkout release branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.branch }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -157,7 +124,6 @@ jobs:
   update_release_branch:
     needs:
       - prepare
-      - build_python_api
       - tests
     runs-on: ubuntu-latest
     permissions:
@@ -186,9 +152,21 @@ jobs:
             git checkout -b "$BRANCH" "$GITHUB_SHA"
           fi
 
-      - name: Pin image tags and configMap version on release branch
+      - name: Update assets on release branch
         run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
           TAG="${{ needs.prepare.outputs.tag }}"
+
+          # Update Helm chart version.
+          sed -i "s/^version: .*/version: ${VERSION}/" charts/kubeflow-trainer/Chart.yaml
+          echo "Updated Helm chart version to $VERSION"
+
+          # Update Python API __version__.
+          # Normalize semver RC format to PEP 440: 2.2.0-rc.1 -> 2.2.0rc1
+          PY_VERSION=$(echo "$VERSION" | sed 's/-rc\.\([0-9]*\)/rc\1/')
+          sed -i "s/^__version__ = \".*\"/__version__ = \"${PY_VERSION}\"/" \
+            api/python_api/kubeflow_trainer_api/__init__.py
+          echo "Updated Python API __version__ to $PY_VERSION"
 
           # Update newTag in all manifest kustomization files.
           find manifests -type f -name '*.yaml' -exec sed -i "s/newTag: .*/newTag: $TAG/" {} +
@@ -213,10 +191,10 @@ jobs:
           TAG="${{ needs.prepare.outputs.tag }}"
           BRANCH="${{ needs.prepare.outputs.branch }}"
           if git diff --quiet; then
-            echo "No manifest changes needed."
+            echo "No asset changes needed."
           else
-            git add manifests/
-            git commit -s -m "Pin image tags and configMap version to $TAG"
+            git add -A
+            git commit -s -m "Update release assets to $TAG"
           fi
           git push origin "$BRANCH"
 
@@ -225,8 +203,6 @@ jobs:
     needs:
       - prepare
       - build_python_api
-      - tests
-      - update_release_branch
     runs-on: ubuntu-latest
     permissions:
       id-token: write

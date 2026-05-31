@@ -46,14 +46,14 @@ CHANGELOG/
 └── CHANGELOG-2.2.md
 ```
 
-Each file contains releases for that minor series. The release script (`hack/release.sh`)
+Each file contains releases for that minor series. The `make release` target
 prepends new entries automatically using `git-cliff`.
 
 ## Step-by-Step Release Process
 
 ### 1. Update Version and Changelog
 
-Run the release script from your working branch:
+Run the release target from your working branch:
 
 ```bash
 make release VERSION=X.Y.Z GITHUB_TOKEN=<token>
@@ -64,10 +64,15 @@ make release VERSION=X.Y.Z-rc.N GITHUB_TOKEN=<token>
 This will:
 
 1. Update `VERSION` to `vX.Y.Z`.
-2. Update `charts/kubeflow-trainer/Chart.yaml` version.
-3. Generate `CHANGELOG/CHANGELOG-X.Y.md` using `git-cliff`.
+2. Update `api/python_api/kubeflow_trainer_api/__init__.py` `__version__`.
+3. Generate `CHANGELOG/CHANGELOG-X.Y.md` using `git-cliff` (skipped for RC releases).
 4. Run `make generate`.
-5. Create a signed-off commit: `Release vX.Y.Z`.
+
+After reviewing the changes, create a signed commit:
+
+```bash
+git add -A && git commit -s -m 'Release vX.Y.Z'
+```
 
 ### 2. Submit a Release PR
 
@@ -83,17 +88,20 @@ This will:
 When the `VERSION` change is merged, the
 [release workflow](.github/workflows/release.yaml) runs automatically:
 
-1. Validates version, Helm chart version, and Python API version.
+1. Validates version format and ensures the tag doesn't already exist.
 2. Runs Go and Python unit tests.
 3. Builds the Python package.
 4. Creates the `release-X.Y` branch (if it doesn't exist).
-5. Pins image tags and `configMapGenerator` version on the release branch.
+5. Updates release assets on the release branch:
+   - Helm chart version in `Chart.yaml`.
+   - Python API `__version__`.
+   - Image tags and `configMapGenerator` version in manifests.
 6. Publishes the Python package to [PyPI](https://pypi.org/project/kubeflow-trainer-api/)
    using OIDC trusted publishing.
 7. Creates and pushes the git tag `vX.Y.Z`.
 8. Creates a GitHub Release with the generated changelog.
 9. Triggers container image and Helm chart publishing.
 
-> **Note**: Manifest image tags (`newTag`) and `configMapGenerator` version are only updated
+> **Note**: Helm chart version, Python API version, and manifest image tags are only updated
 > on the release branch, not on `master`. This ensures users deploying from `master` always
 > get the latest images.
