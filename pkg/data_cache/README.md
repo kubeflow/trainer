@@ -3,9 +3,9 @@
 ## Prerequisites
 
 - Rust and Cargo
-- AWS CLI configured with appropriate credentials
-- `jq` for JSON parsing
-- `nc` (netcat) for service health checks
+- For **remote (S3) tables**: AWS CLI configured with appropriate credentials and `jq`
+- For **local tables**: Python 3 with `pyiceberg`, `pyarrow`, and `sqlalchemy` (fixture generation only)
+- `nc` (netcat) and `curl` for service health checks
 
 
 ## Development Setup
@@ -75,9 +75,42 @@ This script will:
 
 Press `Ctrl+C` to stop all services.
 
+### Option 2: Local Iceberg table (file://)
+
+Use an on-disk Iceberg table with Parquet files for local validation and CI (no AWS credentials).
+
+**Generate the test fixture once** (from repository root):
+
+```bash
+python3 hack/data_cache/generate_local_iceberg_fixture.py
+```
+
+**Run head and workers** (generates the fixture automatically if missing):
+
+```bash
+./hack/data_cache/run_with_local_table.sh
+```
+
+Default table identifiers: `SCHEMA_NAME=local`, `TABLE_NAME=demo`. The script sets `METADATA_LOC` to the latest `*.metadata.json` under `pkg/data_cache/testdata/local_iceberg/`.
+
+`METADATA_LOC` must be an absolute URI (`file://`, `s3://`, or `s3a://`).
+
 ## Testing
 
+### Run unit and integration tests
+
+From repository root:
+
+```bash
+make test-rust
+```
+
+This includes a local Iceberg fixture integration test (`tests/local_iceberg_fixture.rs`), which regenerates the fixture via Python when needed.
+
 ### Run Client Test
+
+With services running (remote or local script):
+
 ```bash
 cd test
 cargo run --bin client -- --endpoint http://localhost:50051 --local-rank 2 --world-size 4

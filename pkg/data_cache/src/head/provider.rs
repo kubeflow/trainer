@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::config::file_io::build_file_io;
 use arrow::array::{ArrayRef, GenericListBuilder, RecordBatch, StringViewBuilder, UInt64Array};
 use arrow_schema::SchemaRef;
 use async_trait::async_trait;
@@ -30,7 +31,6 @@ use futures::StreamExt;
 use futures::stream::iter;
 use iceberg::TableIdent;
 use iceberg::expr::Predicate;
-use iceberg::io::FileIO;
 use iceberg::scan::{FileScanTask, FileScanTaskStream};
 use iceberg::table::{StaticTable, Table};
 use std::any::Any;
@@ -91,10 +91,7 @@ impl DataFileTableProvider {
         arrow_schema: SchemaRef,
         num_workers: usize,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let file_io = FileIO::from_path(metadata_loc)
-            .map_err(|e| format!("Failed to create FileIO: {}", e))?
-            .build()
-            .map_err(|e| format!("Failed to build FileIO: {}", e))?;
+        let file_io = build_file_io(metadata_loc)?;
         let table_indent = TableIdent::from_strs([schema_name, table_name])
             .map_err(|e| format!("Failed to create table ident: {}", e))?;
         let static_table = StaticTable::from_metadata_file(metadata_loc, table_indent, file_io)

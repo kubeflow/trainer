@@ -205,9 +205,13 @@ test-python-integration: ## Run Python integration test.
 
 	PYTHONPATH=$(PROJECT_DIR) pytest ./test/integration/initializers
 
+.PHONY: generate-data-cache-fixture
+generate-data-cache-fixture: ## Generate local on-disk Iceberg table for data cache dev/CI.
+	python3 ./hack/data_cache/generate_local_iceberg_fixture.py
+
 .PHONY: test-rust
-test-rust: ## Run Rust unit test.
-	cargo test --lib --bins --manifest-path ./pkg/data_cache/Cargo.toml
+test-rust: ## Run Rust unit and integration tests (includes local Iceberg fixture test).
+	cargo test --manifest-path ./pkg/data_cache/Cargo.toml
 
 .PHONY: test-e2e-setup-cluster
 test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test. (Set GPU_CLUSTER=gpu for GPU nodes)

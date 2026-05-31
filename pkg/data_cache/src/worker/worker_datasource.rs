@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::config::config::CACHE_INDEX_COLUMN;
+use crate::config::file_io::build_file_io;
 use arrow::array::UInt64Array;
 use arrow::record_batch::RecordBatch;
 use arrow_schema::{DataType, Field, Schema, SchemaBuilder, SchemaRef};
@@ -31,7 +32,6 @@ use datafusion::physical_plan::{
 use futures::{Stream, StreamExt, TryStreamExt};
 use iceberg::TableIdent;
 use iceberg::arrow::schema_to_arrow_schema;
-use iceberg::io::FileIO;
 use iceberg::scan::{FileScanTask, FileScanTaskStream};
 use iceberg::table::{StaticTable, Table};
 use iceberg_datafusion::{from_datafusion_error, to_datafusion_error};
@@ -107,10 +107,7 @@ impl WorkerDataSource {
         file_urls: Vec<String>,
         start_index: u64,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let file_io = FileIO::from_path(&metadata_loc)
-            .map_err(|e| format!("Failed to create FileIO: {}", e))?
-            .build()
-            .map_err(|e| format!("Failed to build FileIO: {}", e))?;
+        let file_io = build_file_io(&metadata_loc)?;
         let table_indent = TableIdent::from_strs([schema_name, table_name])
             .map_err(|e| format!("Failed to create table ident: {}", e))?;
         let static_table =
