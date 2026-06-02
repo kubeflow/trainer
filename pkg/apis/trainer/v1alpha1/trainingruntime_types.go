@@ -241,7 +241,7 @@ type EnvInjectionTarget struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=253
 	// +required
-	JobName string `json:"jobName"`
+	JobName string `json:"jobName,omitempty"`
 
 	// containerNames lists the container names within the target job
 	// that should receive PET_* envs.
@@ -253,7 +253,7 @@ type EnvInjectionTarget struct {
 	// +kubebuilder:validation:items:MaxLength=63
 	// +kubebuilder:validation:XValidation:rule="!self.exists(c, c == 'node')", message="containerNames must not include the main node container because PET_* envs are always injected into it"
 	// +required
-	ContainerNames []string `json:"containerNames"`
+	ContainerNames []string `json:"containerNames,omitempty"`
 }
 
 // JAXMLPolicySource represents a jax runtime configuration.
