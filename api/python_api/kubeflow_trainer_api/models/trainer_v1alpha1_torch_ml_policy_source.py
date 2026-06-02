@@ -27,7 +27,7 @@ class TrainerV1alpha1TorchMLPolicySource(BaseModel):
     """
     TorchMLPolicySource represents a PyTorch runtime configuration.
     """ # noqa: E501
-    env_injection: Optional[TrainerV1alpha1EnvInjection] = Field(default=None, description="envInjection configures which additional containers should receive the PET_* environment variables. By default, the PET_* variables are injected only into the main \"node\" container. Use this field to also inject them into selected sidecar or init containers. Defaults to empty (main container only).", alias="envInjection")
+    env_injection: Optional[TrainerV1alpha1EnvInjection] = Field(default=None, description="envInjection configures which additional containers should receive the PET_* environment variables. By default, the PET_* variables are injected only into the main \"node\" container. Use this field to also inject them into selected sidecar or init containers. For torchtune, envInjection targets still receive PET_MASTER_ADDR and PET_MASTER_PORT even though the main trainer container uses command-line rendezvous instead. Defaults to empty (main container only).", alias="envInjection")
     __properties: ClassVar[List[str]] = ["envInjection"]
 
     model_config = ConfigDict(

@@ -225,6 +225,8 @@ func (i *Info) FindPodSetByName(psName string) *PodSet {
 	return nil
 }
 
+// FindContainerByPodSetName finds a runtime.Container within the named PodSet,
+// searching regular containers before init containers; returns nil if no match.
 func (i *Info) FindContainerByPodSetName(psName, containerName string) *Container {
 	ps := i.FindPodSetByName(psName)
 	if ps == nil {

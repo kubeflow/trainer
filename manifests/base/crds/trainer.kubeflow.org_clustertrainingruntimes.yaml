@@ -111,12 +111,16 @@ spec:
                           envInjection configures which additional containers should receive the
                           PET_* environment variables. By default, the PET_* variables are injected
                           only into the main "node" container. Use this field to also inject them
-                          into selected sidecar or init containers.
+                          into selected sidecar or init containers. For torchtune, envInjection
+                          targets still receive PET_MASTER_ADDR and PET_MASTER_PORT even though the
+                          main trainer container uses command-line rendezvous instead.
                           Defaults to empty (main container only).
                         properties:
                           targets:
-                            description: targets defines which replicated job containers
-                              receive PET_* env injection.
+                            description: |-
+                              targets defines which replicated job containers receive PET_* env injection.
+                              The item limit keeps runtime validation bounded while allowing common
+                              multi-job runtimes to target their auxiliary containers.
                             items:
                               description: |-
                                 EnvInjectionTarget specifies a replicated job and the containers within it
@@ -126,6 +130,8 @@ spec:
                                   description: |-
                                     containerNames lists the container names within the target job
                                     that should receive PET_* envs.
+                                    The item limit keeps admission checks small while covering typical
+                                    preflight and sidecar use cases.
                                   items:
                                     maxLength: 63
                                     type: string
@@ -133,6 +139,11 @@ spec:
                                   minItems: 1
                                   type: array
                                   x-kubernetes-list-type: set
+                                  x-kubernetes-validations:
+                                  - message: containerNames must not include the main
+                                      node container because PET_* envs are always
+                                      injected into it
+                                    rule: '!self.exists(c, c == ''node'')'
                                 jobName:
                                   description: |-
                                     jobName is the name of the target replicated job (e.g. "node").
@@ -142,6 +153,7 @@ spec:
                                   minLength: 1
                                   type: string
                               required:
+                              - containerNames
                               - jobName
                               type: object
                             maxItems: 16

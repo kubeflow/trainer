@@ -688,7 +688,7 @@ func schema_pkg_apis_trainer_v1alpha1_EnvInjection(ref common.ReferenceCallback)
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "EnvInjection specifies which containers in which jobs receive framework env injection. Defined at the MLPolicy level to allow reuse across policy types in the future.",
+				Description: "EnvInjection specifies which containers in which jobs receive framework env injection. Defined as a standalone type so it can be embedded by other MLPolicySource variants in the future.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"targets": {
@@ -701,7 +701,7 @@ func schema_pkg_apis_trainer_v1alpha1_EnvInjection(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "targets defines which replicated job containers receive PET_* env injection.",
+							Description: "targets defines which replicated job containers receive PET_* env injection. The item limit keeps runtime validation bounded while allowing common multi-job runtimes to target their auxiliary containers.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -731,6 +731,7 @@ func schema_pkg_apis_trainer_v1alpha1_EnvInjectionTarget(ref common.ReferenceCal
 					"jobName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "jobName is the name of the target replicated job (e.g. \"node\"). Using \"jobName\" rather than \"replicatedJobName\" keeps the API future-proof for other CRD types (LWS, Grove, Slurm, etc.).",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -742,7 +743,7 @@ func schema_pkg_apis_trainer_v1alpha1_EnvInjectionTarget(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "containerNames lists the container names within the target job that should receive PET_* envs.",
+							Description: "containerNames lists the container names within the target job that should receive PET_* envs. The item limit keeps admission checks small while covering typical preflight and sidecar use cases.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -756,7 +757,7 @@ func schema_pkg_apis_trainer_v1alpha1_EnvInjectionTarget(ref common.ReferenceCal
 						},
 					},
 				},
-				Required: []string{"jobName"},
+				Required: []string{"jobName", "containerNames"},
 			},
 		},
 	}
@@ -1606,7 +1607,7 @@ func schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"envInjection": {
 						SchemaProps: spec.SchemaProps{
-							Description: "envInjection configures which additional containers should receive the PET_* environment variables. By default, the PET_* variables are injected only into the main \"node\" container. Use this field to also inject them into selected sidecar or init containers. Defaults to empty (main container only).",
+							Description: "envInjection configures which additional containers should receive the PET_* environment variables. By default, the PET_* variables are injected only into the main \"node\" container. Use this field to also inject them into selected sidecar or init containers. For torchtune, envInjection targets still receive PET_MASTER_ADDR and PET_MASTER_PORT even though the main trainer container uses command-line rendezvous instead. Defaults to empty (main container only).",
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EnvInjection"),
 						},
 					},

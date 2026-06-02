@@ -28,6 +28,8 @@ type EnvInjectionTargetApplyConfiguration struct {
 	JobName *string `json:"jobName,omitempty"`
 	// containerNames lists the container names within the target job
 	// that should receive PET_* envs.
+	// The item limit keeps admission checks small while covering typical
+	// preflight and sidecar use cases.
 	ContainerNames []string `json:"containerNames,omitempty"`
 }
 

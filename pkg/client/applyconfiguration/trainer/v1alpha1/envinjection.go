@@ -20,9 +20,12 @@ package v1alpha1
 // with apply.
 //
 // EnvInjection specifies which containers in which jobs receive framework env injection.
-// Defined at the MLPolicy level to allow reuse across policy types in the future.
+// Defined as a standalone type so it can be embedded by other MLPolicySource
+// variants in the future.
 type EnvInjectionApplyConfiguration struct {
 	// targets defines which replicated job containers receive PET_* env injection.
+	// The item limit keeps runtime validation bounded while allowing common
+	// multi-job runtimes to target their auxiliary containers.
 	Targets []EnvInjectionTargetApplyConfiguration `json:"targets,omitempty"`
 }
 

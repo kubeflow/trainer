@@ -25,9 +25,9 @@ from typing_extensions import Self
 
 class TrainerV1alpha1EnvInjection(BaseModel):
     """
-    EnvInjection specifies which containers in which jobs receive framework env injection. Defined at the MLPolicy level to allow reuse across policy types in the future.
+    EnvInjection specifies which containers in which jobs receive framework env injection. Defined as a standalone type so it can be embedded by other MLPolicySource variants in the future.
     """ # noqa: E501
-    targets: Optional[List[TrainerV1alpha1EnvInjectionTarget]] = Field(default=None, description="targets defines which replicated job containers receive PET_* env injection.")
+    targets: Optional[List[TrainerV1alpha1EnvInjectionTarget]] = Field(default=None, description="targets defines which replicated job containers receive PET_* env injection. The item limit keeps runtime validation bounded while allowing common multi-job runtimes to target their auxiliary containers.")
     __properties: ClassVar[List[str]] = ["targets"]
 
     model_config = ConfigDict(

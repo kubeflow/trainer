@@ -55,11 +55,12 @@ func (t *Torch) Name() string {
 
 func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
-	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil || newObj.Spec.Trainer == nil {
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil {
 		return nil, allErrs
 	}
 
 	specPath := field.NewPath("spec")
+	allErrs = append(allErrs, validateEnvInjectionTargets(runtimeInfo, specPath.Child("runtimeRef"))...)
 
 	if newObj.Spec.Trainer != nil {
 		// Check reserved envs.
@@ -85,6 +86,26 @@ func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj
 	return nil, allErrs
 }
 
+func validateEnvInjectionTargets(info *runtime.Info, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if info.RuntimePolicy.MLPolicySource.Torch.EnvInjection == nil {
+		return allErrs
+	}
+	for _, target := range info.RuntimePolicy.MLPolicySource.Torch.EnvInjection.Targets {
+		for _, containerName := range target.ContainerNames {
+			if info.FindContainerByPodSetName(target.JobName, containerName) != nil {
+				continue
+			}
+			allErrs = append(allErrs, field.Invalid(
+				fldPath,
+				target,
+				fmt.Sprintf("envInjection target podSet %q container %q not found in runtime template", target.JobName, containerName),
+			))
+		}
+	}
+	return allErrs
+}
+
 // TODO (andreyvelich): Add support for PyTorch elastic when JobSet supports Elastic Jobs.
 func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Torch == nil {
@@ -92,8 +113,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 
 	torchPolicy := info.RuntimePolicy.MLPolicySource.Torch
-
-	// Check if using torchtune BEFORE any command modifications.
 
 	// TrainJob contains the actual information for the Trainer.
 	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
@@ -196,7 +215,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 			for _, containerName := range target.ContainerNames {
 				container := info.FindContainerByPodSetName(target.JobName, containerName)
 				if container == nil {
-					continue
+					return fmt.Errorf("envInjection target podSet %q container %q not found in runtime template", target.JobName, containerName)
 				}
 				apply.UpsertEnvVars(&container.Env, petEnvs...)
 				apply.UpsertEnvVars(&container.Env, masterEnvVars...)

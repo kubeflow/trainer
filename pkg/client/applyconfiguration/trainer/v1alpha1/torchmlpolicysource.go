@@ -24,7 +24,9 @@ type TorchMLPolicySourceApplyConfiguration struct {
 	// envInjection configures which additional containers should receive the
 	// PET_* environment variables. By default, the PET_* variables are injected
 	// only into the main "node" container. Use this field to also inject them
-	// into selected sidecar or init containers.
+	// into selected sidecar or init containers. For torchtune, envInjection
+	// targets still receive PET_MASTER_ADDR and PET_MASTER_PORT even though the
+	// main trainer container uses command-line rendezvous instead.
 	// Defaults to empty (main container only).
 	EnvInjection *EnvInjectionApplyConfiguration `json:"envInjection,omitempty"`
 }

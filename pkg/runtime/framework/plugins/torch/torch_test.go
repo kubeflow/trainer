@@ -1485,7 +1485,7 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
-		"envInjection without init container (container not found)": {
+		"envInjection target container does not exist": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
@@ -1577,6 +1577,7 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 				},
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
+			wantMLPolicyError: fmt.Errorf("envInjection target podSet %q container %q not found in runtime template", constants.Node, "non-existent-container"),
 		},
 		"envInjection with torchtune command": {
 			info: runtime.NewInfo(
@@ -1947,6 +1948,165 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
+		"envInjection target job does not exist": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicyWithEnvInjection(&trainer.EnvInjection{
+								Targets: []trainer.EnvInjectionTarget{{
+									JobName:        "missing-job",
+									ContainerNames: []string{"preflight-check"},
+								}},
+							}).
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicyWithEnvInjection(&trainer.EnvInjection{
+							Targets: []trainer.EnvInjectionTarget{{
+								JobName:        "missing-job",
+								ContainerNames: []string{"preflight-check"},
+							}},
+						}).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name:  constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{ContainerPort: ptr.To[int32](constants.ContainerTrainerPort)}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{Name: ptr.To(constants.TorchEnvNumNodes), Value: ptr.To("1")},
+								{Name: ptr.To(constants.TorchEnvNumProcPerNode), Value: ptr.To("1")},
+								{Name: ptr.To(constants.TorchEnvNodeRank), ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+									FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{FieldPath: ptr.To(constants.JobCompletionIndexFieldPath)},
+								}},
+								{Name: ptr.To(constants.TorchEnvMasterAddr), Value: ptr.To("test-job-node-0-0.test-job")},
+								{Name: ptr.To(constants.TorchEnvMasterPort), Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort))},
+							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			wantMLPolicyError: fmt.Errorf("envInjection target podSet %q container %q not found in runtime template", "missing-job", "preflight-check"),
+		},
+		"envInjection with multiple targets in different jobs leaves unlisted init container unchanged": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicyWithEnvInjection(&trainer.EnvInjection{
+								Targets: []trainer.EnvInjectionTarget{
+									{JobName: constants.Node, ContainerNames: []string{"sidecar"}},
+									{JobName: "worker", ContainerNames: []string{"worker-check"}},
+								},
+							}).
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 2, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithInitContainers(corev1ac.Container().WithName("preflight-check")).
+					WithContainers(corev1ac.Container().WithName("sidecar"), corev1ac.Container().WithName(constants.Node)),
+				),
+				runtime.WithPodSet("worker", nil, 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithInitContainers(corev1ac.Container().WithName("worker-check")).
+					WithContainers(corev1ac.Container().WithName("worker")),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(2).Obj()).
+				Obj(),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicyWithEnvInjection(&trainer.EnvInjection{
+							Targets: []trainer.EnvInjectionTarget{
+								{JobName: constants.Node, ContainerNames: []string{"sidecar"}},
+								{JobName: "worker", ContainerNames: []string{"worker-check"}},
+							},
+						}).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:              constants.Node,
+							Ancestor:          ptr.To(constants.AncestorTrainer),
+							Count:             ptr.To[int32](2),
+							SinglePodRequests: make(corev1.ResourceList),
+							InitContainers:    []runtime.Container{{Name: "preflight-check"}},
+							Containers: []runtime.Container{
+								{
+									Name: "sidecar",
+									Env: []corev1ac.EnvVarApplyConfiguration{
+										{Name: ptr.To(constants.TorchEnvNumNodes), Value: ptr.To("2")},
+										{Name: ptr.To(constants.TorchEnvNumProcPerNode), Value: ptr.To("1")},
+										{Name: ptr.To(constants.TorchEnvNodeRank), ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+											FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{FieldPath: ptr.To(constants.JobCompletionIndexFieldPath)},
+										}},
+										{Name: ptr.To(constants.TorchEnvMasterAddr), Value: ptr.To("test-job-node-0-0.test-job")},
+										{Name: ptr.To(constants.TorchEnvMasterPort), Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort))},
+									},
+								},
+								{
+									Name:  constants.Node,
+									Ports: []corev1ac.ContainerPortApplyConfiguration{{ContainerPort: ptr.To[int32](constants.ContainerTrainerPort)}},
+									Env: []corev1ac.EnvVarApplyConfiguration{
+										{Name: ptr.To(constants.TorchEnvNumNodes), Value: ptr.To("2")},
+										{Name: ptr.To(constants.TorchEnvNumProcPerNode), Value: ptr.To("1")},
+										{Name: ptr.To(constants.TorchEnvNodeRank), ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+											FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{FieldPath: ptr.To(constants.JobCompletionIndexFieldPath)},
+										}},
+										{Name: ptr.To(constants.TorchEnvMasterAddr), Value: ptr.To("test-job-node-0-0.test-job")},
+										{Name: ptr.To(constants.TorchEnvMasterPort), Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort))},
+									},
+								},
+							},
+						},
+						{
+							Name:              "worker",
+							Count:             ptr.To[int32](1),
+							SinglePodRequests: make(corev1.ResourceList),
+							InitContainers: []runtime.Container{{
+								Name: "worker-check",
+								Env: []corev1ac.EnvVarApplyConfiguration{
+									{Name: ptr.To(constants.TorchEnvNumNodes), Value: ptr.To("2")},
+									{Name: ptr.To(constants.TorchEnvNumProcPerNode), Value: ptr.To("1")},
+									{Name: ptr.To(constants.TorchEnvNodeRank), ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{FieldPath: ptr.To(constants.JobCompletionIndexFieldPath)},
+									}},
+									{Name: ptr.To(constants.TorchEnvMasterAddr), Value: ptr.To("test-job-node-0-0.test-job")},
+									{Name: ptr.To(constants.TorchEnvMasterPort), Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort))},
+								},
+							}},
+							Containers: []runtime.Container{{Name: "worker"}},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -1963,7 +2123,12 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 
 			// Test EnforceMLPolicy
 			err = p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(tc.info, tc.trainJob)
-			if diff := cmp.Diff(tc.wantMLPolicyError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantMLPolicyError, err, cmp.Comparer(func(x, y error) bool {
+				if x == nil || y == nil {
+					return x == y
+				}
+				return x.Error() == y.Error()
+			})); len(diff) != 0 {
 				t.Errorf("Unexpected error from EnforceMLPolicy (-want,+got):\n%s", diff)
 			}
 
@@ -2008,6 +2173,36 @@ func TestTorchValidate(t *testing.T) {
 				Obj(),
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Obj(),
+		},
+		"envInjection target container does not exist": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicyWithEnvInjection(&trainer.EnvInjection{
+							Targets: []trainer.EnvInjectionTarget{{
+								JobName:        constants.Node,
+								ContainerNames: []string{"missing-container"},
+							}},
+						}).
+						Obj(),
+					).
+					Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			),
+			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("runtimeRef"),
+					trainer.EnvInjectionTarget{JobName: constants.Node, ContainerNames: []string{"missing-container"}},
+					fmt.Sprintf("envInjection target podSet %q container %q not found in runtime template", constants.Node, "missing-container"),
+				),
+			},
 		},
 		"no action when info does not have numProcPerNode": {
 			info: runtime.NewInfo(

@@ -2119,6 +2119,33 @@ func TestBuild(t *testing.T) {
 				},
 			},
 		},
+		"return error when podSet initContainers are missing from apply configuration": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:           constants.Node,
+						InitContainers: []runtime.Container{{Name: "preflight-check"}},
+					}},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(jobsetv1alpha2ac.ReplicatedJob().
+							WithName(constants.Node).
+							WithTemplate(batchv1ac.JobTemplateSpec().
+								WithSpec(batchv1ac.JobSpec().
+									WithTemplate(corev1ac.PodTemplateSpec().
+										WithSpec(corev1ac.PodSpec().
+											WithContainers(corev1ac.Container().WithName(constants.Node)),
+										),
+									),
+								),
+							),
+						),
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Obj(),
+			wantError: fmt.Errorf("podSet %q initContainer %q does not have a matching initContainer in the runtime template", constants.Node, "preflight-check"),
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -2132,8 +2159,16 @@ func TestBuild(t *testing.T) {
 				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
 			}
 			objs, err := p.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
-			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
-				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
+			if diff := cmp.Diff(tc.wantError, err, cmp.Comparer(func(x, y error) bool {
+				if x == nil || y == nil {
+					return x == y
+				}
+				return x.Error() == y.Error()
+			})); len(diff) != 0 {
+				t.Errorf("Unexpected error from Build (-want,+got):\n%s", diff)
+			}
+			if tc.wantError != nil {
+				return
 			}
 			typedObjs, err := utiltesting.ToObject(cli.Scheme(), objs...)
 			if err != nil {

@@ -26,7 +26,7 @@ class TrainerV1alpha1EnvInjectionTarget(BaseModel):
     """
     EnvInjectionTarget specifies a replicated job and the containers within it that should receive PET_* env injection.
     """ # noqa: E501
-    container_names: Optional[List[StrictStr]] = Field(default=None, description="containerNames lists the container names within the target job that should receive PET_* envs.", alias="containerNames")
+    container_names: List[StrictStr] = Field(description="containerNames lists the container names within the target job that should receive PET_* envs. The item limit keeps admission checks small while covering typical preflight and sidecar use cases.", alias="containerNames")
     job_name: StrictStr = Field(description="jobName is the name of the target replicated job (e.g. \"node\"). Using \"jobName\" rather than \"replicatedJobName\" keeps the API future-proof for other CRD types (LWS, Grove, Slurm, etc.).", alias="jobName")
     __properties: ClassVar[List[str]] = ["containerNames", "jobName"]
 
