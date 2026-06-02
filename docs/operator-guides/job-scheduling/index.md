@@ -29,8 +29,8 @@ Advanced batch scheduling with Volcano
 ::::
 
 ::::{grid-item-card} Kueue
-:link: kueue
-:link-type: doc
+:link: https://kueue.sigs.k8s.io/docs/tasks/run/trainjobs/
+:link-type: url
 
 Job queueing and resource management with Kueue
 ::::
@@ -53,6 +53,6 @@ Gang scheduling with NVIDIA KAI Scheduler
 overview
 coscheduling
 volcano
-kueue
+Kueue <https://kueue.sigs.k8s.io/docs/tasks/run/trainjobs/>
 kai
 ```

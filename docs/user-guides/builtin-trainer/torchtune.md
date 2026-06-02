@@ -1,6 +1,6 @@
 # TorchTune BuiltinTrainer
 
-This guide describes how to fine-tune LLMs using `BuiltinTrainer` and `TorchTuneConfig`. `TorchTuneConfig` leverages [TorchTune](https://github.com/pytorch/torchtune) to streamline LLMs fine-tuning on Kubernetes. To understand the concept of `BuiltinTrainer`, see the [overview guide](index).
+This guide describes how to fine-tune LLMs using `BuiltinTrainer` and `TorchTuneConfig`. `TorchTuneConfig` leverages [TorchTune](https://github.com/pytorch/torchtune) to streamline LLMs fine-tuning on Kubernetes. To understand the concept of `BuiltinTrainer`, see the [overview guide](overview).
 
 :::{note}
 The supported model list can be seen in [this directory](https://github.com/kubeflow/trainer/tree/master/manifests/base/runtimes/torchtune). It's worth noticing that we do not support multi-node fine-tuning with TorchTune. However, **LoRA (PEFT) fine-tuning is supported** starting from Kubeflow Trainer V2.1.0 and SDK v0.2.0.
@@ -13,8 +13,7 @@ If you want to learn more about TorchTune BuiltinTrainer, please refer to [KEP-2
 Before exploring this guide, make sure to follow [the Getting Started guide](../../getting-started/index.md) to understand the basics of Kubeflow Trainer.
 
 ```Python
-# Get torchtune-llama3.2-1b TorchTune runtime.
-from kubeflow.trainer import *
+from kubeflow.trainer import TrainerClient
 
 # List all TorchTune runtimes
 client = TrainerClient()

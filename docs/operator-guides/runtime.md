@@ -141,7 +141,9 @@ The following runtimes are supported for CustomTrainer:
 | --------------------- | ------------------------------------------------------------- |
 | torch-distributed | [PyTorch](https://docs.pytorch.org/docs/stable/index.html) |
 | deepspeed-distributed | [DeepSpeed](https://www.deepspeed.ai/) |
+| jax-distributed | [JAX](https://jax.readthedocs.io/) |
 | mlx-distributed | [MLX](https://ml-explore.github.io/mlx/build/html/index.html) |
+| xgboost-distributed | [XGBoost](https://xgboost.readthedocs.io/) |
 
 The following runtimes are supported for TorchTune BuiltinTrainer:
 
@@ -149,6 +151,7 @@ The following runtimes are supported for TorchTune BuiltinTrainer:
 | --------------------- | --------------- |
 | torchtune-llama3.2-1b | Llama 3.2 (1B) |
 | torchtune-llama3.2-3b | Llama 3.2 (3B) |
+| torchtune-qwen2.5-1.5b | Qwen 2.5 (1.5B) |
 
 ### Runtime Deprecation Policy
 

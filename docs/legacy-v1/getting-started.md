@@ -37,6 +37,7 @@ to access your Kubernetes cluster where you installed the Training Operator.
 
 ```python
 def train_func():
+    import os
     import torch
     import torch.nn.functional as F
     from torch.utils.data import DistributedSampler

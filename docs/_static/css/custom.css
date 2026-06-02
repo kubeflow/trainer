@@ -955,6 +955,36 @@ body[data-theme="dark"] .feature-icon {
     background: rgba(61, 123, 229, 0.05);
 }
 
+/* ---- DOC NAV (Quick Links from home.rst) ---- */
+
+.doc-nav {
+    padding: 4rem 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.landing-page .doc-cards {
+    margin: 0;
+}
+
+.landing-page a.doc-card {
+    background: var(--lp-surface);
+    border-color: var(--lp-border) !important;
+}
+
+.landing-page a.doc-card strong {
+    color: var(--lp-text);
+}
+
+.landing-page a.doc-card p {
+    color: var(--lp-text-muted);
+}
+
+.landing-page a.doc-card:hover {
+    border-color: var(--lp-blue) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
 /* ---- QUICKSTART CODE ---- */
 
 .quickstart {
@@ -1029,7 +1059,7 @@ body[data-theme="dark"] .feature-icon {
 
 .community-links {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 1.25rem;
 }
 
@@ -1079,7 +1109,12 @@ body[data-theme="dark"] .comm-icon {
 
 .comm-github::before { content: "\2B50"; }
 .comm-slack::before { content: "\1F4AC"; }
+.comm-cncf::before { content: "\1F310"; }
+.comm-mail::before { content: "\2709"; }
 .comm-cal::before { content: "\1F4C5"; }
+.comm-youtube::before { content: "\25B6"; }
+.comm-calendar::before { content: "\1F5D3"; }
+.comm-ical::before { content: "\1F4C6"; }
 .comm-blog::before { content: "\1F4D6"; }
 
 .community-card strong {

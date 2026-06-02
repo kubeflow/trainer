@@ -6,12 +6,14 @@ Kubeflow Trainer is a **Kubernetes-native distributed AI platform** for scalable
 
 Kubeflow Trainer brings **MPI to Kubernetes** for multi-node, multi-GPU distributed jobs across HPC clusters. It integrates seamlessly with the Cloud Native AI ecosystem through tools like:
 
-- **Kueue** for advanced job scheduling
-- **JobSet** and **LeaderWorkerSet** for orchestration
-- **Volcano** for batch scheduling
-- **YuniKorn** for resource optimization
+- **[Kueue](https://kueue.sigs.k8s.io/)** for topology-aware scheduling and multi-cluster dispatch
+- **[JobSet](https://github.com/kubernetes-sigs/jobset)** and **[LeaderWorkerSet](https://github.com/kubernetes-sigs/lws)** for orchestration
+- **[Coscheduling](https://github.com/kubernetes-sigs/scheduler-plugins/blob/master/pkg/coscheduling/README.md)** for gang scheduling with the Kubernetes scheduler
+- **[Volcano](https://volcano.sh/en/)** for batch scheduling
+- **[YuniKorn](https://yunikorn.apache.org/docs/)** for resource optimization
+- **[KAI Scheduler](https://github.com/NVIDIA/KAI-Scheduler)** for GPU-aware gang scheduling
 
-The platform features **distributed data caching** using Apache Arrow and Apache DataFusion for zero-copy tensor streaming directly to GPU nodes, maximizing training performance.
+The platform features **distributed data caching** using [Apache Arrow](https://arrow.apache.org/) and [Apache DataFusion](https://datafusion.apache.org/) for zero-copy tensor streaming directly to GPU nodes, maximizing training performance.
 
 ![Kubeflow Trainer Tech Stack](../images/trainer-tech-stack.drawio.svg)
 
@@ -29,7 +31,6 @@ ML engineers and data scientists who use the **Kubeflow Python SDK** and **Train
 - Training guides for PyTorch, JAX, DeepSpeed, MLX
 - LLM fine-tuning blueprints with TorchTune
 - Local execution backends for development
-- Python SDK reference documentation
 
 ### Platform Administrators
 
@@ -73,7 +74,7 @@ Pre-built templates for **generative AI fine-tuning** with TorchTune, supporting
 
 Intelligent data streaming and caching maximize **GPU utilization**, reducing training costs and time. Supports efficient model parallelism with PyTorch FSDP and DeepSpeed ZeRO.
 
-### ☸️ Native Kubernetes Integrations
+### Native Kubernetes Integrations
 
 Achieve optimal GPU utilization and coordinated scheduling for large-scale AI workloads.
 Kubeflow Trainer seamlessly integrates with Kubernetes ecosystem projects like

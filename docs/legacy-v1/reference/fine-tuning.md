@@ -33,18 +33,18 @@ Training Operator implements`train` API with these pre-created components:
 
 ### Model Provider
 
-Model provider downloads pre-trained model. Currently, Training Operator supports [HuggingFace model provider](https://github.com/kubeflow/training-operator/blob/6ce4d57d699a76c3d043917bd0902c931f14080f/sdk/python/kubeflow/storage_initializer/hugging_face.py#L56) that downloads model from HuggingFace Hub.
+Model provider downloads pre-trained model. Currently, Training Operator supports [HuggingFace model provider](https://github.com/kubeflow/training-operator/blob/6ce4d57d699a76c3d043917bd0902c931f14080f/sdk/python/kubeflow/storage_initializer/hugging_face.py) that downloads model from HuggingFace Hub.
 
-You can implement your own model provider by using [this abstract base class](https://github.com/kubeflow/training-operator/blob/6ce4d57d699a76c3d043917bd0902c931f14080f/sdk/python/kubeflow/storage_initializer/abstract_model_provider.py#L4)
+You can implement your own model provider by using [this abstract base class](https://github.com/kubeflow/training-operator/blob/6ce4d57d699a76c3d043917bd0902c931f14080f/sdk/python/kubeflow/storage_initializer/abstract_model_provider.py)
 
 ### Dataset Provider
 
-Dataset provider downloads dataset. Currently, Training Operator supports [AWS S3](https://github.com/kubeflow/training-operator/blob/6ce4d57d699a76c3d043917bd0902c931f14080f/sdk/python/kubeflow/storage_initializer/s3.py#L37) and [HuggingFace](https://github.com/kubeflow/training-operator/blob/6ce4d57d699a76c3d043917bd0902c931f14080f/sdk/python/kubeflow/storage_initializer/hugging_face.py#L92) dataset providers.
+Dataset provider downloads dataset. Currently, Training Operator supports [AWS S3](https://github.com/kubeflow/training-operator/blob/6ce4d57d699a76c3d043917bd0902c931f14080f/sdk/python/kubeflow/storage_initializer/s3.py) and [HuggingFace](https://github.com/kubeflow/training-operator/blob/6ce4d57d699a76c3d043917bd0902c931f14080f/sdk/python/kubeflow/storage_initializer/hugging_face.py) dataset providers.
 
 You can implement your own dataset provider by using [this abstract base class](https://github.com/kubeflow/training-operator/blob/6ce4d57d699a76c3d043917bd0902c931f14080f/sdk/python/kubeflow/storage_initializer/abstract_dataset_provider.py)
 
 ### LLM Trainer
 
-Trainer implements training loop to fine-tune LLM. Currently, Training Operator supports [HuggingFace trainer](https://github.com/kubeflow/training-operator/blob/6ce4d57d699a76c3d043917bd0902c931f14080f/sdk/python/kubeflow/trainer/hf_llm_training.py#L118-L139) to fine-tune LLMs.
+Trainer implements training loop to fine-tune LLM. Currently, Training Operator supports [HuggingFace trainer](https://github.com/kubeflow/training-operator/blob/6ce4d57d699a76c3d043917bd0902c931f14080f/sdk/python/kubeflow/trainer/hf_llm_training.py) to fine-tune LLMs.
 
 You can implement your own trainer for other ML use-cases such as image classification, voice recognition, etc.

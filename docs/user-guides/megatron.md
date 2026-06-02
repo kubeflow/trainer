@@ -304,7 +304,7 @@ via [RuntimePatches](../../operator-guides/runtime-patches).
 **Option 1: Cluster administrator — patch the runtime once for every job.**
 
 ```yaml
-apiVersion: trainer.kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
   name: torch-distributed
@@ -331,7 +331,7 @@ spec:
 **Option 2: TrainJob author — attach the mount to a single job with `runtimePatches`.**
 
 ```yaml
-apiVersion: trainer.kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainJob
 metadata:
   name: megatron-tp

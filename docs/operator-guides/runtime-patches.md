@@ -18,7 +18,7 @@ model: rather than a single flat list of overrides, each controller writes to it
 and the Trainer admission webhook merges all entries into the final JobSet before creation.
 
 ```yaml
-apiVersion: trainer.kubeflow.org/v2alpha1
+apiVersion: trainer.kubeflow.org/v1alpha1
 kind: TrainJob
 metadata:
   name: pytorch-distributed

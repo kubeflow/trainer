@@ -12,8 +12,12 @@ The data cache feature enables efficient data streaming for distributed training
 
 Data cache automatically fetches data from object store and partitions it across data nodes:
 
+![Data Cache Batch](../images/data-cache-batch.png)
+
 Multiple TrainJobs can access data from the cache using [the Apache Arrow Flight](https://arrow.apache.org/docs/format/Flight.html)
 protocol:
+
+![Data Cache TrainJob Access](../images/data-cache-trainjob-access.png)
 
 The data cache is powered by [Apache Arrow](https://arrow.apache.org/) and [Apache DataFusion](https://datafusion.apache.org/)
 to effectively store data in-memory
@@ -25,6 +29,8 @@ The training workflow consists of two stages:
 
 1. **Dataset Initializer**: Sets up a distributed cache cluster that preprocesses and serves the training data
 2. **Training Nodes**: Stream data from the cache and perform model training
+
+![Data Cache Init](../images/data-cache-init.png)
 
 ## Prerequisites
 
