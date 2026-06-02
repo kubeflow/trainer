@@ -13968,8 +13968,7 @@
           },
           "jobName": {
             "description": "jobName is the name of the target replicated job (e.g. \"node\"). Using \"jobName\" rather than \"replicatedJobName\" keeps the API future-proof for other CRD types (LWS, Grove, Slurm, etc.).",
-            "type": "string",
-            "default": ""
+            "type": "string"
           }
         }
       },

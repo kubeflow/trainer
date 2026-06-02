@@ -731,7 +731,6 @@ func schema_pkg_apis_trainer_v1alpha1_EnvInjectionTarget(ref common.ReferenceCal
 					"jobName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "jobName is the name of the target replicated job (e.g. \"node\"). Using \"jobName\" rather than \"replicatedJobName\" keeps the API future-proof for other CRD types (LWS, Grove, Slurm, etc.).",
-							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},

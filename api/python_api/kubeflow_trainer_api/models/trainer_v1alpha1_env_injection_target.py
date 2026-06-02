@@ -96,7 +96,7 @@ class TrainerV1alpha1EnvInjectionTarget(BaseModel):
 
         _obj = cls.model_validate({
             "containerNames": obj.get("containerNames"),
-            "jobName": obj.get("jobName") if obj.get("jobName") is not None else ''
+            "jobName": obj.get("jobName")
         })
         return _obj
 
