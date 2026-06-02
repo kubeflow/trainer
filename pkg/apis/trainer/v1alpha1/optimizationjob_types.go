@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // Objective defines the metric and goal for the OptimizationJob.
@@ -35,8 +34,9 @@ type Objective struct {
 
 // Algorithm defines the optimization algorithm configuration.
 type Algorithm struct {
-	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Enum=random;grid
 	Name string `json:"name"`
+
 	// +listType=map
 	// +listMapKey=name
 	Settings []SettingKV `json:"settings,omitempty"`
@@ -50,16 +50,20 @@ type SettingKV struct {
 }
 
 // SearchSpace defines the type and exact boundaries for the algorithm to search.
-// +kubebuilder:validation:XValidation:rule="self.type != 'categorical' || has(self.list)",message="list must be provided when type is categorical"
-// +kubebuilder:validation:XValidation:rule="self.type == 'categorical' || (has(self.min) && has(self.max))",message="min and max must be provided for int or double types"
+// +kubebuilder:validation:XValidation:rule="self.type != 'categorical' || (has(self.list) && size(self.list) > 0)",message="list must be provided and contain at least one item when type is categorical"
+// +kubebuilder:validation:XValidation:rule="self.type == 'categorical' || (has(self.min) && has(self.max) && self.min != ” && self.max != ”)",message="min and max must be provided and be non-empty for int or double types"
 type SearchSpace struct {
 	// +kubebuilder:validation:Enum=int;double;categorical
 	Type string `json:"type"` // e.g., int, double, categorical
 
+	// +kubebuilder:validation:MinLength=1
 	Max string `json:"max,omitempty"`
+
+	// +kubebuilder:validation:MinLength=1
 	Min string `json:"min,omitempty"`
 
 	// +listType=atomic
+	// +kubebuilder:validation:MinItems=1
 	// +optional
 	List []string `json:"list,omitempty"`
 }
@@ -101,14 +105,13 @@ type TrialConfig struct {
 }
 
 // BestTrial tracks the best performing trial.
-// Kept minimal for MVP; users can inspect the specific Trial/TrainJob for exact metrics and settings.
 type BestTrial struct {
 	Name string `json:"name"`
 
-	// optimalParameters is a list of the hyperparameter assignments that won.
+	// parameters is a list of the hyperparameter assignments that won.
 	// +listType=atomic
 	// +optional
-	OptimalParameters []ParameterAssignment `json:"optimalParameters,omitempty"`
+	Parameters []ParameterAssignment `json:"parameters,omitempty"`
 }
 
 // OptimizationJobSpec defines the desired state of OptimizationJob.
@@ -126,14 +129,27 @@ type OptimizationJobSpec struct {
 
 	TrialConfig TrialConfig `json:"trialConfig"`
 
-	// TrialTemplate acts as a generic wrapper for the underlying workload.
-	// Parameters are injected via native Kubernetes Environment Variables, replacing regex.
-	// +kubebuilder:pruning:PreserveUnknownFields
-	TrialTemplate runtime.RawExtension `json:"trialTemplate"`
+	// TrialTemplate wraps the underlying TrainJob workload.
+	// Parameters are injected via native Kubernetes Environment Variables.
+	TrialTemplate TrainJobSpec `json:"trialTemplate"`
 }
+
+// OptimizationJobPhase represents the current phase of the OptimizationJob.
+type OptimizationJobPhase string
+
+const (
+	OptimizationJobScheduling OptimizationJobPhase = "Scheduling"
+	OptimizationJobRunning    OptimizationJobPhase = "Running"
+	OptimizationJobSucceeded  OptimizationJobPhase = "Succeeded"
+	OptimizationJobFailed     OptimizationJobPhase = "Failed"
+)
 
 // OptimizationJobStatus defines the observed state of OptimizationJob.
 type OptimizationJobStatus struct {
+	// Phase represents the current state of the OptimizationJob.
+	// +optional
+	Phase OptimizationJobPhase `json:"phase,omitempty"`
+
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -150,9 +166,6 @@ type OptimizationJobStatus struct {
 
 	// BestTrial caches the highest performing trial based on the Objective.
 	BestTrial *BestTrial `json:"bestTrial,omitempty"`
-
-	// Note: SchedulerState and SuggestionState are deferred to Phase 2
-	// to support advanced stateful algorithms (Hyperband, PBT)
 }
 
 // +genclient
