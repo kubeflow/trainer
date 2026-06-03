@@ -36,7 +36,7 @@ markdown-it-py==4.2.0
     # via rich
 mdurl==0.1.2
     # via markdown-it-py
-opendal==0.47.1
+opendal==0.47.2
     # via -r cmd/initializers/model/requirements.txt
 packaging==26.2
     # via huggingface-hub
