@@ -32,8 +32,9 @@ import (
 )
 
 const (
-	rJobReplicasErrorMsg       = "always must be 1"
-	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
+	rJobReplicasErrorMsg        = "always must be 1"
+	rJobTrainerReplicasErrorMsg = "must be greater than or equal to 1"
+	rJobContainerNamesErrorMsg  = "must contain the required container for the ancestor: %s"
 )
 
 var (
@@ -76,7 +77,14 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 		}
 
 		if labelAncestor, ok := rJob.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestors.Has(labelAncestor) {
-			if labelAncestor != constants.AncestorTrainer && rJob.Replicas != 1 {
+			if labelAncestor == constants.AncestorTrainer {
+				// The trainer ancestor can run as several JobSet replicas, one per TPU slice,
+				// so any value of one or more is fine here. We still reject zero or negative,
+				// since that would admit a runtime whose JobSet never schedules any pods.
+				if rJob.Replicas < 1 {
+					allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobTrainerReplicasErrorMsg))
+				}
+			} else if rJob.Replicas != 1 {
 				allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasErrorMsg))
 			}
 
