@@ -47,7 +47,7 @@ mdurl==0.1.2
     # via markdown-it-py
 oauthlib==3.3.1
     # via requests-oauthlib
-opendal==0.47.1
+opendal==0.47.2
     # via -r cmd/initializers/dataset/requirements.txt
 packaging==26.2
     # via huggingface-hub
