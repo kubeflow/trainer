@@ -8,7 +8,7 @@ Authors:
 
 [Dynamic Resource Allocation (DRA)](https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/)
 graduated to GA in Kubernetes 1.34, establishing a new standard for device scheduling that
-supersedes extended resources for GPUs and accelerators. Users need the ability to configure
+provides a modern alternative to extended resources for GPUs and accelerators. Users need the ability to configure
 `ResourceClaims` on training workloads managed by Kubeflow Trainer.
 
 This KEP proposes adding a `resourceClaims` field to `PodSpecPatch` so that platform admins
@@ -110,7 +110,7 @@ spec:
                         claims:
                           - name: gpu
 ---
-apiVersion: resource.k8s.io/v1beta2
+apiVersion: resource.k8s.io/v1
 kind: ResourceClaimTemplate
 metadata:
   name: a100-40gb-template
@@ -119,12 +119,18 @@ spec:
     devices:
       requests:
         - name: gpu
-          deviceClassName: gpu.nvidia.com
-          selectors:
-            - cel:
-                expression: device.attributes["gpu.nvidia.com"].productName == "A100-SXM4-40GB"
-          count: 4
+          exactly:
+            deviceClassName: gpu.nvidia.com
+            allocationMode: ExactCount
+            count: 4
+            selectors:
+              - cel:
+                  expression: device.attributes["gpu.nvidia.com"].productName == "A100-SXM4-40GB"
 ```
+
+This example targets Kubernetes 1.34+, where DRA is GA and `resource.k8s.io/v1` is the default
+API. Clusters on 1.32–1.33 may still use `resource.k8s.io/v1beta2`; see the
+[ResourceClaimTemplate API reference](https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/resource-claim-template-v1/).
 
 ### Story 2: Data Scientist References GPU Claim in TrainJob
 
@@ -218,8 +224,8 @@ type PodSpecPatch struct {
 	// +listType=map
 	// +listMapKey=name
 	// +kubebuilder:validation:MaxItems=32
-	// +kubebuilder:validation:XValidation:rule="self.all(c, has(c.resourceClaimName) && c.resourceClaimName != '' || has(c.resourceClaimTemplateName) && c.resourceClaimTemplateName != '')", message="each claim must set either resourceClaimName or resourceClaimTemplateName"
-	// +kubebuilder:validation:XValidation:rule="self.all(c, !(has(c.resourceClaimName) && c.resourceClaimName != '' && has(c.resourceClaimTemplateName) && c.resourceClaimTemplateName != ''))", message="each claim must set only one of resourceClaimName or resourceClaimTemplateName"
+	// +kubebuilder:validation:XValidation:rule="self == null || self.all(c, has(c.resourceClaimName) && c.resourceClaimName != '' || has(c.resourceClaimTemplateName) && c.resourceClaimTemplateName != '')", message="each claim must set either resourceClaimName or resourceClaimTemplateName"
+	// +kubebuilder:validation:XValidation:rule="self == null || self.all(c, !(has(c.resourceClaimName) && c.resourceClaimName != '' && has(c.resourceClaimTemplateName) && c.resourceClaimTemplateName != ''))", message="each claim must set only one of resourceClaimName or resourceClaimTemplateName"
 	// +optional
 	ResourceClaims []corev1.PodResourceClaim `json:"resourceClaims,omitempty"`
 }
@@ -416,8 +422,8 @@ list level using `self.all()`:
 	// +listType=map
 	// +listMapKey=name
 	// +kubebuilder:validation:MaxItems=32
-	// +kubebuilder:validation:XValidation:rule="self.all(c, has(c.resourceClaimName) && c.resourceClaimName != '' || has(c.resourceClaimTemplateName) && c.resourceClaimTemplateName != '')", message="each claim must set either resourceClaimName or resourceClaimTemplateName"
-	// +kubebuilder:validation:XValidation:rule="self.all(c, !(has(c.resourceClaimName) && c.resourceClaimName != '' && has(c.resourceClaimTemplateName) && c.resourceClaimTemplateName != ''))", message="each claim must set only one of resourceClaimName or resourceClaimTemplateName"
+	// +kubebuilder:validation:XValidation:rule="self == null || self.all(c, has(c.resourceClaimName) && c.resourceClaimName != '' || has(c.resourceClaimTemplateName) && c.resourceClaimTemplateName != '')", message="each claim must set either resourceClaimName or resourceClaimTemplateName"
+	// +kubebuilder:validation:XValidation:rule="self == null || self.all(c, !(has(c.resourceClaimName) && c.resourceClaimName != '' && has(c.resourceClaimTemplateName) && c.resourceClaimTemplateName != ''))", message="each claim must set only one of resourceClaimName or resourceClaimTemplateName"
 	// +optional
 	ResourceClaims []corev1.PodResourceClaim `json:"resourceClaims,omitempty"`
 ```
@@ -427,6 +433,8 @@ webhook or controller code runs. They catch malformed claims early with clear er
 
 **CEL design notes:**
 
+- Each rule uses `self == null ||` so omitted `resourceClaims` (optional field) skip validation
+  instead of failing when `self` is unset.
 - The rules check both `has(field)` AND non-empty (`!= ''`) to avoid false positives. The
   `has()` function returns true for empty strings in pointer/optional fields, so checking
   presence alone would pass invalid configurations where both fields are set to `""`.
