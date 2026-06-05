@@ -896,7 +896,6 @@ func TestApplyClientConnection(t *testing.T) {
 	}
 }
 
-
 func TestLoadHTTP2(t *testing.T) {
 	testScheme := runtime.NewScheme()
 	if err := configapi.AddToScheme(testScheme); err != nil {
