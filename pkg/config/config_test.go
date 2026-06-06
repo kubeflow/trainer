@@ -76,8 +76,8 @@ apiVersion: config.trainer.kubeflow.org/v1alpha1
 kind: Configuration
 certManagement:
   enable: true
-  webhookServiceName: custom-webhook-service
-  webhookSecretName: custom-webhook-secret
+  serviceName: custom-webhook-service
+  secretName: custom-webhook-secret
 `), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
 	}
@@ -195,8 +195,8 @@ controller:
     TrainingRuntime.trainer.kubeflow.org: 1
 certManagement:
   enable: true
-  webhookServiceName: kubeflow-trainer-controller-manager
-  webhookSecretName: kubeflow-trainer-webhook-cert
+  serviceName: kubeflow-trainer-controller-manager
+  secretName: kubeflow-trainer-webhook-cert
 clientConnection:
   qps: 50
   burst: 100
@@ -270,9 +270,9 @@ this is not: valid: yaml: content
 	}
 
 	defaultCertManagement := &configapi.CertManagement{
-		Enable:             ptr.To(true),
-		WebhookServiceName: "kubeflow-trainer-controller-manager",
-		WebhookSecretName:  "kubeflow-trainer-webhook-cert",
+		Enable:      ptr.To(true),
+		ServiceName: "kubeflow-trainer-controller-manager",
+		SecretName:  "kubeflow-trainer-webhook-cert",
 	}
 
 	defaultClientConnection := &configapi.ClientConnection{
@@ -500,9 +500,9 @@ this is not: valid: yaml: content
 				ClientConnection: defaultClientConnection,
 				StatusServer:     defaultStatusServer,
 				CertManagement: &configapi.CertManagement{
-					Enable:             ptr.To(true),
-					WebhookServiceName: "custom-webhook-service",
-					WebhookSecretName:  "custom-webhook-secret",
+					Enable:      ptr.To(true),
+					ServiceName: "custom-webhook-service",
+					SecretName:  "custom-webhook-secret",
 				},
 			},
 			wantOptions: defaultOptions,
@@ -518,9 +518,9 @@ this is not: valid: yaml: content
 				ClientConnection: defaultClientConnection,
 				StatusServer:     defaultStatusServer,
 				CertManagement: &configapi.CertManagement{
-					Enable:             ptr.To(false),
-					WebhookServiceName: "kubeflow-trainer-controller-manager",
-					WebhookSecretName:  "kubeflow-trainer-webhook-cert",
+					Enable:      ptr.To(false),
+					ServiceName: "kubeflow-trainer-controller-manager",
+					SecretName:  "kubeflow-trainer-webhook-cert",
 				},
 			},
 			wantOptions: defaultOptions,

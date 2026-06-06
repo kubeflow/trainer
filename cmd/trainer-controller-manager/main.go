@@ -129,8 +129,8 @@ func main() {
 	if config.IsCertManagementEnabled(&cfg) {
 		setupLog.Info("Setting up certificate management")
 		if err = cert.ManageCerts(mgr, cert.Config{
-			WebhookSecretName:                  cfg.CertManagement.WebhookSecretName,
-			WebhookServiceName:                 cfg.CertManagement.WebhookServiceName,
+			SecretName:                         cfg.CertManagement.SecretName,
+			ServiceName:                        cfg.CertManagement.ServiceName,
 			ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
 			MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
 		}, certsReady); err != nil {
