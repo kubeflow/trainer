@@ -17,7 +17,7 @@ jobs:
     runs-on: cncf-ubuntu-16-64-x86
 
     env:
-      SHOULD_PUBLISH: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+      SHOULD_PUBLISH: ${{ github.event_name == 'push' }}
 
     strategy:
       fail-fast: false

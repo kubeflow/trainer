@@ -232,7 +232,6 @@ jobs:
 
     permissions:
       contents: write
-      actions: write
 
     runs-on: ubuntu-latest
     environment:
@@ -245,16 +244,30 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.branch }}
 
-      - name: Generate changelog
+      - name: Extract changelog
+        if: needs.prepare.outputs.is-prerelease != 'true'
         id: changelog
-        uses: orhun/git-cliff-action@v4
-        with:
-          config: cliff.toml
-          args: >
-            --unreleased
-            --tag ${{ needs.prepare.outputs.tag }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+          CHANGELOG_FILE="CHANGELOG/CHANGELOG-${MAJOR_MINOR}.md"
+          set -euo pipefail
+          [[ -f "$CHANGELOG_FILE" ]] || { echo "ERROR: $CHANGELOG_FILE not found" >&2; exit 1; }
+          HEADER_REGEX="^#\{1,2\} \\[v\?${VERSION//./\\.}\\]"
+          SECTION=$(sed -n "/$HEADER_REGEX/,\$p" "$CHANGELOG_FILE")
+          [[ -n "$SECTION" ]] || { echo "ERROR: No changelog section for v$VERSION in $CHANGELOG_FILE" >&2; exit 1; }
+          NEXT_VERSION=$(echo "$SECTION" | tail -n +2 | grep -m1 "^#\{1,2\} \\[" || true)
+          if [[ -n "$NEXT_VERSION" ]]; then
+              CHANGELOG=$(echo "$SECTION" | sed '1d' | sed '/^#\{1,2\} \[/,$d')
+          else
+              CHANGELOG=$(echo "$SECTION" | sed '1d')
+          fi
+          [[ -n "$CHANGELOG" ]] || { echo "ERROR: Empty changelog body for v$VERSION in $CHANGELOG_FILE" >&2; exit 1; }
+          {
+            echo "changelog<<EOF"
+            echo "$CHANGELOG"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Configure Git
         run: |
@@ -267,72 +280,13 @@ jobs:
           git tag -a "${{ needs.prepare.outputs.tag }}" "$TAG_SHA" -m "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
           git push origin "${{ needs.prepare.outputs.tag }}"
 
-      - name: Publish release artifacts
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const tag = '${{ needs.prepare.outputs.tag }}';
-            const workflows = [
-              'build-and-push-images.yaml',
-              'publish-helm-charts.yaml',
-            ];
-            const timeoutMs = 90 * 60 * 1000;
-            const intervalMs = 60 * 1000;
-            const deadline = Date.now() + timeoutMs;
-
-            const dispatchedRuns = await Promise.all(workflows.map(async (workflow_id) => {
-              const response = await github.rest.actions.createWorkflowDispatch({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id,
-                ref: tag,
-                return_run_details: true,
-              });
-              const runId = response.data.workflow_run_id;
-              if (!runId) {
-                throw new Error(`GitHub did not return a run ID for ${workflow_id}`);
-              }
-              core.info(`Dispatched ${workflow_id}: ${response.data.html_url}`);
-              return { workflow_id, runId };
-            }));
-
-            for (const { workflow_id, runId } of dispatchedRuns) {
-              core.info(`Waiting for ${workflow_id} to complete for ${tag}`);
-              let run;
-
-              while (Date.now() < deadline) {
-                const response = await github.rest.actions.getWorkflowRun({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  run_id: runId,
-                });
-                run = response.data;
-
-                if (run?.status === 'completed') {
-                  if (run.conclusion === 'success') {
-                    core.info(`${workflow_id} completed successfully: ${run.html_url}`);
-                    break;
-                  }
-                  core.setFailed(`${workflow_id} concluded with ${run.conclusion}: ${run.html_url}`);
-                  return;
-                }
-
-                await new Promise((resolve) => setTimeout(resolve, intervalMs));
-              }
-
-              if (run?.status !== 'completed') {
-                core.setFailed(`Timed out waiting for ${workflow_id} to complete for ${tag}`);
-                return;
-              }
-            }
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           name: "${{ needs.prepare.outputs.tag }}"
           tag_name: ${{ needs.prepare.outputs.tag }}
           target_commitish: ${{ needs.prepare.outputs.branch }}
           prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
           draft: false
-          body_path: ${{ steps.changelog.outputs.changelog }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          generate_release_notes: false
