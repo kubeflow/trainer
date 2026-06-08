@@ -24,6 +24,7 @@ import (
 	"maps"
 
 	batchv1 "k8s.io/api/batch/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -83,10 +84,24 @@ func NewTrainingRuntime(ctx context.Context, c client.Client, indexer client.Fie
 
 func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
 	var trainingRuntime trainer.TrainingRuntime
-	err := r.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, &trainingRuntime)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errorNotFoundSpecifiedTrainingRuntime, err)
+	// Try to get runtime from snapshot first
+	if err := getRuntimeSnapshot(ctx, r.client, trainJob, &trainingRuntime); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("getting runtime snapshot: %w", err)
+		}
+
+		// Snapshot doesn't exist, load runtime from API server
+		err := r.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, &trainingRuntime)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", errorNotFoundSpecifiedTrainingRuntime, err)
+		}
+
+		// Create snapshot for future reconciliations
+		if err := createRuntimeSnapshot(ctx, r.client, trainJob, &trainingRuntime); err != nil {
+			return nil, fmt.Errorf("creating runtime snapshot: %w", err)
+		}
 	}
+
 	info, err := r.RuntimeInfo(trainJob, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy)
 	if err != nil {
 		return nil, err
