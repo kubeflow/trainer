@@ -2551,5 +2551,202 @@ alpha-node-0-1.alpha slots=8
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 		})
+
+		ginkgo.Context("Integration Tests for Runtime Snapshots", func() {
+			ginkgo.It("Should create snapshot ConfigMap with correct structure and ownerReference for a TrainingRuntime", func() {
+				ginkgo.By("Creating TrainingRuntime and TrainJob")
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if snapshot ConfigMap is created with correct structure")
+				snapshotKey := client.ObjectKey{
+					Name:      trainJob.Name + "-runtime-snapshot",
+					Namespace: trainJob.Namespace,
+				}
+				gomega.Eventually(func(g gomega.Gomega) {
+					cm := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, snapshotKey, cm)).Should(gomega.Succeed())
+
+					// Verify ConfigMap has correct owner reference
+					g.Expect(cm.OwnerReferences).Should(gomega.HaveLen(1))
+					ownerRef := cm.OwnerReferences[0]
+					g.Expect(ownerRef.APIVersion).Should(gomega.Equal(trainer.GroupVersion.String()))
+					g.Expect(ownerRef.Kind).Should(gomega.Equal(trainer.TrainJobKind))
+					g.Expect(ownerRef.Name).Should(gomega.Equal(trainJob.Name))
+					g.Expect(ownerRef.UID).Should(gomega.Equal(trainJob.UID))
+					g.Expect(ownerRef.Controller).Should(gomega.Equal(ptr.To(true)))
+					g.Expect(ownerRef.BlockOwnerDeletion).Should(gomega.Equal(ptr.To(true)))
+
+					// Verify ConfigMap has runtime data
+					g.Expect(cm.Data).Should(gomega.HaveKey("runtime"))
+					runtimeYAML := cm.Data["runtime"]
+					g.Expect(runtimeYAML).ShouldNot(gomega.BeEmpty())
+
+					// Verify YAML contains expected runtime configuration
+					g.Expect(runtimeYAML).Should(gomega.ContainSubstring("kind: TrainingRuntime"))
+					g.Expect(runtimeYAML).Should(gomega.ContainSubstring("name: alpha"))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should create snapshot ConfigMap with correct structure and ownerReference for a ClusterTrainingRuntime", func() {
+				ginkgo.By("Creating ClusterTrainingRuntime and TrainJob")
+				clusterTrainingRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("cluster-training-runtime").Obj()
+				gomega.Expect(k8sClient.Create(ctx, clusterTrainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterTrainingRuntime), clusterTrainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "test-job").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), clusterTrainingRuntime.Name).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if snapshot ConfigMap is created with correct structure")
+				snapshotKey := client.ObjectKey{
+					Name:      trainJob.Name + "-runtime-snapshot",
+					Namespace: trainJob.Namespace,
+				}
+				gomega.Eventually(func(g gomega.Gomega) {
+					cm := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, snapshotKey, cm)).Should(gomega.Succeed())
+
+					// Verify ConfigMap has correct owner reference
+					g.Expect(cm.OwnerReferences).Should(gomega.HaveLen(1))
+					ownerRef := cm.OwnerReferences[0]
+					g.Expect(ownerRef.APIVersion).Should(gomega.Equal(trainer.GroupVersion.String()))
+					g.Expect(ownerRef.Kind).Should(gomega.Equal(trainer.TrainJobKind))
+					g.Expect(ownerRef.Name).Should(gomega.Equal(trainJob.Name))
+					g.Expect(ownerRef.UID).Should(gomega.Equal(trainJob.UID))
+					g.Expect(ownerRef.Controller).Should(gomega.Equal(ptr.To(true)))
+					g.Expect(ownerRef.BlockOwnerDeletion).Should(gomega.Equal(ptr.To(true)))
+
+					// Verify ConfigMap has runtime data
+					g.Expect(cm.Data).Should(gomega.HaveKey("runtime"))
+					runtimeYAML := cm.Data["runtime"]
+					g.Expect(runtimeYAML).ShouldNot(gomega.BeEmpty())
+
+					// Verify YAML contains expected runtime configuration
+					g.Expect(runtimeYAML).Should(gomega.ContainSubstring("kind: ClusterTrainingRuntime"))
+					g.Expect(runtimeYAML).Should(gomega.ContainSubstring("name: cluster-training-runtime"))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should use the runtime snapshot during reconciliation rather than the current runtime contents", func() {
+				const (
+					originalLabelValue = "snapshot-v1"
+					updatedLabelValue  = "snapshot-v2"
+				)
+
+				ginkgo.By("Creating TrainingRuntime with a discriminating label")
+				trainingRuntime.Spec.Template.Labels = map[string]string{
+					"snapshot-test-marker": originalLabelValue,
+				}
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Creating suspended TrainJob which creates a snapshot")
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Waiting for snapshot ConfigMap to be created")
+				snapshotKey := client.ObjectKey{
+					Name:      trainJob.Name + "-runtime-snapshot",
+					Namespace: trainJob.Namespace,
+				}
+				gomega.Eventually(func(g gomega.Gomega) {
+					cm := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, snapshotKey, cm)).Should(gomega.Succeed())
+					g.Expect(cm.Data["runtime"]).Should(gomega.ContainSubstring(originalLabelValue))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Verifying initial JobSet is suspended and has the original label from snapshot")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(*jobSet.Spec.Suspend).Should(gomega.BeTrue())
+					g.Expect(jobSet.Labels).Should(gomega.HaveKeyWithValue("snapshot-test-marker", originalLabelValue))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Updating the TrainingRuntime with a different label value")
+				gomega.Eventually(func(g gomega.Gomega) {
+					updatedRuntime := &trainer.TrainingRuntime{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), updatedRuntime)).Should(gomega.Succeed())
+					updatedRuntime.Spec.Template.Labels["snapshot-test-marker"] = updatedLabelValue
+					g.Expect(k8sClient.Update(ctx, updatedRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Triggering reconciliation by unsuspending the TrainJob")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					gotTrainJob.Spec.Suspend = ptr.To(false)
+					g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Verifying JobSet suspend is updated but labels are not updated")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(*jobSet.Spec.Suspend).Should(gomega.BeFalse())
+					// Should still have original value from snapshot
+					g.Expect(jobSet.Labels).Should(gomega.HaveKeyWithValue("snapshot-test-marker", originalLabelValue),
+						"JobSet should use snapshot label value, not updated runtime value")
+					// Explicitly verify it's NOT the updated value
+					g.Expect(jobSet.Labels["snapshot-test-marker"]).ShouldNot(gomega.Equal(updatedLabelValue),
+						"JobSet should not pick up the updated runtime label")
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should create snapshots for existing TrainJobs that were created before the snapshot feature was added", func() {
+				ginkgo.By("Creating TrainingRuntime and TrainJob")
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Waiting for initial snapshot to be created")
+				snapshotKey := client.ObjectKey{
+					Name:      trainJob.Name + "-runtime-snapshot",
+					Namespace: trainJob.Namespace,
+				}
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, snapshotKey, &corev1.ConfigMap{})).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Simulating migration by deleting the snapshot ConfigMap")
+				cm := &corev1.ConfigMap{}
+				gomega.Expect(k8sClient.Get(ctx, snapshotKey, cm)).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Delete(ctx, cm)).Should(gomega.Succeed())
+
+				ginkgo.By("Verifying snapshot is gone")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, snapshotKey, &corev1.ConfigMap{})).Should(testingutil.BeNotFoundError())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Triggering reconciliation to recreate snapshot")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					if gotTrainJob.Annotations == nil {
+						gotTrainJob.Annotations = make(map[string]string)
+					}
+					gotTrainJob.Annotations["migration-test"] = "trigger"
+					g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Verifying snapshot ConfigMap is recreated")
+				gomega.Eventually(func(g gomega.Gomega) {
+					cm := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, snapshotKey, cm)).Should(gomega.Succeed())
+					g.Expect(cm.Data).Should(gomega.HaveKey("runtime"))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
+
 	})
 })
