@@ -17,21 +17,20 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.trainer_v1alpha1_optimization_storage import TrainerV1alpha1OptimizationStorage
+from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_apis_meta_v1_object_meta import IoK8sApimachineryPkgApisMetaV1ObjectMeta
+from kubeflow_trainer_api.models.trainer_v1alpha1_train_job_spec import TrainerV1alpha1TrainJobSpec
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1TrialConfig(BaseModel):
+class TrainerV1alpha1TrainJobTemplateSpec(BaseModel):
     """
-    TrialConfig controls the orchestration of the trials.
+    TrainJobTemplateSpec describes the metadata and spec of the TrainJobs created by the OptimizationJob.
     """ # noqa: E501
-    max_failed_trials: Optional[StrictInt] = Field(default=None, alias="maxFailedTrials")
-    num_trials: Optional[StrictInt] = Field(default=None, alias="numTrials")
-    parallel_trials: Optional[StrictInt] = Field(default=None, alias="parallelTrials")
-    storage: Optional[TrainerV1alpha1OptimizationStorage] = Field(default=None, description="Storage configures where suspended trials persist their checkpoints.")
-    __properties: ClassVar[List[str]] = ["maxFailedTrials", "numTrials", "parallelTrials", "storage"]
+    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="Standard object's metadata.")
+    spec: TrainerV1alpha1TrainJobSpec = Field(description="Specification of the desired behavior of the TrainJob. Hyperparameters are injected into this template via String Templating. Users can place placeholders like {{.parameter_name}} anywhere in this spec (e.g., in args, env values, or annotations) and the controller will render the actual values before applying the TrainJob.")
+    __properties: ClassVar[List[str]] = ["metadata", "spec"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -51,7 +50,7 @@ class TrainerV1alpha1TrialConfig(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrialConfig from a JSON string"""
+        """Create an instance of TrainerV1alpha1TrainJobTemplateSpec from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -72,14 +71,17 @@ class TrainerV1alpha1TrialConfig(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of storage
-        if self.storage:
-            _dict['storage'] = self.storage.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of metadata
+        if self.metadata:
+            _dict['metadata'] = self.metadata.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of spec
+        if self.spec:
+            _dict['spec'] = self.spec.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrialConfig from a dict"""
+        """Create an instance of TrainerV1alpha1TrainJobTemplateSpec from a dict"""
         if obj is None:
             return None
 
@@ -87,10 +89,8 @@ class TrainerV1alpha1TrialConfig(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "maxFailedTrials": obj.get("maxFailedTrials"),
-            "numTrials": obj.get("numTrials"),
-            "parallelTrials": obj.get("parallelTrials"),
-            "storage": TrainerV1alpha1OptimizationStorage.from_dict(obj["storage"]) if obj.get("storage") is not None else None
+            "metadata": IoK8sApimachineryPkgApisMetaV1ObjectMeta.from_dict(obj["metadata"]) if obj.get("metadata") is not None else None,
+            "spec": TrainerV1alpha1TrainJobSpec.from_dict(obj["spec"]) if obj.get("spec") is not None else None
         })
         return _obj
 

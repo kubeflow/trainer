@@ -24,6 +24,8 @@ type TrialConfigApplyConfiguration struct {
 	NumTrials       *int32 `json:"numTrials,omitempty"`
 	ParallelTrials  *int32 `json:"parallelTrials,omitempty"`
 	MaxFailedTrials *int32 `json:"maxFailedTrials,omitempty"`
+	// Storage configures where suspended trials persist their checkpoints.
+	Storage *OptimizationStorageApplyConfiguration `json:"storage,omitempty"`
 }
 
 // TrialConfigApplyConfiguration constructs a declarative configuration of the TrialConfig type for use with
@@ -53,5 +55,13 @@ func (b *TrialConfigApplyConfiguration) WithParallelTrials(value int32) *TrialCo
 // If called multiple times, the MaxFailedTrials field is set to the value of the last call.
 func (b *TrialConfigApplyConfiguration) WithMaxFailedTrials(value int32) *TrialConfigApplyConfiguration {
 	b.MaxFailedTrials = &value
+	return b
+}
+
+// WithStorage sets the Storage field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Storage field is set to the value of the last call.
+func (b *TrialConfigApplyConfiguration) WithStorage(value *OptimizationStorageApplyConfiguration) *TrialConfigApplyConfiguration {
+	b.Storage = value
 	return b
 }

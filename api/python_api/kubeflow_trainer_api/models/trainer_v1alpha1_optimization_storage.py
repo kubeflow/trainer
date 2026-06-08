@@ -17,21 +17,18 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.trainer_v1alpha1_optimization_storage import TrainerV1alpha1OptimizationStorage
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1TrialConfig(BaseModel):
+class TrainerV1alpha1OptimizationStorage(BaseModel):
     """
-    TrialConfig controls the orchestration of the trials.
+    OptimizationStorage defines the persistent layer for trial checkpoints and state recovery.
     """ # noqa: E501
-    max_failed_trials: Optional[StrictInt] = Field(default=None, alias="maxFailedTrials")
-    num_trials: Optional[StrictInt] = Field(default=None, alias="numTrials")
-    parallel_trials: Optional[StrictInt] = Field(default=None, alias="parallelTrials")
-    storage: Optional[TrainerV1alpha1OptimizationStorage] = Field(default=None, description="Storage configures where suspended trials persist their checkpoints.")
-    __properties: ClassVar[List[str]] = ["maxFailedTrials", "numTrials", "parallelTrials", "storage"]
+    pvc_name: Optional[StrictStr] = Field(default=None, description="PvcName is the name of an existing PersistentVolumeClaim in the same namespace.", alias="pvcName")
+    storage_uri: Optional[StrictStr] = Field(default=None, description="StorageUri is the remote object storage path (e.g., s3://my-bucket/experiments).", alias="storageUri")
+    __properties: ClassVar[List[str]] = ["pvcName", "storageUri"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -51,7 +48,7 @@ class TrainerV1alpha1TrialConfig(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrialConfig from a JSON string"""
+        """Create an instance of TrainerV1alpha1OptimizationStorage from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -72,14 +69,11 @@ class TrainerV1alpha1TrialConfig(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of storage
-        if self.storage:
-            _dict['storage'] = self.storage.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrialConfig from a dict"""
+        """Create an instance of TrainerV1alpha1OptimizationStorage from a dict"""
         if obj is None:
             return None
 
@@ -87,10 +81,8 @@ class TrainerV1alpha1TrialConfig(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "maxFailedTrials": obj.get("maxFailedTrials"),
-            "numTrials": obj.get("numTrials"),
-            "parallelTrials": obj.get("parallelTrials"),
-            "storage": TrainerV1alpha1OptimizationStorage.from_dict(obj["storage"]) if obj.get("storage") is not None else None
+            "pvcName": obj.get("pvcName"),
+            "storageUri": obj.get("storageUri")
         })
         return _obj
 

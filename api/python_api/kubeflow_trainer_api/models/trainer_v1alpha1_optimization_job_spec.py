@@ -18,10 +18,12 @@ import re  # noqa: F401
 import json
 
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_algorithm import TrainerV1alpha1Algorithm
+from kubeflow_trainer_api.models.trainer_v1alpha1_early_stopping import TrainerV1alpha1EarlyStopping
 from kubeflow_trainer_api.models.trainer_v1alpha1_objective import TrainerV1alpha1Objective
 from kubeflow_trainer_api.models.trainer_v1alpha1_parameter import TrainerV1alpha1Parameter
+from kubeflow_trainer_api.models.trainer_v1alpha1_train_job_template_spec import TrainerV1alpha1TrainJobTemplateSpec
 from kubeflow_trainer_api.models.trainer_v1alpha1_trial_config import TrainerV1alpha1TrialConfig
 from typing import Optional, Set
 from typing_extensions import Self
@@ -31,11 +33,12 @@ class TrainerV1alpha1OptimizationJobSpec(BaseModel):
     OptimizationJobSpec defines the desired state of OptimizationJob.
     """ # noqa: E501
     algorithm: TrainerV1alpha1Algorithm
+    early_stopping: Optional[TrainerV1alpha1EarlyStopping] = Field(default=None, description="EarlyStopping separates the pruning logic from the search algorithm.", alias="earlyStopping")
     objectives: List[TrainerV1alpha1Objective]
     parameters: List[TrainerV1alpha1Parameter]
     trial_config: TrainerV1alpha1TrialConfig = Field(alias="trialConfig")
-    trial_template: Dict[str, Any] = Field(description="TrialTemplate acts as a generic wrapper for the underlying workload. Parameters are injected via native Kubernetes Environment Variables, replacing regex.", alias="trialTemplate")
-    __properties: ClassVar[List[str]] = ["algorithm", "objectives", "parameters", "trialConfig", "trialTemplate"]
+    trial_template: TrainerV1alpha1TrainJobTemplateSpec = Field(description="TrialTemplate wraps the underlying TrainJob workload and its metadata. Parameter propagation is handled via native string rendering before creation.", alias="trialTemplate")
+    __properties: ClassVar[List[str]] = ["algorithm", "earlyStopping", "objectives", "parameters", "trialConfig", "trialTemplate"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -79,6 +82,9 @@ class TrainerV1alpha1OptimizationJobSpec(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of algorithm
         if self.algorithm:
             _dict['algorithm'] = self.algorithm.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of early_stopping
+        if self.early_stopping:
+            _dict['earlyStopping'] = self.early_stopping.to_dict()
         # override the default output from pydantic by calling `to_dict()` of each item in objectives (list)
         _items = []
         if self.objectives:
@@ -96,6 +102,9 @@ class TrainerV1alpha1OptimizationJobSpec(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of trial_config
         if self.trial_config:
             _dict['trialConfig'] = self.trial_config.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of trial_template
+        if self.trial_template:
+            _dict['trialTemplate'] = self.trial_template.to_dict()
         return _dict
 
     @classmethod
@@ -109,10 +118,11 @@ class TrainerV1alpha1OptimizationJobSpec(BaseModel):
 
         _obj = cls.model_validate({
             "algorithm": TrainerV1alpha1Algorithm.from_dict(obj["algorithm"]) if obj.get("algorithm") is not None else None,
+            "earlyStopping": TrainerV1alpha1EarlyStopping.from_dict(obj["earlyStopping"]) if obj.get("earlyStopping") is not None else None,
             "objectives": [TrainerV1alpha1Objective.from_dict(_item) for _item in obj["objectives"]] if obj.get("objectives") is not None else None,
             "parameters": [TrainerV1alpha1Parameter.from_dict(_item) for _item in obj["parameters"]] if obj.get("parameters") is not None else None,
             "trialConfig": TrainerV1alpha1TrialConfig.from_dict(obj["trialConfig"]) if obj.get("trialConfig") is not None else None,
-            "trialTemplate": obj.get("trialTemplate")
+            "trialTemplate": TrainerV1alpha1TrainJobTemplateSpec.from_dict(obj["trialTemplate"]) if obj.get("trialTemplate") is not None else None
         })
         return _obj
 

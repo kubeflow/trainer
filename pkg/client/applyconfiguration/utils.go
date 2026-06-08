@@ -42,6 +42,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.CoschedulingPodGroupPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("DatasetInitializer"):
 		return &trainerv1alpha1.DatasetInitializerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("EarlyStopping"):
+		return &trainerv1alpha1.EarlyStoppingApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("FluxMLPolicySource"):
 		return &trainerv1alpha1.FluxMLPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Initializer"):
@@ -76,6 +78,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.OptimizationJobSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("OptimizationJobStatus"):
 		return &trainerv1alpha1.OptimizationJobStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("OptimizationStorage"):
+		return &trainerv1alpha1.OptimizationStorageApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Parameter"):
 		return &trainerv1alpha1.ParameterApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ParameterAssignment"):
@@ -114,6 +118,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.TrainJobSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobStatus"):
 		return &trainerv1alpha1.TrainJobStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobTemplateSpec"):
+		return &trainerv1alpha1.TrainJobTemplateSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrialConfig"):
 		return &trainerv1alpha1.TrialConfigApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("VolcanoPodGroupPolicySource"):

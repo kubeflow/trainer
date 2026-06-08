@@ -17,7 +17,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, StrictStr
 from typing import Any, ClassVar, Dict, List
 from typing import Optional, Set
 from typing_extensions import Self
@@ -26,8 +26,8 @@ class TrainerV1alpha1ParameterAssignment(BaseModel):
     """
     ParameterAssignment represents a single hyperparameter and its assigned value.
     """ # noqa: E501
-    name: StrictStr = Field(description="name is the user-defined label for the parameter (e.g., \"learning_rate\").")
-    value: StrictStr = Field(description="value of the parameter. Values must be serialized as a string to avoid float precision issues and align with Trainer v2 patterns.")
+    name: StrictStr
+    value: StrictStr
     __properties: ClassVar[List[str]] = ["name", "value"]
 
     model_config = ConfigDict(

@@ -27,18 +27,33 @@ type Objective struct {
 
 	// +kubebuilder:validation:Enum=maximize;minimize
 	Direction string `json:"direction"`
-
-	// deferred to phase 2
-	// Goal      *float64 `json:"goal,omitempty"`
 }
 
 // Algorithm defines the optimization algorithm configuration.
 type Algorithm struct {
-	// +kubebuilder:validation:Enum=random;grid
+	// Name of the optimization algorithm (e.g., random, grid, bayesian, tpe, hyperband).
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Provider specifies the backend suggestion engine executing the math (e.g., optuna, vizier).
+	// If omitted, the controller will route to a cluster-default provider.
+	// +optional
+	Provider *string `json:"provider,omitempty"`
+
+	// +listType=map
+	// +listMapKey=name
+	Settings []SettingKV `json:"settings,omitempty"`
+}
+
+// EarlyStopping defines the configuration for pruning unpromising trials.
+type EarlyStopping struct {
+	// Name of the early stopping algorithm (e.g., median, asha).
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// +listType=map
 	// +listMapKey=name
+	// +optional
 	Settings []SettingKV `json:"settings,omitempty"`
 }
 
@@ -51,10 +66,10 @@ type SettingKV struct {
 
 // SearchSpace defines the type and exact boundaries for the algorithm to search.
 // +kubebuilder:validation:XValidation:rule="self.type != 'categorical' || (has(self.list) && size(self.list) > 0)",message="list must be provided and contain at least one item when type is categorical"
-// +kubebuilder:validation:XValidation:rule="self.type == 'categorical' || (has(self.min) && has(self.max) && self.min != ” && self.max != ”)",message="min and max must be provided and be non-empty for int or double types"
+// +kubebuilder:validation:XValidation:rule="self.type == 'categorical' || (has(self.min) && has(self.max) && size(self.min) > 0 && size(self.max) > 0)",message="min and max must be provided and be non-empty for int or double types"
 type SearchSpace struct {
 	// +kubebuilder:validation:Enum=int;double;categorical
-	Type string `json:"type"` // e.g., int, double, categorical
+	Type string `json:"type"`
 
 	// +kubebuilder:validation:MinLength=1
 	Max string `json:"max,omitempty"`
@@ -77,18 +92,27 @@ type Parameter struct {
 
 // ParameterAssignment represents a single hyperparameter and its assigned value.
 type ParameterAssignment struct {
-	// name is the user-defined label for the parameter (e.g., "learning_rate").
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=64
 	// +required
 	Name string `json:"name"`
 
-	// value of the parameter. Values must be serialized as a string
-	// to avoid float precision issues and align with Trainer v2 patterns.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=64
 	// +required
 	Value string `json:"value"`
+}
+
+// OptimizationStorage defines the persistent layer for trial checkpoints and state recovery.
+type OptimizationStorage struct {
+	// StorageUri is the remote object storage path (e.g., s3://my-bucket/experiments).
+	// +kubebuilder:validation:Pattern=`^[A-Za-z][A-Za-z0-9+.-]*://.+$`
+	// +optional
+	StorageUri *string `json:"storageUri,omitempty"`
+
+	// PvcName is the name of an existing PersistentVolumeClaim in the same namespace.
+	// +optional
+	PvcName *string `json:"pvcName,omitempty"`
 }
 
 // TrialConfig controls the orchestration of the trials.
@@ -102,16 +126,39 @@ type TrialConfig struct {
 
 	// +kubebuilder:validation:Minimum=0
 	MaxFailedTrials *int32 `json:"maxFailedTrials,omitempty"`
+
+	// Storage configures where suspended trials persist their checkpoints.
+	// +optional
+	Storage *OptimizationStorage `json:"storage,omitempty"`
 }
 
 // BestTrial tracks the best performing trial.
 type BestTrial struct {
 	Name string `json:"name"`
 
-	// parameters is a list of the hyperparameter assignments that won.
+	// Value is the actual observed metric value achieved by this trial.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=64
+	Value string `json:"value"`
+
 	// +listType=atomic
 	// +optional
 	Parameters []ParameterAssignment `json:"parameters,omitempty"`
+}
+
+// TrainJobTemplateSpec describes the metadata and spec of the TrainJobs created by the OptimizationJob.
+type TrainJobTemplateSpec struct {
+	// Standard object's metadata.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="!has(self.name) && !has(self.namespace)", message="name and namespace cannot be set in a template."
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Specification of the desired behavior of the TrainJob.
+	// Hyperparameters are injected into this template via String Templating.
+	// Users can place placeholders like {{.parameter_name}} anywhere in this spec
+	// (e.g., in args, env values, or annotations) and the controller will render
+	// the actual values before applying the TrainJob.
+	Spec TrainJobSpec `json:"spec"`
 }
 
 // OptimizationJobSpec defines the desired state of OptimizationJob.
@@ -122,6 +169,10 @@ type OptimizationJobSpec struct {
 
 	Algorithm Algorithm `json:"algorithm"`
 
+	// EarlyStopping separates the pruning logic from the search algorithm.
+	// +optional
+	EarlyStopping *EarlyStopping `json:"earlyStopping,omitempty"`
+
 	// +listType=map
 	// +listMapKey=name
 	// +kubebuilder:validation:MinItems=1
@@ -129,9 +180,9 @@ type OptimizationJobSpec struct {
 
 	TrialConfig TrialConfig `json:"trialConfig"`
 
-	// TrialTemplate wraps the underlying TrainJob workload.
-	// Parameters are injected via native Kubernetes Environment Variables.
-	TrialTemplate TrainJobSpec `json:"trialTemplate"`
+	// TrialTemplate wraps the underlying TrainJob workload and its metadata.
+	// Parameter propagation is handled via native string rendering before creation.
+	TrainJobTemplate TrainJobTemplateSpec `json:"trialTemplate"`
 }
 
 // OptimizationJobPhase represents the current phase of the OptimizationJob.
@@ -146,7 +197,6 @@ const (
 
 // OptimizationJobStatus defines the observed state of OptimizationJob.
 type OptimizationJobStatus struct {
-	// Phase represents the current state of the OptimizationJob.
 	// +optional
 	Phase OptimizationJobPhase `json:"phase,omitempty"`
 
@@ -154,9 +204,12 @@ type OptimizationJobStatus struct {
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// Counters for Trial states
 	// +kubebuilder:validation:Minimum=0
 	Active int32 `json:"active,omitempty"`
+
+	// Suspended tracks trials that are paused by dynamic algorithms (e.g., PBT).
+	// +kubebuilder:validation:Minimum=0
+	Suspended int32 `json:"suspended,omitempty"`
 
 	// +kubebuilder:validation:Minimum=0
 	Succeeded int32 `json:"succeeded,omitempty"`

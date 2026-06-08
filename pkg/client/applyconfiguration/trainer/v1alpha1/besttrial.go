@@ -20,11 +20,11 @@ package v1alpha1
 // with apply.
 //
 // BestTrial tracks the best performing trial.
-// Kept minimal for MVP; users can inspect the specific Trial/TrainJob for exact metrics and settings.
 type BestTrialApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
-	// optimalParameters is a list of the hyperparameter assignments that won.
-	OptimalParameters []ParameterAssignmentApplyConfiguration `json:"optimalParameters,omitempty"`
+	// Value is the actual observed metric value achieved by this trial.
+	Value      *string                                 `json:"value,omitempty"`
+	Parameters []ParameterAssignmentApplyConfiguration `json:"parameters,omitempty"`
 }
 
 // BestTrialApplyConfiguration constructs a declarative configuration of the BestTrial type for use with
@@ -41,15 +41,23 @@ func (b *BestTrialApplyConfiguration) WithName(value string) *BestTrialApplyConf
 	return b
 }
 
-// WithOptimalParameters adds the given value to the OptimalParameters field in the declarative configuration
+// WithValue sets the Value field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Value field is set to the value of the last call.
+func (b *BestTrialApplyConfiguration) WithValue(value string) *BestTrialApplyConfiguration {
+	b.Value = &value
+	return b
+}
+
+// WithParameters adds the given value to the Parameters field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the OptimalParameters field.
-func (b *BestTrialApplyConfiguration) WithOptimalParameters(values ...*ParameterAssignmentApplyConfiguration) *BestTrialApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the Parameters field.
+func (b *BestTrialApplyConfiguration) WithParameters(values ...*ParameterAssignmentApplyConfiguration) *BestTrialApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
-			panic("nil value passed to WithOptimalParameters")
+			panic("nil value passed to WithParameters")
 		}
-		b.OptimalParameters = append(b.OptimalParameters, *values[i])
+		b.Parameters = append(b.Parameters, *values[i])
 	}
 	return b
 }

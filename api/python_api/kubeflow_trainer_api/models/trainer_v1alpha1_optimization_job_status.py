@@ -17,7 +17,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_apis_meta_v1_condition import IoK8sApimachineryPkgApisMetaV1Condition
 from kubeflow_trainer_api.models.trainer_v1alpha1_best_trial import TrainerV1alpha1BestTrial
@@ -28,12 +28,14 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
     """
     OptimizationJobStatus defines the observed state of OptimizationJob.
     """ # noqa: E501
-    active: Optional[StrictInt] = Field(default=None, description="Counters for Trial states")
+    active: Optional[StrictInt] = None
     best_trial: Optional[TrainerV1alpha1BestTrial] = Field(default=None, description="BestTrial caches the highest performing trial based on the Objective.", alias="bestTrial")
     conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = None
     failed: Optional[StrictInt] = None
+    phase: Optional[StrictStr] = None
     succeeded: Optional[StrictInt] = None
-    __properties: ClassVar[List[str]] = ["active", "bestTrial", "conditions", "failed", "succeeded"]
+    suspended: Optional[StrictInt] = Field(default=None, description="Suspended tracks trials that are paused by dynamic algorithms (e.g., PBT).")
+    __properties: ClassVar[List[str]] = ["active", "bestTrial", "conditions", "failed", "phase", "succeeded", "suspended"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -100,7 +102,9 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
             "bestTrial": TrainerV1alpha1BestTrial.from_dict(obj["bestTrial"]) if obj.get("bestTrial") is not None else None,
             "conditions": [IoK8sApimachineryPkgApisMetaV1Condition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
             "failed": obj.get("failed"),
-            "succeeded": obj.get("succeeded")
+            "phase": obj.get("phase"),
+            "succeeded": obj.get("succeeded"),
+            "suspended": obj.get("suspended")
         })
         return _obj
 

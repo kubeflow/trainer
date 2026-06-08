@@ -17,7 +17,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_setting_kv import TrainerV1alpha1SettingKV
 from typing import Optional, Set
@@ -27,9 +27,10 @@ class TrainerV1alpha1Algorithm(BaseModel):
     """
     Algorithm defines the optimization algorithm configuration.
     """ # noqa: E501
-    name: StrictStr
+    name: StrictStr = Field(description="Name of the optimization algorithm (e.g., random, grid, bayesian, tpe, hyperband).")
+    provider: Optional[StrictStr] = Field(default=None, description="Provider specifies the backend suggestion engine executing the math (e.g., optuna, vizier). If omitted, the controller will route to a cluster-default provider.")
     settings: Optional[List[TrainerV1alpha1SettingKV]] = None
-    __properties: ClassVar[List[str]] = ["name", "settings"]
+    __properties: ClassVar[List[str]] = ["name", "provider", "settings"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -90,6 +91,7 @@ class TrainerV1alpha1Algorithm(BaseModel):
 
         _obj = cls.model_validate({
             "name": obj.get("name") if obj.get("name") is not None else '',
+            "provider": obj.get("provider"),
             "settings": [TrainerV1alpha1SettingKV.from_dict(_item) for _item in obj["settings"]] if obj.get("settings") is not None else None
         })
         return _obj

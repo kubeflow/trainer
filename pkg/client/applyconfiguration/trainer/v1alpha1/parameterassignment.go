@@ -21,10 +21,7 @@ package v1alpha1
 //
 // ParameterAssignment represents a single hyperparameter and its assigned value.
 type ParameterAssignmentApplyConfiguration struct {
-	// name is the user-defined label for the parameter (e.g., "learning_rate").
-	Name *string `json:"name,omitempty"`
-	// value of the parameter. Values must be serialized as a string
-	// to avoid float precision issues and align with Trainer v2 patterns.
+	Name  *string `json:"name,omitempty"`
 	Value *string `json:"value,omitempty"`
 }
 

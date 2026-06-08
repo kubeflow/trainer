@@ -17,21 +17,19 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.trainer_v1alpha1_optimization_storage import TrainerV1alpha1OptimizationStorage
+from kubeflow_trainer_api.models.trainer_v1alpha1_setting_kv import TrainerV1alpha1SettingKV
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1TrialConfig(BaseModel):
+class TrainerV1alpha1EarlyStopping(BaseModel):
     """
-    TrialConfig controls the orchestration of the trials.
+    EarlyStopping defines the configuration for pruning unpromising trials.
     """ # noqa: E501
-    max_failed_trials: Optional[StrictInt] = Field(default=None, alias="maxFailedTrials")
-    num_trials: Optional[StrictInt] = Field(default=None, alias="numTrials")
-    parallel_trials: Optional[StrictInt] = Field(default=None, alias="parallelTrials")
-    storage: Optional[TrainerV1alpha1OptimizationStorage] = Field(default=None, description="Storage configures where suspended trials persist their checkpoints.")
-    __properties: ClassVar[List[str]] = ["maxFailedTrials", "numTrials", "parallelTrials", "storage"]
+    name: StrictStr = Field(description="Name of the early stopping algorithm (e.g., median, asha).")
+    settings: Optional[List[TrainerV1alpha1SettingKV]] = None
+    __properties: ClassVar[List[str]] = ["name", "settings"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -51,7 +49,7 @@ class TrainerV1alpha1TrialConfig(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrialConfig from a JSON string"""
+        """Create an instance of TrainerV1alpha1EarlyStopping from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -72,14 +70,18 @@ class TrainerV1alpha1TrialConfig(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of storage
-        if self.storage:
-            _dict['storage'] = self.storage.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of each item in settings (list)
+        _items = []
+        if self.settings:
+            for _item_settings in self.settings:
+                if _item_settings:
+                    _items.append(_item_settings.to_dict())
+            _dict['settings'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrialConfig from a dict"""
+        """Create an instance of TrainerV1alpha1EarlyStopping from a dict"""
         if obj is None:
             return None
 
@@ -87,10 +89,8 @@ class TrainerV1alpha1TrialConfig(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "maxFailedTrials": obj.get("maxFailedTrials"),
-            "numTrials": obj.get("numTrials"),
-            "parallelTrials": obj.get("parallelTrials"),
-            "storage": TrainerV1alpha1OptimizationStorage.from_dict(obj["storage"]) if obj.get("storage") is not None else None
+            "name": obj.get("name") if obj.get("name") is not None else '',
+            "settings": [TrainerV1alpha1SettingKV.from_dict(_item) for _item in obj["settings"]] if obj.get("settings") is not None else None
         })
         return _obj
 

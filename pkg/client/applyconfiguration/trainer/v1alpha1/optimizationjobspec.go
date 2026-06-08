@@ -16,22 +16,20 @@
 
 package v1alpha1
 
-import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
-)
-
 // OptimizationJobSpecApplyConfiguration represents a declarative configuration of the OptimizationJobSpec type for use
 // with apply.
 //
 // OptimizationJobSpec defines the desired state of OptimizationJob.
 type OptimizationJobSpecApplyConfiguration struct {
-	Objectives  []ObjectiveApplyConfiguration  `json:"objectives,omitempty"`
-	Algorithm   *AlgorithmApplyConfiguration   `json:"algorithm,omitempty"`
-	Parameters  []ParameterApplyConfiguration  `json:"parameters,omitempty"`
-	TrialConfig *TrialConfigApplyConfiguration `json:"trialConfig,omitempty"`
-	// TrialTemplate acts as a generic wrapper for the underlying workload.
-	// Parameters are injected via native Kubernetes Environment Variables, replacing regex.
-	TrialTemplate *runtime.RawExtension `json:"trialTemplate,omitempty"`
+	Objectives []ObjectiveApplyConfiguration `json:"objectives,omitempty"`
+	Algorithm  *AlgorithmApplyConfiguration  `json:"algorithm,omitempty"`
+	// EarlyStopping separates the pruning logic from the search algorithm.
+	EarlyStopping *EarlyStoppingApplyConfiguration `json:"earlyStopping,omitempty"`
+	Parameters    []ParameterApplyConfiguration    `json:"parameters,omitempty"`
+	TrialConfig   *TrialConfigApplyConfiguration   `json:"trialConfig,omitempty"`
+	// TrialTemplate wraps the underlying TrainJob workload and its metadata.
+	// Parameter propagation is handled via native string rendering before creation.
+	TrainJobTemplate *TrainJobTemplateSpecApplyConfiguration `json:"trialTemplate,omitempty"`
 }
 
 // OptimizationJobSpecApplyConfiguration constructs a declarative configuration of the OptimizationJobSpec type for use with
@@ -61,6 +59,14 @@ func (b *OptimizationJobSpecApplyConfiguration) WithAlgorithm(value *AlgorithmAp
 	return b
 }
 
+// WithEarlyStopping sets the EarlyStopping field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the EarlyStopping field is set to the value of the last call.
+func (b *OptimizationJobSpecApplyConfiguration) WithEarlyStopping(value *EarlyStoppingApplyConfiguration) *OptimizationJobSpecApplyConfiguration {
+	b.EarlyStopping = value
+	return b
+}
+
 // WithParameters adds the given value to the Parameters field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Parameters field.
@@ -82,10 +88,10 @@ func (b *OptimizationJobSpecApplyConfiguration) WithTrialConfig(value *TrialConf
 	return b
 }
 
-// WithTrialTemplate sets the TrialTemplate field in the declarative configuration to the given value
+// WithTrainJobTemplate sets the TrainJobTemplate field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the TrialTemplate field is set to the value of the last call.
-func (b *OptimizationJobSpecApplyConfiguration) WithTrialTemplate(value runtime.RawExtension) *OptimizationJobSpecApplyConfiguration {
-	b.TrialTemplate = &value
+// If called multiple times, the TrainJobTemplate field is set to the value of the last call.
+func (b *OptimizationJobSpecApplyConfiguration) WithTrainJobTemplate(value *TrainJobTemplateSpecApplyConfiguration) *OptimizationJobSpecApplyConfiguration {
+	b.TrainJobTemplate = value
 	return b
 }

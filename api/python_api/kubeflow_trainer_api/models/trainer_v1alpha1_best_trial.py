@@ -25,11 +25,12 @@ from typing_extensions import Self
 
 class TrainerV1alpha1BestTrial(BaseModel):
     """
-    BestTrial tracks the best performing trial. Kept minimal for MVP; users can inspect the specific Trial/TrainJob for exact metrics and settings.
+    BestTrial tracks the best performing trial.
     """ # noqa: E501
     name: StrictStr
-    optimal_parameters: Optional[List[TrainerV1alpha1ParameterAssignment]] = Field(default=None, description="optimalParameters is a list of the hyperparameter assignments that won.", alias="optimalParameters")
-    __properties: ClassVar[List[str]] = ["name", "optimalParameters"]
+    parameters: Optional[List[TrainerV1alpha1ParameterAssignment]] = None
+    value: StrictStr = Field(description="Value is the actual observed metric value achieved by this trial.")
+    __properties: ClassVar[List[str]] = ["name", "parameters", "value"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -70,13 +71,13 @@ class TrainerV1alpha1BestTrial(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in optimal_parameters (list)
+        # override the default output from pydantic by calling `to_dict()` of each item in parameters (list)
         _items = []
-        if self.optimal_parameters:
-            for _item_optimal_parameters in self.optimal_parameters:
-                if _item_optimal_parameters:
-                    _items.append(_item_optimal_parameters.to_dict())
-            _dict['optimalParameters'] = _items
+        if self.parameters:
+            for _item_parameters in self.parameters:
+                if _item_parameters:
+                    _items.append(_item_parameters.to_dict())
+            _dict['parameters'] = _items
         return _dict
 
     @classmethod
@@ -90,7 +91,8 @@ class TrainerV1alpha1BestTrial(BaseModel):
 
         _obj = cls.model_validate({
             "name": obj.get("name") if obj.get("name") is not None else '',
-            "optimalParameters": [TrainerV1alpha1ParameterAssignment.from_dict(_item) for _item in obj["optimalParameters"]] if obj.get("optimalParameters") is not None else None
+            "parameters": [TrainerV1alpha1ParameterAssignment.from_dict(_item) for _item in obj["parameters"]] if obj.get("parameters") is not None else None,
+            "value": obj.get("value") if obj.get("value") is not None else ''
         })
         return _obj
 

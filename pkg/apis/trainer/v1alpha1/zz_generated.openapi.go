@@ -40,6 +40,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ContainerPatch":                   schema_pkg_apis_trainer_v1alpha1_ContainerPatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource": schema_pkg_apis_trainer_v1alpha1_CoschedulingPodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.DatasetInitializer":               schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EarlyStopping":                    schema_pkg_apis_trainer_v1alpha1_EarlyStopping(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.FluxMLPolicySource":               schema_pkg_apis_trainer_v1alpha1_FluxMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Initializer":                      schema_pkg_apis_trainer_v1alpha1_Initializer(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource":                schema_pkg_apis_trainer_v1alpha1_JAXMLPolicySource(ref),
@@ -59,6 +60,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobList":              schema_pkg_apis_trainer_v1alpha1_OptimizationJobList(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobSpec":              schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobStatus":            schema_pkg_apis_trainer_v1alpha1_OptimizationJobStatus(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationStorage":              schema_pkg_apis_trainer_v1alpha1_OptimizationStorage(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Parameter":                        schema_pkg_apis_trainer_v1alpha1_Parameter(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ParameterAssignment":              schema_pkg_apis_trainer_v1alpha1_ParameterAssignment(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicy":                   schema_pkg_apis_trainer_v1alpha1_PodGroupPolicy(ref),
@@ -75,6 +77,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobList":                     schema_pkg_apis_trainer_v1alpha1_TrainJobList(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobSpec":                     schema_pkg_apis_trainer_v1alpha1_TrainJobSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobStatus":                   schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTemplateSpec":             schema_pkg_apis_trainer_v1alpha1_TrainJobTemplateSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Trainer":                          schema_pkg_apis_trainer_v1alpha1_Trainer(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus":                    schema_pkg_apis_trainer_v1alpha1_TrainerStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntime":                  schema_pkg_apis_trainer_v1alpha1_TrainingRuntime(ref),
@@ -464,9 +467,17 @@ func schema_pkg_apis_trainer_v1alpha1_Algorithm(ref common.ReferenceCallback) co
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "Name of the optimization algorithm (e.g., random, grid, bayesian, tpe, hyperband).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"provider": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Provider specifies the backend suggestion engine executing the math (e.g., optuna, vizier). If omitted, the controller will route to a cluster-default provider.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"settings": {
@@ -503,7 +514,7 @@ func schema_pkg_apis_trainer_v1alpha1_BestTrial(ref common.ReferenceCallback) co
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "BestTrial tracks the best performing trial. Kept minimal for MVP; users can inspect the specific Trial/TrainJob for exact metrics and settings.",
+				Description: "BestTrial tracks the best performing trial.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -513,15 +524,22 @@ func schema_pkg_apis_trainer_v1alpha1_BestTrial(ref common.ReferenceCallback) co
 							Format:  "",
 						},
 					},
-					"optimalParameters": {
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value is the actual observed metric value achieved by this trial.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"parameters": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
 								"x-kubernetes-list-type": "atomic",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "optimalParameters is a list of the hyperparameter assignments that won.",
-							Type:        []string{"array"},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -533,7 +551,7 @@ func schema_pkg_apis_trainer_v1alpha1_BestTrial(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"name"},
+				Required: []string{"name", "value"},
 			},
 		},
 		Dependencies: []string{
@@ -775,6 +793,51 @@ func schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref common.ReferenceCal
 		},
 		Dependencies: []string{
 			corev1.EnvVar{}.OpenAPIModelName(), corev1.LocalObjectReference{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_EarlyStopping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EarlyStopping defines the configuration for pruning unpromising trials.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the early stopping algorithm (e.g., median, asha).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"settings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SettingKV"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SettingKV"},
 	}
 }
 
@@ -1402,6 +1465,12 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 							Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Algorithm"),
 						},
 					},
+					"earlyStopping": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EarlyStopping separates the pruning logic from the search algorithm.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EarlyStopping"),
+						},
+					},
 					"parameters": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -1431,8 +1500,9 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 					},
 					"trialTemplate": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TrialTemplate acts as a generic wrapper for the underlying workload. Parameters are injected via native Kubernetes Environment Variables, replacing regex.",
-							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
+							Description: "TrialTemplate wraps the underlying TrainJob workload and its metadata. Parameter propagation is handled via native string rendering before creation.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTemplateSpec"),
 						},
 					},
 				},
@@ -1440,7 +1510,7 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Algorithm", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Objective", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Parameter", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrialConfig", runtime.RawExtension{}.OpenAPIModelName()},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Algorithm", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EarlyStopping", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Objective", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Parameter", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTemplateSpec", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrialConfig"},
 	}
 }
 
@@ -1451,6 +1521,12 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobStatus(ref common.Reference
 				Description: "OptimizationJobStatus defines the observed state of OptimizationJob.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
+					"phase": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
 					"conditions": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -1474,7 +1550,13 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobStatus(ref common.Reference
 					},
 					"active": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Counters for Trial states",
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"suspended": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Suspended tracks trials that are paused by dynamic algorithms (e.g., PBT).",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -1502,6 +1584,33 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobStatus(ref common.Reference
 		},
 		Dependencies: []string{
 			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.BestTrial", metav1.Condition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_OptimizationStorage(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "OptimizationStorage defines the persistent layer for trial checkpoints and state recovery.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"storageUri": {
+						SchemaProps: spec.SchemaProps{
+							Description: "StorageUri is the remote object storage path (e.g., s3://my-bucket/experiments).",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"pvcName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PvcName is the name of an existing PersistentVolumeClaim in the same namespace.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -1543,18 +1652,16 @@ func schema_pkg_apis_trainer_v1alpha1_ParameterAssignment(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "name is the user-defined label for the parameter (e.g., \"learning_rate\").",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
 						},
 					},
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "value of the parameter. Values must be serialized as a string to avoid float precision issues and align with Trainer v2 patterns.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
 						},
 					},
 				},
@@ -2258,6 +2365,36 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref common.ReferenceCallbac
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_TrainJobTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TrainJobTemplateSpec describes the metadata and spec of the TrainJobs created by the OptimizationJob.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specification of the desired behavior of the TrainJob. Hyperparameters are injected into this template via String Templating. Users can place placeholders like {{.parameter_name}} anywhere in this spec (e.g., in args, env values, or annotations) and the controller will render the actual values before applying the TrainJob.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobSpec"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobSpec", metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -2590,9 +2727,17 @@ func schema_pkg_apis_trainer_v1alpha1_TrialConfig(ref common.ReferenceCallback) 
 							Format: "int32",
 						},
 					},
+					"storage": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Storage configures where suspended trials persist their checkpoints.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationStorage"),
+						},
+					},
 				},
 			},
 		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationStorage"},
 	}
 }
 
