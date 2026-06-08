@@ -1157,14 +1157,11 @@ support them. For example, runtimes for [Jax](https://jax.readthedocs.io/en/late
 After initial implementation, we will support TensorFlow, XGboost, and PaddlePaddle runtimes, but
 it is out of scope for this KEP.
 
-The `TrainingRuntime` is immutable, and so to make a change, a new version of the `TrainingRuntime`
-must be created and then the user must change the `TrainJob` to point to the new version.
-This provides control as to how changes to runtimes propagate to existing training jobs.
-For example, when training is running for a long time (e.g. 1-2 months).
-
-In the future implementation, we will introduce a revision control mechanism similar to
-[Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#updating-a-deployment)
-to control versions of `TrainingRuntime` and enable rolling updates.
+When a `TrainJob` is created, the Training Operator captures a snapshot of the referenced
+`TrainingRuntime` or `ClusterTrainingRuntime` configuration. This snapshot mechanism decouples the
+runtime lifecycle from running TrainJobs, allowing platform administrators to update or delete
+runtimes without affecting existing jobs.
+See [KEP-2599](../2599-mutable-runtimes/README.md) for the snapshot implementation details.
 
 We are going to create two CRDs: `TrainingRuntime` and `ClusterTrainingRuntime`. These runtimes have
 exactly the same APIs, but the first one is the namespace-scoped, the second is the cluster-scoped.
@@ -1942,6 +1939,7 @@ spec:
 - 2026-02-23 Removed `numProcPerNode` from `TorchMLPolicySource`; `TrainJob.Trainer.numProcPerNode`
   now accepts only int values (torch plugin defaults to `auto`)
 - 2025-10-09 Replace PodTemplateOverrides with RuntimePatches API
+- 2026-06-08 Removed runtime immutability requirement; runtime lifecycle decoupled from TrainJobs via snapshot mechanism ([KEP-2599](../2599-mutable-runtimes/README.md))
 
 ## Alternatives
 
