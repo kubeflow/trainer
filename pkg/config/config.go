@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -131,6 +132,19 @@ func Load(scheme *runtime.Scheme, configFile string, enableHTTP2 bool) (ctrl.Opt
 	addTo(&options, &cfg, enableHTTP2)
 
 	return options, cfg, nil
+}
+
+// ApplyClientConnection copies QPS and burst from cfg.ClientConnection to restCfg.
+// If ClientConnection is nil or individual fields are nil, existing restCfg values are preserved.
+func ApplyClientConnection(restCfg *rest.Config, cfg *configapi.Configuration) {
+	if cfg.ClientConnection != nil {
+		if cfg.ClientConnection.QPS != nil {
+			restCfg.QPS = *cfg.ClientConnection.QPS
+		}
+		if cfg.ClientConnection.Burst != nil {
+			restCfg.Burst = int(*cfg.ClientConnection.Burst)
+		}
+	}
 }
 
 // IsCertManagementEnabled returns true if certificate management is enabled.
