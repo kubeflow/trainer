@@ -54,13 +54,7 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "is-prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
 
-      - name: Ensure tag does not exist
-        run: |
-          git fetch --tags
-          if git tag -l | grep -q "^${{ steps.vars.outputs.tag }}$"; then
-            echo "Tag '${{ steps.vars.outputs.tag }}' already exists."
-            exit 1
-          fi
+
 
   tests:
     needs:
@@ -203,6 +197,7 @@ jobs:
     needs:
       - prepare
       - build_python_api
+      - create_tag
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -223,11 +218,39 @@ jobs:
           print-hash: true
           packages-dir: dist/
 
+  create_tag:
+    if: ${{ !cancelled() && !failure() }}
+    needs:
+      - prepare
+      - update_release_branch
+      - build_python_api
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.branch }}
+
+      - name: Create and push tag
+        run: |
+          TAG="${{ needs.prepare.outputs.tag }}"
+          if git ls-remote --tags origin "$TAG" | grep -q "refs/tags/$TAG"; then
+            echo "Tag $TAG already exists. Skipping"
+            exit 0
+          fi
+          git tag "$TAG"
+          git push origin "$TAG"
+
   github_release:
     if: ${{ !cancelled() && !failure() }}
     needs:
       - prepare
       - update_release_branch
+      - create_tag
       - publish_pypi
 
     permissions:
@@ -268,17 +291,6 @@ jobs:
             echo "$CHANGELOG"
             echo "EOF"
           } >> $GITHUB_OUTPUT
-
-      - name: Configure Git
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-      - name: Create and push tag
-        run: |
-          TAG_SHA=$(git rev-parse HEAD)
-          git tag -a "${{ needs.prepare.outputs.tag }}" "$TAG_SHA" -m "Kubeflow Trainer ${{ needs.prepare.outputs.tag }}"
-          git push origin "${{ needs.prepare.outputs.tag }}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
