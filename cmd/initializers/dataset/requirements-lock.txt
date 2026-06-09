@@ -4,10 +4,18 @@
 #
 #    pip-compile --output-file=cmd/initializers/dataset/requirements-lock.txt --strip-extras cmd/initializers/dataset/requirements.txt
 #
+aiohappyeyeballs==2.6.2
+    # via aiohttp
+aiohttp==3.14.1
+    # via kubernetes
+aiosignal==1.4.0
+    # via aiohttp
 annotated-doc==0.0.4
     # via typer
 anyio==4.13.0
     # via httpx
+attrs==26.1.0
+    # via aiohttp
 certifi==2026.5.20
     # via
     #   httpcore
@@ -16,17 +24,19 @@ certifi==2026.5.20
     #   requests
 charset-normalizer==3.4.7
     # via requests
-click==8.4.0
-    # via typer
 durationpy==0.10
     # via kubernetes
-filelock==3.29.0
+filelock==3.29.1
     # via huggingface-hub
+frozenlist==1.8.0
+    # via
+    #   aiohttp
+    #   aiosignal
 fsspec==2026.4.0
     # via huggingface-hub
 h11==0.16.0
     # via httpcore
-hf-xet==1.5.0
+hf-xet==1.5.1
     # via huggingface-hub
 httpcore==1.0.9
     # via httpx
@@ -34,23 +44,32 @@ httpx==0.28.1
     # via huggingface-hub
 huggingface-hub==1.14.0
     # via -r cmd/initializers/dataset/requirements.txt
-idna==3.15
+idna==3.18
     # via
     #   anyio
     #   httpx
     #   requests
-kubernetes==35.0.0
+    #   yarl
+kubernetes==36.0.2
     # via -r cmd/initializers/dataset/requirements.txt
 markdown-it-py==4.2.0
     # via rich
 mdurl==0.1.2
     # via markdown-it-py
+multidict==6.7.1
+    # via
+    #   aiohttp
+    #   yarl
 oauthlib==3.3.1
     # via requests-oauthlib
-opendal==0.47.1
+opendal==0.47.2
     # via -r cmd/initializers/dataset/requirements.txt
 packaging==26.2
     # via huggingface-hub
+propcache==0.5.2
+    # via
+    #   aiohttp
+    #   yarl
 pygments==2.20.0
     # via rich
 python-dateutil==2.9.0.post0
@@ -73,12 +92,14 @@ six==1.17.0
     # via
     #   kubernetes
     #   python-dateutil
-tqdm==4.67.3
+tqdm==4.68.2
     # via huggingface-hub
-typer==0.25.1
+typer==0.26.7
     # via huggingface-hub
 typing-extensions==4.15.0
     # via
+    #   aiohttp
+    #   aiosignal
     #   anyio
     #   huggingface-hub
 urllib3==2.7.0
@@ -87,3 +108,5 @@ urllib3==2.7.0
     #   requests
 websocket-client==1.9.0
     # via kubernetes
+yarl==1.24.2
+    # via aiohttp
