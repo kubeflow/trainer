@@ -55,19 +55,29 @@ func getRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.
 
 	// Unmarshal YAML into the runtime type
 	if err := yaml.Unmarshal([]byte(runtimeYAML), runtimeObj); err != nil {
-		return fmt.Errorf("invalid runtime snapshot: unable to unmarshall the snapshot: %w", err)
+		return fmt.Errorf("invalid runtime snapshot: unable to unmarshal the snapshot: %w", err)
 	}
 
 	// Validate snapshot matches expected RuntimeRef
 	snapshotGVK := runtimeObj.GetObjectKind().GroupVersionKind()
-	if snapshotGVK.Kind != *trainJob.Spec.RuntimeRef.Kind ||
-		snapshotGVK.Group != *trainJob.Spec.RuntimeRef.APIGroup ||
-		runtimeObj.GetName() != trainJob.Spec.RuntimeRef.Name {
+	kindMismatch := trainJob.Spec.RuntimeRef.Kind != nil && snapshotGVK.Kind != *trainJob.Spec.RuntimeRef.Kind
+	groupMismatch := trainJob.Spec.RuntimeRef.APIGroup != nil && snapshotGVK.Group != *trainJob.Spec.RuntimeRef.APIGroup
+	nameMismatch := runtimeObj.GetName() != trainJob.Spec.RuntimeRef.Name
+
+	if kindMismatch || groupMismatch || nameMismatch {
+		expectedKind := "<any>"
+		if trainJob.Spec.RuntimeRef.Kind != nil {
+			expectedKind = *trainJob.Spec.RuntimeRef.Kind
+		}
+		expectedGroup := "<any>"
+		if trainJob.Spec.RuntimeRef.APIGroup != nil {
+			expectedGroup = *trainJob.Spec.RuntimeRef.APIGroup
+		}
 		return fmt.Errorf(
 			"invalid runtime snapshot: the snapshot refers to the wrong runtime: expecting a runtime with name, api group and kind of %q, %q, %q but found runtime with name, api group and kind of %q, %q, %q",
 			trainJob.Spec.RuntimeRef.Name,
-			*trainJob.Spec.RuntimeRef.APIGroup,
-			*trainJob.Spec.RuntimeRef.Kind,
+			expectedGroup,
+			expectedKind,
 			runtimeObj.GetName(),
 			snapshotGVK.Group,
 			snapshotGVK.Kind,
