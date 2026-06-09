@@ -250,7 +250,7 @@ spec:
 				},
 			},
 			inputRuntimeObj: &trainer.ClusterTrainingRuntime{},
-			wantError:       "invalid runtime snapshot: unable to unmarshall the snapshot",
+			wantError:       "invalid runtime snapshot: unable to unmarshal the snapshot",
 		},
 		"returns error when snapshot runtime name does not match RuntimeRef": {
 			trainJob: testingutil.MakeTrainJobWrapper("test-namespace", "test-job").
