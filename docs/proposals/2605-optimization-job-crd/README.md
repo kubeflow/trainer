@@ -239,25 +239,25 @@ The reconciliation loop follows a strictly defined lifecycle to manage trial exe
 
 ### 7.1. Decision: Parameter Propagation via String Templating
 **Status: Resolved in v1alpha1**
-To inject parameters into the training container without forcing users to adopt a custom SDK or injecting heavyweight gRPC sidecars, `OptimizationJob` utilizes native string templating. 
-* **The Design:** Users write their `TrainJobTemplateSpec` normally but place text placeholders (e.g., `{{.learning_rate}}`) wherever they need the value (CLI args, env vars, labels). 
+To inject parameters into the training container without forcing users to adopt a custom SDK or injecting heavyweight gRPC sidecars, `OptimizationJob` utilizes native string templating.
+* **The Design:** Users write their `TrainJobTemplateSpec` normally but place text placeholders (e.g., `{{.learning_rate}}`) wherever they need the value (CLI args, env vars, labels).
 * **The "Why":** Before applying the `TrainJob`, the controller performs an in-memory string replacement. This ensures the pod boots with the exact configuration required, keeps the API schema concise, and requires zero code changes from the user's ML script. A Validating Admission Webhook ensures that all declared parameters exist as placeholders in the template prior to admitting the resource.
 
 ### 7.2. Decision: Deprecating the Trial CRD
 **Status: Resolved in v1alpha1**
-In legacy Katib, the `Trial` CRD was necessary because worker jobs lacked native observability; the Trial acted as an intermediary metrics scraper. With the new unified `TrainJob` API exposing `TrainerStatus.Metrics` directly, this adapter layer is obsolete. 
+In legacy Katib, the `Trial` CRD was necessary because worker jobs lacked native observability; the Trial acted as an intermediary metrics scraper. With the new unified `TrainJob` API exposing `TrainerStatus.Metrics` directly, this adapter layer is obsolete.
 The `OptimizationJob` controller bypasses the `Trial` CRD entirely, creating `TrainJobs` directly and watching their status for convergence. This eliminates an entire controller reconciliation loop and keeps the hierarchy clean (`OptimizationJob` -> `TrainJob`).
 
 ### 7.3. Open Discussion: Handling Dynamic Algorithms (Ray Tune, PBT, Hyperband)
 Population-Based Training (PBT) and Hyperband algorithms are stateful and dynamic. Frameworks like Ray Tune handle this by directly mutating Python worker memory mid-flight. Because Kubernetes pod specifications are immutable once running, we evaluated two paths for OptimizationJob:
 
 * **Approach 1: The Kubernetes-Native Path (Suspend & Patch) [Recommended]**
-    Leverage native K8s job suspension. When a trial hits a bracket, the controller flips `Suspend: true` on the `TrainJob`. The pods spin down, and the ML framework checkpoints to persistent storage. The controller appends a `RuntimePatch` to overwrite the hyperparameters, then flips `Suspend: false`. The pods reschedule, load the new parameters/checkpoint, and resume. 
+    Leverage native K8s job suspension. When a trial hits a bracket, the controller flips `Suspend: true` on the `TrainJob`. The pods spin down, and the ML framework checkpoints to persistent storage. The controller appends a `RuntimePatch` to overwrite the hyperparameters, then flips `Suspend: false`. The pods reschedule, load the new parameters/checkpoint, and resume.
     *Tradeoffs:* Introduces scheduling latency, but keeps cluster state completely declarative and requires no custom user SDKs. We have introduced a `Suspended` counter in `OptimizationJobStatus` to support this logic safely.
 * **Approach 2: The Zero-Restart Path (gRPC Sidecar)**
     Inject a lightweight gRPC sidecar into the `TrainJob` pod. The controller sends parameter updates to the sidecar, and the user's Python script polls a local socket to update its memory.
     *Tradeoffs:* Extremely fast, but breaks the declarative truth of K8s (Pod spec won't match running memory state) and creates high integration friction by forcing users to rewrite their ML code.
 
 ### 7.4. Open Discussion: Pluggable Suggestion Architecture
-If a user requests "Bayesian Optimization," we cannot hardcode the execution to a single backend library (e.g., Optuna uses TPE, while Google OSS Vizier uses gRPC-native scaling). 
+If a user requests "Bayesian Optimization," we cannot hardcode the execution to a single backend library (e.g., Optuna uses TPE, while Google OSS Vizier uses gRPC-native scaling).
 To avoid vendor lock-in, Phase 2 will treat mathematical execution as an external dependency. We have introduced a `Provider` field into the `Algorithm` struct. The `OptimizationJob` controller will act strictly as a router, maintaining a standard gRPC contract with backend suggestion engines deployed as independent microservices. The controller will read `TrainJob` metrics, check the `Provider`, send the history to the respective microservice, and receive the next hyperparameters to apply.
