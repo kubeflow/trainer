@@ -3,12 +3,14 @@ name: Validate Python Lockfiles
 on:
   pull_request:
     paths:
+      - 'cmd/initializers/dataset/pyproject.toml'
+      - 'cmd/initializers/dataset/uv.lock'
       - 'cmd/initializers/dataset/requirements.txt'
-      - 'cmd/initializers/dataset/requirements-lock.txt'
+      - 'cmd/initializers/model/pyproject.toml'
+      - 'cmd/initializers/model/uv.lock'
       - 'cmd/initializers/model/requirements.txt'
-      - 'cmd/initializers/model/requirements-lock.txt'
       - 'api/python_api/pyproject.toml'
-      - 'api/python_api/requirements-lock.txt'
+      - 'api/python_api/uv.lock'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -24,59 +26,92 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
-          python-version: '3.12'
-
-      - name: Install pip-tools
-        run: pip install 'pip-tools==7.5.3'
+          enable-cache: true
 
       - name: Verify lockfiles are in sync
         run: |
           set -euo pipefail
 
-          LOCKFILE_PAIRS=(
-            "cmd/initializers/dataset/requirements.txt|cmd/initializers/dataset/requirements-lock.txt"
-            "cmd/initializers/model/requirements.txt|cmd/initializers/model/requirements-lock.txt"
-            "api/python_api/pyproject.toml|api/python_api/requirements-lock.txt"
+          LOCKFILE_DIRS=(
+            "cmd/initializers/dataset"
+            "cmd/initializers/model"
+            "api/python_api"
           )
 
           FAILED=false
 
-          for pair in "${LOCKFILE_PAIRS[@]}"; do
-            source_file="${pair%%|*}"
-            lockfile="${pair##*|}"
-
-            echo "=== Checking $source_file -> $lockfile ==="
-
-            pip-compile "$source_file" -o "${lockfile}.check" --strip-extras --quiet 2>&1
-
-            # Strip auto-generated header comments before comparing — pip-compile
-            # embeds the output filename in the header, which differs between the
-            # committed lockfile and the .check file.
-            grep -v '^#' "$lockfile" > "${lockfile}.stripped"
-            grep -v '^#' "${lockfile}.check" > "${lockfile}.check.stripped"
-
-            if ! diff -q "${lockfile}.stripped" "${lockfile}.check.stripped" > /dev/null 2>&1; then
-              echo "::error::$lockfile is out of sync with $source_file. Please run 'pip-compile $source_file -o $lockfile --strip-extras' and commit the changes."
-              diff "${lockfile}.stripped" "${lockfile}.check.stripped" || true
+          for dir in "${LOCKFILE_DIRS[@]}"; do
+            echo "=== Checking $dir/uv.lock ==="
+            cd "$dir"
+            if ! uv lock --check; then
+              echo "::error title=Lockfile Out of Sync::$dir/uv.lock is out of sync with pyproject.toml."
+              echo "Run 'uv lock' in $dir and commit the changes."
               FAILED=true
             else
               echo "In sync"
             fi
-
-            rm -f "${lockfile}.check" "${lockfile}.stripped" "${lockfile}.check.stripped"
+            cd - > /dev/null
           done
 
           if [ "$FAILED" = true ]; then
             echo ""
-            echo "One or more lockfiles are out of sync."
-            echo "To fix, run the following and commit the updated lockfiles:"
-            echo ""
-            echo "  pip install pip-tools"
-            echo "  pip-compile cmd/initializers/dataset/requirements.txt -o cmd/initializers/dataset/requirements-lock.txt --strip-extras"
-            echo "  pip-compile cmd/initializers/model/requirements.txt -o cmd/initializers/model/requirements-lock.txt --strip-extras"
-            echo "  pip-compile api/python_api/pyproject.toml -o api/python_api/requirements-lock.txt --strip-extras"
+            echo "One or more lockfiles are out of sync. To fix:"
+            echo "  cd cmd/initializers/dataset && uv lock"
+            echo "  cd cmd/initializers/model && uv lock"
+            echo "  cd api/python_api && uv lock"
+            exit 1
+          fi
+
+check-security-regressions:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    strategy:
+      matrix:
+        directory:
+          - cmd/initializers/dataset
+          - cmd/initializers/model
+          - api/python_api
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          path: pr-code
+
+      - name: Checkout base branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.base_ref }}
+          path: base-code
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Audit PR branch lockfile
+        run: |
+          cd pr-code/${{ matrix.directory }}
+          rc=0
+          uv audit --preview-features audit > ../../../audit-pr.txt 2>&1 || rc=$?
+          cat ../../../audit-pr.txt
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+            echo "::error::uv audit failed in ${{ matrix.directory }} with exit code $rc"
+            exit 1
+          fi
+
+      - name: Audit base branch lockfile
+        run: |
+          cd base-code/${{ matrix.directory }}
+          rc=0
+          uv audit --preview-features audit > ../../../audit-base.txt 2>&1 || rc=$?
+          cat ../../../audit-base.txt
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+            echo "::error::uv audit failed in ${{ matrix.directory }} with exit code $rc"
             exit 1
           fi
