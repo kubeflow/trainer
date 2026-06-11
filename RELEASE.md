@@ -64,9 +64,7 @@ make release VERSION=X.Y.Z-rc.N GITHUB_TOKEN=<token>
 This will:
 
 1. Update `VERSION` to `vX.Y.Z`.
-2. Update `api/python_api/kubeflow_trainer_api/__init__.py` `__version__`.
-3. Generate `CHANGELOG/CHANGELOG-X.Y.md` using `git-cliff` (skipped for RC releases).
-4. Run `make generate`.
+2. Generate `CHANGELOG/CHANGELOG-X.Y.md` using `git-cliff` (skipped for RC releases).
 
 After reviewing the changes, create a signed commit:
 

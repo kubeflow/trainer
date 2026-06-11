@@ -256,10 +256,6 @@ release: ## Create a release commit. Usage: make release VERSION=X.Y.Z [GITHUB_T
 	fi
 	@echo -n "v$(VERSION)" > VERSION
 	@echo "Updated VERSION to $(VERSION)"
-	@PY_VERSION=$$(echo "$(VERSION)" | sed 's/-rc\.\([0-9]*\)/rc\1/'); \
-	sed -i'' -e "s/^__version__ = \".*\"/__version__ = \"$$PY_VERSION\"/" \
-		api/python_api/kubeflow_trainer_api/__init__.py; \
-	echo "Updated Python API __version__ to $$PY_VERSION"
 	@if echo "$(VERSION)" | grep -E -q '\-rc\.[0-9]+$$'; then \
 		echo "Skipping changelog generation for RC release $(VERSION)"; \
 	else \
@@ -279,7 +275,6 @@ release: ## Create a release commit. Usage: make release VERSION=X.Y.Z [GITHUB_T
 		fi; \
 		echo "Changelog generated at $$CHANGELOG_PATH"; \
 	fi
-	@$(MAKE) generate
 	@echo ""
 	@echo "Release commit for v$(VERSION) is ready."
 	@echo "Review the changes, then commit with:"

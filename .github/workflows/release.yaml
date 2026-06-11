@@ -188,7 +188,7 @@ jobs:
             echo "No asset changes needed."
           else
             git add -A
-            git commit -s -m "Update release assets to $TAG"
+            git commit -s -m "Kubeflow Trainer Official Release $TAG"
           fi
           git push origin "$BRANCH"
 
