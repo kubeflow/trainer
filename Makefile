@@ -241,3 +241,41 @@ helm-lint: ## Run Helm chart lint test.
 .PHONY: helm-docs
 helm-docs: helm-docs-plugin ## Generates markdown documentation for helm charts from requirements and values files.
 	$(HELM_DOCS) --sort-values-order=file
+
+##@ Release
+
+# Release version (X.Y.Z or X.Y.Z-rc.N)
+VERSION ?=
+GITHUB_TOKEN ?=
+
+.PHONY: release
+release: ## Create a release commit. Usage: make release VERSION=X.Y.Z [GITHUB_TOKEN=<token>]
+	@if [ -z "$(VERSION)" ] || ! echo "$(VERSION)" | grep -E -q '^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$$'; then \
+		echo "Error: VERSION must be set in X.Y.Z or X.Y.Z-rc.N format. Usage: make release VERSION=X.Y.Z[-rc.N]"; \
+		exit 1; \
+	fi
+	@echo -n "v$(VERSION)" > VERSION
+	@echo "Updated VERSION to $(VERSION)"
+	@if echo "$(VERSION)" | grep -E -q '\-rc\.[0-9]+$$'; then \
+		echo "Skipping changelog generation for RC release $(VERSION)"; \
+	else \
+		MAJOR_MINOR=$$(echo "$(VERSION)" | cut -d. -f1,2); \
+		CHANGELOG_PATH="CHANGELOG/CHANGELOG-$$MAJOR_MINOR.md"; \
+		echo "Generating changelog for v$(VERSION)"; \
+		CLIFF_CMD="docker run --rm -u $$(id -u):$$(id -g) -v $(PROJECT_DIR):/app"; \
+		if [ -n "$(GITHUB_TOKEN)" ]; then \
+			CLIFF_CMD="$$CLIFF_CMD -e GITHUB_TOKEN=$(GITHUB_TOKEN)"; \
+		fi; \
+		CLIFF_CMD="$$CLIFF_CMD -w /app ghcr.io/orhun/git-cliff/git-cliff:latest --unreleased --tag v$(VERSION)"; \
+		if [ -f "$$CHANGELOG_PATH" ]; then \
+			$$CLIFF_CMD --prepend "$$CHANGELOG_PATH"; \
+		else \
+			mkdir -p CHANGELOG; \
+			$$CLIFF_CMD -o "$$CHANGELOG_PATH"; \
+		fi; \
+		echo "Changelog generated at $$CHANGELOG_PATH"; \
+	fi
+	@echo ""
+	@echo "Release commit for v$(VERSION) is ready."
+	@echo "Review the changes, then commit with:"
+	@echo "  git add -A && git commit -s -m 'Release v$(VERSION)'"
