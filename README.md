@@ -94,7 +94,7 @@ Please refer to the [CONTRIBUTING guide](CONTRIBUTING.md).
 
 ## Changelog
 
-Please refer to the [CHANGELOG](CHANGELOG.md).
+Please refer to the [CHANGELOG](CHANGELOG/) directory.
 
 ## Kubeflow Training Operator V1
 
