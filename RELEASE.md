@@ -2,14 +2,10 @@
 
 ## Prerequisites
 
-- [Write](https://docs.github.com/en/organizations/managing-access-to-your-organizations-repositories/repository-permission-levels-for-an-organization#permission-levels-for-repositories-owned-by-an-organization)
-  permission for the Kubeflow Trainer repository.
-
 - Docker available locally (required for changelog generation with
   [`git-cliff`](https://git-cliff.org/)).
 
-- Create a [GitHub Token](https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token)
-  and set it as `GITHUB_TOKEN` environment variable.
+- Create a [GitHub Token](https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token).
 
 ## Versioning Policy
 
@@ -53,12 +49,15 @@ prepends new entries automatically using `git-cliff`.
 
 ### 1. Update Version and Changelog
 
-Run the release target from your working branch:
+For **the latest minor release**, run the following command from the `master` branch.
+
+For **an older minor series patch** (for example, `v2.2.1` when `master` is on `v2.3.x`), checkout
+to the corresponding `release-X.Y` branch and run the following command.
 
 ```bash
-make release VERSION=X.Y.Z GITHUB_TOKEN=<token>
+make release VERSION=vX.Y.Z GITHUB_TOKEN=<token>
 # or for a release candidate:
-make release VERSION=X.Y.Z-rc.N GITHUB_TOKEN=<token>
+make release VERSION=vX.Y.Z-rc.N GITHUB_TOKEN=<token>
 ```
 
 This will:
@@ -66,22 +65,14 @@ This will:
 1. Update `VERSION` to `vX.Y.Z`.
 2. Generate `CHANGELOG/CHANGELOG-X.Y.md` using `git-cliff` (skipped for RC releases).
 
-After reviewing the changes, create a signed commit:
+After reviewing the changes, create a signed commit and open a PR to the appropriate branch
+(e.g. `master` or `release-X.Y`):
 
 ```bash
-git add -A && git commit -s -m 'Release vX.Y.Z'
+git add -A && git commit -s -m 'Prepare release vX.Y.Z'
 ```
 
-### 2. Submit a Release PR
-
-- **Latest minor release** (including patches on the latest minor series):
-  open a PR to `master`.
-
-- **Old minor series patch** (e.g. `v2.1.2` when `master` is at `v2.2.x`):
-  cherry-pick the necessary fixes from `master` via PRs to the `release-X.Y` branch,
-  then open the release PR to `release-X.Y`.
-
-### 3. Automated Release After Merge
+### 2. Automated Release After Merge
 
 When the `VERSION` change is merged, the
 [release workflow](.github/workflows/release.yaml) runs automatically:
@@ -103,3 +94,10 @@ When the `VERSION` change is merged, the
 > **Note**: Helm chart version, Python API version, and manifest image tags are only updated
 > on the release branch, not on `master`. This ensures users deploying from `master` always
 > get the latest images.
+
+## Announcement
+
+Post the release announcement for the new Kubeflow Trainer release in:
+
+- [#kubeflow-trainer](https://cloud-native.slack.com/archives/C0742LDFZ4K) Slack channel
+- [`kubeflow-discuss`](https://groups.google.com/g/kubeflow-discuss) mailing list
