@@ -66,7 +66,7 @@ This will:
 2. Generate `CHANGELOG/CHANGELOG-X.Y.md` using `git-cliff` (skipped for RC releases).
 
 After reviewing the changes, create a signed commit and open a PR to the appropriate branch
-(e.g. `master` or `release-X.Y`).:
+(e.g. `master` or `release-X.Y`):
 
 ```bash
 git add -A && git commit -s -m 'Prepare release vX.Y.Z'
