@@ -276,10 +276,15 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		return nil, nil
 	}
 
+	if len(jobSetSpec.ReplicatedJobs) < len(info.TemplateSpec.PodSets) {
+		return nil, fmt.Errorf(
+			"runtime template has %d replicatedJobs but runtime info has %d podSets",
+			len(jobSetSpec.ReplicatedJobs),
+			len(info.TemplateSpec.PodSets),
+		)
+	}
+
 	for psIdx, ps := range info.TemplateSpec.PodSets {
-		if psIdx >= len(jobSetSpec.ReplicatedJobs) {
-			return nil, fmt.Errorf("podSet %q does not have a matching replicatedJob in the runtime template", ps.Name)
-		}
 		if ps.Count != nil {
 			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Parallelism = ps.Count
 			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Completions = ps.Count
@@ -305,18 +310,9 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 				container.VolumeMounts...,
 			)
 		}
-		// Mirror regular-container mutations above, but match init containers by name
-		// so plugin updates do not depend on apply-config slice ordering.
 		initContainers := jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers
-		for _, container := range ps.InitContainers {
-			containerIdx := -1
-			for idx := range initContainers {
-				if ptr.Deref(initContainers[idx].Name, "") == container.Name {
-					containerIdx = idx
-					break
-				}
-			}
-			if containerIdx == -1 {
+		for containerIdx, container := range ps.InitContainers {
+			if containerIdx >= len(initContainers) {
 				return nil, fmt.Errorf("podSet %q initContainer %q does not have a matching initContainer in the runtime template", ps.Name, container.Name)
 			}
 			if len(container.Command) > 0 {

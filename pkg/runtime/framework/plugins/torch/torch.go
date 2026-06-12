@@ -112,8 +112,6 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 		return nil
 	}
 
-	torchPolicy := info.RuntimePolicy.MLPolicySource.Torch
-
 	// TrainJob contains the actual information for the Trainer.
 	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
 	if trainerPS != nil && trainerPS.Count != nil && trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
@@ -210,8 +208,8 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	// auxiliary containers (init containers, sidecars) that may need the master
 	// address for preflight checks or coordination, regardless of whether the
 	// main container uses torchtune (which uses command-line rendezvous instead).
-	if torchPolicy.EnvInjection != nil {
-		for _, target := range torchPolicy.EnvInjection.Targets {
+	if info.RuntimePolicy.MLPolicySource.Torch.EnvInjection != nil {
+		for _, target := range info.RuntimePolicy.MLPolicySource.Torch.EnvInjection.Targets {
 			for _, containerName := range target.ContainerNames {
 				container := info.FindContainerByPodSetName(target.JobName, containerName)
 				if container == nil {
