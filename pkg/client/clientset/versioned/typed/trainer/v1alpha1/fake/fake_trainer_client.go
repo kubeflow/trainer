@@ -32,6 +32,10 @@ func (c *FakeTrainerV1alpha1) ClusterTrainingRuntimes() v1alpha1.ClusterTraining
 	return newFakeClusterTrainingRuntimes(c)
 }
 
+func (c *FakeTrainerV1alpha1) OptimizationJobs(namespace string) v1alpha1.OptimizationJobInterface {
+	return newFakeOptimizationJobs(c, namespace)
+}
+
 func (c *FakeTrainerV1alpha1) TrainJobs(namespace string) v1alpha1.TrainJobInterface {
 	return newFakeTrainJobs(c, namespace)
 }

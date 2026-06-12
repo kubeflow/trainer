@@ -29,6 +29,7 @@ import (
 type TrainerV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	ClusterTrainingRuntimesGetter
+	OptimizationJobsGetter
 	TrainJobsGetter
 	TrainingRuntimesGetter
 }
@@ -40,6 +41,10 @@ type TrainerV1alpha1Client struct {
 
 func (c *TrainerV1alpha1Client) ClusterTrainingRuntimes() ClusterTrainingRuntimeInterface {
 	return newClusterTrainingRuntimes(c)
+}
+
+func (c *TrainerV1alpha1Client) OptimizationJobs(namespace string) OptimizationJobInterface {
+	return newOptimizationJobs(c, namespace)
 }
 
 func (c *TrainerV1alpha1Client) TrainJobs(namespace string) TrainJobInterface {

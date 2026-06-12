@@ -13759,6 +13759,70 @@
           }
         }
       },
+      "trainer.v1alpha1.Algorithm": {
+        "description": "Algorithm defines the optimization algorithm configuration.",
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "description": "Name of the optimization algorithm (e.g., random, grid, bayesian, tpe, hyperband).",
+            "type": "string",
+            "default": ""
+          },
+          "provider": {
+            "description": "Provider specifies the backend suggestion engine executing the math (e.g., optuna, vizier). If omitted, the controller will route to a cluster-default provider.",
+            "type": "string"
+          },
+          "settings": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.SettingKV"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          }
+        }
+      },
+      "trainer.v1alpha1.BestTrial": {
+        "description": "BestTrial tracks the best performing trial.",
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": ""
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.ParameterAssignment"
+                }
+              ]
+            },
+            "x-kubernetes-list-type": "atomic"
+          },
+          "value": {
+            "description": "Value is the actual observed metric value achieved by this trial.",
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
       "trainer.v1alpha1.ClusterTrainingRuntime": {
         "description": "ClusterTrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced by TrainJob that created in *any* namespace.",
         "type": "object",
@@ -13924,6 +13988,35 @@
           "storageUri": {
             "description": "storageUri is the URI for the dataset provider. If set, it may be empty, or it must be a valid URI format (e.g., s3://bucket/path, gs://bucket/path).",
             "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.EarlyStopping": {
+        "description": "EarlyStopping defines the configuration for pruning unpromising trials.",
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "description": "Name of the early stopping algorithm (e.g., median, asha).",
+            "type": "string",
+            "default": ""
+          },
+          "settings": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.SettingKV"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
           }
         }
       },
@@ -14281,6 +14374,274 @@
           }
         }
       },
+      "trainer.v1alpha1.Objective": {
+        "description": "Objective defines the metric and goal for the OptimizationJob.",
+        "type": "object",
+        "required": [
+          "metric",
+          "direction"
+        ],
+        "properties": {
+          "direction": {
+            "type": "string",
+            "default": ""
+          },
+          "metric": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJob": {
+        "description": "OptimizationJob is the Schema for the optimizationjobs API.",
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJobSpec"
+              }
+            ]
+          },
+          "status": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJobStatus"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobList": {
+        "description": "OptimizationJobList contains a list of OptimizationJob.",
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJob"
+                }
+              ]
+            }
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobSpec": {
+        "description": "OptimizationJobSpec defines the desired state of OptimizationJob.",
+        "type": "object",
+        "required": [
+          "objectives",
+          "algorithm",
+          "parameters",
+          "trialConfig",
+          "trialTemplate"
+        ],
+        "properties": {
+          "algorithm": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.Algorithm"
+              }
+            ]
+          },
+          "earlyStopping": {
+            "description": "EarlyStopping separates the pruning logic from the search algorithm.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.EarlyStopping"
+              }
+            ]
+          },
+          "objectives": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.Objective"
+                }
+              ]
+            },
+            "x-kubernetes-list-type": "atomic"
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.Parameter"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "trialConfig": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrialConfig"
+              }
+            ]
+          },
+          "trialTemplate": {
+            "description": "TrialTemplate wraps the underlying TrainJob workload and its metadata. Parameter propagation is handled via native string rendering before creation.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobTemplateSpec"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobStatus": {
+        "description": "OptimizationJobStatus defines the observed state of OptimizationJob.",
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bestTrial": {
+            "description": "BestTrial caches the highest performing trial based on the Objective.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.BestTrial"
+              }
+            ]
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "type"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "succeeded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "suspended": {
+            "description": "Suspended tracks trials that are paused by dynamic algorithms (e.g., PBT).",
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationStorage": {
+        "description": "OptimizationStorage defines the persistent layer for trial checkpoints and state recovery.",
+        "type": "object",
+        "properties": {
+          "pvcName": {
+            "description": "PvcName is the name of an existing PersistentVolumeClaim in the same namespace.",
+            "type": "string"
+          },
+          "storageUri": {
+            "description": "StorageUri is the remote object storage path (e.g., s3://my-bucket/experiments).",
+            "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.Parameter": {
+        "description": "Parameter defines a single hyperparameter and its search space.",
+        "type": "object",
+        "required": [
+          "name",
+          "searchSpace"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": ""
+          },
+          "searchSpace": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.SearchSpace"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.ParameterAssignment": {
+        "description": "ParameterAssignment represents a single hyperparameter and its assigned value.",
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": ""
+          },
+          "value": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
       "trainer.v1alpha1.PodGroupPolicy": {
         "description": "PodGroupPolicy represents a PodGroup configuration for gang-scheduling.",
         "type": "object",
@@ -14550,6 +14911,51 @@
           }
         }
       },
+      "trainer.v1alpha1.SearchSpace": {
+        "description": "SearchSpace defines the type and exact boundaries for the algorithm to search.",
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "default": ""
+            },
+            "x-kubernetes-list-type": "atomic"
+          },
+          "max": {
+            "type": "string"
+          },
+          "min": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
+      "trainer.v1alpha1.SettingKV": {
+        "description": "SettingKV is a key-value pair for algorithm settings.",
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": ""
+          },
+          "value": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
       "trainer.v1alpha1.TorchMLPolicySource": {
         "description": "TorchMLPolicySource represents a PyTorch runtime configuration.",
         "type": "object"
@@ -14737,6 +15143,33 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.TrainerStatus"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.TrainJobTemplateSpec": {
+        "description": "TrainJobTemplateSpec describes the metadata and spec of the TrainJobs created by the OptimizationJob.",
+        "type": "object",
+        "required": [
+          "spec"
+        ],
+        "properties": {
+          "metadata": {
+            "description": "Standard object's metadata.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "description": "Specification of the desired behavior of the TrainJob. Hyperparameters are injected into this template via String Templating. Users can place placeholders like {{.parameter_name}} anywhere in this spec (e.g., in args, env values, or annotations) and the controller will render the actual values before applying the TrainJob.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobSpec"
               }
             ]
           }
@@ -14951,6 +15384,32 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobSetTemplatePatch"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.TrialConfig": {
+        "description": "TrialConfig controls the orchestration of the trials.",
+        "type": "object",
+        "properties": {
+          "maxFailedTrials": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "numTrials": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "parallelTrials": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "storage": {
+            "description": "Storage configures where suspended trials persist their checkpoints.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationStorage"
               }
             ]
           }

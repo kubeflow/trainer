@@ -33,5 +33,8 @@ func Setup(mgr ctrl.Manager, runtimes map[string]runtime.Runtime) (string, error
 	if err := setupWebhookForTrainJob(mgr, runtimes); err != nil {
 		return trainer.TrainJobKind, err
 	}
+	if err := SetupWebhookForOptimizationJob(mgr); err != nil {
+		return "OptimizationJob", err
+	}
 	return "", nil
 }
