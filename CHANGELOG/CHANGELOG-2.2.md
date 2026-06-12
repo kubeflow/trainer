@@ -1,4 +1,3 @@
-# Changelog
 # [v2.2.0](https://github.com/kubeflow/trainer/tree/v2.2.0) (2026-03-19)
 
 This is Kubeflow Trainer v2.2.0 release.
@@ -15,7 +14,7 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
 
 ## Breaking Changes
 
-- feat(api): BREAKING CHANGE: Replace PodTemplateOverrides with RuntimePatches API  ([#3309](https://github.com/kubeflow/trainer/pull/3309) by @astefanutti)
+- feat(api): BREAKING CHANGE: Replace PodTemplateOverrides with RuntimePatches API ([#3309](https://github.com/kubeflow/trainer/pull/3309) by @astefanutti)
 - feat(api): BREAKING CHANGE: Remove numProcPerNode from Torch API ([#3239](https://github.com/kubeflow/trainer/pull/3239) by @andreyvelich)
 - feat(api): BREAKING CHANGE: Remove ElasticPolicy API ([#3235](https://github.com/kubeflow/trainer/pull/3235) by @andreyvelich)
 - feat(api): Fix immutability of the TrainJob APIs ([#3157](https://github.com/kubeflow/trainer/pull/3157) by @andreyvelich)
@@ -28,7 +27,6 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
 - feat(docs): KEP-2598 XGBoost Runtime for Trainer V2 ([#3118](https://github.com/kubeflow/trainer/pull/3118) by @Krishna-kg732)
 - feat(runtimes): Add JAX training runtime ([#3151](https://github.com/kubeflow/trainer/pull/3151) by @kaisoz)
 - feat(cache): KEP-2655: Adding default runtime with cache and example ([#2923](https://github.com/kubeflow/trainer/pull/2923) by @akshaychitneni)
-
 
 ### Flux Runtime for MPI and HPC Workloads
 

@@ -4,10 +4,10 @@ repo = "trainer"
 
 [changelog]
 body = """
-{%- if version %}
-## [{{ version }}](https://github.com/kubeflow/trainer/releases/tag/{{ version }}) ({{ timestamp | date(format="%Y-%m-%d") }})
+{%- if version -%}
+# [{{ version }}](https://github.com/kubeflow/trainer/releases/tag/{{ version }}) ({{ timestamp | date(format="%Y-%m-%d") }})
 {% else %}
-## [Unreleased]
+# [Unreleased]
 {%- endif %}
 
 {%- set group_order = ["🚀 Features", "🐛 Bug Fixes", "⚙️ Miscellaneous Tasks", "⏪ Reverts"] -%}
@@ -15,7 +15,7 @@ body = """
 {%- for group_name in group_order %}
 {%- set group_commits = commits | filter(attribute="group", value=group_name) -%}
 {%- if group_commits | length > 0 %}
-### {{ group_name }}
+## {{ group_name }}
 
 {% for commit in group_commits | reverse -%}
 {%- set message = commit.message | split(pat="\n") | first | trim -%}
@@ -35,13 +35,14 @@ body = """
 {%- if github -%}
 {%- set new_contributors = github.contributors | filter(attribute="is_first_time", value=true) -%}
 {%- if new_contributors | length != 0 %}
-### New Contributors
+## New Contributors
 {% for contributor in new_contributors %}
 - @{{ contributor.username }} made their first contribution in \
   [#{{ contributor.pr_number }}](https://github.com/kubeflow/trainer/pull/{{ contributor.pr_number }})
 {%- endfor %}
 {%- endif %}
-{%- endif -%}
+{%- endif %}
+
 """
 
 trim = true
@@ -59,9 +60,9 @@ ignore_tags = ".*-(alpha|beta|rc).*"
 
 # Manually define groups based on conventional patterns
 commit_parsers = [
-    { message = "^feat(\\(.*\\))?:", group = "🚀 Features" },
-    { message = "^fix(\\(.*\\))?:", group = "🐛 Bug Fixes" },
-    { message = "^chore(\\(.*\\))?:", group = "⚙️ Miscellaneous Tasks" },
-    { message = "^revert(\\(.*\\))?:", group = "⏪ Reverts" },
-    { message = ".*", skip = true },
+   { message = "^feat(\\(.*\\))?:", group = "🚀 Features" },
+   { message = "^fix(\\(.*\\))?:", group = "🐛 Bug Fixes" },
+   { message = "^chore(\\(.*\\))?:", group = "⚙️ Miscellaneous Tasks" },
+   { message = "^revert(\\(.*\\))?:", group = "⏪ Reverts" },
+   { message = ".*", skip = true },
 ]
