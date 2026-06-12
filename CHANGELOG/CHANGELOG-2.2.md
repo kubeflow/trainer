@@ -1,5 +1,3 @@
-# Changelog
-
 # [v2.2.0](https://github.com/kubeflow/trainer/tree/v2.2.0) (2026-03-19)
 
 This is Kubeflow Trainer v2.2.0 release.

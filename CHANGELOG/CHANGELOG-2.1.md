@@ -1,5 +1,3 @@
-# Changelog
-
 # [v2.1.0](https://github.com/kubeflow/trainer/tree/v2.1.0) (2025-11-07)
 
 This is Kubeflow Trainer v2.1.0 release.
@@ -97,7 +95,7 @@ For more information, please see [the Kubeflow Trainer docs](https://www.kubeflo
 
 ## Misc
 
-- [release-2.1] feat: Adding local execution example notebook  ([#2924](https://github.com/kubeflow/trainer/pull/2924) by [@Fiona-Waters](https://github.com/Fiona-Waters))
+- [release-2.1] feat: Adding local execution example notebook ([#2924](https://github.com/kubeflow/trainer/pull/2924) by [@Fiona-Waters](https://github.com/Fiona-Waters))
 - feat(manifests): Publish Kubeflow Trainer Helm charts ([#2917](https://github.com/kubeflow/trainer/pull/2917) by [@adity1raut](https://github.com/adity1raut))
 - [release-2.1] chore(operator): Use SSA throughout runtime framework ([#2912](https://github.com/kubeflow/trainer/pull/2912) by [@astefanutti](https://github.com/astefanutti))
 - [release-2.1] feat(initializer): add s3 model and dataset initializers ([#2911](https://github.com/kubeflow/trainer/pull/2911) by [@rudeigerc](https://github.com/rudeigerc))
