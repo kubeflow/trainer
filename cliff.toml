@@ -23,9 +23,9 @@ body = """
    {% if parts | length > 1 and parts | last | trim | split(pat=")") | length > 1 -%}
       {%- set pr_part = parts | last | trim -%}
       {%- set pr_number = pr_part | replace(from=")", to="") -%}
-      - {{ parts | slice(end=-1) | join(sep=" (#") }} ([#{{ pr_number }}](https://github.com/kubeflow/trainer/pull/{{ pr_number }}) by @{{ commit.remote.username }})
+      - {{ parts | slice(end=-1) | join(sep=" (#") }} ([#{{ pr_number }}](https://github.com/kubeflow/trainer/pull/{{ pr_number }}){% if commit.remote.username %} by @{{ commit.remote.username }}{% endif %})
    {% else -%}
-      - {{ message }} (@{{ commit.remote.username }})
+      - {{ message }}{% if commit.remote.username %} (@{{ commit.remote.username }}){% endif %}
    {% endif -%}
 {% endfor %}
 
