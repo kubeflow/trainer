@@ -17,14 +17,21 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"os"
+	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
+	tlspkg "github.com/openshift/controller-runtime-common/pkg/tls"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -48,12 +55,66 @@ func fromFile(path string, scheme *runtime.Scheme, cfg *configapi.Configuration)
 	return nil
 }
 
+var (
+	tlsScheme = runtime.NewScheme()
+	configLog = ctrl.Log.WithName("config")
+)
+
+func init() {
+	utilruntime.Must(configv1.Install(tlsScheme))
+}
+
+// TLSProfileResult holds the result of fetching the cluster TLS profile.
+type TLSProfileResult struct {
+	TLSOpts               []func(*tls.Config)
+	Profile               configv1.TLSProfileSpec
+	HasOpenShiftConfigAPI bool
+}
+
+// FetchTLSProfile fetches the cluster TLS profile and returns TLS options.
+func FetchTLSProfile(restCfg *rest.Config) TLSProfileResult {
+	var result TLSProfileResult
+	bootstrapCtx, bootstrapCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer bootstrapCancel()
+	bootstrapClient, err := client.New(restCfg, client.Options{Scheme: tlsScheme})
+	if err != nil {
+		configLog.Info("Failed to create bootstrap client for TLS profile, using hardened defaults")
+		result.TLSOpts = append(result.TLSOpts, func(c *tls.Config) {
+			c.MinVersion = tls.VersionTLS12
+		})
+		return result
+	}
+	result.Profile, err = tlspkg.FetchAPIServerTLSProfile(bootstrapCtx, bootstrapClient)
+	if err != nil {
+		if apimeta.IsNoMatchError(err) {
+			configLog.Info("TLS profile not available, using hardened defaults (non-OpenShift cluster)")
+		} else {
+			configLog.Error(err, "Failed to read APIServer TLS profile, using hardened defaults")
+		}
+		result.TLSOpts = append(result.TLSOpts, func(c *tls.Config) {
+			c.MinVersion = tls.VersionTLS12
+		})
+	} else {
+		result.HasOpenShiftConfigAPI = true
+		tlsConfigFn, unsupportedCiphers := tlspkg.NewTLSConfigFromProfile(result.Profile)
+		if len(unsupportedCiphers) > 0 {
+			configLog.Info("Some ciphers from TLS profile are not supported by Go", "unsupported", unsupportedCiphers)
+		}
+		result.TLSOpts = append(result.TLSOpts, tlsConfigFn)
+	}
+	return result
+}
+
 // addTo applies the configuration to controller runtime Options.
-func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
-	// Set metrics server options
+func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool, tlsResult TLSProfileResult) {
 	var tlsOpts []func(*tls.Config)
-	if !enableHTTP2 {
-		// Disable http/2 for security reasons (CVE-2023-44487, CVE-2023-39325)
+	tlsOpts = append(tlsOpts, tlsResult.TLSOpts...)
+	// ALPN must always be set for HTTP/2 support
+	if enableHTTP2 {
+		tlsOpts = append(tlsOpts, func(c *tls.Config) {
+			c.NextProtos = []string{"h2", "http/1.1"}
+		})
+	} else {
 		tlsOpts = append(tlsOpts, func(c *tls.Config) {
 			c.NextProtos = []string{"http/1.1"}
 		})
@@ -104,9 +165,10 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 	}
 }
 
-// Load loads configuration from file and returns controller Options and Configuration.
+// Load loads configuration from file and returns controller Options, Configuration, and TLS profile result.
 // If configFile is empty, default configuration is used.
-func Load(scheme *runtime.Scheme, configFile string, enableHTTP2 bool) (ctrl.Options, configapi.Configuration, error) {
+func Load(scheme *runtime.Scheme, configFile string, enableHTTP2 bool, restCfg *rest.Config) (ctrl.Options, configapi.Configuration, TLSProfileResult, error) {
+	var tlsResult TLSProfileResult
 	options := ctrl.Options{
 		Scheme: scheme,
 	}
@@ -119,19 +181,22 @@ func Load(scheme *runtime.Scheme, configFile string, enableHTTP2 bool) (ctrl.Opt
 	} else {
 		// Load from file
 		if err := fromFile(configFile, scheme, &cfg); err != nil {
-			return options, cfg, err
+			return options, cfg, tlsResult, err
 		}
 	}
 
 	// Validate configuration
 	if errs := validate(&cfg); len(errs) > 0 {
-		return options, cfg, fmt.Errorf("invalid configuration: %v", errs.ToAggregate())
+		return options, cfg, tlsResult, fmt.Errorf("invalid configuration: %v", errs.ToAggregate())
 	}
 
-	// Apply configuration to options
-	addTo(&options, &cfg, enableHTTP2)
+	// Fetch cluster TLS profile
+	tlsResult = FetchTLSProfile(restCfg)
 
-	return options, cfg, nil
+	// Apply configuration to options
+	addTo(&options, &cfg, enableHTTP2, tlsResult)
+
+	return options, cfg, tlsResult, nil
 }
 
 // ApplyClientConnection copies QPS and burst from cfg.ClientConnection to restCfg.
