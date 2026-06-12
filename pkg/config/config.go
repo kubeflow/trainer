@@ -72,13 +72,21 @@ type TLSProfileResult struct {
 }
 
 // FetchTLSProfile fetches the cluster TLS profile and returns TLS options.
+// When restCfg is nil (e.g. in unit tests), hardened defaults are returned without
+// attempting API access.
 func FetchTLSProfile(restCfg *rest.Config) TLSProfileResult {
 	var result TLSProfileResult
+	if restCfg == nil {
+		result.TLSOpts = append(result.TLSOpts, func(c *tls.Config) {
+			c.MinVersion = tls.VersionTLS12
+		})
+		return result
+	}
 	bootstrapCtx, bootstrapCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer bootstrapCancel()
 	bootstrapClient, err := client.New(restCfg, client.Options{Scheme: tlsScheme})
 	if err != nil {
-		configLog.Info("Failed to create bootstrap client for TLS profile, using hardened defaults")
+		configLog.Error(err, "Failed to create bootstrap client for TLS profile, using hardened defaults")
 		result.TLSOpts = append(result.TLSOpts, func(c *tls.Config) {
 			c.MinVersion = tls.VersionTLS12
 		})
@@ -116,7 +124,7 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool, tlsR
 		})
 	} else {
 		tlsOpts = append(tlsOpts, func(c *tls.Config) {
-			c.NextProtos = []string{"http/1.1"}
+			c.NextProtos = []string{"h2", "http/1.1"}
 		})
 	}
 
