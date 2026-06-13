@@ -21,9 +21,13 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -189,6 +193,68 @@ func TestGetRecipeAndConfig(t *testing.T) {
 			}
 			if config != tc.wantConfig {
 				t.Errorf("config = %q, want %q", config, tc.wantConfig)
+			}
+		})
+	}
+}
+
+func TestExtractOverridesFromRuntime(t *testing.T) {
+	// makeInfo builds a runtime.Info whose template carries a single replicated job
+	// with the given ancestor label and a container with the given name and commands.
+	makeInfo := func(ancestor, containerName string, commands []string) *runtime.Info {
+		return runtime.NewInfo(runtime.WithTemplateSpecObjApply(
+			jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+				jobsetv1alpha2ac.ReplicatedJob().WithTemplate(
+					batchv1ac.JobTemplateSpec().
+						WithLabels(map[string]string{constants.LabelTrainJobAncestor: ancestor}).
+						WithSpec(batchv1ac.JobSpec().WithTemplate(
+							corev1ac.PodTemplateSpec().WithSpec(
+								corev1ac.PodSpec().WithContainers(
+									corev1ac.Container().WithName(containerName).WithCommand(commands...),
+								),
+							),
+						)),
+				),
+			),
+		))
+	}
+
+	immutableCommands := []string{
+		constants.TorchTuneModelOutputDir + "=/out",
+		constants.TorchTuneTokenizerPath + "=/tok",
+		"batch_size=32",
+	}
+	wantOverrides := []string{
+		constants.TorchTuneModelOutputDir + "=/out",
+		constants.TorchTuneTokenizerPath + "=/tok",
+	}
+
+	cases := map[string]struct {
+		info *runtime.Info
+		want []string
+	}{
+		"no jobset template": {
+			info: runtime.NewInfo(),
+			want: []string{},
+		},
+		"trainer node container returns only immutable configs": {
+			info: makeInfo(constants.AncestorTrainer, constants.Node, immutableCommands),
+			want: wantOverrides,
+		},
+		"non-trainer ancestor is ignored": {
+			info: makeInfo("other", constants.Node, immutableCommands),
+			want: []string{},
+		},
+		"non-node container is ignored": {
+			info: makeInfo(constants.AncestorTrainer, "sidecar", immutableCommands),
+			want: []string{},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := extractOverridesFromRuntime(tc.info)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("Unexpected overrides (-want,+got):\n%s", diff)
 			}
 		})
 	}
