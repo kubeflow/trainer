@@ -20,8 +20,11 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestGetModelFromRuntimeRef(t *testing.T) {
@@ -113,6 +116,79 @@ func TestIsUseQLoraFinetune(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if got := isUseQLoraFinetune(tc.args); got != tc.want {
 				t.Errorf("isUseQLoraFinetune() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGetRecipeAndConfig(t *testing.T) {
+	const model = constants.TORCHTUNE_MODEL_LLAMA3_2_1B
+	runtimeRef := "torchtune-llama3.2-1b"
+	loraArgs := []string{constants.TorchTuneLoraAttnModules + "=['q_proj']"}
+	qloraArgs := []string{constants.TorchTuneQuantizeBase + "=True"}
+
+	makeTrainJob := func(args []string) *trainer.TrainJob {
+		return utiltesting.MakeTrainJobWrapper("default", "torchtune-job").
+			Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+				Container("", []string{"tune", "run"}, args, nil).
+				Obj(),
+			).
+			RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeRef).
+			Obj()
+	}
+
+	cases := map[string]struct {
+		numNodes       int32
+		numProcPerNode intstr.IntOrString
+		gpuQ           int
+		args           []string
+		wantRecipe     string
+		wantConfig     string
+	}{
+		"single device full": {
+			numNodes: 1, numProcPerNode: intstr.FromString("auto"), gpuQ: 1,
+			wantRecipe: constants.TorchTuneFullFinetuneSingleDevice,
+			wantConfig: model + constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix,
+		},
+		"single device lora": {
+			numNodes: 1, numProcPerNode: intstr.FromString("auto"), gpuQ: 1, args: loraArgs,
+			wantRecipe: constants.TorchTuneLoRAFinetuneSingleDevice,
+			wantConfig: model + constants.TorchTuneLoRAFinetuneSingleDeviceConfigSuffix,
+		},
+		"single device qlora": {
+			numNodes: 1, numProcPerNode: intstr.FromString("auto"), gpuQ: 1, args: qloraArgs,
+			wantRecipe: constants.TorchTuneLoRAFinetuneSingleDevice,
+			wantConfig: model + constants.TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix,
+		},
+		"single node multi-gpu full": {
+			numNodes: 1, numProcPerNode: intstr.FromString("auto"), gpuQ: 4,
+			wantRecipe: constants.TorchTuneFullFinetuneDistributed,
+			wantConfig: model + constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix,
+		},
+		"single node multi-gpu lora": {
+			numNodes: 1, numProcPerNode: intstr.FromString("auto"), gpuQ: 4, args: loraArgs,
+			wantRecipe: constants.TorchTuneLoRAFinetuneDistributed,
+			wantConfig: model + constants.TorchTuneLoRAFinetuneDistributedConfigSuffix,
+		},
+		"single node multi-gpu qlora": {
+			numNodes: 1, numProcPerNode: intstr.FromString("auto"), gpuQ: 4, args: qloraArgs,
+			wantRecipe: constants.TorchTuneLoRAFinetuneDistributed,
+			wantConfig: model + constants.TorchTuneQLoRAFinetuneDistributedConfigSuffix,
+		},
+		"multi-node full": {
+			numNodes: 2, numProcPerNode: intstr.FromString("auto"), gpuQ: 8,
+			wantRecipe: constants.TorchTuneFullFinetuneDistributed,
+			wantConfig: model + constants.TorchTuneFullFinetuneMultiNodesConfigSuffix,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			recipe, config := getRecipeAndConfig(tc.numNodes, tc.numProcPerNode, tc.gpuQ, makeTrainJob(tc.args))
+			if recipe != tc.wantRecipe {
+				t.Errorf("recipe = %q, want %q", recipe, tc.wantRecipe)
+			}
+			if config != tc.wantConfig {
+				t.Errorf("config = %q, want %q", config, tc.wantConfig)
 			}
 		})
 	}
