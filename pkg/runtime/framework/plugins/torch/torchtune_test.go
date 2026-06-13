@@ -59,3 +59,30 @@ func TestGetModelFromRuntimeRef(t *testing.T) {
 		})
 	}
 }
+
+func TestIsLoraConfigEnabled(t *testing.T) {
+	cases := map[string]struct {
+		args []string
+		want bool
+	}{
+		"lora attn modules present": {
+			args: []string{"batch_size=32", constants.TorchTuneLoraAttnModules + "=['q_proj','v_proj']"},
+			want: true,
+		},
+		"no lora args": {
+			args: []string{"batch_size=32", "epochs=10"},
+			want: false,
+		},
+		"empty args": {
+			args: nil,
+			want: false,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := isLoraConfigEnabled(tc.args); got != tc.want {
+				t.Errorf("isLoraConfigEnabled() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
