@@ -86,3 +86,34 @@ func TestIsLoraConfigEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestIsUseQLoraFinetune(t *testing.T) {
+	cases := map[string]struct {
+		args []string
+		want bool
+	}{
+		"quantize base enabled": {
+			args: []string{constants.TorchTuneQuantizeBase + "=True"},
+			want: true,
+		},
+		"dora short-circuits even when quantize base is set": {
+			args: []string{constants.TorchTuneQuantizeBase + "=True", constants.TorchTuneUseDora + "=True"},
+			want: false,
+		},
+		"neither quantize base nor dora": {
+			args: []string{"batch_size=32"},
+			want: false,
+		},
+		"empty args": {
+			args: nil,
+			want: false,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := isUseQLoraFinetune(tc.args); got != tc.want {
+				t.Errorf("isUseQLoraFinetune() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
