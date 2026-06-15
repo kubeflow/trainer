@@ -2210,6 +2210,62 @@ func TestMergeResourceRequirements(t *testing.T) {
 				},
 			},
 		},
+		"trainjob requests override runtime requests": {
+			base: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("32Gi"),
+				},
+			},
+			override: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+			},
+			want: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("32Gi"),
+				},
+			},
+		},
+		"trainjob claims override runtime claims": {
+			base: corev1.ResourceRequirements{
+				Claims: []corev1.ResourceClaim{
+					{Name: "gpu", Request: "default"},
+				},
+			},
+			override: corev1.ResourceRequirements{
+				Claims: []corev1.ResourceClaim{
+					{Name: "gpu", Request: "large"},
+				},
+			},
+			want: corev1.ResourceRequirements{
+				Claims: []corev1.ResourceClaim{
+					{Name: "gpu", Request: "large"},
+				},
+			},
+		},
+		"unset override claims keep runtime claims": {
+			base: corev1.ResourceRequirements{
+				Claims: []corev1.ResourceClaim{
+					{Name: "gpu", Request: "default"},
+				},
+			},
+			override: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+			},
+			want: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+				Claims: []corev1.ResourceClaim{
+					{Name: "gpu", Request: "default"},
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

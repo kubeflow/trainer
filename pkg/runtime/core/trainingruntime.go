@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -185,13 +186,7 @@ func (r *TrainingRuntime) newRuntimeInfo(
 								mergedRes := mergeResourceRequirements(runtimeRes, *trainJob.Spec.Trainer.ResourcesPerNode)
 								jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Resources = mergedRes
 
-								requirements := corev1ac.ResourceRequirements()
-								if limits := mergedRes.Limits; limits != nil {
-									requirements.WithLimits(limits)
-								}
-								if requests := mergedRes.Requests; requests != nil {
-									requirements.WithRequests(requests)
-								}
+								requirements := toResourceRequirementsApplyConfiguration(mergedRes)
 								for k := range jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
 									if jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Name != nil &&
 										*jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Name == constants.Node {
@@ -287,13 +282,9 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 // mergeResourceRequirements overlays override onto base.
 // Keys in override replace matching keys in base; unset keys are kept from base.
 func mergeResourceRequirements(base, override corev1.ResourceRequirements) corev1.ResourceRequirements {
-	merged := corev1.ResourceRequirements{}
-
-	if base.Limits != nil {
-		merged.Limits = maps.Clone(base.Limits)
-	}
-	if base.Requests != nil {
-		merged.Requests = maps.Clone(base.Requests)
+	merged := base.DeepCopy()
+	if merged == nil {
+		merged = &corev1.ResourceRequirements{}
 	}
 	if override.Limits != nil {
 		if merged.Limits == nil {
@@ -307,5 +298,29 @@ func mergeResourceRequirements(base, override corev1.ResourceRequirements) corev
 		}
 		maps.Copy(merged.Requests, override.Requests)
 	}
-	return merged
+	if override.Claims != nil {
+		merged.Claims = slices.Clone(override.Claims)
+	}
+	return *merged
+}
+
+func toResourceRequirementsApplyConfiguration(res corev1.ResourceRequirements) *corev1ac.ResourceRequirementsApplyConfiguration {
+	requirements := corev1ac.ResourceRequirements()
+	if limits := res.Limits; limits != nil {
+		requirements.WithLimits(maps.Clone(limits))
+	}
+	if requests := res.Requests; requests != nil {
+		requirements.WithRequests(maps.Clone(requests))
+	}
+	if claims := res.Claims; len(claims) > 0 {
+		claimApplies := make([]*corev1ac.ResourceClaimApplyConfiguration, 0, len(claims))
+		for i := range claims {
+			claim := claims[i]
+			claimApplies = append(claimApplies, corev1ac.ResourceClaim().
+				WithName(claim.Name).
+				WithRequest(claim.Request))
+		}
+		requirements.WithClaims(claimApplies...)
+	}
+	return requirements
 }
