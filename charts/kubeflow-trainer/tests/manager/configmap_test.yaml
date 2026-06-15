@@ -82,6 +82,30 @@ tests:
           path: data["controller_manager_config.yaml"]
           pattern: "ClusterTrainingRuntime.trainer.kubeflow.org: 3"
 
+  - it: should render default clientConnection qps and burst
+    asserts:
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "clientConnection:"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "qps: 50"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "burst: 100"
+
+  - it: should render custom clientConnection qps and burst
+    set:
+      manager.config.clientConnection.qps: 200
+      manager.config.clientConnection.burst: 400
+    asserts:
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "qps: 200"
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: "burst: 400"
+
   - it: should set feature gates
     set:
       manager.config.featureGates.FeatOn: true

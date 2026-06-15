@@ -13,7 +13,7 @@
 # limitations under the License.
 
 FROM mpioperator/base:v0.8.0 AS mpi
-FROM nvidia/cuda:13.2.1-devel-ubuntu22.04
+FROM nvidia/cuda:13.3.0-devel-ubuntu22.04
 
 # Install libraries required for OpenMPI to work. Image installs OpenMPI 5.0.7
 RUN apt update && apt install -y --no-install-recommends \

@@ -230,7 +230,7 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
     --set runtimes.defaultEnabled=true \
     --set runtimes.xgboost.image.repository=${XGBOOST_RUNTIME_CI_IMAGE_NAME} \
     --set runtimes.xgboost.image.tag=${CI_IMAGE_TAG} \
-    --set controllerManager.image.tag=${CI_IMAGE_TAG} \
+    --set image.tag=${CI_IMAGE_TAG} \
     --set manager.config.featureGates.TrainJobStatus=true \
     --wait
 fi
