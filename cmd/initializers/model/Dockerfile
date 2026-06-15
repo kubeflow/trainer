@@ -17,10 +17,11 @@ FROM python:3.14-slim-bookworm
 WORKDIR /app
 
 # Copy the required Python modules.
-COPY cmd/initializers/model/requirements.txt .
+COPY cmd/initializers/model/pyproject.toml .
+COPY cmd/initializers/model/uv.lock .
 COPY pkg/initializers pkg/initializers
 
-# Install the needed packages.
-RUN pip install -r requirements.txt
+# Install uv and the needed packages.
+RUN pip install uv && uv sync --frozen --no-dev
 
 ENTRYPOINT ["python", "-m", "pkg.initializers.model"]
