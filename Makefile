@@ -283,6 +283,8 @@ release: ## Create a release commit. Usage: make release VERSION=vX.Y.Z [GITHUB_
 		fi; \
 		echo "Changelog generated at $$CHANGELOG_PATH"; \
 	fi
+	@echo "Regenerating files for $(VERSION)"
+	@$(MAKE) generate
 	@echo ""
 	@echo "Release commit for $(VERSION) is ready."
 	@echo "Review the changelog changes, then commit with:"
