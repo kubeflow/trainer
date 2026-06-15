@@ -22,6 +22,6 @@ COPY cmd/initializers/dataset/uv.lock .
 COPY pkg/initializers pkg/initializers
 
 # Install uv and the needed packages.
-RUN pip install uv && uv sync --frozen --no-dev
+RUN pip install --no-cache-dir uv && uv sync --frozen --no-dev --system
 
 ENTRYPOINT ["python", "-m", "pkg.initializers.dataset"]
