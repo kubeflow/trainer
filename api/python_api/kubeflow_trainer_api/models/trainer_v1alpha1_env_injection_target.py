@@ -31,24 +31,18 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.trainer_v1alpha1_flux_ml_policy_source import TrainerV1alpha1FluxMLPolicySource
-from kubeflow_trainer_api.models.trainer_v1alpha1_mpiml_policy_source import TrainerV1alpha1MPIMLPolicySource
-from kubeflow_trainer_api.models.trainer_v1alpha1_torch_ml_policy_source import TrainerV1alpha1TorchMLPolicySource
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from typing import Any, ClassVar, Dict, List
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1MLPolicySource(BaseModel):
+class TrainerV1alpha1EnvInjectionTarget(BaseModel):
     """
-    MLPolicySource represents the runtime-specific configuration for various technologies. One of the following specs can be set.
+    EnvInjectionTarget specifies a replicated job and the containers within it that should receive PET_* env injection.
     """ # noqa: E501
-    flux: Optional[TrainerV1alpha1FluxMLPolicySource] = Field(default=None, description="flux defines the configuration for the Flux runtime.")
-    jax: Optional[Dict[str, Any]] = Field(default=None, description="jax defines the configuration for the JAX Runtime")
-    mpi: Optional[TrainerV1alpha1MPIMLPolicySource] = Field(default=None, description="mpi defines the configuration for the MPI Runtime.")
-    torch: Optional[TrainerV1alpha1TorchMLPolicySource] = Field(default=None, description="torch defines the configuration for the PyTorch runtime.")
-    xgboost: Optional[Dict[str, Any]] = Field(default=None, description="xgboost defines the configuration for the XGBoost Runtime.")
-    __properties: ClassVar[List[str]] = ["flux", "jax", "mpi", "torch", "xgboost"]
+    container_names: List[StrictStr] = Field(description="containerNames lists the container names within the target job that should receive PET_* envs. The item limit keeps admission checks small while covering typical preflight and sidecar use cases.", alias="containerNames")
+    job_name: StrictStr = Field(description="jobName is the name of the target replicated job (e.g. \"node\"). Using \"jobName\" rather than \"replicatedJobName\" keeps the API future-proof for other CRD types (LWS, Grove, Slurm, etc.).", alias="jobName")
+    __properties: ClassVar[List[str]] = ["containerNames", "jobName"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -68,7 +62,7 @@ class TrainerV1alpha1MLPolicySource(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1MLPolicySource from a JSON string"""
+        """Create an instance of TrainerV1alpha1EnvInjectionTarget from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -89,20 +83,11 @@ class TrainerV1alpha1MLPolicySource(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of flux
-        if self.flux:
-            _dict['flux'] = self.flux.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of mpi
-        if self.mpi:
-            _dict['mpi'] = self.mpi.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of torch
-        if self.torch:
-            _dict['torch'] = self.torch.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1MLPolicySource from a dict"""
+        """Create an instance of TrainerV1alpha1EnvInjectionTarget from a dict"""
         if obj is None:
             return None
 
@@ -110,11 +95,8 @@ class TrainerV1alpha1MLPolicySource(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "flux": TrainerV1alpha1FluxMLPolicySource.from_dict(obj["flux"]) if obj.get("flux") is not None else None,
-            "jax": obj.get("jax"),
-            "mpi": TrainerV1alpha1MPIMLPolicySource.from_dict(obj["mpi"]) if obj.get("mpi") is not None else None,
-            "torch": TrainerV1alpha1TorchMLPolicySource.from_dict(obj["torch"]) if obj.get("torch") is not None else None,
-            "xgboost": obj.get("xgboost")
+            "containerNames": obj.get("containerNames"),
+            "jobName": obj.get("jobName")
         })
         return _obj
 

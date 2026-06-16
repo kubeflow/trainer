@@ -35,6 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_flux_ml_policy_source import TrainerV1alpha1FluxMLPolicySource
 from kubeflow_trainer_api.models.trainer_v1alpha1_mpiml_policy_source import TrainerV1alpha1MPIMLPolicySource
+from kubeflow_trainer_api.models.trainer_v1alpha1_torch_ml_policy_source import TrainerV1alpha1TorchMLPolicySource
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -46,7 +47,7 @@ class TrainerV1alpha1MLPolicy(BaseModel):
     jax: Optional[Dict[str, Any]] = Field(default=None, description="jax defines the configuration for the JAX Runtime")
     mpi: Optional[TrainerV1alpha1MPIMLPolicySource] = Field(default=None, description="mpi defines the configuration for the MPI Runtime.")
     num_nodes: Optional[StrictInt] = Field(default=None, description="numNodes is the number of training nodes. Defaults to 1.", alias="numNodes")
-    torch: Optional[Dict[str, Any]] = Field(default=None, description="torch defines the configuration for the PyTorch runtime.")
+    torch: Optional[TrainerV1alpha1TorchMLPolicySource] = Field(default=None, description="torch defines the configuration for the PyTorch runtime.")
     xgboost: Optional[Dict[str, Any]] = Field(default=None, description="xgboost defines the configuration for the XGBoost Runtime.")
     __properties: ClassVar[List[str]] = ["flux", "jax", "mpi", "numNodes", "torch", "xgboost"]
 
@@ -95,6 +96,9 @@ class TrainerV1alpha1MLPolicy(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of mpi
         if self.mpi:
             _dict['mpi'] = self.mpi.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of torch
+        if self.torch:
+            _dict['torch'] = self.torch.to_dict()
         return _dict
 
     @classmethod
@@ -111,7 +115,7 @@ class TrainerV1alpha1MLPolicy(BaseModel):
             "jax": obj.get("jax"),
             "mpi": TrainerV1alpha1MPIMLPolicySource.from_dict(obj["mpi"]) if obj.get("mpi") is not None else None,
             "numNodes": obj.get("numNodes"),
-            "torch": obj.get("torch"),
+            "torch": TrainerV1alpha1TorchMLPolicySource.from_dict(obj["torch"]) if obj.get("torch") is not None else None,
             "xgboost": obj.get("xgboost")
         })
         return _obj

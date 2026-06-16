@@ -1267,6 +1267,11 @@ func (m *MLPolicySourceWrapper) TorchPolicy() *MLPolicySourceWrapper {
 	return m
 }
 
+func (m *MLPolicySourceWrapper) TorchPolicyWithEnvInjection(envInjection *trainer.EnvInjection) *MLPolicySourceWrapper {
+	m.Torch = &trainer.TorchMLPolicySource{EnvInjection: envInjection}
+	return m
+}
+
 func (w *MLPolicySourceWrapper) JAXPolicy() *MLPolicySourceWrapper {
 	w.JAX = &trainer.JAXMLPolicySource{}
 	return w
