@@ -53,14 +53,15 @@ func TestFlux(t *testing.T) {
 
 	var procs int32 = 1
 	configMapName := "test-job-flux-entrypoint"
+	curveSecretName := "test-job-flux-curve"
 
 	cases := map[string]struct {
 		info              *runtime.Info
 		trainJob          *trainer.TrainJob
 		wantInfo          *runtime.Info
 		wantObjs          []apiruntime.Object
-		wantMLPolicyError error
-		wantBuildError    error
+		wantMLPolicyError error // kept for MPI parity; Flux currently has no EnforceMLPolicy error paths
+		wantBuildError    error // kept for MPI parity; Flux currently has no Build error paths
 	}{
 		"no action when flux policy is nil": {
 			info: &runtime.Info{
@@ -166,7 +167,7 @@ func TestFlux(t *testing.T) {
 								*corev1ac.Volume().WithName(constants.FluxInstallVolumeName).WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
 								*corev1ac.Volume().WithName(configMapName).WithConfigMap(corev1ac.ConfigMapVolumeSource().WithName(configMapName).WithDefaultMode(0755)),
 								*corev1ac.Volume().WithName(constants.FluxMemoryVolumeName).WithEmptyDir(corev1ac.EmptyDirVolumeSource().WithMedium(corev1.StorageMediumMemory)),
-								*corev1ac.Volume().WithName(constants.FluxCurveVolumeName).WithSecret(corev1ac.SecretVolumeSource().WithSecretName("test-job-flux-curve").WithDefaultMode(0400)),
+								*corev1ac.Volume().WithName(constants.FluxCurveVolumeName).WithSecret(corev1ac.SecretVolumeSource().WithSecretName(curveSecretName).WithDefaultMode(0400)),
 							},
 						},
 					},
@@ -176,7 +177,7 @@ func TestFlux(t *testing.T) {
 				utiltesting.MakeConfigMapWrapper(configMapName, metav1.NamespaceDefault).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "test-uid").
 					Obj(),
-				utiltesting.MakeSecretWrapper("test-job-flux-curve", metav1.NamespaceDefault).
+				utiltesting.MakeSecretWrapper(curveSecretName, metav1.NamespaceDefault).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "test-uid").
 					Obj(),
 			},
@@ -197,8 +198,6 @@ func TestFlux(t *testing.T) {
 				t.Errorf("Unexpected error from EnforceMLPolicy (-want, +got): %s", diff)
 			}
 			if diff := gocmp.Diff(tc.wantInfo, tc.info,
-				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
-				cmpopts.SortMaps(func(a, b int) bool { return a < b }),
 				utiltesting.PodSetEndpointsCmpOpts,
 			); len(diff) != 0 {
 				t.Errorf("Unexpected info from EnforceMLPolicy (-want, +got): %s", diff)
@@ -209,10 +208,13 @@ func TestFlux(t *testing.T) {
 			if diff := gocmp.Diff(tc.wantBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
 			}
+			if err != nil {
+				return
+			}
 			var typedObjs []apiruntime.Object
 			typedObjs, err = utiltesting.ToObject(cli.Scheme(), objs...)
 			if err != nil {
-				t.Errorf("Failed to convert object: %v", err)
+				t.Fatalf("Failed to convert objects: %v", err)
 			}
 			if diff := gocmp.Diff(tc.wantObjs, typedObjs, objCmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
