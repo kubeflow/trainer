@@ -259,16 +259,27 @@ release: ## Create a release commit. Usage: make release VERSION=vX.Y.Z [GITHUB_
 	@if echo "$(VERSION)" | grep -E -q '\-rc\.[0-9]+$$'; then \
 		echo "Skipping changelog generation for RC release $(VERSION)"; \
 	else \
+		git fetch upstream --tags --prune; \
 		MAJOR_MINOR=$$(echo "$(VERSION)" | sed 's/^v//' | cut -d. -f1,2); \
 		CHANGELOG_PATH="CHANGELOG/CHANGELOG-$$MAJOR_MINOR.md"; \
 		RELEASE_BRANCH="release-$$MAJOR_MINOR"; \
-		PREV_TAG=$$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-rc*' "$$RELEASE_BRANCH" 2>/dev/null || true); \
-		if [ -n "$$PREV_TAG" ]; then \
-			CLIFF_SCOPE="$$PREV_TAG..$$RELEASE_BRANCH"; \
-			echo "Generating changelog for $(VERSION) (range: $$CLIFF_SCOPE)"; \
-		else \
+		RELEASE_SHA=$$(git rev-parse --verify --quiet "refs/heads/$$RELEASE_BRANCH" \
+			|| git rev-parse --verify --quiet "refs/remotes/upstream/$$RELEASE_BRANCH"); \
+		if [ -n "$$RELEASE_SHA" ]; then \
+			PREV_TAG=$$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*rc*' "$$RELEASE_SHA" 2>/dev/null || true); \
+			if [ -n "$$PREV_TAG" ]; then \
+				CLIFF_SCOPE="$$PREV_TAG..$$RELEASE_SHA"; \
+				echo "Generating changelog for $(VERSION) (range: $$PREV_TAG..$$RELEASE_BRANCH @ $$RELEASE_SHA)"; \
+			else \
+				CLIFF_SCOPE="--unreleased"; \
+				echo "Generating changelog for $(VERSION) (no prior tag on $$RELEASE_BRANCH; using --unreleased)"; \
+			fi; \
+		elif [ ! -f "$$CHANGELOG_PATH" ]; then \
 			CLIFF_SCOPE="--unreleased"; \
-			echo "Generating changelog for $(VERSION) (no prior tag on $$RELEASE_BRANCH; using --unreleased)"; \
+			echo "Generating changelog for $(VERSION) (new release line $$MAJOR_MINOR, branch $$RELEASE_BRANCH not created yet; using --unreleased)"; \
+		else \
+			echo "Error: branch $$RELEASE_BRANCH not found locally or on upstream, but $$CHANGELOG_PATH exists. Run: git fetch upstream $$RELEASE_BRANCH"; \
+			exit 1; \
 		fi; \
 		CLIFF_CMD="docker run --rm -u $$(id -u):$$(id -g) -v $(PROJECT_DIR):/app"; \
 		if [ -n "$(GITHUB_TOKEN)" ]; then \
@@ -278,11 +289,13 @@ release: ## Create a release commit. Usage: make release VERSION=vX.Y.Z [GITHUB_
 		if [ -f "$$CHANGELOG_PATH" ]; then \
 			$$CLIFF_CMD --prepend "$$CHANGELOG_PATH"; \
 		else \
-			mkdir -p CHANGELOG; \
 			$$CLIFF_CMD -o "$$CHANGELOG_PATH"; \
+			printf '%s\n' "$$(cat "$$CHANGELOG_PATH")" > "$$CHANGELOG_PATH"; \
 		fi; \
 		echo "Changelog generated at $$CHANGELOG_PATH"; \
 	fi
+	@echo "Regenerating files for $(VERSION)"
+	@$(MAKE) generate
 	@echo ""
 	@echo "Release commit for $(VERSION) is ready."
 	@echo "Review the changelog changes, then commit with:"

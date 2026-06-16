@@ -63,7 +63,8 @@ make release VERSION=vX.Y.Z-rc.N GITHUB_TOKEN=<token>
 This will:
 
 1. Update `VERSION` to `vX.Y.Z`.
-2. Generate `CHANGELOG/CHANGELOG-X.Y.md` using `git-cliff` (skipped for RC releases).
+1. Update Python API models version to `X.Y.Z`
+1. Generate `CHANGELOG/CHANGELOG-X.Y.md` using `git-cliff` (skipped for RC releases).
 
 After reviewing the changes, create a signed commit and open a PR to the appropriate branch
 (e.g. `master` or `release-X.Y`):
@@ -83,7 +84,6 @@ When the `VERSION` change is merged, the
 4. Creates the `release-X.Y` branch (if it doesn't exist).
 5. Updates release assets on the release branch:
    - Helm chart version in `Chart.yaml`.
-   - Python API `__version__`.
    - Image tags and `configMapGenerator` version in manifests.
 6. Publishes the Python package to [PyPI](https://pypi.org/project/kubeflow-trainer-api/)
    using OIDC trusted publishing.
