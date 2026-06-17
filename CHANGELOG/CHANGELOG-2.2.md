@@ -1,3 +1,34 @@
+# [v2.2.1](https://github.com/kubeflow/trainer/releases/tag/v2.2.1) (2026-06-16)
+
+## 🚀 Features
+
+- feat(ci): automate release process (#3536) ([#3590](https://github.com/kubeflow/trainer/pull/3590) by @Krishna-kg732)
+- feat: update k8s to 0.36 for release-2.2 ([#3514](https://github.com/kubeflow/trainer/pull/3514) by @kannon92)
+
+## 🐛 Bug Fixes
+
+- [release-2.2] fix(ci): Update Python API models version in make release ([#3622](https://github.com/kubeflow/trainer/pull/3622) by @andreyvelich)
+- [release-2.2] fix(ci): Guard git-cliff against empty user names ([#3598](https://github.com/kubeflow/trainer/pull/3598) by @andreyvelich)
+- [release-2.2] fix(ci): Fix git-cliff for patch release Changelog (#3591) ([#3593](https://github.com/kubeflow/trainer/pull/3593) by @andreyvelich)
+- [release-2.2] fix(examples): use namespaced SQuAD dataset (#3560) ([#3592](https://github.com/kubeflow/trainer/pull/3592) by @XploY04)
+- [release-2.2] fix(api): allow atomic RuntimePatches update on unsuspend ([#3489](https://github.com/kubeflow/trainer/pull/3489) by @NarayanaSabari)
+- [release-2.2] fix(manifests): Use released version for JobSet and LWS images ([#3453](https://github.com/kubeflow/trainer/pull/3453) by @andreyvelich)
+
+## ⚙️ Miscellaneous Tasks
+
+- chore(ci): Remove Trivy Action (#3389) ([#3391](https://github.com/kubeflow/trainer/pull/3391) by @andreyvelich)
+
+# [v2.2.1](https://github.com/kubeflow/trainer/releases/tag/v2.2.1) (2026-06-16)
+
+## 🚀 Features
+
+- feat(ci): automate release process (#3536) ([#3590](https://github.com/kubeflow/trainer/pull/3590) by @andreyvelich)
+- feat: update k8s to 0.36 for release-2.2 ([#3514](https://github.com/kubeflow/trainer/pull/3514) by @kannon92)
+
+## ⚙️ Miscellaneous Tasks
+
+- chore(ci): Remove Trivy Action (#3389) ([#3391](https://github.com/kubeflow/trainer/pull/3391) by @andreyvelich)
+
 # [v2.2.0](https://github.com/kubeflow/trainer/tree/v2.2.0) (2026-03-19)
 
 This is Kubeflow Trainer v2.2.0 release.

@@ -263,8 +263,7 @@ release: ## Create a release commit. Usage: make release VERSION=vX.Y.Z [GITHUB_
 		MAJOR_MINOR=$$(echo "$(VERSION)" | sed 's/^v//' | cut -d. -f1,2); \
 		CHANGELOG_PATH="CHANGELOG/CHANGELOG-$$MAJOR_MINOR.md"; \
 		RELEASE_BRANCH="release-$$MAJOR_MINOR"; \
-		RELEASE_SHA=$$(git rev-parse --verify --quiet "refs/heads/$$RELEASE_BRANCH" \
-			|| git rev-parse --verify --quiet "refs/remotes/upstream/$$RELEASE_BRANCH"); \
+		RELEASE_SHA=$$(git rev-parse --verify --quiet "refs/remotes/upstream/$$RELEASE_BRANCH"); \
 		if [ -n "$$RELEASE_SHA" ]; then \
 			PREV_TAG=$$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*rc*' "$$RELEASE_SHA" 2>/dev/null || true); \
 			if [ -n "$$PREV_TAG" ]; then \
