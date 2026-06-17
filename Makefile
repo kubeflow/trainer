@@ -11,6 +11,17 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+# Setting SED allows macOS users to install GNU sed (gsed) and use it instead
+# of the default BSD sed, which the in-place edits in this Makefile require.
+ifeq ($(shell command -v gsed 2>/dev/null),)
+    SED ?= $(shell command -v sed)
+else
+    SED ?= $(shell command -v gsed)
+endif
+ifeq ($(shell ${SED} --version 2>&1 | grep -q GNU; echo $$?),1)
+    $(error !!! GNU sed is required. If on OS X, use 'brew install gnu-sed'.)
+endif
+
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 REPO := github.com/kubeflow/trainer
 TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
@@ -111,6 +122,14 @@ yq: # Download yq locally if required.
 .PHONY: kube-linter
 kube-linter: ## Download kube-linter locally if required.
 	GOBIN=$(LOCALBIN) go install golang.stackrox.io/kube-linter/cmd/kube-linter@$(KUBE_LINTER_VERSION)
+
+.PHONY: uv
+uv: ## Install uv if it is not already installed.
+	@command -v uv > /dev/null 2>&1 || { \
+		echo "Installing uv"; \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+		echo "uv has been installed."; \
+	}
 
 .PHONY: lint-manifests
 lint-manifests: kube-linter ## Run kube-linter on manifests and helm charts.
@@ -256,11 +275,14 @@ release: ## Create a release commit. Usage: make release VERSION=vX.Y.Z [GITHUB_
 	fi
 	@echo -n "$(VERSION)" > VERSION
 	@echo "Updated VERSION to $(VERSION)"
+	@CHART_VERSION=$$(echo "$(VERSION)" | $(SED) 's/^v//'); \
+		$(SED) -i "s/^version: .*/version: $$CHART_VERSION/" charts/kubeflow-trainer/Chart.yaml; \
+		echo "Updated Helm chart version to $$CHART_VERSION"
 	@if echo "$(VERSION)" | grep -E -q '\-rc\.[0-9]+$$'; then \
 		echo "Skipping changelog generation for RC release $(VERSION)"; \
 	else \
 		git fetch upstream --tags --prune; \
-		MAJOR_MINOR=$$(echo "$(VERSION)" | sed 's/^v//' | cut -d. -f1,2); \
+		MAJOR_MINOR=$$(echo "$(VERSION)" | $(SED) 's/^v//' | cut -d. -f1,2); \
 		CHANGELOG_PATH="CHANGELOG/CHANGELOG-$$MAJOR_MINOR.md"; \
 		RELEASE_BRANCH="release-$$MAJOR_MINOR"; \
 		RELEASE_SHA=$$(git rev-parse --verify --quiet "refs/remotes/upstream/$$RELEASE_BRANCH"); \
