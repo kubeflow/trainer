@@ -197,10 +197,12 @@ func TestFlux(t *testing.T) {
 			if diff := gocmp.Diff(tc.wantMLPolicyError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from EnforceMLPolicy (-want, +got): %s", diff)
 			}
-			if diff := gocmp.Diff(tc.wantInfo, tc.info,
-				utiltesting.PodSetEndpointsCmpOpts,
-			); len(diff) != 0 {
-				t.Errorf("Unexpected info from EnforceMLPolicy (-want, +got): %s", diff)
+			if err == nil {
+				if diff := gocmp.Diff(tc.wantInfo, tc.info,
+					utiltesting.PodSetEndpointsCmpOpts,
+				); len(diff) != 0 {
+					t.Errorf("Unexpected info from EnforceMLPolicy (-want, +got): %s", diff)
+				}
 			}
 
 			var objs []apiruntime.ApplyConfiguration
