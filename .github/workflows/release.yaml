@@ -16,6 +16,8 @@ jobs:
   prepare:
     name: Prepare release branch
     runs-on: ubuntu-latest
+    environment:
+      name: release
     permissions:
       contents: write
     outputs:
