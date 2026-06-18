@@ -12,77 +12,99 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  SEMVER_PATTERN: '^(v)?([0-9]+)\.([0-9]+)\.([0-9]+)(-rc\.([0-9]+))?$'
-
 jobs:
   prepare:
+    name: Prepare release branch
     runs-on: ubuntu-latest
+    environment:
+      name: release
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.vars.outputs.version }}
-      tag: ${{ steps.vars.outputs.tag }}
       branch: ${{ steps.vars.outputs.branch }}
       is-prerelease: ${{ steps.vars.outputs.is-prerelease }}
 
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Validate version and set outputs
+      - name: Configure git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Check version and branch
         id: vars
         run: |
-          RAW_VERSION=$(cat VERSION | tr -d ' \n')
-          VERSION=${RAW_VERSION#v}
-          if [[ ! ${RAW_VERSION} =~ ${{ env.SEMVER_PATTERN }} ]]; then
-            echo "Version '${RAW_VERSION}' does not match semver pattern."
-            exit 1
-          fi
-
-          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+          VERSION=$(cat VERSION | tr -d ' \n')
+          MAJOR_MINOR=$(echo "${VERSION#v}" | cut -d. -f1,2)
           BRANCH="release-${MAJOR_MINOR}"
-          TAG="v${VERSION}"
-          IS_PRERELEASE=false
-          if [[ ${VERSION} == *"-rc."* ]]; then
-            IS_PRERELEASE=true
-          fi
 
-          echo "Version '${RAW_VERSION}' matches semver pattern."
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "is-prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+          if [[ "$VERSION" =~ -rc\.[0-9]+$ ]]; then
+            echo "is-prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is-prerelease=false" >> $GITHUB_OUTPUT
+          fi
 
-  tests:
-    needs:
-      - prepare
-    runs-on: ubuntu-latest
+      - name: Update assets on the release branch
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.vars.outputs.version }}"
+          BRANCH="${{ steps.vars.outputs.branch }}"
+          MAIN_SHA="${{ github.sha }}"
 
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v6
+          # 1. Cherry pick version and changelog bump if needed.
+          if [[ "${GITHUB_REF_NAME}" == "$BRANCH" ]]; then
+            echo "Triggered on $BRANCH. Skipping cherry-pick from main."
+            exit 0
+          fi
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
+          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+            echo "Using existing branch: $BRANCH"
+            git fetch origin "$BRANCH":"$BRANCH"
+            git checkout "$BRANCH"
+            if git merge-base --is-ancestor "$MAIN_SHA" "$BRANCH"; then
+              echo "Commit $MAIN_SHA already present in $BRANCH. Skipping cherry-pick."
+            else
+              if ! git cherry-pick -x "$MAIN_SHA"; then
+                echo "Cherry-pick failed. Please resolve manually on $BRANCH." >&2
+                exit 1
+              fi
+            fi
+          else
+            echo "Creating new branch: $BRANCH from main@$MAIN_SHA"
+            git checkout -B "$BRANCH" "$MAIN_SHA"
+          fi
 
-      - name: Run Go unit tests
-        run: make test
+          # 2. Update assets on release branch.
+          for f in \
+            manifests/overlays/manager/kustomization.yaml \
+            manifests/overlays/runtimes/kustomization.yaml \
+            manifests/overlays/data-cache/kustomization.yaml; do
+            sed -i "s/newTag: .*/newTag: $TAG/" "$f"
+            echo "Updated image tags in $f to $TAG"
+          done
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+          sed -i -E "s|(ghcr\.io/kubeflow/trainer/data-cache):[^\"]*|\\1:${TAG}|" \
+            manifests/base/runtimes/data-cache/torch_distributed_with_cache.yaml
+          echo "Updated CACHE_IMAGE to data-cache:$TAG"
 
-      - name: Run Python unit tests
-        run: make test-python
+          sed -i "s/kubeflow_trainer_version=.*/kubeflow_trainer_version=${TAG}/" \
+            manifests/overlays/manager/kustomization.yaml
+          echo "Updated ConfigMap version to $TAG"
 
-  build_python_api:
-    needs:
-      - prepare
-      - update_release_branch
+          # 3. Commit the pinned assets and push the release branch.
+          git add -A
+          git commit -s -m "Kubeflow Trainer Official Release $TAG"
+          git push origin "$BRANCH"
+
+  build:
+    name: Build Python package
+    needs: [prepare]
     runs-on: ubuntu-latest
 
     steps:
@@ -96,99 +118,47 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install build tooling
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install build twine
+      - name: Install uv
+        run: make uv
 
-      - name: Build Python package
-        working-directory: api/python_api
+      - name: Build and validate package
         run: |
-          python -m build
-          python -m twine check dist/*
+          uv build api/python_api -o dist
+          uvx twine check dist/*
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: python-dist-${{ needs.prepare.outputs.version }}
-          path: api/python_api/dist/
+          name: dist-${{ needs.prepare.outputs.version }}
+          path: dist/
 
-  update_release_branch:
-    needs:
-      - prepare
-      - tests
-    runs-on: ubuntu-latest
+  create-tag:
+    name: Create and push tag
+    needs: [prepare, build]
     permissions:
       contents: write
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source code
+      - name: Checkout release branch
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.branch }}
 
-      - name: Configure Git
+      - name: Create tag
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-      - name: Create or checkout release branch
-        run: |
-          BRANCH="${{ needs.prepare.outputs.branch }}"
-          if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null 2>&1; then
-            echo "Release branch $BRANCH already exists, checking it out."
-            git checkout "$BRANCH"
-            git pull origin "$BRANCH"
-          else
-            echo "Creating release branch $BRANCH from $GITHUB_SHA"
-            git checkout -b "$BRANCH" "$GITHUB_SHA"
+          TAG="${{ needs.prepare.outputs.version }}"
+          if git ls-remote --tags origin "$TAG" | grep -q "refs/tags/$TAG"; then
+            echo "Tag $TAG already exists. Skipping"
+            exit 0
           fi
+          git tag "$TAG"
+          git push origin "$TAG"
 
-      - name: Update assets on release branch
-        run: |
-          VERSION="${{ needs.prepare.outputs.version }}"
-          TAG="${{ needs.prepare.outputs.tag }}"
-
-          # Update Helm chart version.
-          sed -i "s/^version: .*/version: ${VERSION}/" charts/kubeflow-trainer/Chart.yaml
-          echo "Updated Helm chart version to $VERSION"
-
-          # Update newTag in all manifest kustomization files.
-          find manifests -type f -name '*.yaml' -exec sed -i "s/newTag: .*/newTag: $TAG/" {} +
-          echo "Updated image tags in manifests to $TAG"
-
-          # Pin ghcr.io image references from :latest to the release tag.
-          CHANGED_FILES=$(grep -REl "ghcr\.io/kubeflow/trainer/[A-Za-z0-9._/-]+:latest" manifests || true)
-          if [ -n "$CHANGED_FILES" ]; then
-            while IFS= read -r f; do
-              sed -i -E "s|(ghcr\.io/kubeflow/trainer/[A-Za-z0-9._/-]+):latest|\\1:${TAG}|g" "$f"
-              echo "  Pinned $f"
-            done <<< "$CHANGED_FILES"
-          fi
-
-          # Update configMapGenerator version in manager overlay.
-          sed -i "s/kubeflow_trainer_version=.*/kubeflow_trainer_version=${TAG}/" \
-            manifests/overlays/manager/kustomization.yaml
-          echo "Updated configMapGenerator version to $TAG"
-
-      - name: Commit and push release branch
-        run: |
-          TAG="${{ needs.prepare.outputs.tag }}"
-          BRANCH="${{ needs.prepare.outputs.branch }}"
-          if git diff --quiet; then
-            echo "No asset changes needed."
-          else
-            git add -A
-            git commit -s -m "Kubeflow Trainer Official Release $TAG"
-          fi
-          git push origin "$BRANCH"
-
-  publish_pypi:
-    if: ${{ !cancelled() && !failure() }}
-    needs:
-      - prepare
-      - build_python_api
-      - create_tag
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [prepare, build, create-tag]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -200,56 +170,23 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v8
         with:
-          name: python-dist-${{ needs.prepare.outputs.version }}
+          name: dist-${{ needs.prepare.outputs.version }}
           path: dist/
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           print-hash: true
-          packages-dir: dist/
 
-  create_tag:
-    if: ${{ !cancelled() && !failure() }}
-    needs:
-      - prepare
-      - update_release_branch
-      - build_python_api
+  github-release:
+    name: Create GitHub release
+    needs: [prepare, build, create-tag, publish-pypi]
     permissions:
       contents: write
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout release branch
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.prepare.outputs.branch }}
-
-      - name: Create and push tag
-        run: |
-          TAG="${{ needs.prepare.outputs.tag }}"
-          if git ls-remote --tags origin "$TAG" | grep -q "refs/tags/$TAG"; then
-            echo "Tag $TAG already exists. Skipping"
-            exit 0
-          fi
-          git tag "$TAG"
-          git push origin "$TAG"
-
-  github_release:
-    if: ${{ !cancelled() && !failure() }}
-    needs:
-      - prepare
-      - update_release_branch
-      - create_tag
-      - publish_pypi
-
-    permissions:
-      contents: write
-
     runs-on: ubuntu-latest
     environment:
       name: release
+      url: https://github.com/kubeflow/trainer/releases
 
     steps:
       - name: Checkout release branch
@@ -257,26 +194,32 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.branch }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: dist-${{ needs.prepare.outputs.version }}
+          path: dist/
 
       - name: Extract changelog
         if: needs.prepare.outputs.is-prerelease != 'true'
         id: changelog
         run: |
           VERSION="${{ needs.prepare.outputs.version }}"
-          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+          MAJOR_MINOR=$(echo "${VERSION#v}" | cut -d. -f1,2)
           CHANGELOG_FILE="CHANGELOG/CHANGELOG-${MAJOR_MINOR}.md"
           set -euo pipefail
           [[ -f "$CHANGELOG_FILE" ]] || { echo "ERROR: $CHANGELOG_FILE not found" >&2; exit 1; }
-          HEADER_REGEX="^#\{1,2\} \\[v\?${VERSION//./\\.}\\]"
+          HEADER_REGEX="^#\{1,2\} \\[${VERSION//./\\.}\\]"
           SECTION=$(sed -n "/$HEADER_REGEX/,\$p" "$CHANGELOG_FILE")
-          [[ -n "$SECTION" ]] || { echo "ERROR: No changelog section for v$VERSION in $CHANGELOG_FILE" >&2; exit 1; }
-          NEXT_VERSION=$(echo "$SECTION" | tail -n +2 | grep -m1 "^#\{1,2\} \\[" || true)
+          [[ -n "$SECTION" ]] || { echo "ERROR: No changelog section for $VERSION in $CHANGELOG_FILE" >&2; exit 1; }
+          NEXT_VERSION=$(echo "$SECTION" | grep -m1 "^#\{1,2\} \\[v[0-9]" || true)
           if [[ -n "$NEXT_VERSION" ]]; then
-              CHANGELOG=$(echo "$SECTION" | sed '1d' | sed '/^#\{1,2\} \[/,$d')
+              CHANGELOG=$(echo "$SECTION" | sed '1d' | sed '/^#\{1,2\} \[v[0-9]/,$d')
           else
               CHANGELOG=$(echo "$SECTION" | sed '1d')
           fi
-          [[ -n "$CHANGELOG" ]] || { echo "ERROR: Empty changelog body for v$VERSION in $CHANGELOG_FILE" >&2; exit 1; }
+          [[ -n "$CHANGELOG" ]] || { echo "ERROR: Empty changelog body for $VERSION in $CHANGELOG_FILE" >&2; exit 1; }
           {
             echo "changelog<<EOF"
             echo "$CHANGELOG"
@@ -286,10 +229,11 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          name: "${{ needs.prepare.outputs.tag }}"
-          tag_name: ${{ needs.prepare.outputs.tag }}
-          target_commitish: ${{ needs.prepare.outputs.branch }}
-          prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
-          draft: false
+          tag_name: ${{ needs.prepare.outputs.version }}
+          name: ${{ needs.prepare.outputs.version }}
           body: ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
           generate_release_notes: false
+          files: |
+            dist/*
