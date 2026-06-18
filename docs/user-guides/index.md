@@ -109,6 +109,13 @@ Pre-built training workflows (TorchTune and more)
 Active deadlines, suspend/resume for TrainJobs
 ::::
 
+::::{grid-item-card} TrainJob Progress and Metrics
+:link: trainjob-progress
+:link-type: doc
+
+Monitor training progress and custom metrics in TrainJob status
+::::
+
 :::::
 
 ## Local Development
@@ -161,6 +168,7 @@ mlx
 xgboost
 megatron
 flux
+trainjob-progress
 data-cache
 builtin-trainer/index
 local-execution/index
