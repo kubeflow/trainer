@@ -64,6 +64,7 @@ This will:
 
 1. Update `VERSION` to `vX.Y.Z`.
 1. Update Python API models version to `X.Y.Z`
+1. Update Helm Charts version to `X.Y.Z`
 1. Generate `CHANGELOG/CHANGELOG-X.Y.md` using `git-cliff` (skipped for RC releases).
 
 After reviewing the changes, create a signed commit and open a PR to the appropriate branch
@@ -78,22 +79,19 @@ git add -A && git commit -s -m 'Prepare release vX.Y.Z'
 When the `VERSION` change is merged, the
 [release workflow](.github/workflows/release.yaml) runs automatically:
 
-1. Validates version format and ensures the tag doesn't already exist.
-2. Runs Go and Python unit tests.
-3. Builds the Python package.
-4. Creates the `release-X.Y` branch (if it doesn't exist).
-5. Updates release assets on the release branch:
-   - Helm chart version in `Chart.yaml`.
-   - Image tags and `configMapGenerator` version in manifests.
-6. Publishes the Python package to [PyPI](https://pypi.org/project/kubeflow-trainer-api/)
+1. Ensures the `release-X.Y` branch exists and contains the version bump:
+   cherry-picks the merged "Prepare release" commit (VERSION, Helm chart version,
+   regenerated assets, and changelog) onto the branch, or creates the branch from
+   `master` if it doesn't exist yet.
+2. Pins the release-only image references on the release branch, then commits and pushes:
+   - Image tags (`newTag`) in the manifest overlays.
+   - `CACHE_IMAGE` in the data cache runtime.
+   - `configMapGenerator` version in the manager overlay.
+3. Builds and validates the Python package with `uv`.
+4. Creates and pushes the git tag `vX.Y.Z` (skipped if it already exists).
+5. Publishes the Python package to [PyPI](https://pypi.org/project/kubeflow-trainer-api/)
    using OIDC trusted publishing.
-7. Creates and pushes the git tag `vX.Y.Z`.
-8. Creates a GitHub Release with the generated changelog.
-9. Triggers container image and Helm chart publishing.
-
-> **Note**: Helm chart version, Python API version, and manifest image tags are only updated
-> on the release branch, not on `master`. This ensures users deploying from `master` always
-> get the latest images.
+6. Creates a GitHub Release with the generated changelog and the built package artifacts.
 
 ## Announcement
 
