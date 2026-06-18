@@ -184,6 +184,16 @@ func TestGetRecipeAndConfig(t *testing.T) {
 			wantRecipe: constants.TorchTuneFullFinetuneDistributed,
 			wantConfig: model + constants.TorchTuneFullFinetuneMultiNodesConfigSuffix,
 		},
+		"numProcPerNode=1 forces single device even with multiple gpus": {
+			numNodes: 1, numProcPerNode: intstr.FromInt(1), gpuQ: 4,
+			wantRecipe: constants.TorchTuneFullFinetuneSingleDevice,
+			wantConfig: model + constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix,
+		},
+		"numProcPerNode>1 uses distributed": {
+			numNodes: 1, numProcPerNode: intstr.FromInt(4), gpuQ: 4,
+			wantRecipe: constants.TorchTuneFullFinetuneDistributed,
+			wantConfig: model + constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix,
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
