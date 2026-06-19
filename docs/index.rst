@@ -11,6 +11,7 @@
    <div class="hero-content">
    <div class="hero-badge">Open Source &middot; CNCF Project</div>
    <h1 class="hero-title">Kubeflow Trainer</h1>
+   <img class="hero-logo" src="_images/trainer-logo.svg" alt="Kubeflow Trainer" />
    <p class="hero-tagline">The Kubernetes-native platform for distributed AI training and LLM fine-tuning at any scale.</p>
    <div class="hero-actions">
    <a href="getting-started/index.html" class="btn btn-primary">Get Started <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
@@ -146,6 +147,13 @@
    </footer>
 
    </div>
+
+.. only:: html
+
+   .. Ensure Sphinx copies the logo to _images/
+   .. image:: images/trainer-logo.svg
+      :width: 0
+      :class: hidden
 
 .. toctree::
    :hidden:
