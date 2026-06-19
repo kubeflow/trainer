@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 env:
@@ -23,6 +23,7 @@ env:
 jobs:
   govulncheck:
     name: govulncheck
+    if: ${{ github.repository == 'kubeflow/trainer' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -37,7 +38,7 @@ jobs:
       - name: Checkout base branch
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.base_ref }}
+          ref: ${{ github.base_ref || github.event.repository.default_branch }}
           path: base-code
 
       - name: Setup Go
@@ -74,6 +75,25 @@ jobs:
       - name: Compare and detect regressions
         id: compare
         run: |
+          set -eo pipefail
+
+          for f in govulncheck-pr.json govulncheck-base.json; do
+            if [ ! -s "$f" ]; then
+              echo "::error::$f is empty or missing — scan may have failed silently"
+              exit 1
+            fi
+            if ! jq -s -e '.[0].config' "$f" > /dev/null 2>&1; then
+              echo "::error::$f missing config record — not valid govulncheck output"
+              exit 1
+            fi
+            finding_count=$(jq -s '[.[] | select(.finding)] | length' "$f")
+            osv_count=$(jq -s '[.[] | select(.osv)] | length' "$f")
+            echo "$f: $osv_count advisories, $finding_count reachable findings"
+            if [ "$osv_count" -gt 0 ] && [ "$finding_count" -eq 0 ]; then
+              echo "::warning::$f has advisories but no reachable findings — scan output may be incomplete"
+            fi
+          done
+
           JQ_EXTRACT='
             [.[] | select(.finding)] | group_by(.finding.osv) | map(.[0].finding.osv) | sort
           '
@@ -109,7 +129,7 @@ jobs:
               | group_by(.finding.osv)[]
               | .[0].finding as $f
               | $osv_map[$f.osv] as $osv
-              | select([.finding.osv] | inside($new_vulns))
+              | select($new_vulns | index($f.osv))
               | {
                   osv_id: $f.osv,
                   cve: ([$osv.aliases[]? | select(startswith("CVE-"))] | first // $f.osv),
@@ -153,11 +173,13 @@ jobs:
       - name: Comment on PR with regression details
         id: comment
         continue-on-error: true
-        if: always() && steps.compare.outputs.new_cves_found == 'true'
+        if: always() && github.event_name == 'pull_request' && steps.compare.outputs.new_cves_found == 'true'
         uses: actions/github-script@v8
+        env:
+          NEW_CVES: ${{ steps.compare.outputs.new_cves }}
         with:
           script: |
-            const newCves = `${{ steps.compare.outputs.new_cves }}`;
+            const newCves = process.env.NEW_CVES;
             const commentMarker = '<!-- govulncheck-security-check -->';
             const body = [
               commentMarker,
@@ -175,10 +197,11 @@ jobs:
               '> **Note:** This check is informational and does not block merging.',
             ].join('\n');
 
-            const { data: comments } = await github.rest.issues.listComments({
+            const comments = await github.paginate(github.rest.issues.listComments, {
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
+              per_page: 100,
             });
 
             const existingComment = comments.find(comment =>
@@ -202,7 +225,9 @@ jobs:
             }
 
       - name: Fallback alert if PR comment failed
-        if: always() && steps.compare.outputs.new_cves_found == 'true' && steps.comment.outcome == 'failure'
+        if: always() && github.event_name == 'pull_request' && steps.compare.outputs.new_cves_found == 'true' && steps.comment.outcome == 'failure'
+        env:
+          NEW_CVES: ${{ steps.compare.outputs.new_cves }}
         run: |
           echo "::warning::Failed to post security regression comment on PR. See details in step summary."
           {
@@ -210,21 +235,23 @@ jobs:
             echo ""
             echo "> The PR comment could not be posted (API failure). Review the regression details below."
             echo ""
-            echo '${{ steps.compare.outputs.new_cves }}'
+            echo "$NEW_CVES"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Delete security comment when resolved
+        id: delete-comment
         continue-on-error: true
-        if: success() && steps.compare.outputs.new_cves_found == 'false'
+        if: success() && github.event_name == 'pull_request' && steps.compare.outputs.new_cves_found == 'false'
         uses: actions/github-script@v8
         with:
           script: |
             const commentMarker = '<!-- govulncheck-security-check -->';
 
-            const { data: comments } = await github.rest.issues.listComments({
+            const comments = await github.paginate(github.rest.issues.listComments, {
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
+              per_page: 100,
             });
 
             const existingComment = comments.find(comment =>
@@ -239,3 +266,8 @@ jobs:
               });
               console.log('Security comment deleted - vulnerabilities resolved!');
             }
+
+      - name: Fallback alert if comment deletion failed
+        if: success() && github.event_name == 'pull_request' && steps.delete-comment.outcome == 'failure'
+        run: |
+          echo "::warning::Failed to delete stale security comment on PR. It may need manual removal."
