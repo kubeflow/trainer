@@ -122,7 +122,7 @@ For any significant features or enhancement for Kubeflow Trainer project we foll
 [Kubeflow Enhancement Proposal process](https://github.com/kubeflow/community/tree/master/proposals).
 
 If you want to submit a significant change to the Kubeflow Trainer, please submit a new KEP under
-[./docs/proposals](./docs/proposals/) directory.
+[./proposals](./proposals/) directory.
 
 ### Go Development
 

@@ -52,7 +52,6 @@ exclude_patterns = [
     ".DS_Store",
     "*.egg-info",
     "__pycache__",
-    "proposals",  # Exclude pre-existing proposals directory
     "images",  # Exclude pre-existing images directory
     "release",  # Exclude pre-existing release directory
     "README.md",  # Exclude pre-existing README
