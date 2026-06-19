@@ -128,6 +128,23 @@ make vet                      # Vet the Go code
 make golangci-lint            # Verify the Go code
 ```
 
+### Targeted lint/format
+
+For quick feedback on specific files or packages instead of running project-wide `make` targets:
+
+```bash
+# Go
+make golangci-lint LINT_PKG=./pkg/controller/...             # Lint a single Go package
+go vet ./pkg/controller/...                                  # Vet a single Go package (package-level)
+gofmt -w path/to/file.go                                     # Format a single Go file
+
+# Python
+pre-commit run --files path/to/file.py                       # Run all hooks on a single file
+
+# Rust (crate-level: triggers on the file but formats/checks the entire crate)
+pre-commit run --files path/to/file.rs                       # Run all hooks on a single file
+```
+
 **Code generation** (always run after modifying the APIs):
 
 ```bash
