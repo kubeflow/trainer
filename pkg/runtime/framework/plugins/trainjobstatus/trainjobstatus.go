@@ -63,7 +63,7 @@ type Status struct {
 }
 
 var _ framework.ComponentBuilderPlugin = (*Status)(nil)
-var _ framework.EnforceMLPolicyPlugin = (*Status)(nil)
+var _ framework.EnforceRuntimeInfoPlugin = (*Status)(nil)
 
 func New(_ context.Context, c client.Client, _ client.FieldIndexer, cfg *configapi.Configuration) (framework.Plugin, error) {
 	return &Status{client: c, cfg: cfg}, nil
@@ -73,7 +73,7 @@ func (p *Status) Name() string {
 	return Name
 }
 
-func (p *Status) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
+func (p *Status) EnforceRuntimeInfo(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil || trainJob == nil {
 		return nil
 	}
