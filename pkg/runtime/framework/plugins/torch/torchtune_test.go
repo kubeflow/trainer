@@ -103,9 +103,17 @@ func TestIsUseQLoraFinetune(t *testing.T) {
 			args: []string{constants.TorchTuneQuantizeBase + "=True"},
 			want: true,
 		},
+		"quantize base explicitly disabled": {
+			args: []string{constants.TorchTuneQuantizeBase + "=False"},
+			want: false,
+		},
 		"dora short-circuits even when quantize base is set": {
 			args: []string{constants.TorchTuneQuantizeBase + "=True", constants.TorchTuneUseDora + "=True"},
 			want: false,
+		},
+		"dora explicitly disabled with quantize base set": {
+			args: []string{constants.TorchTuneQuantizeBase + "=True", constants.TorchTuneUseDora + "=False"},
+			want: true,
 		},
 		"neither quantize base nor dora": {
 			args: []string{"batch_size=32"},
