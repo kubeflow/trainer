@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout repository for local actions
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Setup CPU Cluster
         uses: ./.github/workflows/template-setup-clusters
@@ -50,7 +50,7 @@ jobs:
 
       # TODO (andreyvelich): Discuss how we can upload artifacts for multiple Notebooks.
       - name: Upload Artifacts to GitHub
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
           name: cpu-${{ matrix.kubernetes-version }}
@@ -76,7 +76,7 @@ jobs:
 
     steps:
       - name: Checkout repository for local actions
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Setup GPU Cluster
         uses: ./.github/workflows/template-setup-clusters
@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload Artifacts to GitHub
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: gpu-${{ matrix.kubernetes-version }}
           path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
