@@ -26,13 +26,13 @@ spec:
     {{- include "trainer.manager.selectorLabels" . | nindent 4 }}
   ports:
   - name: monitoring-port
-    port: 8443
+    port: {{ include "trainer.portFromAddress" .Values.manager.config.metrics.bindAddress }}
     targetPort: metrics
   - name: webhook-server
-    port: 443
+    port: {{ .Values.manager.config.webhook.servicePort }}
     protocol: TCP
     targetPort: webhook
   - name: status-server
-    port: 10443
+    port: {{ .Values.manager.config.statusServer.port }}
     targetPort: status-server
     protocol: TCP

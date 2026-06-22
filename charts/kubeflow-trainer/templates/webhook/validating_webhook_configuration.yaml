@@ -29,6 +29,7 @@ webhooks:
       name: {{ include "trainer.webhook.service.name" . }}
       namespace: {{ .Release.Namespace }}
       path: /validate-trainer-kubeflow-org-v1alpha1-clustertrainingruntime
+      port: {{ .Values.manager.config.webhook.servicePort }}
   sideEffects: None
   {{- with .Values.webhook.failurePolicy }}
   failurePolicy: {{ . }}
@@ -51,6 +52,7 @@ webhooks:
       name: {{ include "trainer.webhook.service.name" . }}
       namespace: {{ .Release.Namespace }}
       path: /validate-trainer-kubeflow-org-v1alpha1-trainingruntime
+      port: {{ .Values.manager.config.webhook.servicePort }}
   sideEffects: None
   {{- with .Values.webhook.failurePolicy }}
   failurePolicy: {{ . }}
@@ -73,6 +75,7 @@ webhooks:
       name: {{ include "trainer.webhook.service.name" . }}
       namespace: {{ .Release.Namespace }}
       path: /validate-trainer-kubeflow-org-v1alpha1-trainjob
+      port: {{ .Values.manager.config.webhook.servicePort }}
   sideEffects: None
   {{- with .Values.webhook.failurePolicy }}
   failurePolicy: {{ . }}

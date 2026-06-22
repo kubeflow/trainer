@@ -131,6 +131,9 @@ manager:
     webhook:
       port: 9443
       host: ""
+      # -- Service port for the webhook server. Kubernetes defaults to 443 when calling admission webhooks.
+      # Change this (along with the container port above) when using host networking to avoid conflicts.
+      servicePort: 443
     leaderElection:
       leaderElect: true
       resourceName: "trainer.kubeflow.org"
