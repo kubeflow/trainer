@@ -145,11 +145,21 @@ manager:
 | manager.replicas | int | `1` | Number of replicas of manager. |
 | manager.resources | object | `{}` | Pod resource requests and limits for manager containers. |
 | manager.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for manager containers. |
-| manager.selectorLabels | object | `{}` | Selector labels for the manager Deployment and pods. These labels are used for both `spec.selector.matchLabels` and `spec.template.metadata.labels`. NOTE: Deployment selectors are immutable once created. |
-| manager.tolerations | list | `[]` | List of node taints to tolerate for manager pods. |
-| manager.volumeMounts | list | `[]` | Volume mounts for manager containers. |
-| manager.volumes | list | `[]` | Volumes for manager pods. |
-| nameOverride | string | `""` | String to partially override release name. |
+| manager.config | object | `{"certManagement":{"enable":true,"webhookSecretName":"","webhookServiceName":""},"clientConnection":{"burst":100,"qps":50},"controller":{"groupKindConcurrency":{"clusterTrainingRuntime":1,"trainJob":5,"trainingRuntime":1}},"featureGates":{},"health":{"healthProbeBindAddress":":8081","livenessEndpointName":"healthz","readinessEndpointName":"readyz"},"leaderElection":{"leaderElect":true,"leaseDuration":"15s","renewDeadline":"10s","resourceName":"trainer.kubeflow.org","resourceNamespace":"","retryPeriod":"2s"},"metrics":{"bindAddress":":8443","secureServing":true},"statusServer":{"burst":10,"port":10443,"qps":5},"webhook":{"host":"","port":9443}}` | Controller manager configuration. This configuration is used to generate the ConfigMap for the controller manager. |
+| manager.config.clientConnection.qps | int | `50` | QPS rate limit for the manager's Kubernetes API client. Accepts fractional values (e.g. 0.5). |
+| manager.config.clientConnection.burst | int | `100` | Burst rate limit for the manager's Kubernetes API client |
+| manager.config.statusServer.port | int | `10443` | Port that the TrainJob status server serves on. |
+| manager.config.statusServer.qps | int | `5` | QPS rate limit for the TrainJob Status Server api client |
+| manager.config.statusServer.burst | int | `10` | Burst rate limit for the TrainJob Status Server api client |
+| webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
+| dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |
+| dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency. Set to `false` if LeaderWorkerSet is already installed in the cluster. |
+| dataCache.lws.fullnameOverride | string | `"lws"` | String to fully override LeaderWorkerSet release name. |
+| dataCache.cacheImage.registry | string | `"ghcr.io"` | Data cache image registry |
+| dataCache.cacheImage.repository | string | `"kubeflow/trainer/data-cache"` | Data cache image repository |
+| dataCache.cacheImage.tag | string | `""` | Data cache image tag. Defaults to chart version if empty. |
+| dataCache.runtimes.torchDistributedWithCache | object | `{"enabled":false}` | PyTorch distributed training with data cache support |
+| dataCache.runtimes.torchDistributedWithCache.enabled | bool | `false` | Enable deployment of torch-distributed-with-cache runtime |
 | runtimes | object | `{"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"defaultEnabled":false,"jaxDistributed":{"enabled":false},"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchtuneDistributed":{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}},"xgboostDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/xgboost-runtime","tag":""}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
 | runtimes.deepspeedDistributed | object | `{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}}` | DeepSpeed distributed training runtime |
 | runtimes.deepspeedDistributed.enabled | bool | `false` | Enable deployment of deepspeed-distributed runtime |

@@ -1,9 +1,22 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 import time
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
-from kubernetes.dynamic.exceptions import ConflictError
 
 import pkg.initializers.types.types as types
 import pkg.initializers.utils.utils as utils
@@ -269,7 +282,7 @@ class CacheInitializer(utils.DatasetProvider):
                 core_v1.create_namespaced_service(namespace=namespace, body=service)
                 logging.info(f"Created Service {service.metadata.name}")
             except ApiException as e:
-                if e is ConflictError:
+                if e.status == 409:
                     logging.info(
                         f"Service {service.metadata.name} already exists, "
                         f"skipping creation"

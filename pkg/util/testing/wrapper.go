@@ -338,6 +338,15 @@ func (j *JobSetWrapper) SchedulingGates(rJobName string, schedulingGates ...core
 	return j
 }
 
+func (j *JobSetWrapper) TerminationGracePeriodSeconds(rJobName string, seconds int64) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.TerminationGracePeriodSeconds = &seconds
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) ImagePullSecrets(rJobName string, imagePullSecrets ...corev1.LocalObjectReference) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {
@@ -1255,6 +1264,11 @@ func MakeMLPolicySourceWrapper() *MLPolicySourceWrapper {
 
 func (m *MLPolicySourceWrapper) TorchPolicy() *MLPolicySourceWrapper {
 	m.Torch = &trainer.TorchMLPolicySource{}
+	return m
+}
+
+func (m *MLPolicySourceWrapper) TorchPolicyWithEnvInjection(envInjection *trainer.EnvInjection) *MLPolicySourceWrapper {
+	m.Torch = &trainer.TorchMLPolicySource{EnvInjection: envInjection}
 	return m
 }
 

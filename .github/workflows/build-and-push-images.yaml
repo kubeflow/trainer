@@ -8,12 +8,13 @@ on:
     tags:
       - "v*"
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build-and-publish:
     name: Build and Publish Images
     if: github.repository == 'kubeflow/trainer'
-    runs-on: oracle-vm-16cpu-64gb-x86-64
+    runs-on: cncf-ubuntu-16-64-x86
 
     env:
       SHOULD_PUBLISH: ${{ github.event_name == 'push' }}
