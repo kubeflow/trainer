@@ -46,7 +46,7 @@ rich==15.0.0
     # via typer
 shellingham==1.5.4
     # via typer
-tqdm==4.68.2
+tqdm==4.68.3
     # via huggingface-hub
 typer==0.26.7
     # via huggingface-hub
