@@ -48,11 +48,14 @@ kubeflow/trainer/
 │   │   └── model/
 │   ├── runtimes/                      # Builtin ML training runtimes
 │   │   ├── deepspeed/                   # DeepSpeed runtime
-│   │   └── mlx/                         # MLX runtime
+│   │   ├── mlx/                         # MLX runtime
+│   │   └── xgboost/                     # XGBoost runtime
 │   ├── trainers/                      # Builtin trainers for LLM fine-tuning
 │   │   └── torchtune/                   # TorchTune fine-tuning trainer
 │   └── data_cache/                    # Distributed data cache service (Rust)
-└── docs/                            # Documentation and proposals
+├── api/                             # Generated API artifacts (OpenAPI spec, Python API)
+├── CHANGELOG/                       # Release changelogs
+├── docs/                            # Documentation
 ├── examples/                        # Examples with TrainJobs
 ├── hack/                            # Scripts to manage CI/CD and installation
 ├── manifests/                       # Kustomize manifests for deployment
@@ -60,8 +63,12 @@ kubeflow/trainer/
 │   ├── apis/                          # Kubernetes CRD API definitions
 │   │   ├── trainer/v1alpha1/            # TrainJob, TrainingRuntime, and ClusterTrainingRuntime APIs
 │   │   └── config/v1alpha1/             # Trainer config APIs
+│   ├── apply/                         # Server-side apply helpers
+│   ├── client/                        # Generated Kubernetes clientset, informers, and listers
 │   ├── config/                        # Trainer config logic
+│   ├── constants/                     # Shared constants
 │   ├── controller/                    # Trainer Kubernetes controllers logic
+│   ├── features/                      # Feature gate definitions
 │   ├── runtime/                     # Trainer Extension Framework
 │   │   ├── core/                      # Core runtime implementation
 │   │   └── framework/                 # Implementation for the framework
@@ -72,10 +79,12 @@ kubeflow/trainer/
 │   │       │   └── ...
 │   │       └── interface.go           # Framework interface definitions
 │   │       └── runtime.go             # Implementation of Info object which carries information trough the plugin chain.
+│   ├── statusserver/                  # TrainJob status collection HTTPS server
 │   ├── webhooks/                    # Kubernetes validation/mutation webhooks for Trainer
 │   ├── data_cache/                  # Distributed in-memory cache (Rust)
 │   ├── initializers/                # Dataset and model initializers (Python)
 │   └── util/                        # Utility functions (Go)
+├── proposals/                       # Kubeflow Enhancement Proposals (KEPs)
 ├── test/                          # Integration and E2E tests
 │   ├── integration/                 # Ginkgo integration tests
 │   └── e2e/                         # End-to-end tests
