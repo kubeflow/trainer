@@ -67,3 +67,15 @@ if [[ $(uname) == "Darwin" ]]; then
 else
   sed -i -e "s/__version__.*/__version__ = \"${API_VERSION}\"/" ${PKG_ROOT}/__init__.py
 fi
+
+echo "Adding copyright headers to generated Python API models"
+BOILERPLATE="${TRAINER_ROOT}/hack/boilerplate/boilerplate.sh.txt"
+find "${PKG_ROOT}/models" "${PKG_ROOT}/__init__.py" -name '*.py' -type f | while read -r f; do
+  if ! head -n 5 "$f" | grep -q "Copyright"; then
+    tmp="$(mktemp)"
+    cat "${BOILERPLATE}" > "$tmp"
+    echo "" >> "$tmp"
+    cat "$f" >> "$tmp"
+    mv "$tmp" "$f"
+  fi
+done

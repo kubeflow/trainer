@@ -508,6 +508,96 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						Obj()
 				},
 				testingutil.BeForbiddenError()),
+			ginkgo.Entry("Should succeed to create TrainJob with valid terminationGracePeriodSeconds in RuntimePatches",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "valid-termination-grace-period").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "acme.io/manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: constants.Node,
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																TerminationGracePeriodSeconds: ptr.To(int64(300)),
+															},
+														},
+													},
+												},
+											}},
+										},
+									},
+								},
+							},
+						}).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create TrainJob with negative terminationGracePeriodSeconds",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "invalid-termination-grace-period").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "acme.io/manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: constants.Node,
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																TerminationGracePeriodSeconds: ptr.To(int64(-1)),
+															},
+														},
+													},
+												},
+											}},
+										},
+									},
+								},
+							},
+						}).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed to create TrainJob with zero terminationGracePeriodSeconds",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "zero-termination-grace-period").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "acme.io/manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: constants.Node,
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																TerminationGracePeriodSeconds: ptr.To(int64(0)),
+															},
+														},
+													},
+												},
+											}},
+										},
+									},
+								},
+							},
+						}).
+						Obj()
+				},
+				gomega.Succeed()),
 		)
 		ginkgo.DescribeTable("Defaulting TrainJob on creation", func(trainJob func() *trainer.TrainJob, wantTrainJob func() *trainer.TrainJob) {
 			created := trainJob()
@@ -688,6 +778,40 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 					return job
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should fail to update TrainJob terminationGracePeriodSeconds after creation",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "immutable-termination-grace-period").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "acme.io/manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: constants.Node,
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																TerminationGracePeriodSeconds: ptr.To(int64(300)),
+															},
+														},
+													},
+												},
+											}},
+										},
+									},
+								},
+							},
+						}).
+						Obj()
+				},
+				func(job *trainer.TrainJob) *trainer.TrainJob {
+					job.Spec.RuntimePatches[0].TrainingRuntimeSpec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(600))
+					return job
+				},
+				testingutil.BeInvalidError()),
 		)
 	})
 })

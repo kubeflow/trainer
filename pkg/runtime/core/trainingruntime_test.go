@@ -430,6 +430,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 																	Effect:   corev1.TaintEffectNoSchedule,
 																},
 															},
+															TerminationGracePeriodSeconds: ptr.To(int64(300)),
 															Volumes: []corev1.Volume{
 																{
 																	Name: "node_secret",
@@ -575,6 +576,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							Operator: corev1.TolerationOpExists,
 							Effect:   corev1.TaintEffectNoSchedule,
 						}).
+					TerminationGracePeriodSeconds(constants.Node, 300).
 					Volumes(constants.DatasetInitializer,
 						corev1.Volume{
 							Name: "initializer_claim",
