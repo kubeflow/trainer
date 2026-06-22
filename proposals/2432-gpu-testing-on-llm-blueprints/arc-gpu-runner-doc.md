@@ -143,7 +143,7 @@ The following LLM blueprints are tested in the CI pipeline:
 
 ## Migration from OCI VM Method
 
-The KEP also has Terraform to provision OCI GPU VMs as self-hosted runners. These files are preserved in `docs/proposals/2432-gpu-testing-on-llm-blueprints/OCI VM/` for reference:
+The KEP also has Terraform to provision OCI GPU VMs as self-hosted runners. These files are preserved in `proposals/2432-gpu-testing-on-llm-blueprints/OCI VM/` for reference:
 
 - `main.tf` - Terraform configuration for VM.GPU.A10.1 instance
 - `bootstrap.sh` - Setup script for GPU drivers and dependencies

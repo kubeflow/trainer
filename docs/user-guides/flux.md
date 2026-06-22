@@ -182,4 +182,4 @@ Thanks for stopping by!
 
 - Check out [the Flux Operator](https://github.com/flux-framework/flux-operator).
 - Learn more about [Flux Framework APIs](https://flux-framework.org).
-- For more about Flux and its context for Kubeflow Trainer, see [KEP-2841](https://github.com/kubeflow/trainer/tree/master/docs/proposals/2841-flux-hpc).
+- For more about Flux and its context for Kubeflow Trainer, see [KEP-2841](https://github.com/kubeflow/trainer/tree/master/proposals/2841-flux-hpc).

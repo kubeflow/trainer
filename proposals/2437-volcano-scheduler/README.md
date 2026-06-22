@@ -2,7 +2,7 @@
 
 ## Summary
 
-This document outlines a proposal to support Volcano for gang-scheduling in Kubeflow Trainer, so as to provide users with more AI-specific scheduling capacities like priority scheduling and queue resource management. Thanks to the [Kubeflow Trainer Pipeline Framework](https://github.com/kubeflow/trainer/tree/master/docs/proposals/2170-kubeflow-trainer-v2#pipeline-framework), we can seamlessly integrate Volcano into Kubeflow Trainer as a runtime plugin.
+This document outlines a proposal to support Volcano for gang-scheduling in Kubeflow Trainer, so as to provide users with more AI-specific scheduling capacities like priority scheduling and queue resource management. Thanks to the [Kubeflow Trainer Pipeline Framework](https://github.com/kubeflow/trainer/tree/master/proposals/2170-kubeflow-trainer-v2#pipeline-framework), we can seamlessly integrate Volcano into Kubeflow Trainer as a runtime plugin.
 
 ## Motivation
 
@@ -37,7 +37,7 @@ Introducing the **Volcano** scheduler will enhance Trainer's scheduling capabili
 
 ## Proposal
 
-We plan to integrate Volcano into Kubeflow Trainer as a runtime plugin, following the best practice of [Kubeflow Trainer Pipeline Framework](https://github.com/kubeflow/trainer/tree/master/docs/proposals/2170-kubeflow-trainer-v2#pipeline-framework). This plugin-based design allows users to switch to Volcano scheduler without reinstalling or modifying the core Trainer component, making the integration more modular, flexible, and user-friendly.
+We plan to integrate Volcano into Kubeflow Trainer as a runtime plugin, following the best practice of [Kubeflow Trainer Pipeline Framework](https://github.com/kubeflow/trainer/tree/master/proposals/2170-kubeflow-trainer-v2#pipeline-framework). This plugin-based design allows users to switch to Volcano scheduler without reinstalling or modifying the core Trainer component, making the integration more modular, flexible, and user-friendly.
 
 PodGroup is the basic scheduling unit. It is created based on the scheduling parameters specified in *Training Runtime*, after which Volcano will manage and schedule the pods specified in the PodGroup. This is similar to the approach used in Training Operator V1.
 

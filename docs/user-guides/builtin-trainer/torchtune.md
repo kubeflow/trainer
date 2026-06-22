@@ -5,7 +5,7 @@ This guide describes how to fine-tune LLMs using `BuiltinTrainer` and `TorchTune
 :::{note}
 The supported model list can be seen in [this directory](https://github.com/kubeflow/trainer/tree/master/manifests/base/runtimes/torchtune). It's worth noticing that we do not support multi-node fine-tuning with TorchTune. However, **LoRA (PEFT) fine-tuning is supported** starting from Kubeflow Trainer V2.1.0 and SDK v0.2.0.
 
-If you want to learn more about TorchTune BuiltinTrainer, please refer to [KEP-2401](https://github.com/kubeflow/trainer/tree/master/docs/proposals/2401-llm-trainer-v2) in Kubeflow Trainer.
+If you want to learn more about TorchTune BuiltinTrainer, please refer to [KEP-2401](https://github.com/kubeflow/trainer/tree/master/proposals/2401-llm-trainer-v2) in Kubeflow Trainer.
 :::
 
 ## Prerequisites
