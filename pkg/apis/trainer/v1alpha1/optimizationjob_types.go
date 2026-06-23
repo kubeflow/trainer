@@ -64,23 +64,49 @@ type SettingKV struct {
 	Value string `json:"value"`
 }
 
-// SearchSpace defines the type and exact boundaries for the algorithm to search.
-// +kubebuilder:validation:XValidation:rule="self.type != 'categorical' || (has(self.list) && size(self.list) > 0)",message="list must be provided and contain at least one item when type is categorical"
-// +kubebuilder:validation:XValidation:rule="self.type == 'categorical' || (has(self.min) && has(self.max) && size(self.min) > 0 && size(self.max) > 0)",message="min and max must be provided and be non-empty for int or double types"
+// SearchSpace acts as a Discriminated Union (OneOf). Exactly one of the concrete types must be set.
+// +kubebuilder:validation:XValidation:rule="(has(self.int) ? 1 : 0) + (has(self.double) ? 1 : 0) + (has(self.categorical) ? 1 : 0) == 1",message="Exactly one search space configuration (int, double, or categorical) must be provided"
 type SearchSpace struct {
-	// +kubebuilder:validation:Enum=int;double;categorical
-	Type string `json:"type"`
+	// +optional
+	Int *IntSpace `json:"int,omitempty"`
+
+	// +optional
+	Double *DoubleSpace `json:"double,omitempty"`
+
+	// +optional
+	Categorical *CategoricalSpace `json:"categorical,omitempty"`
+}
+
+// IntSpace defines a search space for discrete integer values.
+type IntSpace struct {
+	// +kubebuilder:validation:MinLength=1
+	Min string `json:"min"`
 
 	// +kubebuilder:validation:MinLength=1
-	Max string `json:"max,omitempty"`
+	Max string `json:"max"`
+
+	// +optional
+	Step *string `json:"step,omitempty"`
+}
+
+// DoubleSpace defines a search space for continuous floating-point values.
+type DoubleSpace struct {
+	// +kubebuilder:validation:MinLength=1
+	Min string `json:"min"`
 
 	// +kubebuilder:validation:MinLength=1
-	Min string `json:"min,omitempty"`
+	Max string `json:"max"`
 
+	// +kubebuilder:validation:Enum=linear;log;reverseLog
+	// +optional
+	Scale *string `json:"scale,omitempty"`
+}
+
+// CategoricalSpace defines a search space over a discrete set of un-ordered strings.
+type CategoricalSpace struct {
 	// +listType=atomic
 	// +kubebuilder:validation:MinItems=1
-	// +optional
-	List []string `json:"list,omitempty"`
+	List []string `json:"list"`
 }
 
 // Parameter defines a single hyperparameter and its search space.
