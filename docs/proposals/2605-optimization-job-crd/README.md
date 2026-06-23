@@ -32,10 +32,10 @@ To ensure a stable and reviewable implementation, the project is broken down int
 
 - **TrainJob Feature Flag** (Hard Dependency): The unified TrainJob feature flag MUST be enabled in the cluster/controller environment. The OptimizationJob orchestrator relies entirely on this API and will not function without it.
 - **Tighter TrainJob Integration:** Introduce the `OptimizationJob` CRD focused exclusively on `TrainJobs`, using a structured `TrainJobTemplateSpec` to enable native Kubernetes API validation while allowing user-defined metadata.
-- **Native Parameter Injection:** Replace legacy brittle regex YAML substitution with native Go text templating (e.g., `{{.parameter_name}}`), allowing safe injection of hyperparameters anywhere within the `TrainJob` spec.
-- **Dependency Reduction (No Katib DB):** Rely strictly on the `TrainJob` Progress API (via `status.trainerStatus`) for evaluating objective metrics, completely removing the dependency on Katib DB for the core MVP.
-- **In-Process Algorithm Execution:** Run stateless algorithms (Random, Grid) in-process within the controller to reduce pod startup latency and validate the core loop.
-- **Precision-Safe Typing**: All hyperparameter values and search space boundaries (min/max) are strictly serialized as strings in the API to prevent standard JSON float precision loss and align with Trainer v2 patterns.
+- **Native Parameter Injection:** Replace legacy brittle regex YAML substitution with standard Kubernetes mechanisms: prefixed environment variables (e.g., `KUBEFLOW_OPT_LR`) and Pod annotations, allowing the SDK to easily parse configurations.
+- **Dependency Reduction (No Katib DB or Trial CRD):** Rely strictly on the `TrainJob` annotations for historical parameters and the Progress API (via `status.trainerStatus`) for evaluating objective metrics.
+- **Concrete Type Architecture (OneOf)**: Implement a strongly-typed discriminated union pattern (`IntSpace`, `DoubleSpace`, `CategoricalSpace`) for the SearchSpace, simplifying API validation and ensuring extensibility.
+- **Stateless Suggestion Services**: Transition from Katib's 1-to-1 stateful sidecar model to a shared, stateless gRPC provider model where the controller passes the full trial history on demand.
 - **Native CEL Validation**: Replace legacy validating webhooks with native Kubernetes Common Expression Language (CEL) rules to enforce constraints (e.g., parallelTrials <= numTrials, search space requirements) directly at the API server level.
 
 ### Phase 2: Stateful & Advanced Integrations
@@ -110,13 +110,26 @@ type Parameter struct {
     SearchSpace SearchSpace `json:"searchSpace"`
 }
 
-// SearchSpace defines the type and boundaries.
-// Validated via CEL to ensure min/max exist for numbers, and lists exist for categoricals.
 type SearchSpace struct {
-    Type string   `json:"type"` // int, double, categorical
-    Max  string   `json:"max,omitempty"`
-    Min  string   `json:"min,omitempty"`
-    List []string `json:"list,omitempty"`
+    Int *IntSpace `json:"int,omitempty"`
+    Double *DoubleSpace `json:"double,omitempty"`
+    Categorical *CategoricalSpace `json:"categorical,omitempty"`
+}
+
+type IntSpace struct {
+    Min string `json:"min"`
+    Max string `json:"max"`
+    Step *string `json:"step,omitempty"`
+}
+
+type DoubleSpace struct {
+    Min string `json:"min"`
+    Max string `json:"max"`
+    Scale *string `json:"scale,omitempty"`
+}
+
+type CategoricalSpace struct {
+    List []string `json:"list"`
 }
 
 type TrialConfig struct {
@@ -133,7 +146,6 @@ type OptimizationStorage struct {
 
 type TrainJobTemplateSpec struct {
     // Standard object's metadata. System fields are blocked via CEL validation.
-    // +optional
     metav1.ObjectMeta `json:"metadata,omitempty"`
 
     // Specification of the desired behavior of the TrainJob.
@@ -185,13 +197,14 @@ spec:
   parameters:
     - name: learning_rate
       searchSpace:
-        type: double
-        min: "0.001"
-        max: "0.1"
+        double:
+          min: "0.001"
+          max: "0.1"
+          scale: "log"
     - name: batch_size
       searchSpace:
-        type: categorical
-        list: ["16", "32", "64"]
+        categorical:
+          list: ["16", "32", "64"]
   trialConfig:
     numTrials: 10
     parallelTrials: 2
@@ -205,59 +218,56 @@ spec:
         apiGroup: trainer.kubeflow.org
         kind: ClusterTrainingRuntime
       trainer:
-        # Hyperparameters are injected securely via string templating
         image: docker.io/my-org/bert-tuner:latest
         command:
           - "python"
           - "train.py"
-          - "--lr={{.learning_rate}}"
-          - "--batch-size={{.batch_size}}"
+        # The ML script reads KUBEFLOW_OPT_LEARNING_RATE and KUBEFLOW_OPT_BATCH_SIZE 
+        # either manually or via the Kubeflow Python SDK helper functions.
 ```
 
 ## 6. Reconciliation & Architecture (Phase 1)
 
 ### Suggestion Service Integration
 
-To optimize resource utilization and minimize trial startup latency, Phase 1 adopts a split execution strategy for algorithms:
+To eliminate the massive cluster resource overhead and startup latency of Katib's legacy 1-to-1 sidecar model, `OptimizationJob` utilizes a Stateless Shared Provider architecture via gRPC.
 
-- **Stateless Algorithms (Random, Grid):** The controller executes these in-process.
-  - By avoiding the deployment of separate, always-on gRPC pods, we eliminate unnecessary startup latency and cluster overhead.
-  - The controller calls internal generation functions directly during the reconciliation loop.
-- **(Deferred to Phase 2) Stateful Algorithms:** These will be executed via transient One-Shot Jobs to ensure mathematical state is persisted without requiring always-on resources.
+- Providers like Optuna or Vizier are pre-deployed as long-running, shared microservices in the cluster.
+
+- The OptimizationJob controller acts as the orchestrator. When evaluating a new trial, the controller gathers the history of completed TrainJobs by reading their annotations and final metrics, packages this history, and sends a single stateless gRPC request to the Provider.
+
+- The Provider calculates the next parameters, returns them, and forgets the interaction, keeping mathematical execution stateless and independent of Kubernetes state.
 
 ### Controller Flow
 
 The reconciliation loop follows a strictly defined lifecycle to manage trial execution without external database dependencies:
 
-1. **Suggestion Phase:** The controller evaluates current cluster capacity against `trialConfig.parallelTrials` and invokes the in-process Suggestion Service to generate new parameter assignments.
-2. **Trial Injection:** The controller constructs `TrainJob` manifests from the provided `TrainJobTemplate`, dynamically resolving hyperparameter values using native string templating (e.g., replacing `{{.learning_rate}}` with `0.01`) before submitting the object to the API server.
-3. **Monitoring (No Katib DB):** The controller monitors the `TrainJobStatus` via the Progress API.
-  - It relies on `status.trainerStatus` to track real-time success or failure of active trials.
-4. **Completion Phase:** Upon trial completion, the controller evaluates the final metrics surfaced in the `TrainJob` status, While the schema natively supports an array of `Objectives` for future extensibility, the Phase 1 controller will evaluate the primary (first) objective to identify the `BestTrial` and update the `OptimizationJobStatus` accordingly.
+1. **State Gathering:** The controller queries existing TrainJobs via label selectors, reconstructing the trial history using `TrainJob` annotations (for parameters) and the `TrainerStatus` (for metrics).
+2. **Suggestion Phase:** The controller invokes the Suggestion Service (either via gRPC or in-process for Random/Grid) passing the history and the count of required parameters.
+3. **Trial Injection:** The controller dynamically injects the generated hyperparameters into the `TrainJob` template as prefixed environment variables (e.g., `KUBEFLOW_OPT_<NAME>`) and appends a tracking annotation before creating the `TrainJob`.
+4. **Monitoring (No Katib DB):** The controller relies strictly on the `TrainJob` status to track success/failure.
+5. **Completion Phase:** Upon trial completion, the `BestTrial` is evaluated and cached in `OptimizationJobStatus`. No database or Trial CRD is required.
 
 ## 7. Design Decisions & Open Discussions
 
-### 7.1. Decision: Parameter Propagation via String Templating
+### 7.1. Decision: Parameter Propagation via Environment Variables & Annotations
 **Status: Resolved in v1alpha1**
-To inject parameters into the training container without forcing users to adopt a custom SDK or injecting heavyweight gRPC sidecars, `OptimizationJob` utilizes native string templating.
-* **The Design:** Users write their `TrainJobTemplateSpec` normally but place text placeholders (e.g., `{{.learning_rate}}`) wherever they need the value (CLI args, env vars, labels).
-* **The "Why":** Before applying the `TrainJob`, the controller performs an in-memory string replacement. This ensures the pod boots with the exact configuration required, keeps the API schema concise, and requires zero code changes from the user's ML script. A Validating Admission Webhook ensures that all declared parameters exist as placeholders in the template prior to admitting the resource.
+We have deprecated string templating ({{.param}}). To pass parameters to the training container reliably, `OptimizationJob` leverages native Kubernetes downward API mechanisms:
+* **The Design:** The controller injects `KUBEFLOW_OPT_<PARAM_NAME>` as environment variables into the Pod. It simultaneously stores the raw JSON parameter assignment as an Annotation on the TrainJob metadata.
+* **The "Why":** This aligns perfectly with the unified Kubeflow Python SDK (KEP-46). Data scientists can use SDK helper functions (e.g., `get_hyperparameters()`) to cleanly parse the environment variables inside their training scripts without modifying YAML command arguments. The metadata annotations allow the controller to reconstruct trial history purely from the Kubernetes API without requiring Katib DB.
 
 ### 7.2. Decision: Deprecating the Trial CRD
 **Status: Resolved in v1alpha1**
-In legacy Katib, the `Trial` CRD was necessary because worker jobs lacked native observability; the Trial acted as an intermediary metrics scraper. With the new unified `TrainJob` API exposing `TrainerStatus.Metrics` directly, this adapter layer is obsolete.
-The `OptimizationJob` controller bypasses the `Trial` CRD entirely, creating `TrainJobs` directly and watching their status for convergence. This eliminates an entire controller reconciliation loop and keeps the hierarchy clean (`OptimizationJob` -> `TrainJob`).
+With the new unified TrainJob API exposing metrics directly, the `OptimizationJob` controller bypasses the Trial CRD entirely. The `OptimizationJob` directly creates TrainJobs and reconstructs historical state by reading their labels and annotations.
 
-### 7.3. Open Discussion: Handling Dynamic Algorithms (Ray Tune, PBT, Hyperband)
-Population-Based Training (PBT) and Hyperband algorithms are stateful and dynamic. Frameworks like Ray Tune handle this by directly mutating Python worker memory mid-flight. Because Kubernetes pod specifications are immutable once running, we evaluated two paths for OptimizationJob:
+### 7.3. Decision: Search Space Concrete Types (OneOf Pattern)
+**Status: Resolved in v1alpha1**
+Instead of employing a single flat struct with a generic `type` string, the `SearchSpace` utilizes a discriminated union (Concrete Sub-types like `IntSpace` or `DoubleSpace`). This establishes strong typing at the Kubernetes API layer, eliminating the need for heavy custom validating webhooks and permitting the easy addition of future mathematical domains.
 
-* **Approach 1: The Kubernetes-Native Path (Suspend & Patch) [Recommended]**
-    Leverage native K8s job suspension. When a trial hits a bracket, the controller flips `Suspend: true` on the `TrainJob`. The pods spin down, and the ML framework checkpoints to persistent storage. The controller appends a `RuntimePatch` to overwrite the hyperparameters, then flips `Suspend: false`. The pods reschedule, load the new parameters/checkpoint, and resume.
-    *Tradeoffs:* Introduces scheduling latency, but keeps cluster state completely declarative and requires no custom user SDKs. We have introduced a `Suspended` counter in `OptimizationJobStatus` to support this logic safely.
-* **Approach 2: The Zero-Restart Path (gRPC Sidecar)**
-    Inject a lightweight gRPC sidecar into the `TrainJob` pod. The controller sends parameter updates to the sidecar, and the user's Python script polls a local socket to update its memory.
-    *Tradeoffs:* Extremely fast, but breaks the declarative truth of K8s (Pod spec won't match running memory state) and creates high integration friction by forcing users to rewrite their ML code.
+### 7.4. Open Discussion: Handling Dynamic Algorithms (Ray Tune, PBT, Hyperband)
+Because K8s pod environment variables and template specs are strictly immutable once created, we cannot "pause, mutate, and resume" a single `TrainJob` for stateful algorithms like PBT.
+To handle mid-flight hyperparameter mutation safely within Kubernetes, we evaluate the following patterns for Phase 2:
 
-### 7.4. Open Discussion: Pluggable Suggestion Architecture
-If a user requests "Bayesian Optimization," we cannot hardcode the execution to a single backend library (e.g., Optuna uses TPE, while Google OSS Vizier uses gRPC-native scaling).
-To avoid vendor lock-in, Phase 2 will treat mathematical execution as an external dependency. We have introduced a `Provider` field into the `Algorithm` struct. The `OptimizationJob` controller will act strictly as a router, maintaining a standard gRPC contract with backend suggestion engines deployed as independent microservices. The controller will read `TrainJob` metrics, check the `Provider`, send the history to the respective microservice, and receive the next hyperparameters to apply.
+* **Approach 1: The Kubernetes-Native Path (Checkpoint & Recreate) [Recommended]**
+    When a trial hits a bracket, the `TrainJob` saves a checkpoint to a persistent volume (PVC) and completes. The controller evaluates the population, mutates the parameters, and spins up a  new TrainJob. This new job receives the mutated environment variables and an extra injected RESTORE_PATH variable pointing to the previous checkpoint, resuming the trial.
+    *Tradeoffs:* Introduces some scheduling latency (image pulls, pod scheduling)
