@@ -12,7 +12,7 @@ aiosignal==1.4.0
     # via aiohttp
 annotated-doc==0.0.4
     # via typer
-anyio==4.13.0
+anyio==4.14.0
     # via httpx
 attrs==26.1.0
     # via aiohttp
