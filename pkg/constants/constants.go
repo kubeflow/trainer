@@ -153,7 +153,7 @@ const (
 	// MPISSHPrivateKeyFileMode is the mode for the mounted MPI SSH private key (0o640: owner rw, group r).
 	MPISSHPrivateKeyFileMode int32 = 0o640
 
-	// MPISSHPublicKeyFileMode is the mode for the mounted MPI SSH public key and authorized_keys (0o644: owner rw, world r).
+	// MPISSHPublicKeyFileMode is the mode for the mounted MPI SSH public key and authorized_keys (0o644: owner rw, group r, world r).
 	MPISSHPublicKeyFileMode int32 = 0o644
 
 	// MPIHostfilePath is the directory for the MPI hostfile.
