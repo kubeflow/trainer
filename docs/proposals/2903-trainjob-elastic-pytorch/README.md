@@ -35,7 +35,7 @@ event. Without this, users running jobs on spot instances must tolerate full job
 ### Non-Goals
 
 - A custom autoscaler inside the Training Operator. Scaling is fully delegated to Kubernetes HPA or Kueue.
-- Elastic scaling for frameworks without native dynamic rendezvous (e.g. MPI).
+- Elastic scaling for frameworks without native dynamic rendezvous (eg. MPI).
 
 ## Proposal
 
