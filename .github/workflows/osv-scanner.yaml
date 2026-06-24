@@ -128,6 +128,13 @@ jobs:
             echo ""
             echo "=== Processing: $pkg $current_ver -> $fix_ver ($advisory_id) ==="
 
+            # stdlib vulnerabilities require a Go toolchain update (go directive in go.mod),
+            # which is a project-wide decision — skip auto-fix, rely on SARIF/Security tab.
+            if [ "$pkg" = "stdlib" ]; then
+              echo "Skipping stdlib ($advisory_id): requires manual Go version bump to ${fix_ver}"
+              continue
+            fi
+
             # Snapshot go.mod/go.sum so a failure only reverts this iteration, not prior fixes
             cp go.mod go.mod.bak
             cp go.sum go.sum.bak
