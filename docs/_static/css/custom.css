@@ -1268,14 +1268,13 @@ a.link-preview {
     border-bottom: none !important;
 }
 
-/* EthicalAds: placed at the very bottom of the page via footer block */
+/* EthicalAds: horizontal text ad at page bottom via footer block */
 .ethical-ads-footer {
-    margin: 1.5rem auto 0;
+    margin: 2rem 0 0;
+    padding: 0.75rem 1rem;
+    width: 100%;
+    max-width: none;
+    border-top: 1px solid var(--color-foreground-border, #4a5568);
+    font-size: 0.85rem;
     text-align: center;
-    max-width: 400px;
-    padding: 1rem 0;
-}
-
-.ethical-ads-footer img {
-    border-radius: 6px;
 }
