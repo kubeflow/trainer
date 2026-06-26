@@ -180,7 +180,7 @@ manifests: controller-gen ## Generate manifests.
 			manifests/base/webhook/manifests.yaml; do \
 		{ cat $(BOILERPLATE_HEADER); echo; cat "$$f"; } > "$$f.tmp" && mv "$$f.tmp" "$$f"; \
 	done
-	cp -f manifests/base/crds/trainer.kubeflow.org_*.yaml $(TRAINER_CHART_DIR)/crds/
+	cp -f manifests/base/crds/trainer.kubeflow.org_*.yaml $(TRAINER_CHART_DIR)/templates/crd/
 
 .PHONY: generate
 generate: go-mod-download manifests helm-docs ## Generate APIs.
