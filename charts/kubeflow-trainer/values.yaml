@@ -161,6 +161,20 @@ webhook:
   # Available options are `Ignore` or `Fail`.
   failurePolicy: Fail
 
+grafanaDashboard:
+  # -- Whether to install the default Grafana dashboard ConfigMap.
+  # Intended for environments running Grafana with sidecar dashboard auto-discovery.
+  enabled: false
+
+  # -- Labels applied to the dashboard ConfigMap.
+  # Match your Grafana sidecar label selector.
+  labels:
+    grafana_dashboard: "1"
+
+  # -- Annotations applied to the dashboard ConfigMap.
+  # Use to set Grafana folder: grafana_folder: "Kubeflow"
+  annotations: {}
+
 dataCache:
   # -- Enable/disable data cache support (LWS dependency, ClusterRole).
   # Set to `true` to install data cache components.
