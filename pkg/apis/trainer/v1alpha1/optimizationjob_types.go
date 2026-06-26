@@ -29,9 +29,9 @@ type Objective struct {
 	Direction string `json:"direction"`
 }
 
-// Algorithm defines the optimization algorithm configuration.
-type Algorithm struct {
-	// Name of the optimization algorithm (e.g., random, grid, bayesian, tpe, hyperband).
+// SearchAlgorithm defines the hyperparameter sampling algorithm configuration.
+type SearchAlgorithm struct {
+	// Name of the sampling algorithm (e.g., random, grid, bayesian, tpe).
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
@@ -42,42 +42,76 @@ type Algorithm struct {
 
 	// +listType=map
 	// +listMapKey=name
-	Settings []SettingKV `json:"settings,omitempty"`
-}
-
-// EarlyStopping defines the configuration for pruning unpromising trials.
-type EarlyStopping struct {
-	// Name of the early stopping algorithm (e.g., median, asha).
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
-
-	// +listType=map
-	// +listMapKey=name
 	// +optional
 	Settings []SettingKV `json:"settings,omitempty"`
 }
 
-// SettingKV is a key-value pair for algorithm settings.
+// SettingKV is a key-value pair for algorithm and provider settings.
 type SettingKV struct {
 	// +kubebuilder:validation:MinLength=1
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
 
-// SearchSpace acts as a Discriminated Union (OneOf). Exactly one of the concrete types must be set.
-// +kubebuilder:validation:XValidation:rule="(has(self.int) ? 1 : 0) + (has(self.double) ? 1 : 0) + (has(self.categorical) ? 1 : 0) == 1",message="Exactly one search space configuration (int, double, or categorical) must be provided"
+// SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.
+// +kubebuilder:validation:XValidation:rule="(has(self.uniform) ? 1 : 0) + (has(self.logUniform) ? 1 : 0) + (has(self.normal) ? 1 : 0) + (has(self.logNormal) ? 1 : 0) + (has(self.int) ? 1 : 0) + (has(self.categorical) ? 1 : 0) == 1",message="Exactly one search space distribution configuration must be provided"
 type SearchSpace struct {
 	// +optional
-	Int *IntSpace `json:"int,omitempty"`
+	Uniform *UniformSpace `json:"uniform,omitempty"`
 
 	// +optional
-	Double *DoubleSpace `json:"double,omitempty"`
+	LogUniform *LogUniformSpace `json:"logUniform,omitempty"`
+
+	// +optional
+	Normal *NormalSpace `json:"normal,omitempty"`
+
+	// +optional
+	LogNormal *LogNormalSpace `json:"logNormal,omitempty"`
+
+	// +optional
+	Int *IntSpace `json:"int,omitempty"`
 
 	// +optional
 	Categorical *CategoricalSpace `json:"categorical,omitempty"`
 }
 
-// IntSpace defines a search space for discrete integer values.
+// UniformSpace defines a continuous uniform distribution over [Min, Max].
+type UniformSpace struct {
+	// +kubebuilder:validation:MinLength=1
+	Min string `json:"min"`
+
+	// +kubebuilder:validation:MinLength=1
+	Max string `json:"max"`
+}
+
+// LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].
+type LogUniformSpace struct {
+	// +kubebuilder:validation:MinLength=1
+	Min string `json:"min"`
+
+	// +kubebuilder:validation:MinLength=1
+	Max string `json:"max"`
+}
+
+// NormalSpace defines a continuous normal (Gaussian) distribution.
+type NormalSpace struct {
+	// +kubebuilder:validation:MinLength=1
+	Mean string `json:"mean"`
+
+	// +kubebuilder:validation:MinLength=1
+	StdDev string `json:"stdDev"`
+}
+
+// LogNormalSpace defines a continuous log-normal distribution.
+type LogNormalSpace struct {
+	// +kubebuilder:validation:MinLength=1
+	Mean string `json:"mean"`
+
+	// +kubebuilder:validation:MinLength=1
+	StdDev string `json:"stdDev"`
+}
+
+// IntSpace defines a discrete integer search space over [Min, Max].
 type IntSpace struct {
 	// +kubebuilder:validation:MinLength=1
 	Min string `json:"min"`
@@ -89,20 +123,7 @@ type IntSpace struct {
 	Step *string `json:"step,omitempty"`
 }
 
-// DoubleSpace defines a search space for continuous floating-point values.
-type DoubleSpace struct {
-	// +kubebuilder:validation:MinLength=1
-	Min string `json:"min"`
-
-	// +kubebuilder:validation:MinLength=1
-	Max string `json:"max"`
-
-	// +kubebuilder:validation:Enum=linear;log;reverseLog
-	// +optional
-	Scale *string `json:"scale,omitempty"`
-}
-
-// CategoricalSpace defines a search space over a discrete set of un-ordered strings.
+// CategoricalSpace defines a search space over a discrete set of unordered strings.
 type CategoricalSpace struct {
 	// +listType=atomic
 	// +kubebuilder:validation:MinItems=1
@@ -180,10 +201,8 @@ type TrainJobTemplateSpec struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Specification of the desired behavior of the TrainJob.
-	// Hyperparameters are injected into this template via String Templating.
-	// Users can place placeholders like {{.parameter_name}} anywhere in this spec
-	// (e.g., in args, env values, or annotations) and the controller will render
-	// the actual values before applying the TrainJob.
+	// Hyperparameters are injected into this template dynamically by the controller
+	// via prefixed environment variables (KUBEFLOW_OPT_*) and metadata annotations.
 	Spec TrainJobSpec `json:"spec"`
 }
 
@@ -193,11 +212,8 @@ type OptimizationJobSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	Objectives []Objective `json:"objectives"`
 
-	Algorithm Algorithm `json:"algorithm"`
-
-	// EarlyStopping separates the pruning logic from the search algorithm.
-	// +optional
-	EarlyStopping *EarlyStopping `json:"earlyStopping,omitempty"`
+	// SearchAlgorithm explicitly separates initial sampling from mid-run pruning.
+	SearchAlgorithm SearchAlgorithm `json:"searchAlgorithm"`
 
 	// +listType=map
 	// +listMapKey=name
@@ -206,9 +222,8 @@ type OptimizationJobSpec struct {
 
 	TrialConfig TrialConfig `json:"trialConfig"`
 
-	// TrialTemplate wraps the underlying TrainJob workload and its metadata.
-	// Parameter propagation is handled via native string rendering before creation.
-	TrainJobTemplate TrainJobTemplateSpec `json:"trialTemplate"`
+	// TrainJobTemplate wraps the underlying TrainJob workload and its metadata.
+	TrainJobTemplate TrainJobTemplateSpec `json:"trainJobTemplate"`
 }
 
 // OptimizationJobPhase represents the current phase of the OptimizationJob.
@@ -233,7 +248,7 @@ type OptimizationJobStatus struct {
 	// +kubebuilder:validation:Minimum=0
 	Active int32 `json:"active,omitempty"`
 
-	// Suspended tracks trials that are paused by dynamic algorithms (e.g., PBT).
+	// Suspended tracks trials paused by dynamic mutators (eg. PBT).
 	// +kubebuilder:validation:Minimum=0
 	Suspended int32 `json:"suspended,omitempty"`
 
