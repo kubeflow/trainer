@@ -190,31 +190,38 @@ EOF
         exit 1
     )
 
-  echo "Deploy Kubeflow Trainer runtimes"
-  E2E_RUNTIMES_DIR="artifacts/e2e/runtimes"
-  mkdir -p "${E2E_RUNTIMES_DIR}"
+ echo "Deploy Kubeflow Trainer runtimes"
+E2E_RUNTIMES_DIR="artifacts/e2e/runtimes"
+mkdir -p "${E2E_RUNTIMES_DIR}"
 
-  cat <<EOF >"${E2E_RUNTIMES_DIR}/kustomization.yaml"
-  apiVersion: kustomize.config.k8s.io/v1beta1
-  kind: Kustomization
-  resources:
-  - ../../../manifests/overlays/runtimes
-  images:
-  - name: "${XGBOOST_RUNTIME_CI_IMAGE_NAME}"
-    newTag: "${CI_IMAGE_TAG}"
-  - name: "${DATASET_INITIALIZER_CI_IMAGE_NAME}"
-    newTag: "${CI_IMAGE_TAG}"
-  - name: "${MODEL_INITIALIZER_CI_IMAGE_NAME}"
-    newTag: "${CI_IMAGE_TAG}"
-  - name: "${TRAINER_CI_IMAGE_NAME}"
-    newTag: "${CI_IMAGE_TAG}"
+cat <<EOF >"${E2E_RUNTIMES_DIR}/kustomization.yaml"
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../../../manifests/overlays/runtimes
+images:
+- name: "${XGBOOST_RUNTIME_CI_IMAGE_NAME}"
+  newTag: "${CI_IMAGE_TAG}"
+- name: "${DATASET_INITIALIZER_CI_IMAGE_NAME}"
+  newTag: "${CI_IMAGE_TAG}"
+- name: "${MODEL_INITIALIZER_CI_IMAGE_NAME}"
+  newTag: "${CI_IMAGE_TAG}"
+- name: "${TRAINER_CI_IMAGE_NAME}"
+  newTag: "${CI_IMAGE_TAG}"
 EOF
 
-  kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
-    kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
-      print_cluster_info &&
-      exit 1
-  )
+kubectl apply --server-side -k "${E2E_RUNTIMES_DIR}" || (
+  kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=trainer &&
+  print_cluster_info &&
+  exit 1
+)
+
+echo "===== Installed ClusterTrainingRuntimes ====="
+kubectl get clustertrainingruntimes
+
+echo "===== Flux runtime ====="
+kubectl get clustertrainingruntime flux-distributed -o yaml || true
+
 
 elif [ "${INSTALL_METHOD}" = "helm" ]; then
   echo "Skipping Kustomize control plane deployment (Helm will handle control plane)"
