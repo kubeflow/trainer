@@ -901,16 +901,20 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithName(constants.MPISSHAuthVolumeName).
 														WithSecret(corev1ac.SecretVolumeSource().
 															WithSecretName(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix)).
+															WithDefaultMode(constants.MPISSHAuthDefaultMode).
 															WithItems(
 																corev1ac.KeyToPath().
 																	WithKey(corev1.SSHAuthPrivateKey).
-																	WithPath(constants.MPISSHPrivateKeyFile),
+																	WithPath(constants.MPISSHPrivateKeyFile).
+																	WithMode(constants.MPISSHPrivateKeyFileMode),
 																corev1ac.KeyToPath().
 																	WithKey(constants.MPISSHPublicKey).
-																	WithPath(constants.MPISSHPublicKeyFile),
+																	WithPath(constants.MPISSHPublicKeyFile).
+																	WithMode(constants.MPISSHPublicKeyFileMode),
 																corev1ac.KeyToPath().
 																	WithKey(constants.MPISSHPublicKey).
-																	WithPath(constants.MPISSHAuthorizedKeys),
+																	WithPath(constants.MPISSHAuthorizedKeys).
+																	WithMode(constants.MPISSHPublicKeyFileMode),
 															),
 														),
 													corev1ac.Volume().
@@ -975,16 +979,20 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithName(constants.MPISSHAuthVolumeName).
 														WithSecret(corev1ac.SecretVolumeSource().
 															WithSecretName(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix)).
+															WithDefaultMode(constants.MPISSHAuthDefaultMode).
 															WithItems(
 																corev1ac.KeyToPath().
 																	WithKey(corev1.SSHAuthPrivateKey).
-																	WithPath(constants.MPISSHPrivateKeyFile),
+																	WithPath(constants.MPISSHPrivateKeyFile).
+																	WithMode(constants.MPISSHPrivateKeyFileMode),
 																corev1ac.KeyToPath().
 																	WithKey(constants.MPISSHPublicKey).
-																	WithPath(constants.MPISSHPublicKeyFile),
+																	WithPath(constants.MPISSHPublicKeyFile).
+																	WithMode(constants.MPISSHPublicKeyFileMode),
 																corev1ac.KeyToPath().
 																	WithKey(constants.MPISSHPublicKey).
-																	WithPath(constants.MPISSHAuthorizedKeys),
+																	WithPath(constants.MPISSHAuthorizedKeys).
+																	WithMode(constants.MPISSHPublicKeyFileMode),
 															),
 														),
 												),
@@ -1085,16 +1093,20 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -1142,16 +1154,20 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 							},
@@ -1206,19 +1222,23 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							Name: constants.MPISSHAuthVolumeName,
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									SecretName:  fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									DefaultMode: ptr.To(constants.MPISSHAuthDefaultMode),
 									Items: []corev1.KeyToPath{
 										{
 											Key:  corev1.SSHAuthPrivateKey,
 											Path: constants.MPISSHPrivateKeyFile,
+											Mode: ptr.To(constants.MPISSHPrivateKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHPublicKeyFile,
+											Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHAuthorizedKeys,
+											Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 										},
 									},
 								},
@@ -1247,19 +1267,23 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 							Name: constants.MPISSHAuthVolumeName,
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									SecretName:  fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									DefaultMode: ptr.To(constants.MPISSHAuthDefaultMode),
 									Items: []corev1.KeyToPath{
 										{
 											Key:  corev1.SSHAuthPrivateKey,
 											Path: constants.MPISSHPrivateKeyFile,
+											Mode: ptr.To(constants.MPISSHPrivateKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHPublicKeyFile,
+											Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHAuthorizedKeys,
+											Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 										},
 									},
 								},

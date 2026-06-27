@@ -32,7 +32,7 @@ func init() {
 
 const (
 	// owner: robert-bell
-	// kep: https://github.com/kubeflow/trainer/blob/main/docs/proposals/2779-trainjob-progress/README.md
+	// kep: https://github.com/kubeflow/trainer/blob/main/proposals/2779-trainjob-progress/README.md
 	//
 	// Enables status server allowing TrainJob pods to update their status.
 	TrainJobStatus featuregate.Feature = "TrainJobStatus"

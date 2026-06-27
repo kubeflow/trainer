@@ -1,0 +1,239 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+      - release-*
+    paths:
+      - VERSION
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Prepare release branch
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
+      branch: ${{ steps.vars.outputs.branch }}
+      is-prerelease: ${{ steps.vars.outputs.is-prerelease }}
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Check version and branch
+        id: vars
+        run: |
+          VERSION=$(cat VERSION | tr -d ' \n')
+          MAJOR_MINOR=$(echo "${VERSION#v}" | cut -d. -f1,2)
+          BRANCH="release-${MAJOR_MINOR}"
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
+          if [[ "$VERSION" =~ -rc\.[0-9]+$ ]]; then
+            echo "is-prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is-prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update assets on the release branch
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.vars.outputs.version }}"
+          BRANCH="${{ steps.vars.outputs.branch }}"
+          MAIN_SHA="${{ github.sha }}"
+
+          # 1. Cherry pick version and changelog bump if needed.
+          if [[ "${GITHUB_REF_NAME}" == "$BRANCH" ]]; then
+            echo "Triggered on $BRANCH. Skipping cherry-pick from main."
+            exit 0
+          fi
+
+          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+            echo "Using existing branch: $BRANCH"
+            git fetch origin "$BRANCH":"$BRANCH"
+            git checkout "$BRANCH"
+            if git merge-base --is-ancestor "$MAIN_SHA" "$BRANCH"; then
+              echo "Commit $MAIN_SHA already present in $BRANCH. Skipping cherry-pick."
+            else
+              if ! git cherry-pick -x "$MAIN_SHA"; then
+                echo "Cherry-pick failed. Please resolve manually on $BRANCH." >&2
+                exit 1
+              fi
+            fi
+          else
+            echo "Creating new branch: $BRANCH from main@$MAIN_SHA"
+            git checkout -B "$BRANCH" "$MAIN_SHA"
+          fi
+
+          # 2. Update assets on release branch.
+          for f in \
+            manifests/overlays/manager/kustomization.yaml \
+            manifests/overlays/runtimes/kustomization.yaml \
+            manifests/overlays/data-cache/kustomization.yaml; do
+            sed -i "s/newTag: .*/newTag: $TAG/" "$f"
+            echo "Updated image tags in $f to $TAG"
+          done
+
+          sed -i -E "s|(ghcr\.io/kubeflow/trainer/data-cache):[^\"]*|\\1:${TAG}|" \
+            manifests/base/runtimes/data-cache/torch_distributed_with_cache.yaml
+          echo "Updated CACHE_IMAGE to data-cache:$TAG"
+
+          sed -i "s/kubeflow_trainer_version=.*/kubeflow_trainer_version=${TAG}/" \
+            manifests/overlays/manager/kustomization.yaml
+          echo "Updated ConfigMap version to $TAG"
+
+          # 3. Commit the pinned assets and push the release branch.
+          git add -A
+          git commit -s -m "Kubeflow Trainer Official Release $TAG"
+          git push origin "$BRANCH"
+
+  build:
+    name: Build Python package
+    needs: [prepare]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ needs.prepare.outputs.branch }}
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: make uv
+
+      - name: Build and validate package
+        run: |
+          uv build api/python_api -o dist
+          uvx twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dist-${{ needs.prepare.outputs.version }}
+          path: dist/
+
+  create-tag:
+    name: Create and push tag
+    needs: [prepare, build]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.branch }}
+
+      - name: Create tag
+        run: |
+          TAG="${{ needs.prepare.outputs.version }}"
+          if git ls-remote --tags origin "$TAG" | grep -q "refs/tags/$TAG"; then
+            echo "Tag $TAG already exists. Skipping"
+            exit 0
+          fi
+          git tag "$TAG"
+          git push origin "$TAG"
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [prepare, build, create-tag]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    environment:
+      name: release
+      url: https://pypi.org/project/kubeflow-trainer-api/
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: dist-${{ needs.prepare.outputs.version }}
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
+        with:
+          print-hash: true
+
+  github-release:
+    name: Create GitHub release
+    needs: [prepare, build, create-tag, publish-pypi]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://github.com/kubeflow/trainer/releases
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.branch }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: dist-${{ needs.prepare.outputs.version }}
+          path: dist/
+
+      - name: Extract changelog
+        if: needs.prepare.outputs.is-prerelease != 'true'
+        id: changelog
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          MAJOR_MINOR=$(echo "${VERSION#v}" | cut -d. -f1,2)
+          CHANGELOG_FILE="CHANGELOG/CHANGELOG-${MAJOR_MINOR}.md"
+          set -euo pipefail
+          [[ -f "$CHANGELOG_FILE" ]] || { echo "ERROR: $CHANGELOG_FILE not found" >&2; exit 1; }
+          HEADER_REGEX="^#\{1,2\} \\[${VERSION//./\\.}\\]"
+          SECTION=$(sed -n "/$HEADER_REGEX/,\$p" "$CHANGELOG_FILE")
+          [[ -n "$SECTION" ]] || { echo "ERROR: No changelog section for $VERSION in $CHANGELOG_FILE" >&2; exit 1; }
+          NEXT_VERSION=$(echo "$SECTION" | grep -m1 "^#\{1,2\} \\[v[0-9]" || true)
+          if [[ -n "$NEXT_VERSION" ]]; then
+              CHANGELOG=$(echo "$SECTION" | sed '1d' | sed '/^#\{1,2\} \[v[0-9]/,$d')
+          else
+              CHANGELOG=$(echo "$SECTION" | sed '1d')
+          fi
+          [[ -n "$CHANGELOG" ]] || { echo "ERROR: Empty changelog body for $VERSION in $CHANGELOG_FILE" >&2; exit 1; }
+          {
+            echo "changelog<<EOF"
+            echo "$CHANGELOG"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        with:
+          tag_name: ${{ needs.prepare.outputs.version }}
+          name: ${{ needs.prepare.outputs.version }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
+          generate_release_notes: false
+          files: |
+            dist/*

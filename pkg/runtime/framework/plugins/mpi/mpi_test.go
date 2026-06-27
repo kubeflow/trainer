@@ -137,16 +137,20 @@ func TestMPI(t *testing.T) {
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -174,16 +178,20 @@ func TestMPI(t *testing.T) {
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 							},
@@ -274,16 +282,20 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -311,16 +323,20 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 							},
@@ -411,16 +427,20 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -448,16 +468,20 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 							},
@@ -579,16 +603,20 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -624,16 +652,20 @@ trainJob-node-1-1.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 							},
@@ -707,16 +739,20 @@ trainJob-node-1-0.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 								*corev1ac.Volume().
@@ -790,16 +826,20 @@ trainJob-node-1-0.trainJob slots=1
 									WithName(constants.MPISSHAuthVolumeName).
 									WithSecret(corev1ac.SecretVolumeSource().
 										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
 										WithItems(
 											corev1ac.KeyToPath().
 												WithKey(corev1.SSHAuthPrivateKey).
-												WithPath(constants.MPISSHPrivateKeyFile),
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHPublicKeyFile),
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 											corev1ac.KeyToPath().
 												WithKey(constants.MPISSHPublicKey).
-												WithPath(constants.MPISSHAuthorizedKeys),
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
 										),
 									),
 								*corev1ac.Volume().

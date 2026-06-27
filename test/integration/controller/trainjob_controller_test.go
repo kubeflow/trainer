@@ -1099,19 +1099,23 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									Name: constants.MPISSHAuthVolumeName,
 									VolumeSource: corev1.VolumeSource{
 										Secret: &corev1.SecretVolumeSource{
-											SecretName: fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											SecretName:  fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											DefaultMode: ptr.To(constants.MPISSHAuthDefaultMode),
 											Items: []corev1.KeyToPath{
 												{
 													Key:  corev1.SSHAuthPrivateKey,
 													Path: constants.MPISSHPrivateKeyFile,
+													Mode: ptr.To(constants.MPISSHPrivateKeyFileMode),
 												},
 												{
 													Key:  constants.MPISSHPublicKey,
 													Path: constants.MPISSHPublicKeyFile,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 												},
 												{
 													Key:  constants.MPISSHPublicKey,
 													Path: constants.MPISSHAuthorizedKeys,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 												},
 											},
 										},
@@ -1138,19 +1142,23 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									Name: constants.MPISSHAuthVolumeName,
 									VolumeSource: corev1.VolumeSource{
 										Secret: &corev1.SecretVolumeSource{
-											SecretName: fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											SecretName:  fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											DefaultMode: ptr.To(constants.MPISSHAuthDefaultMode),
 											Items: []corev1.KeyToPath{
 												{
 													Key:  corev1.SSHAuthPrivateKey,
 													Path: constants.MPISSHPrivateKeyFile,
+													Mode: ptr.To(constants.MPISSHPrivateKeyFileMode),
 												},
 												{
 													Key:  constants.MPISSHPublicKey,
 													Path: constants.MPISSHPublicKeyFile,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 												},
 												{
 													Key:  constants.MPISSHPublicKey,
 													Path: constants.MPISSHAuthorizedKeys,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 												},
 											},
 										},

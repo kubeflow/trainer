@@ -23,8 +23,6 @@ inputs:
 runs:
   using: composite
   steps:
-    # This step is a Workaround to avoid the "No space left on device" error.
-    # ref: https://github.com/actions/runner-images/issues/2840
     - name: Remove unnecessary files
       shell: bash
       run: |
@@ -68,25 +66,24 @@ runs:
         sudo systemctl --no-pager -l -o short status docker
 
     - name: Setup QEMU
-      uses: docker/setup-qemu-action@v3
+      uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       with:
         platforms: amd64,ppc64le,arm64
 
     - name: Set Up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
     - name: Add Docker Tags
       id: meta
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
       with:
         images: ${{ inputs.image }}
         tags: |
           type=ref,event=tag
-          type=raw,value=latest,enable={{is_default_branch}}
           type=sha
 
     - name: Build and Push
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
       with:
         platforms: ${{ inputs.platforms }}
         context: ${{ inputs.context }}
