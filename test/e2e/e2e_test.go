@@ -323,54 +323,18 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 
 	ginkgo.When("Creating TrainJob to perform Flux workload", func() {
 		ginkgo.It("should create TrainJob with Flux runtime reference", func() {
-			ginkgo.By("Create Flux ClusterTrainingRuntime")
-			fluxRuntimeName := fluxRuntime + "-" + ns.Name
-			fluxClusterRuntimeWrapper := testingutil.MakeClusterTrainingRuntimeWrapper(fluxRuntimeName)
-			for _, rJob := range fluxClusterRuntimeWrapper.Spec.Template.Spec.ReplicatedJobs {
-				if rJob.Name == constants.Node {
-					rJob.Template.Spec.Template.Spec.Volumes = nil
-					rJob.Template.Spec.Template.Spec.Containers[0].VolumeMounts = nil
-					fluxClusterRuntimeWrapper.Spec.Template.Spec.ReplicatedJobs = []jobsetv1alpha2.ReplicatedJob{rJob}
-					break
-				}
-			}
-			fluxClusterRuntime := fluxClusterRuntimeWrapper.
-				RuntimeSpec(
-					testingutil.MakeTrainingRuntimeSpecWrapper(fluxClusterRuntimeWrapper.Spec).
-						WithMLPolicy(
-							testingutil.MakeMLPolicyWrapper().
-								WithNumNodes(2).
-								WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
-									FluxPolicy(ptr.To[int32](1)).
-									Obj(),
-								).
-								Obj(),
-						).
-						Container(
-							constants.Node,
-							constants.Node,
-							"ubuntu:22.04",
-							[]string{"bash"},
-							[]string{"-c", "true"},
-							corev1.ResourceList{},
-						).
-						Obj(),
-				).
-				Obj()
-			gomega.Expect(k8sClient.Create(ctx, fluxClusterRuntime)).Should(gomega.Succeed())
-			defer func() {
-				gomega.Expect(k8sClient.Delete(ctx, fluxClusterRuntime)).Should(gomega.Succeed())
-			}()
-
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-flux").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), fluxRuntimeName).
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					fluxRuntime,
+				).
 				Trainer(
 					testingutil.MakeTrainJobTrainerWrapper().
 						NumNodes(2).
 						Container(
 							"ubuntu:22.04",
-							[]string{"bash"},
-							[]string{"-c", "true"},
+							[]string{"flux", "getattr", "rank"},
+							nil,
 							corev1.ResourceList{},
 						).
 						Obj(),

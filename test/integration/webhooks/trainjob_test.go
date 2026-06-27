@@ -196,6 +196,50 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				testingutil.BeForbiddenError()),
+
+			ginkgo.Entry("Should fail in creating TrainJob with Flux numProcPerNode < 1",
+				func() *trainer.TrainJob {
+					trainingRuntime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{
+							Flux: &trainer.FluxMLPolicySource{},
+						},
+					}
+					gomega.Expect(k8sClient.Update(ctx, trainingRuntime)).To(gomega.Succeed())
+
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(
+							trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind),
+							runtimeName,
+						).
+						Trainer(&trainer.Trainer{
+							NumProcPerNode: ptr.To[int32](0),
+						}).
+						Obj()
+				},
+				testingutil.BeForbiddenError(),
+			),
+			ginkgo.Entry("Should fail in creating TrainJob with reserved flux-installer init container",
+				func() *trainer.TrainJob {
+					trainingRuntime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{
+							Flux: &trainer.FluxMLPolicySource{},
+						},
+					}
+					trainingRuntime.Spec = testingutil.MakeTrainingRuntimeSpecWrapper(trainingRuntime.Spec).
+						InitContainer(constants.Node, constants.FluxInstallerContainerName, "ubuntu:22.04").
+						Obj()
+
+					gomega.Expect(k8sClient.Update(ctx, trainingRuntime)).To(gomega.Succeed())
+
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(
+							trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind),
+							runtimeName,
+						).
+						Obj()
+				},
+				testingutil.BeForbiddenError(),
+			),
 			ginkgo.Entry("Should fail with invalid dataset storageUri",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
