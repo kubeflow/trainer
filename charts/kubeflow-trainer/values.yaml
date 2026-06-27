@@ -184,7 +184,7 @@ dataCache:
 # These are optional runtime templates that can be deployed with the Helm chart.
 # Each runtime provides a blueprint for different ML frameworks and configurations.
 runtimes:
-  # -- Enable all default runtimes (torch, deepspeed, mlx, jax, torchtune) when set to true.
+  # -- Enable all default runtimes (torch, deepspeed, mlx, jax, flux, torchtune) when set to true.
   # Individual runtime settings will be ignored if this is enabled.
   defaultEnabled: false
 
@@ -258,3 +258,7 @@ runtimes:
     qwen2_5_1_5B:
       # -- Enable deployment of Qwen 2.5 1.5B runtime
       enabled: false
+
+
+  fluxDistributed:
+    enabled: false
