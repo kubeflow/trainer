@@ -135,6 +135,50 @@ func TestRuntimeRefIsClusterTrainingRuntime(t *testing.T) {
 	}
 }
 
+func TestIsManagedByExternalController(t *testing.T) {
+	cases := map[string]struct {
+		trainJob *trainer.TrainJob
+		want     bool
+	}{
+		"managedBy is unset": {
+			trainJob: &trainer.TrainJob{},
+			want:     false,
+		},
+		"managedBy is the built-in TrainJob controller": {
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					ManagedBy: ptr.To(TrainJobControllerName),
+				},
+			},
+			want: false,
+		},
+		"managedBy is MultiKueue": {
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					ManagedBy: ptr.To("kueue.x-k8s.io/multikueue"),
+				},
+			},
+			want: true,
+		},
+		"managedBy is an unrecognized controller": {
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					ManagedBy: ptr.To("foo"),
+				},
+			},
+			want: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := IsManagedByExternalController(tc.trainJob)
+			if got != tc.want {
+				t.Errorf("IsManagedByExternalController(%v) = %v, want %v", tc.trainJob, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestIsTrainJobFinished(t *testing.T) {
 	cases := map[string]struct {
 		trainJob *trainer.TrainJob
