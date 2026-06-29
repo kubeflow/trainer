@@ -43,7 +43,8 @@ You can install Kubeflow Trainer controller manager using Helm charts:
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --namespace kubeflow-system \
     --create-namespace \
-    --version ${VERSION#v}
+    --version ${VERSION#v} \
+    --set crds.enabled=true
 ```
 
 For the latest changes run
@@ -53,8 +54,17 @@ For the latest changes run
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --namespace kubeflow-system \
     --create-namespace \
-    --version 0.0.0-sha-48e7a93
+    --version 0.0.0-sha-48e7a93 \
+    --set crds.enabled=true
 ```
+
+:::{note}
+The Trainer CRDs (`TrainJob`, `TrainingRuntime`, `ClusterTrainingRuntime`) are installed by the chart only
+when `crds.enabled=true`. This is disabled by default so that users who manage CRDs out-of-band (previously via
+Helm's `--skip-crds` flag) keep that control. Starting from **Trainer v2.4**, `crds.enabled` will default to
+`true`, and you will no longer need to set this flag explicitly.
+:::
+
 
 Ensure that the JobSet and Trainer controller manager pods are running:
 
@@ -91,6 +101,7 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --namespace kubeflow-system \
     --create-namespace \
     --version ${VERSION#v} \
+    --set crds.enabled=true \
     --set runtimes.defaultEnabled=true
 ```
 
@@ -101,6 +112,7 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --namespace kubeflow-system \
     --create-namespace \
     --version ${VERSION#v} \
+    --set crds.enabled=true \
     --set runtimes.torchDistributed.enabled=true \
     --set runtimes.deepspeedDistributed.enabled=true
 ```
