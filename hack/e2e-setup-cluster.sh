@@ -240,9 +240,20 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
   helm dependency build charts/kubeflow-trainer
 
   # Install Trainer via Helm
+
+  # Phase 1: install the control plane and CRDs (runtimes are disabled by default).
   helm install trainer charts/kubeflow-trainer \
     --namespace ${NAMESPACE} \
     --create-namespace \
+    --set image.tag=${CI_IMAGE_TAG} \
+    --set manager.config.featureGates.TrainJobStatus=true \
+    --wait
+
+  # Phase 2: deploy the ClusterTrainingRuntimes now that their CRD exists.
+  helm upgrade trainer charts/kubeflow-trainer \
+    --namespace ${NAMESPACE} \
+    --set image.tag=${CI_IMAGE_TAG} \
+    --set manager.config.featureGates.TrainJobStatus=true \
     --set runtimes.defaultEnabled=true \
     --set runtimes.xgboostDistributed.image.tag=${CI_IMAGE_TAG} \
     --set runtimes.mlxDistributed.image.tag=${CI_IMAGE_TAG} \
