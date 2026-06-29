@@ -115,6 +115,11 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 					}).
 					SchedulingTimeout(120).
 					Obj(),
+				testingutil.MakePodDisruptionBudgetWrapper("test-job", metav1.NamespaceDefault).
+					MinAvailable(30). // 30 trainer replicas; initializers are excluded.
+					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-job"}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+					Obj(),
 			},
 		},
 		"succeeded to build JobSet with NumNodes from the Runtime and container from the TrainJob.": {
