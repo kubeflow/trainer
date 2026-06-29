@@ -252,8 +252,7 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
   # Phase 2: deploy the ClusterTrainingRuntimes now that their CRD exists.
   helm upgrade trainer charts/kubeflow-trainer \
     --namespace ${NAMESPACE} \
-    --set image.tag=${CI_IMAGE_TAG} \
-    --set manager.config.featureGates.TrainJobStatus=true \
+    --reuse-values \
     --set runtimes.defaultEnabled=true \
     --set runtimes.xgboostDistributed.image.tag=${CI_IMAGE_TAG} \
     --set runtimes.mlxDistributed.image.tag=${CI_IMAGE_TAG} \
