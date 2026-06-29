@@ -31,23 +31,35 @@ Alternatively, you can install the latest version from the master branch (e.g. `
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version 0.0.0-sha-bfccb7b
 ```
 
+> [!NOTE]
+> The Trainer CRDs (`TrainJob`, `TrainingRuntime`, `ClusterTrainingRuntime`) are installed by the chart by default.
+> If you manage the CRDs out-of-band (previously via Helm's `--skip-crds` flag), set `--set crds.enabled=false` to skip
+> installing them with the chart.
+
 ### Install with ClusterTrainingRuntimes
 
 You can optionally deploy ClusterTrainingRuntimes as part of the Helm installation. Runtimes are disabled by default to keep the chart lightweight.
 
+> [!NOTE]
+> ClusterTrainingRuntimes are custom resources of the Trainer CRDs, so the CRDs must already exist in the cluster
+> before they can be applied. Enable them with `helm upgrade` **after** the chart (and its CRDs) is installed, rather
+> than during the initial `helm install` on a fresh cluster.
+
 To enable all default runtimes (torch, deepspeed, mlx, torchtune):
 
 ```bash
-helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
   --version 2.1.0 \
+  --reuse-values \
   --set runtimes.defaultEnabled=true
 ```
 
 To enable specific runtimes:
 
 ```bash
-helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
   --version 2.1.0 \
+  --reuse-values \
   --set runtimes.torchDistributed.enabled=true \
   --set runtimes.deepspeedDistributed.enabled=true
 ```
@@ -74,11 +86,12 @@ dataCache:
       enabled: true
 ```
 
-Then install with:
+Then apply with:
 
 ```bash
-helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
   --version 2.1.0 \
+  --reuse-values \
   -f values.yaml
 ```
 
@@ -115,6 +128,7 @@ manager:
 |-----|------|---------|-------------|
 | nameOverride | string | `""` | String to partially override release name. |
 | fullnameOverride | string | `""` | String to fully override release name. |
+| crds.enabled | bool | `true` | Whether to install the Trainer CRDs (TrainJob, TrainingRuntime, ClusterTrainingRuntime) with the chart. Set to `false` if you manage the CRDs outside of the chart (for example, applying them separately). This replaces Helm's built-in `--skip-crds` flag, which no longer applies now that the CRDs are chart templates. |
 | jobset.install | bool | `true` | Whether to install jobset as a dependency managed by trainer. This must be set to `false` if jobset controller/webhook has already been installed into the cluster. |
 | jobset.fullnameOverride | string | `"jobset"` | String to fully override jobset release name. |
 | commonLabels | object | `{}` | Common labels to add to the resources. |
