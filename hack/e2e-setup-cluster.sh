@@ -243,7 +243,6 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
   helm install trainer charts/kubeflow-trainer \
     --namespace ${NAMESPACE} \
     --create-namespace \
-    --set crds.enabled=true \
     --set runtimes.defaultEnabled=true \
     --set runtimes.xgboostDistributed.image.tag=${CI_IMAGE_TAG} \
     --set runtimes.mlxDistributed.image.tag=${CI_IMAGE_TAG} \

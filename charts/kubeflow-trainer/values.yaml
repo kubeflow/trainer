@@ -26,8 +26,7 @@ crds:
   # -- Whether to install the Trainer CRDs (TrainJob, TrainingRuntime, ClusterTrainingRuntime) with the chart.
   # Set to `false` if you manage the CRDs outside of the chart (for example, applying them separately).
   # This replaces Helm's built-in `--skip-crds` flag, which no longer applies now that the CRDs are chart templates.
-  # NOTE: Starting from Trainer v2.4, this will default to `true`.
-  enabled: false
+  enabled: true
 
 jobset:
   # -- Whether to install jobset as a dependency managed by trainer.

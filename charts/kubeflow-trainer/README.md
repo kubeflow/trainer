@@ -22,20 +22,19 @@ This chart bootstraps a [Kubernetes Trainer](https://github.com/kubeflow/trainer
 Install the released version (e.g. 2.1.0):
 
 ```bash
-helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version 2.1.0 --set crds.enabled=true
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version 2.1.0
 ```
 
 Alternatively, you can install the latest version from the master branch (e.g. `bfccb7b` commit):
 
 ```bash
-helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version 0.0.0-sha-bfccb7b --set crds.enabled=true
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version 0.0.0-sha-bfccb7b
 ```
 
 > [!NOTE]
-> The Trainer CRDs (`TrainJob`, `TrainingRuntime`, `ClusterTrainingRuntime`) are installed by the chart only when
-> `crds.enabled=true`. This is disabled by default so that users who manage CRDs out-of-band (previously via Helm's
-> `--skip-crds` flag) keep that control. Starting from **Trainer v2.4**, `crds.enabled` will default to `true`, and you
-> will no longer need to set this flag explicitly.
+> The Trainer CRDs (`TrainJob`, `TrainingRuntime`, `ClusterTrainingRuntime`) are installed by the chart by default.
+> If you manage the CRDs out-of-band (previously via Helm's `--skip-crds` flag), set `--set crds.enabled=false` to skip
+> installing them with the chart.
 
 ### Install with ClusterTrainingRuntimes
 
@@ -46,7 +45,6 @@ To enable all default runtimes (torch, deepspeed, mlx, torchtune):
 ```bash
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
   --version 2.1.0 \
-  --set crds.enabled=true \
   --set runtimes.defaultEnabled=true
 ```
 
@@ -55,7 +53,6 @@ To enable specific runtimes:
 ```bash
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
   --version 2.1.0 \
-  --set crds.enabled=true \
   --set runtimes.torchDistributed.enabled=true \
   --set runtimes.deepspeedDistributed.enabled=true
 ```
@@ -87,7 +84,6 @@ Then install with:
 ```bash
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
   --version 2.1.0 \
-  --set crds.enabled=true \
   -f values.yaml
 ```
 
@@ -124,7 +120,7 @@ manager:
 |-----|------|---------|-------------|
 | nameOverride | string | `""` | String to partially override release name. |
 | fullnameOverride | string | `""` | String to fully override release name. |
-| crds.enabled | bool | `false` | Whether to install the Trainer CRDs (TrainJob, TrainingRuntime, ClusterTrainingRuntime) with the chart. Set to `false` if you manage the CRDs outside of the chart (for example, applying them separately). This replaces Helm's built-in `--skip-crds` flag, which no longer applies now that the CRDs are chart templates. NOTE: Starting from Trainer v2.4, this will default to `true`. |
+| crds.enabled | bool | `true` | Whether to install the Trainer CRDs (TrainJob, TrainingRuntime, ClusterTrainingRuntime) with the chart. Set to `false` if you manage the CRDs outside of the chart (for example, applying them separately). This replaces Helm's built-in `--skip-crds` flag, which no longer applies now that the CRDs are chart templates. |
 | jobset.install | bool | `true` | Whether to install jobset as a dependency managed by trainer. This must be set to `false` if jobset controller/webhook has already been installed into the cluster. |
 | jobset.fullnameOverride | string | `"jobset"` | String to fully override jobset release name. |
 | commonLabels | object | `{}` | Common labels to add to the resources. |
