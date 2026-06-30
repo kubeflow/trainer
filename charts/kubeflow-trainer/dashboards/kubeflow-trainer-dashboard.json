@@ -574,7 +574,7 @@
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
-        "regex": ".*trainer.*",
+        "regex": "",
         "sort": 1,
         "type": "query"
       },
@@ -585,7 +585,7 @@
           "value": ".*"
         },
         "datasource": {
-        "regex": "",
+          "type": "prometheus",
           "uid": "${datasource}"
         },
         "definition": "label_values(controller_runtime_reconcile_total{namespace=~\"$namespace\", job=~\"$job\"}, controller)",
