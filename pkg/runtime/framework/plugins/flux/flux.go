@@ -134,6 +134,16 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 		return nil
 	}
 
+	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	if trainerPS != nil && trainerPS.Count != nil &&
+		trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
+	}
+
+	if trainJob.Spec.Trainer == nil {
+		return nil
+	}
+
 	settings := f.brokerSettingsFromEnvironment(trainJob, info)
 	configMapName := fmt.Sprintf("%s-flux-entrypoint", trainJob.Name)
 	curveSecretName := fmt.Sprintf("%s-flux-curve", trainJob.Name)
@@ -215,6 +225,9 @@ func (f *Flux) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.
 
 	// If the user's chosen runtime does not have the flux policy enabled, skip this plugin
 	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Flux == nil {
+		return nil, nil
+	}
+	if trainJob.Spec.Trainer == nil {
 		return nil, nil
 	}
 
@@ -322,7 +335,9 @@ func (f *Flux) buildInitScriptConfigMap(
 ) (*corev1ac.ConfigMapApplyConfiguration, error) {
 
 	// The entrypoint script finishes Flux setup and executes the wrapped application
-	initScript := generateInitEntrypoint(trainJob, settings)
+	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
+	initScript := generateInitEntrypoint(trainJob, settings, numNodes)
 	entrypointScript := f.generateFluxEntrypoint(trainJob, info)
 
 	// Build the ConfigMap using the Apply Configuration pattern
@@ -411,7 +426,8 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	var tasks int32
 	var flags string
 
-	nodes := *trainJob.Spec.Trainer.NumNodes
+	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	nodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
 	if trainJob.Spec.Trainer.NumProcPerNode != nil {
 		tasks = *trainJob.Spec.Trainer.NumProcPerNode
 	} else {
@@ -442,6 +458,7 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 func generateInitEntrypoint(
 	trainJob *trainer.TrainJob,
 	settings map[string]string,
+	numNodes int32,
 ) string {
 
 	// fluxRoot for the view is in /opt/view/lib
@@ -449,7 +466,7 @@ func generateInitEntrypoint(
 	// github.com:converged-computing/flux-views.git
 	fluxRoot := "/opt/view"
 	mainHost := fmt.Sprintf("%s-0", trainJob.Name)
-	size := *trainJob.Spec.Trainer.NumNodes
+	size := numNodes
 
 	// Generate hostlists. The hostname (prefix) is the trainJob Name
 	// We need the initial jobset size, and container command	size := *trainJob.Spec.Trainer.NumNodes

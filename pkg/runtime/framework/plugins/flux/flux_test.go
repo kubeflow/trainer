@@ -41,6 +41,13 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
+func errStr(e error) string {
+	if e == nil {
+		return ""
+	}
+	return e.Error()
+}
+
 func TestFlux(t *testing.T) {
 	objCmpOpts := []gocmp.Option{
 		cmpopts.SortSlices(func(a, b apiruntime.Object) int {
@@ -60,8 +67,8 @@ func TestFlux(t *testing.T) {
 		trainJob          *trainer.TrainJob
 		wantInfo          *runtime.Info
 		wantObjs          []apiruntime.Object
-		wantMLPolicyError error // kept for MPI parity; Flux currently has no EnforceMLPolicy error paths
-		wantBuildError    error // kept for MPI parity; Flux currently has no Build error paths
+		wantMLPolicyError error
+		wantBuildError    error
 	}{
 		"no action when flux policy is nil": {
 			info: &runtime.Info{
@@ -151,6 +158,133 @@ func TestFlux(t *testing.T) {
 						{
 							Name:     constants.Node,
 							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](2),
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().WithName(constants.FluxInstallVolumeName).WithMountPath(constants.FluxVolumePath),
+									*corev1ac.VolumeMount().WithName(constants.FluxSpackViewVolumeName).WithMountPath(constants.FluxSpackViewVolumePath),
+									*corev1ac.VolumeMount().WithName(configMapName).WithMountPath(constants.FluxConfigVolumeName).WithReadOnly(true),
+									*corev1ac.VolumeMount().WithName(constants.FluxCurveVolumeName).WithMountPath(constants.FluxCurveVolumePath).WithReadOnly(true),
+									*corev1ac.VolumeMount().WithName(constants.FluxMemoryVolumeName).WithMountPath(constants.FluxMemoryVolumePath).WithReadOnly(true),
+								},
+							}},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().WithName(constants.FluxSpackViewVolumeName).WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
+								*corev1ac.Volume().WithName(constants.FluxInstallVolumeName).WithEmptyDir(corev1ac.EmptyDirVolumeSource()),
+								*corev1ac.Volume().WithName(configMapName).WithConfigMap(corev1ac.ConfigMapVolumeSource().WithName(configMapName).WithDefaultMode(0755)),
+								*corev1ac.Volume().WithName(constants.FluxMemoryVolumeName).WithEmptyDir(corev1ac.EmptyDirVolumeSource().WithMedium(corev1.StorageMediumMemory)),
+								*corev1ac.Volume().WithName(constants.FluxCurveVolumeName).WithSecret(corev1ac.SecretVolumeSource().WithSecretName(curveSecretName).WithDefaultMode(0400)),
+							},
+						},
+					},
+				},
+			},
+			wantObjs: []apiruntime.Object{
+				utiltesting.MakeConfigMapWrapper(configMapName, metav1.NamespaceDefault).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "test-uid").
+					Obj(),
+				utiltesting.MakeSecretWrapper(curveSecretName, metav1.NamespaceDefault).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "test-uid").
+					Obj(),
+			},
+		},
+		"skips when Trainer is nil": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{},
+					},
+				},
+			},
+		},
+		"uses PodSet count when NumNodes is nil": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{
+							NumProcPerNode: &procs,
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: v1alpha2.JobSetSpec().
+						WithReplicatedJobs(
+							v1alpha2.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+					PodSets: []runtime.PodSet{
+						{
+							Name:       constants.Node,
+							Ancestor:   ptr.To(constants.AncestorTrainer),
+							Count:      ptr.To[int32](1),
+							Containers: []runtime.Container{{Name: constants.Node}},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("test-uid").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+			wantInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{
+							NumProcPerNode: &procs,
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: v1alpha2.JobSetSpec().
+						WithReplicatedJobs(
+							v1alpha2.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												).
+												WithInitContainers(
+													corev1ac.Container().
+														WithName(constants.FluxInstallerContainerName).
+														WithImage(constants.FluxInstallerImage).
+														WithCommand("/bin/bash", "/etc/flux-config/init.sh").
+														WithVolumeMounts(
+															corev1ac.VolumeMount().WithName(constants.FluxInstallVolumeName).WithMountPath(constants.FluxVolumePath),
+															corev1ac.VolumeMount().WithName(configMapName).WithMountPath(constants.FluxConfigVolumeName).WithReadOnly(true),
+														),
+												),
+											),
+										),
+									),
+								),
+						),
+					PodSets: []runtime.PodSet{
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
 							Count:    ptr.To[int32](1),
 							Containers: []runtime.Container{{
 								Name: constants.Node,
@@ -194,8 +328,8 @@ func TestFlux(t *testing.T) {
 			}
 
 			err = p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(tc.info, tc.trainJob)
-			if diff := gocmp.Diff(tc.wantMLPolicyError, err, cmpopts.EquateErrors()); len(diff) != 0 {
-				t.Errorf("Unexpected error from EnforceMLPolicy (-want, +got): %s", diff)
+			if errStr(tc.wantMLPolicyError) != errStr(err) {
+				t.Errorf("Unexpected error from EnforceMLPolicy: got %v, want %v", err, tc.wantMLPolicyError)
 			}
 			if err == nil {
 				if diff := gocmp.Diff(tc.wantInfo, tc.info,
@@ -207,19 +341,18 @@ func TestFlux(t *testing.T) {
 
 			var objs []apiruntime.ApplyConfiguration
 			objs, err = p.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
-			if diff := gocmp.Diff(tc.wantBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
-				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
+			if errStr(tc.wantBuildError) != errStr(err) {
+				t.Errorf("Unexpected error from Build: got %v, want %v", err, tc.wantBuildError)
 			}
-			if err != nil {
-				return
-			}
-			var typedObjs []apiruntime.Object
-			typedObjs, err = utiltesting.ToObject(cli.Scheme(), objs...)
-			if err != nil {
-				t.Fatalf("Failed to convert objects: %v", err)
-			}
-			if diff := gocmp.Diff(tc.wantObjs, typedObjs, objCmpOpts...); len(diff) != 0 {
-				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
+			if err == nil {
+				var typedObjs []apiruntime.Object
+				typedObjs, err = utiltesting.ToObject(cli.Scheme(), objs...)
+				if err != nil {
+					t.Fatalf("Failed to convert objects: %v", err)
+				}
+				if diff := gocmp.Diff(tc.wantObjs, typedObjs, objCmpOpts...); len(diff) != 0 {
+					t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
+				}
 			}
 		})
 	}
