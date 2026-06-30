@@ -107,8 +107,8 @@ When a new minor release branch (`release-X.Y`) is cut, update the
 configuration in the `GoogleCloudPlatform/oss-test-infra` repository so Prow keeps
 auto-applying the correct milestone to PRs on each branch. See [this PR example](https://github.com/GoogleCloudPlatform/oss-test-infra/pull/2587).
 
-1. Bumps the `master` milestone to the next upcoming minor (e.g. `v2.2` -> `v2.3`).
-1. Adds an entry pinning the newly created release branch to its milestone
+1. Bump the `master` milestone to the next upcoming minor (e.g. `v2.2` -> `v2.3`).
+1. Add an entry pinning the newly created release branch to its milestone
    (e.g. `release-2.2: v2.2`).
 
 ```yaml
