@@ -40,6 +40,7 @@ var (
 	}
 	IgnoreConditions = cmp.Options{
 		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime", "ObservedGeneration"),
+		cmpopts.SortSlices(func(a, b metav1.Condition) bool { return a.Type < b.Type }),
 	}
 	SortJobsStatus = cmp.Options{
 		cmpopts.SortSlices(func(a, b trainer.JobStatus) bool { return a.Name < b.Name }),

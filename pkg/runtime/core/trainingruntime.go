@@ -38,6 +38,7 @@ import (
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
+	applyconfig "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	fwkcore "github.com/kubeflow/trainer/v2/pkg/runtime/framework/core"
@@ -238,7 +239,7 @@ func (r *TrainingRuntime) mergeRuntimePatches(trainJob *trainer.TrainJob, jobSet
 	return nil
 }
 
-func (r *TrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
+func (r *TrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *trainer.TrainJob) (*applyconfig.TrainJobStatusApplyConfiguration, error) {
 	return r.framework.RunTrainJobStatusPlugin(ctx, trainJob)
 }
 
