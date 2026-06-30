@@ -585,7 +585,7 @@
           "value": ".*"
         },
         "datasource": {
-          "type": "prometheus",
+        "regex": "",
           "uid": "${datasource}"
         },
         "definition": "label_values(controller_runtime_reconcile_total{namespace=~\"$namespace\", job=~\"$job\"}, controller)",
