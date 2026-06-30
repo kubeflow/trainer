@@ -56,8 +56,22 @@ func TestValidateReplicatedJobs(t *testing.T) {
 					"2", ""),
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"),
 					"2", ""),
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(3).Child("replicas"),
-					"2", ""),
+			},
+		},
+		"valid trainer replicas greater than one for multi-slice TPU": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				Replicas(1, constants.DatasetInitializer, constants.ModelInitializer).
+				Replicas(4, constants.Node).
+				Obj().Spec.ReplicatedJobs,
+		},
+		"invalid trainer replicas: zero is not allowed": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				Replicas(1, constants.DatasetInitializer, constants.ModelInitializer).
+				Replicas(0, constants.Node).
+				Obj().Spec.ReplicatedJobs,
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("replicas"),
+					int32(0), ""),
 			},
 		},
 		"missing required container in replicatedJobs": {

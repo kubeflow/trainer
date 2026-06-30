@@ -166,13 +166,16 @@ func (r *TrainingRuntime) newRuntimeInfo(
 	}
 
 	for i, rJob := range jobSetSpecApply.ReplicatedJobs {
-		// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 		// REF: https://github.com/kubeflow/trainer/issues/2318
 		count := ptr.Deref(rJob.Template.Spec.Parallelism, 1)
 		var ancestor *string
 		if metadata := rJob.Template.ObjectMetaApplyConfiguration; metadata != nil && metadata.Labels != nil {
 			if labelAncestor, ok := metadata.Labels[constants.LabelTrainJobAncestor]; ok {
 				if labelAncestor == constants.AncestorTrainer && mlPolicy != nil {
+					// For multi-slice TPU, numNodes represents total nodes across all slices.
+					// Per-slice Parallelism/Completions is computed in Build() by dividing
+					// the final count (set by EnforceMLPolicy) by trainer replicas.
+					// REF: https://github.com/kubeflow/trainer/issues/3407
 					count = ptr.Deref(mlPolicy.NumNodes, 1)
 
 					// Apply resourcesPerNode from TrainJob to the template spec
