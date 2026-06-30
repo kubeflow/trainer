@@ -134,6 +134,19 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 		return nil
 	}
 
+	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	if trainerPS != nil && trainerPS.Count != nil &&
+		trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
+		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
+	}
+
+	if trainJob.Spec.Trainer == nil {
+		return fmt.Errorf("the Flux runtime requires spec.trainer to be set")
+	}
+	if trainJob.Spec.Trainer.NumNodes == nil {
+		trainJob.Spec.Trainer.NumNodes = ptr.To[int32](1)
+	}
+
 	settings := f.brokerSettingsFromEnvironment(trainJob, info)
 	configMapName := fmt.Sprintf("%s-flux-entrypoint", trainJob.Name)
 	curveSecretName := fmt.Sprintf("%s-flux-curve", trainJob.Name)
@@ -216,6 +229,12 @@ func (f *Flux) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.
 	// If the user's chosen runtime does not have the flux policy enabled, skip this plugin
 	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Flux == nil {
 		return nil, nil
+	}
+	if trainJob.Spec.Trainer == nil {
+		return nil, fmt.Errorf("the Flux runtime requires spec.trainer to be set")
+	}
+	if trainJob.Spec.Trainer.NumNodes == nil {
+		trainJob.Spec.Trainer.NumNodes = ptr.To[int32](1)
 	}
 
 	// Note that for Flux, we currently support a design that allows for
