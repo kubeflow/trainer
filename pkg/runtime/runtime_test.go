@@ -428,6 +428,60 @@ func TestNewInfo(t *testing.T) {
 				Scheduler:   &Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
+		"image and command are extracted from containers and init containers": {
+			infoOpts: []InfoOption{
+				WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 2, corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:    constants.Node,
+						Image:   "train:latest",
+						Command: []string{"python", "train.py"},
+					}},
+					InitContainers: []corev1.Container{{
+						Name:    "flux-installer",
+						Image:   "flux:v1",
+						Command: []string{"/bin/bash", "/etc/flux-config/init.sh"},
+					}},
+				}, corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().
+							WithName(constants.Node).
+							WithImage("train:latest").
+							WithCommand("python", "train.py"),
+					).
+					WithInitContainers(
+						corev1ac.Container().
+							WithName("flux-installer").
+							WithImage("flux:v1").
+							WithCommand("/bin/bash", "/etc/flux-config/init.sh"),
+					),
+				),
+			},
+			wantInfo: &Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				Scheduler:   &Scheduler{PodLabels: make(map[string]string)},
+				TemplateSpec: TemplateSpec{
+					PodSets: []PodSet{
+						{
+							Name:     constants.Node,
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](2),
+							Containers: []Container{{
+								Name:    constants.Node,
+								Image:   "train:latest",
+								Command: []string{"python", "train.py"},
+							}},
+							InitContainers: []Container{{
+								Name:    "flux-installer",
+								Image:   "flux:v1",
+								Command: []string{"/bin/bash", "/etc/flux-config/init.sh"},
+							}},
+							SinglePodRequests: corev1.ResourceList{},
+						},
+					},
+				},
+			},
+		},
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortMaps(func(a, b string) bool { return a < b }),
