@@ -109,6 +109,9 @@ func (r *TrainingRuntime) RuntimeInfo(
 	if err = r.framework.RunEnforceMLPolicyPlugins(info, trainJob); err != nil {
 		return nil, err
 	}
+	if err = r.framework.RunBuildParallelCountPlugins(info); err != nil {
+		return nil, err
+	}
 
 	if err = r.framework.RunEnforcePodGroupPolicyPlugins(info, trainJob); err != nil {
 		return nil, err
