@@ -138,6 +138,9 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
   --set grafanaDashboard.enabled=true
 ```
 
+ > **Prerequisite:** Prometheus must be configured to scrape the controller's
+> metrics endpoint (port 8443, HTTPS). The chart does not include a ServiceMonitor.
+
 If your Grafana sidecar uses a different label selector, override `grafanaDashboard.labels` accordingly.
 
 {{ template "chart.valuesSection" . }}
