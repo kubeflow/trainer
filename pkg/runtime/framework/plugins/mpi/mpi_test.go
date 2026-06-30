@@ -211,6 +211,7 @@ func TestMPI(t *testing.T) {
 			},
 			wantObjs: []apiruntime.Object{
 				utiltesting.MakeSecretWrapper(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "trainJob"}).
 					WithImmutable(true).
 					WithType(corev1.SecretTypeSSHAuth).
 					WithData(map[string][]byte{
@@ -220,6 +221,7 @@ func TestMPI(t *testing.T) {
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
 					Obj(),
 				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "trainJob"}).
 					WithData(map[string]string{
 						constants.MPIHostfileName: `trainJob-node-1-0.trainJob slots=1
 trainJob-node-1-1.trainJob slots=1
@@ -355,6 +357,7 @@ trainJob-node-1-1.trainJob slots=1
 			},
 			wantObjs: []apiruntime.Object{
 				utiltesting.MakeSecretWrapper(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "trainJob"}).
 					WithImmutable(true).
 					WithType(corev1.SecretTypeSSHAuth).
 					WithData(map[string][]byte{
@@ -364,6 +367,7 @@ trainJob-node-1-1.trainJob slots=1
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
 					Obj(),
 				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "trainJob"}).
 					WithData(map[string]string{
 						constants.MPIHostfileName: `trainJob-node-1-0.trainJob slots=2
 `,
@@ -500,6 +504,7 @@ trainJob-node-1-1.trainJob slots=1
 			},
 			wantObjs: []apiruntime.Object{
 				utiltesting.MakeSecretWrapper(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "trainJob"}).
 					WithImmutable(true).
 					WithType(corev1.SecretTypeSSHAuth).
 					WithData(map[string][]byte{
@@ -509,6 +514,7 @@ trainJob-node-1-1.trainJob slots=1
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
 					Obj(),
 				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "trainJob"}).
 					WithData(map[string]string{
 						constants.MPIHostfileName: `trainJob-node-1-0.trainJob slots=5
 `,
@@ -679,6 +685,7 @@ trainJob-node-1-1.trainJob slots=1
 			},
 			wantObjs: []apiruntime.Object{
 				utiltesting.MakeSecretWrapper(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "trainJob"}).
 					WithImmutable(true).
 					WithType(corev1.SecretTypeSSHAuth).
 					WithData(map[string][]byte{
@@ -688,6 +695,7 @@ trainJob-node-1-1.trainJob slots=1
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
 					Obj(),
 				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "trainJob"}).
 					WithData(map[string]string{
 						constants.MPIHostfileName: `trainJob-launcher-0-0.trainJob slots=1
 trainJob-node-1-0.trainJob slots=1
@@ -700,6 +708,7 @@ trainJob-node-1-0.trainJob slots=1
 		"sshAuth secret already has existed in the cluster": {
 			objs: []client.Object{
 				utiltesting.MakeSecretWrapper(sshAuthSecretName("trainJob"), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "trainJob"}).
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
 					WithImmutable(true).
 					Obj(),
@@ -782,6 +791,7 @@ trainJob-node-1-0.trainJob slots=1
 			},
 			wantObjs: []apiruntime.Object{
 				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
+					WithLabels(map[string]string{constants.LabelJobName: "trainJob"}).
 					WithData(map[string]string{
 						constants.MPIHostfileName: `trainJob-launcher-0-0.trainJob slots=1
 `,
@@ -879,7 +889,7 @@ trainJob-node-1-0.trainJob slots=1
 			b := utiltesting.NewClientBuilder().WithObjects(tc.objs...)
 			b.WithInterceptorFuncs(interceptor.Funcs{
 				Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					if _, ok := obj.(*corev1.Secret); ok && errors.Is(tc.wantBuildError, errorGetSSHAuthSecretFromAPI) {
+					if _, ok := obj.(*metav1.PartialObjectMetadata); ok && errors.Is(tc.wantBuildError, errorGetSSHAuthSecretFromAPI) {
 						return errorGetSSHAuthSecretFromAPI
 					}
 					return client.Get(ctx, key, obj, opts...)
