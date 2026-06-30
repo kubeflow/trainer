@@ -35,6 +35,7 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	pkgruntime "github.com/kubeflow/trainer/v2/pkg/runtime"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
@@ -2137,6 +2138,202 @@ test-job-node-0-1.test-job slots=8
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestMergeResourceRequirements(t *testing.T) {
+	cases := map[string]struct {
+		base     corev1.ResourceRequirements
+		override corev1.ResourceRequirements
+		want     corev1.ResourceRequirements
+	}{
+		"gpu only overlays runtime cpu and memory": {
+			base: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("32Gi"),
+				},
+			},
+			override: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"nvidia.com/gpu": resource.MustParse("4"),
+				},
+			},
+			want: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("32Gi"),
+					"nvidia.com/gpu":      resource.MustParse("4"),
+				},
+			},
+		},
+		"trainjob cpu overrides runtime cpu": {
+			base: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("8"),
+				},
+			},
+			override: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+			},
+			want: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+			},
+		},
+		"partial override keeps other runtime keys": {
+			base: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("5"),
+					corev1.ResourceMemory: resource.MustParse("32Gi"),
+				},
+			},
+			override: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"nvidia.com/gpu":      resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+			want: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("5"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+					"nvidia.com/gpu":      resource.MustParse("2"),
+				},
+			},
+		},
+		"empty override returns base": {
+			base: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("1"),
+				},
+			},
+			override: corev1.ResourceRequirements{},
+			want: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("1"),
+				},
+			},
+		},
+		"trainjob requests override runtime requests": {
+			base: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("32Gi"),
+				},
+			},
+			override: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+			},
+			want: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("32Gi"),
+				},
+			},
+		},
+		"trainjob claims override runtime claims": {
+			base: corev1.ResourceRequirements{
+				Claims: []corev1.ResourceClaim{
+					{Name: "gpu", Request: "default"},
+				},
+			},
+			override: corev1.ResourceRequirements{
+				Claims: []corev1.ResourceClaim{
+					{Name: "gpu", Request: "large"},
+				},
+			},
+			want: corev1.ResourceRequirements{
+				Claims: []corev1.ResourceClaim{
+					{Name: "gpu", Request: "large"},
+				},
+			},
+		},
+		"unset override claims keep runtime claims": {
+			base: corev1.ResourceRequirements{
+				Claims: []corev1.ResourceClaim{
+					{Name: "gpu", Request: "default"},
+				},
+			},
+			override: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+			},
+			want: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+				Claims: []corev1.ResourceClaim{
+					{Name: "gpu", Request: "default"},
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := mergeResourceRequirements(tc.base, tc.override)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("unexpected diff (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNewRuntimeInfoMergeResourcesPerNode(t *testing.T) {
+	resRequests := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("8"),
+		corev1.ResourceMemory: resource.MustParse("32Gi"),
+	}
+	trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+		RuntimeSpec(
+			testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+				WithMLPolicy(
+					testingutil.MakeMLPolicyWrapper().
+						WithNumNodes(1).
+						Obj(),
+				).
+				Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+				Obj(),
+		).Obj()
+
+	trainerSpec := testingutil.MakeTrainJobTrainerWrapper().
+		NumNodes(1).
+		Obj()
+	trainerSpec.ResourcesPerNode = &corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			"nvidia.com/gpu": resource.MustParse("4"),
+		},
+	}
+
+	trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+		RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+		Trainer(trainerSpec).
+		Obj()
+
+	rt := &TrainingRuntime{}
+	info, err := rt.newRuntimeInfo(trainJob, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy)
+	if err != nil {
+		t.Fatalf("newRuntimeInfo(): %v", err)
+	}
+
+	got := pkgruntime.ExtractResourcePerNodeFromRuntime(info)
+	want := &corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("8"),
+			corev1.ResourceMemory: resource.MustParse("32Gi"),
+		},
+		Limits: corev1.ResourceList{
+			"nvidia.com/gpu": resource.MustParse("4"),
+		},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected merged resourcesPerNode (-want,+got):\n%s", diff)
 	}
 }
 

@@ -22,13 +22,16 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -179,7 +182,18 @@ func (r *TrainingRuntime) newRuntimeInfo(
 					if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
 						for j := range jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
 							if jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Name == constants.Node {
-								jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Resources = *trainJob.Spec.Trainer.ResourcesPerNode.DeepCopy()
+								runtimeRes := jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Resources
+								mergedRes := mergeResourceRequirements(runtimeRes, *trainJob.Spec.Trainer.ResourcesPerNode)
+								jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Resources = mergedRes
+
+								requirements := toResourceRequirementsApplyConfiguration(mergedRes)
+								for k := range jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
+									if jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Name != nil &&
+										*jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Name == constants.Node {
+										jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].WithResources(requirements)
+										break
+									}
+								}
 								break
 							}
 						}
@@ -263,4 +277,50 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 	}
 	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
 	return r.framework.RunCustomValidationPlugins(ctx, info, old, new)
+}
+
+// mergeResourceRequirements overlays override onto base.
+// Keys in override replace matching keys in base; unset keys are kept from base.
+func mergeResourceRequirements(base, override corev1.ResourceRequirements) corev1.ResourceRequirements {
+	merged := base.DeepCopy()
+	if merged == nil {
+		merged = &corev1.ResourceRequirements{}
+	}
+	if override.Limits != nil {
+		if merged.Limits == nil {
+			merged.Limits = make(corev1.ResourceList)
+		}
+		maps.Copy(merged.Limits, override.Limits)
+	}
+	if override.Requests != nil {
+		if merged.Requests == nil {
+			merged.Requests = make(corev1.ResourceList)
+		}
+		maps.Copy(merged.Requests, override.Requests)
+	}
+	if override.Claims != nil {
+		merged.Claims = slices.Clone(override.Claims)
+	}
+	return *merged
+}
+
+func toResourceRequirementsApplyConfiguration(res corev1.ResourceRequirements) *corev1ac.ResourceRequirementsApplyConfiguration {
+	requirements := corev1ac.ResourceRequirements()
+	if limits := res.Limits; limits != nil {
+		requirements.WithLimits(maps.Clone(limits))
+	}
+	if requests := res.Requests; requests != nil {
+		requirements.WithRequests(maps.Clone(requests))
+	}
+	if claims := res.Claims; len(claims) > 0 {
+		claimApplies := make([]*corev1ac.ResourceClaimApplyConfiguration, 0, len(claims))
+		for i := range claims {
+			claim := claims[i]
+			claimApplies = append(claimApplies, corev1ac.ResourceClaim().
+				WithName(claim.Name).
+				WithRequest(claim.Request))
+		}
+		requirements.WithClaims(claimApplies...)
+	}
+	return requirements
 }
