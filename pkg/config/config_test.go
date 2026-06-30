@@ -731,7 +731,7 @@ this is not: valid: yaml: content
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			options, cfg, err := Load(testScheme, tc.configFile, false)
+			options, cfg, _, err := Load(testScheme, tc.configFile, false, nil)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("Expected error but got none")
@@ -905,31 +905,25 @@ func TestLoadHTTP2(t *testing.T) {
 	testcases := []struct {
 		name        string
 		enableHTTP2 bool
-		wantTLSOpts bool
 	}{
 		{
 			name:        "HTTP/2 disabled sets TLSOpts",
 			enableHTTP2: false,
-			wantTLSOpts: true,
 		},
 		{
-			name:        "HTTP/2 enabled does not set TLSOpts",
+			name:        "HTTP/2 enabled sets TLSOpts",
 			enableHTTP2: true,
-			wantTLSOpts: false,
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			options, _, err := Load(testScheme, "", tc.enableHTTP2)
+			options, _, _, err := Load(testScheme, "", tc.enableHTTP2, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if tc.wantTLSOpts && len(options.Metrics.TLSOpts) == 0 {
-				t.Error("Expected TLSOpts to be set for disabling HTTP/2")
-			}
-			if !tc.wantTLSOpts && len(options.Metrics.TLSOpts) > 0 {
-				t.Error("Expected TLSOpts to be empty when HTTP/2 is enabled")
+			if len(options.Metrics.TLSOpts) == 0 {
+				t.Error("Expected TLSOpts to be set (TLS profile + ALPN)")
 			}
 		})
 	}

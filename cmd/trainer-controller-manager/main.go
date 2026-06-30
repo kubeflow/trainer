@@ -17,11 +17,14 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"net/http"
 	"os"
 
+	configv1 "github.com/openshift/api/config/v1"
+	tlspkg "github.com/openshift/controller-runtime-common/pkg/tls"
 	zaplog "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
@@ -65,7 +68,10 @@ func init() {
 	utilruntime.Must(jobsetv1alpha2.AddToScheme(scheme))
 	utilruntime.Must(schedulerpluginsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(volcanov1beta1.AddToScheme(scheme))
+	utilruntime.Must(configv1.Install(scheme))
 }
+
+// +kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get;list;watch
 
 func main() {
 	var configFile string
@@ -97,8 +103,10 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zapOpts)))
 
+	restCfg := ctrl.GetConfigOrDie()
+
 	setupLog.Info("Loading configuration", "configFile", configFile)
-	options, cfg, err := config.Load(scheme, configFile, enableHTTP2)
+	options, cfg, tlsResult, err := config.Load(scheme, configFile, enableHTTP2, restCfg)
 	if err != nil {
 		setupLog.Error(err, "Unable to load configuration")
 		os.Exit(1)
@@ -118,7 +126,6 @@ func main() {
 		}
 	}
 
-	restCfg := ctrl.GetConfigOrDie()
 	config.ApplyClientConnection(restCfg, &cfg)
 
 	setupLog.Info("Creating manager", "qps", restCfg.QPS, "burst", restCfg.Burst)
@@ -145,7 +152,24 @@ func main() {
 		close(certsReady)
 	}
 
-	ctx := ctrl.SetupSignalHandler()
+	sigCtx := ctrl.SetupSignalHandler()
+	ctx, cancel := context.WithCancel(sigCtx)
+	defer cancel()
+
+	if tlsResult.HasOpenShiftConfigAPI {
+		watcher := &tlspkg.SecurityProfileWatcher{
+			Client:                mgr.GetClient(),
+			InitialTLSProfileSpec: tlsResult.Profile,
+			OnProfileChange: func(_ context.Context, _, _ configv1.TLSProfileSpec) {
+				setupLog.Info("TLS profile changed, initiating graceful shutdown to reload")
+				cancel()
+			},
+		}
+		if err := watcher.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to register TLS security profile watcher")
+			os.Exit(1)
+		}
+	}
 
 	setupProbeEndpoints(mgr, certsReady)
 	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer(), &cfg)
