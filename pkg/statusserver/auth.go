@@ -114,9 +114,9 @@ func (p *projectedServiceAccountTokenAuthorizer) Authorize(ctx context.Context, 
 }
 
 func extractRawToken(authHeader string) string {
-	parts := strings.Split(authHeader, " ")
+	parts := strings.Fields(authHeader)
 
-	if len(parts) != 2 || parts[0] != "Bearer" {
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
 		return ""
 	}
 
