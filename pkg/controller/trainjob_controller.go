@@ -106,6 +106,11 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	ctx = ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling TrainJob")
 
+	if trainjob.IsManagedByExternalController(&trainJob) {
+		log.V(2).Info("Skipping TrainJob managed by a custom controller", "managedBy", ptr.Deref(trainJob.Spec.ManagedBy, ""))
+		return ctrl.Result{}, nil
+	}
+
 	var err error
 	// Keep track of the origin TrainJob status
 	prevTrainJob := trainJob.DeepCopy()
