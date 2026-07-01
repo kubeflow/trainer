@@ -29,7 +29,7 @@ class TrainerV1alpha1TrainJobTemplateSpec(BaseModel):
     TrainJobTemplateSpec describes the metadata and spec of the TrainJobs created by the OptimizationJob.
     """ # noqa: E501
     metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="Standard object's metadata.")
-    spec: TrainerV1alpha1TrainJobSpec = Field(description="Specification of the desired behavior of the TrainJob. Hyperparameters are injected into this template via String Templating. Users can place placeholders like {{.parameter_name}} anywhere in this spec (e.g., in args, env values, or annotations) and the controller will render the actual values before applying the TrainJob.")
+    spec: TrainerV1alpha1TrainJobSpec = Field(description="Specification of the desired behavior of the TrainJob. Hyperparameters are injected into this template dynamically by the controller via prefixed environment variables (KUBEFLOW_OPT_*) and metadata annotations.")
     __properties: ClassVar[List[str]] = ["metadata", "spec"]
 
     model_config = ConfigDict(

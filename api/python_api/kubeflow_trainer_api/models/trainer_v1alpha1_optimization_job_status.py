@@ -34,8 +34,7 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
     failed: Optional[StrictInt] = None
     phase: Optional[StrictStr] = None
     succeeded: Optional[StrictInt] = None
-    suspended: Optional[StrictInt] = Field(default=None, description="Suspended tracks trials that are paused by dynamic algorithms (e.g., PBT).")
-    __properties: ClassVar[List[str]] = ["active", "bestTrial", "conditions", "failed", "phase", "succeeded", "suspended"]
+    __properties: ClassVar[List[str]] = ["active", "bestTrial", "conditions", "failed", "phase", "succeeded"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -103,8 +102,7 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
             "conditions": [IoK8sApimachineryPkgApisMetaV1Condition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
             "failed": obj.get("failed"),
             "phase": obj.get("phase"),
-            "succeeded": obj.get("succeeded"),
-            "suspended": obj.get("suspended")
+            "succeeded": obj.get("succeeded")
         })
         return _obj
 

@@ -39,68 +39,6 @@ spec:
           spec:
             description: OptimizationJobSpec defines the desired state of OptimizationJob.
             properties:
-              algorithm:
-                description: Algorithm defines the optimization algorithm configuration.
-                properties:
-                  name:
-                    description: Name of the optimization algorithm (e.g., random,
-                      grid, bayesian, tpe, hyperband).
-                    minLength: 1
-                    type: string
-                  provider:
-                    description: |-
-                      Provider specifies the backend suggestion engine executing the math (e.g., optuna, vizier).
-                      If omitted, the controller will route to a cluster-default provider.
-                    type: string
-                  settings:
-                    items:
-                      description: SettingKV is a key-value pair for algorithm settings.
-                      properties:
-                        name:
-                          minLength: 1
-                          type: string
-                        value:
-                          type: string
-                      required:
-                      - name
-                      - value
-                      type: object
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
-                required:
-                - name
-                type: object
-              earlyStopping:
-                description: EarlyStopping separates the pruning logic from the search
-                  algorithm.
-                properties:
-                  name:
-                    description: Name of the early stopping algorithm (e.g., median,
-                      asha).
-                    minLength: 1
-                    type: string
-                  settings:
-                    items:
-                      description: SettingKV is a key-value pair for algorithm settings.
-                      properties:
-                        name:
-                          minLength: 1
-                          type: string
-                        value:
-                          type: string
-                      required:
-                      - name
-                      - value
-                      type: object
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
-                required:
-                - name
-                type: object
               objectives:
                 items:
                   description: Objective defines the metric and goal for the OptimizationJob.
@@ -129,39 +67,120 @@ spec:
                       minLength: 1
                       type: string
                     searchSpace:
-                      description: SearchSpace defines the type and exact boundaries
-                        for the algorithm to search.
+                      description: SearchSpace acts as a Discriminated Union (OneOf)
+                        supporting flexible statistical distributions.
                       properties:
-                        list:
-                          items:
-                            type: string
-                          minItems: 1
-                          type: array
-                          x-kubernetes-list-type: atomic
-                        max:
-                          minLength: 1
-                          type: string
-                        min:
-                          minLength: 1
-                          type: string
-                        type:
-                          enum:
-                          - int
-                          - double
-                          - categorical
-                          type: string
-                      required:
-                      - type
+                        categorical:
+                          description: CategoricalSpace defines a search space over
+                            a discrete set of unordered strings.
+                          properties:
+                            list:
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          required:
+                          - list
+                          type: object
+                        int:
+                          description: IntSpace defines a discrete integer search
+                            space over [Min, Max].
+                          properties:
+                            max:
+                              minLength: 1
+                              type: string
+                            min:
+                              minLength: 1
+                              type: string
+                            step:
+                              type: string
+                          required:
+                          - max
+                          - min
+                          type: object
+                          x-kubernetes-validations:
+                          - message: min must be strictly less than max
+                            rule: int(self.min) < int(self.max)
+                        logNormal:
+                          description: LogNormalSpace defines a continuous log-normal
+                            distribution.
+                          properties:
+                            mean:
+                              minLength: 1
+                              type: string
+                            stdDev:
+                              minLength: 1
+                              type: string
+                          required:
+                          - mean
+                          - stdDev
+                          type: object
+                          x-kubernetes-validations:
+                          - message: stdDev must be strictly greater than 0
+                            rule: double(self.stdDev) > 0.0
+                        logUniform:
+                          description: LogUniformSpace defines a continuous log-uniform
+                            distribution over [Min, Max].
+                          properties:
+                            max:
+                              minLength: 1
+                              type: string
+                            min:
+                              minLength: 1
+                              type: string
+                          required:
+                          - max
+                          - min
+                          type: object
+                          x-kubernetes-validations:
+                          - message: min must be strictly greater than 0 for a log-uniform
+                              distribution
+                            rule: double(self.min) > 0.0
+                          - message: min must be strictly less than max
+                            rule: double(self.min) < double(self.max)
+                        normal:
+                          description: NormalSpace defines a continuous normal (Gaussian)
+                            distribution.
+                          properties:
+                            mean:
+                              minLength: 1
+                              type: string
+                            stdDev:
+                              minLength: 1
+                              type: string
+                          required:
+                          - mean
+                          - stdDev
+                          type: object
+                          x-kubernetes-validations:
+                          - message: stdDev must be strictly greater than 0
+                            rule: double(self.stdDev) > 0.0
+                        uniform:
+                          description: UniformSpace defines a continuous uniform distribution
+                            over [Min, Max].
+                          properties:
+                            max:
+                              minLength: 1
+                              type: string
+                            min:
+                              minLength: 1
+                              type: string
+                          required:
+                          - max
+                          - min
+                          type: object
+                          x-kubernetes-validations:
+                          - message: min must be strictly less than max
+                            rule: double(self.min) < double(self.max)
                       type: object
                       x-kubernetes-validations:
-                      - message: list must be provided and contain at least one item
-                          when type is categorical
-                        rule: self.type != 'categorical' || (has(self.list) && size(self.list)
-                          > 0)
-                      - message: min and max must be provided and be non-empty for
-                          int or double types
-                        rule: self.type == 'categorical' || (has(self.min) && has(self.max)
-                          && size(self.min) > 0 && size(self.max) > 0)
+                      - message: Exactly one search space distribution configuration
+                          must be provided
+                        rule: '(has(self.uniform) ? 1 : 0) + (has(self.logUniform)
+                          ? 1 : 0) + (has(self.normal) ? 1 : 0) + (has(self.logNormal)
+                          ? 1 : 0) + (has(self.int) ? 1 : 0) + (has(self.categorical)
+                          ? 1 : 0) == 1'
                   required:
                   - name
                   - searchSpace
@@ -171,44 +190,104 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
-              trialConfig:
-                description: TrialConfig controls the orchestration of the trials.
+              searchAlgorithm:
+                description: SearchAlgorithm explicitly separates initial sampling
+                  from mid-run pruning.
                 properties:
-                  maxFailedTrials:
-                    format: int32
-                    minimum: 0
-                    type: integer
-                  numTrials:
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  parallelTrials:
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  storage:
-                    description: Storage configures where suspended trials persist
-                      their checkpoints.
+                  bayesian:
                     properties:
-                      pvcName:
-                        description: PvcName is the name of an existing PersistentVolumeClaim
-                          in the same namespace.
+                      acquisitionFunction:
+                        enum:
+                        - ucb
+                        - ei
+                        - pi
                         type: string
-                      storageUri:
-                        description: StorageUri is the remote object storage path
-                          (e.g., s3://my-bucket/experiments).
-                        pattern: ^[A-Za-z][A-Za-z0-9+.-]*://.+$
+                      initialTrials:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    type: object
+                  custom:
+                    description: Custom acts as an escape hatch for arbitrary or proprietary
+                      samplers.
+                    properties:
+                      name:
+                        minLength: 1
                         type: string
+                      settings:
+                        items:
+                          properties:
+                            name:
+                              minLength: 1
+                              type: string
+                            value:
+                              type: string
+                          required:
+                          - name
+                          - value
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
+                    required:
+                    - name
+                    type: object
+                  grid:
+                    description: GridAlgorithm is intentionally empty; step-intervals
+                      are derived from SearchSpace.Int.Step.
+                    type: object
+                  provider:
+                    description: Provider specifies the backend suggestion engine.
+                      Defaults to "optuna" if omitted.
+                    type: string
+                  providerSettings:
+                    description: ProviderSettings passes raw engine kwargs down to
+                      the backend microservice.
+                    items:
+                      properties:
+                        name:
+                          minLength: 1
+                          type: string
+                        value:
+                          type: string
+                      required:
+                      - name
+                      - value
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                  random:
+                    properties:
+                      seed:
+                        format: int64
+                        type: integer
+                    type: object
+                  tpe:
+                    properties:
+                      eiCandidates:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      initialTrials:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      seed:
+                        format: int64
+                        type: integer
                     type: object
                 type: object
                 x-kubernetes-validations:
-                - message: parallelTrials cannot exceed numTrials
-                  rule: '!has(self.parallelTrials) || !has(self.numTrials) || self.parallelTrials
-                    <= self.numTrials'
-              trialTemplate:
-                description: |-
-                  TrialTemplate wraps the underlying TrainJob workload and its metadata.
-                  Parameter propagation is handled via native string rendering before creation.
+                - message: Exactly one search algorithm configuration must be provided
+                  rule: '(has(self.random) ? 1 : 0) + (has(self.grid) ? 1 : 0) + (has(self.tpe)
+                    ? 1 : 0) + (has(self.bayesian) ? 1 : 0) + (has(self.custom) ?
+                    1 : 0) == 1'
+              trainJobTemplate:
+                description: TrainJobTemplate wraps the underlying TrainJob workload
+                  and its metadata.
                 properties:
                   metadata:
                     description: Standard object's metadata.
@@ -236,10 +315,8 @@ spec:
                   spec:
                     description: |-
                       Specification of the desired behavior of the TrainJob.
-                      Hyperparameters are injected into this template via String Templating.
-                      Users can place placeholders like {{.parameter_name}} anywhere in this spec
-                      (e.g., in args, env values, or annotations) and the controller will render
-                      the actual values before applying the TrainJob.
+                      Hyperparameters are injected into this template dynamically by the controller
+                      via prefixed environment variables (KUBEFLOW_OPT_*) and metadata annotations.
                     properties:
                       activeDeadlineSeconds:
                         description: |-
@@ -6489,12 +6566,32 @@ spec:
                 required:
                 - spec
                 type: object
+              trialConfig:
+                description: TrialConfig controls the orchestration of the trials.
+                properties:
+                  maxFailedTrials:
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  numTrials:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  parallelTrials:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                type: object
+                x-kubernetes-validations:
+                - message: parallelTrials cannot exceed numTrials
+                  rule: '!has(self.parallelTrials) || !has(self.numTrials) || self.parallelTrials
+                    <= self.numTrials'
             required:
-            - algorithm
             - objectives
             - parameters
+            - searchAlgorithm
+            - trainJobTemplate
             - trialConfig
-            - trialTemplate
             type: object
           status:
             description: OptimizationJobStatus defines the observed state of OptimizationJob.
@@ -6606,12 +6703,6 @@ spec:
                   the OptimizationJob.
                 type: string
               succeeded:
-                format: int32
-                minimum: 0
-                type: integer
-              suspended:
-                description: Suspended tracks trials that are paused by dynamic algorithms
-                  (e.g., PBT).
                 format: int32
                 minimum: 0
                 type: integer

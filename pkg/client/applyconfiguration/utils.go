@@ -30,24 +30,28 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=trainer.kubeflow.org, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithKind("Algorithm"):
-		return &trainerv1alpha1.AlgorithmApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("BayesianAlgorithm"):
+		return &trainerv1alpha1.BayesianAlgorithmApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BestTrial"):
 		return &trainerv1alpha1.BestTrialApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("CategoricalSpace"):
+		return &trainerv1alpha1.CategoricalSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ClusterTrainingRuntime"):
 		return &trainerv1alpha1.ClusterTrainingRuntimeApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ContainerPatch"):
 		return &trainerv1alpha1.ContainerPatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("CoschedulingPodGroupPolicySource"):
 		return &trainerv1alpha1.CoschedulingPodGroupPolicySourceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("CustomAlgorithm"):
+		return &trainerv1alpha1.CustomAlgorithmApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("DatasetInitializer"):
 		return &trainerv1alpha1.DatasetInitializerApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("EarlyStopping"):
-		return &trainerv1alpha1.EarlyStoppingApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("FluxMLPolicySource"):
 		return &trainerv1alpha1.FluxMLPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Initializer"):
 		return &trainerv1alpha1.InitializerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("IntSpace"):
+		return &trainerv1alpha1.IntSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobSetSpecPatch"):
 		return &trainerv1alpha1.JobSetSpecPatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobSetTemplatePatch"):
@@ -60,6 +64,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.JobStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobTemplatePatch"):
 		return &trainerv1alpha1.JobTemplatePatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("LogNormalSpace"):
+		return &trainerv1alpha1.LogNormalSpaceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("LogUniformSpace"):
+		return &trainerv1alpha1.LogUniformSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Metric"):
 		return &trainerv1alpha1.MetricApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MLPolicy"):
@@ -70,6 +78,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.ModelInitializerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MPIMLPolicySource"):
 		return &trainerv1alpha1.MPIMLPolicySourceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("NormalSpace"):
+		return &trainerv1alpha1.NormalSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Objective"):
 		return &trainerv1alpha1.ObjectiveApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("OptimizationJob"):
@@ -78,8 +88,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.OptimizationJobSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("OptimizationJobStatus"):
 		return &trainerv1alpha1.OptimizationJobStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("OptimizationStorage"):
-		return &trainerv1alpha1.OptimizationStorageApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Parameter"):
 		return &trainerv1alpha1.ParameterApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ParameterAssignment"):
@@ -92,16 +100,22 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.PodSpecPatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("PodTemplatePatch"):
 		return &trainerv1alpha1.PodTemplatePatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("RandomAlgorithm"):
+		return &trainerv1alpha1.RandomAlgorithmApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ReplicatedJobPatch"):
 		return &trainerv1alpha1.ReplicatedJobPatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimePatch"):
 		return &trainerv1alpha1.RuntimePatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimeRef"):
 		return &trainerv1alpha1.RuntimeRefApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("SearchAlgorithm"):
+		return &trainerv1alpha1.SearchAlgorithmApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SearchSpace"):
 		return &trainerv1alpha1.SearchSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SettingKV"):
 		return &trainerv1alpha1.SettingKVApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TPEAlgorithm"):
+		return &trainerv1alpha1.TPEAlgorithmApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Trainer"):
 		return &trainerv1alpha1.TrainerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainerStatus"):
@@ -122,6 +136,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.TrainJobTemplateSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrialConfig"):
 		return &trainerv1alpha1.TrialConfigApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("UniformSpace"):
+		return &trainerv1alpha1.UniformSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("VolcanoPodGroupPolicySource"):
 		return &trainerv1alpha1.VolcanoPodGroupPolicySourceApplyConfiguration{}
 

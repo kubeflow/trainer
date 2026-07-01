@@ -16,45 +16,31 @@
 
 package v1alpha1
 
-// AlgorithmApplyConfiguration represents a declarative configuration of the Algorithm type for use
+// CustomAlgorithmApplyConfiguration represents a declarative configuration of the CustomAlgorithm type for use
 // with apply.
-//
-// Algorithm defines the optimization algorithm configuration.
-type AlgorithmApplyConfiguration struct {
-	// Name of the optimization algorithm (e.g., random, grid, bayesian, tpe, hyperband).
-	Name *string `json:"name,omitempty"`
-	// Provider specifies the backend suggestion engine executing the math (e.g., optuna, vizier).
-	// If omitted, the controller will route to a cluster-default provider.
-	Provider *string                       `json:"provider,omitempty"`
+type CustomAlgorithmApplyConfiguration struct {
+	Name     *string                       `json:"name,omitempty"`
 	Settings []SettingKVApplyConfiguration `json:"settings,omitempty"`
 }
 
-// AlgorithmApplyConfiguration constructs a declarative configuration of the Algorithm type for use with
+// CustomAlgorithmApplyConfiguration constructs a declarative configuration of the CustomAlgorithm type for use with
 // apply.
-func Algorithm() *AlgorithmApplyConfiguration {
-	return &AlgorithmApplyConfiguration{}
+func CustomAlgorithm() *CustomAlgorithmApplyConfiguration {
+	return &CustomAlgorithmApplyConfiguration{}
 }
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *AlgorithmApplyConfiguration) WithName(value string) *AlgorithmApplyConfiguration {
+func (b *CustomAlgorithmApplyConfiguration) WithName(value string) *CustomAlgorithmApplyConfiguration {
 	b.Name = &value
-	return b
-}
-
-// WithProvider sets the Provider field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Provider field is set to the value of the last call.
-func (b *AlgorithmApplyConfiguration) WithProvider(value string) *AlgorithmApplyConfiguration {
-	b.Provider = &value
 	return b
 }
 
 // WithSettings adds the given value to the Settings field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Settings field.
-func (b *AlgorithmApplyConfiguration) WithSettings(values ...*SettingKVApplyConfiguration) *AlgorithmApplyConfiguration {
+func (b *CustomAlgorithmApplyConfiguration) WithSettings(values ...*SettingKVApplyConfiguration) *CustomAlgorithmApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithSettings")

@@ -19,12 +19,14 @@ package v1alpha1
 // SearchSpaceApplyConfiguration represents a declarative configuration of the SearchSpace type for use
 // with apply.
 //
-// SearchSpace defines the type and exact boundaries for the algorithm to search.
+// SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.
 type SearchSpaceApplyConfiguration struct {
-	Type *string  `json:"type,omitempty"`
-	Max  *string  `json:"max,omitempty"`
-	Min  *string  `json:"min,omitempty"`
-	List []string `json:"list,omitempty"`
+	Uniform     *UniformSpaceApplyConfiguration     `json:"uniform,omitempty"`
+	LogUniform  *LogUniformSpaceApplyConfiguration  `json:"logUniform,omitempty"`
+	Normal      *NormalSpaceApplyConfiguration      `json:"normal,omitempty"`
+	LogNormal   *LogNormalSpaceApplyConfiguration   `json:"logNormal,omitempty"`
+	Int         *IntSpaceApplyConfiguration         `json:"int,omitempty"`
+	Categorical *CategoricalSpaceApplyConfiguration `json:"categorical,omitempty"`
 }
 
 // SearchSpaceApplyConfiguration constructs a declarative configuration of the SearchSpace type for use with
@@ -33,36 +35,50 @@ func SearchSpace() *SearchSpaceApplyConfiguration {
 	return &SearchSpaceApplyConfiguration{}
 }
 
-// WithType sets the Type field in the declarative configuration to the given value
+// WithUniform sets the Uniform field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Type field is set to the value of the last call.
-func (b *SearchSpaceApplyConfiguration) WithType(value string) *SearchSpaceApplyConfiguration {
-	b.Type = &value
+// If called multiple times, the Uniform field is set to the value of the last call.
+func (b *SearchSpaceApplyConfiguration) WithUniform(value *UniformSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
+	b.Uniform = value
 	return b
 }
 
-// WithMax sets the Max field in the declarative configuration to the given value
+// WithLogUniform sets the LogUniform field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Max field is set to the value of the last call.
-func (b *SearchSpaceApplyConfiguration) WithMax(value string) *SearchSpaceApplyConfiguration {
-	b.Max = &value
+// If called multiple times, the LogUniform field is set to the value of the last call.
+func (b *SearchSpaceApplyConfiguration) WithLogUniform(value *LogUniformSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
+	b.LogUniform = value
 	return b
 }
 
-// WithMin sets the Min field in the declarative configuration to the given value
+// WithNormal sets the Normal field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Min field is set to the value of the last call.
-func (b *SearchSpaceApplyConfiguration) WithMin(value string) *SearchSpaceApplyConfiguration {
-	b.Min = &value
+// If called multiple times, the Normal field is set to the value of the last call.
+func (b *SearchSpaceApplyConfiguration) WithNormal(value *NormalSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
+	b.Normal = value
 	return b
 }
 
-// WithList adds the given value to the List field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the List field.
-func (b *SearchSpaceApplyConfiguration) WithList(values ...string) *SearchSpaceApplyConfiguration {
-	for i := range values {
-		b.List = append(b.List, values[i])
-	}
+// WithLogNormal sets the LogNormal field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LogNormal field is set to the value of the last call.
+func (b *SearchSpaceApplyConfiguration) WithLogNormal(value *LogNormalSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
+	b.LogNormal = value
+	return b
+}
+
+// WithInt sets the Int field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Int field is set to the value of the last call.
+func (b *SearchSpaceApplyConfiguration) WithInt(value *IntSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
+	b.Int = value
+	return b
+}
+
+// WithCategorical sets the Categorical field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Categorical field is set to the value of the last call.
+func (b *SearchSpaceApplyConfiguration) WithCategorical(value *CategoricalSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
+	b.Categorical = value
 	return b
 }

@@ -24,7 +24,7 @@ from typing_extensions import Self
 
 class TrainerV1alpha1SettingKV(BaseModel):
     """
-    SettingKV is a key-value pair for algorithm settings.
+    TrainerV1alpha1SettingKV
     """ # noqa: E501
     name: StrictStr
     value: StrictStr

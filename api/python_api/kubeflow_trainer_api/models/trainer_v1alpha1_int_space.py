@@ -17,19 +17,19 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1TrialConfig(BaseModel):
+class TrainerV1alpha1IntSpace(BaseModel):
     """
-    TrialConfig controls the orchestration of the trials.
+    IntSpace defines a discrete integer search space over [Min, Max].
     """ # noqa: E501
-    max_failed_trials: Optional[StrictInt] = Field(default=None, alias="maxFailedTrials")
-    num_trials: Optional[StrictInt] = Field(default=None, alias="numTrials")
-    parallel_trials: Optional[StrictInt] = Field(default=None, alias="parallelTrials")
-    __properties: ClassVar[List[str]] = ["maxFailedTrials", "numTrials", "parallelTrials"]
+    max: StrictStr
+    min: StrictStr
+    step: Optional[StrictStr] = None
+    __properties: ClassVar[List[str]] = ["max", "min", "step"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +49,7 @@ class TrainerV1alpha1TrialConfig(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrialConfig from a JSON string"""
+        """Create an instance of TrainerV1alpha1IntSpace from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -74,7 +74,7 @@ class TrainerV1alpha1TrialConfig(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1TrialConfig from a dict"""
+        """Create an instance of TrainerV1alpha1IntSpace from a dict"""
         if obj is None:
             return None
 
@@ -82,9 +82,9 @@ class TrainerV1alpha1TrialConfig(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "maxFailedTrials": obj.get("maxFailedTrials"),
-            "numTrials": obj.get("numTrials"),
-            "parallelTrials": obj.get("parallelTrials")
+            "max": obj.get("max") if obj.get("max") is not None else '',
+            "min": obj.get("min") if obj.get("min") is not None else '',
+            "step": obj.get("step")
         })
         return _obj
 

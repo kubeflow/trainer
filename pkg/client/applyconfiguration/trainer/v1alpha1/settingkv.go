@@ -18,8 +18,6 @@ package v1alpha1
 
 // SettingKVApplyConfiguration represents a declarative configuration of the SettingKV type for use
 // with apply.
-//
-// SettingKV is a key-value pair for algorithm settings.
 type SettingKVApplyConfiguration struct {
 	Name  *string `json:"name,omitempty"`
 	Value *string `json:"value,omitempty"`

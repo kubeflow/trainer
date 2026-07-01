@@ -29,10 +29,8 @@ type OptimizationJobStatusApplyConfiguration struct {
 	Phase      *trainerv1alpha1.OptimizationJobPhase `json:"phase,omitempty"`
 	Conditions []v1.ConditionApplyConfiguration      `json:"conditions,omitempty"`
 	Active     *int32                                `json:"active,omitempty"`
-	// Suspended tracks trials that are paused by dynamic algorithms (e.g., PBT).
-	Suspended *int32 `json:"suspended,omitempty"`
-	Succeeded *int32 `json:"succeeded,omitempty"`
-	Failed    *int32 `json:"failed,omitempty"`
+	Succeeded  *int32                                `json:"succeeded,omitempty"`
+	Failed     *int32                                `json:"failed,omitempty"`
 	// BestTrial caches the highest performing trial based on the Objective.
 	BestTrial *BestTrialApplyConfiguration `json:"bestTrial,omitempty"`
 }
@@ -69,14 +67,6 @@ func (b *OptimizationJobStatusApplyConfiguration) WithConditions(values ...*v1.C
 // If called multiple times, the Active field is set to the value of the last call.
 func (b *OptimizationJobStatusApplyConfiguration) WithActive(value int32) *OptimizationJobStatusApplyConfiguration {
 	b.Active = &value
-	return b
-}
-
-// WithSuspended sets the Suspended field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Suspended field is set to the value of the last call.
-func (b *OptimizationJobStatusApplyConfiguration) WithSuspended(value int32) *OptimizationJobStatusApplyConfiguration {
-	b.Suspended = &value
 	return b
 }
 

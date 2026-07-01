@@ -22,14 +22,12 @@ package v1alpha1
 // OptimizationJobSpec defines the desired state of OptimizationJob.
 type OptimizationJobSpecApplyConfiguration struct {
 	Objectives []ObjectiveApplyConfiguration `json:"objectives,omitempty"`
-	Algorithm  *AlgorithmApplyConfiguration  `json:"algorithm,omitempty"`
-	// EarlyStopping separates the pruning logic from the search algorithm.
-	EarlyStopping *EarlyStoppingApplyConfiguration `json:"earlyStopping,omitempty"`
-	Parameters    []ParameterApplyConfiguration    `json:"parameters,omitempty"`
-	TrialConfig   *TrialConfigApplyConfiguration   `json:"trialConfig,omitempty"`
-	// TrialTemplate wraps the underlying TrainJob workload and its metadata.
-	// Parameter propagation is handled via native string rendering before creation.
-	TrainJobTemplate *TrainJobTemplateSpecApplyConfiguration `json:"trialTemplate,omitempty"`
+	// SearchAlgorithm explicitly separates initial sampling from mid-run pruning.
+	SearchAlgorithm *SearchAlgorithmApplyConfiguration `json:"searchAlgorithm,omitempty"`
+	Parameters      []ParameterApplyConfiguration      `json:"parameters,omitempty"`
+	TrialConfig     *TrialConfigApplyConfiguration     `json:"trialConfig,omitempty"`
+	// TrainJobTemplate wraps the underlying TrainJob workload and its metadata.
+	TrainJobTemplate *TrainJobTemplateSpecApplyConfiguration `json:"trainJobTemplate,omitempty"`
 }
 
 // OptimizationJobSpecApplyConfiguration constructs a declarative configuration of the OptimizationJobSpec type for use with
@@ -51,19 +49,11 @@ func (b *OptimizationJobSpecApplyConfiguration) WithObjectives(values ...*Object
 	return b
 }
 
-// WithAlgorithm sets the Algorithm field in the declarative configuration to the given value
+// WithSearchAlgorithm sets the SearchAlgorithm field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Algorithm field is set to the value of the last call.
-func (b *OptimizationJobSpecApplyConfiguration) WithAlgorithm(value *AlgorithmApplyConfiguration) *OptimizationJobSpecApplyConfiguration {
-	b.Algorithm = value
-	return b
-}
-
-// WithEarlyStopping sets the EarlyStopping field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the EarlyStopping field is set to the value of the last call.
-func (b *OptimizationJobSpecApplyConfiguration) WithEarlyStopping(value *EarlyStoppingApplyConfiguration) *OptimizationJobSpecApplyConfiguration {
-	b.EarlyStopping = value
+// If called multiple times, the SearchAlgorithm field is set to the value of the last call.
+func (b *OptimizationJobSpecApplyConfiguration) WithSearchAlgorithm(value *SearchAlgorithmApplyConfiguration) *OptimizationJobSpecApplyConfiguration {
+	b.SearchAlgorithm = value
 	return b
 }
 

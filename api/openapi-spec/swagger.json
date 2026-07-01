@@ -13759,36 +13759,15 @@
           }
         }
       },
-      "trainer.v1alpha1.Algorithm": {
-        "description": "Algorithm defines the optimization algorithm configuration.",
+      "trainer.v1alpha1.BayesianAlgorithm": {
         "type": "object",
-        "required": [
-          "name"
-        ],
         "properties": {
-          "name": {
-            "description": "Name of the optimization algorithm (e.g., random, grid, bayesian, tpe, hyperband).",
-            "type": "string",
-            "default": ""
-          },
-          "provider": {
-            "description": "Provider specifies the backend suggestion engine executing the math (e.g., optuna, vizier). If omitted, the controller will route to a cluster-default provider.",
+          "acquisitionFunction": {
             "type": "string"
           },
-          "settings": {
-            "type": "array",
-            "items": {
-              "default": {},
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/trainer.v1alpha1.SettingKV"
-                }
-              ]
-            },
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map"
+          "initialTrials": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -13820,6 +13799,23 @@
             "description": "Value is the actual observed metric value achieved by this trial.",
             "type": "string",
             "default": ""
+          }
+        }
+      },
+      "trainer.v1alpha1.CategoricalSpace": {
+        "description": "CategoricalSpace defines a search space over a discrete set of unordered strings.",
+        "type": "object",
+        "required": [
+          "list"
+        ],
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "default": ""
+            },
+            "x-kubernetes-list-type": "atomic"
           }
         }
       },
@@ -13957,6 +13953,33 @@
           }
         }
       },
+      "trainer.v1alpha1.CustomAlgorithm": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": ""
+          },
+          "settings": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.SettingKV"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          }
+        }
+      },
       "trainer.v1alpha1.DatasetInitializer": {
         "description": "DatasetInitializer represents the desired configuration to initialize and pre-process dataset. The DatasetInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
         "type": "object",
@@ -13991,35 +14014,6 @@
           }
         }
       },
-      "trainer.v1alpha1.EarlyStopping": {
-        "description": "EarlyStopping defines the configuration for pruning unpromising trials.",
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "properties": {
-          "name": {
-            "description": "Name of the early stopping algorithm (e.g., median, asha).",
-            "type": "string",
-            "default": ""
-          },
-          "settings": {
-            "type": "array",
-            "items": {
-              "default": {},
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/trainer.v1alpha1.SettingKV"
-                }
-              ]
-            },
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map"
-          }
-        }
-      },
       "trainer.v1alpha1.FluxMLPolicySource": {
         "description": "FluxMLPolicySource represents a Flux HPC runtime configuration.",
         "type": "object",
@@ -14030,6 +14024,10 @@
             "format": "int32"
           }
         }
+      },
+      "trainer.v1alpha1.GridAlgorithm": {
+        "description": "GridAlgorithm is intentionally empty; step-intervals are derived from SearchSpace.Int.Step.",
+        "type": "object"
       },
       "trainer.v1alpha1.Initializer": {
         "description": "Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.",
@@ -14050,6 +14048,27 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.ModelInitializer"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.IntSpace": {
+        "description": "IntSpace defines a discrete integer search space over [Min, Max].",
+        "type": "object",
+        "required": [
+          "min",
+          "max"
+        ],
+        "properties": {
+          "max": {
+            "type": "string",
+            "default": ""
+          },
+          "min": {
+            "type": "string",
+            "default": ""
+          },
+          "step": {
+            "type": "string"
           }
         }
       },
@@ -14200,6 +14219,42 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobSpecPatch"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.LogNormalSpace": {
+        "description": "LogNormalSpace defines a continuous log-normal distribution.",
+        "type": "object",
+        "required": [
+          "mean",
+          "stdDev"
+        ],
+        "properties": {
+          "mean": {
+            "type": "string",
+            "default": ""
+          },
+          "stdDev": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
+      "trainer.v1alpha1.LogUniformSpace": {
+        "description": "LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].",
+        "type": "object",
+        "required": [
+          "min",
+          "max"
+        ],
+        "properties": {
+          "max": {
+            "type": "string",
+            "default": ""
+          },
+          "min": {
+            "type": "string",
+            "default": ""
           }
         }
       },
@@ -14374,6 +14429,24 @@
           }
         }
       },
+      "trainer.v1alpha1.NormalSpace": {
+        "description": "NormalSpace defines a continuous normal (Gaussian) distribution.",
+        "type": "object",
+        "required": [
+          "mean",
+          "stdDev"
+        ],
+        "properties": {
+          "mean": {
+            "type": "string",
+            "default": ""
+          },
+          "stdDev": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
       "trainer.v1alpha1.Objective": {
         "description": "Objective defines the metric and goal for the OptimizationJob.",
         "type": "object",
@@ -14471,28 +14544,12 @@
         "type": "object",
         "required": [
           "objectives",
-          "algorithm",
+          "searchAlgorithm",
           "parameters",
           "trialConfig",
-          "trialTemplate"
+          "trainJobTemplate"
         ],
         "properties": {
-          "algorithm": {
-            "default": {},
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.Algorithm"
-              }
-            ]
-          },
-          "earlyStopping": {
-            "description": "EarlyStopping separates the pruning logic from the search algorithm.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.EarlyStopping"
-              }
-            ]
-          },
           "objectives": {
             "type": "array",
             "items": {
@@ -14520,20 +14577,29 @@
             ],
             "x-kubernetes-list-type": "map"
           },
+          "searchAlgorithm": {
+            "description": "SearchAlgorithm explicitly separates initial sampling from mid-run pruning.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.SearchAlgorithm"
+              }
+            ]
+          },
+          "trainJobTemplate": {
+            "description": "TrainJobTemplate wraps the underlying TrainJob workload and its metadata.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobTemplateSpec"
+              }
+            ]
+          },
           "trialConfig": {
             "default": {},
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.TrialConfig"
-              }
-            ]
-          },
-          "trialTemplate": {
-            "description": "TrialTemplate wraps the underlying TrainJob workload and its metadata. Parameter propagation is handled via native string rendering before creation.",
-            "default": {},
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobTemplateSpec"
               }
             ]
           }
@@ -14578,11 +14644,6 @@
             "type": "string"
           },
           "succeeded": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "suspended": {
-            "description": "Suspended tracks trials that are paused by dynamic algorithms (e.g., PBT).",
             "type": "integer",
             "format": "int32"
           }
@@ -14835,6 +14896,15 @@
           }
         }
       },
+      "trainer.v1alpha1.RandomAlgorithm": {
+        "type": "object",
+        "properties": {
+          "seed": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "trainer.v1alpha1.ReplicatedJobPatch": {
         "description": "ReplicatedJobPatch defines patches for a specific replicated job within the JobSet.",
         "type": "object",
@@ -14906,35 +14976,77 @@
           }
         }
       },
-      "trainer.v1alpha1.SearchSpace": {
-        "description": "SearchSpace defines the type and exact boundaries for the algorithm to search.",
+      "trainer.v1alpha1.SearchAlgorithm": {
+        "description": "SearchAlgorithm defines the hyperparameter sampling configuration.",
         "type": "object",
-        "required": [
-          "type"
-        ],
         "properties": {
-          "list": {
+          "bayesian": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.BayesianAlgorithm"
+          },
+          "custom": {
+            "description": "Custom acts as an escape hatch for arbitrary or proprietary samplers.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.CustomAlgorithm"
+              }
+            ]
+          },
+          "grid": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.GridAlgorithm"
+          },
+          "provider": {
+            "description": "Provider specifies the backend suggestion engine. Defaults to \"optuna\" if omitted.",
+            "type": "string"
+          },
+          "providerSettings": {
+            "description": "ProviderSettings passes raw engine kwargs down to the backend microservice.",
             "type": "array",
             "items": {
-              "type": "string",
-              "default": ""
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.SettingKV"
+                }
+              ]
             },
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
           },
-          "max": {
-            "type": "string"
+          "random": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.RandomAlgorithm"
           },
-          "min": {
-            "type": "string"
+          "tpe": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.TPEAlgorithm"
+          }
+        }
+      },
+      "trainer.v1alpha1.SearchSpace": {
+        "description": "SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.",
+        "type": "object",
+        "properties": {
+          "categorical": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.CategoricalSpace"
           },
-          "type": {
-            "type": "string",
-            "default": ""
+          "int": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.IntSpace"
+          },
+          "logNormal": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.LogNormalSpace"
+          },
+          "logUniform": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.LogUniformSpace"
+          },
+          "normal": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.NormalSpace"
+          },
+          "uniform": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.UniformSpace"
           }
         }
       },
       "trainer.v1alpha1.SettingKV": {
-        "description": "SettingKV is a key-value pair for algorithm settings.",
         "type": "object",
         "required": [
           "name",
@@ -14948,6 +15060,23 @@
           "value": {
             "type": "string",
             "default": ""
+          }
+        }
+      },
+      "trainer.v1alpha1.TPEAlgorithm": {
+        "type": "object",
+        "properties": {
+          "eiCandidates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "initialTrials": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "seed": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -15160,7 +15289,7 @@
             ]
           },
           "spec": {
-            "description": "Specification of the desired behavior of the TrainJob. Hyperparameters are injected into this template via String Templating. Users can place placeholders like {{.parameter_name}} anywhere in this spec (e.g., in args, env values, or annotations) and the controller will render the actual values before applying the TrainJob.",
+            "description": "Specification of the desired behavior of the TrainJob. Hyperparameters are injected into this template dynamically by the controller via prefixed environment variables (KUBEFLOW_OPT_*) and metadata annotations.",
             "default": {},
             "allOf": [
               {
@@ -15399,14 +15528,24 @@
           "parallelTrials": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "trainer.v1alpha1.UniformSpace": {
+        "description": "UniformSpace defines a continuous uniform distribution over [Min, Max].",
+        "type": "object",
+        "required": [
+          "min",
+          "max"
+        ],
+        "properties": {
+          "max": {
+            "type": "string",
+            "default": ""
           },
-          "storage": {
-            "description": "Storage configures where suspended trials persist their checkpoints.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationStorage"
-              }
-            ]
+          "min": {
+            "type": "string",
+            "default": ""
           }
         }
       },

@@ -30,10 +30,8 @@ type TrainJobTemplateSpecApplyConfiguration struct {
 	// Standard object's metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the TrainJob.
-	// Hyperparameters are injected into this template via String Templating.
-	// Users can place placeholders like {{.parameter_name}} anywhere in this spec
-	// (e.g., in args, env values, or annotations) and the controller will render
-	// the actual values before applying the TrainJob.
+	// Hyperparameters are injected into this template dynamically by the controller
+	// via prefixed environment variables (KUBEFLOW_OPT_*) and metadata annotations.
 	Spec *TrainJobSpecApplyConfiguration `json:"spec,omitempty"`
 }
 

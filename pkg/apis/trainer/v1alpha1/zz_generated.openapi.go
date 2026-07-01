@@ -33,16 +33,19 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Algorithm":                        schema_pkg_apis_trainer_v1alpha1_Algorithm(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.BayesianAlgorithm":                schema_pkg_apis_trainer_v1alpha1_BayesianAlgorithm(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.BestTrial":                        schema_pkg_apis_trainer_v1alpha1_BestTrial(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CategoricalSpace":                 schema_pkg_apis_trainer_v1alpha1_CategoricalSpace(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ClusterTrainingRuntime":           schema_pkg_apis_trainer_v1alpha1_ClusterTrainingRuntime(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ClusterTrainingRuntimeList":       schema_pkg_apis_trainer_v1alpha1_ClusterTrainingRuntimeList(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ContainerPatch":                   schema_pkg_apis_trainer_v1alpha1_ContainerPatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CoschedulingPodGroupPolicySource": schema_pkg_apis_trainer_v1alpha1_CoschedulingPodGroupPolicySource(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CustomAlgorithm":                  schema_pkg_apis_trainer_v1alpha1_CustomAlgorithm(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.DatasetInitializer":               schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref),
-		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EarlyStopping":                    schema_pkg_apis_trainer_v1alpha1_EarlyStopping(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.FluxMLPolicySource":               schema_pkg_apis_trainer_v1alpha1_FluxMLPolicySource(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.GridAlgorithm":                    schema_pkg_apis_trainer_v1alpha1_GridAlgorithm(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Initializer":                      schema_pkg_apis_trainer_v1alpha1_Initializer(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.IntSpace":                         schema_pkg_apis_trainer_v1alpha1_IntSpace(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JAXMLPolicySource":                schema_pkg_apis_trainer_v1alpha1_JAXMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetSpecPatch":                  schema_pkg_apis_trainer_v1alpha1_JobSetSpecPatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSetTemplatePatch":              schema_pkg_apis_trainer_v1alpha1_JobSetTemplatePatch(ref),
@@ -50,11 +53,14 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSpecPatch":                     schema_pkg_apis_trainer_v1alpha1_JobSpecPatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobStatus":                        schema_pkg_apis_trainer_v1alpha1_JobStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobTemplatePatch":                 schema_pkg_apis_trainer_v1alpha1_JobTemplatePatch(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogNormalSpace":                   schema_pkg_apis_trainer_v1alpha1_LogNormalSpace(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogUniformSpace":                  schema_pkg_apis_trainer_v1alpha1_LogUniformSpace(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicy":                         schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicySource":                   schema_pkg_apis_trainer_v1alpha1_MLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource":                schema_pkg_apis_trainer_v1alpha1_MPIMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Metric":                           schema_pkg_apis_trainer_v1alpha1_Metric(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ModelInitializer":                 schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.NormalSpace":                      schema_pkg_apis_trainer_v1alpha1_NormalSpace(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Objective":                        schema_pkg_apis_trainer_v1alpha1_Objective(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJob":                  schema_pkg_apis_trainer_v1alpha1_OptimizationJob(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobList":              schema_pkg_apis_trainer_v1alpha1_OptimizationJobList(ref),
@@ -67,11 +73,14 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodGroupPolicySource":             schema_pkg_apis_trainer_v1alpha1_PodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodSpecPatch":                     schema_pkg_apis_trainer_v1alpha1_PodSpecPatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.PodTemplatePatch":                 schema_pkg_apis_trainer_v1alpha1_PodTemplatePatch(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RandomAlgorithm":                  schema_pkg_apis_trainer_v1alpha1_RandomAlgorithm(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ReplicatedJobPatch":               schema_pkg_apis_trainer_v1alpha1_ReplicatedJobPatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimePatch":                     schema_pkg_apis_trainer_v1alpha1_RuntimePatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RuntimeRef":                       schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SearchAlgorithm":                  schema_pkg_apis_trainer_v1alpha1_SearchAlgorithm(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SearchSpace":                      schema_pkg_apis_trainer_v1alpha1_SearchSpace(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SettingKV":                        schema_pkg_apis_trainer_v1alpha1_SettingKV(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TPEAlgorithm":                     schema_pkg_apis_trainer_v1alpha1_TPEAlgorithm(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TorchMLPolicySource":              schema_pkg_apis_trainer_v1alpha1_TorchMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJob":                         schema_pkg_apis_trainer_v1alpha1_TrainJob(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobList":                     schema_pkg_apis_trainer_v1alpha1_TrainJobList(ref),
@@ -85,6 +94,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeSpec":              schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeSpecPatch":         schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeSpecPatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrialConfig":                      schema_pkg_apis_trainer_v1alpha1_TrialConfig(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.UniformSpace":                     schema_pkg_apis_trainer_v1alpha1_UniformSpace(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.UpdateTrainJobStatusRequest":      schema_pkg_apis_trainer_v1alpha1_UpdateTrainJobStatusRequest(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.VolcanoPodGroupPolicySource":      schema_pkg_apis_trainer_v1alpha1_VolcanoPodGroupPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.XGBoostMLPolicySource":            schema_pkg_apis_trainer_v1alpha1_XGBoostMLPolicySource(ref),
@@ -458,55 +468,27 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 	}
 }
 
-func schema_pkg_apis_trainer_v1alpha1_Algorithm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_trainer_v1alpha1_BayesianAlgorithm(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Algorithm defines the optimization algorithm configuration.",
-				Type:        []string{"object"},
+				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
-					"name": {
+					"initialTrials": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the optimization algorithm (e.g., random, grid, bayesian, tpe, hyperband).",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Type:   []string{"integer"},
+							Format: "int32",
 						},
 					},
-					"provider": {
+					"acquisitionFunction": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Provider specifies the backend suggestion engine executing the math (e.g., optuna, vizier). If omitted, the controller will route to a cluster-default provider.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"settings": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type": "map",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SettingKV"),
-									},
-								},
-							},
+							Type:   []string{"string"},
+							Format: "",
 						},
 					},
 				},
-				Required: []string{"name"},
 			},
 		},
-		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SettingKV"},
 	}
 }
 
@@ -556,6 +538,39 @@ func schema_pkg_apis_trainer_v1alpha1_BestTrial(ref common.ReferenceCallback) co
 		},
 		Dependencies: []string{
 			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ParameterAssignment"},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_CategoricalSpace(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CategoricalSpace defines a search space over a discrete set of unordered strings.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"list": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"list"},
+			},
+		},
 	}
 }
 
@@ -746,6 +761,49 @@ func schema_pkg_apis_trainer_v1alpha1_CoschedulingPodGroupPolicySource(ref commo
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_CustomAlgorithm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"settings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SettingKV"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SettingKV"},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -796,51 +854,6 @@ func schema_pkg_apis_trainer_v1alpha1_DatasetInitializer(ref common.ReferenceCal
 	}
 }
 
-func schema_pkg_apis_trainer_v1alpha1_EarlyStopping(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "EarlyStopping defines the configuration for pruning unpromising trials.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name of the early stopping algorithm (e.g., median, asha).",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"settings": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"name",
-								},
-								"x-kubernetes-list-type": "map",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SettingKV"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"name"},
-			},
-		},
-		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SettingKV"},
-	}
-}
-
 func schema_pkg_apis_trainer_v1alpha1_FluxMLPolicySource(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -856,6 +869,17 @@ func schema_pkg_apis_trainer_v1alpha1_FluxMLPolicySource(ref common.ReferenceCal
 						},
 					},
 				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_GridAlgorithm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GridAlgorithm is intentionally empty; step-intervals are derived from SearchSpace.Int.Step.",
+				Type:        []string{"object"},
 			},
 		},
 	}
@@ -885,6 +909,40 @@ func schema_pkg_apis_trainer_v1alpha1_Initializer(ref common.ReferenceCallback) 
 		},
 		Dependencies: []string{
 			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.DatasetInitializer", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ModelInitializer"},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_IntSpace(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "IntSpace defines a discrete integer search space over [Min, Max].",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"min": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"max": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"step": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+				Required: []string{"min", "max"},
+			},
+		},
 	}
 }
 
@@ -1092,6 +1150,62 @@ func schema_pkg_apis_trainer_v1alpha1_JobTemplatePatch(ref common.ReferenceCallb
 		},
 		Dependencies: []string{
 			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSpecPatch", metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_LogNormalSpace(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "LogNormalSpace defines a continuous log-normal distribution.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"mean": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"stdDev": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"mean", "stdDev"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_LogUniformSpace(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"min": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"max": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"min", "max"},
+			},
+		},
 	}
 }
 
@@ -1310,6 +1424,34 @@ func schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref common.ReferenceCallb
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_NormalSpace(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NormalSpace defines a continuous normal (Gaussian) distribution.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"mean": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"stdDev": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"mean", "stdDev"},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_Objective(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -1459,16 +1601,11 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 							},
 						},
 					},
-					"algorithm": {
+					"searchAlgorithm": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Algorithm"),
-						},
-					},
-					"earlyStopping": {
-						SchemaProps: spec.SchemaProps{
-							Description: "EarlyStopping separates the pruning logic from the search algorithm.",
-							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EarlyStopping"),
+							Description: "SearchAlgorithm explicitly separates initial sampling from mid-run pruning.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SearchAlgorithm"),
 						},
 					},
 					"parameters": {
@@ -1498,19 +1635,19 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 							Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrialConfig"),
 						},
 					},
-					"trialTemplate": {
+					"trainJobTemplate": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TrialTemplate wraps the underlying TrainJob workload and its metadata. Parameter propagation is handled via native string rendering before creation.",
+							Description: "TrainJobTemplate wraps the underlying TrainJob workload and its metadata.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTemplateSpec"),
 						},
 					},
 				},
-				Required: []string{"objectives", "algorithm", "parameters", "trialConfig", "trialTemplate"},
+				Required: []string{"objectives", "searchAlgorithm", "parameters", "trialConfig", "trainJobTemplate"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Algorithm", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.EarlyStopping", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Objective", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Parameter", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTemplateSpec", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrialConfig"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Objective", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Parameter", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SearchAlgorithm", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTemplateSpec", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrialConfig"},
 	}
 }
 
@@ -1552,13 +1689,6 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobStatus(ref common.Reference
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"integer"},
 							Format: "int32",
-						},
-					},
-					"suspended": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Suspended tracks trials that are paused by dynamic algorithms (e.g., PBT).",
-							Type:        []string{"integer"},
-							Format:      "int32",
 						},
 					},
 					"succeeded": {
@@ -1931,6 +2061,24 @@ func schema_pkg_apis_trainer_v1alpha1_PodTemplatePatch(ref common.ReferenceCallb
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_RandomAlgorithm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"seed": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int64",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_ReplicatedJobPatch(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -2030,55 +2178,118 @@ func schema_pkg_apis_trainer_v1alpha1_RuntimeRef(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_pkg_apis_trainer_v1alpha1_SearchSpace(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_trainer_v1alpha1_SearchAlgorithm(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "SearchSpace defines the type and exact boundaries for the algorithm to search.",
+				Description: "SearchAlgorithm defines the hyperparameter sampling configuration.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"type": {
+					"provider": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "Provider specifies the backend suggestion engine. Defaults to \"optuna\" if omitted.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
-					"max": {
+					"random": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RandomAlgorithm"),
 						},
 					},
-					"min": {
+					"grid": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.GridAlgorithm"),
 						},
 					},
-					"list": {
+					"tpe": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TPEAlgorithm"),
+						},
+					},
+					"bayesian": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.BayesianAlgorithm"),
+						},
+					},
+					"custom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Custom acts as an escape hatch for arbitrary or proprietary samplers.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CustomAlgorithm"),
+						},
+					},
+					"providerSettings": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
+							Description: "ProviderSettings passes raw engine kwargs down to the backend microservice.",
+							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SettingKV"),
 									},
 								},
 							},
 						},
 					},
 				},
-				Required: []string{"type"},
 			},
 		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.BayesianAlgorithm", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CustomAlgorithm", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.GridAlgorithm", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RandomAlgorithm", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SettingKV", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TPEAlgorithm"},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_SearchSpace(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"uniform": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.UniformSpace"),
+						},
+					},
+					"logUniform": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogUniformSpace"),
+						},
+					},
+					"normal": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.NormalSpace"),
+						},
+					},
+					"logNormal": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogNormalSpace"),
+						},
+					},
+					"int": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.IntSpace"),
+						},
+					},
+					"categorical": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CategoricalSpace"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CategoricalSpace", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.IntSpace", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogNormalSpace", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogUniformSpace", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.NormalSpace", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.UniformSpace"},
 	}
 }
 
@@ -2086,8 +2297,7 @@ func schema_pkg_apis_trainer_v1alpha1_SettingKV(ref common.ReferenceCallback) co
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "SettingKV is a key-value pair for algorithm settings.",
-				Type:        []string{"object"},
+				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
@@ -2105,6 +2315,36 @@ func schema_pkg_apis_trainer_v1alpha1_SettingKV(ref common.ReferenceCallback) co
 					},
 				},
 				Required: []string{"name", "value"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_TPEAlgorithm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"initialTrials": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"eiCandidates": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"seed": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int64",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -2381,7 +2621,7 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobTemplateSpec(ref common.ReferenceC
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired behavior of the TrainJob. Hyperparameters are injected into this template via String Templating. Users can place placeholders like {{.parameter_name}} anywhere in this spec (e.g., in args, env values, or annotations) and the controller will render the actual values before applying the TrainJob.",
+							Description: "Specification of the desired behavior of the TrainJob. Hyperparameters are injected into this template dynamically by the controller via prefixed environment variables (KUBEFLOW_OPT_*) and metadata annotations.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobSpec"),
 						},
@@ -2727,17 +2967,37 @@ func schema_pkg_apis_trainer_v1alpha1_TrialConfig(ref common.ReferenceCallback) 
 							Format: "int32",
 						},
 					},
-					"storage": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Storage configures where suspended trials persist their checkpoints.",
-							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationStorage"),
-						},
-					},
 				},
 			},
 		},
-		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationStorage"},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_UniformSpace(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UniformSpace defines a continuous uniform distribution over [Min, Max].",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"min": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"max": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"min", "max"},
+			},
+		},
 	}
 }
 
