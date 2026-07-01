@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent / "_ext"))
 
 # -- Project information -----------------------------------------------------
 project = "Kubeflow Trainer"
-copyright = "2026, Kubeflow Authors"
+copyright = "Kubeflow Authors"
 author = "Kubeflow Authors"
 
 # The version is set from environment variable or defaults to "latest"
@@ -61,6 +61,7 @@ exclude_patterns = [
 html_theme = "furo"
 html_title = "Kubeflow Trainer"
 html_static_path = ["_static"]
+html_favicon = "_static/img/kubeflow-trainer-icon.svg"
 html_css_files = ["css/custom.css"]
 html_js_files = ["js/external-links.js", "js/sidebar-toggle.js", "js/landing-page.js"]
 
