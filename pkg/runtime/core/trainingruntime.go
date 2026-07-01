@@ -166,9 +166,8 @@ func (r *TrainingRuntime) newRuntimeInfo(
 	}
 
 	for i, rJob := range jobSetSpecApply.ReplicatedJobs {
-		// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
-		// REF: https://github.com/kubeflow/trainer/issues/2318
-		count := ptr.Deref(rJob.Template.Spec.Parallelism, 1)
+		replicas := ptr.Deref(rJob.Replicas, 1)
+		count := ptr.Deref(rJob.Template.Spec.Parallelism, 1) * replicas
 		var ancestor *string
 		if metadata := rJob.Template.ObjectMetaApplyConfiguration; metadata != nil && metadata.Labels != nil {
 			if labelAncestor, ok := metadata.Labels[constants.LabelTrainJobAncestor]; ok {
