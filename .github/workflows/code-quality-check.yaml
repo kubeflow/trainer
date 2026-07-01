@@ -46,3 +46,6 @@ jobs:
 
       - name: Check boilerplate headers
         run: make verify-boilerplate
+
+      - name: Check AI agent config is in sync
+        run: make verify-agents-config

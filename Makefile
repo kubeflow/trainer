@@ -211,6 +211,14 @@ golangci-lint: golangci-lint-install golangci-lint-kal ## Run golangci-lint to v
 verify-boilerplate: ## Verify copyright boilerplate headers in source files.
 	python3 hack/boilerplate/boilerplate.py --base-ref "$(TARGET_BRANCH)"
 
+.PHONY: sync-agents-config
+sync-agents-config: ## Sync AI agent config from ai/ to tool-specific directories.
+	./hack/sync-agents-config.sh
+
+.PHONY: verify-agents-config
+verify-agents-config: ## Verify AI agent config is in sync with ai/.
+	./hack/verify-agents-config.sh
+
 # Instructions to run tests.
 .PHONY: test
 test: ## Run Go unit test.
