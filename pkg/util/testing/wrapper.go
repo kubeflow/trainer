@@ -21,9 +21,11 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
@@ -1508,4 +1510,53 @@ func (s *SecretWrapper) ControllerReference(gvk schema.GroupVersionKind, name, u
 
 func (s *SecretWrapper) Obj() *corev1.Secret {
 	return &s.Secret
+}
+
+type PodDisruptionBudgetWrapper struct {
+	policyv1.PodDisruptionBudget
+}
+
+func MakePodDisruptionBudgetWrapper(name, ns string) *PodDisruptionBudgetWrapper {
+	return &PodDisruptionBudgetWrapper{
+		PodDisruptionBudget: policyv1.PodDisruptionBudget{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: policyv1.SchemeGroupVersion.String(),
+				Kind:       "PodDisruptionBudget",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+		},
+	}
+}
+
+func (p *PodDisruptionBudgetWrapper) MinAvailable(minAvailable int32) *PodDisruptionBudgetWrapper {
+	v := intstr.FromInt32(minAvailable)
+	p.Spec.MinAvailable = &v
+	return p
+}
+
+func (p *PodDisruptionBudgetWrapper) MatchLabels(matchLabels map[string]string) *PodDisruptionBudgetWrapper {
+	if p.Spec.Selector == nil {
+		p.Spec.Selector = &metav1.LabelSelector{}
+	}
+	p.Spec.Selector.MatchLabels = matchLabels
+	return p
+}
+
+func (p *PodDisruptionBudgetWrapper) ControllerReference(gvk schema.GroupVersionKind, name, uid string) *PodDisruptionBudgetWrapper {
+	p.OwnerReferences = append(p.OwnerReferences, metav1.OwnerReference{
+		APIVersion:         gvk.GroupVersion().String(),
+		Kind:               gvk.Kind,
+		Name:               name,
+		UID:                types.UID(uid),
+		Controller:         ptr.To(true),
+		BlockOwnerDeletion: ptr.To(true),
+	})
+	return p
+}
+
+func (p *PodDisruptionBudgetWrapper) Obj() *policyv1.PodDisruptionBudget {
+	return &p.PodDisruptionBudget
 }

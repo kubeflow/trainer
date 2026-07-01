@@ -55,6 +55,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/pdb"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/volcano"
@@ -84,6 +85,7 @@ func TestNew(t *testing.T) {
 					flux.Name:         &flux.Flux{},
 					volcano.Name:      &volcano.Volcano{},
 					mpi.Name:          &mpi.MPI{},
+					pdb.Name:          &pdb.PodDisruptionBudget{},
 					plainml.Name:      &plainml.PlainML{},
 					torch.Name:        &torch.Torch{},
 					jobset.Name:       &jobset.JobSet{},
@@ -117,6 +119,7 @@ func TestNew(t *testing.T) {
 					&volcano.Volcano{},
 					&jobset.JobSet{},
 					&mpi.MPI{},
+					&pdb.PodDisruptionBudget{},
 				},
 				podNetworkPlugins: []framework.PodNetworkPlugin{
 					&jobset.JobSet{},
@@ -127,6 +130,7 @@ func TestNew(t *testing.T) {
 					&volcano.Volcano{},
 					&jobset.JobSet{},
 					&mpi.MPI{},
+					&pdb.PodDisruptionBudget{},
 				},
 				trainJobStatusPlugin: &jobset.JobSet{},
 			},
@@ -148,7 +152,7 @@ func TestNew(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(Framework{}),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, flux.Flux{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}, xgboost.XGBoost{}),
+		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, flux.Flux{}, volcano.Volcano{}, mpi.MPI{}, plainml.PlainML{}, torch.Torch{}, jobset.JobSet{}, xgboost.XGBoost{}, pdb.PodDisruptionBudget{}),
 		cmpopts.IgnoreFields(flux.Flux{}, "client", "scheme"),
 		cmpopts.IgnoreFields(coscheduling.CoScheduling{}, "client"),
 		cmpopts.IgnoreFields(volcano.Volcano{}, "client"),
@@ -1762,6 +1766,11 @@ test-job-node-0-1.test-job slots=1
 						corev1.ResourceMemory: resource.MustParse("8Gi"),
 					}).
 					Obj(),
+				testingutil.MakePodDisruptionBudgetWrapper("test-job", metav1.NamespaceDefault).
+					MinAvailable(100). // 100 trainer replicas; initializers are excluded.
+					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-job"}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-job", "uid").
+					Obj(),
 			},
 		},
 		"succeeded to build PodGroup and JobSet with NumNodes from TrainJob with volcano plugin": {
@@ -2210,6 +2219,11 @@ test-job-node-0-1.test-job slots=1
 						corev1.ResourceMemory: resource.MustParse("4Gi"),
 					}).
 					Obj(),
+				testingutil.MakePodDisruptionBudgetWrapper("test-volcano-job", metav1.NamespaceDefault).
+					MinAvailable(100). // 100 trainer replicas; initializers are excluded.
+					MatchLabels(map[string]string{jobsetv1alpha2.JobSetNameKey: "test-volcano-job"}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-volcano-job", "uid").
+					Obj(),
 			},
 		},
 		"an empty registry": {},
@@ -2300,6 +2314,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 				&volcano.Volcano{},
 				&jobset.JobSet{},
 				&mpi.MPI{},
+				&pdb.PodDisruptionBudget{},
 			},
 		},
 		"an empty registry": {
@@ -2308,7 +2323,7 @@ func TestWatchExtensionPlugins(t *testing.T) {
 	}
 	cmpOpts := []cmp.Option{
 		cmpopts.SortSlices(func(a, b framework.Plugin) bool { return a.Name() < b.Name() }),
-		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, jobset.JobSet{}, mpi.MPI{}, flux.Flux{}),
+		cmpopts.IgnoreUnexported(coscheduling.CoScheduling{}, volcano.Volcano{}, jobset.JobSet{}, mpi.MPI{}, flux.Flux{}, pdb.PodDisruptionBudget{}),
 		cmpopts.IgnoreFields(flux.Flux{}, "client", "scheme"),
 	}
 	for name, tc := range cases {
