@@ -6,6 +6,57 @@ version: "2"
 run:
   allow-parallel-runners: true
 
+linters:
+  enable:
+    - depguard
+  settings:
+    depguard:
+      rules:
+        apis-boundary:
+          list-mode: lax
+          files:
+            - "pkg/apis/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/kubeflow/trainer/v2/pkg/controller
+              desc: "pkg/apis/ must not import pkg/controller/ - API types are pure data, no business logic"
+            - pkg: github.com/kubeflow/trainer/v2/pkg/webhooks
+              desc: "pkg/apis/ must not import pkg/webhooks/ - API types are pure data, no business logic"
+            - pkg: github.com/kubeflow/trainer/v2/pkg/runtime
+              desc: "pkg/apis/ must not import pkg/runtime/ - API types are pure data, no business logic"
+        controller-boundary:
+          list-mode: lax
+          files:
+            - "pkg/controller/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/kubeflow/trainer/v2/test
+              desc: "pkg/controller/ must not import test/ packages"
+            - pkg: github.com/kubeflow/trainer/v2/pkg/webhooks
+              desc: "pkg/controller/ must not import pkg/webhooks/ - controllers and webhooks are separate concerns"
+        webhooks-boundary:
+          list-mode: lax
+          files:
+            - "pkg/webhooks/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/kubeflow/trainer/v2/test
+              desc: "pkg/webhooks/ must not import test/ packages"
+            - pkg: github.com/kubeflow/trainer/v2/pkg/controller
+              desc: "pkg/webhooks/ must not import pkg/controller/ - webhooks delegate to runtime, not controller"
+        runtime-boundary:
+          list-mode: lax
+          files:
+            - "pkg/runtime/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/kubeflow/trainer/v2/test
+              desc: "pkg/runtime/ must not import test/ packages"
+            - pkg: github.com/kubeflow/trainer/v2/pkg/controller
+              desc: "pkg/runtime/ must not import pkg/controller/ - runtime is consumed by controller, not the other way"
+            - pkg: github.com/kubeflow/trainer/v2/pkg/webhooks
+              desc: "pkg/runtime/ must not import pkg/webhooks/ - runtime is consumed by webhooks, not the other way"
+
 issues:
   max-same-issues: 0
 
