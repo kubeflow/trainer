@@ -41,7 +41,7 @@ To ensure a stable and reviewable implementation, the project is broken down int
 
 ### Phase 2: Stateful & Advanced Integrations
 
-- **Advanced Pruning & Early Stopping:** Integrate trial pruning algorithms (e.g., ASHA, Hyperband). This is deferred to Phase 2 to ensure the foundational search orchestration logic is fully stabilized first.
+- **Advanced Pruning & Early Stopping:** Implement a separate `PruneAlgorithm` API block. This system will utilize the decoupled metric-reporting pipeline: the controller will run `should_prune()` logic asynchronously on accumulated history, and termination signals will be propagated to the `TrainJob` via the `KubeflowCallback` runtime integration.
 - **Trial Suspension & Storage Checkpointing:** Introduce `OptimizationStorage` and `status.Suspended` to allow pausing and resuming trials mid-flight, pending integration with Early Stopping and Kueue.
 - **Stateful Algorithms & Shared Initialization:** Implement One-Shot Jobs for Bayesian/TPE to persist mathematical state, and integrate the `SharedInitializer` plugin to share datasets across trials.
 
@@ -367,10 +367,22 @@ We have deprecated string templating (`{{.param}}`). To pass parameters to the t
 * **The Design:** The controller injects `KUBEFLOW_OPT_<PARAM_NAME>` as environment variables into the Pod. It simultaneously stores the raw JSON parameter assignment as an Annotation on the TrainJob metadata.
 * **The "Why":** This aligns perfectly with the unified Kubeflow Python SDK (KEP-46). Data scientists can use SDK helper functions (e.g., `get_hyperparameters()`) to cleanly parse the environment variables inside their training scripts without modifying YAML command arguments. The metadata annotations allow the controller to reconstruct trial history purely from the Kubernetes API without requiring Katib DB.
 
-### 7.3. Decision: Deprecating the Trial CRD
+### 7.3. Decision: Explicit Separation of Search vs. Pruning
+**Status: Resolved (Phase 2 Roadmap)**
+
+We explicitly rename the core API block to `searchAlgorithm` and define a separate, future `pruneAlgorithm` block.
+Search algorithms (TPE/BO) and Pruning algorithms (ASHA/Hyperband) represent different mathematical domains—sampling vs. evaluation. Separate API blocks allow us to evolve these domains independently without polluting the schema with heterogeneous parameters.
+
+### 7.4. Decision: Deprecating the Trial CRD
 **Status: Resolved in v1alpha1**
 With the new unified TrainJob API exposing metrics directly, the `OptimizationJob` controller bypasses the Trial CRD entirely. The `OptimizationJob` directly creates TrainJobs and reconstructs historical state by reading their labels and annotations.
 
-### 7.4. Decision: Search Space Concrete Types (OneOf Pattern)
+### 7.5. Decision: Search Space Concrete Types (OneOf Pattern)
 **Status: Resolved in v1alpha1**
 Instead of employing a single flat struct with a generic type string, the `SearchSpace` utilizes a discriminated union. This establishes strong typing at the Kubernetes API layer, permitting mathematical CEL validations (`double()`, `int()`) and the easy addition of future mathematical domains without heavy Webhook validation logic.
+
+### 7.6. Open Discussion: Decoupling Metric Reporting from Termination Logic
+**Status: Pending**
+Metric reporting from the TrainJob is strictly asynchronous and non-blocking. Pruning decisions are computed controller-side based on the monotonic metric history. A "Stop Signal" is propagated to the training runtime as a non-blocking annotation or status field, which the KubeflowCallback (SDK) periodically polls.
+
+Synchronous "kill" calls during metric reporting create tight coupling and latency bottlenecks. By separating reporting from termination, we ensure the controller remains performant even under heavy trial loads.
