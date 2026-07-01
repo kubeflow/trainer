@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo '$FILEPATH' | grep -q '\\.go$'; then gofmt -w '$FILEPATH'; fi",
+            "timeout": 10000
+          },
+          {
+            "type": "command",
+            "command": "if echo '$FILEPATH' | grep -q '\\.py$'; then pre-commit run --files '$FILEPATH' 2>/dev/null || true; fi",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
+  }
+}

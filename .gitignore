@@ -3,7 +3,9 @@
 bin/
 manifests/external-crds/
 .specify/
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/skills/
 specs/
 # IDEs
 .vscode/
