@@ -4,7 +4,6 @@ metadata:
   name: deepspeed-distributed
   labels:
     trainer.kubeflow.org/framework: deepspeed
-    trainer.kubeflow.org/webhook-validation: disabled
 spec:
   mlPolicy:
     numNodes: 1

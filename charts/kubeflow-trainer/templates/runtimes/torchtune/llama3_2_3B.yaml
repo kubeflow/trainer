@@ -21,7 +21,9 @@ metadata:
   name: torchtune-llama3.2-3b
   labels:
     trainer.kubeflow.org/framework: torchtune
-    trainer.kubeflow.org/webhook-validation: disabled
+    {{- with .Values.runtimes.commonLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
     {{- include "trainer.labels" . | nindent 4 }}
 spec:
   mlPolicy:

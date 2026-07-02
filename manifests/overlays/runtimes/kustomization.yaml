@@ -3,6 +3,12 @@ kind: Kustomization
 resources:
   - ../../base/runtimes
 
+# The built-in ClusterTrainingRuntime are validated ahead of time.
+labels:
+  - pairs:
+      trainer.kubeflow.org/webhook-validation: disabled
+    includeSelectors: false
+
 # Update the Kubeflow LLM Trainer image tag.
 images:
   - name: ghcr.io/kubeflow/trainer/torchtune-trainer

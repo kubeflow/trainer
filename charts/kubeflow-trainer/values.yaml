@@ -104,7 +104,7 @@ manager:
     runAsNonRoot: true
     capabilities:
       drop:
-      - ALL
+        - ALL
     seccompProfile:
       type: RuntimeDefault
 
@@ -187,6 +187,11 @@ runtimes:
   # -- Enable all default runtimes (torch, deepspeed, mlx, jax, torchtune) when set to true.
   # Individual runtime settings will be ignored if this is enabled.
   defaultEnabled: false
+
+  # -- Common labels applied to every built-in runtime.
+  # The built-in ClusterTrainingRuntime are validated ahead of time.
+  commonLabels:
+    trainer.kubeflow.org/webhook-validation: disabled
 
   # -- PyTorch distributed training runtime (no custom images required)
   torchDistributed:
