@@ -258,7 +258,3 @@ runtimes:
     qwen2_5_1_5B:
       # -- Enable deployment of Qwen 2.5 1.5B runtime
       enabled: false
-
-
-  fluxDistributed:
-    enabled: false

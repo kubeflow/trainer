@@ -7,4 +7,3 @@ resources:
   - jax_distributed.yaml
   - xgboost_distributed.yaml
   - torchtune
-  - flux_distributed.yaml
