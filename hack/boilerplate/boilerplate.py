@@ -16,9 +16,18 @@
 
 """Verify boilerplate copyright headers in source files.
 
-Policy:
-  - Files that already contain a copyright year are accepted.
-  - Files without a year must match the year-less boilerplate template.
+Two checks are applied:
+
+  1. All files: the header must match the boilerplate template once any
+     copyright year is normalized out, so a year-bearing header and a
+     year-less header both validate against the single year-less template.
+  2. New files (added relative to the base branch): the header must
+     additionally be year-less; a hardcoded copyright year is rejected.
+
+New-file detection compares against the base branch (--base-ref, default
+$TARGET_BRANCH or master), resolved as origin/<ref> then <ref>. If the base
+cannot be resolved, or files cannot be listed, the run fails rather than
+passing vacuously.
 
 Reference: https://github.com/kubernetes/steering/issues/299
 """
@@ -29,11 +38,13 @@ import os
 import re
 import subprocess
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 # Maps file extension (or special basename) to the boilerplate template
-# stem on disk (boilerplate.<stem>.txt). One template is reused across
-# all hash-comment languages (sh, bash, py, Dockerfile, yaml, yml).
+# stem on disk (boilerplate.<stem>.txt). The "sh" stem is reused for every
+# hash-comment language (bash, py, Dockerfile, yaml, yml). "helm" (also used
+# for gotmpl) maps to boilerplate.helm.txt for Go-template comments, and
+# go / rs have their own templates.
 EXTENSION_TEMPLATES = {
     "go": "go",
     "helm": "helm",
@@ -52,7 +63,8 @@ EXTENSION_TEMPLATES = {
 GENERATED_GO_TEMPLATE = "generatego"
 
 # Regex patterns
-_RE_ANY_YEAR = re.compile(r"Copyright \d{4} ")
+_RE_ANY_YEAR = re.compile(r"Copyright \d{4}")
+_RE_YEAR_STRIP = re.compile(r"(Copyright )\d{4}(?:-\d{4})? ")
 _RE_GO_BUILD_CONSTRAINTS = re.compile(r"^(//(go:build| \+build).*\n)+\n", re.MULTILINE)
 _RE_SHEBANG = re.compile(r"^(#!.*\n)\n*")
 _RE_GENERATED = re.compile(r"DO NOT EDIT", re.MULTILINE)
@@ -71,6 +83,32 @@ def find_root_dir() -> str:
         return result.stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return os.getcwd()
+
+
+def base_tree_files(base_ref: str, rootdir: str) -> Optional[Set[str]]:
+    """Repo-relative paths at the merge-base of the base branch and HEAD.
+
+    Tries origin/<base_ref> then <base_ref>. Returns None if neither
+    resolves, so the caller can fail rather than skip the new-file check.
+    """
+    for ref in (f"origin/{base_ref}", base_ref):
+        try:
+            base = subprocess.run(
+                ["git", "-C", rootdir, "merge-base", ref, "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            tree = subprocess.run(
+                ["git", "-C", rootdir, "ls-tree", "-r", "--name-only", base],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+        return {line for line in tree.stdout.splitlines() if line}
+    return None
 
 
 def load_templates(boilerplate_dir: str) -> Dict[str, List[str]]:
@@ -95,11 +133,13 @@ def template_stem_for(filename: str) -> Optional[str]:
     return EXTENSION_TEMPLATES.get(ext)
 
 
-def list_git_files(rootdir: str) -> List[str]:
+def list_git_files(rootdir: str) -> Optional[List[str]]:
     """List files git considers part of the working tree.
 
     Includes tracked files plus untracked-not-ignored files, so newly
     added files are checked but build artifacts and __pycache__ are not.
+    Returns None if git fails, so the caller can fail rather than treat a
+    broken listing as "no files".
     """
     try:
         result = subprocess.run(
@@ -116,13 +156,14 @@ def list_git_files(rootdir: str) -> List[str]:
             text=True,
             check=True,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return []
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"ERROR: 'git ls-files' failed: {e}", file=sys.stderr)
+        return None
     return [os.path.join(rootdir, line) for line in result.stdout.splitlines() if line]
 
 
-def collect_files(rootdir: str, filenames: Optional[List[str]]) -> List[str]:
-    """Return the files to check."""
+def collect_files(rootdir: str, filenames: Optional[List[str]]) -> Optional[List[str]]:
+    """Return the files to check, or None if the git listing failed."""
     if filenames:
         candidates: List[str] = []
         for f in filenames:
@@ -132,17 +173,25 @@ def collect_files(rootdir: str, filenames: Optional[List[str]]) -> List[str]:
                 for root, _, names in os.walk(f):
                     for name in names:
                         candidates.append(os.path.join(root, name))
-    else:
-        candidates = list_git_files(rootdir)
+        return sorted(candidates)
 
-    return sorted(candidates)
+    files = list_git_files(rootdir)
+    if files is None:
+        return None
+    return sorted(files)
 
 
 def file_passes(
     filename: str,
     templates: Dict[str, List[str]],
+    new_file: bool = False,
 ) -> Tuple[bool, Optional[str]]:
-    """Check that filename starts with the expected boilerplate header."""
+    """Verify filename's boilerplate header.
+
+    Check 1 (all files): the header must equal the template after any
+      copyright year is normalized out.
+    Check 2 (new files): the header must be year-less.
+    """
     stem = template_stem_for(filename)
     if stem is None or stem not in templates:
         return True, None
@@ -170,20 +219,22 @@ def file_passes(
     lines = data.splitlines()
     header_lines = lines[: len(ref)]
 
-    # Policy: any file whose header already contains "Copyright YYYY"
-    # is accepted as-is. Those headers were reviewed when the file
-    # landed; re-validating them on every CI run adds little. Trade-off:
-    # a copy-paste with a different holder (e.g. "Copyright 2025 ACME")
-    # would slip through. New files must use the year-less template.
-    for line in header_lines:
-        if _RE_ANY_YEAR.search(line):
-            return True, None
-
     if len(lines) < len(ref):
         return False, "File is shorter than the expected boilerplate header"
 
-    if header_lines != ref:
+    # Check 1: the header must match the template once the copyright year is
+    # normalized out, so year-bearing and year-less headers both validate.
+    normalized = [_RE_YEAR_STRIP.sub(r"\1", line) for line in header_lines]
+    if normalized != ref:
         return False, "Header does not match the boilerplate template"
+
+    # Check 2: files added on this branch must not hardcode a copyright year.
+    if new_file and any(_RE_ANY_YEAR.search(line) for line in header_lines):
+        return (
+            False,
+            "New file must use the year-less header "
+            "(remove the hardcoded copyright year)",
+        )
 
     return True, None
 
@@ -227,6 +278,14 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Root directory to scan (default: auto-detect via git)",
     )
+    parser.add_argument(
+        "--base-ref",
+        default=os.environ.get("TARGET_BRANCH", "master"),
+        help=(
+            "Base branch for new-file detection (default: $TARGET_BRANCH or "
+            "master). Resolved as origin/<ref> then <ref>."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -243,10 +302,27 @@ def main() -> int:
         )
         return 1
 
+    files = collect_files(rootdir, args.filenames or None)
+    if files is None:
+        print("ERROR: could not list repository files via git.", file=sys.stderr)
+        return 1
+
+    base = base_tree_files(args.base_ref, rootdir)
+    if base is None:
+        print(
+            "ERROR: could not resolve a base ref for new-file detection "
+            f"(tried origin/{args.base_ref}, {args.base_ref}). Ensure the base "
+            "branch is fetched (actions/checkout fetch-depth: 0) or pass "
+            "--base-ref.",
+            file=sys.stderr,
+        )
+        return 1
+
     failed: List[Tuple[str, Optional[str]]] = []
-    for filepath in collect_files(rootdir, args.filenames or None):
+    for filepath in files:
         relpath = os.path.relpath(filepath, rootdir).replace(os.sep, "/")
-        passes, error = file_passes(filepath, templates)
+        new_file = relpath not in base
+        passes, error = file_passes(filepath, templates, new_file=new_file)
         if not passes:
             failed.append((relpath, error))
             print(relpath)  # stdout stays parseable
