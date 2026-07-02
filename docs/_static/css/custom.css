@@ -147,10 +147,10 @@ body {
 
 @media (max-width: 768px) {
     .top-nav-links {
-        display: none;
+        display: flex;
     }
-    .top-nav {
-        justify-content: center;
+    .top-nav-links a {
+        display: none !important;
     }
 }
 
