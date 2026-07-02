@@ -1,0 +1,129 @@
+#
+# Copyright 2025 The Kubeflow authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+suite: Test jax-distributed ClusterTrainingRuntime
+templates:
+  - templates/runtimes/jax-distributed.yaml
+release:
+  name: kubeflow-trainer
+  namespace: kubeflow-trainer
+tests:
+  - it: Should not render ClusterTrainingRuntime when runtimes.jaxDistributed.enabled is false
+    set:
+      runtimes:
+        jaxDistributed:
+          enabled: false
+          image:
+            registry: nvcr.io
+            repository: nvidia/jax
+            tag: "25.10-py3"
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: Should render ClusterTrainingRuntime when runtimes.jaxDistributed.enabled is true
+    set:
+      runtimes:
+        jaxDistributed:
+          enabled: true
+          image:
+            registry: nvcr.io
+            repository: nvidia/jax
+            tag: "25.10-py3"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ClusterTrainingRuntime
+      - equal:
+          path: metadata.name
+          value: jax-distributed
+
+  - it: Should have correct framework label
+    set:
+      runtimes:
+        jaxDistributed:
+          enabled: true
+          image:
+            registry: nvcr.io
+            repository: nvidia/jax
+            tag: "25.10-py3"
+    asserts:
+      - equal:
+          path: metadata.labels["trainer.kubeflow.org/framework"]
+          value: jax
+
+  - it: Should have correct mlPolicy configuration
+    set:
+      runtimes:
+        jaxDistributed:
+          enabled: true
+          image:
+            registry: nvcr.io
+            repository: nvidia/jax
+            tag: "25.10-py3"
+    asserts:
+      - equal:
+          path: spec.mlPolicy.numNodes
+          value: 1
+      - equal:
+          path: spec.mlPolicy.jax
+          value: {}
+
+  - it: Should use default JAX image
+    set:
+      runtimes:
+        jaxDistributed:
+          enabled: true
+          image:
+            registry: nvcr.io
+            repository: nvidia/jax
+            tag: "25.10-py3"
+    asserts:
+      - equal:
+          path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.containers[0].image
+          value: nvcr.io/nvidia/jax:25.10-py3
+
+  - it: Should use custom image tag when specified
+    set:
+      runtimes:
+        jaxDistributed:
+          enabled: true
+          image:
+            registry: nvcr.io
+            repository: nvidia/jax
+            tag: "25.01-py3"
+    asserts:
+      - equal:
+          path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.containers[0].image
+          value: nvcr.io/nvidia/jax:25.01-py3
+
+  - it: Should have node replicatedJob with correct container name
+    set:
+      runtimes:
+        jaxDistributed:
+          enabled: true
+          image:
+            registry: nvcr.io
+            repository: nvidia/jax
+            tag: "25.10-py3"
+    asserts:
+      - equal:
+          path: spec.template.spec.replicatedJobs[0].name
+          value: node
+      - equal:
+          path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.containers[0].name
+          value: node

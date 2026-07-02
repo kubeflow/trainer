@@ -51,6 +51,16 @@ manager:
   # -- Number of replicas of manager.
   replicas: 1
 
+  # -- Whether the manager pod should run with host networking.
+  # Useful on clusters where the API server cannot route to pod IPs
+  # (e.g. EKS with a non-VPC-routable CNI), so admission webhooks are reachable.
+  hostNetwork: false
+
+  # -- DNS policy for the manager pod.
+  # When `hostNetwork` is enabled this defaults to `ClusterFirstWithHostNet`
+  # so the pod retains in-cluster DNS resolution. Set explicitly to override.
+  dnsPolicy: ""
+
   # -- Selector labels for the manager Deployment and pods.
   # These labels are used for both `spec.selector.matchLabels` and `spec.template.metadata.labels`.
   # NOTE: Deployment selectors are immutable once created.
@@ -121,6 +131,9 @@ manager:
     webhook:
       port: 9443
       host: ""
+      # -- Service port for the webhook server. Kubernetes defaults to 443 when calling admission webhooks.
+      # Change this (along with the container port above) when using host networking to avoid conflicts.
+      servicePort: 443
     leaderElection:
       leaderElect: true
       resourceName: "trainer.kubeflow.org"
@@ -192,6 +205,13 @@ runtimes:
   torchDistributed:
     # -- Enable deployment of torch-distributed runtime
     enabled: false
+    image:
+      # -- PyTorch runtime image registry
+      registry: docker.io
+      # -- PyTorch runtime image repository
+      repository: pytorch/pytorch
+      # -- PyTorch runtime image tag. Defaults to chart version if empty.
+      tag: "2.10.0-cuda12.8-cudnn9-runtime"
 
   # -- DeepSpeed distributed training runtime
   deepspeedDistributed:
@@ -221,6 +241,13 @@ runtimes:
   jaxDistributed:
     # -- Enable deployment of jax-distributed runtime
     enabled: false
+    image:
+      # -- JAX runtime image registry
+      registry: nvcr.io
+      # -- JAX runtime image repository
+      repository: nvidia/jax
+      # -- JAX runtime image tag. Defaults to chart version if empty.
+      tag: "25.10-py3"
 
   # -- XGBoost distributed training runtime
   xgboostDistributed:

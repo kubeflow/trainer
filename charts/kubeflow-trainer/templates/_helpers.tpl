@@ -126,3 +126,11 @@ dev
 {{ printf "v%s" .Chart.Version }}
 {{- end -}}
 {{- end }}
+{{/*
+Extract the port number from a bind address string.
+Accepts either ":8081" or "0.0.0.0:8081" and returns "8081".
+Usage: include "trainer.portFromAddress" .Values.manager.config.metrics.bindAddress
+*/}}
+{{- define "trainer.portFromAddress" -}}
+{{- splitList ":" . | last -}}
+{{- end -}}
