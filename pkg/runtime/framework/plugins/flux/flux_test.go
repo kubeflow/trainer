@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -227,8 +228,9 @@ func TestFlux(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	cases := map[string]struct {
-		info   *runtime.Info
-		newObj *trainer.TrainJob
+		info      *runtime.Info
+		newObj    *trainer.TrainJob
+		wantError field.ErrorList
 	}{
 		"valid when flux policy is nil": {
 			info:   &runtime.Info{},
@@ -244,6 +246,76 @@ func TestValidate(t *testing.T) {
 			},
 			newObj: &trainer.TrainJob{},
 		},
+		"invalid when runtime policy numProcPerNode is less than one": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{
+							NumProcPerNode: ptr.To[int32](0),
+						},
+					},
+				},
+			},
+			newObj: &trainer.TrainJob{},
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("numProcPerNode"),
+					int32(0),
+					"must be greater than or equal to 1 for Flux TrainJob",
+				),
+			},
+		},
+		"invalid when trainJob numProcPerNode is less than one": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{
+							NumProcPerNode: ptr.To[int32](1),
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					NumProcPerNode(0).
+					Obj(),
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("numProcPerNode"),
+					int32(0),
+					"must be greater than or equal to 1 for Flux TrainJob",
+				),
+			},
+		},
+		"invalid when node podSet includes reserved flux installer init container": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name: constants.Node,
+							InitContainers: []runtime.Container{
+								{Name: constants.FluxInstallerContainerName},
+							},
+						},
+					},
+				},
+			},
+			newObj: &trainer.TrainJob{},
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec", "trainer", "initContainers"),
+					constants.FluxInstallerContainerName,
+					"InitContainer 'flux-installer' is reserved",
+				),
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -251,9 +323,9 @@ func TestValidate(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			p, _ := New(ctx, utiltesting.NewClientBuilder().Build(), nil, nil)
 
-			_, errs := p.(framework.CustomValidationPlugin).Validate(ctx, tc.info, nil, tc.newObj)
-			if len(errs) > 0 {
-				t.Errorf("Unexpected validation error: %v", errs)
+			_, gotError := p.(framework.CustomValidationPlugin).Validate(ctx, tc.info, nil, tc.newObj)
+			if diff := gocmp.Diff(tc.wantError, gotError); diff != "" {
+				t.Errorf("Unexpected validation errors (-want, +got): %s", diff)
 			}
 		})
 	}

@@ -41,6 +41,7 @@ const (
 	deepSpeedRuntime = "deepspeed-distributed"
 	jaxRuntime       = "jax-distributed"
 	xgboostRuntime   = "xgboost-distributed"
+	fluxRuntime      = "flux-distributed"
 )
 
 //go:embed testdata/status_update.py
@@ -293,6 +294,74 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 			})
 
 			// Wait for TrainJob to be in Succeeded status with all jobs succeeded.
+			ginkgo.By("Wait for TrainJob to be in Succeeded status with all jobs succeeded", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
+						{
+							Type:    trainer.TrainJobComplete,
+							Status:  metav1.ConditionTrue,
+							Reason:  jobsetconsts.AllJobsCompletedReason,
+							Message: jobsetconsts.AllJobsCompletedMessage,
+						},
+					}, util.IgnoreConditions))
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
+						{
+							Name:      constants.Node,
+							Ready:     ptr.To(int32(0)),
+							Succeeded: ptr.To(int32(1)),
+							Failed:    ptr.To(int32(0)),
+							Active:    ptr.To(int32(0)),
+							Suspended: ptr.To(int32(0)),
+						},
+					}, util.SortJobsStatus))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+		})
+	})
+
+	ginkgo.When("Creating TrainJob to perform Flux workload", func() {
+		ginkgo.It("should create TrainJob with Flux runtime reference", func() {
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-flux").
+				RuntimeRef(
+					trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind),
+					fluxRuntime,
+				).
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						Container(
+							"ubuntu:22.04",
+							[]string{"flux", "getattr", "rank"},
+							nil,
+							corev1.ResourceList{},
+						).
+						Obj(),
+				).
+				Obj()
+
+			ginkgo.By("Create a TrainJob with flux-distributed runtime reference", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Wait for TrainJob jobs to become active", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
+						{
+							Name:      constants.Node,
+							Ready:     ptr.To(int32(0)),
+							Succeeded: ptr.To(int32(0)),
+							Failed:    ptr.To(int32(0)),
+							Active:    ptr.To(int32(1)),
+							Suspended: ptr.To(int32(0)),
+						},
+					}, util.SortJobsStatus))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
 			ginkgo.By("Wait for TrainJob to be in Succeeded status with all jobs succeeded", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}

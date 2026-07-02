@@ -215,7 +215,11 @@ EOF
       print_cluster_info &&
       exit 1
   )
+echo "Installing Flux runtime for E2E"
+kubectl apply --server-side \
+  -f manifests/base/runtimes/flux_distributed.yaml
 
+kubectl get clustertrainingruntime flux-distributed
 elif [ "${INSTALL_METHOD}" = "helm" ]; then
   echo "Skipping Kustomize control plane deployment (Helm will handle control plane)"
   echo "Installing Kubeflow Trainer via Helm"
@@ -233,6 +237,17 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
     --set image.tag=${CI_IMAGE_TAG} \
     --set manager.config.featureGates.TrainJobStatus=true \
     --wait
+
+  echo "Installing Flux runtime for E2E"
+  kubectl apply --server-side \
+    -f manifests/base/runtimes/flux_distributed.yaml
+
+  echo "===== Installed ClusterTrainingRuntimes ====="
+  kubectl get clustertrainingruntimes
+
+  echo "===== Flux runtime ====="
+  kubectl get clustertrainingruntime flux-distributed -o yaml
+
 fi
 
 if [ "${CLUSTER_TYPE}" = "gpu" ]; then
