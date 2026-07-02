@@ -27,31 +27,14 @@ body {
    ============================================ */
 
 .announcement {
-    background: #2D3748 !important;
-    border-bottom: 1px solid #3a4560 !important;
+    background: var(--color-background-primary, #fff) !important;
+    border-bottom: 1px solid var(--color-background-border, #e2e8f0) !important;
     padding: 0 !important;
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
     z-index: 100 !important;
-}
-
-.top-nav-brand {
-    color: #e2e8f0 !important;
-}
-
-.top-nav-brand:hover {
-    color: #fff !important;
-}
-
-.top-nav-links a {
-    color: #cbd5e0 !important;
-}
-
-.top-nav-links a:hover {
-    color: #fff !important;
-    background: rgba(255,255,255,0.1);
 }
 
 .page {
@@ -89,13 +72,13 @@ body {
     align-items: center;
     gap: 0.5rem;
     text-decoration: none !important;
-    color: #e2e8f0 !important;
+    color: var(--color-foreground-primary, #1a202c) !important;
     font-weight: 600;
     font-size: 1.1rem;
 }
 
 .top-nav-brand:hover {
-    color: #fff !important;
+    color: var(--color-brand-primary, #4299e1) !important;
 }
 
 .top-nav-logo {
@@ -109,7 +92,7 @@ body {
 }
 
 .top-nav-links a {
-    color: #cbd5e0 !important;
+    color: var(--color-foreground-secondary, #2d3748) !important;
     text-decoration: none !important;
     padding: 0.4rem 0.75rem;
     border-radius: 4px;
@@ -118,8 +101,8 @@ body {
 }
 
 .top-nav-links a:hover {
-    color: #fff !important;
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-brand-primary, #4299e1) !important;
+    background: var(--color-background-hover, rgba(0, 0, 0, 0.04));
 }
 
 @media (max-width: 768px) {
@@ -1270,3 +1253,28 @@ body.is-landing .sidebar-toggle {
 .community-card:nth-child(2).animate-on-scroll { transition-delay: 0.05s; }
 .community-card:nth-child(3).animate-on-scroll { transition-delay: 0.1s; }
 .community-card:nth-child(4).animate-on-scroll { transition-delay: 0.15s; }
+
+/* ============================================
+   READTHEDOCS ADDONS OVERRIDES
+   ============================================ */
+
+/* Force-disable link preview tooltips and dotted underlines */
+div[data-linkpreview-href],
+readthedocs-linkpreviews {
+    display: none !important;
+}
+
+a.link-preview {
+    border-bottom: none !important;
+}
+
+/* EthicalAds: horizontal text ad at page bottom via footer block */
+.ethical-ads-footer {
+    margin: 2rem 0 0;
+    padding: 0.75rem 1rem;
+    width: 100%;
+    max-width: none;
+    border-top: 1px solid var(--color-foreground-border, #4a5568);
+    font-size: 0.85rem;
+    text-align: center;
+}

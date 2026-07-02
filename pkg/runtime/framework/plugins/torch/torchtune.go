@@ -142,19 +142,30 @@ func isLoraConfigEnabled(args []string) bool {
 	return false
 }
 
-// isUseQLoraFinetune checks if QLoRA fine-tuning should be used.
-func isUseQLoraFinetune(args []string) bool {
-	hasQuantizeBase := false
+// isBoolArgEnabled reports whether args contains a "key=value" entry whose key
+// matches configItem and whose value is a Python-style truthy boolean (e.g.
+// "model.quantize_base=True"). Entries with a falsy value such as
+// "model.quantize_base=False" are treated as disabled.
+func isBoolArgEnabled(args []string, configItem string) bool {
 	for _, arg := range args {
-		switch {
-		case strings.Contains(arg, constants.TorchTuneUseDora):
-			// If Dora is enabled, no need to continue
-			return false
-		case strings.Contains(arg, constants.TorchTuneQuantizeBase):
-			hasQuantizeBase = true
+		name, value, found := strings.Cut(arg, "=")
+		if !found {
+			continue
+		}
+		if strings.Contains(name, configItem) && strings.EqualFold(strings.TrimSpace(value), "true") {
+			return true
 		}
 	}
-	return hasQuantizeBase
+	return false
+}
+
+// isUseQLoraFinetune checks if QLoRA fine-tuning should be used.
+func isUseQLoraFinetune(args []string) bool {
+	// If DoRA is enabled, QLoRA is not used.
+	if isBoolArgEnabled(args, constants.TorchTuneUseDora) {
+		return false
+	}
+	return isBoolArgEnabled(args, constants.TorchTuneQuantizeBase)
 }
 
 // extractOverridesFromRuntime extracts overrides from the TorchTune Trainer Node.

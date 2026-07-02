@@ -99,3 +99,23 @@ Post the release announcement for the new Kubeflow Trainer release in:
 
 - [#kubeflow-trainer](https://cloud-native.slack.com/archives/C0742LDFZ4K) Slack channel
 - [`kubeflow-discuss`](https://groups.google.com/g/kubeflow-discuss) mailing list
+
+## Bump the Milestone Applier
+
+When a new minor release branch (`release-X.Y`) is cut, update the
+[`milestone_applier`](https://github.com/GoogleCloudPlatform/oss-test-infra/blob/master/prow/oss/plugins.yaml)
+configuration in the `GoogleCloudPlatform/oss-test-infra` repository so Prow keeps
+auto-applying the correct milestone to PRs on each branch. See [this PR example](https://github.com/GoogleCloudPlatform/oss-test-infra/pull/2587).
+
+1. Bump the `master` milestone to the next upcoming minor (e.g. `v2.2` -> `v2.3`).
+1. Add an entry pinning the newly created release branch to its milestone
+   (e.g. `release-2.2: v2.2`).
+
+```yaml
+milestone_applier:
+  kubeflow/trainer:
+    master: v2.3
+    release-2.2: v2.2
+    release-2.1: v2.1
+    release-2.0: v2.0
+```
