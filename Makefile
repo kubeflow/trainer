@@ -25,6 +25,9 @@ endif
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 REPO := github.com/kubeflow/trainer
 TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
+# Year-less copyright header prepended to generated manifests (controller-gen
+# emits none). Single source of truth shared with the boilerplate verifier.
+BOILERPLATE_HEADER := $(PROJECT_DIR)/hack/boilerplate/boilerplate.sh.txt
 # Location to install tool binaries
 LOCALBIN ?= $(PROJECT_DIR)/bin
 
@@ -169,6 +172,14 @@ manifests: controller-gen ## Generate manifests.
 		output:crd:artifacts:config=manifests/base/crds \
 		output:rbac:artifacts:config=manifests/base/rbac \
 		output:webhook:artifacts:config=manifests/base/webhook
+	@# controller-gen emits no license header. Prepend the year-less
+	@# boilerplate to each generated manifest. controller-gen rewrites these
+	@# files in full on every run, so prepending here once is idempotent.
+	@for f in manifests/base/crds/trainer.kubeflow.org_*.yaml \
+			manifests/base/rbac/role.yaml \
+			manifests/base/webhook/manifests.yaml; do \
+		{ cat $(BOILERPLATE_HEADER); echo; cat "$$f"; } > "$$f.tmp" && mv "$$f.tmp" "$$f"; \
+	done
 	cp -f manifests/base/crds/trainer.kubeflow.org_*.yaml $(TRAINER_CHART_DIR)/crds/
 
 .PHONY: generate
@@ -198,7 +209,7 @@ golangci-lint: golangci-lint-install golangci-lint-kal ## Run golangci-lint to v
 
 .PHONY: verify-boilerplate
 verify-boilerplate: ## Verify copyright boilerplate headers in source files.
-	python3 hack/boilerplate/boilerplate.py
+	python3 hack/boilerplate/boilerplate.py --base-ref "$(TARGET_BRANCH)"
 
 # Instructions to run tests.
 .PHONY: test
