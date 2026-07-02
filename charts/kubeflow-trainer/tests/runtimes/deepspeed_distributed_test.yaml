@@ -65,6 +65,9 @@ tests:
       - equal:
           path: metadata.labels["trainer.kubeflow.org/framework"]
           value: deepspeed
+      - equal:
+          path: metadata.labels["trainer.kubeflow.org/webhook-validation"]
+          value: disabled
 
   - it: Should have correct MPI mlPolicy configuration
     set:

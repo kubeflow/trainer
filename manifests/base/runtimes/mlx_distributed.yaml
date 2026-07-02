@@ -4,6 +4,7 @@ metadata:
   name: mlx-distributed
   labels:
     trainer.kubeflow.org/framework: mlx
+    trainer.kubeflow.org/webhook-validation: disabled
 spec:
   mlPolicy:
     numNodes: 1

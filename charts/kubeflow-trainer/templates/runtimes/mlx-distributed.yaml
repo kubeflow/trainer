@@ -21,6 +21,7 @@ metadata:
   name: mlx-distributed
   labels:
     trainer.kubeflow.org/framework: mlx
+    trainer.kubeflow.org/webhook-validation: disabled
     {{- include "trainer.labels" . | nindent 4 }}
 spec:
   mlPolicy:

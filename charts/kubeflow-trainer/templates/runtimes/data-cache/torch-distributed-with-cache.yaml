@@ -25,6 +25,7 @@ metadata:
   name: torch-distributed-with-cache
   labels:
     trainer.kubeflow.org/framework: torch
+    trainer.kubeflow.org/webhook-validation: disabled
     {{- include "trainer.labels" . | nindent 4 }}
 spec:
   mlPolicy:

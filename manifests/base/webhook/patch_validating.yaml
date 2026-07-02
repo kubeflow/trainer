@@ -10,3 +10,19 @@
 - op: replace
   path: /metadata/name
   value: validator.trainer.kubeflow.org
+- op: add
+  path: /webhooks/0/objectSelector
+  value:
+    matchExpressions:
+      - key: trainer.kubeflow.org/webhook-validation
+        operator: NotIn
+        values:
+          - disabled
+- op: add
+  path: /webhooks/1/objectSelector
+  value:
+    matchExpressions:
+      - key: trainer.kubeflow.org/webhook-validation
+        operator: NotIn
+        values:
+          - disabled

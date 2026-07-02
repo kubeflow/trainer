@@ -4,6 +4,7 @@ metadata:
   name: flux-runtime
   labels:
     trainer.kubeflow.org/framework: flux
+    trainer.kubeflow.org/webhook-validation: disabled
 spec:
   mlPolicy:
     numNodes: 1

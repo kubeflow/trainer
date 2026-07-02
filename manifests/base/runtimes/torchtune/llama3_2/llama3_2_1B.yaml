@@ -4,6 +4,7 @@ metadata:
   name: torchtune-llama3.2-1b
   labels:
     trainer.kubeflow.org/framework: torchtune
+    trainer.kubeflow.org/webhook-validation: disabled
 spec:
   mlPolicy:
     numNodes: 1

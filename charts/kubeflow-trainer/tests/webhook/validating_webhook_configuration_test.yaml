@@ -39,3 +39,26 @@ tests:
       - equal:
           path: webhooks[*].failurePolicy
           value: Ignore
+
+  - it: Should skip validation for runtimes labeled trainer.kubeflow.org/webhook-validation=disabled
+    asserts:
+      - equal:
+          path: webhooks[0].objectSelector.matchExpressions[0].key
+          value: trainer.kubeflow.org/webhook-validation
+      - equal:
+          path: webhooks[0].objectSelector.matchExpressions[0].operator
+          value: NotIn
+      - contains:
+          path: webhooks[0].objectSelector.matchExpressions[0].values
+          content: disabled
+      - equal:
+          path: webhooks[1].objectSelector.matchExpressions[0].key
+          value: trainer.kubeflow.org/webhook-validation
+      - equal:
+          path: webhooks[1].objectSelector.matchExpressions[0].operator
+          value: NotIn
+      - contains:
+          path: webhooks[1].objectSelector.matchExpressions[0].values
+          content: disabled
+      - notExists:
+          path: webhooks[2].objectSelector

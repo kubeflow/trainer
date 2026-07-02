@@ -4,6 +4,7 @@ metadata:
   name: xgboost-distributed
   labels:
     trainer.kubeflow.org/framework: xgboost
+    trainer.kubeflow.org/webhook-validation: disabled
 spec:
   mlPolicy:
     numNodes: 1

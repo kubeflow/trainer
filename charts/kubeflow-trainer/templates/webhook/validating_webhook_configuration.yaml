@@ -33,6 +33,12 @@ webhooks:
   {{- with .Values.webhook.failurePolicy }}
   failurePolicy: {{ . }}
   {{- end }}
+  objectSelector:
+    matchExpressions:
+    - key: trainer.kubeflow.org/webhook-validation
+      operator: NotIn
+      values:
+      - disabled
   rules:
   - apiGroups:
     - trainer.kubeflow.org
@@ -55,6 +61,12 @@ webhooks:
   {{- with .Values.webhook.failurePolicy }}
   failurePolicy: {{ . }}
   {{- end }}
+  objectSelector:
+    matchExpressions:
+    - key: trainer.kubeflow.org/webhook-validation
+      operator: NotIn
+      values:
+      - disabled
   rules:
   - apiGroups:
     - trainer.kubeflow.org

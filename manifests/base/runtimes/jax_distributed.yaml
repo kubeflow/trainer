@@ -4,6 +4,7 @@ metadata:
   name: jax-distributed
   labels:
     trainer.kubeflow.org/framework: jax
+    trainer.kubeflow.org/webhook-validation: disabled
 spec:
   mlPolicy:
     numNodes: 1

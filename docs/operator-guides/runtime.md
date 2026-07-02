@@ -128,6 +128,27 @@ BuiltinTrainers.
 
 Check [this guide](../user-guides/builtin-trainer/overview.md) to understand what is CustomTrainer and BuiltinTrainer.
 
+## Skipping Webhook Validation
+
+Kubeflow Trainer runs a validation webhook that verifies every `ClusterTrainingRuntime` and
+`TrainingRuntime` when it is created or updated. The built-in runtimes maintained by the Kubeflow
+community are validated ahead of time, so they carry the following label to skip this webhook:
+
+```yaml
+trainer.kubeflow.org/webhook-validation: disabled
+```
+
+This allows the runtimes to be deployed before the webhook server is ready, for example
+during a single-step `helm install` where the CRDs, control plane, and runtimes are applied
+together.
+
+:::{warning}
+This label opts the runtime out of webhook validation entirely, even after the webhook server is
+ready. It is intended only for trusted runtimes that are shipped and validated by the Kubeflow
+community. Runtimes that you create or modify should omit this label so that they are always
+validated.
+:::
+
 ## Supported Runtimes
 
 Kubeflow Trainer community maintains
@@ -137,20 +158,20 @@ platform administrators to extend these runtimes to fit their specific requireme
 
 The following runtimes are supported for CustomTrainer:
 
-| Runtime Name | ML Framework |
+| Runtime Name          | ML Framework                                                  |
 | --------------------- | ------------------------------------------------------------- |
-| torch-distributed | [PyTorch](https://docs.pytorch.org/docs/stable/index.html) |
-| deepspeed-distributed | [DeepSpeed](https://www.deepspeed.ai/) |
-| jax-distributed | [JAX](https://jax.readthedocs.io/) |
-| mlx-distributed | [MLX](https://ml-explore.github.io/mlx/build/html/index.html) |
-| xgboost-distributed | [XGBoost](https://xgboost.readthedocs.io/) |
+| torch-distributed     | [PyTorch](https://docs.pytorch.org/docs/stable/index.html)    |
+| deepspeed-distributed | [DeepSpeed](https://www.deepspeed.ai/)                        |
+| jax-distributed       | [JAX](https://jax.readthedocs.io/)                            |
+| mlx-distributed       | [MLX](https://ml-explore.github.io/mlx/build/html/index.html) |
+| xgboost-distributed   | [XGBoost](https://xgboost.readthedocs.io/)                    |
 
 The following runtimes are supported for TorchTune BuiltinTrainer:
 
-| Runtime Name | Pre-trained LLM |
-| --------------------- | --------------- |
-| torchtune-llama3.2-1b | Llama 3.2 (1B) |
-| torchtune-llama3.2-3b | Llama 3.2 (3B) |
+| Runtime Name           | Pre-trained LLM |
+| ---------------------- | --------------- |
+| torchtune-llama3.2-1b  | Llama 3.2 (1B)  |
+| torchtune-llama3.2-3b  | Llama 3.2 (3B)  |
 | torchtune-qwen2.5-1.5b | Qwen 2.5 (1.5B) |
 
 ### Runtime Deprecation Policy

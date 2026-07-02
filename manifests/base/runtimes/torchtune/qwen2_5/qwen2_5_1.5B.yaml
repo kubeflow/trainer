@@ -4,6 +4,7 @@ metadata:
   name: torchtune-qwen2.5-1.5b
   labels:
     trainer.kubeflow.org/framework: torchtune
+    trainer.kubeflow.org/webhook-validation: disabled
 spec:
   mlPolicy:
     numNodes: 1
