@@ -235,6 +235,10 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
     --wait
 fi
 
+echo "Installing Flux runtime for E2E"
+kubectl apply --server-side \
+  -f examples/flux/flux-runtime.yaml
+
 if [ "${CLUSTER_TYPE}" = "gpu" ]; then
   # hotfix: patch CRDs to run on GPU nodes (Check #3067)
   echo "Patch CRDs to run on GPU nodes"

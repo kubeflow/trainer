@@ -20,7 +20,7 @@ metadata:
 spec:
   # Reference the pre-defined runtime by name
   runtimeRef:
-    name: flux-runtime
+    name: flux-distributed
   trainer:
     numNodes: 2
     numProcPerNode: 1
