@@ -88,6 +88,7 @@ body {
 
 .top-nav-links {
     display: flex;
+    align-items: center;
     gap: 0.5rem;
 }
 
@@ -103,6 +104,45 @@ body {
 .top-nav-links a:hover {
     color: var(--color-brand-primary, #4299e1) !important;
     background: var(--color-background-hover, rgba(0, 0, 0, 0.04));
+}
+
+/* Light/dark/auto mode toggle button */
+.top-nav-theme-toggle {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-left: 0.5rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-foreground-secondary, #2d3748) !important;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.top-nav-theme-toggle:hover {
+    color: var(--color-brand-primary, #4299e1) !important;
+    background: var(--color-background-hover, rgba(0, 0, 0, 0.04));
+}
+
+.top-nav-theme-toggle svg {
+    color: var(--color-foreground-secondary, #2d3748) !important;
+    width: 16px !important;
+    height: 16px !important;
+}
+
+/* Hide Furo's built-in theme toggle since we have the top-nav theme toggle */
+.theme-toggle-container,
+.theme-toggle-content,
+.theme-toggle:not(.top-nav-theme-toggle) {
+    display: none !important;
+}
+
+.top-nav-theme-toggle:hover svg {
+    color: var(--color-brand-primary, #4299e1) !important;
 }
 
 @media (max-width: 768px) {
@@ -584,9 +624,6 @@ body:has(.landing-page) .bottom-of-page {
 }
 
 body:has(.landing-page) .content-icon-container,
-body:has(.landing-page) .theme-toggle-container,
-body:has(.landing-page) .theme-toggle-content,
-body:has(.landing-page) .theme-toggle,
 body:has(.landing-page) .related-pages,
 body:has(.landing-page) .nav-overlay-icon,
 body:has(.landing-page) .sidebar-toggle {
@@ -619,6 +656,35 @@ body:has(.landing-page) .article-container {
     color: var(--lp-text);
     line-height: 1.6;
     background: #1a1c24;
+}
+
+/* Light Mode */
+body[data-theme="light"] .landing-page {
+    --lp-blue: #3182ce;
+    --lp-blue-deep: #1a3a6b;
+    --lp-blue-glow: #4299e1;
+    --lp-navy: #0c1b33;
+    --lp-surface: #ffffff;
+    --lp-surface-alt: #f7fafc;
+    --lp-text: #1a202c;
+    --lp-text-muted: #4a5568;
+    --lp-border: #e2e8f0;
+    background: #ffffff;
+}
+
+@media not (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]) .landing-page {
+        --lp-blue: #3182ce;
+        --lp-blue-deep: #1a3a6b;
+        --lp-blue-glow: #4299e1;
+        --lp-navy: #0c1b33;
+        --lp-surface: #ffffff;
+        --lp-surface-alt: #f7fafc;
+        --lp-text: #1a202c;
+        --lp-text-muted: #4a5568;
+        --lp-border: #e2e8f0;
+        background: #ffffff;
+    }
 }
 
 .landing-page .section-title {
@@ -1219,9 +1285,6 @@ body.is-landing .bottom-of-page {
 }
 
 body.is-landing .content-icon-container,
-body.is-landing .theme-toggle-container,
-body.is-landing .theme-toggle-content,
-body.is-landing .theme-toggle,
 body.is-landing .related-pages,
 body.is-landing .nav-overlay-icon,
 body.is-landing .sidebar-toggle {
