@@ -36,7 +36,7 @@ ENV PATH=$HOME/.local/bin:$PATH
 
 COPY cmd/runtimes/deepspeed/requirements.txt .
 RUN pip install --upgrade pip
-RUN pip install --user -r requirements.txt
+RUN python -m pip install --retries 5 --timeout 120 --user -r requirements.txt
 
 # Give mpiuser permission to download packages and HF models.
 # .cache directory is used by ML frameworks to download models.
