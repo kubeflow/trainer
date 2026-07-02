@@ -33,14 +33,18 @@ from typing import Dict, List, Optional, Tuple
 
 # Maps file extension (or special basename) to the boilerplate template
 # stem on disk (boilerplate.<stem>.txt). One template is reused across
-# all hash-comment languages.
+# all hash-comment languages (sh, bash, py, Dockerfile, yaml, yml).
 EXTENSION_TEMPLATES = {
     "go": "go",
+    "helm": "helm",
+    "gotmpl": "helm",
     "rs": "rs",
     "sh": "sh",
     "bash": "sh",
     "py": "sh",
     "Dockerfile": "sh",
+    "yaml": "sh",
+    "yml": "sh",
 }
 
 # Template used for code-generated Go files (DO NOT EDIT). Loaded from
@@ -52,6 +56,7 @@ _RE_ANY_YEAR = re.compile(r"Copyright \d{4} ")
 _RE_GO_BUILD_CONSTRAINTS = re.compile(r"^(//(go:build| \+build).*\n)+\n", re.MULTILINE)
 _RE_SHEBANG = re.compile(r"^(#!.*\n)\n*")
 _RE_GENERATED = re.compile(r"DO NOT EDIT", re.MULTILINE)
+_RE_HELM_TEMPLATE = re.compile(r"(?:^|/)charts/[^/]+/templates/.*\.(?:ya?ml|tpl)$")
 
 
 def find_root_dir() -> str:
@@ -80,6 +85,9 @@ def load_templates(boilerplate_dir: str) -> Dict[str, List[str]]:
 
 def template_stem_for(filename: str) -> Optional[str]:
     """Return the template stem for filename, or None to skip."""
+    normalized = filename.replace(os.sep, "/")
+    if _RE_HELM_TEMPLATE.search(normalized):
+        return "helm"
     basename = os.path.basename(filename)
     if basename == "Dockerfile" or basename.startswith("Dockerfile."):
         return EXTENSION_TEMPLATES.get("Dockerfile")
