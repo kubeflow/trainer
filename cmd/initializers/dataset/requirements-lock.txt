@@ -42,7 +42,7 @@ httpcore==1.0.9
     # via httpx
 httpx==0.28.1
     # via huggingface-hub
-huggingface-hub==1.14.0
+huggingface-hub==1.22.0
     # via -r cmd/initializers/dataset/requirements.txt
 idna==3.18
     # via
