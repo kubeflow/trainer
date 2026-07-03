@@ -35,7 +35,7 @@ the TrainJob.
 
 At a high level:
 1. Kubeflow Trainer owns the protocol for mutating the TrainJob (admission gating,
-   API, guardrails, etc.)
+   API, limited observability via conditions, etc.)
 2. Plugin external controllers own the logic for generating the resource
    configurations.
 
@@ -49,7 +49,7 @@ demonstrate the interest in a KEP within the wider Kubeflow community.
 [experience reports]: https://github.com/golang/go/wiki/ExperienceReports
 -->
 
-Resource configuration of TrainJobs is not a minor detail. It is a manual decision
+Resource configuration of TrainJobs is not a minor task. It is a manual decision
 that directly affects queueing time, cost, and success rate. ML practitioners guess
 GPU count and memory headroom following the recommendations of platform teams, but
 these recommendations can go stale. The problem is exacerbated in multi-tenant
@@ -63,20 +63,15 @@ There are two undesired scenarios:
   make the platform feel slower and more expensive than necessary.
 
 Intuitively, Kubernetes can schedule what the user asks for, but it cannot help the
-user size their jobs. Vertical and horizontal pod autoscaling don't address this
-scenario out of the box because they mutate only the resource requirement fields of
-downstream Pod objects but not the TrainJob object that we want to right-size. What
-they are missing is the ability to mutate the TrainJob object itself to ensure
-proper integration with frameworks like Kueue, as well as update fields that depend
-on the resource requirements. For example, `accelerate launch` has command line
-arguments that specify the number of processes to use which typically map to the
-number of GPUs.
+user size their jobs. Fortunately, it is possible to implement methods that
+automatically decide the resource requirements of jobs. For example, there are 
+machine-learning based resource recommenders employing techniques that leverage 
+the characteristics of a TrainJob or even the state of the cluster to automatically
+decide the number of GPUs required for tasks like fine-tuning.
 
-Fortunately, it is possible to leverage the characteristics of a TrainJob or even
-the state of the cluster to automate the resource configuration of a TrainJob. As
-such, this KEP proposes the use of external Kubernetes controllers acting as
-plugins that produce resource recommendations while Kubeflow Trainer orchestrates
-applying these recommendations to TrainJob objects safely.
+This KEP introduces the use of external Kubernetes controllers acting as plugins 
+that produce resource recommendations while Kubeflow Trainer orchestrates applying 
+these recommendations to TrainJob objects safely.
 
 
 ### Goals
@@ -87,17 +82,9 @@ know that this has succeeded?
 -->
 
 - Automatically configure TrainJob resources before the job is eligible for admission:
-  initially once, right after creation. Starting with GPU, CPU, memory, and the number
-  of node replicas.
-- Enforce guardrails to the operations of plugins: timeouts, quota caps, fallback
-  strategies, etc.
-- Allow plugins to set TrainJob parameters that depend on resources:
-  e.g., accelerate/torchrun derived flags.
-- Integrate with Kueue so that the job is not eligible for Kueue's admission
-  flow while it is being auto-configured.
-- Support a catalog of plugins: platform engineers can enable/disable
-  plugins per namespace and users can pick the one they'd like to use for their TrainJob.
-- Provide observability: events and TrainJob status fields reflecting plugin activity.
+  initially once, right after creation. Starting with `spec.trainer.numNodes`.
+- Support a catalog of plugins: platform engineers can enable/disable plugins per 
+  namespace enabling users to pick the one they wish to use for their TrainJob.
 
 ### Non-Goals
 
@@ -112,7 +99,12 @@ and make progress.
   running: this is useful but more complex. It could be future work.
 - Implement a GUI for the catalog: users can discover available plugins using
   kubectl, so we need not complicate things now.
-- Support TrainJobs that use DRAs: It could be future work.
+- Integrate with the [`AdmissionGatedBy`](https://kueue.sigs.k8s.io/docs/reference/labels-and-annotations/#kueuex-k8sioadmission-gated-by)
+  feature in Kueue. This is future work.
+- Support TrainJobs that use DRAs: This is future work.
+- Support modifying the per-node resources. This is future work.
+- Provide ample observability signals (status updates, events, etc). This is future work.
+- Provide guardrails e.g. time out and fallback strategies. This is future work.
 
 ## Proposal
 
@@ -126,20 +118,17 @@ nitty-gritty.
 -->
 
 Kubeflow Trainer implements the protocol that external controllers acting as plugins
-use to mutate the resource requirements of TrainJobs that opt into this process.
+use to mutate the `spec.trainer.numNodes` field of TrainJobs that opt into this process.
 
 TrainJobs that do not opt into automatic resource mutation are treated by Kubeflow
 Trainer as usual.
 
-The protocol for TrainJobs that opt into automatic resource mutation consists of 4 steps:
-1. Kubeflow Trainer gates the admission/scheduling of the TrainJob while the plugin
-   is working on mutating the resource requirements of the TrainJob.
-2. The plugin that the TrainJob opts into updates the resource requirements of the TrainJob
-   as well as other fields that depend on the resource requirements (e.g., cmdline args, etc.).
-3. Kubeflow Trainer applies guardrails on the patch from the plugin and emits
-   observability events and status updates.
-4. Kubeflow Trainer un-gates the TrainJob so that the underlying Kubernetes objects are
-   eventually scheduled.
+At a high level, everything related to deciding and patching the resources of Jobs is 
+the responsibility of the external Kubernetes Controller that acts as the autoconf-plugin.
+Everything related to gating/ungating the execution of the TrainJob is left to Kubeflow 
+Trainer.
+
+
 
 ### User Stories (Optional)
 
@@ -155,24 +144,31 @@ bogged down.
 As a TrainJob user fine-tuning models on my organization's multi-tenant Kubernetes cluster,
 I want to delegate the configuration of my TrainJob's resource requirements to an AI agent.
 The platform engineers managing my cluster have already deployed a Kubernetes controller
-which has the id `ai-agent-recommender`.
+wrapping the autoconf-plugin with the id `ai-agent-recommender`.
 
 It is an AI agent powered resource recommender for TrainJobs. The platform engineers 
 provided the AI agent with Model Context Protocol (MCP) tools that can interact with
 the cluster to get more information about it (e.g. the available GPUs, the running
 workloads, etc).
 
-I write my TrainJob like I usually do and simply add the following annotation to it:
+I write my TrainJob like I usually do except for 2 changes:
+
+- I include the `trainer.kubeflow.org/autoconf-plugin` annotation pointing to the autoconf-plugin I want to use
+- I start the job suspended
 
 ```yaml
+...
 metadata:
   annotations:
     trainer.kubeflow.org/autoconf-plugin: ai-agent-recommender
+  ...
+spec:
+  ...
+  suspend: true
 ```
 
 Soon after the TrainJob is submitted, the AI agent uses the Kubeflow API to patch my
-TrainJob's resource requirements and fields that depend on them. I can use
-`kubectl describe trainjob my-trainjob` to see the changes that the agent made.
+TrainJob's `spec.trainer.numNodes` field. Eventually the job gets unsuspended.
 
 
 ### Notes/Constraints/Caveats (Optional)
@@ -184,15 +180,15 @@ Go into as much detail as necessary here.
 This might be a good place to talk about core concepts and how they relate.
 -->
 
-1. Mutating the resources may require changing command-line arguments e.g.
-   the number of processes for `accelerate launch` or `torchrun`.
-2. The API that a plugin uses must enable associating the changes to the plugin: we
-   can use the `spec.runtimePatches` API from KEP-2170; it requires extending it to
-   support mutating the CLI args and the resource requirements.
-3. JobSet objects do not support mutating resource requirements.
-   We should either not create a JobSet until the plugin controller has finished patching
-   the TrainJob, or we should delete and recreate the JobSet after the plugin
-   has finished patching the TrainJob.
+1. Mutating `spec.trainer.numNodes` requires lifting the immutability constraint of
+  [`spec.trainer` field](https://github.com/kubeflow/trainer/blob/a433daeee5697bfacdbfa0451a042911fbeb4874/pkg/apis/trainer/v1alpha1/trainjob_types.go#L113-L116)
+  
+2. The resource requirements of JobSets are immutable, including the fields that `spec.trainer.numNodes` sets i.e.
+  `spec.replicatedJobs[].template.spec.parallelism` and `spec.replicatedJobs[].template.spec.completions`.
+  We could either not create a JobSet until the plugin controller has finished patching the TrainJob, 
+  or we delete and recreate the JobSet after the plugin is done patching the TrainJob.
+  In this KEP we are opting for the delete and recreation approach.
+  
 
 
 ### Risks and Mitigations
@@ -206,15 +202,13 @@ How will UX be reviewed, and by whom?
 Consider including folks who also work outside the SIG or subproject.
 -->
 
-1. Kueue supports an alpha feature for gating the admission of jobs called [AdmissionGatedBy](https://kueue.sigs.k8s.io/docs/reference/labels-and-annotations/#kueuex-k8sioadmission-gated-by).
-   AdmissionGatedBy is behind a feature gate and is off by default. Thus, Trainer cannot
-   guarantee that Kueue will respect the `kueue.x-k8s.io/admission-gated-by` annotation.
-   This means that there is a chance for Kueue to admit a TrainJob before a plugin has
-   finished patching the TrainJob. To mitigate this risk, Kubeflow Trainer should not 
-   un-suspend the JobSet object before the plugin has finished patching the associated TrainJob.
+1. On clusters where Kueue is configured to manage the Trainjob object, Kueue injects the
+   `kueue.x-k8s.io/queue-name` label to the TrainJob objects it manages. In these cases
+   Kubeflow trainer should not un-suspend the TrainJob at all leaving that decision to Kueue.
+   For MultiKueue TrainJobs, Kueue sets `spec.managedBy="kueue.x-k8s.io/multikueue"`.
 2. There could be other systems like Volcano managing the TrainJob. The proposal will still
-   function properly because Trainer will not un-suspend the JobSet object until it is
-   ready to be scheduled.
+   function properly because Trainer will not un-suspend the TrainJob object until it is
+   ready to be considered a candidate for scheduling.
 3. There is a chance that while the TrainJob is being patched by the plugin, Kueue, Volcano,
    or an equivalent framework preempts a different running workload to make room for the
    new TrainJob based on the original resource requirements of the job, which the plugin
@@ -223,6 +217,13 @@ Consider including folks who also work outside the SIG or subproject.
    would have happened anyway. In fact, an intelligent plugin controller could detect
    that the capacity of the cluster is not enough for a TrainJob and size the TrainJob
    in a way that avoids preempting other workloads.
+    1. Kueue supports temporarily pausing the admission checks for managed jobs 
+       via the [`AdmissionGatedBy`](https://kueue.sigs.k8s.io/docs/reference/labels-and-annotations/#kueuex-k8sioadmission-gated-by)
+       feature. In a future update of this KEP we could instruct users to include 
+       the `AdmissionGatedBy` annotation on creation or even have the Kueue webhook
+       auto-inject it when it detects the presence of the `trainer.kubeflow.org/autoconf-plugin` 
+       annotation. Kubeflow Trainer would then remove the `AdmissionGatedBy` annotation
+       after the autoconf-plugin declares that it has finished patching the TrainJob.
 
 ## Design Details
 
@@ -233,7 +234,47 @@ required) or even code snippets. If there's any ambiguity about HOW your
 proposal will be implemented, this is the place to discuss them.
 -->
 
-TBD
+We forbid the mutation of all fields under `spec.trainer` in a TrainJob except for
+`spec.trainer.numNodes`.
+
+The protocol for TrainJobs that opt into automatic resource mutation consists of the following rules.
+
+### Rules that the user follows
+
+1. TrainJobs that opt-into automatic resource mutation by an `autoconf-plugin` Kubernetes Controller
+   must be created with `spec.suspend=True` and with the `trainer.kubeflow.org/autoconf-plugin=${plugin-id}`
+   annotation. The webhook rejects TrainJobs that carry the annotation but are not
+   created in suspended state.
+
+### Rules that Kubeflow Trainer follows
+
+1. The webhook forbids the creation of `TrainJobs` that contain the annotation 
+   `trainer.kubeflow.org/autoconf-plugin=${plugin-id}` and are not suspended.
+2. Upon reconciliation of a `TrainJob` containing the annotation `trainer.kubeflow.org/autoconf-plugin=${plugin-id}`
+   if the TrainJob does not have the `AutoConfPending` condition, Trainer injects the 
+   condition to the TrainJob.
+3. Upon reconciliation of a `TrainJob` which has the `trainer.kubeflow.org/autoconf-plugin-done=yes`
+   annotation and the condition `AutoConfPending`, Trainer builds the following patch and then applies it:
+   1. Removes the `AutoConfPending` condition
+   2. Inserts the `AutoConfDone` condition
+   3. If the TrainJob does not have a non-empty `kueue.x-k8s.io/queue-name` label AND 
+      the field `spec.managedBy="trainer.kubeflow.org/trainjob-controller"` then 
+      Kubeflow Trainer also sets `spec.suspend=False`
+   4. If the JobSet object exists, and  `spec.replicatedJobs[].template.spec.parallelism`
+      differs from `spec.trainer.numNodes`, then Trainer deletes the JobSet object.
+      1. The next reconciliation iteration will create the JobSet using the updated 
+      `spec.trainer.numNodes` field
+      
+
+### Rules that Kubernetes Controllers operating as autoconf-plugin follow
+
+1. Look for suspended TrainJobs that contain the `trainer.kubeflow.org/autoconf-plugin=${plugin-id}`
+    annotation which is matching the id of the autoconf-plugin.
+2. If the autoconf-plugin can decide the number of nodes that the TrainJob needs, it 
+    should set the `spec.trainer.numNodes`
+3. When the plugin is done patching a TrainJob, it sets the annotation 
+    `trainer.kubeflow.org/autoconf-plugin-done=yes`. 
+4. Must not un-suspend the TrainJob. The autoconf-plugin does not manage the `spec.suspend` field.
 
 ### Test Plan
 
@@ -288,6 +329,19 @@ Describe what tests will be added to ensure proper quality of the enhancement.
 After the implementation PR is merged, add the names of the tests here.
 -->
 
+- TrainJob created with autoconf annotation but `spec.suspend=false` is rejected by
+  the webhook.
+- TrainJob created with autoconf annotation and `spec.suspend=true` gets
+  the `AutoConfPending` condition set; the JobSet is created.
+- For a TrainJob without a queue-name label and with a default `spec.managedBy`.
+  After the plugin patches `spec.trainer.numNodes` and sets the autoconf-done annotation, 
+  Trainer transitions to `AutoConfDone`, deletes any existing JobSet, and on the next 
+  reconciliation creates a new JobSet reflecting the updated node count; with no Kueue 
+  label and `spec.suspend` is set to `false`.
+- Same as above but with a non-empty `kueue.x-k8s.io/queue-name` label: Trainer completes
+  the transition but still with `spec.suspend=true`.
+- Same as above but with `spec.managedBy="kueue.x-k8s.io/multikueue"`
+
 ### Graduation Criteria
 
 <!--
@@ -320,6 +374,7 @@ Major milestones might include:
 -->
 
 - 2026-05-28: KEP Creation
+- 2026-07-01: Reduce scope to just enabling resource recommenders to set the number of nodes
 
 ## Drawbacks
 
@@ -328,8 +383,7 @@ Why should this KEP _not_ be implemented?
 -->
 
 The main disadvantage of this approach is that it requires introducing a different code
-path for TrainJobs. It also requires updating the Trainer API to account for changes
-to the resource requirements of TrainJobs as well as CLI args.
+path for TrainJobs.
 
 ## Alternatives
 
@@ -343,13 +397,12 @@ information to express the idea and why it was not acceptable.
 
 - **Pros:**
   - **Extensible**: platform engineers can develop and deploy custom plugins without modifying Kubeflow Trainer.
-  - **Safe**: Trainer enforces guardrails (timeouts, quota caps) on plugin operations.
-  - **Observable**: `spec.runtimePatches` shows the exact fields that the plugin is mutating,
-    events and status updates offer an additional layer of visibility into the plugin's actions.
 - **Cons:**
+  - **Reduced potential**: This first phase of the protocol sacrifices powerful features (guardrails, 
+     observability, configuration of number of GPUs and other resources) for simplicity.
   - **Adds complexity**: requires gating/un-gating mechanism in Trainer to coordinate with admission/scheduling
     frameworks like Kueue and Kubernetes.
-  - **API extension needed**: requires extending `spec.runtimePatches` to support resource and CLI arg mutations.
+  - **API extension needed**: requires extending `spec.trainer` API to support mutating `spec.trainer.numNodes`.
 
 ### Bake recommenders into Kubeflow Trainer
 
