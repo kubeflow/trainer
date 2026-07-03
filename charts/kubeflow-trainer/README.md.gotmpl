@@ -31,22 +31,30 @@ This chart bootstraps a [Kubernetes Trainer]({{template "chart.homepage" . }}) d
 ## Prerequisites
 
 - Helm >= 3
-- Kubernetes >= 1.29
+- Kubernetes >= 1.31
 
 ## Usage
 
 ### Install the Helm Chart
 
-Install the released version (e.g. 2.1.0):
+Install the released version:
 
 ```bash
-helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version 2.1.0
+export VERSION=v2.1.0
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+    --namespace kubeflow-system \
+    --create-namespace \
+    --version ${VERSION#v}
 ```
 
-Alternatively, you can install the latest version from the master branch (e.g. `bfccb7b` commit):
+For the latest changes run
+([where `48e7a93`](https://github.com/kubeflow/trainer/commit/48e7a93) is the desired commit):
 
 ```bash
-helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version 0.0.0-sha-bfccb7b
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+    --namespace kubeflow-system \
+    --create-namespace \
+    --version 0.0.0-sha-48e7a93
 ```
 
 > [!NOTE]
@@ -56,61 +64,25 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --v
 
 ### Install with ClusterTrainingRuntimes
 
-You can optionally deploy ClusterTrainingRuntimes as part of the Helm installation. Runtimes are disabled by default to keep the chart lightweight.
-
-To enable all default runtimes (torch, deepspeed, mlx, torchtune):
+You can also deploy the default ClusterTrainingRuntimes after installing the control plane with the
+following command:
 
 ```bash
-helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
-  --version 2.1.0 \
-  --set runtimes.defaultEnabled=true
+helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+    --namespace kubeflow-system \
+    --set runtimes.defaultEnabled=true \
+    --version ${VERSION#v}
 ```
 
 To enable specific runtimes:
 
 ```bash
-helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
-  --version 2.1.0 \
-  --set runtimes.torchDistributed.enabled=true \
-  --set runtimes.deepspeedDistributed.enabled=true
+helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+    --namespace kubeflow-system \
+    --version ${VERSION#v} \
+    --set runtimes.torchDistributed.enabled=true \
+    --set runtimes.deepspeedDistributed.enabled=true
 ```
-
-Or use a custom values file:
-
-```yaml
-# values.yaml
-runtimes:
-  torchDistributed:
-    enabled: true
-  deepspeedDistributed:
-    enabled: true
-  mlxDistributed:
-    enabled: true
-
-# For torch-distributed-with-cache, enable both dataCache.enabled and dataCache.runtimes.torchDistributed.enabled
-dataCache:
-  enabled: true
-  cacheImage:
-    tag: "v2.0.0"
-  runtimes:
-    torchDistributedWithCache:
-      enabled: true
-```
-
-Then install with:
-
-```bash
-helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
-  --version 2.1.0 \
-  -f values.yaml
-```
-
-### Available Runtimes
-
-- **torch-distributed**: PyTorch distributed training (no custom images)
-- **torch-distributed-with-cache**: PyTorch with distributed data cache support (requires `dataCache.enabled=true`)
-- **deepspeed-distributed**: DeepSpeed distributed training with MPI
-- **mlx-distributed**: MLX distributed training with MPI
 
 ### Uninstall the chart
 

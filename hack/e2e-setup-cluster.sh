@@ -243,13 +243,17 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
   helm install trainer charts/kubeflow-trainer \
     --namespace ${NAMESPACE} \
     --create-namespace \
-    --set runtimes.defaultEnabled=true \
-    --set runtimes.xgboostDistributed.image.tag=${CI_IMAGE_TAG} \
-    --set runtimes.mlxDistributed.image.tag=${CI_IMAGE_TAG} \
-    --set runtimes.deepspeedDistributed.image.tag=${CI_IMAGE_TAG} \
     --set image.tag=${CI_IMAGE_TAG} \
     --set manager.config.featureGates.TrainJobStatus=true \
     --wait
+
+  # Install Trainer runtimes
+  helm upgrade trainer charts/kubeflow-trainer \
+    --namespace ${NAMESPACE} \
+    --set runtimes.defaultEnabled=true \
+    --set runtimes.xgboostDistributed.image.tag=${CI_IMAGE_TAG} \
+    --set runtimes.mlxDistributed.image.tag=${CI_IMAGE_TAG} \
+    --set runtimes.deepspeedDistributed.image.tag=${CI_IMAGE_TAG}
 fi
 
 echo "Installing Flux runtime for E2E"
