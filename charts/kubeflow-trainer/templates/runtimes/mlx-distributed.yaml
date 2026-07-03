@@ -39,19 +39,6 @@ spec:
         targetReplicatedJobs:
           - launcher
       replicatedJobs:
-        - name: launcher
-          template:
-            metadata:
-              labels:
-                trainer.kubeflow.org/trainjob-ancestor-step: trainer
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: node
-                      image: {{ include "trainer.runtimeImage" (list .Values.runtimes.mlxDistributed.image .) }}
-                      securityContext:
-                        runAsUser: 1000
         - name: node
           template:
             spec:
@@ -72,4 +59,21 @@ spec:
                         tcpSocket:
                           port: 2222
                         initialDelaySeconds: 5
+
+        - name: launcher
+          dependsOn:
+            - name: node
+              status: Ready
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: {{ include "trainer.runtimeImage" (list .Values.runtimes.mlxDistributed.image .) }}
+                      securityContext:
+                        runAsUser: 1000
 {{- end }}
