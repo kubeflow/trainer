@@ -132,9 +132,11 @@ manager:
         trainingRuntime: 1
         clusterTrainingRuntime: 1
     certManagement:
+      # -- Enable automatic TLS certificate management.
       enable: true
-      # serviceName and secretName are auto-generated if not specified
+      # -- Service name for TLS certificate DNS SAN. Defaults to controller manager service name if empty.
       serviceName: ""
+      # -- Secret name for storing TLS certificates. Defaults to "kubeflow-trainer-webhook-cert" if empty.
       secretName: ""
     clientConnection:
       # -- QPS rate limit for the manager's Kubernetes API client. Accepts fractional values (e.g. 0.5).
