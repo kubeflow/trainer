@@ -26,7 +26,7 @@ charset-normalizer==3.4.7
     # via requests
 durationpy==0.10
     # via kubernetes
-filelock==3.29.3
+filelock==3.29.5
     # via huggingface-hub
 frozenlist==1.8.0
     # via
