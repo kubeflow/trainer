@@ -5610,7 +5610,7 @@ spec:
                   args:
                     description: args for the entrypoint for the training container.
                     items:
-                      maxLength: 65536
+                      maxLength: 4194304
                       type: string
                     maxItems: 128
                     type: array
@@ -5618,7 +5618,7 @@ spec:
                   command:
                     description: command for the entrypoint of the training container.
                     items:
-                      maxLength: 65536
+                      maxLength: 4194304
                       type: string
                     maxItems: 128
                     type: array

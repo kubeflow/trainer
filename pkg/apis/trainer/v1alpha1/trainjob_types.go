@@ -253,14 +253,14 @@ type Trainer struct {
 	// command for the entrypoint of the training container.
 	// +listType=atomic
 	// +kubebuilder:validation:MaxItems=128
-	// +kubebuilder:validation:items:MaxLength=65536
+	// +kubebuilder:validation:items:MaxLength=4194304
 	// +optional
 	Command []string `json:"command,omitempty"`
 
 	// args for the entrypoint for the training container.
 	// +listType=atomic
 	// +kubebuilder:validation:MaxItems=128
-	// +kubebuilder:validation:items:MaxLength=65536
+	// +kubebuilder:validation:items:MaxLength=4194304
 	// +optional
 	Args []string `json:"args,omitempty"`
 
