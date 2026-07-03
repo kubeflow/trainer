@@ -40,26 +40,19 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --v
 
 You can optionally deploy ClusterTrainingRuntimes as part of the Helm installation. Runtimes are disabled by default to keep the chart lightweight.
 
-> [!NOTE]
-> ClusterTrainingRuntimes are custom resources of the Trainer CRDs, so the CRDs must already exist in the cluster
-> before they can be applied. Enable them with `helm upgrade` **after** the chart (and its CRDs) is installed, rather
-> than during the initial `helm install` on a fresh cluster.
-
 To enable all default runtimes (torch, deepspeed, mlx, torchtune):
 
 ```bash
-helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
   --version 2.1.0 \
-  --reuse-values \
   --set runtimes.defaultEnabled=true
 ```
 
 To enable specific runtimes:
 
 ```bash
-helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
   --version 2.1.0 \
-  --reuse-values \
   --set runtimes.torchDistributed.enabled=true \
   --set runtimes.deepspeedDistributed.enabled=true
 ```
@@ -86,12 +79,11 @@ dataCache:
       enabled: true
 ```
 
-Then apply with:
+Then install with:
 
 ```bash
-helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
   --version 2.1.0 \
-  --reuse-values \
   -f values.yaml
 ```
 

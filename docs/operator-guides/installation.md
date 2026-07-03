@@ -18,7 +18,8 @@ If you don't have Kubernetes cluster, you can quickly create one locally using [
 ```bash
 kind create cluster # or minikube start
 ```
-:::
+
+:::git
 
 ## Installing the Kubeflow Trainer Controller Manager
 
@@ -62,7 +63,6 @@ If you manage the CRDs out-of-band (previously via Helm's `--skip-crds` flag), s
 installing them with the chart.
 :::
 
-
 Ensure that the JobSet and Trainer controller manager pods are running:
 
 ```bash
@@ -91,29 +91,23 @@ kubectl apply --server-side -k "https://github.com/kubeflow/trainer.git/manifest
 
 You can also deploy ClusterTrainingRuntimes as part of the Helm installation.
 
-:::{note}
-The ClusterTrainingRuntimes are custom resources of the Trainer CRDs, so the CRDs must already be installed in the
-cluster before they can be applied. Deploy them with `helm upgrade` **after** the control plane is installed (as shown
-above), rather than enabling them during the initial `helm install` on a fresh cluster.
-:::
-
 To enable all default runtimes (torch, deepspeed, mlx, jax, torchtune):
 
 ```bash
-helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --namespace kubeflow-system \
+    --create-namespace \
     --version ${VERSION#v} \
-    --reuse-values \
     --set runtimes.defaultEnabled=true
 ```
 
 To enable specific runtimes:
 
 ```bash
-helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --namespace kubeflow-system \
+    --create-namespace \
     --version ${VERSION#v} \
-    --reuse-values \
     --set runtimes.torchDistributed.enabled=true \
     --set runtimes.deepspeedDistributed.enabled=true
 ```
