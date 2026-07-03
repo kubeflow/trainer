@@ -26,8 +26,8 @@ class TrainerV1alpha1CategoricalSpace(BaseModel):
     """
     CategoricalSpace defines a search space over a discrete set of unordered strings.
     """ # noqa: E501
-    list: List[StrictStr]
-    __properties: ClassVar[List[str]] = ["list"]
+    choices: List[StrictStr]
+    __properties: ClassVar[List[str]] = ["choices"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -80,7 +80,7 @@ class TrainerV1alpha1CategoricalSpace(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "list": obj.get("list")
+            "choices": obj.get("choices")
         })
         return _obj
 

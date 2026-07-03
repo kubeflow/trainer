@@ -20,10 +20,7 @@ import json
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_categorical_space import TrainerV1alpha1CategoricalSpace
-from kubeflow_trainer_api.models.trainer_v1alpha1_int_space import TrainerV1alpha1IntSpace
-from kubeflow_trainer_api.models.trainer_v1alpha1_log_normal_space import TrainerV1alpha1LogNormalSpace
 from kubeflow_trainer_api.models.trainer_v1alpha1_log_uniform_space import TrainerV1alpha1LogUniformSpace
-from kubeflow_trainer_api.models.trainer_v1alpha1_normal_space import TrainerV1alpha1NormalSpace
 from kubeflow_trainer_api.models.trainer_v1alpha1_uniform_space import TrainerV1alpha1UniformSpace
 from typing import Optional, Set
 from typing_extensions import Self
@@ -33,12 +30,9 @@ class TrainerV1alpha1SearchSpace(BaseModel):
     SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.
     """ # noqa: E501
     categorical: Optional[TrainerV1alpha1CategoricalSpace] = None
-    int: Optional[TrainerV1alpha1IntSpace] = None
-    log_normal: Optional[TrainerV1alpha1LogNormalSpace] = Field(default=None, alias="logNormal")
     log_uniform: Optional[TrainerV1alpha1LogUniformSpace] = Field(default=None, alias="logUniform")
-    normal: Optional[TrainerV1alpha1NormalSpace] = None
     uniform: Optional[TrainerV1alpha1UniformSpace] = None
-    __properties: ClassVar[List[str]] = ["categorical", "int", "logNormal", "logUniform", "normal", "uniform"]
+    __properties: ClassVar[List[str]] = ["categorical", "logUniform", "uniform"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -82,18 +76,9 @@ class TrainerV1alpha1SearchSpace(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of categorical
         if self.categorical:
             _dict['categorical'] = self.categorical.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of int
-        if self.int:
-            _dict['int'] = self.int.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of log_normal
-        if self.log_normal:
-            _dict['logNormal'] = self.log_normal.to_dict()
         # override the default output from pydantic by calling `to_dict()` of log_uniform
         if self.log_uniform:
             _dict['logUniform'] = self.log_uniform.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of normal
-        if self.normal:
-            _dict['normal'] = self.normal.to_dict()
         # override the default output from pydantic by calling `to_dict()` of uniform
         if self.uniform:
             _dict['uniform'] = self.uniform.to_dict()
@@ -110,10 +95,7 @@ class TrainerV1alpha1SearchSpace(BaseModel):
 
         _obj = cls.model_validate({
             "categorical": TrainerV1alpha1CategoricalSpace.from_dict(obj["categorical"]) if obj.get("categorical") is not None else None,
-            "int": TrainerV1alpha1IntSpace.from_dict(obj["int"]) if obj.get("int") is not None else None,
-            "logNormal": TrainerV1alpha1LogNormalSpace.from_dict(obj["logNormal"]) if obj.get("logNormal") is not None else None,
             "logUniform": TrainerV1alpha1LogUniformSpace.from_dict(obj["logUniform"]) if obj.get("logUniform") is not None else None,
-            "normal": TrainerV1alpha1NormalSpace.from_dict(obj["normal"]) if obj.get("normal") is not None else None,
             "uniform": TrainerV1alpha1UniformSpace.from_dict(obj["uniform"]) if obj.get("uniform") is not None else None
         })
         return _obj

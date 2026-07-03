@@ -30,7 +30,7 @@ type Objective struct {
 }
 
 // SearchAlgorithm defines the hyperparameter sampling configuration.
-// +kubebuilder:validation:XValidation:rule="(has(self.random) ? 1 : 0) + (has(self.grid) ? 1 : 0) + (has(self.tpe) ? 1 : 0) + (has(self.bayesian) ? 1 : 0) + (has(self.custom) ? 1 : 0) == 1",message="Exactly one search algorithm configuration must be provided"
+// +kubebuilder:validation:XValidation:rule="(has(self.random) ? 1 : 0) == 1",message="Exactly one search algorithm configuration must be provided"
 type SearchAlgorithm struct {
 	// Provider specifies the backend suggestion engine. Defaults to "optuna" if omitted.
 	// +optional
@@ -38,19 +38,6 @@ type SearchAlgorithm struct {
 
 	// +optional
 	Random *RandomAlgorithm `json:"random,omitempty"`
-
-	// +optional
-	Grid *GridAlgorithm `json:"grid,omitempty"`
-
-	// +optional
-	TPE *TPEAlgorithm `json:"tpe,omitempty"`
-
-	// +optional
-	Bayesian *BayesianAlgorithm `json:"bayesian,omitempty"`
-
-	// Custom acts as an escape hatch for arbitrary or proprietary samplers.
-	// +optional
-	Custom *CustomAlgorithm `json:"custom,omitempty"`
 
 	// ProviderSettings passes raw engine kwargs down to the backend microservice.
 	// +listType=map
@@ -64,42 +51,6 @@ type RandomAlgorithm struct {
 	Seed *int64 `json:"seed,omitempty"`
 }
 
-// GridAlgorithm is intentionally empty; step-intervals are derived from SearchSpace.Int.Step.
-type GridAlgorithm struct{}
-
-type TPEAlgorithm struct {
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	InitialTrials *int32 `json:"initialTrials,omitempty"`
-
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	EICandidates *int32 `json:"eiCandidates,omitempty"`
-
-	// +optional
-	Seed *int64 `json:"seed,omitempty"`
-}
-
-type BayesianAlgorithm struct {
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	InitialTrials *int32 `json:"initialTrials,omitempty"`
-
-	// +kubebuilder:validation:Enum=ucb;ei;pi
-	// +optional
-	AcquisitionFunction *string `json:"acquisitionFunction,omitempty"`
-}
-
-type CustomAlgorithm struct {
-	// +kubebuilder:validation:MinLength=1
-	Name string `json:"name"`
-
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	Settings []SettingKV `json:"settings,omitempty"`
-}
-
 type SettingKV struct {
 	// +kubebuilder:validation:MinLength=1
 	Name  string `json:"name"`
@@ -107,22 +58,13 @@ type SettingKV struct {
 }
 
 // SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.
-// +kubebuilder:validation:XValidation:rule="(has(self.uniform) ? 1 : 0) + (has(self.logUniform) ? 1 : 0) + (has(self.normal) ? 1 : 0) + (has(self.logNormal) ? 1 : 0) + (has(self.int) ? 1 : 0) + (has(self.categorical) ? 1 : 0) == 1",message="Exactly one search space distribution configuration must be provided"
+// +kubebuilder:validation:XValidation:rule="(has(self.uniform) ? 1 : 0) + (has(self.logUniform) ? 1 : 0) + (has(self.categorical) ? 1 : 0) == 1",message="Exactly one search space distribution configuration must be provided"
 type SearchSpace struct {
 	// +optional
 	Uniform *UniformSpace `json:"uniform,omitempty"`
 
 	// +optional
 	LogUniform *LogUniformSpace `json:"logUniform,omitempty"`
-
-	// +optional
-	Normal *NormalSpace `json:"normal,omitempty"`
-
-	// +optional
-	LogNormal *LogNormalSpace `json:"logNormal,omitempty"`
-
-	// +optional
-	Int *IntSpace `json:"int,omitempty"`
 
 	// +optional
 	Categorical *CategoricalSpace `json:"categorical,omitempty"`
@@ -147,46 +89,17 @@ type LogUniformSpace struct {
 
 	// +kubebuilder:validation:MinLength=1
 	Max string `json:"max"`
-}
 
-// NormalSpace defines a continuous normal (Gaussian) distribution.
-// +kubebuilder:validation:XValidation:rule="double(self.stdDev) > 0.0",message="stdDev must be strictly greater than 0"
-type NormalSpace struct {
-	// +kubebuilder:validation:MinLength=1
-	Mean string `json:"mean"`
-
-	// +kubebuilder:validation:MinLength=1
-	StdDev string `json:"stdDev"`
-}
-
-// LogNormalSpace defines a continuous log-normal distribution.
-// +kubebuilder:validation:XValidation:rule="double(self.stdDev) > 0.0",message="stdDev must be strictly greater than 0"
-type LogNormalSpace struct {
-	// +kubebuilder:validation:MinLength=1
-	Mean string `json:"mean"`
-
-	// +kubebuilder:validation:MinLength=1
-	StdDev string `json:"stdDev"`
-}
-
-// IntSpace defines a discrete integer search space over [Min, Max].
-// +kubebuilder:validation:XValidation:rule="int(self.min) < int(self.max)",message="min must be strictly less than max"
-type IntSpace struct {
-	// +kubebuilder:validation:MinLength=1
-	Min string `json:"min"`
-
-	// +kubebuilder:validation:MinLength=1
-	Max string `json:"max"`
-
+	// Type specifies the underlying data type. Defaults to "float".
 	// +optional
-	Step *string `json:"step,omitempty"`
+	Type *string `json:"type,omitempty"`
 }
 
 // CategoricalSpace defines a search space over a discrete set of unordered strings.
 type CategoricalSpace struct {
 	// +listType=atomic
 	// +kubebuilder:validation:MinItems=1
-	List []string `json:"list"`
+	Choices []string `json:"choices"`
 }
 
 // Parameter defines a single hyperparameter and its search space.
@@ -234,15 +147,8 @@ type TrialConfig struct {
 	MaxFailedTrials *int32 `json:"maxFailedTrials,omitempty"`
 }
 
-// BestTrial tracks the best performing trial.
+// BestTrial tracks the parameters of the highest performing trial.
 type BestTrial struct {
-	Name string `json:"name"`
-
-	// Value is the actual observed metric value achieved by this trial.
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=64
-	Value string `json:"value"`
-
 	// +listType=atomic
 	// +optional
 	Parameters []ParameterAssignment `json:"parameters,omitempty"`
@@ -309,7 +215,7 @@ type OptimizationJobStatus struct {
 	// +kubebuilder:validation:Minimum=0
 	Failed int32 `json:"failed,omitempty"`
 
-	// BestTrial caches the highest performing trial based on the Objective.
+	// BestTrial caches the highest performing parameters based on the Objective.
 	BestTrial *BestTrial `json:"bestTrial,omitempty"`
 }
 

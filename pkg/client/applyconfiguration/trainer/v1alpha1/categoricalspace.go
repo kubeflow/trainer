@@ -21,7 +21,7 @@ package v1alpha1
 //
 // CategoricalSpace defines a search space over a discrete set of unordered strings.
 type CategoricalSpaceApplyConfiguration struct {
-	List []string `json:"list,omitempty"`
+	Choices []string `json:"choices,omitempty"`
 }
 
 // CategoricalSpaceApplyConfiguration constructs a declarative configuration of the CategoricalSpace type for use with
@@ -30,12 +30,12 @@ func CategoricalSpace() *CategoricalSpaceApplyConfiguration {
 	return &CategoricalSpaceApplyConfiguration{}
 }
 
-// WithList adds the given value to the List field in the declarative configuration
+// WithChoices adds the given value to the Choices field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the List field.
-func (b *CategoricalSpaceApplyConfiguration) WithList(values ...string) *CategoricalSpaceApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the Choices field.
+func (b *CategoricalSpaceApplyConfiguration) WithChoices(values ...string) *CategoricalSpaceApplyConfiguration {
 	for i := range values {
-		b.List = append(b.List, values[i])
+		b.Choices = append(b.Choices, values[i])
 	}
 	return b
 }

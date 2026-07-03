@@ -17,8 +17,8 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, StrictStr
-from typing import Any, ClassVar, Dict, List
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -28,7 +28,8 @@ class TrainerV1alpha1LogUniformSpace(BaseModel):
     """ # noqa: E501
     max: StrictStr
     min: StrictStr
-    __properties: ClassVar[List[str]] = ["max", "min"]
+    type: Optional[StrictStr] = Field(default=None, description="Type specifies the underlying data type. Defaults to \"float\".")
+    __properties: ClassVar[List[str]] = ["max", "min", "type"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -82,7 +83,8 @@ class TrainerV1alpha1LogUniformSpace(BaseModel):
 
         _obj = cls.model_validate({
             "max": obj.get("max") if obj.get("max") is not None else '',
-            "min": obj.get("min") if obj.get("min") is not None else ''
+            "min": obj.get("min") if obj.get("min") is not None else '',
+            "type": obj.get("type")
         })
         return _obj
 

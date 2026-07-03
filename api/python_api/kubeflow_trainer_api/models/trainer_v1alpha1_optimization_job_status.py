@@ -29,7 +29,7 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
     OptimizationJobStatus defines the observed state of OptimizationJob.
     """ # noqa: E501
     active: Optional[StrictInt] = None
-    best_trial: Optional[TrainerV1alpha1BestTrial] = Field(default=None, description="BestTrial caches the highest performing trial based on the Objective.", alias="bestTrial")
+    best_trial: Optional[TrainerV1alpha1BestTrial] = Field(default=None, description="BestTrial caches the highest performing parameters based on the Objective.", alias="bestTrial")
     conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = None
     failed: Optional[StrictInt] = None
     phase: Optional[StrictStr] = None

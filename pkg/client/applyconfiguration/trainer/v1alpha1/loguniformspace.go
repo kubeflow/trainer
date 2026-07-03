@@ -23,6 +23,8 @@ package v1alpha1
 type LogUniformSpaceApplyConfiguration struct {
 	Min *string `json:"min,omitempty"`
 	Max *string `json:"max,omitempty"`
+	// Type specifies the underlying data type. Defaults to "float".
+	Type *string `json:"type,omitempty"`
 }
 
 // LogUniformSpaceApplyConfiguration constructs a declarative configuration of the LogUniformSpace type for use with
@@ -44,5 +46,13 @@ func (b *LogUniformSpaceApplyConfiguration) WithMin(value string) *LogUniformSpa
 // If called multiple times, the Max field is set to the value of the last call.
 func (b *LogUniformSpaceApplyConfiguration) WithMax(value string) *LogUniformSpaceApplyConfiguration {
 	b.Max = &value
+	return b
+}
+
+// WithType sets the Type field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Type field is set to the value of the last call.
+func (b *LogUniformSpaceApplyConfiguration) WithType(value string) *LogUniformSpaceApplyConfiguration {
+	b.Type = &value
 	return b
 }

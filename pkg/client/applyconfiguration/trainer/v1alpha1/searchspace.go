@@ -23,9 +23,6 @@ package v1alpha1
 type SearchSpaceApplyConfiguration struct {
 	Uniform     *UniformSpaceApplyConfiguration     `json:"uniform,omitempty"`
 	LogUniform  *LogUniformSpaceApplyConfiguration  `json:"logUniform,omitempty"`
-	Normal      *NormalSpaceApplyConfiguration      `json:"normal,omitempty"`
-	LogNormal   *LogNormalSpaceApplyConfiguration   `json:"logNormal,omitempty"`
-	Int         *IntSpaceApplyConfiguration         `json:"int,omitempty"`
 	Categorical *CategoricalSpaceApplyConfiguration `json:"categorical,omitempty"`
 }
 
@@ -48,30 +45,6 @@ func (b *SearchSpaceApplyConfiguration) WithUniform(value *UniformSpaceApplyConf
 // If called multiple times, the LogUniform field is set to the value of the last call.
 func (b *SearchSpaceApplyConfiguration) WithLogUniform(value *LogUniformSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
 	b.LogUniform = value
-	return b
-}
-
-// WithNormal sets the Normal field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Normal field is set to the value of the last call.
-func (b *SearchSpaceApplyConfiguration) WithNormal(value *NormalSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
-	b.Normal = value
-	return b
-}
-
-// WithLogNormal sets the LogNormal field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the LogNormal field is set to the value of the last call.
-func (b *SearchSpaceApplyConfiguration) WithLogNormal(value *LogNormalSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
-	b.LogNormal = value
-	return b
-}
-
-// WithInt sets the Int field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Int field is set to the value of the last call.
-func (b *SearchSpaceApplyConfiguration) WithInt(value *IntSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
-	b.Int = value
 	return b
 }
 

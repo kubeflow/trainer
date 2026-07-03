@@ -31,7 +31,7 @@ type OptimizationJobStatusApplyConfiguration struct {
 	Active     *int32                                `json:"active,omitempty"`
 	Succeeded  *int32                                `json:"succeeded,omitempty"`
 	Failed     *int32                                `json:"failed,omitempty"`
-	// BestTrial caches the highest performing trial based on the Objective.
+	// BestTrial caches the highest performing parameters based on the Objective.
 	BestTrial *BestTrialApplyConfiguration `json:"bestTrial,omitempty"`
 }
 

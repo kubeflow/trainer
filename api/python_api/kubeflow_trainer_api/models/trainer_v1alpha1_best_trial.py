@@ -17,7 +17,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_parameter_assignment import TrainerV1alpha1ParameterAssignment
 from typing import Optional, Set
@@ -25,12 +25,10 @@ from typing_extensions import Self
 
 class TrainerV1alpha1BestTrial(BaseModel):
     """
-    BestTrial tracks the best performing trial.
+    BestTrial tracks the parameters of the highest performing trial.
     """ # noqa: E501
-    name: StrictStr
     parameters: Optional[List[TrainerV1alpha1ParameterAssignment]] = None
-    value: StrictStr = Field(description="Value is the actual observed metric value achieved by this trial.")
-    __properties: ClassVar[List[str]] = ["name", "parameters", "value"]
+    __properties: ClassVar[List[str]] = ["parameters"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -90,9 +88,7 @@ class TrainerV1alpha1BestTrial(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "name": obj.get("name") if obj.get("name") is not None else '',
-            "parameters": [TrainerV1alpha1ParameterAssignment.from_dict(_item) for _item in obj["parameters"]] if obj.get("parameters") is not None else None,
-            "value": obj.get("value") if obj.get("value") is not None else ''
+            "parameters": [TrainerV1alpha1ParameterAssignment.from_dict(_item) for _item in obj["parameters"]] if obj.get("parameters") is not None else None
         })
         return _obj
 

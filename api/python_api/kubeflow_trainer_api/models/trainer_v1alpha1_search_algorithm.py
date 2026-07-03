@@ -19,11 +19,8 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.trainer_v1alpha1_bayesian_algorithm import TrainerV1alpha1BayesianAlgorithm
-from kubeflow_trainer_api.models.trainer_v1alpha1_custom_algorithm import TrainerV1alpha1CustomAlgorithm
 from kubeflow_trainer_api.models.trainer_v1alpha1_random_algorithm import TrainerV1alpha1RandomAlgorithm
 from kubeflow_trainer_api.models.trainer_v1alpha1_setting_kv import TrainerV1alpha1SettingKV
-from kubeflow_trainer_api.models.trainer_v1alpha1_tpe_algorithm import TrainerV1alpha1TPEAlgorithm
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -31,14 +28,10 @@ class TrainerV1alpha1SearchAlgorithm(BaseModel):
     """
     SearchAlgorithm defines the hyperparameter sampling configuration.
     """ # noqa: E501
-    bayesian: Optional[TrainerV1alpha1BayesianAlgorithm] = None
-    custom: Optional[TrainerV1alpha1CustomAlgorithm] = Field(default=None, description="Custom acts as an escape hatch for arbitrary or proprietary samplers.")
-    grid: Optional[Dict[str, Any]] = Field(default=None, description="GridAlgorithm is intentionally empty; step-intervals are derived from SearchSpace.Int.Step.")
     provider: Optional[StrictStr] = Field(default=None, description="Provider specifies the backend suggestion engine. Defaults to \"optuna\" if omitted.")
     provider_settings: Optional[List[TrainerV1alpha1SettingKV]] = Field(default=None, description="ProviderSettings passes raw engine kwargs down to the backend microservice.", alias="providerSettings")
     random: Optional[TrainerV1alpha1RandomAlgorithm] = None
-    tpe: Optional[TrainerV1alpha1TPEAlgorithm] = None
-    __properties: ClassVar[List[str]] = ["bayesian", "custom", "grid", "provider", "providerSettings", "random", "tpe"]
+    __properties: ClassVar[List[str]] = ["provider", "providerSettings", "random"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -79,12 +72,6 @@ class TrainerV1alpha1SearchAlgorithm(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of bayesian
-        if self.bayesian:
-            _dict['bayesian'] = self.bayesian.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of custom
-        if self.custom:
-            _dict['custom'] = self.custom.to_dict()
         # override the default output from pydantic by calling `to_dict()` of each item in provider_settings (list)
         _items = []
         if self.provider_settings:
@@ -95,9 +82,6 @@ class TrainerV1alpha1SearchAlgorithm(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of random
         if self.random:
             _dict['random'] = self.random.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of tpe
-        if self.tpe:
-            _dict['tpe'] = self.tpe.to_dict()
         return _dict
 
     @classmethod
@@ -110,13 +94,9 @@ class TrainerV1alpha1SearchAlgorithm(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "bayesian": TrainerV1alpha1BayesianAlgorithm.from_dict(obj["bayesian"]) if obj.get("bayesian") is not None else None,
-            "custom": TrainerV1alpha1CustomAlgorithm.from_dict(obj["custom"]) if obj.get("custom") is not None else None,
-            "grid": obj.get("grid"),
             "provider": obj.get("provider"),
             "providerSettings": [TrainerV1alpha1SettingKV.from_dict(_item) for _item in obj["providerSettings"]] if obj.get("providerSettings") is not None else None,
-            "random": TrainerV1alpha1RandomAlgorithm.from_dict(obj["random"]) if obj.get("random") is not None else None,
-            "tpe": TrainerV1alpha1TPEAlgorithm.from_dict(obj["tpe"]) if obj.get("tpe") is not None else None
+            "random": TrainerV1alpha1RandomAlgorithm.from_dict(obj["random"]) if obj.get("random") is not None else None
         })
         return _obj
 

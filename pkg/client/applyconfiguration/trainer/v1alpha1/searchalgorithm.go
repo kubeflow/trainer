@@ -16,23 +16,14 @@
 
 package v1alpha1
 
-import (
-	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
-)
-
 // SearchAlgorithmApplyConfiguration represents a declarative configuration of the SearchAlgorithm type for use
 // with apply.
 //
 // SearchAlgorithm defines the hyperparameter sampling configuration.
 type SearchAlgorithmApplyConfiguration struct {
 	// Provider specifies the backend suggestion engine. Defaults to "optuna" if omitted.
-	Provider *string                              `json:"provider,omitempty"`
-	Random   *RandomAlgorithmApplyConfiguration   `json:"random,omitempty"`
-	Grid     *trainerv1alpha1.GridAlgorithm       `json:"grid,omitempty"`
-	TPE      *TPEAlgorithmApplyConfiguration      `json:"tpe,omitempty"`
-	Bayesian *BayesianAlgorithmApplyConfiguration `json:"bayesian,omitempty"`
-	// Custom acts as an escape hatch for arbitrary or proprietary samplers.
-	Custom *CustomAlgorithmApplyConfiguration `json:"custom,omitempty"`
+	Provider *string                            `json:"provider,omitempty"`
+	Random   *RandomAlgorithmApplyConfiguration `json:"random,omitempty"`
 	// ProviderSettings passes raw engine kwargs down to the backend microservice.
 	ProviderSettings []SettingKVApplyConfiguration `json:"providerSettings,omitempty"`
 }
@@ -56,38 +47,6 @@ func (b *SearchAlgorithmApplyConfiguration) WithProvider(value string) *SearchAl
 // If called multiple times, the Random field is set to the value of the last call.
 func (b *SearchAlgorithmApplyConfiguration) WithRandom(value *RandomAlgorithmApplyConfiguration) *SearchAlgorithmApplyConfiguration {
 	b.Random = value
-	return b
-}
-
-// WithGrid sets the Grid field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Grid field is set to the value of the last call.
-func (b *SearchAlgorithmApplyConfiguration) WithGrid(value trainerv1alpha1.GridAlgorithm) *SearchAlgorithmApplyConfiguration {
-	b.Grid = &value
-	return b
-}
-
-// WithTPE sets the TPE field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the TPE field is set to the value of the last call.
-func (b *SearchAlgorithmApplyConfiguration) WithTPE(value *TPEAlgorithmApplyConfiguration) *SearchAlgorithmApplyConfiguration {
-	b.TPE = value
-	return b
-}
-
-// WithBayesian sets the Bayesian field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Bayesian field is set to the value of the last call.
-func (b *SearchAlgorithmApplyConfiguration) WithBayesian(value *BayesianAlgorithmApplyConfiguration) *SearchAlgorithmApplyConfiguration {
-	b.Bayesian = value
-	return b
-}
-
-// WithCustom sets the Custom field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Custom field is set to the value of the last call.
-func (b *SearchAlgorithmApplyConfiguration) WithCustom(value *CustomAlgorithmApplyConfiguration) *SearchAlgorithmApplyConfiguration {
-	b.Custom = value
 	return b
 }
 

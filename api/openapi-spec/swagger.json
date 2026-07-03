@@ -13759,30 +13759,10 @@
           }
         }
       },
-      "trainer.v1alpha1.BayesianAlgorithm": {
-        "type": "object",
-        "properties": {
-          "acquisitionFunction": {
-            "type": "string"
-          },
-          "initialTrials": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
       "trainer.v1alpha1.BestTrial": {
-        "description": "BestTrial tracks the best performing trial.",
+        "description": "BestTrial tracks the parameters of the highest performing trial.",
         "type": "object",
-        "required": [
-          "name",
-          "value"
-        ],
         "properties": {
-          "name": {
-            "type": "string",
-            "default": ""
-          },
           "parameters": {
             "type": "array",
             "items": {
@@ -13794,11 +13774,6 @@
               ]
             },
             "x-kubernetes-list-type": "atomic"
-          },
-          "value": {
-            "description": "Value is the actual observed metric value achieved by this trial.",
-            "type": "string",
-            "default": ""
           }
         }
       },
@@ -13806,10 +13781,10 @@
         "description": "CategoricalSpace defines a search space over a discrete set of unordered strings.",
         "type": "object",
         "required": [
-          "list"
+          "choices"
         ],
         "properties": {
-          "list": {
+          "choices": {
             "type": "array",
             "items": {
               "type": "string",
@@ -13953,33 +13928,6 @@
           }
         }
       },
-      "trainer.v1alpha1.CustomAlgorithm": {
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "default": ""
-          },
-          "settings": {
-            "type": "array",
-            "items": {
-              "default": {},
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/trainer.v1alpha1.SettingKV"
-                }
-              ]
-            },
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map"
-          }
-        }
-      },
       "trainer.v1alpha1.DatasetInitializer": {
         "description": "DatasetInitializer represents the desired configuration to initialize and pre-process dataset. The DatasetInitializer spec will override the runtime Job template which contains this label: `trainer.kubeflow.org/trainjob-ancestor-step: dataset-initializer`",
         "type": "object",
@@ -14025,10 +13973,6 @@
           }
         }
       },
-      "trainer.v1alpha1.GridAlgorithm": {
-        "description": "GridAlgorithm is intentionally empty; step-intervals are derived from SearchSpace.Int.Step.",
-        "type": "object"
-      },
       "trainer.v1alpha1.Initializer": {
         "description": "Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.",
         "type": "object",
@@ -14048,27 +13992,6 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.ModelInitializer"
               }
             ]
-          }
-        }
-      },
-      "trainer.v1alpha1.IntSpace": {
-        "description": "IntSpace defines a discrete integer search space over [Min, Max].",
-        "type": "object",
-        "required": [
-          "min",
-          "max"
-        ],
-        "properties": {
-          "max": {
-            "type": "string",
-            "default": ""
-          },
-          "min": {
-            "type": "string",
-            "default": ""
-          },
-          "step": {
-            "type": "string"
           }
         }
       },
@@ -14222,24 +14145,6 @@
           }
         }
       },
-      "trainer.v1alpha1.LogNormalSpace": {
-        "description": "LogNormalSpace defines a continuous log-normal distribution.",
-        "type": "object",
-        "required": [
-          "mean",
-          "stdDev"
-        ],
-        "properties": {
-          "mean": {
-            "type": "string",
-            "default": ""
-          },
-          "stdDev": {
-            "type": "string",
-            "default": ""
-          }
-        }
-      },
       "trainer.v1alpha1.LogUniformSpace": {
         "description": "LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].",
         "type": "object",
@@ -14255,6 +14160,10 @@
           "min": {
             "type": "string",
             "default": ""
+          },
+          "type": {
+            "description": "Type specifies the underlying data type. Defaults to \"float\".",
+            "type": "string"
           }
         }
       },
@@ -14429,24 +14338,6 @@
           }
         }
       },
-      "trainer.v1alpha1.NormalSpace": {
-        "description": "NormalSpace defines a continuous normal (Gaussian) distribution.",
-        "type": "object",
-        "required": [
-          "mean",
-          "stdDev"
-        ],
-        "properties": {
-          "mean": {
-            "type": "string",
-            "default": ""
-          },
-          "stdDev": {
-            "type": "string",
-            "default": ""
-          }
-        }
-      },
       "trainer.v1alpha1.Objective": {
         "description": "Objective defines the metric and goal for the OptimizationJob.",
         "type": "object",
@@ -14614,7 +14505,7 @@
             "format": "int32"
           },
           "bestTrial": {
-            "description": "BestTrial caches the highest performing trial based on the Objective.",
+            "description": "BestTrial caches the highest performing parameters based on the Objective.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.BestTrial"
@@ -14980,20 +14871,6 @@
         "description": "SearchAlgorithm defines the hyperparameter sampling configuration.",
         "type": "object",
         "properties": {
-          "bayesian": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.BayesianAlgorithm"
-          },
-          "custom": {
-            "description": "Custom acts as an escape hatch for arbitrary or proprietary samplers.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.CustomAlgorithm"
-              }
-            ]
-          },
-          "grid": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.GridAlgorithm"
-          },
           "provider": {
             "description": "Provider specifies the backend suggestion engine. Defaults to \"optuna\" if omitted.",
             "type": "string"
@@ -15016,9 +14893,6 @@
           },
           "random": {
             "$ref": "#/components/schemas/trainer.v1alpha1.RandomAlgorithm"
-          },
-          "tpe": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.TPEAlgorithm"
           }
         }
       },
@@ -15029,17 +14903,8 @@
           "categorical": {
             "$ref": "#/components/schemas/trainer.v1alpha1.CategoricalSpace"
           },
-          "int": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.IntSpace"
-          },
-          "logNormal": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.LogNormalSpace"
-          },
           "logUniform": {
             "$ref": "#/components/schemas/trainer.v1alpha1.LogUniformSpace"
-          },
-          "normal": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.NormalSpace"
           },
           "uniform": {
             "$ref": "#/components/schemas/trainer.v1alpha1.UniformSpace"
@@ -15060,23 +14925,6 @@
           "value": {
             "type": "string",
             "default": ""
-          }
-        }
-      },
-      "trainer.v1alpha1.TPEAlgorithm": {
-        "type": "object",
-        "properties": {
-          "eiCandidates": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "initialTrials": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "seed": {
-            "type": "integer",
-            "format": "int64"
           }
         }
       },

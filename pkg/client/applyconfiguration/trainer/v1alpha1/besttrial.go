@@ -19,11 +19,8 @@ package v1alpha1
 // BestTrialApplyConfiguration represents a declarative configuration of the BestTrial type for use
 // with apply.
 //
-// BestTrial tracks the best performing trial.
+// BestTrial tracks the parameters of the highest performing trial.
 type BestTrialApplyConfiguration struct {
-	Name *string `json:"name,omitempty"`
-	// Value is the actual observed metric value achieved by this trial.
-	Value      *string                                 `json:"value,omitempty"`
 	Parameters []ParameterAssignmentApplyConfiguration `json:"parameters,omitempty"`
 }
 
@@ -31,22 +28,6 @@ type BestTrialApplyConfiguration struct {
 // apply.
 func BestTrial() *BestTrialApplyConfiguration {
 	return &BestTrialApplyConfiguration{}
-}
-
-// WithName sets the Name field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Name field is set to the value of the last call.
-func (b *BestTrialApplyConfiguration) WithName(value string) *BestTrialApplyConfiguration {
-	b.Name = &value
-	return b
-}
-
-// WithValue sets the Value field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Value field is set to the value of the last call.
-func (b *BestTrialApplyConfiguration) WithValue(value string) *BestTrialApplyConfiguration {
-	b.Value = &value
-	return b
 }
 
 // WithParameters adds the given value to the Parameters field in the declarative configuration

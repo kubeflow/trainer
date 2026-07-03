@@ -74,51 +74,15 @@ spec:
                           description: CategoricalSpace defines a search space over
                             a discrete set of unordered strings.
                           properties:
-                            list:
+                            choices:
                               items:
                                 type: string
                               minItems: 1
                               type: array
                               x-kubernetes-list-type: atomic
                           required:
-                          - list
+                          - choices
                           type: object
-                        int:
-                          description: IntSpace defines a discrete integer search
-                            space over [Min, Max].
-                          properties:
-                            max:
-                              minLength: 1
-                              type: string
-                            min:
-                              minLength: 1
-                              type: string
-                            step:
-                              type: string
-                          required:
-                          - max
-                          - min
-                          type: object
-                          x-kubernetes-validations:
-                          - message: min must be strictly less than max
-                            rule: int(self.min) < int(self.max)
-                        logNormal:
-                          description: LogNormalSpace defines a continuous log-normal
-                            distribution.
-                          properties:
-                            mean:
-                              minLength: 1
-                              type: string
-                            stdDev:
-                              minLength: 1
-                              type: string
-                          required:
-                          - mean
-                          - stdDev
-                          type: object
-                          x-kubernetes-validations:
-                          - message: stdDev must be strictly greater than 0
-                            rule: double(self.stdDev) > 0.0
                         logUniform:
                           description: LogUniformSpace defines a continuous log-uniform
                             distribution over [Min, Max].
@@ -128,6 +92,10 @@ spec:
                               type: string
                             min:
                               minLength: 1
+                              type: string
+                            type:
+                              description: Type specifies the underlying data type.
+                                Defaults to "float".
                               type: string
                           required:
                           - max
@@ -139,23 +107,6 @@ spec:
                             rule: double(self.min) > 0.0
                           - message: min must be strictly less than max
                             rule: double(self.min) < double(self.max)
-                        normal:
-                          description: NormalSpace defines a continuous normal (Gaussian)
-                            distribution.
-                          properties:
-                            mean:
-                              minLength: 1
-                              type: string
-                            stdDev:
-                              minLength: 1
-                              type: string
-                          required:
-                          - mean
-                          - stdDev
-                          type: object
-                          x-kubernetes-validations:
-                          - message: stdDev must be strictly greater than 0
-                            rule: double(self.stdDev) > 0.0
                         uniform:
                           description: UniformSpace defines a continuous uniform distribution
                             over [Min, Max].
@@ -178,9 +129,7 @@ spec:
                       - message: Exactly one search space distribution configuration
                           must be provided
                         rule: '(has(self.uniform) ? 1 : 0) + (has(self.logUniform)
-                          ? 1 : 0) + (has(self.normal) ? 1 : 0) + (has(self.logNormal)
-                          ? 1 : 0) + (has(self.int) ? 1 : 0) + (has(self.categorical)
-                          ? 1 : 0) == 1'
+                          ? 1 : 0) + (has(self.categorical) ? 1 : 0) == 1'
                   required:
                   - name
                   - searchSpace
@@ -194,49 +143,6 @@ spec:
                 description: SearchAlgorithm explicitly separates initial sampling
                   from mid-run pruning.
                 properties:
-                  bayesian:
-                    properties:
-                      acquisitionFunction:
-                        enum:
-                        - ucb
-                        - ei
-                        - pi
-                        type: string
-                      initialTrials:
-                        format: int32
-                        minimum: 1
-                        type: integer
-                    type: object
-                  custom:
-                    description: Custom acts as an escape hatch for arbitrary or proprietary
-                      samplers.
-                    properties:
-                      name:
-                        minLength: 1
-                        type: string
-                      settings:
-                        items:
-                          properties:
-                            name:
-                              minLength: 1
-                              type: string
-                            value:
-                              type: string
-                          required:
-                          - name
-                          - value
-                          type: object
-                        type: array
-                        x-kubernetes-list-map-keys:
-                        - name
-                        x-kubernetes-list-type: map
-                    required:
-                    - name
-                    type: object
-                  grid:
-                    description: GridAlgorithm is intentionally empty; step-intervals
-                      are derived from SearchSpace.Int.Step.
-                    type: object
                   provider:
                     description: Provider specifies the backend suggestion engine.
                       Defaults to "optuna" if omitted.
@@ -265,26 +171,10 @@ spec:
                         format: int64
                         type: integer
                     type: object
-                  tpe:
-                    properties:
-                      eiCandidates:
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      initialTrials:
-                        format: int32
-                        minimum: 1
-                        type: integer
-                      seed:
-                        format: int64
-                        type: integer
-                    type: object
                 type: object
                 x-kubernetes-validations:
                 - message: Exactly one search algorithm configuration must be provided
-                  rule: '(has(self.random) ? 1 : 0) + (has(self.grid) ? 1 : 0) + (has(self.tpe)
-                    ? 1 : 0) + (has(self.bayesian) ? 1 : 0) + (has(self.custom) ?
-                    1 : 0) == 1'
+                  rule: '(has(self.random) ? 1 : 0) == 1'
               trainJobTemplate:
                 description: TrainJobTemplate wraps the underlying TrainJob workload
                   and its metadata.
@@ -6601,11 +6491,9 @@ spec:
                 minimum: 0
                 type: integer
               bestTrial:
-                description: BestTrial caches the highest performing trial based on
-                  the Objective.
+                description: BestTrial caches the highest performing parameters based
+                  on the Objective.
                 properties:
-                  name:
-                    type: string
                   parameters:
                     items:
                       description: ParameterAssignment represents a single hyperparameter
@@ -6625,15 +6513,6 @@ spec:
                       type: object
                     type: array
                     x-kubernetes-list-type: atomic
-                  value:
-                    description: Value is the actual observed metric value achieved
-                      by this trial.
-                    maxLength: 64
-                    minLength: 1
-                    type: string
-                required:
-                - name
-                - value
                 type: object
               conditions:
                 items:
