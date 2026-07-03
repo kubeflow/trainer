@@ -21,6 +21,9 @@ metadata:
   name: jax-distributed
   labels:
     trainer.kubeflow.org/framework: jax
+    {{- with .Values.runtimes.commonLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
     {{- include "trainer.labels" . | nindent 4 }}
 spec:
   mlPolicy:

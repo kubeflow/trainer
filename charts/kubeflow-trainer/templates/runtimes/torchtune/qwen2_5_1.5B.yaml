@@ -21,6 +21,9 @@ metadata:
   name: torchtune-qwen2.5-1.5b
   labels:
     trainer.kubeflow.org/framework: torchtune
+    {{- with .Values.runtimes.commonLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
     {{- include "trainer.labels" . | nindent 4 }}
 spec:
   mlPolicy:

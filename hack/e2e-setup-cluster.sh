@@ -135,6 +135,16 @@ TRAINER_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/torchtune-trainer"
 TRAINER_CI_IMAGE="${TRAINER_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 ${CONTAINER_RUNTIME} build . -f cmd/trainers/torchtune/Dockerfile -t ${TRAINER_CI_IMAGE}
 
+MLX_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/mlx-runtime"
+MLX_RUNTIME_CI_IMAGE="${MLX_RUNTIME_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+echo "Build MLX runtime image"
+${CONTAINER_RUNTIME} build . -f cmd/runtimes/mlx/Dockerfile -t ${MLX_RUNTIME_CI_IMAGE}
+
+DEEPSPEED_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/deepspeed-runtime"
+DEEPSPEED_RUNTIME_CI_IMAGE="${DEEPSPEED_RUNTIME_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
+echo "Build DeepSpeed runtime image"
+${CONTAINER_RUNTIME} build . -f cmd/runtimes/deepspeed/Dockerfile -t ${DEEPSPEED_RUNTIME_CI_IMAGE}
+
 XGBOOST_RUNTIME_CI_IMAGE_NAME="ghcr.io/kubeflow/trainer/xgboost-runtime"
 XGBOOST_RUNTIME_CI_IMAGE="${XGBOOST_RUNTIME_CI_IMAGE_NAME}:${CI_IMAGE_TAG}"
 echo "Build XGBoost runtime image"
@@ -149,6 +159,8 @@ load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${MODEL_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${TRAINER_CI_IMAGE}" "${CLUSTER_NAME}"
+load_image_to_kind "${MLX_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
+load_image_to_kind "${DEEPSPEED_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${XGBOOST_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${JAX_RUNTIME_IMAGE}" "${CLUSTER_NAME}"
 
@@ -198,15 +210,19 @@ EOF
   apiVersion: kustomize.config.k8s.io/v1beta1
   kind: Kustomization
   resources:
-  - ../../../manifests/overlays/runtimes
+  - ../../../manifests/base/runtimes
   images:
-  - name: "${XGBOOST_RUNTIME_CI_IMAGE_NAME}"
-    newTag: "${CI_IMAGE_TAG}"
   - name: "${DATASET_INITIALIZER_CI_IMAGE_NAME}"
     newTag: "${CI_IMAGE_TAG}"
   - name: "${MODEL_INITIALIZER_CI_IMAGE_NAME}"
     newTag: "${CI_IMAGE_TAG}"
   - name: "${TRAINER_CI_IMAGE_NAME}"
+    newTag: "${CI_IMAGE_TAG}"
+  - name: "${MLX_RUNTIME_CI_IMAGE_NAME}"
+    newTag: "${CI_IMAGE_TAG}"
+  - name: "${DEEPSPEED_RUNTIME_CI_IMAGE_NAME}"
+    newTag: "${CI_IMAGE_TAG}"
+  - name: "${XGBOOST_RUNTIME_CI_IMAGE_NAME}"
     newTag: "${CI_IMAGE_TAG}"
 EOF
 
@@ -228,8 +244,9 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
     --namespace ${NAMESPACE} \
     --create-namespace \
     --set runtimes.defaultEnabled=true \
-    --set runtimes.xgboost.image.repository=${XGBOOST_RUNTIME_CI_IMAGE_NAME} \
-    --set runtimes.xgboost.image.tag=${CI_IMAGE_TAG} \
+    --set runtimes.xgboostDistributed.image.tag=${CI_IMAGE_TAG} \
+    --set runtimes.mlxDistributed.image.tag=${CI_IMAGE_TAG} \
+    --set runtimes.deepspeedDistributed.image.tag=${CI_IMAGE_TAG} \
     --set image.tag=${CI_IMAGE_TAG} \
     --set manager.config.featureGates.TrainJobStatus=true \
     --wait

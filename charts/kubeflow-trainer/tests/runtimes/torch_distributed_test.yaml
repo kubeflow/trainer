@@ -53,6 +53,9 @@ tests:
       - equal:
           path: metadata.labels["trainer.kubeflow.org/framework"]
           value: torch
+      - equal:
+          path: metadata.labels["trainer.kubeflow.org/webhook-validation"]
+          value: disabled
 
   - it: Should have correct mlPolicy configuration
     set:

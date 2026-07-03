@@ -4,6 +4,7 @@ metadata:
   name: torch-distributed-with-cache
   labels:
     trainer.kubeflow.org/framework: torch
+    trainer.kubeflow.org/webhook-validation: disabled
 spec:
   mlPolicy:
     numNodes: 1

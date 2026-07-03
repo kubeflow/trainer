@@ -65,6 +65,9 @@ tests:
       - equal:
           path: metadata.labels["trainer.kubeflow.org/framework"]
           value: xgboost
+      - equal:
+          path: metadata.labels["trainer.kubeflow.org/webhook-validation"]
+          value: disabled
 
   - it: Should have correct XGBoost mlPolicy configuration
     set:

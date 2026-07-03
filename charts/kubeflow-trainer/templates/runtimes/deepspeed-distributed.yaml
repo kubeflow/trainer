@@ -21,6 +21,9 @@ metadata:
   name: deepspeed-distributed
   labels:
     trainer.kubeflow.org/framework: deepspeed
+    {{- with .Values.runtimes.commonLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
     {{- include "trainer.labels" . | nindent 4 }}
 spec:
   mlPolicy:
