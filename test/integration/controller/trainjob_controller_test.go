@@ -1078,6 +1078,13 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					RuntimeSpec(
 						testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").Spec).
 							LauncherReplica().
+							DependsOn(
+								constants.Launcher,
+								jobsetv1alpha2.DependsOn{
+									Name:   constants.Node,
+									Status: jobsetv1alpha2.DependencyReady,
+								},
+							).
 							Replicas(1, constants.Launcher).
 							WithMLPolicy(
 								testingutil.MakeMLPolicyWrapper().
@@ -1106,6 +1113,13 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
 							Suspend(false).
 							LauncherReplica().
+							DependsOn(
+								constants.Launcher,
+								jobsetv1alpha2.DependsOn{
+									Name:   constants.Node,
+									Status: jobsetv1alpha2.DependencyReady,
+								},
+							).
 							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 							Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).

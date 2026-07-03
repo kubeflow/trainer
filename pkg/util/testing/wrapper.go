@@ -1138,6 +1138,17 @@ func (s *TrainingRuntimeSpecWrapper) LauncherReplica() *TrainingRuntimeSpecWrapp
 	}
 	return s
 }
+func (s *TrainingRuntimeSpecWrapper) DependsOn(
+	rJobName string,
+	dependsOn ...jobsetv1alpha2.DependsOn,
+) *TrainingRuntimeSpecWrapper {
+	for i, rJob := range s.Template.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			s.Template.Spec.ReplicatedJobs[i].DependsOn = dependsOn
+		}
+	}
+	return s
+}
 
 func (s *TrainingRuntimeSpecWrapper) Replicas(replicas int32, rJobNames ...string) *TrainingRuntimeSpecWrapper {
 	for i, rJob := range s.Template.Spec.ReplicatedJobs {
