@@ -10,7 +10,7 @@ pydantic==2.13.4
     # via kubeflow_trainer_api (api/python_api/pyproject.toml)
 pydantic-core==2.46.4
     # via pydantic
-typing-extensions==4.15.0
+typing-extensions==4.16.0
     # via
     #   pydantic
     #   pydantic-core
