@@ -752,6 +752,211 @@ replicatedJobs:
                     value: AutoModelForCausalLM
 ```
 
+### The Initializer Plugin
+
+The `Initializer` Plugin is a Pipeline Framework plugin that configures the
+dataset and model initializer PodSets of the resolved runtime from
+`TrainJob.Spec.Initializer`. It operates on the runtime-agnostic `PodSet`
+abstraction in `RuntimeInfo`, independent of the JobSet plugin that assembles
+the final `JobSet`.
+
+Today, initializer wiring is applied inline by the JobSet plugin's builder
+(`pkg/runtime/framework/plugins/jobset/builder.go`), which couples initializer
+configuration to JobSet assembly and forces `TrainJob`s to use only runtimes
+that already ship initializer ReplicatedJob templates. Separating the
+Initializer into a dedicated plugin keeps initializer configuration
+runtime-agnostic: the plugin only understands `PodSet`s, while runtime-shape
+translation — including PVC provisioning, such as JobSet's
+`VolumeClaimPolicies` — stays in each runtime's `ComponentBuilder`. Adding a
+future runtime (for example, Grove) then requires only a new `ComponentBuilder`
+that translates the same `PodSet` abstraction with its own PVC mechanism, and
+no change to the Initializer Plugin (see
+[kubeflow/trainer#2886](https://github.com/kubeflow/trainer/issues/2886)).
+It also provides a natural home for shared initialization across TrainJobs
+(see [KEP-3310](https://github.com/kubeflow/trainer/pull/3311)).
+
+The Initializer Plugin in Kubeflow Trainer is responsible for:
+
+- **Configuring initializer PodSets** — for each initializer PodSet in the
+  resolved runtime (identified by the
+  `trainer.kubeflow.org/trainjob-ancestor-step` label), applying the matching
+  `TrainJob.Spec.Initializer.Dataset` or `.Model` fields (`storageUri`, `env`,
+  `secretRef`) onto that container.
+- **Validating** the Initializer spec at admission time against the resolved
+  runtime — for example, rejecting a `TrainJob` that requests an initializer
+  when neither the runtime template nor the Configuration defaults (see
+  [Initializer defaults via RuntimeDefaults](#initializer-defaults-via-runtimedefaults))
+  provide a corresponding initializer PodSet.
+
+The initializer PodSet itself is contributed either by the `TrainingRuntime`
+template or, when the runtime ships none, by cluster-level `RuntimeDefaults`
+merged during runtime resolution (below). The plugin does not synthesize
+PodSets from Trainer Configuration itself; it only configures and validates
+what the resolved runtime already contains.
+
+The plugin implements two Pipeline Framework extension points:
+
+- `EnforceInitializer` (Build Phase, pre-build): a new extension point that
+  mutates the initializer `PodSet`s in `RuntimeInfo` to apply the `TrainJob`
+  initializer configuration.
+- `CustomValidation` (PreExecution Phase): validates Initializer fields
+  against the resolved runtime.
+
+`EnforceInitializer` is a pre-build step: like `EnforceMLPolicy` and
+`EnforcePodGroupPolicy`, it runs in the pre-build portion of the Build Phase,
+configuring the initializer `PodSet`s in `RuntimeInfo` **before**
+`ComponentBuilder` assembles the final runtime resources. It only configures
+the initializer pods; it does not itself build or deploy any resources.
+
+To carry env-from-secret references through the `RuntimeInfo` abstraction,
+the `Container` type is extended with an `EnvFrom` field:
+
+```golang
+type Container struct {
+	Name         string
+	Image        string
+	Command      []string
+	Env          []corev1ac.EnvVarApplyConfiguration
+	EnvFrom      []corev1ac.EnvFromSourceApplyConfiguration
+	Ports        []corev1ac.ContainerPortApplyConfiguration
+	VolumeMounts []corev1ac.VolumeMountApplyConfiguration
+}
+```
+
+The JobSet plugin's `ComponentBuilder` writes `EnvFrom` through to the JobSet
+apply configuration in the same loop that writes `Env` and `VolumeMounts`.
+
+#### Initializer defaults via RuntimeDefaults
+
+When a runtime does not itself ship initializer ReplicatedJob templates, the
+initializer PodSet can be contributed by cluster-level defaults rather than
+synthesized by the plugin. These defaults live in a new `runtimeDefaults`
+block on the controller-manager `Configuration` and are merged into the
+runtime template **during runtime resolution** — i.e. when the effective
+runtime is loaded, alongside the existing `RuntimePatches` merge — not by the
+Initializer Plugin. This keeps defaults as plain "initial" configuration that
+is overlaid first by the `TrainingRuntime` and then by the `TrainJob`:
+
+Merge precedence: `RuntimeDefaults` (Configuration) → `TrainingRuntime` →
+`TrainJob`.
+
+`RuntimeDefaults` mirrors the structure of `TrainingRuntimeSpec` so the merge
+is a familiar strategic-merge over the runtime template, keeping the shape
+familiar to admins. Each runtime shape gets its own defaults type, and only a
+curated, minimal set of fields is exposed — fields that don't make sense as
+defaults are simply omitted:
+
+```golang
+type Configuration struct {
+	// ... existing fields
+	RuntimeDefaults *RuntimeDefaults `json:"runtimeDefaults,omitempty"`
+}
+
+type RuntimeDefaults struct {
+	// TrainingRuntime holds defaults for the JobSet-backed TrainingRuntime.
+	// Future runtimes (e.g. Grove) add their own mirror type here.
+	TrainingRuntime *TrainingRuntimeDefaults `json:"trainingRuntime,omitempty"`
+}
+
+type TrainingRuntimeDefaults struct {
+	Template *JobSetTemplateDefaults `json:"template,omitempty"`
+}
+
+type JobSetTemplateDefaults struct {
+	Metadata *metav1.ObjectMeta  `json:"metadata,omitempty"`
+	Spec     *JobSetSpecDefaults `json:"spec,omitempty"`
+}
+
+type JobSetSpecDefaults struct {
+	ReplicatedJobs      []ReplicatedJobDefaults     `json:"replicatedJobs,omitempty"`
+	VolumeClaimPolicies []VolumeClaimPolicyDefaults `json:"volumeClaimPolicies,omitempty"`
+}
+
+// ReplicatedJobDefaults exposes the subset of a JobSet ReplicatedJob that makes
+// sense to default for an initializer step. Entries are matched to the runtime
+// template by Name.
+type ReplicatedJobDefaults struct {
+	Name     string                   `json:"name"`
+	Template *PodTemplateSpecDefaults `json:"template,omitempty"`
+}
+
+// PodTemplateSpecDefaults exposes the pod-level fields an admin may default on
+// an initializer pod (metadata plus scheduling constraints).
+type PodTemplateSpecDefaults struct {
+	Metadata *metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec     *PodSpecDefaults   `json:"spec,omitempty"`
+}
+
+type PodSpecDefaults struct {
+	Containers   []ContainerDefaults `json:"containers,omitempty"`
+	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
+	Affinity     *corev1.Affinity    `json:"affinity,omitempty"`
+	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
+}
+
+// ContainerDefaults is matched to the runtime container by Name; only image
+// and resources are defaultable (command/args/env come from the image and
+// TrainJob.Spec.Initializer).
+type ContainerDefaults struct {
+	Name      string                       `json:"name"`
+	Image     string                       `json:"image,omitempty"`
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+// VolumeClaimPolicyDefaults exposes the PVC-provisioning fields for the
+// reserved `initializer` volume. The volumeName is fixed and not overridable.
+type VolumeClaimPolicyDefaults struct {
+	Metadata *metav1.ObjectMeta                `json:"metadata,omitempty"`
+	Spec     *corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
+}
+```
+
+The fields that may be given a default, and those intentionally **not** exposed
+on the `*Defaults` mirror types, are:
+
+| Scope | Defaultable | Not exposed (rationale) |
+| --- | --- | --- |
+| `ReplicatedJob` | `name` (match key), `template` | `replicas`, `dependsOn` — set by initializer wiring, not an admin default |
+| Pod | `metadata` (labels/annotations), `nodeSelector`, `affinity`, `tolerations` | `restartPolicy` — from a higher layer; reserved `initializer` volume — plugin-enforced |
+| Container | `name` (match key), `image`, `resources` | `command`, `args`, `env`, `volumeMounts` — from the initializer image and `TrainJob.Spec.Initializer` |
+| `VolumeClaimPolicy` | `metadata`, `spec` (`storageClassName`, `accessModes`, `resources`) | `volumeName` — reserved as `initializer`, plugin-enforced |
+
+A non-exposed field is not stripped at merge time — the mirror type simply has
+no field for it. During resolution the `*Defaults` value is projected into a
+partial `TrainingRuntimeSpec` (exposed fields populated, everything else left
+zero) and strategically merged **under** the runtime template. Non-exposed
+fields therefore stay zero in the projection and pass through from the runtime
+template, the initializer image, or `TrainJob.Spec.Initializer` unchanged.
+Reserved fields (for example `volumeName: initializer`) are a stronger case:
+the Initializer Plugin owns and enforces them regardless of any layer.
+
+Grouping PVC configuration under `VolumeClaimPolicies` (rather than flat
+`image`/`mountPath`/`resources` fields) lets admins set `storageClassName`,
+`accessModes`, `resources`, and PVC labels/annotations without growing the API
+one field at a time, while reserving the `initializer` volume name. The
+broader runtime API surface that does not make sense as an initializer default
+(for example, `mlPolicy`, `podGroupPolicy`, `suspend`) is intentionally not
+exposed on the `*Defaults` mirror types.
+
+Because `RuntimeDefaults` are contributed as ordinary ReplicatedJobs during
+runtime resolution, the resulting initializer PodSets flow through the JobSet
+plugin's `ComponentBuilder` unchanged; the Initializer Plugin does not need to
+reason about JobSet shape, and no orphan-PodSet reconstruction is required.
+
+#### Interaction with the runtime snapshot
+
+Because `RuntimeDefaults` are merged during runtime resolution, the effective
+runtime already reflects them before it is snapshotted. Defaults therefore
+apply only to `TrainJob`s created after a Configuration change; updating
+`RuntimeDefaults` does not retroactively mutate already-created `TrainJob`s.
+The runtime snapshot mechanism ([KEP-2599](../2599-mutable-runtimes/README.md))
+must snapshot this effective runtime; the concrete snapshot changes are tracked
+as a follow-up in that KEP.
+
+Existing `TrainingRuntime`s that ship initializer ReplicatedJob templates
+continue to work unchanged. Existing `TrainJob`s are unchanged. No CRD schema
+changes are required.
+
 ### The RuntimePatches API
 
 `runtimePatches` allows controllers, admission webhooks, and custom clients to attach structured
@@ -1842,6 +2047,9 @@ On the other hand, the Internal APIs are not exposed and could not add any opera
       to any kind of resources like PodSpec.
     - `EnforceMLPolicy`: This configure MachineLearning framework specific parameters (e.x, specified in TrainingRuntime `.spec.mlPolicy`)
       to any kind of resources like PodSpec.
+    - `EnforceInitializer`: This configures initializer-specific parameters (specified in TrainJob `.spec.initializer`)
+      on the dataset and model initializer PodSets. Like `EnforcePodGroupPolicy` and `EnforceMLPolicy`, it is a
+      pre-build step that mutates `RuntimeInfo` before `ComponentBuilder` builds the resources.
     - `PodNetwork`: This identifies Pod-to-Pod communication network endpoints for each Pod and stores them to `RuntimeInfo`.
     - `ComponentBuilder`: This builds Kubernetes resources leveraging `RuntimeInfo` and `TrainJob`.
       `RuntimeInfo` is abstracted objects extracted from runtimes like TrainingRuntime and ClusterTrainingRuntime.
@@ -1940,6 +2148,8 @@ spec:
   now accepts only int values (torch plugin defaults to `auto`)
 - 2025-10-09 Replace PodTemplateOverrides with RuntimePatches API
 - 2026-06-08 Removed runtime immutability requirement; runtime lifecycle decoupled from TrainJobs via snapshot mechanism ([KEP-2599](../2599-mutable-runtimes/README.md))
+- 2026-07-30 Extended the KEP with the Initializer Plugin (`EnforceInitializer` extension point)
+  and the `RuntimeDefaults` Configuration API
 
 ## Alternatives
 
