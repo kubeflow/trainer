@@ -16,7 +16,7 @@ blank_issues_enabled: true
 
 contact_links:
   - name: Kubeflow Trainer Documentation
-    url: https://www.kubeflow.org/docs/components/trainer/
+    url: https://trainer.kubeflow.org/en/latest/
     about: Much help can be found in the docs
   - name: Kubeflow Trainer Slack Channel
     url: https://www.kubeflow.org/docs/about/community/#kubeflow-slack-channels
