@@ -53,8 +53,8 @@ RUN apt-get update && \
 COPY --from=builder /workspace/target/release/head /usr/local/bin/head
 COPY --from=builder /workspace/target/release/worker /usr/local/bin/worker
 
-# Create non-root user
-RUN groupadd -r cache_user && useradd -r -g cache_user cache_user
+# Create a non-root user that matches the runtime security context.
+RUN groupadd --gid 1000 cache_user && useradd --uid 1000 --gid cache_user cache_user
 
 # Change ownership and switch to non-root user
 RUN chown -R cache_user:cache_user /usr/local/bin/

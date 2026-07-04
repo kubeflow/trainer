@@ -21,6 +21,20 @@ from kubernetes.client.rest import ApiException
 import pkg.initializers.types.types as types
 import pkg.initializers.utils.utils as utils
 
+RESTRICTED_POD_SECURITY_CONTEXT = {
+    "runAsNonRoot": True,
+    "runAsUser": 1000,
+    "seccompProfile": {"type": "RuntimeDefault"},
+}
+
+RESTRICTED_CONTAINER_SECURITY_CONTEXT = {
+    "allowPrivilegeEscalation": False,
+    "capabilities": {"drop": ["ALL"]},
+    "runAsNonRoot": True,
+    "runAsUser": 1000,
+    "seccompProfile": {"type": "RuntimeDefault"},
+}
+
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%SZ",
@@ -174,12 +188,14 @@ class CacheInitializer(utils.DatasetProvider):
                             },
                             "spec": {
                                 "serviceAccountName": service_account.metadata.name,
+                                "securityContext": RESTRICTED_POD_SECURITY_CONTEXT,
                                 "containers": [
                                     {
                                         "name": "head",
                                         "image": cache_image,
                                         "command": ["head"],
                                         "args": ["0.0.0.0", "50051"],
+                                        "securityContext": RESTRICTED_CONTAINER_SECURITY_CONTEXT,
                                         "resources": {
                                             "limits": {
                                                 "cpu": head_cpu,
@@ -212,12 +228,14 @@ class CacheInitializer(utils.DatasetProvider):
                         "workerTemplate": {
                             "spec": {
                                 "serviceAccountName": f"{train_job_name}-cache",
+                                "securityContext": RESTRICTED_POD_SECURITY_CONTEXT,
                                 "containers": [
                                     {
                                         "name": "worker",
                                         "image": cache_image,
                                         "command": ["worker"],
                                         "args": ["0.0.0.0", "50051"],
+                                        "securityContext": RESTRICTED_CONTAINER_SECURITY_CONTEXT,
                                         "resources": {
                                             "limits": {
                                                 "cpu": worker_cpu,

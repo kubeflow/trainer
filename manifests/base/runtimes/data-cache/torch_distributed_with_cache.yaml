@@ -36,9 +36,23 @@ spec:
             template:
               spec:
                 serviceAccountName: kubeflow-trainer-cache-initializer
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 1000
+                  seccompProfile:
+                    type: RuntimeDefault
                 containers:
                   - name: dataset-initializer
                     image: ghcr.io/kubeflow/trainer/dataset-initializer
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                        drop:
+                          - ALL
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                      seccompProfile:
+                        type: RuntimeDefault
                     env:
                       - name: CACHE_IMAGE
                         value: "ghcr.io/kubeflow/trainer/data-cache:latest"
@@ -58,9 +72,24 @@ spec:
           spec:
             template:
               spec:
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 1000
+                  seccompProfile:
+                    type: RuntimeDefault
                 containers:
                   - name: node
                     image: pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
+                    workingDir: /tmp
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                        drop:
+                          - ALL
+                      runAsNonRoot: true
+                      runAsUser: 1000
+                      seccompProfile:
+                        type: RuntimeDefault
                     env:
                       - name: TRAIN_JOB_NAME
                         valueFrom:

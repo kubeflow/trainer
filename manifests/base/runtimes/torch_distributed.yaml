@@ -33,6 +33,21 @@ spec:
             spec:
               template:
                 spec:
+                  securityContext:
+                    runAsNonRoot: true
+                    runAsUser: 1000
+                    seccompProfile:
+                      type: RuntimeDefault
                   containers:
                     - name: node
                       image: pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
+                      workingDir: /tmp
+                      securityContext:
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsNonRoot: true
+                        runAsUser: 1000
+                        seccompProfile:
+                          type: RuntimeDefault
