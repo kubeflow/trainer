@@ -62,3 +62,41 @@ tests:
       - matchRegex:
           path: data["runtimes.yaml"]
           pattern: "ghcr.io/kubeflow/trainer/data-cache:v1.0.0"
+
+  - it: Should have node job depend on dataset-initializer
+    set:
+      dataCache:
+        enabled: true
+        cacheImage:
+          registry: ghcr.io
+          repository: kubeflow/trainer/data-cache
+          tag: "v1.0.0"
+        runtimes:
+          torchDistributedWithCache:
+            enabled: true
+    asserts:
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: |-
+            (?s)- name: node\s+dependsOn:\s+- name: dataset-initializer\s+status: Complete
+
+  - it: Should set restricted PSS compatible security contexts
+    set:
+      dataCache:
+        enabled: true
+        cacheImage:
+          registry: ghcr.io
+          repository: kubeflow/trainer/data-cache
+          tag: "v1.0.0"
+        runtimes:
+          torchDistributedWithCache:
+            enabled: true
+    asserts:
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: |-
+            (?s)- name: dataset-initializer.*securityContext:\s+runAsNonRoot: true\s+runAsUser: 1000\s+seccompProfile:\s+type: RuntimeDefault\s+containers:\s+- name: dataset-initializer\s+image: ghcr.io/kubeflow/trainer/dataset-initializer:.*\s+securityContext:\s+allowPrivilegeEscalation: false\s+capabilities:\s+drop:\s+- ALL\s+runAsNonRoot: true\s+runAsUser: 1000\s+seccompProfile:\s+type: RuntimeDefault
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: |-
+            (?s)- name: node.*securityContext:\s+runAsNonRoot: true\s+runAsUser: 1000\s+seccompProfile:\s+type: RuntimeDefault\s+containers:\s+- name: node\s+image: pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime\s+workingDir: /tmp\s+securityContext:\s+allowPrivilegeEscalation: false\s+capabilities:\s+drop:\s+- ALL\s+runAsNonRoot: true\s+runAsUser: 1000\s+seccompProfile:\s+type: RuntimeDefault
