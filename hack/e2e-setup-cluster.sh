@@ -239,8 +239,9 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
   # Build Helm dependencies
   helm dependency build charts/kubeflow-trainer
 
-  # Install Trainer via Helm
-  helm install trainer charts/kubeflow-trainer \
+  # Install/upgrade Trainer in one command so required E2E values
+  # (for example TrainJobStatus feature gate) are not dropped by a follow-up upgrade.
+  helm upgrade --install trainer charts/kubeflow-trainer \
     --namespace ${NAMESPACE} \
     --create-namespace \
     --set runtimes.defaultEnabled=true \
