@@ -565,7 +565,7 @@ func TestBuilderTrainer(t *testing.T) {
 				},
 			},
 		},
-		"trainer ancestor with resourcesPerNode": {
+		"trainer ancestor with resourcesPerNode leaves merge to trainingruntime": {
 			jobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 2, constants.Node),
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
@@ -583,45 +583,8 @@ func TestBuilderTrainer(t *testing.T) {
 					},
 				},
 			},
-			info: &runtime.Info{},
-			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
-				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
-					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
-						{
-							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
-								Spec: &batchv1ac.JobSpecApplyConfiguration{
-									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
-										Spec: &corev1ac.PodSpecApplyConfiguration{
-											Containers: []corev1ac.ContainerApplyConfiguration{
-												{
-													Name: ptr.To(constants.Node),
-													Resources: &corev1ac.ResourceRequirementsApplyConfiguration{
-														Limits: &corev1.ResourceList{
-															"nvidia.com/gpu":      resource.MustParse("2"),
-															corev1.ResourceMemory: resource.MustParse("16Gi"),
-														},
-														Requests: &corev1.ResourceList{
-															corev1.ResourceCPU:    resource.MustParse("4"),
-															corev1.ResourceMemory: resource.MustParse("8Gi"),
-														},
-													},
-												},
-											},
-										},
-									},
-								},
-								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
-									Labels: map[string]string{
-										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
-									},
-								},
-							},
-							Name:     ptr.To(constants.Node),
-							Replicas: ptr.To[int32](1),
-						},
-					},
-				},
-			},
+			info:       &runtime.Info{},
+			wantJobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 1, constants.Node),
 		},
 		"trainer ancestor with nil Trainer spec sets replicas to 1": {
 			jobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 5, constants.Node),
@@ -746,11 +709,6 @@ func TestBuilderTrainer(t *testing.T) {
 															Value: ptr.To("present-once"),
 														},
 													},
-													Resources: &corev1ac.ResourceRequirementsApplyConfiguration{
-														Limits: &corev1.ResourceList{
-															corev1.ResourceMemory: resource.MustParse("48Gi"),
-														},
-													},
 												},
 											},
 										},
@@ -836,14 +794,7 @@ func TestBuilderTrainer(t *testing.T) {
 									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
 										Spec: &corev1ac.PodSpecApplyConfiguration{
 											Containers: []corev1ac.ContainerApplyConfiguration{
-												{
-													Name: ptr.To(constants.Node),
-													Resources: &corev1ac.ResourceRequirementsApplyConfiguration{
-														Limits: &corev1.ResourceList{
-															corev1.ResourceMemory: resource.MustParse("32Gi"),
-														},
-													},
-												},
+												*corev1ac.Container().WithName(constants.Node),
 											},
 										},
 									},

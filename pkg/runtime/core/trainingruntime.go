@@ -22,16 +22,13 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"slices"
 
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -149,6 +146,35 @@ func (r *TrainingRuntime) newRuntimeInfo(
 	if err != nil {
 		return nil, err
 	}
+
+	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
+		for i := range jobSetTemplateSpec.Spec.ReplicatedJobs {
+			rJob := &jobSetTemplateSpec.Spec.ReplicatedJobs[i]
+			labelAncestor, hasAncestor := "", false
+			if rJob.Template.Labels != nil {
+				labelAncestor, hasAncestor = rJob.Template.Labels[constants.LabelTrainJobAncestor], true
+			}
+			if !(hasAncestor && labelAncestor == constants.AncestorTrainer && mlPolicy != nil) &&
+				!(mlPolicy != nil && mlPolicy.MPI != nil &&
+					ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && rJob.Name == constants.Node) {
+				continue
+			}
+			for j := range rJob.Template.Spec.Template.Spec.Containers {
+				if rJob.Template.Spec.Template.Spec.Containers[j].Name != constants.Node {
+					continue
+				}
+				container := &rJob.Template.Spec.Template.Spec.Containers[j]
+				mergedRes, mergeErr := runtime.MergeResourceRequirements(
+					container.Resources, *trainJob.Spec.Trainer.ResourcesPerNode)
+				if mergeErr != nil {
+					return nil, mergeErr
+				}
+				container.Resources = mergedRes
+				break
+			}
+		}
+	}
+
 	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: jobsetv1alpha2.GroupVersion.String(),
@@ -177,27 +203,6 @@ func (r *TrainingRuntime) newRuntimeInfo(
 			if labelAncestor, ok := metadata.Labels[constants.LabelTrainJobAncestor]; ok {
 				if labelAncestor == constants.AncestorTrainer && mlPolicy != nil {
 					count = ptr.Deref(mlPolicy.NumNodes, 1)
-
-					// Apply resourcesPerNode from TrainJob to the template spec
-					if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
-						for j := range jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
-							if jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Name == constants.Node {
-								runtimeRes := jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Resources
-								mergedRes := mergeResourceRequirements(runtimeRes, *trainJob.Spec.Trainer.ResourcesPerNode)
-								jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Resources = mergedRes
-
-								requirements := toResourceRequirementsApplyConfiguration(mergedRes)
-								for k := range jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
-									if jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Name != nil &&
-										*jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Name == constants.Node {
-										jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].WithResources(requirements)
-										break
-									}
-								}
-								break
-							}
-						}
-					}
 				}
 				ancestor = &labelAncestor
 			}
@@ -277,50 +282,4 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 	}
 	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
 	return r.framework.RunCustomValidationPlugins(ctx, info, old, new)
-}
-
-// mergeResourceRequirements overlays override onto base.
-// Keys in override replace matching keys in base; unset keys are kept from base.
-func mergeResourceRequirements(base, override corev1.ResourceRequirements) corev1.ResourceRequirements {
-	merged := base.DeepCopy()
-	if merged == nil {
-		merged = &corev1.ResourceRequirements{}
-	}
-	if override.Limits != nil {
-		if merged.Limits == nil {
-			merged.Limits = make(corev1.ResourceList)
-		}
-		maps.Copy(merged.Limits, override.Limits)
-	}
-	if override.Requests != nil {
-		if merged.Requests == nil {
-			merged.Requests = make(corev1.ResourceList)
-		}
-		maps.Copy(merged.Requests, override.Requests)
-	}
-	if override.Claims != nil {
-		merged.Claims = slices.Clone(override.Claims)
-	}
-	return *merged
-}
-
-func toResourceRequirementsApplyConfiguration(res corev1.ResourceRequirements) *corev1ac.ResourceRequirementsApplyConfiguration {
-	requirements := corev1ac.ResourceRequirements()
-	if limits := res.Limits; limits != nil {
-		requirements.WithLimits(maps.Clone(limits))
-	}
-	if requests := res.Requests; requests != nil {
-		requirements.WithRequests(maps.Clone(requests))
-	}
-	if claims := res.Claims; len(claims) > 0 {
-		claimApplies := make([]*corev1ac.ResourceClaimApplyConfiguration, 0, len(claims))
-		for i := range claims {
-			claim := claims[i]
-			claimApplies = append(claimApplies, corev1ac.ResourceClaim().
-				WithName(claim.Name).
-				WithRequest(claim.Request))
-		}
-		requirements.WithClaims(claimApplies...)
-	}
-	return requirements
 }
