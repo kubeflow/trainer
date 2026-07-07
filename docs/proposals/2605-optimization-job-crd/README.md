@@ -9,12 +9,13 @@
 ## Index
 
 1. [Background & Motivation](#1-background--motivation)
-2. [Goals by Phase](#2-goals-by-phase)
-3. [Non-Goals](#3-non-goals)
-4. [Phase 1 API Design (v1alpha1)](#4-phase-1-api-design-v1alpha1)
-5. [Sample YAML (Phase 1)](#5-sample-yaml-phase-1)
-6. [Reconciliation & Architecture (Phase 1)](#6-reconciliation--architecture-phase-1)
-7. [Open Discussions](#7-open-discussions)
+2. [User Stories](#2-user-stories)
+3. [Goals by Phase](#3-goals-by-phase)
+4. [Non-Goals](#4-non-goals)
+5. [Phase 1 API Design (v1alpha1)](#5-phase-1-api-design-v1alpha1)
+6. [Sample YAML (Phase 1)](#6-sample-yaml-phase-1)
+7. [Reconciliation & Architecture (Phase 1)](#7-reconciliation--architecture-phase-1)
+8. [Open Discussions](#8-open-discussions)
 
 ---
 
@@ -24,7 +25,25 @@ Historically, Katib has served as Kubeflow’s general-purpose hyperparameter tu
 
 While highly flexible, its broad scope creates friction for standard ML workflows. It forces users to write verbose YAML and relies on brittle regex string substitution (e.g., `${searchSpace.lr}`) to inject parameters. With the introduction of the unified Kubeflow Python SDK (KEP-46), there is a strong need for a strongly-typed, iterative orchestration layer that integrates natively with `TrainJobs` and relies on push-based metrics.
 
-## 2. Goals by Phase
+## 2. User Stories
+
+**Story 1: The ML Engineer (Simplified Orchestration)**
+* **As an ML Engineer**, I want to define my hyperparameter tuning configurations directly alongside my `TrainJob` template.
+* **Motivation:** To avoid managing two separate, loosely-coupled CRDs (Experiment and Trial) and ensure my training infrastructure and tuning parameters are version-controlled in a single file.
+
+**Story 2: The Data Scientist (Immediate Observability)**
+* **As a Data Scientist**, I want to see the "best trial" results directly in the `OptimizationJob` status.
+* **Motivation:** To avoid executing manual `kubectl` queries across dozens of individual pods to figure out which combination of learning rate and batch size actually performed the best.
+
+**Story 3: The Platform Operator (Stateless Infrastructure)**
+* **As a Platform Operator**, I want the HPO orchestration service to be stateless and avoid deploying dedicated sidecars or persistent databases.
+* **Motivation:** To eliminate the heavy cluster resource overhead required by legacy sidecar models and reduce the operational complexity of maintaining a persistent storage layer strictly for HPO experiments.
+
+**Story 4: The ML Researcher (Native SDK Integration)**
+* **As an ML Researcher**, I want to consume hyperparameter suggestions via standard environment variables rather than brittle YAML regex string substitution.
+* **Motivation:** Using the `KUBEFLOW_OPT_<NAME>` pattern allows me to cleanly parse tuning suggestions inside my Python scripts using existing SDK helper functions without modifying my container's CLI argument parsing logic.
+
+## 3. Goals by Phase
 
 To ensure a stable and reviewable implementation, the project is broken down into strict phases to manage scope.
 
@@ -45,13 +64,13 @@ To ensure a stable and reviewable implementation, the project is broken down int
 - **Trial Suspension & Storage Checkpointing:** Introduce `OptimizationStorage` and `status.Suspended` to allow pausing and resuming trials mid-flight, pending integration with Early Stopping and Kueue.
 - **Stateful Algorithms & Shared Initialization:** Implement One-Shot Jobs for Bayesian/TPE to persist mathematical state, and integrate the `SharedInitializer` plugin to share datasets across trials.
 
-## 3. Non-Goals
+## 4. Non-Goals
 
 - **Neural Architecture Search (NAS):** NAS requires a fundamentally different, graph-structured search space model and is out of scope.
 - **Arbitrary CRD Support:** Supporting arbitrary K8s Custom Resources (e.g., standard K8s Jobs) is dropped to enforce `TrainJob` stability.
 - **Pull-Based Metrics:** Legacy sidecar metric collectors (Prometheus, stdout parsers) are omitted.
 
-## 4. Phase 1 API Design (v1alpha1)
+## 5. Phase 1 API Design (v1alpha1)
 
 The MVP API surface is strongly typed to ensure native API server validation via OpenAPI schemas and CEL rules. Mathematical parameters like standard deviations and interval boundaries utilize `string` types to prevent float precision rounding, protected by K8s CEL type-casting.
 
@@ -279,7 +298,7 @@ type ParameterAssignment struct {
 }
 ```
 
-## 5. Sample YAML (Phase 1)
+## 6. Sample YAML (Phase 1)
 
 The `TrainJobTemplate` utilizes a structured approach. Legacy string templating has been entirely removed. Hyperparameters are dynamically injected by the controller directly into the Pod as prefixed environment variables (e.g., `KUBEFLOW_OPT_<PARAM_NAME>`) and appended as annotations on the `TrainJob` metadata, allowing the Kubeflow Python SDK to parse them natively."
 
@@ -337,51 +356,66 @@ spec:
         # either manually or via the Kubeflow Python SDK helper functions.
 ```
 
-## 6. Reconciliation & Architecture (Phase 1)
+## 7. Reconciliation & Architecture (Phase 1)
 
-### Parameter Translation Flow
-Algorithm settings differ fundamentally between backend frameworks (e.g., Optuna's `n_startup_trials` vs. Hyperopt's `n_startup_jobs`). To decouple the Go Controller from third-party library syntax while maintaining a clean, vendor-agnostic gRPC contract, parameter mapping will occur across a three-step pipeline:
+### 7.1. gRPC API Strategy & Adapter Pattern
 
-1. **Kubernetes API (CRD):** Accepts strictly typed, canonical configurations defined by our OpenAPI schema (e.g., `tpe: { initialTrials: 10 }`).
-2. **Go Reconciler:** Translates the canonical K8s types into provider-specific keys (e.g., mapping `initialTrials` to Optuna's `n_startup_trials`) and flattens them into a standard string map.
-3. **gRPC API:** The `GetSuggestions` Protobuf message schema remains simple and provider-agnostic, utilizing a flat `map<string, string>` to transmit the parameters.
-4. **Python Provider:** The backend suggestion microservice (Optuna) receives the flat map and injects it directly into the engine's initialization logic.
+To accelerate the MVP and reduce risk, the evolution of the gRPC contract between the Go controller and the Python suggestion engines is divided into two phases:
 
-### Suggestion Service Integration
-To eliminate the massive cluster resource overhead and startup latency of Katib's legacy 1-to-1 sidecar model, `OptimizationJob` utilizes a Stateless Shared Provider architecture via gRPC.
+**Phase 1: Legacy API Adapter (Initial Release)**
+For the initial v1alpha1 release, we will use the **existing Katib gRPC API design** (`api.v1.beta1`). 
+* The controller will act as a translation adapter. It will map the new, strictly typed `OptimizationJob` structs (e.g., `SearchSpace`, `RandomAlgorithm`) into the legacy `Experiment` and `Trial` protobuf messages.
+* This allows us to natively reuse the existing, Python suggestion images (e.g., `ghcr.io/kubeflow/katib/suggestion-optuna:latest`) without requiring any immediate modifications to the Python microservices.
+* The controller remains stateless: it reconstructs the trial history by reading `TrainJob` annotations and passes the full history via the `GetSuggestionsRequest` on demand.
 
-* Providers (like Optuna) are pre-deployed as long-running, shared microservices in the cluster.
-* The `OptimizationJob` controller acts as the orchestrator. When evaluating a new trial, the controller gathers the history of completed TrainJobs by reading their annotations and final metrics, packages this history, and sends a single stateless gRPC request to the Provider.
-* The Provider calculates the next parameters, returns them, and forgets the interaction, keeping mathematical execution stateless and independent of Kubernetes state.
+**Phase 2: gRPC Contract Refactoring (Post-Release)**
+After the core orchestration loop is stabilized in the first release, the gRPC contract will be refactored. The legacy `Experiment` protobuf dependency will be removed. The KEP will be updated at that time to align with the new structure.
 
-## 7. Design Decisions & Open Discussions
+### 7.2 The Suggestion Service Architecture
 
-### 7.1. Decision: Decoupling the gRPC Contract
-**Status: Resolved in v1alpha1**
-By resolving to push mathematical bounds and types into the Kubernetes Schema, we eliminate the need for the `ValidateAlgorithmSettings` gRPC call used in Katib. Furthermore, by translating the parameters to a flat map inside the Go controller, we prevent the gRPC protobuf schema from bloating into a massive structured file.
+**Legacy Statefulness (Katib Today)**
+Katib currently operates on a 1-to-1 mapping where every `Experiment` triggers a dedicated, stateful `Suggestion` sidecar. This model forces each experiment to maintain a local database connection and internal state, creating significant resource overhead and operational complexity for sidecar lifecycle management.
 
-### 7.2. Decision: Parameter Propagation via Environment Variables & Annotations
+**The Stateless Evolution (OptimizationJob):**
+Our model evolves this architecture into a stateless, provider-agnostic system:
+
+**Deployment Pattern**
+For Phase 1, we maintain isolation by deploying one dedicated `Suggestion` service container per `OptimizationJob`.
+
+**Stateless Orchestration**
+Unlike Katib, our controller treats the service as an ephemeral provider. The controller orchestrates the experiment by gathering history from completed `TrainJob` annotations and passing this full, point-in-time snapshot to the `GetSuggestions` gRPC method.
+
+**Independence**
+The Provider calculates the next parameters and returns them, "forgetting" the interaction immediately. This keeps mathematical execution stateless and entirely independent of the Kubernetes cluster state, removing the need for a persistent database or stateful sidecars.
+
+## 8. Design Decisions & Open Discussions
+
+### 8.1. Decision: Decoupling the gRPC Contract
+**Status: Deferred to Phase 2**
+Initially, we considered creating a new, provider-agnostic gRPC protobuf schema for Phase 1 to prevent the schema from bloating. However, to ensure a faster and more stable initial release, we have decided to use the existing Katib `api.v1.beta1` protobufs via an adapter pattern in the Go controller. Once the first release is complete, this decision will be revisited, and the gRPC contract will be decoupled and refactored.
+
+### 8.2. Decision: Parameter Propagation via Environment Variables & Annotations
 **Status: Resolved in v1alpha1**
 We have deprecated string templating (`{{.param}}`). To pass parameters to the training container reliably, `OptimizationJob` leverages native Kubernetes downward API mechanisms:
 
 * **The Design:** The controller injects `KUBEFLOW_OPT_<PARAM_NAME>` as environment variables into the Pod. It simultaneously stores the raw JSON parameter assignment as an Annotation on the TrainJob metadata.
 * **The "Why":** This aligns perfectly with the unified Kubeflow Python SDK (KEP-46). Data scientists can use SDK helper functions (e.g., `get_hyperparameters()`) to cleanly parse the environment variables inside their training scripts without modifying YAML command arguments. The metadata annotations allow the controller to reconstruct trial history purely from the Kubernetes API without requiring Katib DB.
 
-### 7.3. Decision: Explicit Separation of Search vs. Pruning
+### 8.3. Decision: Explicit Separation of Search vs. Pruning
 **Status: Resolved (Phase 2 Roadmap)**
 
 We explicitly rename the core API block to `searchAlgorithm` and define a separate, future `pruneAlgorithm` block.
 Search algorithms (TPE/BO) and Pruning algorithms (ASHA/Hyperband) represent different mathematical domains—sampling vs. evaluation. Separate API blocks allow us to evolve these domains independently without polluting the schema with heterogeneous parameters.
 
-### 7.4. Decision: Deprecating the Trial CRD
+### 8.4. Decision: Deprecating the Trial CRD
 **Status: Resolved in v1alpha1**
 With the new unified TrainJob API exposing metrics directly, the `OptimizationJob` controller bypasses the Trial CRD entirely. The `OptimizationJob` directly creates TrainJobs and reconstructs historical state by reading their labels and annotations.
 
-### 7.5. Decision: Search Space Concrete Types (OneOf Pattern)
+### 8.5. Decision: Search Space Concrete Types (OneOf Pattern)
 **Status: Resolved in v1alpha1**
 Instead of employing a single flat struct with a generic type string, the `SearchSpace` utilizes a discriminated union. This establishes strong typing at the Kubernetes API layer, permitting mathematical CEL validations (`double()`, `int()`) and the easy addition of future mathematical domains without heavy Webhook validation logic.
 
-### 7.6. Open Discussion: Decoupling Metric Reporting from Termination Logic
+### 8.6. Open Discussion: Decoupling Metric Reporting from Termination Logic
 **Status: Pending**
 Metric reporting from the TrainJob is strictly asynchronous and non-blocking. Pruning decisions are computed controller-side based on the monotonic metric history. A "Stop Signal" is propagated to the training runtime as a non-blocking annotation or status field, which the KubeflowCallback (SDK) periodically polls.
 
