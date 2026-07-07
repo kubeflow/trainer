@@ -630,11 +630,49 @@ body:has(.landing-page) .sidebar-toggle {
     display: none !important;
 }
 
+body:has(.landing-page) footer:not(.landing-footer),
+body.is-landing footer:not(.landing-footer) {
+    border-top: none !important;
+    margin-top: 0 !important;
+    padding: 0 !important;
+    background-color: #0c1b33 !important;
+}
+
+/* Remove border-top divider from ethical ads and ReadTheDocs addons on the landing page */
+body:has(.landing-page) .ethical-ads-footer,
+body:has(.landing-page) #ethical-ad-placement,
+body:has(.landing-page) readthedocs-addons,
+body:has(.landing-page) .rst-versions,
+body.is-landing .ethical-ads-footer,
+body.is-landing #ethical-ad-placement,
+body.is-landing readthedocs-addons,
+body.is-landing .rst-versions {
+    border-top: none !important;
+}
+
+/* Make ethical ads background transparent */
+body:has(.landing-page) .ethical-ads-footer,
+body:has(.landing-page) .ethical-ads-footer *,
+body:has(.landing-page) #ethical-ad-placement,
+body:has(.landing-page) #ethical-ad-placement *,
+body.is-landing .ethical-ads-footer,
+body.is-landing .ethical-ads-footer *,
+body.is-landing #ethical-ad-placement,
+body.is-landing #ethical-ad-placement * {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
 body:has(.landing-page) .article-container {
     max-width: 100% !important;
     width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
+}
+
+.landing-page ~ .image-reference,
+.landing-page ~ .toctree-wrapper {
+    display: none !important;
 }
 
 /* Font import — DM Sans for headings, Source Sans 3 for body */
