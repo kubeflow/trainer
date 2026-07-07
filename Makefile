@@ -153,12 +153,12 @@ SHELLCHECK_OPTIONS ?=
 .PHONY: shell-fmt
 shell-fmt: shfmt
 	@echo "Running shfmt..."
-	@git ls-files '*.sh' | xargs -I{} $(SHFMT) --write --list $(SHFMT_OPTIONS) "{}"
+	@git ls-files -z '*.sh' | xargs -0 -I{} $(SHFMT) --write --list $(SHFMT_OPTIONS) "{}"
 
 .PHONY: shell-lint
 shell-lint: shellcheck
 	@echo "Running shellcheck..."
-	@git ls-files '*.sh' | xargs -I{} $(SHELLCHECK) $(SHELLCHECK_OPTIONS) "{}"
+	@git ls-files -z '*.sh' | xargs -0 -I{} $(SHELLCHECK) $(SHELLCHECK_OPTIONS) "{}"
 
 # Download external CRDs for Go integration testings.
 EXTERNAL_CRDS_DIR ?= $(PROJECT_DIR)/manifests/external-crds
