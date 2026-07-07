@@ -22,6 +22,9 @@ on:
     tags:
       - "v*"
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'proposals/**'
   workflow_dispatch:
 
 jobs:
