@@ -96,4 +96,4 @@ go run ${OPENAPI_PKG}/cmd/openapi-gen \
 
 # Generating OpenAPI Swagger for Kubeflow Trainer.
 echo "Generate OpenAPI Swagger for Kubeflow Trainer"
-go run hack/swagger/main.go >api/openapi-spec/swagger.json
+go run hack/swagger/main.go > api/openapi-spec/swagger.json
