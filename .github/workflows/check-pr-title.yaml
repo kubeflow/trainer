@@ -42,6 +42,7 @@ jobs:
           scopes: |
             api
             ci
+            deps
             docs
             examples
             exporter
@@ -55,5 +56,4 @@ jobs:
           requireScope: false
           ignoreLabels: |
             do-not-merge/work-in-progress
-            dependencies
             area/release
