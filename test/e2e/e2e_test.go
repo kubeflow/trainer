@@ -576,6 +576,29 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 		})
 	})
 
+	ginkgo.When("Creating a TrainJob managed by an external controller", func() {
+		ginkgo.It("should not be reconciled by the built-in controller", func() {
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-managed-by").
+				ManagedBy("kueue.x-k8s.io/multikueue").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
+				Obj()
+			trainJobKey := client.ObjectKeyFromObject(trainJob)
+
+			ginkgo.By("Create a TrainJob managed by MultiKueue", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Ensuring the built-in controller neither creates a JobSet nor sets any status", func() {
+				gomega.Consistently(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(testingutil.BeNotFoundError())
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeEmpty())
+				}, 15*time.Second, util.Interval).Should(gomega.Succeed())
+			})
+		})
+	})
+
 	ginkgo.When("Creating a TrainJob with Resource Timeouts", func() {
 		ginkgo.It("should fail the TrainJob with DeadlineExceeded when active timeout expires", func() {
 			deadline := int64(10)
