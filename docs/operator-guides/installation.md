@@ -49,25 +49,31 @@ If you manage the CRDs out-of-band (previously via Helm's `--skip-crds` flag), s
 installing them with the chart.
 :::
 
-You can also deploy the default ClusterTrainingRuntimes after installing the control plane with the
-following command:
+You can enable the default ClusterTrainingRuntimes together with the control plane in a single
+step. A post-install Helm hook applies the runtimes once the CRDs and controller are ready:
 
 ```bash
-helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --namespace kubeflow-system \
-    --set runtimes.defaultEnabled=true \
-    --version ${VERSION#v}
+    --create-namespace \
+    --version ${VERSION#v} \
+    --set runtimes.defaultEnabled=true
 ```
 
-To enable specific runtimes:
+To enable specific runtimes instead of all of them:
 
 ```bash
-helm upgrade kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --namespace kubeflow-system \
+    --create-namespace \
     --version ${VERSION#v} \
     --set runtimes.torchDistributed.enabled=true \
     --set runtimes.deepspeedDistributed.enabled=true
 ```
+
+You can also enable runtimes on an existing installation with `helm upgrade` using the same
+`--set` flags. The hook re-applies the enabled runtimes on every upgrade. Disabling a runtime does
+not remove it automatically; delete it manually with `kubectl delete clustertrainingruntime <name>`.
 
 For the available Helm values to configure runtimes, see the
 [kubeflow-trainer Helm chart documentation](https://github.com/kubeflow/trainer/tree/master/charts/kubeflow-trainer).

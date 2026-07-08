@@ -1,0 +1,49 @@
+{{- /*
+Copyright The Kubeflow Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/ -}}
+
+{{- if eq (include "trainer.runtimes.enabled" .) "true" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "trainer.runtimes.installer.name" . }}-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "trainer.runtimes.installer.labels" . | nindent 4 }}
+  annotations:
+    # The built-in runtimes are applied imperatively by the installer Job, so
+    # they are not tracked as release resources. This pre-delete hook removes
+    # them on `helm uninstall`. It runs while the installer ServiceAccount and
+    # RBAC still exist (release resources are deleted after pre-delete hooks).
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "trainer.runtimes.installer.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "trainer.runtimes.installer.name" . }}
+      containers:
+        - name: delete-runtimes
+          image: "{{ .Values.runtimes.installer.image.registry }}/{{ .Values.runtimes.installer.image.repository }}:{{ .Values.runtimes.installer.image.tag }}"
+          command:
+            - kubectl
+            - delete
+            - clustertrainingruntime
+            - --selector=trainer.kubeflow.org/managed-by=runtimes-installer
+            - --ignore-not-found
+{{- end }}

@@ -197,6 +197,19 @@ runtimes:
   commonLabels:
     trainer.kubeflow.org/webhook-validation: disabled
 
+  # -- Configuration for the runtimes installer.
+  # The built-in runtimes are applied by a post-install/post-upgrade Helm hook Job
+  # so that the ClusterTrainingRuntime CRD is registered before the runtimes are created.
+  # The same Job re-applies (server-side) the runtimes on `helm upgrade`.
+  installer:
+    image:
+      # -- Installer image registry (must provide `kubectl`).
+      registry: registry.k8s.io
+      # -- Installer image repository.
+      repository: kubectl
+      # -- Installer image tag.
+      tag: v1.36.0
+
   # -- PyTorch distributed training runtime (no custom images required)
   torchDistributed:
     # -- Enable deployment of torch-distributed runtime

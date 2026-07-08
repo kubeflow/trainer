@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-suite: Test torchtune-llama3.2-1b runtime in installer ConfigMap
+suite: Test jax-distributed runtime in installer ConfigMap
 templates:
   - templates/runtimes/configmap.yaml
 release:
@@ -22,44 +22,35 @@ tests:
   - it: Should not render the installer ConfigMap when no runtime is enabled
     set:
       runtimes:
-        torchtuneDistributed:
-          llama3_2_1B:
-            enabled: false
+        jaxDistributed:
+          enabled: false
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: Should include torchtune-llama3.2-1b when enabled
+  - it: Should include jax-distributed when enabled
     set:
       runtimes:
-        torchtuneDistributed:
-          llama3_2_1B:
-            enabled: true
+        jaxDistributed:
+          enabled: true
     asserts:
       - hasDocuments:
           count: 1
       - matchRegex:
           path: data["runtimes.yaml"]
-          pattern: "name: torchtune-llama3.2-1b"
+          pattern: "name: jax-distributed"
       - matchRegex:
           path: data["runtimes.yaml"]
-          pattern: "trainer.kubeflow.org/framework: torchtune"
+          pattern: "trainer.kubeflow.org/framework: jax"
       - matchRegex:
           path: data["runtimes.yaml"]
           pattern: "trainer.kubeflow.org/managed-by: runtimes-installer"
-      - matchRegex:
-          path: data["runtimes.yaml"]
-          pattern: "hf://meta-llama/Llama-3.2-1B-Instruct"
 
-  - it: Should use custom trainer image tag when specified
+  - it: Should include jax-distributed when runtimes.defaultEnabled is true
     set:
       runtimes:
-        torchtuneDistributed:
-          image:
-            tag: v1.0.0
-          llama3_2_1B:
-            enabled: true
+        defaultEnabled: true
     asserts:
       - matchRegex:
           path: data["runtimes.yaml"]
-          pattern: "image: ghcr.io/kubeflow/trainer/torchtune-trainer:v1.0.0"
+          pattern: "name: jax-distributed"

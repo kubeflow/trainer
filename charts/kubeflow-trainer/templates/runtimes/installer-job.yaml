@@ -1,0 +1,62 @@
+{{- /*
+Copyright The Kubeflow Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/ -}}
+
+{{- if eq (include "trainer.runtimes.enabled" .) "true" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "trainer.runtimes.installer.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "trainer.runtimes.installer.labels" . | nindent 4 }}
+  annotations:
+    # Run after the CRDs and controller are installed/upgraded so that the
+    # ClusterTrainingRuntime type is registered before we apply the runtimes.
+    "helm.sh/hook": post-install,post-upgrade
+    # `before-hook-creation` guarantees a fresh Job on every upgrade (Job specs
+    # are immutable); `hook-succeeded` cleans it up once it completes. Failed
+    # Jobs are intentionally retained for troubleshooting.
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "trainer.runtimes.installer.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "trainer.runtimes.installer.name" . }}
+      containers:
+        - name: apply-runtimes
+          image: "{{ .Values.runtimes.installer.image.registry }}/{{ .Values.runtimes.installer.image.repository }}:{{ .Values.runtimes.installer.image.tag }}"
+          # Create or update the built-in runtimes. Server-side apply reconciles
+          # them on every install/upgrade. Runtimes disabled on a later upgrade
+          # are not pruned automatically; the pre-delete hook removes them on
+          # uninstall.
+          command:
+            - kubectl
+            - apply
+            - --server-side
+            - --force-conflicts
+            - --filename=/manifests/runtimes.yaml
+          volumeMounts:
+            - name: manifests
+              mountPath: /manifests
+              readOnly: true
+      volumes:
+        - name: manifests
+          configMap:
+            name: {{ include "trainer.runtimes.installer.name" . }}
+{{- end }}
