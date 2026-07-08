@@ -324,11 +324,15 @@ spec:
                                 order and the first matching rule is executed.
                               properties:
                                 action:
-                                  description: action to take if the rule is matched.
+                                  description: |-
+                                    action to take if the rule is matched.
+                                    Valid values are FailJobSet, RestartJobSet, RestartJobSetAndIgnoreMaxRestarts, RestartJob, RestartJobAndIgnoreMaxRestarts.
                                   enum:
                                   - FailJobSet
                                   - RestartJobSet
                                   - RestartJobSetAndIgnoreMaxRestarts
+                                  - RestartJob
+                                  - RestartJobAndIgnoreMaxRestarts
                                   type: string
                                 name:
                                   description: |-
