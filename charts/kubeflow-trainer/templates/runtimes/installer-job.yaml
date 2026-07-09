@@ -52,7 +52,8 @@ spec:
               set -e
               # Apply the enabled built-in runtimes.
               kubectl apply --server-side --force-conflicts -f /manifests/runtimes.yaml
-              # Prune: delete runtimes we own that are no longer in the manifest
+              kubectl label --overwrite -f /manifests/runtimes.yaml trainer.kubeflow.org/managed-by=runtimes-installer
+              # Prune: delete runtimes we own that are no longer in the manifest.
               desired="$(kubectl apply -f /manifests/runtimes.yaml --dry-run=client -o name)"
               for res in $(kubectl get clustertrainingruntime -l trainer.kubeflow.org/managed-by=runtimes-installer -o name); do
                 echo "$desired" | grep -qx "$res" || kubectl delete "$res" --ignore-not-found

@@ -64,6 +64,9 @@ tests:
           pattern: "kubectl apply --server-side --force-conflicts -f /manifests/runtimes.yaml"
       - matchRegex:
           path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl label --overwrite -f /manifests/runtimes.yaml trainer.kubeflow.org/managed-by=runtimes-installer"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
           pattern: "kubectl get clustertrainingruntime -l trainer.kubeflow.org/managed-by=runtimes-installer"
       - matchRegex:
           path: spec.template.spec.containers[0].command[2]

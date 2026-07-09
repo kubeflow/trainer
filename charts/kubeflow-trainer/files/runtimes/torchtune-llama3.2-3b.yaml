@@ -17,7 +17,6 @@ metadata:
   name: torchtune-llama3.2-3b
   labels:
     trainer.kubeflow.org/framework: torchtune
-    trainer.kubeflow.org/managed-by: runtimes-installer
     {{- with .Values.runtimes.commonLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}

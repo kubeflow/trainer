@@ -46,9 +46,6 @@ tests:
           pattern: "trainer.kubeflow.org/framework: torchtune"
       - matchRegex:
           path: data["runtimes.yaml"]
-          pattern: "trainer.kubeflow.org/managed-by: runtimes-installer"
-      - matchRegex:
-          path: data["runtimes.yaml"]
           pattern: "hf://meta-llama/Llama-3.2-3B-Instruct"
 
   - it: Should use custom trainer image tag when specified

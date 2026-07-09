@@ -42,9 +42,6 @@ tests:
       - matchRegex:
           path: data["runtimes.yaml"]
           pattern: "trainer.kubeflow.org/framework: deepspeed"
-      - matchRegex:
-          path: data["runtimes.yaml"]
-          pattern: "trainer.kubeflow.org/managed-by: runtimes-installer"
 
   - it: Should include deepspeed-distributed when runtimes.defaultEnabled is true
     set:

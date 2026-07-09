@@ -17,7 +17,6 @@ metadata:
   name: jax-distributed
   labels:
     trainer.kubeflow.org/framework: jax
-    trainer.kubeflow.org/managed-by: runtimes-installer
     {{- with .Values.runtimes.commonLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
