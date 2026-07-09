@@ -208,7 +208,7 @@ runtimes:
       # -- Installer image repository.
       repository: bitnami/kubectl
       # -- Installer image tag.
-      tag: "1.36.1"
+      tag: "1.36.0"
     # -- Image pull secrets for the installer Job.
     imagePullSecrets: []
     # -- Pod resource requests and limits for the installer Job.
