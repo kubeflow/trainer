@@ -45,16 +45,18 @@ spec:
       containers:
         - name: apply-runtimes
           image: "{{ .Values.runtimes.installer.image.registry }}/{{ .Values.runtimes.installer.image.repository }}:{{ .Values.runtimes.installer.image.tag }}"
-          # Create or update the built-in runtimes. Server-side apply reconciles
-          # them on every install/upgrade. Runtimes disabled on a later upgrade
-          # are not pruned automatically; the pre-delete hook removes them on
-          # uninstall.
           command:
-            - kubectl
-            - apply
-            - --server-side
-            - --force-conflicts
-            - --filename=/manifests/runtimes.yaml
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              # Apply the enabled built-in runtimes.
+              kubectl apply --server-side --force-conflicts -f /manifests/runtimes.yaml
+              # Prune: delete runtimes we own that are no longer in the manifest
+              desired="$(kubectl apply -f /manifests/runtimes.yaml --dry-run=client -o name)"
+              for res in $(kubectl get clustertrainingruntime -l trainer.kubeflow.org/managed-by=runtimes-installer -o name); do
+                echo "$desired" | grep -qx "$res" || kubectl delete "$res" --ignore-not-found
+              done
           volumeMounts:
             - name: manifests
               mountPath: /manifests

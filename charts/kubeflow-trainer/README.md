@@ -69,8 +69,9 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
 ```
 
 You can also enable runtimes on an existing installation with `helm upgrade` using the same
-`--set` flags. The hook re-applies the enabled runtimes on every upgrade. Disabling a runtime does
-not remove it automatically; delete it manually with `kubectl delete clustertrainingruntime <name>`.
+`--set` flags. The hook reconciles runtimes on every upgrade: newly enabled runtimes are applied
+and disabled ones are removed. Disabling *all* runtimes removes the installer itself, so in that
+case delete any remaining runtimes manually or with `helm uninstall`.
 
 ### Uninstall the chart
 
@@ -135,13 +136,13 @@ manager:
 | dataCache.cacheImage.tag | string | `""` | Data cache image tag. Defaults to chart version if empty. |
 | dataCache.runtimes.torchDistributedWithCache | object | `{"enabled":false}` | PyTorch distributed training with data cache support |
 | dataCache.runtimes.torchDistributedWithCache.enabled | bool | `false` | Enable deployment of torch-distributed-with-cache runtime |
-| runtimes | object | `{"commonLabels":{"trainer.kubeflow.org/webhook-validation":"disabled"},"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"defaultEnabled":false,"installer":{"affinity":{},"image":{"registry":"registry.k8s.io","repository":"kubectl","tag":"v1.36.0"},"imagePullSecrets":[],"nodeSelector":{},"resources":{},"tolerations":[]},"jaxDistributed":{"enabled":false},"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchtuneDistributed":{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}},"xgboostDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/xgboost-runtime","tag":""}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
+| runtimes | object | `{"commonLabels":{"trainer.kubeflow.org/webhook-validation":"disabled"},"deepspeedDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/deepspeed-runtime","tag":""}},"defaultEnabled":false,"installer":{"affinity":{},"image":{"registry":"docker.io","repository":"bitnami/kubectl","tag":"1.36.1"},"imagePullSecrets":[],"nodeSelector":{},"resources":{},"tolerations":[]},"jaxDistributed":{"enabled":false},"mlxDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/mlx-runtime","tag":""}},"torchDistributed":{"enabled":false},"torchtuneDistributed":{"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/torchtune-trainer","tag":""},"llama3_2_1B":{"enabled":false},"llama3_2_3B":{"enabled":false},"qwen2_5_1_5B":{"enabled":false}},"xgboostDistributed":{"enabled":false,"image":{"registry":"ghcr.io","repository":"kubeflow/trainer/xgboost-runtime","tag":""}}}` | ClusterTrainingRuntimes configuration These are optional runtime templates that can be deployed with the Helm chart. Each runtime provides a blueprint for different ML frameworks and configurations. |
 | runtimes.defaultEnabled | bool | `false` | Enable all default runtimes (torch, deepspeed, mlx, jax, torchtune) when set to true. Individual runtime settings will be ignored if this is enabled. |
 | runtimes.commonLabels | object | `{"trainer.kubeflow.org/webhook-validation":"disabled"}` | Common labels applied to every built-in runtime. The built-in ClusterTrainingRuntime are validated ahead of time. |
-| runtimes.installer | object | `{"affinity":{},"image":{"registry":"registry.k8s.io","repository":"kubectl","tag":"v1.36.0"},"imagePullSecrets":[],"nodeSelector":{},"resources":{},"tolerations":[]}` | Configuration for the runtimes installer. The built-in runtimes are applied by a post-install/post-upgrade Helm hook Job so that the ClusterTrainingRuntime CRD is registered before the runtimes are created. The same Job re-applies (server-side) the runtimes on `helm upgrade`. |
-| runtimes.installer.image.registry | string | `"registry.k8s.io"` | Installer image registry (must provide `kubectl`). |
-| runtimes.installer.image.repository | string | `"kubectl"` | Installer image repository. |
-| runtimes.installer.image.tag | string | `"v1.36.0"` | Installer image tag. |
+| runtimes.installer | object | `{"affinity":{},"image":{"registry":"docker.io","repository":"bitnami/kubectl","tag":"1.36.1"},"imagePullSecrets":[],"nodeSelector":{},"resources":{},"tolerations":[]}` | Configuration for the runtimes installer. The built-in runtimes are applied by a post-install/post-upgrade Helm hook Job so that the ClusterTrainingRuntime CRD is registered before the runtimes are created. The same Job re-applies (server-side) the runtimes on `helm upgrade`. |
+| runtimes.installer.image.registry | string | `"docker.io"` | Installer image registry (must provide `kubectl` and a shell). |
+| runtimes.installer.image.repository | string | `"bitnami/kubectl"` | Installer image repository. |
+| runtimes.installer.image.tag | string | `"1.36.1"` | Installer image tag. |
 | runtimes.installer.imagePullSecrets | list | `[]` | Image pull secrets for the installer Job. |
 | runtimes.installer.resources | object | `{}` | Pod resource requests and limits for the installer Job. |
 | runtimes.installer.nodeSelector | object | `{}` | Node selector for the installer Job pods. |

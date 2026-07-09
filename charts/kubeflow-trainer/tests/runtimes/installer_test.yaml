@@ -48,20 +48,26 @@ tests:
           value: kubeflow-trainer-runtimes-installer
       - equal:
           path: spec.template.spec.containers[0].image
-          value: registry.k8s.io/kubectl:v1.36.0
+          value: docker.io/bitnami/kubectl:1.36.1
 
-  - it: Should reconcile runtimes with a server-side apply
+  - it: Should apply runtimes server-side and prune the ones no longer desired
     template: templates/runtimes/installer-job.yaml
     set:
       runtimes:
         defaultEnabled: true
     asserts:
-      - contains:
-          path: spec.template.spec.containers[0].command
-          content: --server-side
-      - contains:
-          path: spec.template.spec.containers[0].command
-          content: --force-conflicts
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: /bin/sh
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl apply --server-side --force-conflicts -f /manifests/runtimes.yaml"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl get clustertrainingruntime -l trainer.kubeflow.org/managed-by=runtimes-installer"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl delete"
 
   - it: Should apply scheduling and resource overrides to the installer Job
     template: templates/runtimes/installer-job.yaml

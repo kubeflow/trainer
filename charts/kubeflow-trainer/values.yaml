@@ -203,12 +203,12 @@ runtimes:
   # The same Job re-applies (server-side) the runtimes on `helm upgrade`.
   installer:
     image:
-      # -- Installer image registry (must provide `kubectl`).
-      registry: registry.k8s.io
+      # -- Installer image registry (must provide `kubectl` and a shell).
+      registry: docker.io
       # -- Installer image repository.
-      repository: kubectl
+      repository: bitnami/kubectl
       # -- Installer image tag.
-      tag: v1.36.0
+      tag: "1.36.1"
     # -- Image pull secrets for the installer Job.
     imagePullSecrets: []
     # -- Pod resource requests and limits for the installer Job.

@@ -72,8 +72,9 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
 ```
 
 You can also enable runtimes on an existing installation with `helm upgrade` using the same
-`--set` flags. The hook re-applies the enabled runtimes on every upgrade. Disabling a runtime does
-not remove it automatically; delete it manually with `kubectl delete clustertrainingruntime <name>`.
+`--set` flags. The hook reconciles runtimes on every upgrade: newly enabled runtimes are applied
+and disabled ones are removed. Disabling *all* runtimes removes the installer itself, so in that
+case delete any remaining runtimes manually or with `helm uninstall`.
 
 For the available Helm values to configure runtimes, see the
 [kubeflow-trainer Helm chart documentation](https://github.com/kubeflow/trainer/tree/master/charts/kubeflow-trainer).
