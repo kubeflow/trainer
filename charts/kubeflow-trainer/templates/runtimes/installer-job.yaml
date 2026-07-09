@@ -38,6 +38,10 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ include "trainer.runtimes.installer.name" . }}
+      {{- with .Values.runtimes.installer.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: apply-runtimes
           image: "{{ .Values.runtimes.installer.image.registry }}/{{ .Values.runtimes.installer.image.repository }}:{{ .Values.runtimes.installer.image.tag }}"
@@ -55,8 +59,24 @@ spec:
             - name: manifests
               mountPath: /manifests
               readOnly: true
+          {{- with .Values.runtimes.installer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: manifests
           configMap:
             name: {{ include "trainer.runtimes.installer.name" . }}
+      {{- with .Values.runtimes.installer.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runtimes.installer.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runtimes.installer.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 {{- end }}

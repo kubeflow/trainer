@@ -209,6 +209,16 @@ runtimes:
       repository: kubectl
       # -- Installer image tag.
       tag: v1.36.0
+    # -- Image pull secrets for the installer Job.
+    imagePullSecrets: []
+    # -- Pod resource requests and limits for the installer Job.
+    resources: {}
+    # -- Node selector for the installer Job pods.
+    nodeSelector: {}
+    # -- Affinity for the installer Job pods.
+    affinity: {}
+    # -- Tolerations for the installer Job pods.
+    tolerations: []
 
   # -- PyTorch distributed training runtime (no custom images required)
   torchDistributed:

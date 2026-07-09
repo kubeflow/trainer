@@ -63,6 +63,45 @@ tests:
           path: spec.template.spec.containers[0].command
           content: --force-conflicts
 
+  - it: Should apply scheduling and resource overrides to the installer Job
+    template: templates/runtimes/installer-job.yaml
+    set:
+      runtimes:
+        defaultEnabled: true
+        installer:
+          imagePullSecrets:
+            - name: my-secret
+          resources:
+            requests:
+              cpu: 100m
+          nodeSelector:
+            disktype: ssd
+          tolerations:
+            - key: dedicated
+              operator: Exists
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: disktype
+                        operator: Exists
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: my-secret
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.template.spec.nodeSelector.disktype
+          value: ssd
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: dedicated
+      - isNotNullOrEmpty:
+          path: spec.template.spec.affinity.nodeAffinity
+
   - it: Should render the cleanup Job as a pre-delete hook
     template: templates/runtimes/cleanup-job.yaml
     set:

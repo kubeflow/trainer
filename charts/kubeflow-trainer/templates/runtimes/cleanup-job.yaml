@@ -37,6 +37,10 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ include "trainer.runtimes.installer.name" . }}
+      {{- with .Values.runtimes.installer.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: delete-runtimes
           image: "{{ .Values.runtimes.installer.image.registry }}/{{ .Values.runtimes.installer.image.repository }}:{{ .Values.runtimes.installer.image.tag }}"
@@ -46,4 +50,20 @@ spec:
             - clustertrainingruntime
             - --selector=trainer.kubeflow.org/managed-by=runtimes-installer
             - --ignore-not-found
+          {{- with .Values.runtimes.installer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.runtimes.installer.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runtimes.installer.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runtimes.installer.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 {{- end }}
