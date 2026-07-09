@@ -47,7 +47,7 @@ const (
 	SupportDeprecated string = "deprecated"
 
 	// RuntimeDeprecationPolicyURL is the URL to the runtime deprecation policy documentation.
-	RuntimeDeprecationPolicyURL string = "https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy"
+	RuntimeDeprecationPolicyURL string = "https://trainer.kubeflow.org/en/latest/operator-guides/runtime.html#runtime-deprecation-policy"
 
 	// DatasetInitializer is the name of the Job, volume mount, container, and label value for the dataset initializer.
 	DatasetInitializer string = "dataset-initializer"
