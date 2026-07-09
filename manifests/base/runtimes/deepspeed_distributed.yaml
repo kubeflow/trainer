@@ -40,13 +40,14 @@ spec:
             spec:
               template:
                 spec:
+                  securityContext:
+                    fsGroup: 1000
                   containers:
                     - name: node
                       image: ghcr.io/kubeflow/trainer/deepspeed-runtime
                       securityContext:
-                        unAsUser: 1000
+                        runAsUser: 1000
                         runAsGroup: 1000
-                        fsGroup: 1000
                       command:
                         - /usr/sbin/sshd
                       args:
@@ -69,10 +70,11 @@ spec:
             spec:
               template:
                 spec:
+                  securityContext:
+                    fsGroup: 1000
                   containers:
                     - name: node
                       image: ghcr.io/kubeflow/trainer/deepspeed-runtime
                       securityContext:
-                        unAsUser: 1000
+                        runAsUser: 1000
                         runAsGroup: 1000
-                        fsGroup: 1000
