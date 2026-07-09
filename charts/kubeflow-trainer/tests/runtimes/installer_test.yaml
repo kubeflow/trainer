@@ -48,7 +48,7 @@ tests:
           value: kubeflow-trainer-runtimes-installer
       - equal:
           path: spec.template.spec.containers[0].image
-          value: docker.io/bitnami/kubectl:1.35.0
+          value: docker.io/bitnami/kubectl:latest
 
   - it: Should apply runtimes server-side and prune the ones no longer desired
     template: templates/runtimes/installer-job.yaml
