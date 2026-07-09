@@ -13,7 +13,7 @@ You can now install controller manager with Helm charts 🚀
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer --version 2.1.0
 ```
 
-For more information, please see [the Kubeflow Trainer docs](https://www.kubeflow.org/docs/components/trainer/overview/)
+For more information, please see [the Kubeflow Trainer docs](https://trainer.kubeflow.org/en/latest/overview/index.html)
 
 ## Breaking Changes
 

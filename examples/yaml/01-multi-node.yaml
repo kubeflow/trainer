@@ -20,7 +20,7 @@
 # (PET_NNODES, PET_NPROC_PER_NODE, PET_NODE_RANK, PET_MASTER_ADDR,
 # PET_MASTER_PORT) and exposes WORLD_SIZE / RANK / LOCAL_RANK to each worker.
 #
-# See https://www.kubeflow.org/docs/components/trainer/user-guides/pytorch/#pytorch-distributed-environment
+# See https://trainer.kubeflow.org/en/latest/user-guides/pytorch.html#pytorch-distributed-environment
 #
 # Apply: kubectl apply -f 01-multi-node.yaml
 # Check: kubectl get trainjob multi-node-example

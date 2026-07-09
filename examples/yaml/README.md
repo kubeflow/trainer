@@ -1,6 +1,6 @@
 # Kubeflow Trainer YAML Examples
 
-Standalone manifests that can be applied directly with `kubectl`. For an end-to-end conceptual walkthrough, see the [Kubeflow Trainer documentation](https://www.kubeflow.org/docs/components/trainer/).
+Standalone manifests that can be applied directly with `kubectl`. For an end-to-end conceptual walkthrough, see the [Kubeflow Trainer documentation](https://trainer.kubeflow.org/en/latest/).
 
 ## Prerequisites
 
@@ -34,6 +34,6 @@ kubectl delete trainjob multi-node-example
 
 ## See also
 
-- [Runtime guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/)
-- [Job scheduling guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/)
+- [Runtime guide](https://trainer.kubeflow.org/en/latest/operator-guides/runtime.html)
+- [Job scheduling guide](https://trainer.kubeflow.org/en/latest/operator-guides/job-scheduling/overview.html)
 - [Python SDK examples](../pytorch/)
