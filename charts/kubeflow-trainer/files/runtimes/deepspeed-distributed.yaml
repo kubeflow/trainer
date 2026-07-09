@@ -84,9 +84,13 @@ spec:
                         runAsUser: 1000
                         runAsGroup: 1000
 <<<<<<< HEAD:charts/kubeflow-trainer/files/runtimes/deepspeed-distributed.yaml
+<<<<<<< HEAD:charts/kubeflow-trainer/files/runtimes/deepspeed-distributed.yaml
                         fsGroup: 1000
 {{- end }}
 >>>>>>> 2a6f67f0 (feat(runtimes): make MPI launcher depend on worker readiness):charts/kubeflow-trainer/templates/runtimes/deepspeed-distributed.yaml
 =======
 {{- end }}
 >>>>>>> 0eb56b2e (fix: fix typos and misplaced fsgroup):charts/kubeflow-trainer/templates/runtimes/deepspeed-distributed.yaml
+=======
+{{- end }}
+>>>>>>> f1e51320 (fix: fix yaml linting):charts/kubeflow-trainer/templates/runtimes/deepspeed-distributed.yaml
