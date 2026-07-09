@@ -48,6 +48,8 @@ spec:
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
                       securityContext:
                         runAsUser: 1000
+                        runAsGroup: 1000
+                        fsGroup: 1000
                       command:
                         - /usr/sbin/sshd
                       args:
@@ -77,5 +79,7 @@ spec:
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
                       securityContext:
                         runAsUser: 1000
+                        runAsGroup: 1000
+                        fsGroup: 1000
 {{- end }}
 >>>>>>> 2a6f67f0 (feat(runtimes): make MPI launcher depend on worker readiness):charts/kubeflow-trainer/templates/runtimes/deepspeed-distributed.yaml
