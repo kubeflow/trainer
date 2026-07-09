@@ -48,7 +48,7 @@ tests:
           value: kubeflow-trainer-runtimes-installer
       - equal:
           path: spec.template.spec.containers[0].image
-          value: docker.io/bitnami/kubectl:latest
+          value: docker.io/alpine:3.21
 
   - it: Should apply runtimes server-side and prune the ones no longer desired
     template: templates/runtimes/installer-job.yaml
@@ -59,6 +59,9 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].command[0]
           value: /bin/sh
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "apk add --no-cache kubectl"
       - matchRegex:
           path: spec.template.spec.containers[0].command[2]
           pattern: "kubectl apply --server-side --force-conflicts -f /manifests/runtimes.yaml"
@@ -122,15 +125,15 @@ tests:
       - equal:
           path: metadata.annotations["helm.sh/hook"]
           value: pre-delete
-      - contains:
-          path: spec.template.spec.containers[0].command
-          content: delete
-      - contains:
-          path: spec.template.spec.containers[0].command
-          content: clustertrainingruntime
-      - contains:
-          path: spec.template.spec.containers[0].command
-          content: --selector=trainer.kubeflow.org/managed-by=runtimes-installer
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: /bin/sh
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "apk add --no-cache kubectl"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl delete clustertrainingruntime --selector=trainer.kubeflow.org/managed-by=runtimes-installer --ignore-not-found"
 
   - it: Should grant the installer permission to reconcile ClusterTrainingRuntimes
     template: templates/runtimes/rbac.yaml

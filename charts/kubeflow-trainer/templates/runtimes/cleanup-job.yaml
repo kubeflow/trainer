@@ -45,11 +45,14 @@ spec:
         - name: delete-runtimes
           image: "{{ .Values.runtimes.installer.image.registry }}/{{ .Values.runtimes.installer.image.repository }}:{{ .Values.runtimes.installer.image.tag }}"
           command:
-            - kubectl
-            - delete
-            - clustertrainingruntime
-            - --selector=trainer.kubeflow.org/managed-by=runtimes-installer
-            - --ignore-not-found
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              # Install kubectl
+              apk add --no-cache kubectl
+              # Remove the built-in runtimes applied by the installer.
+              kubectl delete clustertrainingruntime --selector=trainer.kubeflow.org/managed-by=runtimes-installer --ignore-not-found
           {{- with .Values.runtimes.installer.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

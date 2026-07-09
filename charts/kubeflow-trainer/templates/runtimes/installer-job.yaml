@@ -50,6 +50,8 @@ spec:
             - -c
             - |
               set -e
+              # Install kubectl
+              apk add --no-cache kubectl
               # Apply the enabled built-in runtimes.
               kubectl apply --server-side --force-conflicts -f /manifests/runtimes.yaml
               kubectl label --overwrite -f /manifests/runtimes.yaml trainer.kubeflow.org/managed-by=runtimes-installer
