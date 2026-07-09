@@ -153,12 +153,6 @@ JAX_RUNTIME_IMAGE="nvcr.io/nvidia/jax:25.10-py3"
 echo "Pull JAX runtime image"
 ${CONTAINER_RUNTIME} pull ${JAX_RUNTIME_IMAGE}
 
-# Base image used by the runtimes-installer Job (it installs kubectl at runtime).
-# Preloaded so the post-install hook does not depend on a Docker Hub pull.
-RUNTIMES_INSTALLER_IMAGE="docker.io/alpine:3.21"
-echo "Pull runtimes installer image"
-${CONTAINER_RUNTIME} pull ${RUNTIMES_INSTALLER_IMAGE}
-
 echo "Load Kubeflow Trainer and Runtime images into Kind"
 load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
@@ -168,7 +162,6 @@ load_image_to_kind "${MLX_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${DEEPSPEED_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${XGBOOST_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${JAX_RUNTIME_IMAGE}" "${CLUSTER_NAME}"
-load_image_to_kind "${RUNTIMES_INSTALLER_IMAGE}" "${CLUSTER_NAME}"
 
 # ==========================================
 # 3. Deploy Control Plane & Runtimes

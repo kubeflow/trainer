@@ -30,10 +30,6 @@ metadata:
   labels:
     {{- include "trainer.runtimes.installer.labels" . | nindent 4 }}
 rules:
-# The installer Job reconciles the built-in ClusterTrainingRuntimes with
-# `kubectl apply --server-side --prune`, hence the create/update/patch/delete
-# verbs. `list` is required so that `--prune` and the pre-delete cleanup can
-# find the runtimes it owns.
 - apiGroups:
   - trainer.kubeflow.org
   resources:

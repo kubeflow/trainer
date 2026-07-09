@@ -52,6 +52,8 @@ jobs:
       # left behind. Only tested here on a single Kubernetes version.
       - name: Verify Helm Uninstall
         run: |
+          kubectl delete trainjobs --all --all-namespaces --force
+
           # --wait blocks on the pre-delete cleanup Job; a failing hook fails this step.
           helm uninstall trainer --namespace kubeflow-system --wait
 
