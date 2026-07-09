@@ -46,3 +46,23 @@ jobs:
 
       - name: Run Go E2E Tests
         run: make test-e2e || (kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer && exit 1)
+
+      # Verify that `helm uninstall` succeeds, including the pre-delete cleanup
+      # hook that removes the built-in runtimes, and that no chart resources are
+      # left behind. Only tested here on a single Kubernetes version.
+      - name: Verify Helm Uninstall
+        run: |
+          # --wait blocks on the pre-delete cleanup Job; a failing hook fails this step.
+          helm uninstall trainer --namespace kubeflow-system --wait
+
+          echo "Checking that no chart resources remain after uninstall..."
+          namespaced=$(kubectl get all,serviceaccount,configmap,secret,role,rolebinding \
+            -n kubeflow-system -l app.kubernetes.io/instance=trainer -o name || true)
+          clustered=$(kubectl get clusterrole,clusterrolebinding,validatingwebhookconfiguration,mutatingwebhookconfiguration \
+            -l app.kubernetes.io/instance=trainer -o name || true)
+          if [ -n "${namespaced}${clustered}" ]; then
+            echo "ERROR: resources still present after helm uninstall:"
+            printf '%s\n%s\n' "${namespaced}" "${clustered}"
+            exit 1
+          fi
+          echo "Verified: helm uninstall removed all chart resources"

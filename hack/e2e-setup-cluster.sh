@@ -33,7 +33,6 @@ setup_container_runtime
 export CLUSTER_TYPE=${CLUSTER_TYPE:-"cpu"}
 INSTALL_METHOD=${INSTALL_METHOD:-kustomize}
 KIND=${KIND:-./bin/kind}
-K8S_VERSION=${K8S_VERSION:-1.32.0}
 KIND_NODE_VERSION=kindest/node:v${K8S_VERSION}
 NAMESPACE="kubeflow-system"
 TIMEOUT="5m"
