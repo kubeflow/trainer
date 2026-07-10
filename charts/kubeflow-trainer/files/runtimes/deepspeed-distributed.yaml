@@ -54,7 +54,7 @@ spec:
                     - name: node
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
                       securityContext:
-                        runAsUser: 1000
+                        runAsUser: 0
 
         - name: node
           template:
@@ -65,7 +65,7 @@ spec:
                     - name: node
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
                       securityContext:
-                        runAsUser: 1000
+                        runAsUser: 0
                       command:
                         - /usr/sbin/sshd
                       args:
