@@ -50,28 +50,22 @@ spec:
             spec:
               template:
                 spec:
-                  securityContext:
-                    fsGroup: 1000
                   containers:
                     - name: node
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
                       securityContext:
                         runAsUser: 1000
-                        runAsGroup: 1000
 
         - name: node
           template:
             spec:
               template:
                 spec:
-                  securityContext:
-                    fsGroup: 1000
                   containers:
                     - name: node
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
                       securityContext:
                         runAsUser: 1000
-                        runAsGroup: 1000
                       command:
                         - /usr/sbin/sshd
                       args:
