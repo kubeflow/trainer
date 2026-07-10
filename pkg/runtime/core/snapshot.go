@@ -34,8 +34,9 @@ const (
 	runtimeDataKey        = "runtime"
 )
 
-// getRuntimeSnapshot retrieves the runtime snapshot from the ConfigMap, and populate the value in runtimeObj.
-// Returns an error if the snapshot ConfigMap doesn't exist or if the data is invalid.
+// getRuntimeSnapshot retrieves the runtime snapshot from the ConfigMap and unmarshalls the value into runtimeObj.
+// Returns an error if the snapshot ConfigMap doesn't exist or if the data is invalid. The value of runtimeObj is
+// only valid if no error was returned.
 func getRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.TrainJob, runtimeObj client.Object) error {
 	cm := &corev1.ConfigMap{}
 	cmKey := client.ObjectKey{
@@ -89,7 +90,7 @@ func getRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.
 
 // createRuntimeSnapshot creates a ConfigMap containing a YAML-serialized snapshot of the runtime configuration.
 // The ConfigMap is owned by the TrainJob and will be automatically deleted when the TrainJob is deleted.
-// Uses Server-Side Apply for idempotent creation.
+// An existing configmap will be overwritten. Callers must only invoke this when no snapshot exists.
 func createRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.TrainJob, runtimeObj client.Object) error {
 	// Serialize the runtime object to YAML
 	runtimeYAML, err := yaml.Marshal(runtimeObj)

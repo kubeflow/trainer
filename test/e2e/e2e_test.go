@@ -693,7 +693,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 	ginkgo.When("Updating a runtime", func() {
 		// These tests ensure that a TrainJob is using a "snapshot" of the runtime from creation time, rather than
 		// the latest value of the runtime.
-		// This is testing the "snapshot" mechanism from docs/proposals/2599-mutable-runtimes/README.md.
+		// This is testing the "snapshot" mechanism from proposals/2599-mutable-runtimes/README.md.
 
 		const (
 			// These images are arbitrary, but are chosen to be small and to come from
@@ -837,6 +837,20 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 						for _, jobStatus := range gotTrainJob.Status.JobsStatus {
 							g.Expect(*jobStatus.Active).Should(gomega.BeNumerically(">", 0))
 						}
+					}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+				})
+
+				ginkgo.By("Verifying the Runtime snapshot is garbage collected", func() {
+					snapshot := &corev1.ConfigMap{}
+					snapshotKey := client.ObjectKey{Name: trainJob.Name + "-runtime-snapshot", Namespace: ns.Name}
+
+					// check snapshot exists before deleting to avoid false-positive test result
+					gomega.Expect(k8sClient.Get(ctx, snapshotKey, snapshot)).Should(gomega.Succeed())
+
+					// delete the TrainJob and wait for GC
+					gomega.Expect(k8sClient.Delete(ctx, trainJob)).Should(gomega.Succeed())
+					gomega.Eventually(func(g gomega.Gomega) {
+						g.Expect(k8sClient.Get(ctx, snapshotKey, snapshot)).Should(testingutil.BeNotFoundError())
 					}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 				})
 			},

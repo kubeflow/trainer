@@ -2699,6 +2699,13 @@ alpha-node-0-1.alpha slots=8
 					g.Expect(jobSet.Labels["snapshot-test-marker"]).ShouldNot(gomega.Equal(updatedLabelValue),
 						"JobSet should not pick up the updated runtime label")
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				ginkgo.By("Verifying snapshot ConfigMap is unchanged")
+				gomega.Eventually(func(g gomega.Gomega) {
+					cm := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, snapshotKey, cm)).Should(gomega.Succeed())
+					g.Expect(cm.Data["runtime"]).Should(gomega.ContainSubstring(originalLabelValue))
+					g.Expect(cm.Data["runtime"]).ShouldNot(gomega.ContainSubstring(updatedLabelValue))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 
 			ginkgo.It("Should create snapshots for existing TrainJobs that were created before the snapshot feature was added", func() {
