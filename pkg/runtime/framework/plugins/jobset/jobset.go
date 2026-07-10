@@ -108,29 +108,33 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 		}
 		rJobVolumeNames[*rJob.Name] = sets.New[string]()
 		for _, v := range rJob.Template.Spec.Template.Spec.Volumes {
+			if v.Name == nil {
+ 				continue
+ 			}
 			rJobVolumeNames[*rJob.Name].Insert(*v.Name)
 		}
 	}
 	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Dataset != nil {
 		if containers, ok := rJobContainerNames[constants.DatasetInitializer]; !ok {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.DatasetInitializer)))
-		} else if !containers.Has(constants.DatasetInitializer) {
-			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.DatasetInitializer, constants.DatasetInitializer)))
-		}
-		if volumes, ok := rJobVolumeNames[constants.DatasetInitializer]; !ok || !volumes.Has(jobsetplgconsts.VolumeNameInitializer) {
-			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.DatasetInitializer)))
-		}
+		} else {
+ 			if !containers.Has(constants.DatasetInitializer) {
+ 				allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.DatasetInitializer, constants.DatasetInitializer)))
+ 			}
+ 			if volumes := rJobVolumeNames[constants.DatasetInitializer]; !volumes.Has(jobsetplgconsts.VolumeNameInitializer) {
+ 				allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.DatasetInitializer)))
+ 			}
 	}
 	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Model != nil {
 		if containers, ok := rJobContainerNames[constants.ModelInitializer]; !ok {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input modelConfig", constants.ModelInitializer)))
-		} else if !containers.Has(constants.ModelInitializer) {
-			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)))
-		}
-		if volumes, ok := rJobVolumeNames[constants.ModelInitializer]; !ok || !volumes.Has(jobsetplgconsts.VolumeNameInitializer) {
-			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.ModelInitializer)))
-		}
-	}
+		} else {
+ 			if !containers.Has(constants.ModelInitializer) {
+ 				allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)))
+ 			}
+ 			if volumes := rJobVolumeNames[constants.ModelInitializer]; !volumes.Has(jobsetplgconsts.VolumeNameInitializer) {
+ 				allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.ModelInitializer)))
+ 			}
 
 	allErrs = append(allErrs, j.checkRuntimePatchesImmutability(ctx, oldObj, newObj)...)
 
