@@ -38,19 +38,29 @@ spec:
         targetReplicatedJobs:
           - launcher
       replicatedJobs:
-        - name: node
+        - name: launcher
           template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
             spec:
               template:
                 spec:
-                  securityContext:
-                    fsGroup: 1000
                   containers:
                     - name: node
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
                       securityContext:
                         runAsUser: 1000
-                        runAsGroup: 1000
+        - name: node
+          template:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
+                      securityContext:
+                        runAsUser: 1000
                       command:
                         - /usr/sbin/sshd
                       args:
@@ -61,36 +71,3 @@ spec:
                         tcpSocket:
                           port: 2222
                         initialDelaySeconds: 5
-<<<<<<< HEAD:charts/kubeflow-trainer/files/runtimes/deepspeed-distributed.yaml
-=======
-
-        - name: launcher
-          dependsOn:
-            - name: node
-              status: Ready
-          template:
-            metadata:
-              labels:
-                trainer.kubeflow.org/trainjob-ancestor-step: trainer
-            spec:
-              template:
-                spec:
-                  securityContext:
-                    fsGroup: 1000
-                  containers:
-                    - name: node
-                      image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
-                      securityContext:
-                        runAsUser: 1000
-                        runAsGroup: 1000
-<<<<<<< HEAD:charts/kubeflow-trainer/files/runtimes/deepspeed-distributed.yaml
-<<<<<<< HEAD:charts/kubeflow-trainer/files/runtimes/deepspeed-distributed.yaml
-                        fsGroup: 1000
-{{- end }}
->>>>>>> 2a6f67f0 (feat(runtimes): make MPI launcher depend on worker readiness):charts/kubeflow-trainer/templates/runtimes/deepspeed-distributed.yaml
-=======
-{{- end }}
->>>>>>> 0eb56b2e (fix: fix typos and misplaced fsgroup):charts/kubeflow-trainer/templates/runtimes/deepspeed-distributed.yaml
-=======
-{{- end }}
->>>>>>> f1e51320 (fix: fix yaml linting):charts/kubeflow-trainer/templates/runtimes/deepspeed-distributed.yaml

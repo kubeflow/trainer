@@ -38,6 +38,19 @@ spec:
         targetReplicatedJobs:
           - launcher
       replicatedJobs:
+        - name: launcher
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: node
+                      image: {{ include "trainer.runtimeImage" (list .Values.runtimes.mlxDistributed.image .) }}
+                      securityContext:
+                        runAsUser: 1000
         - name: node
           template:
             spec:
@@ -58,24 +71,3 @@ spec:
                         tcpSocket:
                           port: 2222
                         initialDelaySeconds: 5
-<<<<<<< HEAD:charts/kubeflow-trainer/files/runtimes/mlx-distributed.yaml
-=======
-
-        - name: launcher
-          dependsOn:
-            - name: node
-              status: Ready
-          template:
-            metadata:
-              labels:
-                trainer.kubeflow.org/trainjob-ancestor-step: trainer
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: node
-                      image: {{ include "trainer.runtimeImage" (list .Values.runtimes.mlxDistributed.image .) }}
-                      securityContext:
-                        runAsUser: 1000
-{{- end }}
->>>>>>> 2a6f67f0 (feat(runtimes): make MPI launcher depend on worker readiness):charts/kubeflow-trainer/templates/runtimes/mlx-distributed.yaml
