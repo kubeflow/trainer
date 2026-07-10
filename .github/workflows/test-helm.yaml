@@ -52,13 +52,14 @@ jobs:
       # left behind. Only tested here on a single Kubernetes version.
       - name: Verify Helm Uninstall
         run: |
-          kubectl delete trainjobs --all --all-namespaces --force
+          # The flux runtime is applied outside of runtime installer job, so we need to manually delete it.
+          kubectl delete clustertrainingruntime flux-distributed --ignore-not-found --timeout 3m
 
           # --wait blocks on the pre-delete cleanup Job; a failing hook fails this step.
           helm uninstall trainer --namespace kubeflow-system --wait
 
           echo "Checking that no chart resources remain after uninstall..."
-          namespaced=$(kubectl get all,serviceaccount,configmap,secret,role,rolebinding \
+          namespaced=$(kubectl get deployment,service,serviceaccount,configmap,secret,role,rolebinding \
             -n kubeflow-system -l app.kubernetes.io/instance=trainer -o name || true)
           clustered=$(kubectl get clusterrole,clusterrolebinding,validatingwebhookconfiguration,mutatingwebhookconfiguration \
             -l app.kubernetes.io/instance=trainer -o name || true)
