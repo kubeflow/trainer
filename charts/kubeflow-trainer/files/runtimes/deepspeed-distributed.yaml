@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime
 metadata:
@@ -39,6 +40,9 @@ spec:
           - launcher
       replicatedJobs:
         - name: launcher
+          dependsOn:
+            - name: node
+              status: Ready
           template:
             metadata:
               labels:
@@ -51,6 +55,7 @@ spec:
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
                       securityContext:
                         runAsUser: 1000
+
         - name: node
           template:
             spec:
