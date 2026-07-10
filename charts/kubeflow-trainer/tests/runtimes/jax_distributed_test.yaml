@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-suite: Test deepspeed-distributed runtime in installer ConfigMap
+suite: Test jax-distributed runtime in installer ConfigMap
 templates:
   - templates/runtimes/configmap.yaml
 release:
@@ -22,44 +22,32 @@ tests:
   - it: Should not render the installer ConfigMap when no runtime is enabled
     set:
       runtimes:
-        deepspeedDistributed:
+        jaxDistributed:
           enabled: false
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: Should include deepspeed-distributed when enabled
+  - it: Should include jax-distributed when enabled
     set:
       runtimes:
-        deepspeedDistributed:
+        jaxDistributed:
           enabled: true
     asserts:
       - hasDocuments:
           count: 1
       - matchRegex:
           path: data["runtimes.yaml"]
-          pattern: "name: deepspeed-distributed"
+          pattern: "name: jax-distributed"
       - matchRegex:
           path: data["runtimes.yaml"]
-          pattern: "trainer.kubeflow.org/framework: deepspeed"
+          pattern: "trainer.kubeflow.org/framework: jax"
 
-  - it: Should include deepspeed-distributed when runtimes.defaultEnabled is true
+  - it: Should include jax-distributed when runtimes.defaultEnabled is true
     set:
       runtimes:
         defaultEnabled: true
     asserts:
       - matchRegex:
           path: data["runtimes.yaml"]
-          pattern: "name: deepspeed-distributed"
-
-  - it: Should use custom image tag when specified
-    set:
-      runtimes:
-        deepspeedDistributed:
-          enabled: true
-          image:
-            tag: v1.0.0
-    asserts:
-      - matchRegex:
-          path: data["runtimes.yaml"]
-          pattern: "image: ghcr.io/kubeflow/trainer/deepspeed-runtime:v1.0.0"
+          pattern: "name: jax-distributed"

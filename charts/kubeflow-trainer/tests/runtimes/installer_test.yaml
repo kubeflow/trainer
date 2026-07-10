@@ -1,0 +1,162 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Test runtimes installer Job, cleanup Job and RBAC
+templates:
+  - templates/runtimes/installer-job.yaml
+  - templates/runtimes/cleanup-job.yaml
+  - templates/runtimes/rbac.yaml
+release:
+  name: kubeflow-trainer
+  namespace: kubeflow-trainer
+tests:
+  - it: Should not render the installer Job when no runtime is enabled
+    template: templates/runtimes/installer-job.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: Should render the installer Job as a post-install/post-upgrade hook
+    template: templates/runtimes/installer-job.yaml
+    set:
+      runtimes:
+        defaultEnabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: kubeflow-trainer-runtimes-installer
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: docker.io/alpine:3.21
+
+  - it: Should apply runtimes server-side and prune the ones no longer desired
+    template: templates/runtimes/installer-job.yaml
+    set:
+      runtimes:
+        defaultEnabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: /bin/sh
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "apk add --no-cache kubectl"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl apply --server-side --force-conflicts -f /manifests/runtimes.yaml"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl label --overwrite -f /manifests/runtimes.yaml trainer.kubeflow.org/managed-by=runtimes-installer"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl get clustertrainingruntime -l trainer.kubeflow.org/managed-by=runtimes-installer"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl delete"
+
+  - it: Should apply scheduling and resource overrides to the installer Job
+    template: templates/runtimes/installer-job.yaml
+    set:
+      runtimes:
+        defaultEnabled: true
+        installer:
+          imagePullSecrets:
+            - name: my-secret
+          resources:
+            requests:
+              cpu: 100m
+          nodeSelector:
+            disktype: ssd
+          tolerations:
+            - key: dedicated
+              operator: Exists
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: disktype
+                        operator: Exists
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: my-secret
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.template.spec.nodeSelector.disktype
+          value: ssd
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: dedicated
+      - isNotNullOrEmpty:
+          path: spec.template.spec.affinity.nodeAffinity
+
+  - it: Should render the cleanup Job as a pre-delete hook
+    template: templates/runtimes/cleanup-job.yaml
+    set:
+      runtimes:
+        defaultEnabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-delete
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: /bin/sh
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "apk add --no-cache kubectl"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl delete clustertrainingruntime --selector=trainer.kubeflow.org/managed-by=runtimes-installer --ignore-not-found"
+
+  - it: Should grant the installer permission to reconcile ClusterTrainingRuntimes
+    template: templates/runtimes/rbac.yaml
+    set:
+      runtimes:
+        defaultEnabled: true
+    asserts:
+      - hasDocuments:
+          count: 3
+      - equal:
+          path: kind
+          value: ClusterRole
+        documentIndex: 1
+      - equal:
+          path: rules[0].resources
+          value:
+            - clustertrainingruntimes
+        documentIndex: 1
+      - contains:
+          path: rules[0].verbs
+          content: create
+        documentIndex: 1
+      - contains:
+          path: rules[0].verbs
+          content: delete
+        documentIndex: 1

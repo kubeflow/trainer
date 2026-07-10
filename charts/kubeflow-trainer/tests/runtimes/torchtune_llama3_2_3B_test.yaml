@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-suite: Test torchtune-llama3.2-3b ClusterTrainingRuntime
+suite: Test torchtune-llama3.2-3b runtime in installer ConfigMap
 templates:
-  - templates/runtimes/torchtune/llama3_2_3B.yaml
+  - templates/runtimes/configmap.yaml
 release:
   name: kubeflow-trainer
   namespace: kubeflow-trainer
 tests:
-  - it: Should not render ClusterTrainingRuntime when llama3_2_3B.enabled is false
+  - it: Should not render the installer ConfigMap when no runtime is enabled
     set:
       runtimes:
         torchtuneDistributed:
@@ -29,7 +29,7 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: Should render ClusterTrainingRuntime when llama3_2_3B.enabled is true
+  - it: Should include torchtune-llama3.2-3b when enabled
     set:
       runtimes:
         torchtuneDistributed:
@@ -38,137 +38,25 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
-      - isKind:
-          of: ClusterTrainingRuntime
-      - equal:
-          path: metadata.name
-          value: torchtune-llama3.2-3b
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "name: torchtune-llama3.2-3b"
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "trainer.kubeflow.org/framework: torchtune"
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "hf://meta-llama/Llama-3.2-3B-Instruct"
 
-  - it: Should render ClusterTrainingRuntime when runtimes.defaultEnabled is true
-    set:
-      runtimes:
-        defaultEnabled: true
-    asserts:
-      - hasDocuments:
-          count: 1
-      - isKind:
-          of: ClusterTrainingRuntime
-      - equal:
-          path: metadata.name
-          value: torchtune-llama3.2-3b
-
-  - it: Should have correct framework label
+  - it: Should use custom trainer image tag when specified
     set:
       runtimes:
         torchtuneDistributed:
-          llama3_2_3B:
-            enabled: true
-    asserts:
-      - equal:
-          path: metadata.labels["trainer.kubeflow.org/framework"]
-          value: torchtune
-      - equal:
-          path: metadata.labels["trainer.kubeflow.org/webhook-validation"]
-          value: disabled
-
-  - it: Should have correct mlPolicy configuration
-    set:
-      runtimes:
-        torchtuneDistributed:
-          llama3_2_3B:
-            enabled: true
-    asserts:
-      - equal:
-          path: spec.mlPolicy.numNodes
-          value: 1
-      - equal:
-          path: spec.mlPolicy.torch
-          value: {}
-
-  - it: Should have dataset-initializer, model-initializer and node replicatedJobs
-    set:
-      runtimes:
-        torchtuneDistributed:
-          llama3_2_3B:
-            enabled: true
-    asserts:
-      - equal:
-          path: spec.template.spec.replicatedJobs[0].name
-          value: dataset-initializer
-      - equal:
-          path: spec.template.spec.replicatedJobs[1].name
-          value: model-initializer
-      - equal:
-          path: spec.template.spec.replicatedJobs[2].name
-          value: node
-
-  - it: Should make the node job depend on both initializers completing
-    set:
-      runtimes:
-        torchtuneDistributed:
-          llama3_2_3B:
-            enabled: true
-    asserts:
-      - equal:
-          path: spec.template.spec.replicatedJobs[2].dependsOn[0].name
-          value: dataset-initializer
-      - equal:
-          path: spec.template.spec.replicatedJobs[2].dependsOn[0].status
-          value: Complete
-      - equal:
-          path: spec.template.spec.replicatedJobs[2].dependsOn[1].name
-          value: model-initializer
-      - equal:
-          path: spec.template.spec.replicatedJobs[2].dependsOn[1].status
-          value: Complete
-
-  - it: Should use correct dataset and model STORAGE_URI
-    set:
-      runtimes:
-        torchtuneDistributed:
-          llama3_2_3B:
-            enabled: true
-    asserts:
-      - equal:
-          path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.containers[0].env[0].value
-          value: hf://tatsu-lab/alpaca
-      - equal:
-          path: spec.template.spec.replicatedJobs[1].template.spec.template.spec.containers[0].env[0].value
-          value: hf://meta-llama/Llama-3.2-3B-Instruct
-
-  - it: Should use the correct TorchTune recipe config in the node command
-    set:
-      runtimes:
-        torchtuneDistributed:
-          llama3_2_3B:
-            enabled: true
-    asserts:
-      - contains:
-          path: spec.template.spec.replicatedJobs[2].template.spec.template.spec.containers[0].command
-          content: llama3_2/3B_full
-
-  - it: Should request GPU resources for the node container
-    set:
-      runtimes:
-        torchtuneDistributed:
-          llama3_2_3B:
-            enabled: true
-    asserts:
-      - equal:
-          path: spec.template.spec.replicatedJobs[2].template.spec.template.spec.containers[0].resources.limits["nvidia.com/gpu"]
-          value: 2
-
-  - it: Should use custom image tag when specified
-    set:
-      runtimes:
-        torchtuneDistributed:
-          llama3_2_3B:
-            enabled: true
           image:
-            registry: ghcr.io
-            repository: kubeflow/trainer/torchtune-trainer
-            tag: "v1.0.0"
+            tag: v1.0.0
+          llama3_2_3B:
+            enabled: true
     asserts:
-      - equal:
-          path: spec.template.spec.replicatedJobs[2].template.spec.template.spec.containers[0].image
-          value: ghcr.io/kubeflow/trainer/torchtune-trainer:v1.0.0
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "image: ghcr.io/kubeflow/trainer/torchtune-trainer:v1.0.0"

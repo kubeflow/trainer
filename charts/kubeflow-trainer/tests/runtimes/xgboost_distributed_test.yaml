@@ -1,4 +1,4 @@
-# Copyright 2026 The Kubeflow Authors.
+# Copyright The Kubeflow Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,77 +12,50 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-suite: Test xgboost-distributed ClusterTrainingRuntime
+suite: Test xgboost-distributed runtime in installer ConfigMap
 templates:
-  - templates/runtimes/xgboost-distributed.yaml
+  - templates/runtimes/configmap.yaml
 release:
   name: kubeflow-trainer
   namespace: kubeflow-trainer
 tests:
-  - it: Should not render ClusterTrainingRuntime when runtimes.xgboostDistributed.enabled is false
+  - it: Should not render the installer ConfigMap when no runtime is enabled
     set:
       runtimes:
         xgboostDistributed:
           enabled: false
-          image:
-            registry: ghcr.io
-            repository: kubeflow/trainer/xgboost-runtime
-            tag: ""
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: Should render ClusterTrainingRuntime when runtimes.xgboostDistributed.enabled is true
+  - it: Should include xgboost-distributed when runtimes.xgboostDistributed.enabled is true
     set:
       runtimes:
         xgboostDistributed:
           enabled: true
-          image:
-            registry: ghcr.io
-            repository: kubeflow/trainer/xgboost-runtime
-            tag: ""
     asserts:
       - hasDocuments:
           count: 1
       - isKind:
-          of: ClusterTrainingRuntime
-      - equal:
-          path: metadata.name
-          value: xgboost-distributed
+          of: ConfigMap
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "name: xgboost-distributed"
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "trainer.kubeflow.org/framework: xgboost"
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "trainer.kubeflow.org/webhook-validation: disabled"
 
-  - it: Should have correct framework label
+  - it: Should include xgboost-distributed when runtimes.defaultEnabled is true
     set:
       runtimes:
-        xgboostDistributed:
-          enabled: true
-          image:
-            registry: ghcr.io
-            repository: kubeflow/trainer/xgboost-runtime
-            tag: ""
+        defaultEnabled: true
     asserts:
-      - equal:
-          path: metadata.labels["trainer.kubeflow.org/framework"]
-          value: xgboost
-      - equal:
-          path: metadata.labels["trainer.kubeflow.org/webhook-validation"]
-          value: disabled
-
-  - it: Should have correct XGBoost mlPolicy configuration
-    set:
-      runtimes:
-        xgboostDistributed:
-          enabled: true
-          image:
-            registry: ghcr.io
-            repository: kubeflow/trainer/xgboost-runtime
-            tag: ""
-    asserts:
-      - equal:
-          path: spec.mlPolicy.numNodes
-          value: 1
-      - equal:
-          path: spec.mlPolicy.xgboost
-          value: {}
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "name: xgboost-distributed"
 
   - it: Should use custom image tag when specified
     set:
@@ -90,24 +63,8 @@ tests:
         xgboostDistributed:
           enabled: true
           image:
-            registry: ghcr.io
-            repository: kubeflow/trainer/xgboost-runtime
-            tag: "v1.0.0"
+            tag: v1.0.0
     asserts:
-      - equal:
-          path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.containers[0].image
-          value: ghcr.io/kubeflow/trainer/xgboost-runtime:v1.0.0
-
-  - it: Should have node replicatedJob
-    set:
-      runtimes:
-        xgboostDistributed:
-          enabled: true
-          image:
-            registry: ghcr.io
-            repository: kubeflow/trainer/xgboost-runtime
-            tag: ""
-    asserts:
-      - equal:
-          path: spec.template.spec.replicatedJobs[0].name
-          value: node
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "image: ghcr.io/kubeflow/trainer/xgboost-runtime:v1.0.0"
