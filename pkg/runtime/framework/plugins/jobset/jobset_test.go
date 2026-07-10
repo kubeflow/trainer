@@ -43,6 +43,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -394,6 +395,9 @@ func TestValidate(t *testing.T) {
 				field.Invalid(runtimeRefPath,
 					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
 					fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.DatasetInitializer)),
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.DatasetInitializer)),
 			},
 		},
 		"must have container with name - dataset initializer in the dataset initializer job": {
@@ -425,6 +429,9 @@ func TestValidate(t *testing.T) {
 				field.Invalid(runtimeRefPath,
 					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
 					fmt.Sprintf("must have container with name - %s in the %s job", constants.DatasetInitializer, constants.DatasetInitializer)),
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.DatasetInitializer)),
 			},
 		},
 		"no model initializer job": {
@@ -489,6 +496,9 @@ func TestValidate(t *testing.T) {
 				field.Invalid(runtimeRefPath,
 					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
 					fmt.Sprintf("must have %s job when trainJob is configured with input modelConfig", constants.ModelInitializer)),
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.ModelInitializer)),
 			},
 		},
 		"must have container with name - model initializer in the model initializer job": {
@@ -520,6 +530,79 @@ func TestValidate(t *testing.T) {
 				field.Invalid(runtimeRefPath,
 					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
 					fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)),
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.ModelInitializer)),
+			},
+		},
+		"must have volume with name - initializer in the dataset initializer job": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.DatasetInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.DatasetInitializer),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Dataset: &trainer.DatasetInitializer{},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.DatasetInitializer)),
+			},
+		},
+		"must have volume with name - initializer in the model initializer job": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.ModelInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.ModelInitializer),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Model: &trainer.ModelInitializer{},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.ModelInitializer)),
 			},
 		},
 		"runtimePatches contain invalid replicated job": {

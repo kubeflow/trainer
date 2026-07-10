@@ -48,6 +48,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
@@ -94,7 +95,9 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	}
 
 	// TODO (andreyvelich): Refactor this test to verify the ancestor label in PodTemplate.
+	// TODO (andreyvelich): Refactor this test to verify the ancestor label in PodTemplate.
 	rJobContainerNames := make(map[string]sets.Set[string])
+	rJobVolumeNames := make(map[string]sets.Set[string])
 	for _, rJob := range jobSetSpec.ReplicatedJobs {
 		rJobContainerNames[*rJob.Name] = sets.New[string]()
 		// Names of initContainer and containers are unique.
@@ -104,21 +107,29 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 		for _, c := range rJob.Template.Spec.Template.Spec.Containers {
 			rJobContainerNames[*rJob.Name].Insert(*c.Name)
 		}
+		rJobVolumeNames[*rJob.Name] = sets.New[string]()
+		for _, v := range rJob.Template.Spec.Template.Spec.Volumes {
+			rJobVolumeNames[*rJob.Name].Insert(*v.Name)
+		}
 	}
-
 	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Dataset != nil {
 		if containers, ok := rJobContainerNames[constants.DatasetInitializer]; !ok {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.DatasetInitializer)))
 		} else if !containers.Has(constants.DatasetInitializer) {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.DatasetInitializer, constants.DatasetInitializer)))
 		}
+		if volumes, ok := rJobVolumeNames[constants.DatasetInitializer]; !ok || !volumes.Has(jobsetplgconsts.VolumeNameInitializer) {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.DatasetInitializer)))
+		}
 	}
-
 	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Model != nil {
 		if containers, ok := rJobContainerNames[constants.ModelInitializer]; !ok {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input modelConfig", constants.ModelInitializer)))
 		} else if !containers.Has(constants.ModelInitializer) {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)))
+		}
+		if volumes, ok := rJobVolumeNames[constants.ModelInitializer]; !ok || !volumes.Has(jobsetplgconsts.VolumeNameInitializer) {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volume with name - %s in the %s job", jobsetplgconsts.VolumeNameInitializer, constants.ModelInitializer)))
 		}
 	}
 
