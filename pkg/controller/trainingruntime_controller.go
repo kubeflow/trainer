@@ -39,7 +39,6 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
-	idxer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
@@ -78,21 +77,13 @@ func (r *TrainingRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling TrainingRuntime")
 
-	trainJobs := &trainer.TrainJobList{}
-	if err := r.client.List(ctx, trainJobs, client.InNamespace(runtime.Namespace), client.MatchingFields{
-		idxer.TrainJobRuntimeRefKey: runtime.Name,
-	}); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	prevRuntime := runtime.DeepCopy()
-	if !ctrlutil.ContainsFinalizer(&runtime, constants.ResourceInUseFinalizer) && len(trainJobs.Items) != 0 {
-		ctrlutil.AddFinalizer(&runtime, constants.ResourceInUseFinalizer)
-		return ctrl.Result{}, r.client.Patch(ctx, &runtime, client.MergeFrom(prevRuntime))
-	} else if !runtime.DeletionTimestamp.IsZero() && len(trainJobs.Items) == 0 {
+
+	if ctrlutil.ContainsFinalizer(&runtime, constants.ResourceInUseFinalizer) {
 		ctrlutil.RemoveFinalizer(&runtime, constants.ResourceInUseFinalizer)
 		return ctrl.Result{}, r.client.Patch(ctx, &runtime, client.MergeFrom(prevRuntime))
 	}
+
 	return ctrl.Result{}, nil
 }
 

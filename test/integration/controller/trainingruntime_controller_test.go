@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/v2/pkg/constants"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	"github.com/kubeflow/trainer/v2/test/integration/framework"
 	"github.com/kubeflow/trainer/v2/test/util"
@@ -74,7 +73,7 @@ var _ = ginkgo.Describe("TrainingRuntime controller", ginkgo.Ordered, func() {
 			gomega.Expect(k8sClient.DeleteAllOf(ctx, &trainer.TrainingRuntime{}, client.InNamespace(ns.Name))).Should(gomega.Succeed())
 		})
 
-		ginkgo.It("TrainingRuntime obtains finalizer when TrainJob with TrainingRuntime is created", func() {
+		ginkgo.It("TrainingRuntime does not obtain finalizer when TrainJob with TrainingRuntime is created", func() {
 			ginkgo.By("Creating a TrainingRuntime")
 			gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
 
@@ -87,44 +86,20 @@ var _ = ginkgo.Describe("TrainingRuntime controller", ginkgo.Ordered, func() {
 			ginkgo.By("Creating a TrainJob")
 			gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
-			ginkgo.By("Checking if the TrainingRuntime obtains finalizers")
-			gomega.Eventually(func(g gomega.Gomega) {
+			ginkgo.By("Checking that the TrainingRuntime never obtains finalizers")
+			gomega.Consistently(func(g gomega.Gomega) {
 				g.Expect(k8sClient.Get(ctx, trainingRuntimeKey, trainingRuntime)).Should(gomega.Succeed())
-				g.Expect(trainingRuntime.ObjectMeta.Finalizers).Should(gomega.BeComparableTo(
-					[]string{constants.ResourceInUseFinalizer},
-				))
-			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				g.Expect(trainingRuntime.ObjectMeta.Finalizers).Should(gomega.HaveLen(0))
+			}, util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
 		})
 
-		ginkgo.It("TrainingRuntime can be deleted once referenced TrainJob is deleted", func() {
+		ginkgo.It("TrainingRuntime can be deleted while referenced by a TrainJob", func() {
 			ginkgo.By("Creating a TrainingRuntime and TrainJob")
 			gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
 			gomega.Eventually(func(g gomega.Gomega) {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
 			}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
-
-			ginkgo.By("Checking if the TrainingRuntime obtains finalizers")
-			gomega.Eventually(func(g gomega.Gomega) {
-				g.Expect(k8sClient.Get(ctx, trainingRuntimeKey, trainingRuntime)).Should(gomega.Succeed())
-				g.Expect(trainingRuntime.ObjectMeta.Finalizers).Should(gomega.BeComparableTo(
-					[]string{constants.ResourceInUseFinalizer},
-				))
-			}, util.Timeout, util.Interval).Should(gomega.Succeed())
-
-			ginkgo.By("Delete a TrainJob")
-			gomega.Expect(k8sClient.Delete(ctx, trainJob)).Should(gomega.Succeed())
-			gomega.Eventually(func(g gomega.Gomega) {
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(utiltesting.BeNotFoundError())
-			}, util.Timeout, util.Interval).Should(gomega.Succeed())
-
-			ginkgo.By("Checking if the TrainingRuntime keep having finalizers")
-			gomega.Eventually(func(g gomega.Gomega) {
-				g.Expect(k8sClient.Get(ctx, trainingRuntimeKey, trainingRuntime)).Should(gomega.Succeed())
-				g.Expect(trainingRuntime.ObjectMeta.Finalizers).Should(gomega.BeComparableTo(
-					[]string{constants.ResourceInUseFinalizer},
-				))
-			}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
 			ginkgo.By("Checking if the TrainingRuntime can be deleted")
 			gomega.Expect(k8sClient.Delete(ctx, trainingRuntime)).Should(gomega.Succeed())

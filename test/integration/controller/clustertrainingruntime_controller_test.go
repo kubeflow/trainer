@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
-	"github.com/kubeflow/trainer/v2/pkg/constants"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	"github.com/kubeflow/trainer/v2/test/integration/framework"
 	"github.com/kubeflow/trainer/v2/test/util"
@@ -82,57 +81,33 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime controller", ginkgo.Ordered, fun
 			}, util.Timeout, util.Interval).Should(gomega.Succeed())
 		})
 
-		ginkgo.It("ClusterTrainingRuntime obtains finalizer when TrainJob with ClusterTrainingRuntime is created", func() {
+		ginkgo.It("ClusterTrainingRuntime does not obtain finalizer when TrainJob with ClusterTrainingRuntime is created", func() {
 			ginkgo.By("Creating a ClusterTrainingRuntime")
 			gomega.Expect(k8sClient.Create(ctx, clTrainingRuntime)).Should(gomega.Succeed())
 
-			ginkgo.By("Checking if the ClusterTrainingRuntime does not keep obtaining finalizers")
+			ginkgo.By("Checking that the ClusterTrainingRuntime never obtains finalizers")
 			gomega.Consistently(func(g gomega.Gomega) {
 				g.Expect(k8sClient.Get(ctx, clTrainingRuntimeKey, clTrainingRuntime)).Should(gomega.Succeed())
-				g.Expect(clTrainingRuntime.ObjectMeta.Finalizers).Should(gomega.HaveLen(0))
+				g.Expect(clTrainingRuntime.Finalizers).Should(gomega.BeEmpty())
 			}, util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
 
 			ginkgo.By("Creating a TrainJob")
 			gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 
-			ginkgo.By("Checking if the ClusterTrainingRuntime obtains finalizers")
-			gomega.Eventually(func(g gomega.Gomega) {
+			ginkgo.By("Checking that the ClusterTrainingRuntime still has no finalizers")
+			gomega.Consistently(func(g gomega.Gomega) {
 				g.Expect(k8sClient.Get(ctx, clTrainingRuntimeKey, clTrainingRuntime)).Should(gomega.Succeed())
-				g.Expect(clTrainingRuntime.ObjectMeta.Finalizers).Should(gomega.BeComparableTo(
-					[]string{constants.ResourceInUseFinalizer},
-				))
-			}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				g.Expect(clTrainingRuntime.Finalizers).Should(gomega.BeEmpty())
+			}, util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
 		})
 
-		ginkgo.It("ClusterTrainingRuntime can be deleted once referenced TrainJob is deleted", func() {
+		ginkgo.It("ClusterTrainingRuntime can be deleted while referenced by a TrainJob", func() {
 			ginkgo.By("Creating a ClusterTrainingRuntime and TrainJob")
 			gomega.Expect(k8sClient.Create(ctx, clTrainingRuntime)).Should(gomega.Succeed())
 			gomega.Eventually(func(g gomega.Gomega) {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clTrainingRuntime), clTrainingRuntime)).Should(gomega.Succeed())
 			}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
-
-			ginkgo.By("Checking if the ClusterTrainingRuntime obtains finalizers")
-			gomega.Eventually(func(g gomega.Gomega) {
-				g.Expect(k8sClient.Get(ctx, clTrainingRuntimeKey, clTrainingRuntime)).Should(gomega.Succeed())
-				g.Expect(clTrainingRuntime.ObjectMeta.Finalizers).Should(gomega.BeComparableTo(
-					[]string{constants.ResourceInUseFinalizer},
-				))
-			}, util.Timeout, util.Interval).Should(gomega.Succeed())
-
-			ginkgo.By("Delete a TrainJob")
-			gomega.Expect(k8sClient.Delete(ctx, trainJob)).Should(gomega.Succeed())
-			gomega.Eventually(func(g gomega.Gomega) {
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), trainJob)).Should(utiltesting.BeNotFoundError())
-			}, util.Timeout, util.Interval).Should(gomega.Succeed())
-
-			ginkgo.By("Checking if the ClusterTrainingRuntime keeps having finalizers")
-			gomega.Eventually(func(g gomega.Gomega) {
-				g.Expect(k8sClient.Get(ctx, clTrainingRuntimeKey, clTrainingRuntime)).Should(gomega.Succeed())
-				g.Expect(clTrainingRuntime.ObjectMeta.Finalizers).Should(gomega.BeComparableTo(
-					[]string{constants.ResourceInUseFinalizer},
-				))
-			}, util.Timeout, util.Interval).Should(gomega.Succeed())
 
 			ginkgo.By("Checking if the ClusterTrainingRuntime can be deleted")
 			gomega.Expect(k8sClient.Delete(ctx, clTrainingRuntime)).Should(gomega.Succeed())

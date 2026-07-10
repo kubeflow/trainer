@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"iter"
 	"testing"
 	"time"
@@ -29,70 +28,30 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2/ktesting"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
-	idxer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestReconcile_ClusterTrainingRuntimeReconciler(t *testing.T) {
-	errorFailedGetClusterTrainingRuntime := errors.New("TEST: failed to get ClusterTrainingRuntime")
 	cases := map[string]struct {
-		trainJobs             trainer.TrainJobList
 		clTrainingRuntime     *trainer.ClusterTrainingRuntime
 		wantClTrainingRuntime *trainer.ClusterTrainingRuntime
-		wantError             error
 	}{
-		"no action when clusterTrainingRuntime with finalizer does not being deleted": {
+		"remove existing finalizer during reconciliation": {
 			clTrainingRuntime: utiltesting.MakeClusterTrainingRuntimeWrapper("runtime").
 				Finalizers(constants.ResourceInUseFinalizer).
 				Obj(),
 			wantClTrainingRuntime: utiltesting.MakeClusterTrainingRuntimeWrapper("runtime").
-				Finalizers(constants.ResourceInUseFinalizer).
 				Obj(),
 		},
-		"remove clusterTrainingRuntime due to removed finalizers when runtime without finalizer is deleting": {
-			clTrainingRuntime: utiltesting.MakeClusterTrainingRuntimeWrapper("runtime").
-				Finalizers(constants.ResourceInUseFinalizer).
-				DeletionTimestamp(metav1.Now()).
-				Obj(),
-			wantError:             errorFailedGetClusterTrainingRuntime,
-			wantClTrainingRuntime: &trainer.ClusterTrainingRuntime{},
-		},
-		"add finalizer when clusterTrainingRuntime is used by trainJob": {
+		"no action when runtime has no finalizer": {
 			clTrainingRuntime: utiltesting.MakeClusterTrainingRuntimeWrapper("runtime").
 				Obj(),
-			trainJobs: trainer.TrainJobList{
-				Items: []trainer.TrainJob{
-					*utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
-						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "runtime").
-						Obj(),
-				},
-			},
-			wantClTrainingRuntime: utiltesting.MakeClusterTrainingRuntimeWrapper("runtime").
-				Finalizers(constants.ResourceInUseFinalizer).
-				Obj(),
-		},
-		"no action when all TrainJobs use another ClusterTrainingRuntime": {
-			clTrainingRuntime: utiltesting.MakeClusterTrainingRuntimeWrapper("runtime").
-				Obj(),
-			trainJobs: trainer.TrainJobList{
-				Items: []trainer.TrainJob{
-					*utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
-						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "another").
-						Obj(),
-				},
-			},
-			wantClTrainingRuntime: utiltesting.MakeClusterTrainingRuntimeWrapper("runtime").
-				Obj(),
-		},
-		"no action when runtime without finalizer is not used by any TrainJob": {
-			clTrainingRuntime: utiltesting.MakeClusterTrainingRuntimeWrapper("runtime").
-				Obj(),
+
 			wantClTrainingRuntime: utiltesting.MakeClusterTrainingRuntimeWrapper("runtime").
 				Obj(),
 		},
@@ -105,27 +64,16 @@ func TestReconcile_ClusterTrainingRuntimeReconciler(t *testing.T) {
 			t.Cleanup(cancel)
 			cli := utiltesting.NewClientBuilder().
 				WithObjects(tc.clTrainingRuntime).
-				WithLists(&tc.trainJobs).
-				WithIndex(&trainer.TrainJob{}, idxer.TrainJobClusterRuntimeRefKey, idxer.IndexTrainJobClusterTrainingRuntime).
-				WithInterceptorFuncs(interceptor.Funcs{
-					Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-						if _, ok := obj.(*trainer.TrainJob); !ok && errors.Is(tc.wantError, errorFailedGetClusterTrainingRuntime) {
-							return errorFailedGetClusterTrainingRuntime
-						}
-						return cli.Get(ctx, key, obj, opts...)
-					},
-				}).
 				Build()
 			r := NewClusterTrainingRuntimeReconciler(cli, nil)
 			clRuntimeKey := client.ObjectKeyFromObject(tc.clTrainingRuntime)
-			_, gotError := r.Reconcile(ctx, reconcile.Request{NamespacedName: clRuntimeKey})
-			if diff := cmp.Diff(tc.wantError, gotError, cmpopts.EquateErrors()); len(diff) != 0 {
-				t.Errorf("Unexpected Reconcile error (-want, +got): \n%s", diff)
+			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: clRuntimeKey})
+			if err != nil {
+				t.Fatalf("Reconcile() returned error: %v", err)
 			}
 			var gotClRuntime trainer.ClusterTrainingRuntime
-			gotError = cli.Get(ctx, clRuntimeKey, &gotClRuntime)
-			if diff := cmp.Diff(tc.wantError, gotError, cmpopts.EquateErrors()); len(diff) != 0 {
-				t.Errorf("Unexpected GET error (-want, +got): \n%s", diff)
+			if err := cli.Get(ctx, clRuntimeKey, &gotClRuntime); err != nil {
+				t.Fatalf("Get() returned error: %v", err)
 			}
 			if diff := cmp.Diff(tc.wantClTrainingRuntime, &gotClRuntime,
 				cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion"),
