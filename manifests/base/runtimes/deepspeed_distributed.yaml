@@ -36,6 +36,9 @@ spec:
           - launcher
       replicatedJobs:
         - name: launcher
+          dependsOn:
+            - name: node
+              status: Ready
           template:
             metadata:
               labels:
@@ -48,6 +51,7 @@ spec:
                       image: ghcr.io/kubeflow/trainer/deepspeed-runtime
                       securityContext:
                         runAsUser: 1000
+
         - name: node
           template:
             spec:
