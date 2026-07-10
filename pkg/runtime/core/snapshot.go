@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,6 +47,11 @@ func getRuntimeSnapshot(ctx context.Context, c client.Client, trainJob *trainer.
 
 	if err := c.Get(ctx, cmKey, cm); err != nil {
 		return err
+	}
+
+	// Validate snapshot belongs to this TrainJob
+	if owner := metav1.GetControllerOf(cm); owner == nil || owner.UID != trainJob.UID {
+		return fmt.Errorf("invalid runtime snapshot: a snapshot configmap exists but is owned by another object")
 	}
 
 	// Read the runtime data from ConfigMap

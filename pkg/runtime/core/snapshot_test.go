@@ -48,12 +48,19 @@ func TestGetRuntimeSnapshot(t *testing.T) {
 	}{
 		"successfully retrieves ClusterTrainingRuntime snapshot from ConfigMap": {
 			trainJob: testingutil.MakeTrainJobWrapper("test-namespace", "test-job").
+				UID("uid-test-job-runtime-snapshot").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
 				Obj(),
 			configMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-job-runtime-snapshot",
 					Namespace: "test-namespace",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							UID:        "uid-test-job-runtime-snapshot",
+							Controller: ptr.To(true),
+						},
+					},
 				},
 				Data: map[string]string{
 					runtimeDataKey: `apiVersion: trainer.kubeflow.org/v1alpha1
@@ -130,12 +137,19 @@ spec:
 		},
 		"successfully retrieves TrainingRuntime snapshot from ConfigMap": {
 			trainJob: testingutil.MakeTrainJobWrapper("test-namespace", "test-job").
+				UID("uid-test-job-runtime-snapshot").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
 				Obj(),
 			configMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-job-runtime-snapshot",
 					Namespace: "test-namespace",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							UID:        "uid-test-job-runtime-snapshot",
+							Controller: ptr.To(true),
+						},
+					},
 				},
 				Data: map[string]string{
 					runtimeDataKey: `apiVersion: trainer.kubeflow.org/v1alpha1
@@ -214,20 +228,69 @@ spec:
 		},
 		"returns not found error when ConfigMap does not exist": {
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid-test-job-runtime-snapshot").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
 				Obj(),
 			configMap:         nil,
 			inputRuntimeObj:   &trainer.ClusterTrainingRuntime{},
 			wantNotFoundError: true,
 		},
+		"returns error when ConfigMap is not owned and controlled by the TrainJob": {
+			trainJob: testingutil.MakeTrainJobWrapper("test-namespace", "test-job").
+				UID("uid-test-job-runtime-snapshot").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Obj(),
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-job-runtime-snapshot",
+					Namespace:       "test-namespace",
+					OwnerReferences: nil, // No owner reference
+				},
+				Data: map[string]string{
+					runtimeDataKey: `apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainingRuntime
+metadata:
+  name: test-runtime
+  namespace: test-namespace
+spec:
+  mlPolicy:
+    numNodes: 2
+    torch: {}
+  template:
+    spec:
+      replicatedJobs:
+      - name: node
+        template:
+          metadata:
+            labels:
+              trainer.kubeflow.org/trainjob-ancestor-step: trainer
+          spec:
+            template:
+              spec:
+                containers:
+                - name: node
+                  image: pytorch/pytorch:tag
+`,
+				},
+			},
+			inputRuntimeObj: &trainer.TrainingRuntime{},
+			wantError:       "invalid runtime snapshot: a snapshot configmap exists but is owned by another object",
+		},
 		"returns error when ConfigMap is missing runtime data key": {
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid-test-job-runtime-snapshot").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
 				Obj(),
 			configMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-job" + runtimeSnapshotSuffix,
 					Namespace: metav1.NamespaceDefault,
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							UID:        "uid-test-job-runtime-snapshot",
+							Controller: ptr.To(true),
+						},
+					},
 				},
 				Data: map[string]string{
 					"wrong-key": "",
@@ -238,12 +301,19 @@ spec:
 		},
 		"returns error when ConfigMap contains invalid YAML": {
 			trainJob: testingutil.MakeTrainJobWrapper("test-namespace", "test-job").
+				UID("uid-test-job-runtime-snapshot").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
 				Obj(),
 			configMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-job" + runtimeSnapshotSuffix,
 					Namespace: "test-namespace",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							UID:        "uid-test-job-runtime-snapshot",
+							Controller: ptr.To(true),
+						},
+					},
 				},
 				Data: map[string]string{
 					runtimeDataKey: "invalid: yaml: content:\n  - broken",
@@ -254,12 +324,19 @@ spec:
 		},
 		"returns error when snapshot runtime name does not match RuntimeRef": {
 			trainJob: testingutil.MakeTrainJobWrapper("test-namespace", "test-job").
+				UID("uid-test-job-runtime-snapshot").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
 				Obj(),
 			configMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-job" + runtimeSnapshotSuffix,
 					Namespace: "test-namespace",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							UID:        "uid-test-job-runtime-snapshot",
+							Controller: ptr.To(true),
+						},
+					},
 				},
 				Data: map[string]string{
 					runtimeDataKey: `apiVersion: trainer.kubeflow.org/v1alpha1
@@ -281,12 +358,19 @@ spec:
 		},
 		"returns error when snapshot runtime kind does not match RuntimeRef": {
 			trainJob: testingutil.MakeTrainJobWrapper("test-namespace", "test-job").
+				UID("uid-test-job-runtime-snapshot").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
 				Obj(),
 			configMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-job" + runtimeSnapshotSuffix,
 					Namespace: "test-namespace",
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							UID:        "uid-test-job-runtime-snapshot",
+							Controller: ptr.To(true),
+						},
+					},
 				},
 				Data: map[string]string{
 					runtimeDataKey: `apiVersion: trainer.kubeflow.org/v1alpha1
