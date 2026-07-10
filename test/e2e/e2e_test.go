@@ -148,6 +148,8 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+					ginkgo.GinkgoWriter.Printf("JobsStatus: %+v\n", gotTrainJob.Status.JobsStatus)
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
 					nodeStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Node)
 					g.Expect(ok).Should(gomega.BeTrue())
 					g.Expect(nodeStatus.Active).Should(gomega.Equal(ptr.To(int32(1))))
