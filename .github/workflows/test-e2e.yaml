@@ -190,6 +190,68 @@ jobs:
             echo "=================================================================="
             find artifacts -type f || true
 
+
+
+            echo
+            echo "=================================================================="
+            echo "==================== E2E TRAINJOB DETAILS ========================="
+            echo "=================================================================="
+
+            kubectl get trainjobs -A || true
+
+            for ns in $(kubectl get trainjobs -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"\n"}{end}' 2>/dev/null); do              echo "=========================================================="
+              echo "Namespace: $ns"
+              echo "=========================================================="
+
+              kubectl get trainjobs -n "$ns" -o wide || true
+              kubectl describe trainjobs -n "$ns" || true
+              kubectl get trainjobs -n "$ns" -o yaml || true
+
+              echo
+              echo "---------------- JobSets ----------------"
+
+              kubectl get jobsets -n "$ns" -o wide || true
+              kubectl describe jobsets -n "$ns" || true
+              kubectl get jobsets -n "$ns" -o yaml || true
+
+              echo
+              echo "---------------- Jobs ----------------"
+
+              kubectl get jobs -n "$ns" -o wide || true
+              kubectl describe jobs -n "$ns" || true
+
+              echo
+              echo "---------------- Pods ----------------"
+
+              kubectl get pods -n "$ns" -o wide || true
+              kubectl describe pods -n "$ns" || true
+
+              echo
+              echo "---------------- Events ----------------"
+
+              kubectl get events -n "$ns" --sort-by=.metadata.creationTimestamp || true
+
+              kubectl describe trainjobs -n "$ns" \
+                > "artifacts/debug/${ns}-trainjobs.describe" 2>&1 || true
+
+              kubectl get trainjobs -n "$ns" -o yaml \
+                > "artifacts/debug/${ns}-trainjobs.yaml" 2>&1 || true
+
+              kubectl describe jobsets -n "$ns" \
+                > "artifacts/debug/${ns}-jobsets.describe" 2>&1 || true
+
+              kubectl get jobsets -n "$ns" -o yaml \
+                > "artifacts/debug/${ns}-jobsets.yaml" 2>&1 || true
+
+              kubectl describe jobs -n "$ns" \
+                > "artifacts/debug/${ns}-jobs.describe" 2>&1 || true
+
+              kubectl describe pods -n "$ns" \
+                > "artifacts/debug/${ns}-pods.describe" 2>&1 || true
+
+              kubectl get events -n "$ns" --sort-by=.metadata.creationTimestamp \
+                > "artifacts/debug/${ns}-events.txt" 2>&1 || true
+            done
             exit 1
           }
 
