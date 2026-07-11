@@ -22,7 +22,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -149,15 +148,6 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
-					ginkgo.GinkgoWriter.Printf("JobsStatus: %+v\n", gotTrainJob.Status.JobsStatus)
-					ginkgo.GinkgoWriter.Printf("JobsStatus len=%d\n", len(gotTrainJob.Status.JobsStatus))
-					for i, s := range gotTrainJob.Status.JobsStatus {
-						ginkgo.GinkgoWriter.Printf(
-							"JobStatus[%d]: Name=%q Active=%v Ready=%v Succeeded=%v Failed=%v\n",
-							i, s.Name, s.Active, s.Ready, s.Succeeded, s.Failed,
-						)
-					}
-					ginkgo.GinkgoWriter.Printf("TrainJob Status: %+v\n", gotTrainJob.Status)
 					nodeStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Node)
 					g.Expect(ok).Should(gomega.BeTrue())
 					g.Expect(nodeStatus.Active).Should(gomega.Equal(ptr.To(int32(1))))
@@ -170,12 +160,6 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
-
-					if meta.IsStatusConditionTrue(gotTrainJob.Status.Conditions, trainer.TrainJobFailed) {
-						ginkgo.GinkgoWriter.Printf("TrainJob failed: %+v\n", gotTrainJob.Status.Conditions)
-						ginkgo.GinkgoWriter.Printf("JobsStatus: %+v\n", gotTrainJob.Status.JobsStatus)
-					}
-
 					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeComparableTo([]metav1.Condition{
 						{
 							Type:    trainer.TrainJobComplete,
@@ -184,7 +168,6 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 							Message: jobsetconsts.AllJobsCompletedMessage,
 						},
 					}, util.IgnoreConditions))
-
 					launcherStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Launcher)
 					g.Expect(ok).Should(gomega.BeTrue())
 					g.Expect(launcherStatus.Succeeded).Should(gomega.Equal(ptr.To(int32(1))))

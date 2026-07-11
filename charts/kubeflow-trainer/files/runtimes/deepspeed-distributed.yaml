@@ -44,10 +44,6 @@ spec:
             spec:
               template:
                 spec:
-                  securityContext:
-                    runAsUser: 1000
-                    runAsGroup: 1000
-                    fsGroup: 1000
                   containers:
                     - name: node
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
@@ -75,10 +71,6 @@ spec:
             spec:
               template:
                 spec:
-                  securityContext:
-                    runAsUser: 1000
-                    runAsGroup: 1000
-                    fsGroup: 1000
                   containers:
                     - name: node
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
