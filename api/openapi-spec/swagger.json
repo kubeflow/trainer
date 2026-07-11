@@ -13759,21 +13759,15 @@
           }
         }
       },
-      "trainer.v1alpha1.BestTrial": {
-        "description": "BestTrial tracks the parameters of the highest performing trial.",
+      "trainer.v1alpha1.BayesianAlgorithm": {
         "type": "object",
         "properties": {
-          "parameters": {
-            "type": "array",
-            "items": {
-              "default": {},
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/trainer.v1alpha1.ParameterAssignment"
-                }
-              ]
-            },
-            "x-kubernetes-list-type": "atomic"
+          "acquisitionFunction": {
+            "type": "string"
+          },
+          "initialTrials": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -13972,6 +13966,10 @@
             "format": "int32"
           }
         }
+      },
+      "trainer.v1alpha1.GridAlgorithm": {
+        "description": "GridAlgorithm is intentionally empty; step-intervals are derived from SearchSpace.Int.Step.",
+        "type": "object"
       },
       "trainer.v1alpha1.Initializer": {
         "description": "Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.",
@@ -14504,14 +14502,6 @@
             "type": "integer",
             "format": "int32"
           },
-          "bestTrial": {
-            "description": "BestTrial caches the highest performing parameters based on the Objective.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.BestTrial"
-              }
-            ]
-          },
           "conditions": {
             "type": "array",
             "items": {
@@ -14534,23 +14524,17 @@
           "phase": {
             "type": "string"
           },
+          "result": {
+            "description": "Result caches the highest performing parameters based on the Objective.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.Result"
+              }
+            ]
+          },
           "succeeded": {
             "type": "integer",
             "format": "int32"
-          }
-        }
-      },
-      "trainer.v1alpha1.OptimizationStorage": {
-        "description": "OptimizationStorage defines the persistent layer for trial checkpoints and state recovery.",
-        "type": "object",
-        "properties": {
-          "pvcName": {
-            "description": "PvcName is the name of an existing PersistentVolumeClaim in the same namespace.",
-            "type": "string"
-          },
-          "storageUri": {
-            "description": "StorageUri is the remote object storage path (e.g., s3://my-bucket/experiments).",
-            "type": "string"
           }
         }
       },
@@ -14790,7 +14774,7 @@
       "trainer.v1alpha1.RandomAlgorithm": {
         "type": "object",
         "properties": {
-          "seed": {
+          "randomState": {
             "type": "integer",
             "format": "int64"
           }
@@ -14814,6 +14798,35 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobTemplatePatch"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.Result": {
+        "description": "Result tracks the parameters of the highest performing trial.",
+        "type": "object",
+        "required": [
+          "trainJobName"
+        ],
+        "properties": {
+          "parameters": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.ParameterAssignment"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "trainJobName": {
+            "description": "TrainJobName is the name of the underlying TrainJob that achieved this result.",
+            "type": "string",
+            "default": ""
           }
         }
       },
@@ -14871,25 +14884,11 @@
         "description": "SearchAlgorithm defines the hyperparameter sampling configuration.",
         "type": "object",
         "properties": {
-          "provider": {
-            "description": "Provider specifies the backend suggestion engine. Defaults to \"optuna\" if omitted.",
-            "type": "string"
+          "bayesian": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.BayesianAlgorithm"
           },
-          "providerSettings": {
-            "description": "ProviderSettings passes raw engine kwargs down to the backend microservice.",
-            "type": "array",
-            "items": {
-              "default": {},
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/trainer.v1alpha1.SettingKV"
-                }
-              ]
-            },
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map"
+          "grid": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.GridAlgorithm"
           },
           "random": {
             "$ref": "#/components/schemas/trainer.v1alpha1.RandomAlgorithm"

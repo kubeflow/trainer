@@ -16,13 +16,17 @@
 
 package v1alpha1
 
+import (
+	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+)
+
 // ObjectiveApplyConfiguration represents a declarative configuration of the Objective type for use
 // with apply.
 //
 // Objective defines the metric and goal for the OptimizationJob.
 type ObjectiveApplyConfiguration struct {
-	Metric    *string `json:"metric,omitempty"`
-	Direction *string `json:"direction,omitempty"`
+	Metric    *string                             `json:"metric,omitempty"`
+	Direction *trainerv1alpha1.ObjectiveDirection `json:"direction,omitempty"`
 }
 
 // ObjectiveApplyConfiguration constructs a declarative configuration of the Objective type for use with
@@ -42,7 +46,7 @@ func (b *ObjectiveApplyConfiguration) WithMetric(value string) *ObjectiveApplyCo
 // WithDirection sets the Direction field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Direction field is set to the value of the last call.
-func (b *ObjectiveApplyConfiguration) WithDirection(value string) *ObjectiveApplyConfiguration {
+func (b *ObjectiveApplyConfiguration) WithDirection(value trainerv1alpha1.ObjectiveDirection) *ObjectiveApplyConfiguration {
 	b.Direction = &value
 	return b
 }

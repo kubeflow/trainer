@@ -31,8 +31,8 @@ type OptimizationJobStatusApplyConfiguration struct {
 	Active     *int32                                `json:"active,omitempty"`
 	Succeeded  *int32                                `json:"succeeded,omitempty"`
 	Failed     *int32                                `json:"failed,omitempty"`
-	// BestTrial caches the highest performing parameters based on the Objective.
-	BestTrial *BestTrialApplyConfiguration `json:"bestTrial,omitempty"`
+	// Result caches the highest performing parameters based on the Objective.
+	Result *ResultApplyConfiguration `json:"result,omitempty"`
 }
 
 // OptimizationJobStatusApplyConfiguration constructs a declarative configuration of the OptimizationJobStatus type for use with
@@ -86,10 +86,10 @@ func (b *OptimizationJobStatusApplyConfiguration) WithFailed(value int32) *Optim
 	return b
 }
 
-// WithBestTrial sets the BestTrial field in the declarative configuration to the given value
+// WithResult sets the Result field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the BestTrial field is set to the value of the last call.
-func (b *OptimizationJobStatusApplyConfiguration) WithBestTrial(value *BestTrialApplyConfiguration) *OptimizationJobStatusApplyConfiguration {
-	b.BestTrial = value
+// If called multiple times, the Result field is set to the value of the last call.
+func (b *OptimizationJobStatusApplyConfiguration) WithResult(value *ResultApplyConfiguration) *OptimizationJobStatusApplyConfiguration {
+	b.Result = value
 	return b
 }

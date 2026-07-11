@@ -30,8 +30,8 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=trainer.kubeflow.org, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithKind("BestTrial"):
-		return &trainerv1alpha1.BestTrialApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("BayesianAlgorithm"):
+		return &trainerv1alpha1.BayesianAlgorithmApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("CategoricalSpace"):
 		return &trainerv1alpha1.CategoricalSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ClusterTrainingRuntime"):
@@ -94,6 +94,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.RandomAlgorithmApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ReplicatedJobPatch"):
 		return &trainerv1alpha1.ReplicatedJobPatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Result"):
+		return &trainerv1alpha1.ResultApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimePatch"):
 		return &trainerv1alpha1.RuntimePatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimeRef"):
@@ -102,8 +104,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.SearchAlgorithmApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("SearchSpace"):
 		return &trainerv1alpha1.SearchSpaceApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("SettingKV"):
-		return &trainerv1alpha1.SettingKVApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Trainer"):
 		return &trainerv1alpha1.TrainerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainerStatus"):

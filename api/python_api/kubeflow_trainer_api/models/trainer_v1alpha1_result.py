@@ -17,24 +17,19 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_apis_meta_v1_condition import IoK8sApimachineryPkgApisMetaV1Condition
-from kubeflow_trainer_api.models.trainer_v1alpha1_result import TrainerV1alpha1Result
+from kubeflow_trainer_api.models.trainer_v1alpha1_parameter_assignment import TrainerV1alpha1ParameterAssignment
 from typing import Optional, Set
 from typing_extensions import Self
 
-class TrainerV1alpha1OptimizationJobStatus(BaseModel):
+class TrainerV1alpha1Result(BaseModel):
     """
-    OptimizationJobStatus defines the observed state of OptimizationJob.
+    Result tracks the parameters of the highest performing trial.
     """ # noqa: E501
-    active: Optional[StrictInt] = None
-    conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = None
-    failed: Optional[StrictInt] = None
-    phase: Optional[StrictStr] = None
-    result: Optional[TrainerV1alpha1Result] = Field(default=None, description="Result caches the highest performing parameters based on the Objective.")
-    succeeded: Optional[StrictInt] = None
-    __properties: ClassVar[List[str]] = ["active", "conditions", "failed", "phase", "result", "succeeded"]
+    parameters: Optional[List[TrainerV1alpha1ParameterAssignment]] = None
+    train_job_name: StrictStr = Field(description="TrainJobName is the name of the underlying TrainJob that achieved this result.", alias="trainJobName")
+    __properties: ClassVar[List[str]] = ["parameters", "trainJobName"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -54,7 +49,7 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1OptimizationJobStatus from a JSON string"""
+        """Create an instance of TrainerV1alpha1Result from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -75,21 +70,18 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in conditions (list)
+        # override the default output from pydantic by calling `to_dict()` of each item in parameters (list)
         _items = []
-        if self.conditions:
-            for _item_conditions in self.conditions:
-                if _item_conditions:
-                    _items.append(_item_conditions.to_dict())
-            _dict['conditions'] = _items
-        # override the default output from pydantic by calling `to_dict()` of result
-        if self.result:
-            _dict['result'] = self.result.to_dict()
+        if self.parameters:
+            for _item_parameters in self.parameters:
+                if _item_parameters:
+                    _items.append(_item_parameters.to_dict())
+            _dict['parameters'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of TrainerV1alpha1OptimizationJobStatus from a dict"""
+        """Create an instance of TrainerV1alpha1Result from a dict"""
         if obj is None:
             return None
 
@@ -97,12 +89,8 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "active": obj.get("active"),
-            "conditions": [IoK8sApimachineryPkgApisMetaV1Condition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
-            "failed": obj.get("failed"),
-            "phase": obj.get("phase"),
-            "result": TrainerV1alpha1Result.from_dict(obj["result"]) if obj.get("result") is not None else None,
-            "succeeded": obj.get("succeeded")
+            "parameters": [TrainerV1alpha1ParameterAssignment.from_dict(_item) for _item in obj["parameters"]] if obj.get("parameters") is not None else None,
+            "trainJobName": obj.get("trainJobName") if obj.get("trainJobName") is not None else ''
         })
         return _obj
 

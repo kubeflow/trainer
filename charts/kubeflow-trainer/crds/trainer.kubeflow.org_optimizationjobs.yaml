@@ -143,38 +143,34 @@ spec:
                 description: SearchAlgorithm explicitly separates initial sampling
                   from mid-run pruning.
                 properties:
-                  provider:
-                    description: Provider specifies the backend suggestion engine.
-                      Defaults to "optuna" if omitted.
-                    type: string
-                  providerSettings:
-                    description: ProviderSettings passes raw engine kwargs down to
-                      the backend microservice.
-                    items:
-                      properties:
-                        name:
-                          minLength: 1
-                          type: string
-                        value:
-                          type: string
-                      required:
-                      - name
-                      - value
-                      type: object
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
+                  bayesian:
+                    properties:
+                      acquisitionFunction:
+                        enum:
+                        - ucb
+                        - ei
+                        - pi
+                        type: string
+                      initialTrials:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    type: object
+                  grid:
+                    description: GridAlgorithm is intentionally empty; step-intervals
+                      are derived from SearchSpace.Int.Step.
+                    type: object
                   random:
                     properties:
-                      seed:
+                      randomState:
                         format: int64
                         type: integer
                     type: object
                 type: object
                 x-kubernetes-validations:
                 - message: Exactly one search algorithm configuration must be provided
-                  rule: '(has(self.random) ? 1 : 0) == 1'
+                  rule: '[has(self.random), has(self.grid), has(self.bayesian)].filter(x,
+                    x).size() == 1'
               trainJobTemplate:
                 description: TrainJobTemplate wraps the underlying TrainJob workload
                   and its metadata.
@@ -6490,30 +6486,6 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
-              bestTrial:
-                description: BestTrial caches the highest performing parameters based
-                  on the Objective.
-                properties:
-                  parameters:
-                    items:
-                      description: ParameterAssignment represents a single hyperparameter
-                        and its assigned value.
-                      properties:
-                        name:
-                          maxLength: 64
-                          minLength: 1
-                          type: string
-                        value:
-                          maxLength: 64
-                          minLength: 1
-                          type: string
-                      required:
-                      - name
-                      - value
-                      type: object
-                    type: array
-                    x-kubernetes-list-type: atomic
-                type: object
               conditions:
                 items:
                   description: Condition contains details for one aspect of the current
@@ -6581,6 +6553,39 @@ spec:
                 description: OptimizationJobPhase represents the current phase of
                   the OptimizationJob.
                 type: string
+              result:
+                description: Result caches the highest performing parameters based
+                  on the Objective.
+                properties:
+                  parameters:
+                    items:
+                      description: ParameterAssignment represents a single hyperparameter
+                        and its assigned value.
+                      properties:
+                        name:
+                          maxLength: 64
+                          minLength: 1
+                          type: string
+                        value:
+                          maxLength: 64
+                          minLength: 1
+                          type: string
+                      required:
+                      - name
+                      - value
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                  trainJobName:
+                    description: TrainJobName is the name of the underlying TrainJob
+                      that achieved this result.
+                    minLength: 1
+                    type: string
+                required:
+                - trainJobName
+                type: object
               succeeded:
                 format: int32
                 minimum: 0

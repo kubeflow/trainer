@@ -16,30 +16,24 @@
 
 package v1alpha1
 
+import (
+	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+)
+
 // SearchAlgorithmApplyConfiguration represents a declarative configuration of the SearchAlgorithm type for use
 // with apply.
 //
 // SearchAlgorithm defines the hyperparameter sampling configuration.
 type SearchAlgorithmApplyConfiguration struct {
-	// Provider specifies the backend suggestion engine. Defaults to "optuna" if omitted.
-	Provider *string                            `json:"provider,omitempty"`
-	Random   *RandomAlgorithmApplyConfiguration `json:"random,omitempty"`
-	// ProviderSettings passes raw engine kwargs down to the backend microservice.
-	ProviderSettings []SettingKVApplyConfiguration `json:"providerSettings,omitempty"`
+	Random   *RandomAlgorithmApplyConfiguration   `json:"random,omitempty"`
+	Grid     *trainerv1alpha1.GridAlgorithm       `json:"grid,omitempty"`
+	Bayesian *BayesianAlgorithmApplyConfiguration `json:"bayesian,omitempty"`
 }
 
 // SearchAlgorithmApplyConfiguration constructs a declarative configuration of the SearchAlgorithm type for use with
 // apply.
 func SearchAlgorithm() *SearchAlgorithmApplyConfiguration {
 	return &SearchAlgorithmApplyConfiguration{}
-}
-
-// WithProvider sets the Provider field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Provider field is set to the value of the last call.
-func (b *SearchAlgorithmApplyConfiguration) WithProvider(value string) *SearchAlgorithmApplyConfiguration {
-	b.Provider = &value
-	return b
 }
 
 // WithRandom sets the Random field in the declarative configuration to the given value
@@ -50,15 +44,18 @@ func (b *SearchAlgorithmApplyConfiguration) WithRandom(value *RandomAlgorithmApp
 	return b
 }
 
-// WithProviderSettings adds the given value to the ProviderSettings field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the ProviderSettings field.
-func (b *SearchAlgorithmApplyConfiguration) WithProviderSettings(values ...*SettingKVApplyConfiguration) *SearchAlgorithmApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithProviderSettings")
-		}
-		b.ProviderSettings = append(b.ProviderSettings, *values[i])
-	}
+// WithGrid sets the Grid field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Grid field is set to the value of the last call.
+func (b *SearchAlgorithmApplyConfiguration) WithGrid(value trainerv1alpha1.GridAlgorithm) *SearchAlgorithmApplyConfiguration {
+	b.Grid = &value
+	return b
+}
+
+// WithBayesian sets the Bayesian field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Bayesian field is set to the value of the last call.
+func (b *SearchAlgorithmApplyConfiguration) WithBayesian(value *BayesianAlgorithmApplyConfiguration) *SearchAlgorithmApplyConfiguration {
+	b.Bayesian = value
 	return b
 }

@@ -20,35 +20,44 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +kubebuilder:validation:Enum=maximize;minimize
+type ObjectiveDirection string
+
 // Objective defines the metric and goal for the OptimizationJob.
 type Objective struct {
 	// +kubebuilder:validation:MinLength=1
 	Metric string `json:"metric"`
 
-	// +kubebuilder:validation:Enum=maximize;minimize
-	Direction string `json:"direction"`
+	Direction ObjectiveDirection `json:"direction"`
 }
 
 // SearchAlgorithm defines the hyperparameter sampling configuration.
-// +kubebuilder:validation:XValidation:rule="(has(self.random) ? 1 : 0) == 1",message="Exactly one search algorithm configuration must be provided"
+// +kubebuilder:validation:XValidation:rule="[has(self.random), has(self.grid), has(self.bayesian)].filter(x, x).size() == 1",message="Exactly one search algorithm configuration must be provided"
 type SearchAlgorithm struct {
-	// Provider specifies the backend suggestion engine. Defaults to "optuna" if omitted.
-	// +optional
-	Provider *string `json:"provider,omitempty"`
-
 	// +optional
 	Random *RandomAlgorithm `json:"random,omitempty"`
-
-	// ProviderSettings passes raw engine kwargs down to the backend microservice.
-	// +listType=map
-	// +listMapKey=name
 	// +optional
-	ProviderSettings []SettingKV `json:"providerSettings,omitempty"`
+	Grid *GridAlgorithm `json:"grid,omitempty"`
+	// +optional
+	Bayesian *BayesianAlgorithm `json:"bayesian,omitempty"`
 }
 
 type RandomAlgorithm struct {
 	// +optional
-	Seed *int64 `json:"seed,omitempty"`
+	RandomState *int64 `json:"randomState,omitempty"`
+}
+
+// GridAlgorithm is intentionally empty; step-intervals are derived from SearchSpace.Int.Step.
+type GridAlgorithm struct{}
+
+type BayesianAlgorithm struct {
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	InitialTrials *int32 `json:"initialTrials,omitempty"`
+
+	// +kubebuilder:validation:Enum=ucb;ei;pi
+	// +optional
+	AcquisitionFunction *string `json:"acquisitionFunction,omitempty"`
 }
 
 type SettingKV struct {
@@ -122,18 +131,6 @@ type ParameterAssignment struct {
 	Value string `json:"value"`
 }
 
-// OptimizationStorage defines the persistent layer for trial checkpoints and state recovery.
-type OptimizationStorage struct {
-	// StorageUri is the remote object storage path (e.g., s3://my-bucket/experiments).
-	// +kubebuilder:validation:Pattern=`^[A-Za-z][A-Za-z0-9+.-]*://.+$`
-	// +optional
-	StorageUri *string `json:"storageUri,omitempty"`
-
-	// PvcName is the name of an existing PersistentVolumeClaim in the same namespace.
-	// +optional
-	PvcName *string `json:"pvcName,omitempty"`
-}
-
 // TrialConfig controls the orchestration of the trials.
 // +kubebuilder:validation:XValidation:rule="!has(self.parallelTrials) || !has(self.numTrials) || self.parallelTrials <= self.numTrials",message="parallelTrials cannot exceed numTrials"
 type TrialConfig struct {
@@ -147,9 +144,14 @@ type TrialConfig struct {
 	MaxFailedTrials *int32 `json:"maxFailedTrials,omitempty"`
 }
 
-// BestTrial tracks the parameters of the highest performing trial.
-type BestTrial struct {
-	// +listType=atomic
+// Result tracks the parameters of the highest performing trial.
+type Result struct {
+	// TrainJobName is the name of the underlying TrainJob that achieved this result.
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	TrainJobName string `json:"trainJobName"`
+	// +listType=map
+	// +listMapKey=name
 	// +optional
 	Parameters []ParameterAssignment `json:"parameters,omitempty"`
 }
@@ -215,8 +217,8 @@ type OptimizationJobStatus struct {
 	// +kubebuilder:validation:Minimum=0
 	Failed int32 `json:"failed,omitempty"`
 
-	// BestTrial caches the highest performing parameters based on the Objective.
-	BestTrial *BestTrial `json:"bestTrial,omitempty"`
+	// Result caches the highest performing parameters based on the Objective.
+	Result *Result `json:"result,omitempty"`
 }
 
 // +genclient

@@ -73,7 +73,7 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 				validateFunc(got)
 			}, util.Timeout, util.Interval).Should(gomega.Succeed())
 		},
-			ginkgo.Entry("Should succeed to default Provider, ParallelTrials, and NumTrials",
+			ginkgo.Entry("Should succeed to default ParallelTrials and NumTrials",
 				func() *trainer.OptimizationJob {
 					return &trainer.OptimizationJob{
 						ObjectMeta: metav1.ObjectMeta{
@@ -85,14 +85,18 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 								{Metric: "accuracy", Direction: "maximize"},
 							},
 							Parameters: []trainer.Parameter{
-								{Name: "learning_rate", SearchSpace: trainer.SearchSpace{Type: "double", Min: "0.01", Max: "0.1"}},
+								{
+									Name: "learning_rate",
+									SearchSpace: trainer.SearchSpace{
+										Uniform: &trainer.UniformSpace{Min: "0.01", Max: "0.1"},
+									},
+								},
 							},
-							Algorithm: trainer.Algorithm{
-								Name: "random",
-								// Provider is nil
+							SearchAlgorithm: trainer.SearchAlgorithm{
+								Random: &trainer.RandomAlgorithm{},
 							},
 							TrialConfig: trainer.TrialConfig{
-								// ParallelTrials and NumTrials are nil
+								// ParallelTrials and NumTrials are explicitly left nil to test defaulting
 							},
 							TrainJobTemplate: trainer.TrainJobTemplateSpec{
 								Spec: trainer.TrainJobSpec{
@@ -102,7 +106,7 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 										Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
 									},
 									Trainer: &trainer.Trainer{
-										Image: ptr.To("my-training-image:{{.learning_rate}}"),
+										Image: ptr.To("my-training-image:latest"),
 									},
 								},
 							},
@@ -110,91 +114,14 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 					}
 				},
 				func(got *trainer.OptimizationJob) {
-					gomega.Expect(got.Spec.Algorithm.Provider).ToNot(gomega.BeNil())
-					gomega.Expect(*got.Spec.Algorithm.Provider).To(gomega.Equal("optuna"))
-
+					// Assert ParallelTrials defaults to 1
 					gomega.Expect(got.Spec.TrialConfig.ParallelTrials).ToNot(gomega.BeNil())
 					gomega.Expect(*got.Spec.TrialConfig.ParallelTrials).To(gomega.Equal(int32(1)))
 
+					// Assert NumTrials defaults to 1
 					gomega.Expect(got.Spec.TrialConfig.NumTrials).ToNot(gomega.BeNil())
 					gomega.Expect(*got.Spec.TrialConfig.NumTrials).To(gomega.Equal(int32(1)))
 				}),
-		)
-
-		// =====================================================================
-		// 2. VALIDATION INTEGRATION TESTS (String Templating)
-		// =====================================================================
-		ginkgo.DescribeTable("Validate OptimizationJob on creation", func(job func() *trainer.OptimizationJob, errorMatcher gomega.OmegaMatcher) {
-			gomega.Expect(k8sClient.Create(ctx, job())).Should(errorMatcher)
-		},
-			ginkgo.Entry("Should succeed when string template placeholders match parameters",
-				func() *trainer.OptimizationJob {
-					return &trainer.OptimizationJob{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "valid-template",
-							Namespace: ns.Name,
-						},
-						Spec: trainer.OptimizationJobSpec{
-							Objectives: []trainer.Objective{
-								{Metric: "accuracy", Direction: "maximize"},
-							},
-							Algorithm: trainer.Algorithm{Name: "random", Provider: ptr.To("optuna")},
-							Parameters: []trainer.Parameter{
-								{Name: "learning_rate", SearchSpace: trainer.SearchSpace{Type: "double", Min: "0.01", Max: "0.1"}},
-							},
-							TrainJobTemplate: trainer.TrainJobTemplateSpec{
-								Spec: trainer.TrainJobSpec{
-									RuntimeRef: trainer.RuntimeRef{
-										Name:     "dummy-runtime",
-										APIGroup: ptr.To(trainer.SchemeGroupVersion.Group),
-										Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
-									},
-									Trainer: &trainer.Trainer{
-										Image: ptr.To("my-training-image:{{.learning_rate}}"),
-									},
-								},
-							},
-						},
-					}
-				},
-				gomega.Succeed()),
-
-			ginkgo.Entry("Should fail to create when string template placeholders are missing",
-				func() *trainer.OptimizationJob {
-					return &trainer.OptimizationJob{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "invalid-template-missing-placeholder",
-							Namespace: ns.Name,
-						},
-						Spec: trainer.OptimizationJobSpec{
-							Objectives: []trainer.Objective{
-								{Metric: "accuracy", Direction: "maximize"},
-							},
-							Algorithm: trainer.Algorithm{Name: "random", Provider: ptr.To("optuna")},
-							Parameters: []trainer.Parameter{
-								{Name: "learning_rate", SearchSpace: trainer.SearchSpace{Type: "double", Min: "0.01", Max: "0.1"}},
-							},
-							TrainJobTemplate: trainer.TrainJobTemplateSpec{
-								Spec: trainer.TrainJobSpec{
-									RuntimeRef: trainer.RuntimeRef{
-										Name:     "dummy-runtime",
-										APIGroup: ptr.To(trainer.SchemeGroupVersion.Group),
-										Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
-									},
-									Trainer: &trainer.Trainer{
-										Image: ptr.To("my-training-image"), // MISSING: :{{.learning_rate}}
-									},
-								},
-							},
-						},
-					}
-				},
-				gomega.SatisfyAll(
-					gomega.HaveOccurred(),
-					gomega.WithTransform(func(err error) string {
-						return err.Error()
-					}, gomega.ContainSubstring("Parameter 'learning_rate' is defined")),
-				)),
 		)
 	})
 })
