@@ -52,7 +52,138 @@ jobs:
 
       - name: Run e2e with Go
         run: |
-          make test-e2e || (kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer && exit 1)
+          make test-e2e || {
+            set +e
+
+            echo
+            echo "=================================================================="
+            echo "==================== TRAINER CONTROLLER LOGS ======================"
+            echo "=================================================================="
+            kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer --all-containers=true
+
+            echo
+            echo "=================================================================="
+            echo "========================= API RESOURCES ==========================="
+            echo "=================================================================="
+            kubectl api-resources | grep -E "train|jobset"
+
+            echo
+            echo "=================================================================="
+            echo "=========================== NAMESPACES ============================"
+            echo "=================================================================="
+            kubectl get ns
+
+            echo
+            echo "=================================================================="
+            echo "========================== TRAINJOBS =============================="
+            echo "=================================================================="
+            kubectl get trainjobs -A -o wide
+
+            echo
+            echo "======================= TRAINJOB YAML ============================="
+            kubectl get trainjobs -A -o yaml
+
+            echo
+            echo "==================== TRAINJOB DESCRIBE ============================"
+            kubectl describe trainjobs -A
+
+            echo
+            echo "=================================================================="
+            echo "=================== CLUSTERTRAININGRUNTIMES ======================="
+            echo "=================================================================="
+            kubectl get clustertrainingruntimes -A -o wide || true
+
+            echo
+            echo "================ CLUSTERTRAININGRUNTIME YAML ======================"
+            kubectl get clustertrainingruntimes -A -o yaml || true
+
+            echo
+            echo "=================================================================="
+            echo "========================== JOBSETS ================================"
+            echo "=================================================================="
+            kubectl get jobsets -A -o wide || true
+
+            echo
+            echo "======================== JOBSET YAML =============================="
+            kubectl get jobsets -A -o yaml || true
+
+            echo
+            echo "====================== JOBSET DESCRIBE ============================"
+            kubectl describe jobsets -A || true
+
+            echo
+            echo "=================================================================="
+            echo "============================ JOBS ================================"
+            echo "=================================================================="
+            kubectl get jobs -A -o wide
+
+            echo
+            echo "======================== JOB DESCRIBE ============================="
+            kubectl describe jobs -A
+
+            echo
+            echo "=================================================================="
+            echo "============================ PODS ================================"
+            echo "=================================================================="
+            kubectl get pods -A -o wide
+
+            echo
+            echo "======================== POD DESCRIBE ============================="
+            kubectl describe pods -A
+
+            echo
+            echo "=================================================================="
+            echo "========================= POD LOGS ================================"
+            echo "=================================================================="
+
+            for ns in $(kubectl get ns -o jsonpath='{.items[*].metadata.name}'); do
+              for pod in $(kubectl get pods -n "$ns" -o jsonpath='{.items[*].metadata.name}'); do
+                echo
+                echo "------------------------------------------------------------"
+                echo "POD: $ns/$pod"
+                echo "------------------------------------------------------------"
+
+                kubectl logs -n "$ns" "$pod" --all-containers=true --tail=-1 || true
+
+                echo
+                echo "---------------------- PREVIOUS LOGS ------------------------"
+
+                kubectl logs -n "$ns" "$pod" --all-containers=true --previous || true
+              done
+            done
+
+            echo
+            echo "=================================================================="
+            echo "=========================== EVENTS ==============================="
+            echo "=================================================================="
+            kubectl get events -A --sort-by=.metadata.creationTimestamp
+
+            echo
+            echo "=================================================================="
+            echo "====================== RESOURCE SUMMARY =========================="
+            echo "=================================================================="
+            kubectl get trainjobs,clustertrainingruntimes,jobs,pods -A || true
+            kubectl get jobsets -A || true
+            mkdir -p artifacts/debug
+
+            kubectl get trainjobs -A -o yaml > artifacts/debug/trainjobs.yaml 2>&1 || true
+            kubectl describe trainjobs -A > artifacts/debug/trainjobs.describe 2>&1 || true
+
+            kubectl get clustertrainingruntimes -A -o yaml > artifacts/debug/clustertrainingruntimes.yaml 2>&1 || true
+
+            kubectl get jobsets -A -o yaml > artifacts/debug/jobsets.yaml 2>&1 || true
+            kubectl describe jobsets -A > artifacts/debug/jobsets.describe 2>&1 || true
+
+            kubectl get jobs -A -o yaml > artifacts/debug/jobs.yaml 2>&1 || true
+            kubectl describe jobs -A > artifacts/debug/jobs.describe 2>&1 || true
+
+            kubectl get pods -A -o yaml > artifacts/debug/pods.yaml 2>&1 || true
+            kubectl describe pods -A > artifacts/debug/pods.describe 2>&1 || true
+
+            kubectl get events -A --sort-by=.metadata.creationTimestamp > artifacts/debug/events.txt 2>&1 || true
+
+            exit 1
+          }
 
       - name: Run e2e test for example Notebooks
         run: |

@@ -104,7 +104,11 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 	log := ctrl.LoggerFrom(ctx).WithValues("trainJob", klog.KObj(&trainJob))
 	ctx = ctrl.LoggerInto(ctx, log)
-	log.V(2).Info("Reconciling TrainJob")
+	log.Info("[DEBUG] Reconciling TrainJob",
+		"runtimeRef", trainJob.Spec.RuntimeRef,
+		"generation", trainJob.Generation,
+		"status", trainJob.Status,
+	)
 
 	if trainjob.IsManagedByExternalController(&trainJob) {
 		log.V(2).Info("Skipping TrainJob managed by a custom controller", "managedBy", ptr.Deref(trainJob.Spec.ManagedBy, ""))
@@ -121,8 +125,15 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := r.runtimes[runtimeRefGK]
+	log.Info("[DEBUG] Runtime lookup",
+		"runtimeRefGK", runtimeRefGK,
+		"found", ok,
+	)
 	if !ok {
 		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
+		log.Error(err, "[DEBUG] Runtime not found",
+			"runtimeRefGK", runtimeRefGK,
+		)
 		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
 	} else if !trainjob.IsTrainJobFinished(&trainJob) {
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
@@ -141,8 +152,16 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	setSuspendedCondition(&trainJob)
 
+	log.Info("[DEBUG] Calling setTrainJobStatus")
+
 	if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
+		log.Error(statusErr, "[DEBUG] setTrainJobStatus failed")
 		err = errors.Join(err, statusErr)
+	} else {
+		log.Info("[DEBUG] TrainJob status after update",
+			"conditions", trainJob.Status.Conditions,
+			"jobsStatus", trainJob.Status.JobsStatus,
+		)
 	}
 
 	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
@@ -155,21 +174,52 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if !equality.Semantic.DeepEqual(&trainJob.Status, prevTrainJob.Status) {
 		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
 		// for sub-resources. See: https://github.com/kubernetes-sigs/controller-runtime/issues/3183
+		log.Info("[DEBUG] Patching TrainJob status",
+			"oldStatus", prevTrainJob.Status,
+			"newStatus", trainJob.Status,
+		)
 		return ctrl.Result{}, errors.Join(err, r.client.Status().Patch(ctx, &trainJob, client.MergeFrom(prevTrainJob)))
 	}
 	return ctrl.Result{}, err
 }
 
 func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	log.Info("[DEBUG] Calling runtime.NewObjects")
+
 	objects, err := runtime.NewObjects(ctx, trainJob)
 	if err != nil {
+		log.Error(err, "[DEBUG] runtime.NewObjects failed")
 		return err
 	}
-	for _, object := range objects {
+
+	log.Info("[DEBUG] runtime.NewObjects succeeded",
+		"count", len(objects),
+	)
+
+	for i, object := range objects {
+		log.Info("[DEBUG] Applying object",
+			"index", i,
+			"type", fmt.Sprintf("%T", object),
+		)
+
 		if err := r.client.Apply(ctx, object, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
+			log.Error(err, "[DEBUG] Failed applying object",
+				"index", i,
+				"type", fmt.Sprintf("%T", object),
+			)
 			return err
 		}
+
+		log.Info("[DEBUG] Successfully applied object",
+			"index", i,
+			"type", fmt.Sprintf("%T", object),
+		)
 	}
+
+	log.Info("[DEBUG] reconcileObjects completed successfully")
+
 	return nil
 }
 
@@ -280,17 +330,31 @@ func removeFailedCondition(trainJob *trainer.TrainJob) {
 	}
 	meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobFailed)
 }
-
 func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
+	log := ctrl.LoggerFrom(ctx)
 	deadlineCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
 	if deadlineCond != nil && deadlineCond.Reason != trainer.TrainJobDeadlineExceededReason {
 		deadlineCond = nil
 	}
 
 	status, err := runtime.TrainJobStatus(ctx, trainJob)
+
 	if err != nil {
+		log.Error(err, "[DEBUG] runtime.TrainJobStatus failed")
 		return err
 	}
+
+	log.Info("[DEBUG] runtime.TrainJobStatus returned",
+		"statusNil", status == nil,
+	)
+
+	if status != nil {
+		log.Info("[DEBUG] Returned status",
+			"conditions", status.Conditions,
+			"jobsStatus", status.JobsStatus,
+		)
+	}
+
 	if status != nil {
 		trainJob.Status = *status
 	}
