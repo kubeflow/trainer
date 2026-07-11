@@ -208,7 +208,8 @@ type LogUniformSpace struct {
 
 // CategoricalSpace defines a search space over a discrete set of unordered strings.
 type CategoricalSpace struct {
-	// +listType=atomic
+	// +listType=map
+	// +listMapKey=name
 	// +kubebuilder:validation:MinItems=1
 	Choices []string `json:"choices"`
 }
@@ -269,12 +270,17 @@ type OptimizationJobStatus struct {
 	// +kubebuilder:validation:Minimum=0
 	Failed int32 `json:"failed,omitempty"`
 
-	BestTrial *BestTrial `json:"bestTrial,omitempty"`
+	Result *Result `json:"result,omitempty"`
 }
 
-// BestTrial tracks the parameters of the highest performing trial.
-type BestTrial struct {
-	// +listType=atomic
+// Result tracks the parameters of the highest performing trial.
+type Result struct {
+	// TrainJobName is the name of the underlying TrainJob that achieved this result.
+    // +kubebuilder:validation:MinLength=1
+    // +required
+    TrainJobName string `json:"trainJobName"`
+	// +listType=map
+	// +listMapKey=name
 	// +optional
 	Parameters []ParameterAssignment `json:"parameters,omitempty"`
 }
@@ -340,9 +346,8 @@ status:
   active: 0
   succeeded: 20
   failed: 0
-  bestTrial:
-    name: "bayesian-tuning-mvp-trial-ab12c"
-    value: "0.0432"
+  result:
+    trainJobName: "bayesian-tuning-mvp-trial-ab12c"
     parameters:
       - name: "learning_rate"
         value: "0.0021"
