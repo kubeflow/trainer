@@ -64,11 +64,11 @@ spec:
 
 **Story 4: The ML Researcher (Native SDK Integration)**
 * **As an ML Researcher**, I want to consume hyperparameter suggestions via standard environment variables rather than brittle YAML regex string substitution.
-* **Motivation:** Using the `KUBEFLOW_OPT_<NAME>` pattern allows me to cleanly parse tuning suggestions inside my Python scripts using existing SDK helper functions without modifying my container's CLI argument parsing logic.
+* **Motivation:** Using the `KUBEFLOW_OPT_<NAME>` pattern allows me to cleanly parse tuning suggestions inside my Python scripts using existing SDK helper functions without modifying my container's CLI argument parsing logic. [Separate KEP for this integration].
 
 ## 3. Goals
 
-- **TrainJob Feature Flag** (Hard Dependency): The unified TrainJob feature flag MUST be enabled in the cluster/controller environment. 
+- **TrainJob Feature Flag** (Hard Dependency): The unified `TrainJob` API feature flag MUST be enabled in the cluster/controller environment. 
 - **Tighter TrainJob Integration:** Introduce the `OptimizationJob` CRD focused exclusively on `TrainJobs`, using a structured `TrainJobTemplateSpec`.
 - **Native Parameter Injection:** Replace legacy brittle regex YAML substitution with standard Kubernetes mechanisms: prefixed environment variables (e.g., `KUBEFLOW_OPT_LR`) and Pod annotations.
 - **Dependency Reduction (No Katib DB or Trial CRD):** Rely strictly on the `TrainJob` annotations for historical parameters and the Progress API for evaluating metrics.
@@ -136,10 +136,6 @@ type Objective struct {
 
 // +kubebuilder:validation:XValidation:rule="[has(self.random), has(self.grid), has(self.bayesian)].filter(x, x).size() == 1",message="Exactly one search algorithm configuration must be provided"
 type SearchAlgorithm struct {
-	// Provider specifies the backend suggestion engine. Defaults to "optuna".
-	// +optional
-	Provider *string `json:"provider,omitempty"`
-
 	// +optional
 	Random *RandomAlgorithm `json:"random,omitempty"`
 	// +optional
@@ -282,18 +278,6 @@ type BestTrial struct {
 	// +optional
 	Parameters []ParameterAssignment `json:"parameters,omitempty"`
 }
-
-type ParameterAssignment struct {
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=64
-	// +required
-	Name string `json:"name"`
-
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=64
-	// +required
-	Value string `json:"value"`
-}
 ```
 
 ## 6. Sample YAML (Phase 1)
@@ -426,7 +410,7 @@ With the new unified TrainJob API exposing metrics directly, the `OptimizationJo
 Instead of employing a single flat struct with a generic type string, the `SearchSpace` utilizes a discriminated union. This establishes strong typing at the Kubernetes API layer, permitting mathematical CEL validations (`double()`, `int()`) and the easy addition of future mathematical domains without heavy Webhook validation logic.
 
 ### 8.6. Open Discussion: Decoupling Metric Reporting from Termination Logic
-**Status: Pending**
+**Status: Resolved (Phase 2 Roadmap)**
 Metric reporting from the TrainJob is strictly asynchronous and non-blocking. Pruning decisions are computed controller-side based on the monotonic metric history. A "Stop Signal" is propagated to the training runtime as a non-blocking annotation or status field, which the KubeflowCallback (SDK) periodically polls.
 
 Synchronous "kill" calls during metric reporting create tight coupling and latency bottlenecks. By separating reporting from termination, we ensure the controller remains performant even under heavy trial loads.
