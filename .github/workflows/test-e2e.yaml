@@ -55,132 +55,140 @@ jobs:
           make test-e2e || {
             set +e
 
+            mkdir -p artifacts/debug
+
+            echo "===== Debug collection started =====" | tee artifacts/debug/debug.txt
+            echo "PWD: $(pwd)" | tee -a artifacts/debug/debug.txt
+            echo "Date: $(date)" | tee -a artifacts/debug/debug.txt
+            ls -la | tee -a artifacts/debug/debug.txt
+
             echo
             echo "=================================================================="
             echo "==================== TRAINER CONTROLLER LOGS ======================"
             echo "=================================================================="
-            kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer --all-containers=true
+            kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer --all-containers=true \
+              | tee artifacts/debug/trainer-controller.log || true
 
             echo
             echo "=================================================================="
             echo "========================= API RESOURCES ==========================="
             echo "=================================================================="
-            kubectl api-resources | grep -E "train|jobset"
+            kubectl api-resources | grep -E "train|jobset" \
+              | tee artifacts/debug/api-resources.txt || true
 
             echo
             echo "=================================================================="
             echo "=========================== NAMESPACES ============================"
             echo "=================================================================="
-            kubectl get ns
+            kubectl get ns | tee artifacts/debug/namespaces.txt || true
 
             echo
             echo "=================================================================="
             echo "========================== TRAINJOBS =============================="
             echo "=================================================================="
-            kubectl get trainjobs -A -o wide
+            kubectl get trainjobs -A -o wide \
+              | tee artifacts/debug/trainjobs.txt || true
 
-            echo
-            echo "======================= TRAINJOB YAML ============================="
-            kubectl get trainjobs -A -o yaml
+            kubectl get trainjobs -A -o yaml \
+              > artifacts/debug/trainjobs.yaml 2>&1 || true
 
-            echo
-            echo "==================== TRAINJOB DESCRIBE ============================"
-            kubectl describe trainjobs -A
+            kubectl describe trainjobs -A \
+              > artifacts/debug/trainjobs.describe 2>&1 || true
 
             echo
             echo "=================================================================="
             echo "=================== CLUSTERTRAININGRUNTIMES ======================="
             echo "=================================================================="
-            kubectl get clustertrainingruntimes -A -o wide || true
+            kubectl get clustertrainingruntimes -A -o wide \
+              | tee artifacts/debug/clustertrainingruntimes.txt || true
 
-            echo
-            echo "================ CLUSTERTRAININGRUNTIME YAML ======================"
-            kubectl get clustertrainingruntimes -A -o yaml || true
+            kubectl get clustertrainingruntimes -A -o yaml \
+              > artifacts/debug/clustertrainingruntimes.yaml 2>&1 || true
+
+            kubectl describe clustertrainingruntimes -A \
+              > artifacts/debug/clustertrainingruntimes.describe 2>&1 || true
 
             echo
             echo "=================================================================="
             echo "========================== JOBSETS ================================"
             echo "=================================================================="
-            kubectl get jobsets -A -o wide || true
+            kubectl get jobsets -A -o wide \
+              | tee artifacts/debug/jobsets.txt || true
 
-            echo
-            echo "======================== JOBSET YAML =============================="
-            kubectl get jobsets -A -o yaml || true
+            kubectl get jobsets -A -o yaml \
+              > artifacts/debug/jobsets.yaml 2>&1 || true
 
-            echo
-            echo "====================== JOBSET DESCRIBE ============================"
-            kubectl describe jobsets -A || true
+            kubectl describe jobsets -A \
+              > artifacts/debug/jobsets.describe 2>&1 || true
 
             echo
             echo "=================================================================="
             echo "============================ JOBS ================================"
             echo "=================================================================="
-            kubectl get jobs -A -o wide
+            kubectl get jobs -A -o wide \
+              | tee artifacts/debug/jobs.txt || true
 
-            echo
-            echo "======================== JOB DESCRIBE ============================="
-            kubectl describe jobs -A
+            kubectl get jobs -A -o yaml \
+              > artifacts/debug/jobs.yaml 2>&1 || true
+
+            kubectl describe jobs -A \
+              > artifacts/debug/jobs.describe 2>&1 || true
 
             echo
             echo "=================================================================="
             echo "============================ PODS ================================"
             echo "=================================================================="
-            kubectl get pods -A -o wide
+            kubectl get pods -A -o wide \
+              | tee artifacts/debug/pods.txt || true
+
+            kubectl get pods -A -o yaml \
+              > artifacts/debug/pods.yaml 2>&1 || true
+
+            kubectl describe pods -A \
+              > artifacts/debug/pods.describe 2>&1 || true
 
             echo
-            echo "======================== POD DESCRIBE ============================="
-            kubectl describe pods -A
+            echo "===================== NON-RUNNING PODS ============================"
+            kubectl get pods -A \
+              --field-selector=status.phase!=Running,status.phase!=Succeeded \
+              -o wide \
+              | tee artifacts/debug/non-running-pods.txt || true
+
+            echo
+            echo "=================================================================="
+            echo "=========================== EVENTS ==============================="
+            echo "=================================================================="
+            kubectl get events -A --sort-by=.metadata.creationTimestamp \
+              | tee artifacts/debug/events.txt || true
 
             echo
             echo "=================================================================="
             echo "========================= POD LOGS ================================"
             echo "=================================================================="
 
-            for ns in $(kubectl get ns -o jsonpath='{.items[*].metadata.name}'); do
-              for pod in $(kubectl get pods -n "$ns" -o jsonpath='{.items[*].metadata.name}'); do
-                echo
-                echo "------------------------------------------------------------"
-                echo "POD: $ns/$pod"
-                echo "------------------------------------------------------------"
+            for ns in $(kubectl get ns -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+              for pod in $(kubectl get pods -n "$ns" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+                {
+                  echo
+                  echo "======================================================"
+                  echo "Pod: $ns/$pod"
+                  echo "======================================================"
 
-                kubectl logs -n "$ns" "$pod" --all-containers=true --tail=-1 || true
+                  kubectl logs -n "$ns" "$pod" --all-containers=true --tail=-1 || true
 
-                echo
-                echo "---------------------- PREVIOUS LOGS ------------------------"
+                  echo
+                  echo "---------------- PREVIOUS LOGS ----------------"
 
-                kubectl logs -n "$ns" "$pod" --all-containers=true --previous || true
+                  kubectl logs -n "$ns" "$pod" --all-containers=true --previous || true
+                } >> "artifacts/debug/pod-${ns}-${pod}.log" 2>&1
               done
             done
 
             echo
             echo "=================================================================="
-            echo "=========================== EVENTS ==============================="
+            echo "===================== DEBUG FILES CREATED ========================="
             echo "=================================================================="
-            kubectl get events -A --sort-by=.metadata.creationTimestamp
-
-            echo
-            echo "=================================================================="
-            echo "====================== RESOURCE SUMMARY =========================="
-            echo "=================================================================="
-            kubectl get trainjobs,clustertrainingruntimes,jobs,pods -A || true
-            kubectl get jobsets -A || true
-            mkdir -p artifacts/debug
-
-            kubectl get trainjobs -A -o yaml > artifacts/debug/trainjobs.yaml 2>&1 || true
-            kubectl describe trainjobs -A > artifacts/debug/trainjobs.describe 2>&1 || true
-
-            kubectl get clustertrainingruntimes -A -o yaml > artifacts/debug/clustertrainingruntimes.yaml 2>&1 || true
-
-            kubectl get jobsets -A -o yaml > artifacts/debug/jobsets.yaml 2>&1 || true
-            kubectl describe jobsets -A > artifacts/debug/jobsets.describe 2>&1 || true
-
-            kubectl get jobs -A -o yaml > artifacts/debug/jobs.yaml 2>&1 || true
-            kubectl describe jobs -A > artifacts/debug/jobs.describe 2>&1 || true
-
-            kubectl get pods -A -o yaml > artifacts/debug/pods.yaml 2>&1 || true
-            kubectl describe pods -A > artifacts/debug/pods.describe 2>&1 || true
-
-            kubectl get events -A --sort-by=.metadata.creationTimestamp > artifacts/debug/events.txt 2>&1 || true
+            find artifacts -type f || true
 
             exit 1
           }
@@ -243,5 +251,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: gpu-${{ matrix.kubernetes-version }}
-          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts/*
+          path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/artifacts
           retention-days: 1
