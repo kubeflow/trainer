@@ -14,13 +14,16 @@
 
 FROM python:3.14-slim-bookworm
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 WORKDIR /app
 
 # Copy the required Python modules.
-COPY cmd/initializers/model/requirements.txt .
+COPY cmd/initializers/model/pyproject.toml .
+COPY cmd/initializers/model/uv.lock .
 COPY pkg/initializers pkg/initializers
 
 # Install the needed packages.
-RUN pip install -r requirements.txt
+RUN uv sync --locked --no-dev --system
 
 ENTRYPOINT ["python", "-m", "pkg.initializers.model"]
