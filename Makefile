@@ -237,6 +237,9 @@ test-python: ## Run Python unit test.
 	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/model
 	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/utils
 
+	pip install -r ./cmd/trainers/grpo/requirements.txt
+	pytest ./cmd/trainers/grpo
+
 .PHONY: test-python-integration
 test-python-integration: ## Run Python integration test.
 	pip install pytest

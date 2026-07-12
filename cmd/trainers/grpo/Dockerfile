@@ -12,13 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - deepspeed_distributed.yaml
-  - mlx_distributed.yaml
-  - torch_distributed.yaml
-  - jax_distributed.yaml
-  - xgboost_distributed.yaml
-  - torchtune
-  - grpo
+FROM pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
+
+WORKDIR /workspace
+
+# Install build-essential for compiling any dependencies
+RUN apt update && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the required Python modules
+COPY cmd/trainers/grpo/requirements.txt .
+
+# Install the needed packages
+RUN pip install -r requirements.txt
+
+# Copy the GRPO training entrypoint
+COPY cmd/trainers/grpo/train.py .
