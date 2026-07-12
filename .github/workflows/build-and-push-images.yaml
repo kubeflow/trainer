@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 name: Build and Publish Images
 
 on:
@@ -8,6 +22,9 @@ on:
     tags:
       - "v*"
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'proposals/**'
   workflow_dispatch:
 
 jobs:
@@ -50,11 +67,11 @@ jobs:
             platforms: linux/amd64,linux/arm64
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: GHCR Login
         if: env.SHOULD_PUBLISH == 'true'
-        uses: docker/login-action@v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -62,7 +79,7 @@ jobs:
 
       - name: Docker Hub Login
         if: env.SHOULD_PUBLISH == 'true'
-        uses: docker/login-action@v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}

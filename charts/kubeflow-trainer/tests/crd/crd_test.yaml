@@ -1,0 +1,57 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Test CRDs
+
+templates:
+  - crd/trainer.kubeflow.org_trainjobs.yaml
+  - crd/trainer.kubeflow.org_trainingruntimes.yaml
+  - crd/trainer.kubeflow.org_clustertrainingruntimes.yaml
+
+release:
+  name: kubeflow-trainer
+  namespace: kubeflow-system
+
+tests:
+  - it: Should render the TrainJob CRD as a template so it is reconciled on helm upgrade
+    template: crd/trainer.kubeflow.org_trainjobs.yaml
+    asserts:
+      - containsDocument:
+          apiVersion: apiextensions.k8s.io/v1
+          kind: CustomResourceDefinition
+          name: trainjobs.trainer.kubeflow.org
+
+  - it: Should render the TrainingRuntime CRD as a template so it is reconciled on helm upgrade
+    template: crd/trainer.kubeflow.org_trainingruntimes.yaml
+    asserts:
+      - containsDocument:
+          apiVersion: apiextensions.k8s.io/v1
+          kind: CustomResourceDefinition
+          name: trainingruntimes.trainer.kubeflow.org
+
+  - it: Should render the ClusterTrainingRuntime CRD as a template so it is reconciled on helm upgrade
+    template: crd/trainer.kubeflow.org_clustertrainingruntimes.yaml
+    asserts:
+      - containsDocument:
+          apiVersion: apiextensions.k8s.io/v1
+          kind: CustomResourceDefinition
+          name: clustertrainingruntimes.trainer.kubeflow.org
+
+  - it: Should not render the CRDs when crds.enabled is false
+    set:
+      crds:
+        enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

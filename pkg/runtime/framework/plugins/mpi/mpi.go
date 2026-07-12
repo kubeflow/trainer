@@ -150,16 +150,20 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 					WithName(constants.MPISSHAuthVolumeName).
 					WithSecret(corev1ac.SecretVolumeSource().
 						WithSecretName(fmt.Sprintf("%s%s", trainJob.Name, constants.MPISSHAuthSecretSuffix)).
+						WithDefaultMode(constants.MPISSHAuthDefaultMode).
 						WithItems(
 							corev1ac.KeyToPath().
 								WithKey(corev1.SSHAuthPrivateKey).
-								WithPath(constants.MPISSHPrivateKeyFile),
+								WithPath(constants.MPISSHPrivateKeyFile).
+								WithMode(constants.MPISSHPrivateKeyFileMode),
 							corev1ac.KeyToPath().
 								WithKey(constants.MPISSHPublicKey).
-								WithPath(constants.MPISSHPublicKeyFile),
+								WithPath(constants.MPISSHPublicKeyFile).
+								WithMode(constants.MPISSHPublicKeyFileMode),
 							corev1ac.KeyToPath().
 								WithKey(constants.MPISSHPublicKey).
-								WithPath(constants.MPISSHAuthorizedKeys),
+								WithPath(constants.MPISSHAuthorizedKeys).
+								WithMode(constants.MPISSHPublicKeyFileMode),
 						),
 					),
 			}...,

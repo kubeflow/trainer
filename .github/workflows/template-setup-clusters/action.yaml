@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 name: Setup E2E Cluster
 description: Checks out code, sets up Go and Python, installs dependencies, and creates a Kind cluster
 
@@ -14,18 +28,18 @@ runs:
   using: "composite"
   steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       with:
         ref: ${{ github.event.pull_request.head.sha }}
         path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
     - name: Setup Go
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
       with:
         go-version-file: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer/go.mod
 
     - name: Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
       with:
         python-version: 3.12
 

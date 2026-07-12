@@ -60,9 +60,9 @@ ignore_tags = ".*-(alpha|beta|rc).*"
 
 # Manually define groups based on conventional patterns
 commit_parsers = [
-   { message = "^feat(\\(.*\\))?:", group = "🚀 Features" },
-   { message = "^fix(\\(.*\\))?:", group = "🐛 Bug Fixes" },
-   { message = "^chore(\\(.*\\))?:", group = "⚙️ Miscellaneous Tasks" },
-   { message = "^revert(\\(.*\\))?:", group = "⏪ Reverts" },
+   { message = "^(\\[[^]]+\\]\\s*)?feat(\\(.*\\))?:", group = "🚀 Features" },
+   { message = "^(\\[[^]]+\\]\\s*)?fix(\\(.*\\))?:", group = "🐛 Bug Fixes" },
+   { message = "^(\\[[^]]+\\]\\s*)?chore(\\(.*\\))?:", group = "⚙️ Miscellaneous Tasks" },
+   { message = "^(\\[[^]]+\\]\\s*)?revert(\\(.*\\))?:", group = "⏪ Reverts" },
    { message = ".*", skip = true },
 ]

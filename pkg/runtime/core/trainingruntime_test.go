@@ -1981,19 +1981,23 @@ test-job-node-0-1.test-job slots=8
 							Name: constants.MPISSHAuthVolumeName,
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									SecretName:  fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									DefaultMode: ptr.To(constants.MPISSHAuthDefaultMode),
 									Items: []corev1.KeyToPath{
 										{
 											Key:  corev1.SSHAuthPrivateKey,
 											Path: constants.MPISSHPrivateKeyFile,
+											Mode: ptr.To(constants.MPISSHPrivateKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHPublicKeyFile,
+											Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHAuthorizedKeys,
+											Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 										},
 									},
 								},
@@ -2020,19 +2024,23 @@ test-job-node-0-1.test-job slots=8
 							Name: constants.MPISSHAuthVolumeName,
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									SecretName:  fmt.Sprintf("test-job%s", constants.MPISSHAuthSecretSuffix),
+									DefaultMode: ptr.To(constants.MPISSHAuthDefaultMode),
 									Items: []corev1.KeyToPath{
 										{
 											Key:  corev1.SSHAuthPrivateKey,
 											Path: constants.MPISSHPrivateKeyFile,
+											Mode: ptr.To(constants.MPISSHPrivateKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHPublicKeyFile,
+											Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 										},
 										{
 											Key:  constants.MPISSHPublicKey,
 											Path: constants.MPISSHAuthorizedKeys,
+											Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
 										},
 									},
 								},

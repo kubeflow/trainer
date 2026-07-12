@@ -1,7 +1,7 @@
 # Developer Guide
 
 This guide explains how to contribute to the Kubeflow Trainer V2 project.
-For the Kubeflow Trainer documentation, please check [the official Kubeflow documentation](https://www.kubeflow.org/docs/components/trainer/overview/).
+For the Kubeflow Trainer documentation, please check [the official Kubeflow documentation](https://trainer.kubeflow.org/en/latest/overview/index.html).
 
 ## AI Assistant Tooling
 
@@ -122,7 +122,7 @@ For any significant features or enhancement for Kubeflow Trainer project we foll
 [Kubeflow Enhancement Proposal process](https://github.com/kubeflow/community/tree/master/proposals).
 
 If you want to submit a significant change to the Kubeflow Trainer, please submit a new KEP under
-[./docs/proposals](./docs/proposals/) directory.
+[./proposals](./proposals/) directory.
 
 ### Go Development
 

@@ -1,0 +1,287 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This workflow runs govulncheck on PRs to detect known reachable CVEs across the entire Go module.
+# It triggers when any Go source file or Go dependencies (go.mod, go.sum) change.
+# Results are posted as an informational PR comment for new regressions only.
+
+name: govulncheck - CVE Detection
+
+on:
+  pull_request:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  # Bump cadence: check https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck?tab=versions periodically to update to latest release
+  GOVULNCHECK_VERSION: v1.3.0
+
+jobs:
+  govulncheck:
+    name: govulncheck
+    if: ${{ github.repository == 'kubeflow/trainer' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          path: pr-code
+
+      - name: Checkout base branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.base_ref || github.event.repository.default_branch }}
+          path: base-code
+
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version-file: pr-code/go.mod
+
+      - name: Install govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }}
+          echo "Go version: $(go version)"
+          govulncheck -version
+
+      - name: Run govulncheck on PR branch
+        run: |
+          cd pr-code
+          rc=0
+          govulncheck -format json ./... > ../govulncheck-pr.json || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then
+            echo "::error::govulncheck failed on PR branch with exit code $rc"
+            exit 1
+          fi
+
+      - name: Run govulncheck on base branch
+        run: |
+          cd base-code
+          rc=0
+          govulncheck -format json ./... > ../govulncheck-base.json || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then
+            echo "::error::govulncheck failed on base branch with exit code $rc"
+            exit 1
+          fi
+
+      - name: Compare and detect regressions
+        id: compare
+        run: |
+          set -eo pipefail
+
+          for f in govulncheck-pr.json govulncheck-base.json; do
+            if [ ! -s "$f" ]; then
+              echo "::error::$f is empty or missing — scan may have failed silently"
+              exit 1
+            fi
+            if ! jq -s -e '.[0].config' "$f" > /dev/null 2>&1; then
+              echo "::error::$f missing config record — not valid govulncheck output"
+              exit 1
+            fi
+            finding_count=$(jq -s '[.[] | select(.finding)] | length' "$f")
+            osv_count=$(jq -s '[.[] | select(.osv)] | length' "$f")
+            echo "$f: $osv_count advisories, $finding_count reachable findings"
+            if [ "$osv_count" -gt 0 ] && [ "$finding_count" -eq 0 ]; then
+              echo "::warning::$f has advisories but no reachable findings — scan output may be incomplete"
+            fi
+          done
+
+          JQ_EXTRACT='
+            [.[] | select(.finding)] | group_by(.finding.osv) | map(.[0].finding.osv) | sort
+          '
+
+          PR_VULNS=$(jq -s "$JQ_EXTRACT" govulncheck-pr.json)
+          BASE_VULNS=$(jq -s "$JQ_EXTRACT" govulncheck-base.json)
+
+          NEW_VULNS=$(jq -n --argjson pr "$PR_VULNS" --argjson base "$BASE_VULNS" '$pr - $base')
+          NEW_COUNT=$(echo "$NEW_VULNS" | jq 'length')
+
+          echo "Base branch vulnerabilities: $(echo "$BASE_VULNS" | jq 'length')"
+          echo "PR branch vulnerabilities: $(echo "$PR_VULNS" | jq 'length')"
+          echo "New vulnerabilities: $NEW_COUNT"
+
+          if [ "$NEW_COUNT" -eq 0 ]; then
+            echo "No new vulnerabilities introduced by this PR."
+            echo "## govulncheck summary" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "No new vulnerabilities introduced by this PR." >> "$GITHUB_STEP_SUMMARY"
+            echo "new_cves_found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo ""
+          echo "::warning title=Security Alert::This PR introduces $NEW_COUNT new vulnerabilities. Review the bot comment below."
+
+          JQ_DETAILS='
+            [.[] | select(.osv)] as $osvs |
+            [.[] | select(.finding)] as $findings |
+            ($osvs | map({(.osv.id): .osv}) | add) as $osv_map |
+            [
+              $findings
+              | group_by(.finding.osv)[]
+              | .[0].finding as $f
+              | $osv_map[$f.osv] as $osv
+              | select($new_vulns | index($f.osv))
+              | {
+                  osv_id: $f.osv,
+                  cve: ([$osv.aliases[]? | select(startswith("CVE-"))] | first // $f.osv),
+                  summary: ($osv.summary // "N/A"),
+                  module: $f.trace[0].module,
+                  version: $f.trace[0].version,
+                  fixed: $f.fixed_version
+                }
+            ]
+            | sort_by(.module, .osv_id)
+          '
+
+          # Step summary — new vulnerabilities only
+          jq -s --argjson new_vulns "$NEW_VULNS" "$JQ_DETAILS"' |
+            "## govulncheck summary\n\nThis PR introduces **\(length)** new vulnerabilities which are not present in the base branch:\n\n| CVE | Vuln ID | Description | Module | Current | Fixed |\n|-----|---------|-------------|--------|---------|-------|\n" +
+            (map("| \(.cve) | [\(.osv_id)](https://pkg.go.dev/vuln/\(.osv_id)) | \(.summary[:80] | gsub("[\\n\\r]"; " ") | gsub("\\|"; "\\\\|")) | `\(.module)` | \(.version) | \(.fixed) |") | join("\n"))
+          ' -r govulncheck-pr.json >> "$GITHUB_STEP_SUMMARY"
+
+          # Step logs — detailed output
+          echo ""
+          echo "=== New Vulnerabilities Introduced by This PR ==="
+          echo ""
+          jq -s --argjson new_vulns "$NEW_VULNS" "$JQ_DETAILS"' |
+            .[] | "\(.cve)  \(.osv_id)  \(.module)@\(.version) -> \(.fixed)\n  \(.summary)"
+          ' -r govulncheck-pr.json
+          echo ""
+          echo "Total: $NEW_COUNT new vulnerabilities"
+
+          echo "new_cves_found=true" >> $GITHUB_OUTPUT
+
+          {
+            echo "new_cves<<EOF"
+            echo "| CVE | Vuln ID | Description | Module | Current | Fixed |"
+            echo "| :--- | :--- | :--- | :--- | :--- | :--- |"
+            jq -s --argjson new_vulns "$NEW_VULNS" "$JQ_DETAILS"' |
+              .[] | "| \(.cve) | [\(.osv_id)](https://pkg.go.dev/vuln/\(.osv_id)) | \(.summary[:80] | gsub("[\\n\\r]"; " ") | gsub("\\|"; "\\\\|")) | `\(.module)` | \(.version) | \(.fixed) |"
+            ' -r govulncheck-pr.json
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Comment on PR with regression details
+        id: comment
+        continue-on-error: true
+        if: always() && github.event_name == 'pull_request' && steps.compare.outputs.new_cves_found == 'true'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          NEW_CVES: ${{ steps.compare.outputs.new_cves }}
+        with:
+          script: |
+            const newCves = process.env.NEW_CVES;
+            const commentMarker = '<!-- govulncheck-security-check -->';
+            const body = [
+              commentMarker,
+              '## govulncheck: New Vulnerabilities Detected',
+              '',
+              'This PR introduces new vulnerabilities that are not present in the base branch:',
+              '',
+              newCves,
+              '',
+              '### How to Fix',
+              '1. Run `go get <module>@<fixed-version>` for each affected module',
+              '2. Run `go mod tidy` to clean up',
+              '3. If no fix is available, consult with the security team for risk assessment',
+              '',
+              '> **Note:** This check is informational and does not block merging.',
+            ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            const existingComment = comments.find(comment =>
+              comment.body.includes(commentMarker)
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                comment_id: existingComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }
+
+      - name: Fallback alert if PR comment failed
+        if: always() && github.event_name == 'pull_request' && steps.compare.outputs.new_cves_found == 'true' && steps.comment.outcome == 'failure'
+        env:
+          NEW_CVES: ${{ steps.compare.outputs.new_cves }}
+        run: |
+          echo "::warning::Failed to post security regression comment on PR. See details in step summary."
+          {
+            echo "## New Vulnerabilities Detected"
+            echo ""
+            echo "> The PR comment could not be posted (API failure). Review the regression details below."
+            echo ""
+            echo "$NEW_CVES"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Delete security comment when resolved
+        id: delete-comment
+        continue-on-error: true
+        if: success() && github.event_name == 'pull_request' && steps.compare.outputs.new_cves_found == 'false'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const commentMarker = '<!-- govulncheck-security-check -->';
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            const existingComment = comments.find(comment =>
+              comment.body.includes(commentMarker)
+            );
+
+            if (existingComment) {
+              await github.rest.issues.deleteComment({
+                comment_id: existingComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+              console.log('Security comment deleted - vulnerabilities resolved!');
+            }
+
+      - name: Fallback alert if comment deletion failed
+        if: success() && github.event_name == 'pull_request' && steps.delete-comment.outcome == 'failure'
+        run: |
+          echo "::warning::Failed to delete stale security comment on PR. It may need manual removal."

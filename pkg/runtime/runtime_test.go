@@ -562,6 +562,75 @@ func TestFindPodSetByName(t *testing.T) {
 	}
 }
 
+func TestFindContainerByPodSetName(t *testing.T) {
+	cases := map[string]struct {
+		info          *Info
+		psName        string
+		containerName string
+		wantContainer *Container
+	}{
+		"regular container exists": {
+			info: &Info{TemplateSpec: TemplateSpec{PodSets: []PodSet{
+				{
+					Name:       "node",
+					Containers: []Container{{Name: "trainer"}},
+				},
+			}}},
+			psName:        "node",
+			containerName: "trainer",
+			wantContainer: &Container{Name: "trainer"},
+		},
+		"init container exists": {
+			info: &Info{TemplateSpec: TemplateSpec{PodSets: []PodSet{
+				{
+					Name:           "node",
+					InitContainers: []Container{{Name: "preflight"}},
+					Containers:     []Container{{Name: "trainer"}},
+				},
+			}}},
+			psName:        "node",
+			containerName: "preflight",
+			wantContainer: &Container{Name: "preflight"},
+		},
+		"regular container wins name collision": {
+			info: &Info{TemplateSpec: TemplateSpec{PodSets: []PodSet{
+				{
+					Name:           "node",
+					InitContainers: []Container{{Name: "shared", Image: "init"}},
+					Containers:     []Container{{Name: "shared", Image: "main"}},
+				},
+			}}},
+			psName:        "node",
+			containerName: "shared",
+			wantContainer: &Container{Name: "shared", Image: "main"},
+		},
+		"podSet does not exist": {
+			info: &Info{TemplateSpec: TemplateSpec{PodSets: []PodSet{
+				{Name: "node", Containers: []Container{{Name: "trainer"}}},
+			}}},
+			psName:        "worker",
+			containerName: "trainer",
+			wantContainer: nil,
+		},
+		"container does not exist": {
+			info: &Info{TemplateSpec: TemplateSpec{PodSets: []PodSet{
+				{Name: "node", Containers: []Container{{Name: "trainer"}}},
+			}}},
+			psName:        "node",
+			containerName: "preflight",
+			wantContainer: nil,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := tc.info.FindContainerByPodSetName(tc.psName, tc.containerName)
+			if diff := cmp.Diff(tc.wantContainer, got); len(diff) != 0 {
+				t.Errorf("Unexpected Container (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestFindContainerByName(t *testing.T) {
 	cases := map[string]struct {
 		info       *Info

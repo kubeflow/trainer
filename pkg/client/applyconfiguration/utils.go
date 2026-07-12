@@ -40,6 +40,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.CoschedulingPodGroupPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("DatasetInitializer"):
 		return &trainerv1alpha1.DatasetInitializerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("EnvInjection"):
+		return &trainerv1alpha1.EnvInjectionApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("EnvInjectionTarget"):
+		return &trainerv1alpha1.EnvInjectionTargetApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("FluxMLPolicySource"):
 		return &trainerv1alpha1.FluxMLPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Initializer"):
@@ -80,6 +84,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.RuntimePatchApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuntimeRef"):
 		return &trainerv1alpha1.RuntimeRefApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TorchMLPolicySource"):
+		return &trainerv1alpha1.TorchMLPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Trainer"):
 		return &trainerv1alpha1.TrainerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainerStatus"):

@@ -32,7 +32,7 @@ import re  # noqa: F401
 import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -42,11 +42,13 @@ class JobsetV1alpha2ReplicatedJobStatus(BaseModel):
     """ # noqa: E501
     active: StrictInt = Field(description="active is the number of child Jobs with at least 1 pod in a running or pending state which are not marked for deletion.")
     failed: StrictInt = Field(description="failed is the number of failed child Jobs.")
+    job_restarts: Optional[List[StrictInt]] = Field(default=None, description="jobRestarts tracks the number of times the Jobs have been individually restarted. That is, jobRestarts[jobIndex] is the number of times the restart action RestartJob or RestartJobAndIgnoreMaxRestarts have been executed for the Job with index jobIndex and led to its recreation without affecting the other Jobs.", alias="jobRestarts")
+    job_restarts_count_towards_max: Optional[List[StrictInt]] = Field(default=None, description="jobRestartsCountTowardsMax tracks the number of times the Jobs have been individually restarted that count towards the maximum allowed number of restarts. That is, jobRestartsCountTowardsMax[jobIndex] is the number of times the restart action RestartJob has been executed for the Job with index jobIndex and led to its recreation without affecting the other Jobs.", alias="jobRestartsCountTowardsMax")
     name: StrictStr = Field(description="name of the ReplicatedJob.")
     ready: StrictInt = Field(description="ready is the number of child Jobs where the number of ready pods and completed pods is greater than or equal to the total expected pod count for the Job (i.e., the minimum of job.spec.parallelism and job.spec.completions).")
     succeeded: StrictInt = Field(description="succeeded is the number of successfully completed child Jobs.")
     suspended: StrictInt = Field(description="suspended is the number of child Jobs which are in a suspended state.")
-    __properties: ClassVar[List[str]] = ["active", "failed", "name", "ready", "succeeded", "suspended"]
+    __properties: ClassVar[List[str]] = ["active", "failed", "jobRestarts", "jobRestartsCountTowardsMax", "name", "ready", "succeeded", "suspended"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -101,6 +103,8 @@ class JobsetV1alpha2ReplicatedJobStatus(BaseModel):
         _obj = cls.model_validate({
             "active": obj.get("active") if obj.get("active") is not None else 0,
             "failed": obj.get("failed") if obj.get("failed") is not None else 0,
+            "jobRestarts": obj.get("jobRestarts"),
+            "jobRestartsCountTowardsMax": obj.get("jobRestartsCountTowardsMax"),
             "name": obj.get("name") if obj.get("name") is not None else '',
             "ready": obj.get("ready") if obj.get("ready") is not None else 0,
             "succeeded": obj.get("succeeded") if obj.get("succeeded") is not None else 0,

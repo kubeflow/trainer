@@ -11,9 +11,24 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+# Setting SED allows macOS users to install GNU sed (gsed) and use it instead
+# of the default BSD sed, which the in-place edits in this Makefile require.
+ifeq ($(shell command -v gsed 2>/dev/null),)
+    SED ?= $(shell command -v sed)
+else
+    SED ?= $(shell command -v gsed)
+endif
+ifeq ($(shell ${SED} --version 2>&1 | grep -q GNU; echo $$?),1)
+    $(error !!! GNU sed is required. If on OS X, use 'brew install gnu-sed'.)
+endif
+
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 REPO := github.com/kubeflow/trainer
 TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
+# Year-less copyright header prepended to generated manifests (controller-gen
+# emits none). Single source of truth shared with the boilerplate verifier.
+BOILERPLATE_HEADER := $(PROJECT_DIR)/hack/boilerplate/boilerplate.sh.txt
+HELM_BOILERPLATE_HEADER := $(PROJECT_DIR)/hack/boilerplate/boilerplate.helm.txt
 # Location to install tool binaries
 LOCALBIN ?= $(PROJECT_DIR)/bin
 
@@ -43,6 +58,7 @@ HELM_DOCS ?= $(LOCALBIN)/helm-docs
 YQ ?= $(LOCALBIN)/yq
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 GOLANGCI_LINT_KAL ?= $(LOCALBIN)/golangci-lint-kube-api-linter
+LINT_PKG ?= ./...
 KUBE_LINTER ?= $(LOCALBIN)/kube-linter
 
 ##@ General
@@ -112,6 +128,14 @@ yq: # Download yq locally if required.
 kube-linter: ## Download kube-linter locally if required.
 	GOBIN=$(LOCALBIN) go install golang.stackrox.io/kube-linter/cmd/kube-linter@$(KUBE_LINTER_VERSION)
 
+.PHONY: uv
+uv: ## Install uv if it is not already installed.
+	@command -v uv > /dev/null 2>&1 || { \
+		echo "Installing uv"; \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+		echo "uv has been installed."; \
+	}
+
 .PHONY: lint-manifests
 lint-manifests: kube-linter ## Run kube-linter on manifests and helm charts.
 	$(KUBE_LINTER) lint manifests/base --config .kube-linter.yaml
@@ -149,7 +173,22 @@ manifests: controller-gen ## Generate manifests.
 		output:crd:artifacts:config=manifests/base/crds \
 		output:rbac:artifacts:config=manifests/base/rbac \
 		output:webhook:artifacts:config=manifests/base/webhook
-	cp -f manifests/base/crds/trainer.kubeflow.org_*.yaml $(TRAINER_CHART_DIR)/crds/
+	@# controller-gen emits no license header. Prepend the year-less
+	@# boilerplate to each generated manifest. controller-gen rewrites these
+	@# files in full on every run, so prepending here once is idempotent.
+	@# Copy the header-free CRDs into the chart before adding the kustomize (#)
+	@# header, so the chart templates can use the Helm-style license block.
+	cp -f manifests/base/crds/trainer.kubeflow.org_*.yaml $(TRAINER_CHART_DIR)/templates/crd/
+	@for f in manifests/base/crds/trainer.kubeflow.org_*.yaml \
+			manifests/base/rbac/role.yaml \
+			manifests/base/webhook/manifests.yaml; do \
+		{ cat $(BOILERPLATE_HEADER); echo; cat "$$f"; } > "$$f.tmp" && mv "$$f.tmp" "$$f"; \
+	done
+	# Prepend the Helm license block and wrap the chart CRD templates so
+	# installation can be toggled via `crds.enabled`.
+	for f in $(TRAINER_CHART_DIR)/templates/crd/trainer.kubeflow.org_*.yaml; do \
+		{ cat $(HELM_BOILERPLATE_HEADER); echo; echo '{{- if .Values.crds.enabled }}'; cat $$f; echo '{{- end }}'; } > $$f.tmp && mv $$f.tmp $$f; \
+	done
 
 .PHONY: generate
 generate: go-mod-download manifests helm-docs ## Generate APIs.
@@ -173,12 +212,12 @@ vet: ## Run go vet against the code.
 
 .PHONY: golangci-lint
 golangci-lint: golangci-lint-install golangci-lint-kal ## Run golangci-lint to verify Go files.
-	$(GOLANGCI_LINT) run --timeout 5m ./...
+	$(GOLANGCI_LINT) run --timeout 5m $(LINT_PKG)
 	$(GOLANGCI_LINT_KAL) run -v --config $(PROJECT_DIR)/.golangci-kal.yml
 
 .PHONY: verify-boilerplate
 verify-boilerplate: ## Verify copyright boilerplate headers in source files.
-	python3 hack/boilerplate/boilerplate.py
+	python3 hack/boilerplate/boilerplate.py --base-ref "$(TARGET_BRANCH)"
 
 # Instructions to run tests.
 .PHONY: test
@@ -226,6 +265,24 @@ PAPERMILL_TIMEOUT=900
 test-e2e-notebook: ## Run Jupyter Notebook with Papermill.
 	NOTEBOOK_INPUT=$(NOTEBOOK_INPUT) NOTEBOOK_OUTPUT=$(NOTEBOOK_OUTPUT) PAPERMILL_PARAMS="$(PAPERMILL_PARAMS)" PAPERMILL_TIMEOUT=$(PAPERMILL_TIMEOUT) ./hack/e2e-run-notebook.sh
 
+##@ Documentation
+
+.PHONY: docs
+docs: ## Build HTML documentation locally
+	cd docs && $(MAKE) html
+
+.PHONY: docs-linkcheck
+docs-linkcheck: ## Check all links in documentation
+	cd docs && $(MAKE) linkcheck
+
+.PHONY: docs-clean
+docs-clean: ## Remove documentation build artifacts
+	cd docs && $(MAKE) clean
+
+.PHONY: docs-serve
+docs-serve: ## Build and serve documentation locally with live reload
+	cd docs && $(MAKE) serve
+
 ##@ Helm
 
 TARGET_BRANCH ?= master
@@ -256,19 +313,32 @@ release: ## Create a release commit. Usage: make release VERSION=vX.Y.Z [GITHUB_
 	fi
 	@echo -n "$(VERSION)" > VERSION
 	@echo "Updated VERSION to $(VERSION)"
+	@CHART_VERSION=$$(echo "$(VERSION)" | $(SED) 's/^v//'); \
+		$(SED) -i "s/^version: .*/version: $$CHART_VERSION/" charts/kubeflow-trainer/Chart.yaml; \
+		echo "Updated Helm chart version to $$CHART_VERSION"
 	@if echo "$(VERSION)" | grep -E -q '\-rc\.[0-9]+$$'; then \
 		echo "Skipping changelog generation for RC release $(VERSION)"; \
 	else \
-		MAJOR_MINOR=$$(echo "$(VERSION)" | sed 's/^v//' | cut -d. -f1,2); \
+		git fetch upstream --tags --prune; \
+		MAJOR_MINOR=$$(echo "$(VERSION)" | $(SED) 's/^v//' | cut -d. -f1,2); \
 		CHANGELOG_PATH="CHANGELOG/CHANGELOG-$$MAJOR_MINOR.md"; \
 		RELEASE_BRANCH="release-$$MAJOR_MINOR"; \
-		PREV_TAG=$$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-rc*' "$$RELEASE_BRANCH" 2>/dev/null || true); \
-		if [ -n "$$PREV_TAG" ]; then \
-			CLIFF_SCOPE="$$PREV_TAG..$$RELEASE_BRANCH"; \
-			echo "Generating changelog for $(VERSION) (range: $$CLIFF_SCOPE)"; \
-		else \
+		RELEASE_SHA=$$(git rev-parse --verify --quiet "refs/remotes/upstream/$$RELEASE_BRANCH"); \
+		if [ -n "$$RELEASE_SHA" ]; then \
+			PREV_TAG=$$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*rc*' "$$RELEASE_SHA" 2>/dev/null || true); \
+			if [ -n "$$PREV_TAG" ]; then \
+				CLIFF_SCOPE="$$PREV_TAG..$$RELEASE_SHA"; \
+				echo "Generating changelog for $(VERSION) (range: $$PREV_TAG..$$RELEASE_BRANCH @ $$RELEASE_SHA)"; \
+			else \
+				CLIFF_SCOPE="--unreleased"; \
+				echo "Generating changelog for $(VERSION) (no prior tag on $$RELEASE_BRANCH; using --unreleased)"; \
+			fi; \
+		elif [ ! -f "$$CHANGELOG_PATH" ]; then \
 			CLIFF_SCOPE="--unreleased"; \
-			echo "Generating changelog for $(VERSION) (no prior tag on $$RELEASE_BRANCH; using --unreleased)"; \
+			echo "Generating changelog for $(VERSION) (new release line $$MAJOR_MINOR, branch $$RELEASE_BRANCH not created yet; using --unreleased)"; \
+		else \
+			echo "Error: branch $$RELEASE_BRANCH not found locally or on upstream, but $$CHANGELOG_PATH exists. Run: git fetch upstream $$RELEASE_BRANCH"; \
+			exit 1; \
 		fi; \
 		CLIFF_CMD="docker run --rm -u $$(id -u):$$(id -g) -v $(PROJECT_DIR):/app"; \
 		if [ -n "$(GITHUB_TOKEN)" ]; then \
@@ -278,11 +348,13 @@ release: ## Create a release commit. Usage: make release VERSION=vX.Y.Z [GITHUB_
 		if [ -f "$$CHANGELOG_PATH" ]; then \
 			$$CLIFF_CMD --prepend "$$CHANGELOG_PATH"; \
 		else \
-			mkdir -p CHANGELOG; \
 			$$CLIFF_CMD -o "$$CHANGELOG_PATH"; \
+			printf '%s\n' "$$(cat "$$CHANGELOG_PATH")" > "$$CHANGELOG_PATH"; \
 		fi; \
 		echo "Changelog generated at $$CHANGELOG_PATH"; \
 	fi
+	@echo "Regenerating files for $(VERSION)"
+	@$(MAKE) generate
 	@echo ""
 	@echo "Release commit for $(VERSION) is ready."
 	@echo "Review the changelog changes, then commit with:"

@@ -47,7 +47,7 @@ const (
 	SupportDeprecated string = "deprecated"
 
 	// RuntimeDeprecationPolicyURL is the URL to the runtime deprecation policy documentation.
-	RuntimeDeprecationPolicyURL string = "https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/#runtime-deprecation-policy"
+	RuntimeDeprecationPolicyURL string = "https://trainer.kubeflow.org/en/latest/operator-guides/runtime.html#runtime-deprecation-policy"
 
 	// DatasetInitializer is the name of the Job, volume mount, container, and label value for the dataset initializer.
 	DatasetInitializer string = "dataset-initializer"
@@ -146,6 +146,15 @@ const (
 
 	// MPISSHAuthorizedKeys is the file name for authorized keys.
 	MPISSHAuthorizedKeys string = "authorized_keys"
+
+	// MPISSHAuthDefaultMode is the fallback mode for any SSH Secret item without an explicit per-item mode (0o400: owner read-only).
+	MPISSHAuthDefaultMode int32 = 0o400
+
+	// MPISSHPrivateKeyFileMode is the mode for the mounted MPI SSH private key (0o640: owner rw, group r).
+	MPISSHPrivateKeyFileMode int32 = 0o640
+
+	// MPISSHPublicKeyFileMode is the mode for the mounted MPI SSH public key and authorized_keys (0o644: owner rw, group r, world r).
+	MPISSHPublicKeyFileMode int32 = 0o644
 
 	// MPIHostfilePath is the directory for the MPI hostfile.
 	MPIHostfileDir string = "/etc/mpi"

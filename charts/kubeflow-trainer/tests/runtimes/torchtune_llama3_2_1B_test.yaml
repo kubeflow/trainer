@@ -1,0 +1,62 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Test torchtune-llama3.2-1b runtime in installer ConfigMap
+templates:
+  - templates/runtimes/configmap.yaml
+release:
+  name: kubeflow-trainer
+  namespace: kubeflow-trainer
+tests:
+  - it: Should not render the installer ConfigMap when no runtime is enabled
+    set:
+      runtimes:
+        torchtuneDistributed:
+          llama3_2_1B:
+            enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: Should include torchtune-llama3.2-1b when enabled
+    set:
+      runtimes:
+        torchtuneDistributed:
+          llama3_2_1B:
+            enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "name: torchtune-llama3.2-1b"
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "trainer.kubeflow.org/framework: torchtune"
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "hf://meta-llama/Llama-3.2-1B-Instruct"
+
+  - it: Should use custom trainer image tag when specified
+    set:
+      runtimes:
+        torchtuneDistributed:
+          image:
+            tag: v1.0.0
+          llama3_2_1B:
+            enabled: true
+    asserts:
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "image: ghcr.io/kubeflow/trainer/torchtune-trainer:v1.0.0"

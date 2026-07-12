@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Composite action to publish Kubeflow Trainer images.
 name: Build And Publish Container Images
 description: Build Multiplatform Supporting Container Images
@@ -66,16 +80,16 @@ runs:
         sudo systemctl --no-pager -l -o short status docker
 
     - name: Setup QEMU
-      uses: docker/setup-qemu-action@v3
+      uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       with:
         platforms: amd64,ppc64le,arm64
 
     - name: Set Up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
     - name: Add Docker Tags
       id: meta
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
       with:
         images: ${{ inputs.image }}
         tags: |
@@ -83,7 +97,7 @@ runs:
           type=sha
 
     - name: Build and Push
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
       with:
         platforms: ${{ inputs.platforms }}
         context: ${{ inputs.context }}

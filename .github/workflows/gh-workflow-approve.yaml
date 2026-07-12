@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 name: Approve Workflow Runs
 
 permissions:
@@ -23,7 +37,7 @@ jobs:
     steps:
       - name: Check if author is a Kubeflow GitHub member
         id: membership-check
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const username = context.payload.pull_request.user.login;
@@ -45,7 +59,7 @@ jobs:
 
       - name: Approve Pending Workflow Runs
         if: steps.membership-check.outputs.is_member == 'true' || contains(github.event.pull_request.labels.*.name, 'ok-to-test')
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           retries: 3
           script: |

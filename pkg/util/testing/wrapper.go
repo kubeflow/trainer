@@ -1267,6 +1267,11 @@ func (m *MLPolicySourceWrapper) TorchPolicy() *MLPolicySourceWrapper {
 	return m
 }
 
+func (m *MLPolicySourceWrapper) TorchPolicyWithEnvInjection(envInjection *trainer.EnvInjection) *MLPolicySourceWrapper {
+	m.Torch = &trainer.TorchMLPolicySource{EnvInjection: envInjection}
+	return m
+}
+
 func (w *MLPolicySourceWrapper) JAXPolicy() *MLPolicySourceWrapper {
 	w.JAX = &trainer.JAXMLPolicySource{}
 	return w
@@ -1285,6 +1290,14 @@ func (m *MLPolicySourceWrapper) MPIPolicy(numProcPerNode *int32, MPImplementatio
 	m.MPI.MPIImplementation = &MPImplementation
 	m.MPI.SSHAuthMountPath = sshAuthMountPath
 	m.MPI.RunLauncherAsNode = runLauncherAsNode
+	return m
+}
+
+func (m *MLPolicySourceWrapper) FluxPolicy(numProcPerNode *int32) *MLPolicySourceWrapper {
+	if m.Flux == nil {
+		m.Flux = &trainer.FluxMLPolicySource{}
+	}
+	m.Flux.NumProcPerNode = numProcPerNode
 	return m
 }
 
