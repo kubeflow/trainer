@@ -65,7 +65,6 @@ type JobSet struct {
 
 var _ framework.WatchExtensionPlugin = (*JobSet)(nil)
 var _ framework.PodNetworkPlugin = (*JobSet)(nil)
-var _ framework.BuildParallelCountPlugin = (*JobSet)(nil)
 var _ framework.ComponentBuilderPlugin = (*JobSet)(nil)
 var _ framework.TrainJobStatusPlugin = (*JobSet)(nil)
 var _ framework.CustomValidationPlugin = (*JobSet)(nil)
@@ -253,7 +252,7 @@ func (j *JobSet) IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJ
 	return nil
 }
 
-func (j *JobSet) BuildParallelCount(info *runtime.Info) error {
+func (j *JobSet) SyncParallelCount(info *runtime.Info) error {
 	if info == nil {
 		return nil
 	}
@@ -309,10 +308,6 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 	}
 
 	for psIdx, ps := range info.TemplateSpec.PodSets {
-		if ps.Count != nil {
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Parallelism = ps.Count
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Completions = ps.Count
-		}
 		apply.UpsertVolumes(&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Volumes, ps.Volumes...)
 		for containerIdx, container := range ps.Containers {
 			if len(container.Command) > 0 {

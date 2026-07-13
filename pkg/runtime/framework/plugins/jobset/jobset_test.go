@@ -1916,8 +1916,6 @@ func TestBuild(t *testing.T) {
 								Replicas: 0,
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
-										Parallelism: ptr.To[int32](2),
-										Completions: ptr.To[int32](2),
 										Template: corev1.PodTemplateSpec{
 											Spec: corev1.PodSpec{
 												InitContainers: []corev1.Container{
@@ -2011,8 +2009,6 @@ func TestBuild(t *testing.T) {
 								Replicas: 0,
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
-										Parallelism: ptr.To[int32](1),
-										Completions: ptr.To[int32](1),
 										Template: corev1.PodTemplateSpec{
 											Spec: corev1.PodSpec{
 												InitContainers: []corev1.Container{
@@ -2098,8 +2094,6 @@ func TestBuild(t *testing.T) {
 								Replicas: 0,
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
-										Parallelism: ptr.To[int32](3),
-										Completions: ptr.To[int32](3),
 										Template: corev1.PodTemplateSpec{
 											Spec: corev1.PodSpec{
 												InitContainers: []corev1.Container{
@@ -2192,7 +2186,7 @@ func TestBuild(t *testing.T) {
 	}
 }
 
-func TestBuildParallelCount(t *testing.T) {
+func TestSyncParallelCount(t *testing.T) {
 	cases := map[string]struct {
 		info      *runtime.Info
 		wantInfo  *runtime.Info
@@ -2503,7 +2497,7 @@ func TestBuildParallelCount(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
 			}
-			err = p.(framework.BuildParallelCountPlugin).BuildParallelCount(tc.info)
+			err = p.(framework.ComponentBuilderPlugin).SyncParallelCount(tc.info)
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
@@ -2511,7 +2505,7 @@ func TestBuildParallelCount(t *testing.T) {
 				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
 				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
 			); len(diff) != 0 {
-				t.Errorf("Unexpected Info from BuildParallelCount (-want,+got):\n%s", diff)
+				t.Errorf("Unexpected Info from SyncParallelCount (-want,+got):\n%s", diff)
 			}
 		})
 	}

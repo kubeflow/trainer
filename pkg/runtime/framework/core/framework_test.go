@@ -121,9 +121,6 @@ func TestNew(t *testing.T) {
 				podNetworkPlugins: []framework.PodNetworkPlugin{
 					&jobset.JobSet{},
 				},
-				buildParallelCountPlugins: []framework.BuildParallelCountPlugin{
-					&jobset.JobSet{},
-				},
 				componentBuilderPlugins: []framework.ComponentBuilderPlugin{
 					&flux.Flux{},
 					&coscheduling.CoScheduling{},
