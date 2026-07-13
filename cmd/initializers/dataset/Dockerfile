@@ -24,6 +24,6 @@ COPY cmd/initializers/dataset/uv.lock .
 COPY pkg/initializers pkg/initializers
 
 # Install the needed packages.
-RUN uv sync --locked --no-dev --system
+RUN uv sync --locked --no-dev
 
-ENTRYPOINT ["python", "-m", "pkg.initializers.dataset"]
+ENTRYPOINT ["uv", "run", "python", "-m", "pkg.initializers.dataset"]

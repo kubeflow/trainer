@@ -19,10 +19,8 @@ on:
     paths:
       - 'cmd/initializers/dataset/pyproject.toml'
       - 'cmd/initializers/dataset/uv.lock'
-      - 'cmd/initializers/dataset/requirements.txt'
       - 'cmd/initializers/model/pyproject.toml'
       - 'cmd/initializers/model/uv.lock'
-      - 'cmd/initializers/model/requirements.txt'
       - 'api/python_api/pyproject.toml'
       - 'api/python_api/uv.lock'
 
