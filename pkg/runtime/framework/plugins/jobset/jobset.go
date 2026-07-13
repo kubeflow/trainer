@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -96,47 +97,22 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 
 	// TODO (andreyvelich): Refactor this test to verify the ancestor label in PodTemplate.
 	rJobContainerNames := make(map[string]sets.Set[string])
-	rJobContainerVolumeMountNames := make(map[string]map[string]sets.Set[string])
-
 	for _, rJob := range jobSetSpec.ReplicatedJobs {
 		if rJob.Name == nil {
 			continue
 		}
 		rJobName := *rJob.Name
-
 		rJobContainerNames[rJobName] = sets.New[string]()
-		rJobContainerVolumeMountNames[rJobName] = make(map[string]sets.Set[string])
 
 		// Names of initContainer and containers are unique.
 		for _, c := range rJob.Template.Spec.Template.Spec.InitContainers {
-			if c.Name == nil {
-				continue
-			}
-			containerName := *c.Name
-			rJobContainerNames[rJobName].Insert(containerName)
-			rJobContainerVolumeMountNames[rJobName][containerName] = sets.New[string]()
-
-			for _, vm := range c.VolumeMounts {
-				if vm.Name == nil {
-					continue
-				}
-				rJobContainerVolumeMountNames[rJobName][containerName].Insert(*vm.Name)
+			if c.Name != nil {
+				rJobContainerNames[rJobName].Insert(*c.Name)
 			}
 		}
-
 		for _, c := range rJob.Template.Spec.Template.Spec.Containers {
-			if c.Name == nil {
-				continue
-			}
-			containerName := *c.Name
-			rJobContainerNames[rJobName].Insert(containerName)
-			rJobContainerVolumeMountNames[rJobName][containerName] = sets.New[string]()
-
-			for _, vm := range c.VolumeMounts {
-				if vm.Name == nil {
-					continue
-				}
-				rJobContainerVolumeMountNames[rJobName][containerName].Insert(*vm.Name)
+			if c.Name != nil {
+				rJobContainerNames[rJobName].Insert(*c.Name)
 			}
 		}
 	}
@@ -147,10 +123,8 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.DatasetInitializer)))
 		} else if !containers.Has(constants.DatasetInitializer) {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.DatasetInitializer, constants.DatasetInitializer)))
-		} else {
-			if volumeMounts := rJobContainerVolumeMountNames[constants.DatasetInitializer][constants.DatasetInitializer]; !volumeMounts.Has(jobsetplgconsts.VolumeNameInitializer) {
-				allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volumeMount with name - %s in container %s of the %s job", jobsetplgconsts.VolumeNameInitializer, constants.DatasetInitializer, constants.DatasetInitializer)))
-			}
+		} else if !initializerContainerHasVolumeMount(jobSetSpec, constants.DatasetInitializer, constants.DatasetInitializer) {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volumeMount with name - %s in container %s of the %s job", jobsetplgconsts.VolumeNameInitializer, constants.DatasetInitializer, constants.DatasetInitializer)))
 		}
 	}
 
@@ -160,10 +134,8 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input modelConfig", constants.ModelInitializer)))
 		} else if !containers.Has(constants.ModelInitializer) {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)))
-		} else {
-			if volumeMounts := rJobContainerVolumeMountNames[constants.ModelInitializer][constants.ModelInitializer]; !volumeMounts.Has(jobsetplgconsts.VolumeNameInitializer) {
-				allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volumeMount with name - %s in container %s of the %s job", jobsetplgconsts.VolumeNameInitializer, constants.ModelInitializer, constants.ModelInitializer)))
-			}
+		} else if !initializerContainerHasVolumeMount(jobSetSpec, constants.ModelInitializer, constants.ModelInitializer) {
+			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volumeMount with name - %s in container %s of the %s job", jobsetplgconsts.VolumeNameInitializer, constants.ModelInitializer, constants.ModelInitializer)))
 		}
 	}
 
@@ -207,6 +179,43 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	}
 
 	return nil, allErrs
+}
+
+// initializerContainerHasVolumeMount reports whether the container named containerName in the
+// ReplicatedJob named rJobName mounts a volume named jobsetplgconsts.VolumeNameInitializer.
+// The volume itself is supplied by the runtime via JobSet volumeClaimPolicies and injected by
+// the JobSet controller, so only the VolumeMount can be validated at admission time.
+func initializerContainerHasVolumeMount(spec *jobsetv1alpha2ac.JobSetSpecApplyConfiguration, rJobName, containerName string) bool {
+	hasMount := func(c corev1ac.ContainerApplyConfiguration) bool {
+		if c.Name == nil || *c.Name != containerName {
+			return false
+		}
+		for _, vm := range c.VolumeMounts {
+			if vm.Name != nil && *vm.Name == jobsetplgconsts.VolumeNameInitializer {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, rJob := range spec.ReplicatedJobs {
+		if rJob.Name == nil || *rJob.Name != rJobName {
+			continue
+		}
+		podSpec := rJob.Template.Spec.Template.Spec
+		for _, c := range podSpec.InitContainers {
+			if hasMount(c) {
+				return true
+			}
+		}
+		for _, c := range podSpec.Containers {
+			if hasMount(c) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (j *JobSet) checkRuntimePatchesImmutability(ctx context.Context, oldObj, newObj *trainer.TrainJob) field.ErrorList {
