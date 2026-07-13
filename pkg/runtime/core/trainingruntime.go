@@ -43,6 +43,7 @@ import (
 	fwkcore "github.com/kubeflow/trainer/v2/pkg/runtime/framework/core"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
 	idxer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
+	trainingruntimeutil "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
 
 var (
@@ -154,9 +155,10 @@ func (r *TrainingRuntime) newRuntimeInfo(
 			if rJob.Template.Labels != nil {
 				labelAncestor, hasAncestor = rJob.Template.Labels[constants.LabelTrainJobAncestor], true
 			}
-			if !(hasAncestor && labelAncestor == constants.AncestorTrainer && mlPolicy != nil) &&
-				!(mlPolicy != nil && mlPolicy.MPI != nil &&
-					ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && rJob.Name == constants.Node) {
+			isTrainerAncestor := hasAncestor && labelAncestor == constants.AncestorTrainer && mlPolicy != nil
+			isMPILauncherAsNode := mlPolicy != nil && mlPolicy.MPI != nil &&
+				ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && rJob.Name == constants.Node
+			if !isTrainerAncestor && !isMPILauncherAsNode {
 				continue
 			}
 			for j := range rJob.Template.Spec.Template.Spec.Containers {
@@ -164,7 +166,7 @@ func (r *TrainingRuntime) newRuntimeInfo(
 					continue
 				}
 				container := &rJob.Template.Spec.Template.Spec.Containers[j]
-				mergedRes, mergeErr := runtime.MergeResourceRequirements(
+				mergedRes, mergeErr := trainingruntimeutil.MergeResourceRequirements(
 					container.Resources, *trainJob.Spec.Trainer.ResourcesPerNode)
 				if mergeErr != nil {
 					return nil, mergeErr
