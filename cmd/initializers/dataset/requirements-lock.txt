@@ -92,7 +92,7 @@ six==1.17.0
     # via
     #   kubernetes
     #   python-dateutil
-tqdm==4.68.2
+tqdm==4.68.4
     # via huggingface-hub
 typer==0.26.7
     # via huggingface-hub
