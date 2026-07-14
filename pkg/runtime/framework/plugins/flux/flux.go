@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	jobsetapply "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -170,12 +169,6 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 		},
 	}
 
-	// Making changes directly to the PodSet allows them to persist
-	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetapply.JobSetSpecApplyConfiguration](info)
-	if !ok {
-		return nil
-	}
-
 	// Update the PodSets (Abstractions for the ReplicatedJobs)
 	for psIdx, ps := range info.TemplateSpec.PodSets {
 		if ps.Name != constants.Node {
@@ -190,14 +183,9 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 		apply.UpsertVolumes(&info.TemplateSpec.PodSets[psIdx].Volumes, sharedVolumes...)
 		apply.UpsertVolumes(&info.TemplateSpec.PodSets[psIdx].Volumes, *curveVolume)
 
-		// Important! We also have to add an empty container to the JobSet ApplyConfiguration
-		// so the JobSet plugin finds it and syncs the PodSet values into it.
-		jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers = append(
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers,
-			*corev1ac.Container().WithName(constants.FluxInstallerContainerName),
-		)
-
-		// Append to the PodSet abstract structure
+		// Append to the PodSet abstract structure.
+		// The JobSet plugin's Build() sync loop will automatically create a
+		// matching initContainer slot in the JobSetSpec.
 		info.TemplateSpec.PodSets[psIdx].InitContainers = append(
 			info.TemplateSpec.PodSets[psIdx].InitContainers,
 			fluxInstaller,

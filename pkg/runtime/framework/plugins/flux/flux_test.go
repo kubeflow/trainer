@@ -132,10 +132,6 @@ func TestFlux(t *testing.T) {
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().WithName(constants.Node),
-												).
-												WithInitContainers(
-													corev1ac.Container().
-														WithName(constants.FluxInstallerContainerName),
 												),
 											),
 										),
