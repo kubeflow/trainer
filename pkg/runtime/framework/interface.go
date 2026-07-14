@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	applyconfig "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
@@ -63,5 +64,5 @@ type ComponentBuilderPlugin interface {
 
 type TrainJobStatusPlugin interface {
 	Plugin
-	Status(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error)
+	Status(ctx context.Context, trainJob *trainer.TrainJob) (*applyconfig.TrainJobStatusApplyConfiguration, error)
 }

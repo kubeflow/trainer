@@ -27,6 +27,7 @@ import (
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	applyconfig "github.com/kubeflow/trainer/v2/pkg/client/applyconfiguration/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
@@ -145,7 +146,7 @@ func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtim
 	return objs, nil
 }
 
-func (f *Framework) RunTrainJobStatusPlugin(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
+func (f *Framework) RunTrainJobStatusPlugin(ctx context.Context, trainJob *trainer.TrainJob) (*applyconfig.TrainJobStatusApplyConfiguration, error) {
 	if f.trainJobStatusPlugin != nil {
 		return f.trainJobStatusPlugin.Status(ctx, trainJob)
 	}
