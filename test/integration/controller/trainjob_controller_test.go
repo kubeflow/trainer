@@ -1539,6 +1539,398 @@ alpha-node-0-1.alpha slots=8
 			})
 		})
 
+		ginkgo.Context("Integration Tests for the Intel MPI Runtime", func() {
+			var (
+				cmKey  client.ObjectKey
+				secKey client.ObjectKey
+			)
+			ginkgo.It("Should succeed to create TrainJob with Intel MPI TrainingRuntime", func() {
+				ginkgo.By("Creating Intel MPI TrainingRuntime and TrainJob")
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							NumNodes(2).
+							Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Env([]corev1.EnvVar{{Name: "TRAIN_JOB", Value: "value"}}...).
+							Obj()).
+					Obj()
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+				cmKey = client.ObjectKey{
+					Name:      fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPIHostfileConfigMapSuffix),
+					Namespace: trainJobKey.Namespace,
+				}
+				secKey = client.ObjectKey{
+					Name:      fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+					Namespace: trainJobKey.Namespace,
+				}
+
+				trainingRuntime = testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").
+					RuntimeSpec(
+						testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").Spec).
+							LauncherReplica().
+							Replicas(1, constants.Launcher).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									WithNumNodes(1).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(ptr.To[int32](4), trainer.MPIImplementationIntel, ptr.To("/root/.ssh"), ptr.To(false)).
+										Obj(),
+									).
+									Obj(),
+							).
+							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Obj()).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if the appropriate JobSet is created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(jobSet).Should(gomega.BeComparableTo(
+						testingutil.MakeJobSetWrapper(ns.Name, trainJobKey.Name).
+							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
+							Suspend(false).
+							LauncherReplica().
+							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+							Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+							NumNodes(2).
+							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Volumes(constants.Launcher,
+								corev1.Volume{
+									Name: constants.MPISSHAuthVolumeName,
+									VolumeSource: corev1.VolumeSource{
+										Secret: &corev1.SecretVolumeSource{
+											SecretName:  fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											DefaultMode: ptr.To(constants.MPISSHAuthDefaultMode),
+											Items: []corev1.KeyToPath{
+												{
+													Key:  corev1.SSHAuthPrivateKey,
+													Path: constants.MPISSHPrivateKeyFile,
+													Mode: ptr.To(constants.MPISSHPrivateKeyFileMode),
+												},
+												{
+													Key:  constants.MPISSHPublicKey,
+													Path: constants.MPISSHPublicKeyFile,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
+												},
+												{
+													Key:  constants.MPISSHPublicKey,
+													Path: constants.MPISSHAuthorizedKeys,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
+												},
+											},
+										},
+									},
+								},
+								corev1.Volume{
+									Name: constants.MPIHostfileVolumeName,
+									VolumeSource: corev1.VolumeSource{
+										ConfigMap: &corev1.ConfigMapVolumeSource{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPIHostfileConfigMapSuffix),
+											},
+											Items: []corev1.KeyToPath{{
+												Key:  constants.MPIHostfileName,
+												Path: constants.MPIHostfileName,
+												Mode: ptr.To[int32](0444),
+											}},
+										},
+									},
+								},
+							).
+							Volumes(constants.Node,
+								corev1.Volume{
+									Name: constants.MPISSHAuthVolumeName,
+									VolumeSource: corev1.VolumeSource{
+										Secret: &corev1.SecretVolumeSource{
+											SecretName:  fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											DefaultMode: ptr.To(constants.MPISSHAuthDefaultMode),
+											Items: []corev1.KeyToPath{
+												{
+													Key:  corev1.SSHAuthPrivateKey,
+													Path: constants.MPISSHPrivateKeyFile,
+													Mode: ptr.To(constants.MPISSHPrivateKeyFileMode),
+												},
+												{
+													Key:  constants.MPISSHPublicKey,
+													Path: constants.MPISSHPublicKeyFile,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
+												},
+												{
+													Key:  constants.MPISSHPublicKey,
+													Path: constants.MPISSHAuthorizedKeys,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
+												},
+											},
+										},
+									},
+								},
+							).
+							VolumeMounts(constants.Launcher, constants.Node,
+								corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
+								corev1.VolumeMount{Name: constants.MPIHostfileVolumeName, MountPath: constants.MPIHostfileDir},
+							).
+							VolumeMounts(constants.Node, constants.Node,
+								corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
+							).
+							Env(constants.Launcher, constants.Node,
+								corev1.EnvVar{
+									Name:  constants.IntelMPIEnvHostFile,
+									Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),
+								},
+								corev1.EnvVar{
+									Name:  constants.IntelMPIEnvBootstrapExecExtraArgs,
+									Value: constants.IntelMPIEnvDefaultValueBootstrapExecExtraArgs,
+								},
+							).
+							Env(constants.Node, constants.Node,
+								corev1.EnvVar{
+									Name:  "TRAIN_JOB",
+									Value: "value",
+								},
+							).
+							Obj(),
+						util.IgnoreObjectMetadata))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if the appropriate ConfigMap is created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					cm := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, cmKey, cm)).To(gomega.Succeed())
+					g.Expect(cm).Should(gomega.BeComparableTo(
+						testingutil.MakeConfigMapWrapper(cmKey.Name, cmKey.Namespace).
+							WithData(map[string]string{
+								constants.MPIHostfileName: `alpha-node-0-0.alpha:4
+alpha-node-0-1.alpha:4
+`,
+							}).
+							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
+							Obj(),
+						util.IgnoreObjectMetadata, cmp.Comparer(testingutil.MPISecretDataComparer)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if the appropriate Secret is created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					sec := &corev1.Secret{}
+					g.Expect(k8sClient.Get(ctx, secKey, sec)).To(gomega.Succeed())
+					g.Expect(sec).Should(gomega.BeComparableTo(
+						testingutil.MakeSecretWrapper(secKey.Name, secKey.Namespace).
+							WithImmutable(true).
+							WithData(map[string][]byte{
+								corev1.SSHAuthPrivateKey:  []byte("EXIST"),
+								constants.MPISSHPublicKey: []byte("EXIST"),
+							}).
+							WithType(corev1.SecretTypeSSHAuth).
+							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
+							Obj(),
+						util.IgnoreObjectMetadata, cmp.Comparer(testingutil.MPISecretDataComparer)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
+
+		ginkgo.Context("Integration Tests for the MPICH Runtime", func() {
+			var (
+				cmKey  client.ObjectKey
+				secKey client.ObjectKey
+			)
+			ginkgo.It("Should succeed to create TrainJob with MPICH TrainingRuntime", func() {
+				ginkgo.By("Creating MPICH TrainingRuntime and TrainJob with runLauncherAsNode=true")
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							NumNodes(2).
+							Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Env([]corev1.EnvVar{{Name: "TRAIN_JOB", Value: "value"}}...).
+							Obj()).
+					Obj()
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+				cmKey = client.ObjectKey{
+					Name:      fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPIHostfileConfigMapSuffix),
+					Namespace: trainJobKey.Namespace,
+				}
+				secKey = client.ObjectKey{
+					Name:      fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+					Namespace: trainJobKey.Namespace,
+				}
+
+				trainingRuntime = testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").
+					RuntimeSpec(
+						testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").Spec).
+							LauncherReplica().
+							Replicas(1, constants.Launcher).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									WithNumNodes(1).
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(ptr.To[int32](2), trainer.MPIImplementationMPICH, ptr.To("/root/.ssh"), ptr.To(true)).
+										Obj(),
+									).
+									Obj(),
+							).
+							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Obj()).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if the appropriate JobSet is created with adjusted node count")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(jobSet).Should(gomega.BeComparableTo(
+						testingutil.MakeJobSetWrapper(ns.Name, trainJobKey.Name).
+							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
+							Suspend(false).
+							LauncherReplica().
+							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+							Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
+							NumNodes(1).
+							Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							Volumes(constants.Launcher,
+								corev1.Volume{
+									Name: constants.MPISSHAuthVolumeName,
+									VolumeSource: corev1.VolumeSource{
+										Secret: &corev1.SecretVolumeSource{
+											SecretName:  fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											DefaultMode: ptr.To(constants.MPISSHAuthDefaultMode),
+											Items: []corev1.KeyToPath{
+												{
+													Key:  corev1.SSHAuthPrivateKey,
+													Path: constants.MPISSHPrivateKeyFile,
+													Mode: ptr.To(constants.MPISSHPrivateKeyFileMode),
+												},
+												{
+													Key:  constants.MPISSHPublicKey,
+													Path: constants.MPISSHPublicKeyFile,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
+												},
+												{
+													Key:  constants.MPISSHPublicKey,
+													Path: constants.MPISSHAuthorizedKeys,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
+												},
+											},
+										},
+									},
+								},
+								corev1.Volume{
+									Name: constants.MPIHostfileVolumeName,
+									VolumeSource: corev1.VolumeSource{
+										ConfigMap: &corev1.ConfigMapVolumeSource{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPIHostfileConfigMapSuffix),
+											},
+											Items: []corev1.KeyToPath{{
+												Key:  constants.MPIHostfileName,
+												Path: constants.MPIHostfileName,
+												Mode: ptr.To[int32](0444),
+											}},
+										},
+									},
+								},
+							).
+							Volumes(constants.Node,
+								corev1.Volume{
+									Name: constants.MPISSHAuthVolumeName,
+									VolumeSource: corev1.VolumeSource{
+										Secret: &corev1.SecretVolumeSource{
+											SecretName:  fmt.Sprintf("%s%s", trainJobKey.Name, constants.MPISSHAuthSecretSuffix),
+											DefaultMode: ptr.To(constants.MPISSHAuthDefaultMode),
+											Items: []corev1.KeyToPath{
+												{
+													Key:  corev1.SSHAuthPrivateKey,
+													Path: constants.MPISSHPrivateKeyFile,
+													Mode: ptr.To(constants.MPISSHPrivateKeyFileMode),
+												},
+												{
+													Key:  constants.MPISSHPublicKey,
+													Path: constants.MPISSHPublicKeyFile,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
+												},
+												{
+													Key:  constants.MPISSHPublicKey,
+													Path: constants.MPISSHAuthorizedKeys,
+													Mode: ptr.To(constants.MPISSHPublicKeyFileMode),
+												},
+											},
+										},
+									},
+								},
+							).
+							VolumeMounts(constants.Launcher, constants.Node,
+								corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
+								corev1.VolumeMount{Name: constants.MPIHostfileVolumeName, MountPath: constants.MPIHostfileDir},
+							).
+							VolumeMounts(constants.Node, constants.Node,
+								corev1.VolumeMount{Name: constants.MPISSHAuthVolumeName, MountPath: "/root/.ssh"},
+							).
+							Env(constants.Launcher, constants.Node,
+								corev1.EnvVar{
+									Name:  constants.MPICHEnvHostFile,
+									Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),
+								},
+								corev1.EnvVar{
+									Name:  constants.MPICHEnvLauncherExtraArgs,
+									Value: constants.MPICHEnvDefaultValueLauncherExtraArgs,
+								},
+							).
+							Env(constants.Node, constants.Node,
+								corev1.EnvVar{
+									Name:  "TRAIN_JOB",
+									Value: "value",
+								},
+							).
+							Obj(),
+						util.IgnoreObjectMetadata))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if the appropriate ConfigMap is created with Hydra hostfile format")
+				gomega.Eventually(func(g gomega.Gomega) {
+					cm := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, cmKey, cm)).To(gomega.Succeed())
+					g.Expect(cm).Should(gomega.BeComparableTo(
+						testingutil.MakeConfigMapWrapper(cmKey.Name, cmKey.Namespace).
+							WithData(map[string]string{
+								constants.MPIHostfileName: `alpha-launcher-0-0.alpha:2
+alpha-node-0-0.alpha:2
+`,
+							}).
+							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
+							Obj(),
+						util.IgnoreObjectMetadata, cmp.Comparer(testingutil.MPISecretDataComparer)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if the appropriate Secret is created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					sec := &corev1.Secret{}
+					g.Expect(k8sClient.Get(ctx, secKey, sec)).To(gomega.Succeed())
+					g.Expect(sec).Should(gomega.BeComparableTo(
+						testingutil.MakeSecretWrapper(secKey.Name, secKey.Namespace).
+							WithImmutable(true).
+							WithData(map[string][]byte{
+								corev1.SSHAuthPrivateKey:  []byte("EXIST"),
+								constants.MPISSHPublicKey: []byte("EXIST"),
+							}).
+							WithType(corev1.SecretTypeSSHAuth).
+							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
+							Obj(),
+						util.IgnoreObjectMetadata, cmp.Comparer(testingutil.MPISecretDataComparer)))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
+
 		ginkgo.Context("Integration tests for the TrainJob Timeouts", func() {
 
 			ginkgo.It("Should fail TrainJob with DeadlineExceeded when ActiveDeadlineSeconds expires", func() {

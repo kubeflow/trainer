@@ -49,7 +49,6 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 )
 
-
 type MPI struct {
 	client client.Client
 	scheme *apiruntime.Scheme
