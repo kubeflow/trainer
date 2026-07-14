@@ -247,5 +247,5 @@ The following capabilities are planned as follow-ons to this feature, as describ
 
 - [Getting Started with Kubeflow Trainer](../getting-started/index)
 - [Configure TrainJob Lifecycle](trainjob-lifecycle.md)
-- [TrainJob Progress feature proposal](https://github.com/kubeflow/trainer/tree/master/docs/proposals/2779-trainjob-progress)
-- [Kubeflow Trainer v2.2 release blog post](https://blog.kubeflow.org/kubeflow-trainer-v2.2-release/)
+- [TrainJob Progress feature proposal](https://github.com/kubeflow/trainer/tree/master/proposals/2779-trainjob-progress)
+- [KubeCon Talk on TrainJob Progress](https://youtu.be/2PkIZPJk6I0)
