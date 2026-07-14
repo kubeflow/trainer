@@ -11,21 +11,21 @@ require (
 	github.com/open-policy-agent/cert-controller v0.16.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.54.0
-	k8s.io/api v0.36.0
-	k8s.io/apimachinery v0.36.0
-	k8s.io/apiserver v0.36.0
-	k8s.io/client-go v0.36.0
-	k8s.io/code-generator v0.36.0
-	k8s.io/component-base v0.36.0
-	k8s.io/component-helpers v0.36.0
+	k8s.io/api v0.36.2
+	k8s.io/apimachinery v0.36.2
+	k8s.io/apiserver v0.36.2
+	k8s.io/client-go v0.36.2
+	k8s.io/code-generator v0.36.2
+	k8s.io/component-base v0.36.2
+	k8s.io/component-helpers v0.36.2
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
-	sigs.k8s.io/controller-runtime v0.24.0
+	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/jobset v0.12.0
-	sigs.k8s.io/kind v0.31.0
-	sigs.k8s.io/scheduler-plugins v0.34.4-devel-sg
-	sigs.k8s.io/structured-merge-diff/v6 v6.4.0
+	sigs.k8s.io/kind v0.32.0
+	sigs.k8s.io/scheduler-plugins v0.35.4-devel
+	sigs.k8s.io/structured-merge-diff/v6 v6.4.2
 	sigs.k8s.io/yaml v1.6.0
 	volcano.sh/apis v1.13.1-0.20251028070205-46d20c0699e7
 )
