@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/util/tlsconfig"
 )
 
 // fromFile loads configuration from a file.
@@ -40,7 +41,6 @@ func fromFile(path string, scheme *runtime.Scheme, cfg *configapi.Configuration)
 
 	codecs := serializer.NewCodecFactory(scheme, serializer.EnableStrict)
 
-	// Decode the configuration file into the Configuration object
 	if err := runtime.DecodeInto(codecs.UniversalDecoder(), content, cfg); err != nil {
 		return fmt.Errorf("failed to decode config file: %w", err)
 	}
@@ -49,14 +49,11 @@ func fromFile(path string, scheme *runtime.Scheme, cfg *configapi.Configuration)
 }
 
 // addTo applies the configuration to controller runtime Options.
-func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
-	// Set metrics server options
-	var tlsOpts []func(*tls.Config)
-	if !enableHTTP2 {
-		// Disable http/2 for security reasons (CVE-2023-44487, CVE-2023-39325)
-		tlsOpts = append(tlsOpts, func(c *tls.Config) {
-			c.NextProtos = []string{"http/1.1"}
-		})
+func addTo(o *ctrl.Options, cfg *configapi.Configuration) {
+	tlsOpts := []func(*tls.Config){
+		func(c *tls.Config) {
+			tlsconfig.Apply(c, cfg.TLS)
+		},
 	}
 
 	o.Metrics = metricsserver.Options{
@@ -65,7 +62,6 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 		TLSOpts:       tlsOpts,
 	}
 
-	// Set webhook server options
 	if cfg.Webhook.Port != nil {
 		webhookOpts := webhook.Options{
 			Port:    int(*cfg.Webhook.Port),
@@ -77,10 +73,8 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 		o.WebhookServer = webhook.NewServer(webhookOpts)
 	}
 
-	// Set health probe bind address
 	o.HealthProbeBindAddress = cfg.Health.HealthProbeBindAddress
 
-	// Set leader election
 	if cfg.LeaderElection != nil {
 		if cfg.LeaderElection.LeaderElect != nil {
 			o.LeaderElection = *cfg.LeaderElection.LeaderElect
@@ -93,7 +87,6 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 		o.RetryPeriod = &cfg.LeaderElection.RetryPeriod.Duration
 	}
 
-	// Set controller concurrency if specified
 	if cfg.Controller != nil && len(cfg.Controller.GroupKindConcurrency) > 0 {
 		if o.Controller.GroupKindConcurrency == nil {
 			o.Controller.GroupKindConcurrency = make(map[string]int)
@@ -105,8 +98,7 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration, enableHTTP2 bool) {
 }
 
 // Load loads configuration from file and returns controller Options and Configuration.
-// If configFile is empty, default configuration is used.
-func Load(scheme *runtime.Scheme, configFile string, enableHTTP2 bool) (ctrl.Options, configapi.Configuration, error) {
+func Load(scheme *runtime.Scheme, configFile string) (ctrl.Options, configapi.Configuration, error) {
 	options := ctrl.Options{
 		Scheme: scheme,
 	}
@@ -114,22 +106,18 @@ func Load(scheme *runtime.Scheme, configFile string, enableHTTP2 bool) (ctrl.Opt
 	cfg := configapi.Configuration{}
 
 	if configFile == "" {
-		// Apply defaults
 		scheme.Default(&cfg)
 	} else {
-		// Load from file
 		if err := fromFile(configFile, scheme, &cfg); err != nil {
 			return options, cfg, err
 		}
 	}
 
-	// Validate configuration
 	if errs := validate(&cfg); len(errs) > 0 {
 		return options, cfg, fmt.Errorf("invalid configuration: %v", errs.ToAggregate())
 	}
 
-	// Apply configuration to options
-	addTo(&options, &cfg, enableHTTP2)
+	addTo(&options, &cfg)
 
 	return options, cfg, nil
 }
@@ -148,10 +136,9 @@ func ApplyClientConnection(restCfg *rest.Config, cfg *configapi.Configuration) {
 }
 
 // IsCertManagementEnabled returns true if certificate management is enabled.
-// Returns true by default if not explicitly disabled.
 func IsCertManagementEnabled(cfg *configapi.Configuration) bool {
 	if cfg.CertManagement == nil || cfg.CertManagement.Enable == nil {
-		return true // Enabled by default
+		return true
 	}
 	return *cfg.CertManagement.Enable
 }
