@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kubeflowv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	ctlrconfig "github.com/kubeflow/training-operator/pkg/config"
 	commonutil "github.com/kubeflow/training-operator/pkg/util"
 	"github.com/kubeflow/training-operator/pkg/util/testutil"
 )
@@ -569,6 +571,99 @@ var _ = Describe("MPIJob controller", func() {
 				}
 
 				return launcherCreated.Spec.ServiceAccountName
+			}, testutil.Timeout, testutil.Interval).Should(Equal(launcherSaName))
+		})
+	})
+
+	Context("MPIJob with disabled RBAC management", func() {
+		It("Should not create ServiceAccount, Role, or RoleBinding", func() {
+			By("Setting DisableMPIRBACManagement to true")
+			ctlrconfig.Config.DisableMPIRBACManagement = true
+			defer func() {
+				ctlrconfig.Config.DisableMPIRBACManagement = false
+			}()
+
+			By("Creating an MPIJob with a user-provided ServiceAccount")
+			jobName := "test-disable-rbac"
+			launcherSaName := "custom-launcher-sa"
+
+			ctx := context.Background()
+			startTime := metav1.Now()
+			completionTime := metav1.Now()
+
+			mpiJob := newMPIJob(jobName, ptr.To[int32](1), 1, gpuResourceName, &startTime, &completionTime)
+			mpiJob.Spec.MPIReplicaSpecs[kubeflowv1.MPIJobReplicaTypeLauncher].Template.Spec.ServiceAccountName = launcherSaName
+
+			// Pre-create the ServiceAccount since the operator won't create it
+			sa := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      launcherSaName,
+					Namespace: metav1.NamespaceDefault,
+				},
+			}
+			Expect(testK8sClient.Create(ctx, sa)).Should(Succeed())
+			Expect(testK8sClient.Create(ctx, mpiJob)).Should(Succeed())
+
+			By("Reconciling until the launcher pod is created")
+			Eventually(func() error {
+				req := ctrl.Request{NamespacedName: types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      mpiJob.GetName(),
+				}}
+				_, err := reconciler.Reconcile(ctx, req)
+				return err
+			}, testutil.Timeout, testutil.Interval).Should(BeNil())
+
+			By("Verifying no Role was created")
+			Eventually(func() bool {
+				role := &rbacv1.Role{}
+				err := testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, role)
+				return errors.IsNotFound(err)
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			By("Verifying no RoleBinding was created")
+			Eventually(func() bool {
+				rb := &rbacv1.RoleBinding{}
+				err := testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, rb)
+				return errors.IsNotFound(err)
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			By("Verifying no operator-created ServiceAccount was created")
+			Eventually(func() bool {
+				operatorSa := &corev1.ServiceAccount{}
+				err := testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, operatorSa)
+				return errors.IsNotFound(err)
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			By("Verifying ConfigMap was created")
+			Eventually(func() error {
+				cm := &corev1.ConfigMap{}
+				return testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + configSuffix,
+				}, cm)
+			}, testutil.Timeout, testutil.Interval).Should(Succeed())
+
+			By("Verifying launcher pod uses the user-provided ServiceAccount")
+			Eventually(func() string {
+				launcher := &corev1.Pod{}
+				err := testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, launcher)
+				if err != nil {
+					return ""
+				}
+				return launcher.Spec.ServiceAccountName
 			}, testutil.Timeout, testutil.Interval).Should(Equal(launcherSaName))
 		})
 	})
