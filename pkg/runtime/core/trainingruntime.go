@@ -129,7 +129,7 @@ func (r *TrainingRuntime) RuntimeInfo(
 		return nil, err
 	}
 
-	if err = r.framework.RunPodNetworkPlugins(info, trainJob); err != nil {
+	if err = r.framework.RunEnforceInfrastructurePlugins(info, trainJob); err != nil {
 		return nil, err
 	}
 
