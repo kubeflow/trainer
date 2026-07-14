@@ -214,23 +214,25 @@ func (jc *MPIJobReconciler) SetupWithManager(mgr ctrl.Manager, controllerThreads
 		util.OnDependentFuncs[*corev1.ConfigMap](jc.Scheme, jc.Expectations, &jc.JobController))); err != nil {
 		return err
 	}
-	// inject watching for job related Role
-	if err = c.Watch(source.Kind[*rbacv1.Role](mgr.GetCache(), &rbacv1.Role{},
-		handler.TypedEnqueueRequestForOwner[*rbacv1.Role](mgr.GetScheme(), mgr.GetRESTMapper(), &kubeflowv1.MPIJob{}, handler.OnlyControllerOwner()),
-		util.OnDependentFuncs[*rbacv1.Role](jc.Scheme, jc.Expectations, &jc.JobController))); err != nil {
-		return err
-	}
-	// inject watching for job related RoleBinding
-	if err = c.Watch(source.Kind[*rbacv1.RoleBinding](mgr.GetCache(), &rbacv1.RoleBinding{},
-		handler.TypedEnqueueRequestForOwner[*rbacv1.RoleBinding](mgr.GetScheme(), mgr.GetRESTMapper(), &kubeflowv1.MPIJob{}, handler.OnlyControllerOwner()),
-		util.OnDependentFuncs[*rbacv1.RoleBinding](jc.Scheme, jc.Expectations, &jc.JobController))); err != nil {
-		return err
-	}
-	// inject watching for job related ServiceAccount
-	if err = c.Watch(source.Kind[*corev1.ServiceAccount](mgr.GetCache(), &corev1.ServiceAccount{},
-		handler.TypedEnqueueRequestForOwner[*corev1.ServiceAccount](mgr.GetScheme(), mgr.GetRESTMapper(), &kubeflowv1.MPIJob{}, handler.OnlyControllerOwner()),
-		util.OnDependentFuncs[*corev1.ServiceAccount](jc.Scheme, jc.Expectations, &jc.JobController))); err != nil {
-		return err
+	if !ctlrconfig.Config.DisableMPIRBACManagement {
+		// inject watching for job related Role
+		if err = c.Watch(source.Kind[*rbacv1.Role](mgr.GetCache(), &rbacv1.Role{},
+			handler.TypedEnqueueRequestForOwner[*rbacv1.Role](mgr.GetScheme(), mgr.GetRESTMapper(), &kubeflowv1.MPIJob{}, handler.OnlyControllerOwner()),
+			util.OnDependentFuncs[*rbacv1.Role](jc.Scheme, jc.Expectations, &jc.JobController))); err != nil {
+			return err
+		}
+		// inject watching for job related RoleBinding
+		if err = c.Watch(source.Kind[*rbacv1.RoleBinding](mgr.GetCache(), &rbacv1.RoleBinding{},
+			handler.TypedEnqueueRequestForOwner[*rbacv1.RoleBinding](mgr.GetScheme(), mgr.GetRESTMapper(), &kubeflowv1.MPIJob{}, handler.OnlyControllerOwner()),
+			util.OnDependentFuncs[*rbacv1.RoleBinding](jc.Scheme, jc.Expectations, &jc.JobController))); err != nil {
+			return err
+		}
+		// inject watching for job related ServiceAccount
+		if err = c.Watch(source.Kind[*corev1.ServiceAccount](mgr.GetCache(), &corev1.ServiceAccount{},
+			handler.TypedEnqueueRequestForOwner[*corev1.ServiceAccount](mgr.GetScheme(), mgr.GetRESTMapper(), &kubeflowv1.MPIJob{}, handler.OnlyControllerOwner()),
+			util.OnDependentFuncs[*corev1.ServiceAccount](jc.Scheme, jc.Expectations, &jc.JobController))); err != nil {
+			return err
+		}
 	}
 	// skip watching volcano PodGroup if volcano PodGroup is not installed
 	if _, err = mgr.GetRESTMapper().RESTMapping(schema.GroupKind{Group: v1beta1.GroupName, Kind: "PodGroup"},
@@ -367,24 +369,25 @@ func (jc *MPIJobReconciler) ReconcilePods(
 		}
 		isGPULauncher := isGPULauncher(mpiJob)
 
-		// Get the launcher ServiceAccount for this MPIJob.
-		if sa, err := jc.getOrCreateLauncherServiceAccount(mpiJob); sa == nil || err != nil {
-			return err
-		}
-
 		// Get the ConfigMap for this MPIJob.
 		if config, err := jc.getOrCreateConfigMap(mpiJob, workerReplicas, isGPULauncher); config == nil || err != nil {
 			return err
 		}
 
-		// Get the launcher Role for this MPIJob.
-		if r, err := jc.getOrCreateLauncherRole(mpiJob, workerReplicas); r == nil || err != nil {
-			return err
-		}
+		if !ctlrconfig.Config.DisableMPIRBACManagement {
+			// Get the launcher ServiceAccount for this MPIJob.
+			if sa, err := jc.getOrCreateLauncherServiceAccount(mpiJob); sa == nil || err != nil {
+				return err
+			}
+			// Get the launcher Role for this MPIJob.
+			if r, err := jc.getOrCreateLauncherRole(mpiJob, workerReplicas); r == nil || err != nil {
+				return err
+			}
 
-		// Get the launcher RoleBinding for this MPIJob.
-		if rb, err := jc.getLauncherRoleBinding(mpiJob); rb == nil || err != nil {
-			return err
+			// Get the launcher RoleBinding for this MPIJob.
+			if rb, err := jc.getLauncherRoleBinding(mpiJob); rb == nil || err != nil {
+				return err
+			}
 		}
 
 		worker, err = jc.getOrCreateWorker(mpiJob)
@@ -1034,8 +1037,10 @@ func (jc *MPIJobReconciler) newLauncher(mpiJob *kubeflowv1.MPIJob, kubectlDelive
 		jc.PodGroupControl.DecoratePodTemplateSpec(podSpec, mpiJob, rt)
 	}
 
-	if len(mpiJob.Spec.MPIReplicaSpecs[kubeflowv1.MPIJobReplicaTypeLauncher].Template.Spec.ServiceAccountName) == 0 {
-		podSpec.Spec.ServiceAccountName = launcherName
+	if !ctlrconfig.Config.DisableMPIRBACManagement {
+		if len(mpiJob.Spec.MPIReplicaSpecs[kubeflowv1.MPIJobReplicaTypeLauncher].Template.Spec.ServiceAccountName) == 0 {
+			podSpec.Spec.ServiceAccountName = launcherName
+		}
 	}
 
 	podSpec.Spec.InitContainers = append(podSpec.Spec.InitContainers, corev1.Container{

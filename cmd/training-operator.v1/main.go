@@ -111,6 +111,8 @@ func main() {
 	// MPI related flags
 	flag.StringVar(&config.Config.MPIKubectlDeliveryImage, "mpi-kubectl-delivery-image",
 		config.MPIKubectlDeliveryImageDefault, "The image for mpi launcher init container")
+	flag.BoolVar(&config.Config.DisableMPIRBACManagement, "disable-mpi-rbac-management", false,
+		"When set to true, disables the MPIJob controller's management of launcher RBAC resources (ServiceAccount, Role, RoleBinding) and ServiceAccountName injection. Users must provide their own ServiceAccount.")
 
 	// Cert generation flags
 	flag.IntVar(&webhookServerPort, "webhook-server-port", 9443, "Endpoint port for the webhook server.")
