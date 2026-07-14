@@ -133,21 +133,19 @@ trainer.train()
 
 ### Option B: Kubeflow SDK (custom training loop)
 
-Use `update_trainjob_status` from `kubeflow.trainer.utils` when writing a custom training
+Use `update_trainjob_status` from `kubeflow.trainer` when writing a custom training
 loop or using a framework other than HuggingFace Transformers. The SDK throttles updates
-to at most once every 5 seconds to avoid overloading the controller. Use `force=True` to
-bypass the throttle — recommended at the very start and end of training so those
-transitions are always captured.
+to at most once every 5 seconds to avoid overloading the controller.
 
 For detailed API usage of `update_trainjob_status`, refer to the [Kubeflow SDK documentation](https://www.kubeflow.org/docs/components/trainer/sdk/).
 
 ```python
-from kubeflow.trainer.utils import update_trainjob_status
+from kubeflow.trainer import update_trainjob_status
 
 total_epochs = 10
 
-# Signal the start of training (force=True bypasses the 5-second throttle)
-update_trainjob_status(progress_percent=0, force=True)
+# Signal the start of training
+update_trainjob_status(progress_percent=0)
 
 for epoch in range(total_epochs):
     # --- your training logic here ---
@@ -167,8 +165,8 @@ for epoch in range(total_epochs):
         metrics=metrics,
     )
 
-# Signal completion (force=True ensures the final state is never throttled)
-update_trainjob_status(progress_percent=100, force=True)
+# Signal completion
+update_trainjob_status(progress_percent=100)
 ```
 
 ### Option C: Raw HTTP (any language or framework)
