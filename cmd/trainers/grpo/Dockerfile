@@ -14,7 +14,7 @@
 
 FROM pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
 
-WORKDIR /workspace
+WORKDIR /opt/grpo
 
 # Install build-essential for compiling any dependencies
 RUN apt update && apt-get install -y --no-install-recommends build-essential \
@@ -26,5 +26,5 @@ COPY cmd/trainers/grpo/requirements.txt .
 # Install the needed packages
 RUN pip install -r requirements.txt
 
-# Copy the GRPO training entrypoint
+# Copy the GRPO training entrypoint outside /workspace to avoid PVC mount shadowing
 COPY cmd/trainers/grpo/train.py .

@@ -86,7 +86,7 @@ spec:
                       image: ghcr.io/kubeflow/trainer/grpo-trainer
                       command:
                         - torchrun
-                        - train.py
+                        - /opt/grpo/train.py
                       env:
                         - name: MODEL_PATH
                           value: /workspace/model

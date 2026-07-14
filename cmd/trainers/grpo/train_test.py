@@ -199,15 +199,11 @@ def test_main(test_case, monkeypatch, tmp_path):
     for key, value in test_case.env_vars.items():
         monkeypatch.setenv(key, value)
 
-    dataset_dir = tmp_path / "dataset"
-    dataset_dir.mkdir()
-    monkeypatch.setenv("DATASET_PATH", str(dataset_dir))
-
     mock_dataset = MagicMock()
     mock_trainer_instance = MagicMock()
 
     with (
-        patch.object(train, "load_from_disk", return_value=mock_dataset) as mock_load,
+        patch.object(train, "load_dataset", return_value=mock_dataset) as mock_load,
         patch.object(train, "GRPOConfig") as mock_config_cls,
         patch.object(
             train, "GRPOTrainer", return_value=mock_trainer_instance
@@ -215,7 +211,7 @@ def test_main(test_case, monkeypatch, tmp_path):
     ):
         train.main()
 
-        mock_load.assert_called_once_with(str(dataset_dir))
+        mock_load.assert_called_once_with("/workspace/dataset", split="train")
         mock_config_cls.assert_called_once()
         mock_trainer_cls.assert_called_once()
         mock_trainer_instance.train.assert_called_once()

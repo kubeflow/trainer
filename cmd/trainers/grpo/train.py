@@ -39,7 +39,7 @@ import os
 import sys
 from typing import Union
 
-from datasets import load_dataset, load_from_disk
+from datasets import load_dataset
 from trl import GRPOConfig, GRPOTrainer
 
 logging.basicConfig(
@@ -100,7 +100,7 @@ def load_reward_function():
         logger.error("Reward function module not found: %s", module_path)
         sys.exit(1)
 
-    if not hasattr(module, "reward_function"):
+    if not hasattr(module, "reward_function") or not callable(module.reward_function):
         logger.error("Module %s must define a 'reward_function' callable", module_path)
         sys.exit(1)
 
@@ -119,12 +119,8 @@ def main():
     logger.info("Dataset path: %s", dataset_path)
     logger.info("Output directory: %s", output_dir)
 
-    if os.path.isdir(dataset_path):
-        logger.info("Loading dataset from disk: %s", dataset_path)
-        dataset = load_from_disk(dataset_path)
-    else:
-        logger.info("Loading dataset from URI: %s", dataset_path)
-        dataset = load_dataset(dataset_path, split="train")
+    logger.info("Loading dataset: %s", dataset_path)
+    dataset = load_dataset(dataset_path, split="train")
 
     reward_fn = load_reward_function()
 
