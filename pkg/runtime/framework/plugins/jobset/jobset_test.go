@@ -43,6 +43,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -520,6 +521,220 @@ func TestValidate(t *testing.T) {
 				field.Invalid(runtimeRefPath,
 					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
 					fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)),
+			},
+		},
+		"valid dataset initializer with volumeClaimPolicies and volumeMount passes": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						VolumeClaimPolicies: []jobsetv1alpha2ac.VolumeClaimPolicyApplyConfiguration{
+							{
+								Templates: []corev1.PersistentVolumeClaim{
+									{
+										ObjectMeta: metav1.ObjectMeta{
+											Name: jobsetplgconsts.VolumeNameInitializer,
+										},
+									},
+								},
+							},
+						},
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.DatasetInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													*corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(corev1ac.VolumeMount().
+															WithName(jobsetplgconsts.VolumeNameInitializer)),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Dataset: &trainer.DatasetInitializer{},
+				}).Obj(),
+		},
+		"valid model initializer with volumeClaimPolicies and volumeMount passes": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						VolumeClaimPolicies: []jobsetv1alpha2ac.VolumeClaimPolicyApplyConfiguration{
+							{
+								Templates: []corev1.PersistentVolumeClaim{
+									{
+										ObjectMeta: metav1.ObjectMeta{
+											Name: jobsetplgconsts.VolumeNameInitializer,
+										},
+									},
+								},
+							},
+						},
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.ModelInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													*corev1ac.Container().
+														WithName(constants.ModelInitializer).
+														WithVolumeMounts(corev1ac.VolumeMount().
+															WithName(jobsetplgconsts.VolumeNameInitializer)),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Model: &trainer.ModelInitializer{},
+				}).Obj(),
+		},
+		"valid dataset and model initializers together pass": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						VolumeClaimPolicies: []jobsetv1alpha2ac.VolumeClaimPolicyApplyConfiguration{
+							{
+								Templates: []corev1.PersistentVolumeClaim{
+									{
+										ObjectMeta: metav1.ObjectMeta{
+											Name: jobsetplgconsts.VolumeNameInitializer,
+										},
+									},
+								},
+							},
+						},
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.DatasetInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													*corev1ac.Container().
+														WithName(constants.DatasetInitializer).
+														WithVolumeMounts(corev1ac.VolumeMount().
+															WithName(jobsetplgconsts.VolumeNameInitializer)),
+												},
+											},
+										},
+									},
+								},
+							},
+							{
+								Name: ptr.To(constants.ModelInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													*corev1ac.Container().
+														WithName(constants.ModelInitializer).
+														WithVolumeMounts(corev1ac.VolumeMount().
+															WithName(jobsetplgconsts.VolumeNameInitializer)),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Dataset: &trainer.DatasetInitializer{},
+					Model:   &trainer.ModelInitializer{},
+				}).Obj(),
+		},
+		"must have volumeMount with name - initializer in the dataset initializer container": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.DatasetInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.DatasetInitializer),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Dataset: &trainer.DatasetInitializer{},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have volumeMount with name - %s in container %s of the %s job", jobsetplgconsts.VolumeNameInitializer, constants.DatasetInitializer, constants.DatasetInitializer)),
+			},
+		},
+		"must have volumeMount with name - initializer in the model initializer container": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.ModelInitializer),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.ModelInitializer),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				Initializer(&trainer.Initializer{
+					Model: &trainer.ModelInitializer{},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimeRefPath,
+					utiltesting.MakeTrainJobWrapper("default", "test").Obj().Spec.RuntimeRef,
+					fmt.Sprintf("must have volumeMount with name - %s in container %s of the %s job", jobsetplgconsts.VolumeNameInitializer, constants.ModelInitializer, constants.ModelInitializer)),
 			},
 		},
 		"runtimePatches contain invalid replicated job": {

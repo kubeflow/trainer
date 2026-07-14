@@ -69,21 +69,12 @@ func init() {
 
 func main() {
 	var configFile string
-	var enableHTTP2 bool
 	var featureGates string
 
 	flag.StringVar(&configFile, "config", "",
 		"The controller will load its initial configuration from this file. "+
 			"Omit this flag to use the default configuration values. "+
 			"Command-line flags override configuration from this file.")
-	// if the enable-http2 flag is false (the default), http/2 should be disabled
-	// due to its vulnerabilities. More specifically, disabling http/2 will
-	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
-	// Rapid Reset CVEs. For more information see:
-	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
-	// - https://github.com/advisories/GHSA-4374-p667-p6c8
-	flag.BoolVar(&enableHTTP2, "enable-http2", false,
-		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&featureGates, "feature-gates", "",
 		"A comma-separated list of key=value pairs that describe feature gates. "+
 			"Command-line feature gates override those specified in the config file.")
@@ -98,7 +89,7 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zapOpts)))
 
 	setupLog.Info("Loading configuration", "configFile", configFile)
-	options, cfg, err := config.Load(scheme, configFile, enableHTTP2)
+	options, cfg, err := config.Load(scheme, configFile)
 	if err != nil {
 		setupLog.Error(err, "Unable to load configuration")
 		os.Exit(1)
@@ -154,7 +145,7 @@ func main() {
 		os.Exit(1)
 	}
 	// Set up controllers and other components using goroutines to start the manager quickly.
-	go setupManagerComponents(mgr, runtimes, &cfg, certsReady, enableHTTP2)
+	go setupManagerComponents(mgr, runtimes, &cfg, certsReady)
 
 	setupLog.Info("Starting manager")
 	if err = mgr.Start(ctx); err != nil {
@@ -163,7 +154,7 @@ func main() {
 	}
 }
 
-func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, cfg *configapi.Configuration, certsReady <-chan struct{}, enableHTTP2 bool) {
+func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, cfg *configapi.Configuration, certsReady <-chan struct{}) {
 	setupLog.Info("Waiting for certificate generation to complete")
 	<-certsReady
 	setupLog.Info("Certs ready")
@@ -178,7 +169,7 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 	}
 
 	if features.Enabled(features.TrainJobStatus) {
-		if err := statusserver.SetupServer(mgr, cfg.StatusServer, enableHTTP2); err != nil {
+		if err := statusserver.SetupServer(mgr, cfg.StatusServer, cfg.TLS); err != nil {
 			setupLog.Error(err, "Could not create runtime status server")
 			os.Exit(1)
 		}
