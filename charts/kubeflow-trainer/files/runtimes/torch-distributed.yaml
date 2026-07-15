@@ -44,7 +44,6 @@ spec:
                   containers:
                     - name: node
                       image: pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime
-                      workingDir: /tmp
                       securityContext:
                         allowPrivilegeEscalation: false
                         capabilities:
