@@ -40,6 +40,30 @@ def get_namespace() -> str:
         return "default"
 
 
+def parse_cache_storage_uri(storage_uri: str) -> tuple[str, str]:
+    """Parse cache storage URI.
+
+    Expected format: cache://<SCHEMA_NAME>/<TABLE_NAME>
+    """
+    prefix = "cache://"
+    if not storage_uri.startswith(prefix):
+        raise ValueError(
+            f"Invalid cache storage URI {storage_uri!r}: "
+            "expected format cache://<SCHEMA_NAME>/<TABLE_NAME>"
+        )
+
+    uri_path = storage_uri[len(prefix) :]
+    parts = uri_path.split("/")
+
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        raise ValueError(
+            f"Invalid cache storage URI {storage_uri!r}: "
+            "expected format cache://<SCHEMA_NAME>/<TABLE_NAME>"
+        )
+
+    return parts[0], parts[1]
+
+
 class CacheInitializer(utils.DatasetProvider):
 
     def load_config(self):
@@ -48,12 +72,9 @@ class CacheInitializer(utils.DatasetProvider):
         config_dict = {k: v for k, v in config_dict.items() if v is not None}
         self.config = types.CacheDatasetInitializer(**config_dict)
 
-        # Parse schema_name and table_name from storage_uri
-        # Format: cache://<SCHEMA_NAME>/<TABLE_NAME>
-        uri_path = self.config.storage_uri[len("cache://") :]
-        parts = uri_path.split("/")
-        self.schema_name = parts[0]
-        self.table_name = parts[1]
+        self.schema_name, self.table_name = parse_cache_storage_uri(
+            self.config.storage_uri
+        )
 
     def download_dataset(self):
         """Bootstrap cache cluster with dataset"""
@@ -328,3 +349,4 @@ class CacheInitializer(utils.DatasetProvider):
             return
 
         logging.info("Cache cluster creation completed")
+        
