@@ -61,4 +61,4 @@ tests:
       - matchRegex:
           path: data["runtimes.yaml"]
           pattern: |-
-            (?s)- name: node.*securityContext:\s+runAsNonRoot: true\s+runAsUser: 1000\s+seccompProfile:\s+type: RuntimeDefault\s+containers:\s+- name: node\s+image: pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime\s+workingDir: /tmp\s+securityContext:\s+allowPrivilegeEscalation: false\s+capabilities:\s+drop:\s+- ALL\s+runAsNonRoot: true\s+runAsUser: 1000\s+seccompProfile:\s+type: RuntimeDefault
+            (?s)- name: node.*securityContext:\s+runAsNonRoot: true\s+runAsUser: 1000\s+seccompProfile:\s+type: RuntimeDefault\s+containers:\s+- name: node\s+image: pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime\s+securityContext:\s+allowPrivilegeEscalation: false\s+capabilities:\s+drop:\s+- ALL\s+runAsNonRoot: true\s+runAsUser: 1000\s+seccompProfile:\s+type: RuntimeDefault
