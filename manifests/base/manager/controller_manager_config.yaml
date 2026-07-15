@@ -57,13 +57,6 @@ clientConnection:
   qps: 50
   burst: 100
 
-# TLS configuration (optional)
-# Values can be overridden at runtime via --tls-min-version and --tls-cipher-suites flags.
-# tls:
-#   minVersion: "1.2"
-#   cipherSuites: []
-#   nextProtos: []
-
 statusServer:
   port: 10443
   qps: 5

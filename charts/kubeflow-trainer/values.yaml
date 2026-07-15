@@ -155,12 +155,6 @@ manager:
       # -- Burst rate limit for the TrainJob Status Server api client
       burst: 10
     featureGates: {}
-    # -- TLS configuration for webhook and metrics servers.
-    # Values here can be overridden at runtime via --tls-min-version and --tls-cipher-suites flags.
-    tls: {}
-      # minVersion: "1.2"
-      # cipherSuites: []
-      # nextProtos: []
 
 webhook:
   # -- Specifies how unrecognized errors are handled.
