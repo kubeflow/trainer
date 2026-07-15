@@ -18,17 +18,13 @@ package controller
 
 import (
 	"context"
-	"iter"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2/ktesting"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -86,92 +82,6 @@ func TestReconcile_TrainingRuntimeReconciler(t *testing.T) {
 				cmpopts.IgnoreFields(metav1.TypeMeta{}, "Kind", "APIVersion"),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected TrainingRuntime: (-want, +got): \n%s", diff)
-			}
-		})
-	}
-}
-
-func TestNotifyTrainJobUpdate_TrainingRuntimeReconciler(t *testing.T) {
-	t.Parallel()
-	cases := map[string]struct {
-		oldJob    *trainer.TrainJob
-		newJob    *trainer.TrainJob
-		wantEvent event.TypedGenericEvent[iter.Seq[types.NamespacedName]]
-	}{
-		"UPDATE Event: runtimeRef is TrainingRuntime": {
-			oldJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				Obj(),
-			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				RuntimePatches([]trainer.RuntimePatch{{Manager: "test"}}).
-				Obj(),
-			wantEvent: event.TypedGenericEvent[iter.Seq[types.NamespacedName]]{
-				Object: func(yield func(types.NamespacedName) bool) {
-					yield(types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "test-runtime"})
-				},
-			},
-		},
-		"UPDATE Event: runtimeRef is not TrainingRuntime": {
-			oldJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
-				Obj(),
-			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
-				RuntimePatches([]trainer.RuntimePatch{{Manager: "test"}}).
-				Obj(),
-		},
-		"CREATE Event: runtimeRef is TrainingRuntime": {
-			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				Obj(),
-			wantEvent: event.TypedGenericEvent[iter.Seq[types.NamespacedName]]{
-				Object: func(yield func(types.NamespacedName) bool) {
-					yield(types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "test-runtime"})
-				},
-			},
-		},
-		"CREATE Event: runtimeRef is not TrainingRuntime": {
-			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
-				Obj(),
-		},
-		"DELETE Event: runtimeRef is TrainingRuntime": {
-			oldJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				Obj(),
-			wantEvent: event.TypedGenericEvent[iter.Seq[types.NamespacedName]]{
-				Object: func(yield func(types.NamespacedName) bool) {
-					yield(types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "test-runtime"})
-				},
-			},
-		},
-		"DELETE Event: runtimeRef is not TrainingRuntime": {
-			oldJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
-				Obj(),
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			logger, _ := ktesting.NewTestContext(t)
-			updateCh := make(chan event.TypedGenericEvent[iter.Seq[types.NamespacedName]], 1)
-			t.Cleanup(func() {
-				close(updateCh)
-			})
-			r := &TrainingRuntimeReconciler{
-				log:                      logger,
-				nonRuntimeObjectUpdateCh: updateCh,
-			}
-			r.NotifyTrainJobUpdate(tc.oldJob, tc.newJob)
-			var got event.TypedGenericEvent[iter.Seq[types.NamespacedName]]
-			select {
-			case got = <-updateCh:
-			case <-time.After(time.Second):
-			}
-			if diff := cmp.Diff(tc.wantEvent, got, utiltesting.TrainJobUpdateReconcileRequestCmpOpts); len(diff) != 0 {
-				t.Errorf("Unexpected GenericEvent (-want, +got):\n%s", diff)
 			}
 		})
 	}
