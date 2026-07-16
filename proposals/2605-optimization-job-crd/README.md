@@ -14,7 +14,7 @@
 6. [Sample YAML (Phase 1)](#6-sample-yaml-phase-1)
 7. [Reconciliation & Architecture (Phase 1)](#7-reconciliation--architecture-phase-1)
 8. [Open Discussions](#8-open-discussions)
-9. [Implemetation History](#9-implemetation-history)
+9. [Implementation History](#9-implementation-history)
 10. [Alternatives](#10-alternatives)
 
 ---
@@ -50,7 +50,7 @@ spec:
   # ... trial config ...
   trainJobTemplate:
     spec:
-	  runtimeRef:
+	    runtimeRef:
         apiGroup: trainer.kubeflow.org
         kind: ClusterTrainingRuntime
         name: torch-distributed
@@ -77,24 +77,24 @@ spec:
 - **Native Parameter Injection:** Replace legacy brittle regex YAML substitution with standard Kubernetes mechanisms: prefixed environment variables (e.g., `KUBEFLOW_TRAINER_OPT_LR`) and Pod annotations.
 - **Dependency Reduction (No Katib DB or Trial CRD):** Rely strictly on the `TrainJob` annotations for historical parameters and the Progress API for evaluating metrics.
 - **Comprehensive Search Space API**: Define a robust API capable of supporting various parameter distributions to accurately model hyperparameter search spaces.
-- **Single Canonical Provider (Optuna MVP):** Hard-scope the backend suggestion engine to Optuna to stabilize the orchestration loop before multi-tenant provider support is added in the future interations.
+- **Single Canonical Provider (Optuna MVP):** Hard-scope the backend suggestion engine to Optuna to stabilize the orchestration loop before multi-tenant provider support is added in future interations.
 - **Stateless Algorithm Execution**: Compute suggestions dynamically using a stateless gRPC provider model that reconstructs trial history directly from the Kubernetes API rather than relying on a Katib DB.
 - **Native CEL Validation**: Replace legacy validating webhooks with native Kubernetes Common Expression Language (CEL) rule.
 
 - **Phase 2 / Phase 3 Goals**:
-Kubeflow SDK integrations
-Advanced Search Spaces: Normal and LogNormal distributions
-Refactor Katib gRPC service
-Refactor Optuna algorithm service in Trainer repository
-Secure Auth for gRPC service
-Support for Multi-Objective Optimization
-Integration w/ Kueue with `suspend` and `managedBy` APIs in OptimizationJob
+  - Kubeflow SDK integrations
+  - Advanced Search Spaces: Normal and LogNormal distributions
+  - Refactor Katib gRPC service
+  - Refactor Optuna algorithm service in Trainer repository
+  - Secure Auth for gRPC service
+  - Support for Multi-Objective Optimization
+  - Integration w/ Kueue with `suspend` and `managedBy` APIs in OptimizationJob
 
 ## 4. Non-Goals / Future Iterations
 To ensure a stable and reviewable initial release (Phase 1), the following features are explicitly out of scope for now and will be addressed in future iterations:
 
 **Advanced/Custom Algorithms (Phase 2):**
-- Custom algorithms, TPE (Tree-structured Parzen Estimator), and advanced trial pruning algorithms (e.g., ASHA, Hyperband) are deferred. Phase 1 supports only Random, Grid, and Bayesian.
+- Custom algorithms, TPE (Tree-structured Parzen Estimator), Gaussian Process (GP) Bayesian optimization, and advanced trial pruning algorithms (e.g., ASHA, Hyperband) are deferred. Phase 1 supports only Random and Grid search.
 
 **State & Storage (Phase 2):**
 - **Trial Suspension & Storage Checkpointing:** `OptimizationStorage` and `status.Suspended` to allow pausing/resuming trials mid-flight.
@@ -118,83 +118,75 @@ package v1alpha1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-// +kubebuilder:validation:Enum=maximize;minimize
+// +kubebuilder:validation:Enum=Maximize;Minimize
 type ObjectiveDirection string
 
 const (
-    ObjectiveDirectionMaximize ObjectiveDirection = "maximize"
-    ObjectiveDirectionMinimize ObjectiveDirection = "minimize"
+    ObjectiveDirectionMaximize ObjectiveDirection = "Maximize"
+    ObjectiveDirectionMinimize ObjectiveDirection = "Minimize"
 )
 
 type Objective struct {
 	// Metric specifies the name of the objective metric to track. Defaults to "loss".
-    // +kubebuilder:default=loss
-    // +optional
+  // +kubebuilder:default=loss
+  // +kubebuilder:validation:MinLength=1
+  // +kubebuilder:validation:MaxLength=64
+  // +optional
 	Metric *string `json:"metric,omitempty"`
 
-	// Direction specifies the optimization goal. Defaults to "minimize".
-	// +kubebuilder:default=minimize
-	// optional
+	// Direction specifies the optimization goal. Defaults to "Minimize".
+	// +kubebuilder:default=Minimize
+	// +optional
 	Direction *ObjectiveDirection `json:"direction,omitempty"`
 }
 
 // OptimizationJobSpec defines the desired state of OptimizationJob.
 type OptimizationJobSpec struct {
 	// +listType=map
-    // +listMapKey=metric
-    // +kubebuilder:validation:MinItems=1
+  // +listMapKey=metric
+  // +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=1
+  // +required
 	Objectives []Objective `json:"objectives"`
 
-	// Defaults to an empty RandomAlgorithm strategy.
-    // +kubebuilder:default={random: {}}
-    // +optional
+  // +optional
 	SearchAlgorithm *SearchAlgorithm `json:"searchAlgorithm,omitempty"`
 
 	// +listType=map
-    // +listMapKey=name
-    // +kubebuilder:validation:MinItems=1
+  // +listMapKey=name
+  // +kubebuilder:validation:MinItems=1
+  // +required
 	Parameters []Parameter `json:"parameters"`
 
+  // +required
 	TrialPolicy TrialPolicy `json:"trialPolicy"`
 
+  // +required
 	TrainJobTemplate TrainJobTemplateSpec `json:"trainJobTemplate"`
 }
 
-// +kubebuilder:validation:XValidation:rule="[has(self.random), has(self.grid), has(self.bayesian)].filter(x, x).size() == 1",message="Exactly one search algorithm configuration must be provided"
+// +kubebuilder:validation:XValidation:rule="[has(self.random), has(self.grid)].filter(x, x).size() == 1",message="Exactly one search algorithm configuration must be provided"
 type SearchAlgorithm struct {
 	// +optional
 	Random *RandomAlgorithm `json:"random,omitempty"`
 	// +optional
 	Grid *GridAlgorithm `json:"grid,omitempty"`
-	// +optional
-	Bayesian *BayesianAlgorithm `json:"bayesian,omitempty"`
 }
 
 type RandomAlgorithm struct {
 	// +optional
-	RandomState *int64 `json:"seed,omitempty"`
+	Seed *int64 `json:"seed,omitempty"`
 }
 
 // GridAlgorithm is intentionally empty; step-intervals are derived from SearchSpace.Int.Step.
 type GridAlgorithm struct{}
 
-type BayesianAlgorithm struct {
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	InitialTrials *int32 `json:"initialTrials,omitempty"`
-
-	// +kubebuilder:validation:Enum=ucb;ei;pi
-	// +optional
-	AcquisitionFunction *string `json:"acquisitionFunction,omitempty"`
-}
-
-// +kubebuilder:validation:Enum=int;float
+// +kubebuilder:validation:Enum=Int;Float
 type ParameterType string
 
 const (
-    ParameterTypeInt   ParameterType = "int"
-    ParameterTypeFloat ParameterType = "float"
+    ParameterTypeInt   ParameterType = "Int"
+    ParameterTypeFloat ParameterType = "Float"
 )
 
 // SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.
@@ -210,48 +202,58 @@ type SearchSpace struct {
 	Categorical *CategoricalSpace `json:"categorical,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="double(self) == double(self)",message="value must be numeric"
+// +kubebuilder:validation:MaxLength=64
+type Double string
+
 // UniformSpace defines a continuous uniform distribution over [Min, Max].
 // +kubebuilder:validation:XValidation:rule="double(self.min) < double(self.max)",message="min must be strictly less than max"
 type UniformSpace struct {
-	// +kubebuilder:validation:MinLength=1
-	Min string `json:"min"`
+  // +required
+	Min Double `json:"min"`
 
-	// +kubebuilder:validation:MinLength=1
-	Max string `json:"max"`
+  // +required
+	Max Double `json:"max"`
 
-	// Type specifies the underlying data type. Defaults to "float".
-    // +kubebuilder:default=float
-    // +optional
-    Type *ParameterType `json:"type,omitempty"`
+	// Type specifies the underlying data type. Defaults to "Float".
+  // +kubebuilder:default=Float
+  // +required
+  Type ParameterType `json:"type"`
 }
 
 // LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].
-// +kubebuilder:validation:XValidation:rule="double(self.min) > 0.0",message="min must be strictly greater than 0 for a log-uniform distribution"
+// +kubebuilder:validation:XValidation:rule="double(self.min) > 0.0",message="min must be strictly greater than 0"
 // +kubebuilder:validation:XValidation:rule="double(self.min) < double(self.max)",message="min must be strictly less than max"
 type LogUniformSpace struct {
-	// +kubebuilder:validation:MinLength=1
-	Min string `json:"min"`
+  // +required
+	Min Double `json:"min"`
 
-	// +kubebuilder:validation:MinLength=1
-	Max string `json:"max"`
+  // +required
+	Max Double `json:"max"`
 
-	// Type specifies the underlying data type. Defaults to "float".
-	// +kubebuilder:default=float
-	// +optional
-	Type *ParameterType `json:"type,omitempty"`
+	// Type specifies the underlying data type. Defaults to "Float".
+	// +kubebuilder:default=Float
+  // +required
+	Type ParameterType `json:"type"`
 }
 
 // CategoricalSpace defines a search space over a discrete set of unordered strings.
 type CategoricalSpace struct {
-	// +listType=map
-	// +listMapKey=name
-	// +kubebuilder:validation:MinItems=1
+	// Choices is the set of strings to sample from.
+  // +kubebuilder:validation:MinItems=1
+  // +listType=set
+  // +required
 	Choices []string `json:"choices"`
 }
 
 type Parameter struct {
+  // Name is the name of the hyperparameter.
 	// +kubebuilder:validation:MinLength=1
+  // +kubebuilder:validation:MaxLength=64
+  // +required
 	Name        string      `json:"name"`
+
+  // +required
 	SearchSpace SearchSpace `json:"searchSpace"`
 }
 
@@ -268,13 +270,17 @@ type ParameterAssignment struct {
 	Value string `json:"value"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(self.parallelTrials) || !has(self.numTrials) || self.parallelTrials <= self.numTrials",message="parallelTrials cannot exceed numTrials"
+// +kubebuilder:validation:XValidation:rule="self.parallelTrials <= self.numTrials",message="parallelTrials cannot exceed numTrials"
 type TrialPolicy struct {
 	// +kubebuilder:validation:Minimum=1
-	NumTrials *int32 `json:"numTrials,omitempty"`
+  // +required
+	NumTrials int32 `json:"numTrials"`
 
-	// +kubebuilder:validation:Minimum=1
-	ParallelTrials *int32 `json:"parallelTrials,omitempty"`
+  // +kubebuilder:default=1
+  // +kubebuilder:validation:Minimum=1
+  // +kubebuilder:validation:Maximum=100
+  // +optional
+	ParallelTrials int32 `json:"parallelTrials"`
 }
 
 type TrainJobTemplateSpec struct {
@@ -282,23 +288,26 @@ type TrainJobTemplateSpec struct {
 	// +kubebuilder:validation:XValidation:rule="!has(self.name) && !has(self.namespace)", message="name and namespace cannot be set in a template."
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec TrainJobSpec `json:"spec"`
+  // +required
+	Spec TrainJobSpec `json:"spec,omitzero"`
 }
 
 type OptimizationJobStatus struct {
 	// +listType=map
 	// +listMapKey=type
+  // +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
+  // +optional
 	Result *Result `json:"result,omitempty"`
 }
 
 // Result tracks the parameters of the highest performing trial.
 type Result struct {
 	// TrainJobName is the name of the underlying TrainJob that achieved this result.
-    // +kubebuilder:validation:MinLength=1
-    // +required
-    TrainJobName string `json:"trainJobName"`
+  // +kubebuilder:validation:MinLength=1
+  // +required
+  TrainJobName string `json:"trainJobName"`
 	// +listType=map
 	// +listMapKey=name
 	// +optional
@@ -396,7 +405,7 @@ Katib currently operates on a 1-to-1 mapping where every `Experiment` triggers a
 Our model evolves this architecture into a stateless, provider-agnostic system:
 
 **Deployment Pattern**
-For Phase 1, we maintain isolation by deploying one dedicated `Suggestion` service container per `OptimizationJob`.
+For Phase 1, we maintain isolation by deploying one dedicated `Suggestion` service container per `OptimizationJob`. This pod runs continuously for the duration of the job, but holds no persistent state or database volume.
 
 **Stateless Orchestration**
 Unlike Katib, our controller treats the service as an ephemeral provider. The controller orchestrates the experiment by gathering history from completed `TrainJob` annotations and passing this full, point-in-time snapshot to the `GetSuggestions` gRPC method.
@@ -409,13 +418,13 @@ The Provider calculates the next parameters and returns them, "forgetting" the i
 In this section, we define the `OptimizationJob` state transition (`.status.conditions`). The basic `OptimizationJob` state machine tracks the lifecycle of the hyperparameter tuning experiment. The terminal condition (`Failed` or `Complete`) is decided based on the aggregate status of the underlying `TrainJob` objects and the rules defined in the `TrialPolicy`.
 
 In the state transition, a `Created=False` condition will occur in the following situations, identified by the condition reasons (`.status.conditions.[type="Created"].reason`):
-* **SuggestionServiceCreationFailed**: When the controller fails to construct or deploy the gRPC provider service required for generating hyperparameters.
+* **AlgorithmServiceCreationFailed**: When the controller fails to construct or deploy the gRPC provider service required for generating hyperparameters.
 * **TrainJobsCreationFailed**: When the controller successfully generates suggestions but fails to deploy the resulting `TrainJob` objects to the cluster.
 
 The core successful conditions for the Phase 1 MVP are:
 * **Created**: The `OptimizationJob` has been accepted, the suggestion service is running, and the controller is actively provisioning trial `TrainJobs`.
 * **Complete**: The conditions of the `TrialPolicy` have been satisfied (e.g., the desired `NumTrials` have successfully finished) and the best result has been recorded.
-* **Failed**: The `OptimizationJob` encountered a terminal error preventing further execution (e.g., the backend suggestion gRPC service crashed, or invalid provider settings were provided).
+* **Failed**: The `OptimizationJob` encountered a terminal error preventing further execution (e.g., the backend suggestion gRPC service crashed).
 
 ## 8. Design Decisions & Open Discussions
 
@@ -427,8 +436,8 @@ Initially, we considered creating a new, provider-agnostic gRPC protobuf schema 
 **Status: Resolved in v1alpha1**
 We have deprecated string templating (`{{.param}}`). To pass parameters to the training container reliably, `OptimizationJob` leverages native Kubernetes downward API mechanisms:
 
-* **The Design:** The controller injects `KUBEFLOW_TRAINER_OPT_<PARAM_NAME>` as environment variables directly into the primary training containers (all containers defined under `trainJobTemplate.trainer`). It simultaneously stores the raw JSON parameter assignment as an Annotation on the TrainJob metadata.
-* **The "Why":** This aligns perfectly with the unified Kubeflow Python SDK (KEP-46). Data scientists can use SDK helper functions (e.g., `get_hyperparameters()`) to cleanly parse the environment variables inside their training scripts without modifying YAML command arguments. The metadata annotations allow the controller to reconstruct trial history purely from the Kubernetes API without requiring Katib DB.
+* **The Design:** The controller injects `KUBEFLOW_TRAINER_OPT_<PARAM_NAME>` as environment variables directly into the `trainJob.spec.trainer.env` array. It simultaneously stores the raw JSON parameter assignment as an Annotation on the TrainJob metadata.
+* **The "Why":** This aligns well with the unified Kubeflow Python SDK (KEP-46). Data scientists can use SDK helper functions (e.g., `get_hyperparameters()`) to cleanly parse the environment variables inside their training scripts without modifying YAML command arguments. The metadata annotations allow the controller to reconstruct trial history purely from the Kubernetes API without requiring Katib DB.
 
 ### 8.3. Decision: Explicit Separation of Search vs. Pruning
 **Status: Resolved (Phase 2 Roadmap)**
@@ -453,11 +462,6 @@ Pruning decisions are computed controller-side based on this monotonic metric hi
 ## Implementation History
 
 * **2026-06-01:** Initial KEP draft creation for the `OptimizationJob` CRD.
-* **2026-06-11:** Updated design document to reflect structured API boundaries and document key architectural design decisions.
-* **2026-06-23:** Refined `SuggestionState` API.
-* **2026-07-07:** Added User Stories, detailed the Phase 1 gRPC adapter strategy, and explicitly separated Phase 1 MVP goals from the Phase 2 roadmap.
-* **2026-07-11:** Renamed `BestTrial` to `Result` type in the status subresource and applied minor formatting tweaks.
-* **2026-07-13:** Added alternatives to the proposal.
 
 ## 10. Alternatives
 
