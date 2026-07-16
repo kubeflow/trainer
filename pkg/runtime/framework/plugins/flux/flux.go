@@ -131,7 +131,6 @@ func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobO
 	return nil, allErrs
 }
 
-// EnforceMLPolicy updates the JobSet
 func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Flux == nil {
 		return nil
