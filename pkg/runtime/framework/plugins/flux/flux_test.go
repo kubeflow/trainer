@@ -132,16 +132,6 @@ func TestFlux(t *testing.T) {
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().WithName(constants.Node),
-												).
-												WithInitContainers(
-													corev1ac.Container().
-														WithName(constants.FluxInstallerContainerName).
-														WithImage(constants.FluxInstallerImage).
-														WithCommand("/bin/bash", "/etc/flux-config/init.sh").
-														WithVolumeMounts(
-															corev1ac.VolumeMount().WithName(constants.FluxInstallVolumeName).WithMountPath(constants.FluxVolumePath),
-															corev1ac.VolumeMount().WithName(configMapName).WithMountPath(constants.FluxConfigVolumeName).WithReadOnly(true),
-														),
 												),
 											),
 										),
@@ -153,6 +143,15 @@ func TestFlux(t *testing.T) {
 							Name:     constants.Node,
 							Ancestor: ptr.To(constants.AncestorTrainer),
 							Count:    ptr.To[int32](1),
+							InitContainers: []runtime.Container{{
+								Name:    constants.FluxInstallerContainerName,
+								Image:   constants.FluxInstallerImage,
+								Command: []string{"/bin/bash", "/etc/flux-config/init.sh"},
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().WithName(constants.FluxInstallVolumeName).WithMountPath(constants.FluxVolumePath),
+									*corev1ac.VolumeMount().WithName(configMapName).WithMountPath(constants.FluxConfigVolumeName).WithReadOnly(true),
+								},
+							}},
 							Containers: []runtime.Container{{
 								Name: constants.Node,
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{

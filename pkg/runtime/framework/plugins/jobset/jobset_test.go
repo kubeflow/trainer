@@ -2334,12 +2334,13 @@ func TestBuild(t *testing.T) {
 				},
 			},
 		},
-		"return error when podSet initContainers are missing from apply configuration": {
+		"auto-append initContainers from podSet when missing from apply configuration": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:           constants.Node,
-						InitContainers: []runtime.Container{{Name: "preflight-check"}},
+						InitContainers: []runtime.Container{{Name: "preflight-check", Image: "check:latest", Command: []string{"/run-check"}}},
+						Containers:     []runtime.Container{{Name: constants.Node}},
 					}},
 					ObjApply: jobsetv1alpha2ac.JobSetSpec().
 						WithReplicatedJobs(jobsetv1alpha2ac.ReplicatedJob().
@@ -2359,7 +2360,38 @@ func TestBuild(t *testing.T) {
 			},
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
 				Obj(),
-			wantError: fmt.Errorf("podSet %q initContainer %q does not have a matching initContainer in the runtime template", constants.Node, "preflight-check"),
+			wantObjs: []apiruntime.Object{
+				&jobsetv1alpha2.JobSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "trainJob",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{APIVersion: trainer.GroupVersion.String(), Kind: trainer.TrainJobKind, Name: "trainJob", Controller: ptr.To(true)},
+						},
+					},
+					Spec: jobsetv1alpha2.JobSetSpec{
+						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+							{
+								Name: constants.Node,
+								Template: batchv1.JobTemplateSpec{
+									Spec: batchv1.JobSpec{
+										Template: corev1.PodTemplateSpec{
+											Spec: corev1.PodSpec{
+												InitContainers: []corev1.Container{
+													{Name: "preflight-check", Image: "check:latest", Command: []string{"/run-check"}},
+												},
+												Containers: []corev1.Container{
+													{Name: constants.Node},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 	for name, tc := range cases {
