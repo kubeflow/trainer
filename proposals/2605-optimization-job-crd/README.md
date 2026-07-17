@@ -141,6 +141,7 @@ type Objective struct {
 }
 
 // OptimizationJobSpec defines the desired state of OptimizationJob.
+// +kubebuilder:validation:XValidation:rule="self.parallelTrials <= self.numTrials",message="parallelTrials cannot exceed numTrials"
 type OptimizationJobSpec struct {
 	// +listType=map
   // +listMapKey=metric
@@ -155,12 +156,21 @@ type OptimizationJobSpec struct {
 	// +listType=map
   // +listMapKey=name
   // +kubebuilder:validation:MinItems=1
-  // +kubebuilder:validation:MaxItems=1
+  // +kubebuilder:validation:MaxItems=100
   // +required
 	Parameters []Parameter `json:"parameters"`
 
+  // NumTrials is the total number of trials to run.
+  // +kubebuilder:validation:Minimum=1
   // +optional
-	TrialPolicy *TrialPolicy `json:"trialPolicy,omitempty"`
+	NumTrials *int32 `json:"numTrials,omitempty"`
+
+  // ParallelTrials is the number of trials to run in parallel. Defaults to 1.
+  // +kubebuilder:default=1
+  // +kubebuilder:validation:Minimum=1
+  // +kubebuilder:validation:Maximum=100
+  // +optional
+	ParallelTrials *int32 `json:"parallelTrials,omitempty"`
 
   // +required
 	TrainJobTemplate TrainJobTemplateSpec `json:"trainJobTemplate"`
@@ -179,7 +189,6 @@ type RandomAlgorithm struct {
 	Seed *int64 `json:"seed,omitempty"`
 }
 
-// GridAlgorithm is intentionally empty; step-intervals are derived from SearchSpace.Int.Step.
 type GridAlgorithm struct{}
 
 // +kubebuilder:validation:Enum=Int;Float
@@ -242,7 +251,7 @@ type LogUniformSpace struct {
 type CategoricalSpace struct {
 	// Choices is the set of strings to sample from.
   // +kubebuilder:validation:MinItems=1
-  // +kubebuilder:validation:MaxItems=1
+  // +kubebuilder:validation:MaxItems=100
   // +listType=set
   // +required
 	Choices []string `json:"choices"`
@@ -270,19 +279,6 @@ type ParameterAssignment struct {
 	// +kubebuilder:validation:MaxLength=64
 	// +required
 	Value string `json:"value"`
-}
-
-// +kubebuilder:validation:XValidation:rule="self.parallelTrials <= self.numTrials",message="parallelTrials cannot exceed numTrials"
-type TrialPolicy struct {
-	// +kubebuilder:validation:Minimum=1
-  // +optional
-	NumTrials *int32 `json:"numTrials,omitempty"`
-
-  // +kubebuilder:default=1
-  // +kubebuilder:validation:Minimum=1
-  // +kubebuilder:validation:Maximum=100
-  // +optional
-	ParallelTrials int32 `json:"parallelTrials"`
 }
 
 type TrainJobTemplateSpec struct {
@@ -326,16 +322,14 @@ The `TrainJobTemplate` utilizes a structured approach. Hyperparameters are dynam
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: OptimizationJob
 metadata:
-  name: bayesian-tuning-mvp
+  name: random-tuning-mvp
 spec:
   objectives:
     - metric: "val_loss"
       direction: "minimize"
 
   searchAlgorithm:
-    bayesian:
-      initialTrials: 10
-      acquisitionFunction: "ei"
+    random: {}
 
   parameters:
     - name: "learning_rate"
@@ -348,9 +342,8 @@ spec:
         categorical:
           choices: ["16", "32", "64"]
 
-  trialPolicy:
-    numTrials: 20
-    parallelTrials: 4
+  numTrials: 20
+  parallelTrials: 4
 
   trainJobTemplate:
     spec:
@@ -372,7 +365,7 @@ status:
       status: "True"
       reason: "MaxTrialsReached"
   result:
-    trainJobName: "bayesian-tuning-mvp-trial-ab12c"
+    trainJobName: "random-tuning-mvp-trial-ab12c"
     parameters:
       - name: "learning_rate"
         value: "0.0021"
@@ -408,7 +401,7 @@ Katib currently operates on a 1-to-1 mapping where every `Experiment` triggers a
 Our model evolves this architecture into a stateless, provider-agnostic system:
 
 **Deployment Pattern**
-For Phase 1, we maintain isolation by deploying one dedicated `Suggestion` service container per `OptimizationJob`. This pod runs continuously for the duration of the job, but holds no persistent state or database volume.
+For Phase 1, we maintain isolation by deploying one dedicated `Suggestion` service container per `OptimizationJob`. This pod runs continuously for the duration of the job, but holds no persistent state or database volume; the `OptimizationJob` controller manages the complete lifecycle of this service, provisioning it upon job start and terminating it upon job completion.
 
 **Stateless Orchestration**
 Unlike Katib, our controller treats the service as an ephemeral provider. The controller orchestrates the experiment by gathering history from completed `TrainJob` annotations and passing this full, point-in-time snapshot to the `GetSuggestions` gRPC method.
