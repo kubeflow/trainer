@@ -43,6 +43,8 @@ spec:
             spec:
               template:
                 spec:
+                  securityContext:
+                    fsGroup: 1000
                   containers:
                     - name: node
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}
@@ -69,6 +71,8 @@ spec:
             spec:
               template:
                 spec:
+                  securityContext:
+                    fsGroup: 1000
                   containers:
                     - name: node
                       image: {{ include "trainer.runtimeImage" (list .Values.runtimes.deepspeedDistributed.image .) }}

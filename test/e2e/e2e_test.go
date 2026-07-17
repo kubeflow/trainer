@@ -135,9 +135,13 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 	ginkgo.When("Creating TrainJob to perform OpenMPI workload", func() {
 		// Verify the `deepspeed-distributed` ClusterTrainingRuntime.
 		ginkgo.It("should create TrainJob with DeepSpeed runtime reference", func() {
-			// Create a TrainJob.
+			// Create a multi-node MPI TrainJob.
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-deepspeed").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), deepSpeedRuntime).
+				Trainer(&trainer.Trainer{
+					NumNodes: ptr.To(int32(2)),
+					Command:  []string{"mpirun", "sleep", "10"},
+				}).
 				Obj()
 
 			ginkgo.By("Create a TrainJob with deepspeed-distributed runtime reference", func() {
