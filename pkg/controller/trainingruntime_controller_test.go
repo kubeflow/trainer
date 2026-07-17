@@ -18,83 +18,44 @@ package controller
 
 import (
 	"context"
-	"errors"
-	"iter"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2/ktesting"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
-	idxer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
 func TestReconcile_TrainingRuntimeReconciler(t *testing.T) {
-	errorFailedGetTrainingRuntime := errors.New("TEST: failed to get TrainingRuntime")
 	cases := map[string]struct {
-		trainJobs           trainer.TrainJobList
 		trainingRuntime     *trainer.TrainingRuntime
 		wantTrainingRuntime *trainer.TrainingRuntime
-		wantError           error
 	}{
-		"no action when runtime with finalizer does not being deleted": {
+		"remove existing finalizer during reconciliation": {
 			trainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "runtime").
 				Finalizers(constants.ResourceInUseFinalizer).
 				Obj(),
-			wantTrainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "runtime").
-				Finalizers(constants.ResourceInUseFinalizer).
-				Obj(),
+			wantTrainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(
+				metav1.NamespaceDefault,
+				"runtime",
+			).Obj(),
 		},
-		"remove trainingRuntime due to removed finalizers when runtime without finalizer is deleting": {
-			trainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "runtime").
-				Finalizers(constants.ResourceInUseFinalizer).
-				DeletionTimestamp(metav1.Now()).
-				Obj(),
-			wantError:           errorFailedGetTrainingRuntime,
-			wantTrainingRuntime: &trainer.TrainingRuntime{},
-		},
-		"add finalizer when trainingRuntime is used by trainJob": {
-			trainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "runtime").
-				Obj(),
-			trainJobs: trainer.TrainJobList{
-				Items: []trainer.TrainJob{
-					*utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
-						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "runtime").
-						Obj(),
-				},
-			},
-			wantTrainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "runtime").
-				Finalizers(constants.ResourceInUseFinalizer).
-				Obj(),
-		},
-		"no action when all TrainJobs use another TrainingRuntime": {
-			trainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "runtime").
-				Obj(),
-			trainJobs: trainer.TrainJobList{
-				Items: []trainer.TrainJob{
-					*utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
-						RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "another").
-						Obj(),
-				},
-			},
-			wantTrainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "runtime").
-				Obj(),
-		},
-		"no action when runtime without finalizer is not used by any TrainJob": {
-			trainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "runtime").
-				Obj(),
-			wantTrainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "runtime").
-				Obj(),
+		"no action when runtime has no finalizer": {
+			trainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(
+				metav1.NamespaceDefault,
+				"runtime",
+			).Obj(),
+
+			wantTrainingRuntime: utiltesting.MakeTrainingRuntimeWrapper(
+				metav1.NamespaceDefault,
+				"runtime",
+			).Obj(),
 		},
 	}
 	for name, tc := range cases {
@@ -105,119 +66,22 @@ func TestReconcile_TrainingRuntimeReconciler(t *testing.T) {
 			t.Cleanup(cancel)
 			cli := utiltesting.NewClientBuilder().
 				WithObjects(tc.trainingRuntime).
-				WithIndex(&trainer.TrainJob{}, idxer.TrainJobRuntimeRefKey, idxer.IndexTrainJobTrainingRuntime).
-				WithLists(&tc.trainJobs).
-				WithInterceptorFuncs(interceptor.Funcs{
-					Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-						if _, ok := obj.(*trainer.TrainJob); !ok && errors.Is(tc.wantError, errorFailedGetTrainingRuntime) {
-							return errorFailedGetTrainingRuntime
-						}
-						return cli.Get(ctx, key, obj, opts...)
-					},
-				}).
 				Build()
 			r := NewTrainingRuntimeReconciler(cli, nil)
 			runtimeKey := client.ObjectKeyFromObject(tc.trainingRuntime)
-			_, gotError := r.Reconcile(ctx, reconcile.Request{NamespacedName: runtimeKey})
-			if diff := cmp.Diff(tc.wantError, gotError, cmpopts.EquateErrors()); len(diff) != 0 {
-				t.Errorf("Unexpected Recincile error: (-want, +got): \n%s", diff)
+			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: runtimeKey})
+			if err != nil {
+				t.Fatalf("Reconcile() returned error: %v", err)
 			}
 			var gotRuntime trainer.TrainingRuntime
-			gotError = cli.Get(ctx, runtimeKey, &gotRuntime)
-			if diff := cmp.Diff(tc.wantError, gotError, cmpopts.EquateErrors()); len(diff) != 0 {
-				t.Errorf("Unexpected GET error: (-want, +got): \n%s", diff)
+			if err := cli.Get(ctx, runtimeKey, &gotRuntime); err != nil {
+				t.Fatalf("Get() returned error: %v", err)
 			}
 			if diff := cmp.Diff(tc.wantTrainingRuntime, &gotRuntime,
 				cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion"),
 				cmpopts.IgnoreFields(metav1.TypeMeta{}, "Kind", "APIVersion"),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected TrainingRuntime: (-want, +got): \n%s", diff)
-			}
-		})
-	}
-}
-
-func TestNotifyTrainJobUpdate_TrainingRuntimeReconciler(t *testing.T) {
-	t.Parallel()
-	cases := map[string]struct {
-		oldJob    *trainer.TrainJob
-		newJob    *trainer.TrainJob
-		wantEvent event.TypedGenericEvent[iter.Seq[types.NamespacedName]]
-	}{
-		"UPDATE Event: runtimeRef is TrainingRuntime": {
-			oldJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				Obj(),
-			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				RuntimePatches([]trainer.RuntimePatch{{Manager: "test"}}).
-				Obj(),
-			wantEvent: event.TypedGenericEvent[iter.Seq[types.NamespacedName]]{
-				Object: func(yield func(types.NamespacedName) bool) {
-					yield(types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "test-runtime"})
-				},
-			},
-		},
-		"UPDATE Event: runtimeRef is not TrainingRuntime": {
-			oldJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
-				Obj(),
-			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
-				RuntimePatches([]trainer.RuntimePatch{{Manager: "test"}}).
-				Obj(),
-		},
-		"CREATE Event: runtimeRef is TrainingRuntime": {
-			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				Obj(),
-			wantEvent: event.TypedGenericEvent[iter.Seq[types.NamespacedName]]{
-				Object: func(yield func(types.NamespacedName) bool) {
-					yield(types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "test-runtime"})
-				},
-			},
-		},
-		"CREATE Event: runtimeRef is not TrainingRuntime": {
-			newJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
-				Obj(),
-		},
-		"DELETE Event: runtimeRef is TrainingRuntime": {
-			oldJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
-				Obj(),
-			wantEvent: event.TypedGenericEvent[iter.Seq[types.NamespacedName]]{
-				Object: func(yield func(types.NamespacedName) bool) {
-					yield(types.NamespacedName{Namespace: metav1.NamespaceDefault, Name: "test-runtime"})
-				},
-			},
-		},
-		"DELETE Event: runtimeRef is not TrainingRuntime": {
-			oldJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
-				Obj(),
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			logger, _ := ktesting.NewTestContext(t)
-			updateCh := make(chan event.TypedGenericEvent[iter.Seq[types.NamespacedName]], 1)
-			t.Cleanup(func() {
-				close(updateCh)
-			})
-			r := &TrainingRuntimeReconciler{
-				log:                      logger,
-				nonRuntimeObjectUpdateCh: updateCh,
-			}
-			r.NotifyTrainJobUpdate(tc.oldJob, tc.newJob)
-			var got event.TypedGenericEvent[iter.Seq[types.NamespacedName]]
-			select {
-			case got = <-updateCh:
-			case <-time.After(time.Second):
-			}
-			if diff := cmp.Diff(tc.wantEvent, got, utiltesting.TrainJobUpdateReconcileRequestCmpOpts); len(diff) != 0 {
-				t.Errorf("Unexpected GenericEvent (-want, +got):\n%s", diff)
 			}
 		})
 	}

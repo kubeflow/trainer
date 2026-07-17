@@ -20,8 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"iter"
-	"slices"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -49,44 +47,26 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
-type TrainJobWatcher interface {
-	NotifyTrainJobUpdate(oldJob, newJob *trainer.TrainJob)
-}
-
 type TrainJobReconciler struct {
 	log      logr.Logger
 	client   client.Client
 	recorder events.EventRecorder
 	runtimes map[string]jobruntimes.Runtime
-	watchers iter.Seq[TrainJobWatcher]
-}
-
-type TrainJobReconcilerOptions struct {
-	Watchers iter.Seq[TrainJobWatcher]
-}
-
-type TrainJobReconcilerOption func(*TrainJobReconcilerOptions)
-
-func WithWatchers(watchers ...TrainJobWatcher) TrainJobReconcilerOption {
-	return func(o *TrainJobReconcilerOptions) {
-		o.Watchers = slices.Values(watchers)
-	}
 }
 
 var _ reconcile.Reconciler = (*TrainJobReconciler)(nil)
 var _ predicate.TypedPredicate[*trainer.TrainJob] = (*TrainJobReconciler)(nil)
 
-func NewTrainJobReconciler(client client.Client, recorder events.EventRecorder, runtimes map[string]jobruntimes.Runtime, opts ...TrainJobReconcilerOption) *TrainJobReconciler {
-	options := &TrainJobReconcilerOptions{}
-	for _, opt := range opts {
-		opt(options)
-	}
+func NewTrainJobReconciler(
+	client client.Client,
+	recorder events.EventRecorder,
+	runtimes map[string]jobruntimes.Runtime,
+) *TrainJobReconciler {
 	return &TrainJobReconciler{
 		log:      ctrl.Log.WithName("trainjob-controller"),
 		client:   client,
 		recorder: recorder,
 		runtimes: runtimes,
-		watchers: options.Watchers,
 	}
 }
 
@@ -213,31 +193,22 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 
 func (r *TrainJobReconciler) Create(e event.TypedCreateEvent[*trainer.TrainJob]) bool {
 	r.log.WithValues("trainJob", klog.KObj(e.Object)).Info("TrainJob create event")
-	defer r.notifyWatchers(nil, e.Object)
 	return true
 }
 
 func (r *TrainJobReconciler) Delete(e event.TypedDeleteEvent[*trainer.TrainJob]) bool {
 	r.log.WithValues("trainJob", klog.KObj(e.Object)).Info("TrainJob delete event")
-	defer r.notifyWatchers(e.Object, nil)
 	return true
 }
 
 func (r *TrainJobReconciler) Update(e event.TypedUpdateEvent[*trainer.TrainJob]) bool {
 	r.log.WithValues("trainJob", klog.KObj(e.ObjectNew)).Info("TrainJob update event")
-	defer r.notifyWatchers(e.ObjectOld, e.ObjectNew)
 	return true
 }
 
 func (r *TrainJobReconciler) Generic(e event.TypedGenericEvent[*trainer.TrainJob]) bool {
 	r.log.WithValues("trainJob", klog.KObj(e.Object)).Info("TrainJob generic event")
 	return true
-}
-
-func (r *TrainJobReconciler) notifyWatchers(oldJob, newJob *trainer.TrainJob) {
-	for w := range r.watchers {
-		w.NotifyTrainJobUpdate(oldJob, newJob)
-	}
 }
 
 func setSuspendedCondition(trainJob *trainer.TrainJob) {
