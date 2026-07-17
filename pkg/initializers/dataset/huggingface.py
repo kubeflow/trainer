@@ -40,9 +40,16 @@ def parse_huggingface_storage_uri(storage_uri: str) -> str:
         )
 
     storage_uri_parsed = urlparse(storage_uri)
-    path_parts = storage_uri_parsed.path.strip("/").split("/")
+    path_parts = storage_uri_parsed.path.split("/")
 
-    if not storage_uri_parsed.netloc or len(path_parts) != 1 or not path_parts[0]:
+    if (
+        not storage_uri_parsed.netloc
+        or len(path_parts) != 2
+        or path_parts[0]
+        or not path_parts[1]
+        or storage_uri_parsed.query
+        or storage_uri_parsed.fragment
+    ):
         raise ValueError(
             f"Invalid HuggingFace storage URI {storage_uri!r}: "
             "expected format hf://<USER_NAME>/<DATASET_NAME>"
