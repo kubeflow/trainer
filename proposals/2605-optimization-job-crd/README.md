@@ -203,7 +203,7 @@ type SearchSpace struct {
 	Categorical *CategoricalSpace `json:"categorical,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="double(self) == double(self)",message="value must be numeric"
+// +kubebuilder:validation:XValidation:rule="self.matches('^-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?$')",message="value must be a valid numeric value"
 // +kubebuilder:validation:MaxLength=64
 type Double string
 
