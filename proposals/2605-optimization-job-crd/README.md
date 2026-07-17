@@ -155,11 +155,12 @@ type OptimizationJobSpec struct {
 	// +listType=map
   // +listMapKey=name
   // +kubebuilder:validation:MinItems=1
+  // +kubebuilder:validation:MaxItems=1
   // +required
 	Parameters []Parameter `json:"parameters"`
 
-  // +required
-	TrialPolicy TrialPolicy `json:"trialPolicy"`
+  // +optional
+	TrialPolicy *TrialPolicy `json:"trialPolicy,omitempty"`
 
   // +required
 	TrainJobTemplate TrainJobTemplateSpec `json:"trainJobTemplate"`
@@ -241,6 +242,7 @@ type LogUniformSpace struct {
 type CategoricalSpace struct {
 	// Choices is the set of strings to sample from.
   // +kubebuilder:validation:MinItems=1
+  // +kubebuilder:validation:MaxItems=1
   // +listType=set
   // +required
 	Choices []string `json:"choices"`
@@ -270,17 +272,26 @@ type ParameterAssignment struct {
 	Value string `json:"value"`
 }
 
-// +kubebuilder:validation:XValidation:rule="self.parallelTrials <= self.numTrials",message="parallelTrials cannot exceed numTrials"
+// +kubebuilder:validation:XValidation:rule="self.budget.parallelTrials <= self.budget.numTrials",message="parallelTrials cannot exceed numTrials"
 type TrialPolicy struct {
-	// +kubebuilder:validation:Minimum=1
+  // Budget defines the execution limits for the optimization job.
   // +required
-	NumTrials int32 `json:"numTrials"`
+  Budget Budget `json:"budget"`
+}
 
+// Budget defines the execution limits for the optimization job.
+type Budget struct {
+  // NumTrials is the total number of trials to run.
+  // +kubebuilder:validation:Minimum=1
+  // +optional
+  NumTrials *int32 `json:"numTrials,omitempty"`
+
+  // ParallelTrials is the number of trials to run in parallel. Defaults to 1.
   // +kubebuilder:default=1
   // +kubebuilder:validation:Minimum=1
   // +kubebuilder:validation:Maximum=100
   // +optional
-	ParallelTrials int32 `json:"parallelTrials"`
+  ParallelTrials int32 `json:"parallelTrials,omitempty"`
 }
 
 type TrainJobTemplateSpec struct {
@@ -310,6 +321,7 @@ type Result struct {
   TrainJobName string `json:"trainJobName"`
 	// +listType=map
 	// +listMapKey=name
+  // +kubebuilder:validation:MaxItems=100
 	// +optional
 	Parameters []ParameterAssignment `json:"parameters,omitempty"`
 }
@@ -346,8 +358,9 @@ spec:
           choices: ["16", "32", "64"]
 
   trialPolicy:
-    numTrials: 20
-    parallelTrials: 4
+    budget:
+      numTrials: 20
+      parallelTrials: 4
 
   trainJobTemplate:
     spec:
