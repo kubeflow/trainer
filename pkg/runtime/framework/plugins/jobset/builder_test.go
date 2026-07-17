@@ -121,7 +121,7 @@ func TestBuilderInitializer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To("initializer-job"),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](3),
 						},
 					},
 				},
@@ -179,7 +179,7 @@ func TestBuilderInitializer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To("initializer-job"),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](2),
 						},
 					},
 				},
@@ -272,7 +272,7 @@ func TestBuilderInitializer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To("initializer-job"),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](3),
 						},
 					},
 				},
@@ -318,14 +318,74 @@ func TestBuilderInitializer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To("initializer-job"),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](2),
 						},
 					},
 				},
 			},
 		},
-		"dataset initializer ancestor with nil Initializer spec sets replicas to 1": {
+		"dataset initializer ancestor with nil Initializer spec leaves replicas unmodified": {
 			jobSet: makeJobSet(constants.DatasetInitializer, constants.DatasetInitializer, 3, "initializer-job"),
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Initializer: nil,
+				},
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.DatasetInitializer),
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									},
+								},
+							},
+							Name:     ptr.To("initializer-job"),
+							Replicas: ptr.To[int32](3),
+						},
+					},
+				},
+			},
+		},
+		"dataset initializer ancestor with nil replicas defaults to 1": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												*corev1ac.Container().WithName(constants.DatasetInitializer),
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									},
+								},
+							},
+							Name: ptr.To("initializer-job"),
+						},
+					},
+				},
+			},
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
 					Initializer: nil,
@@ -472,7 +532,7 @@ func TestBuilderTrainer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To(constants.Node),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](4),
 						},
 					},
 				},
@@ -559,7 +619,7 @@ func TestBuilderTrainer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To(constants.Node),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](4),
 						},
 					},
 				},
@@ -584,10 +644,71 @@ func TestBuilderTrainer(t *testing.T) {
 				},
 			},
 			info:       &runtime.Info{},
-			wantJobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 1, constants.Node),
+			wantJobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 2, constants.Node),
 		},
-		"trainer ancestor with nil Trainer spec sets replicas to 1": {
+		"trainer ancestor with nil Trainer spec leaves replicas unmodified": {
 			jobSet: makeJobSet(constants.AncestorTrainer, constants.Node, 5, constants.Node),
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Trainer: nil,
+				},
+			},
+			info: &runtime.Info{},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.Node),
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+							},
+							Name:     ptr.To(constants.Node),
+							Replicas: ptr.To[int32](5),
+						},
+					},
+				},
+			},
+		},
+		"trainer ancestor with nil replicas defaults to 1": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												*corev1ac.Container().WithName(constants.Node),
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+							},
+							Name: ptr.To(constants.Node),
+						},
+					},
+				},
+			},
 			trainJob: &trainer.TrainJob{
 				Spec: trainer.TrainJobSpec{
 					Trainer: nil,
@@ -721,7 +842,7 @@ func TestBuilderTrainer(t *testing.T) {
 								},
 							},
 							Name:     ptr.To(constants.Node),
-							Replicas: ptr.To[int32](1),
+							Replicas: ptr.To[int32](3),
 						},
 					},
 				},

@@ -345,6 +345,9 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 				// For non-trainer: count = parallelism * replicas.
 				// Parallelism/Completions must be per-replica, not total pod count.
 				replicas := ptr.Deref(rJob.Replicas, 1)
+				if replicas < 1 {
+					return nil, fmt.Errorf("replicatedJob %s has invalid replicas %d: must be greater than or equal to 1", ptr.Deref(rJob.Name, ""), replicas)
+				}
 				perReplica := *ps.Count / replicas
 				rJob.Template.Spec.Parallelism = &perReplica
 				rJob.Template.Spec.Completions = &perReplica
