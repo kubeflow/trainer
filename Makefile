@@ -230,19 +230,18 @@ test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd volca
 
 .PHONY: test-python
 test-python: ## Run Python unit test.
-	pip install pytest
-	pip install -r ./cmd/initializers/dataset/requirements.txt
+	uv sync --locked --no-dev --directory ./cmd/initializers/dataset
+	uv sync --locked --no-dev --directory ./cmd/initializers/model
 
-	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/dataset
-	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/model
-	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/utils
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/dataset
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/model
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/utils
 
 .PHONY: test-python-integration
 test-python-integration: ## Run Python integration test.
-	pip install pytest
-	pip install -r ./cmd/initializers/dataset/requirements.txt
+	uv sync --locked --no-dev --directory ./cmd/initializers/dataset
 
-	PYTHONPATH=$(PROJECT_DIR) pytest ./test/integration/initializers
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/test/integration/initializers
 
 .PHONY: test-rust
 test-rust: ## Run Rust unit test.
