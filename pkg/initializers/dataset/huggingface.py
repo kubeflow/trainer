@@ -27,6 +27,30 @@ logging.basicConfig(
 )
 
 
+def parse_huggingface_storage_uri(storage_uri: str) -> str:
+    """Parse HuggingFace dataset storage URI.
+
+    Expected format: hf://<USER_NAME>/<DATASET_NAME>
+    """
+    prefix = "hf://"
+    if not storage_uri.startswith(prefix):
+        raise ValueError(
+            f"Invalid HuggingFace storage URI {storage_uri!r}: "
+            "expected format hf://<USER_NAME>/<DATASET_NAME>"
+        )
+
+    storage_uri_parsed = urlparse(storage_uri)
+    path_parts = storage_uri_parsed.path.strip("/").split("/")
+
+    if not storage_uri_parsed.netloc or len(path_parts) != 1 or not path_parts[0]:
+        raise ValueError(
+            f"Invalid HuggingFace storage URI {storage_uri!r}: "
+            "expected format hf://<USER_NAME>/<DATASET_NAME>"
+        )
+
+    return f"{storage_uri_parsed.netloc}/{path_parts[0]}"
+
+
 class HuggingFace(utils.DatasetProvider):
 
     def load_config(self):
@@ -34,10 +58,7 @@ class HuggingFace(utils.DatasetProvider):
         self.config = types.HuggingFaceDatasetInitializer(**config_dict)
 
     def download_dataset(self):
-        storage_uri_parsed = urlparse(self.config.storage_uri)
-        dataset_uri = (
-            storage_uri_parsed.netloc + "/" + storage_uri_parsed.path.split("/")[1]
-        )
+        dataset_uri = parse_huggingface_storage_uri(self.config.storage_uri)
 
         logging.info(f"Downloading dataset: {dataset_uri}")
         logging.info("-" * 40)
@@ -53,3 +74,4 @@ class HuggingFace(utils.DatasetProvider):
         )
 
         logging.info("Dataset has been downloaded")
+        

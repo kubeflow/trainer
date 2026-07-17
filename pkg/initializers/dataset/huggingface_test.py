@@ -17,7 +17,45 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import pkg.initializers.utils.utils as utils
-from pkg.initializers.dataset.huggingface import HuggingFace
+from pkg.initializers.dataset.huggingface import (
+    HuggingFace,
+    parse_huggingface_storage_uri,
+)
+
+
+@pytest.mark.parametrize(
+    "storage_uri, expected",
+    [
+        ("hf://username/dataset-name", "username/dataset-name"),
+        ("hf://org/dataset-v1", "org/dataset-v1"),
+    ],
+)
+def test_parse_huggingface_storage_uri_valid(storage_uri, expected):
+    assert parse_huggingface_storage_uri(storage_uri) == expected
+
+
+@pytest.mark.parametrize(
+    "storage_uri",
+    [
+        "hf://",
+        "hf://username",
+        "hf:///dataset",
+        "hf://username/",
+        "hf://username/dataset/extra",
+        "s3://bucket/dataset",
+        "username/dataset",
+    ],
+)
+def test_parse_huggingface_storage_uri_invalid(storage_uri):
+    expected_message = (
+        f"Invalid HuggingFace storage URI {storage_uri!r}: "
+        "expected format hf://<USER_NAME>/<DATASET_NAME>"
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        parse_huggingface_storage_uri(storage_uri)
+
+    assert str(exc_info.value) == expected_message
 
 
 # Test cases for config loading
@@ -26,18 +64,18 @@ from pkg.initializers.dataset.huggingface import HuggingFace
     [
         (
             "Full config with token",
-            {"storage_uri": "hf://dataset/path", "access_token": "test_token"},
+            {"storage_uri": "hf://username/dataset-name", "access_token": "test_token"},
             {
-                "storage_uri": "hf://dataset/path",
+                "storage_uri": "hf://username/dataset-name",
                 "ignore_patterns": None,
                 "access_token": "test_token",
             },
         ),
         (
             "Minimal config without token",
-            {"storage_uri": "hf://dataset/path"},
+            {"storage_uri": "hf://username/dataset-name"},
             {
-                "storage_uri": "hf://dataset/path",
+                "storage_uri": "hf://username/dataset-name",
                 "ignore_patterns": None,
                 "access_token": None,
             },
@@ -115,3 +153,4 @@ def test_download_dataset(test_name, test_case):
             ignore_patterns=test_case["config"]["ignore_patterns"],
         )
     print("Test execution completed")
+    
