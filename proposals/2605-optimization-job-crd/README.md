@@ -21,7 +21,7 @@
 
 ## 1. Background & Motivation
 
-Historically, Katib has served as Kubeflow’s general-purpose hyperparameter tuning and Neural Architecture Search (NAS) engine. It uses the generic `Experiment` CRD to orchestrate trials, supporting arbitrary Kubernetes workloads via unstructured YAML templates. 
+Historically, Katib has served as Kubeflow’s general-purpose hyperparameter tuning and Neural Architecture Search (NAS) engine. It uses the generic `Experiment` CRD to orchestrate trials, supporting arbitrary Kubernetes workloads via unstructured YAML templates.
 
 While highly flexible, its broad scope creates friction for standard ML workflows. It forces users to write verbose YAML and relies on brittle regex string substitution (e.g., `${searchSpace.lr}`) to inject parameters. With the introduction of the unified Kubeflow Python SDK [KEP-46](https://github.com/kramaranya/sdk/blob/a8d248d13019d9bab0af047770b9bf8e81ed7358/docs/proposals/46-hyperparameter-optimization/README.md), there is a strong need for a strongly-typed, iterative orchestration layer that integrates natively with `TrainJobs` and relies on push-based metrics.
 
@@ -366,7 +366,7 @@ spec:
         command:
           - "python"
           - "train.py"
-        # The ML script reads KUBEFLOW_TRAINER_OPT_LEARNING_RATE and KUBEFLOW_TRAINER_OPT_BATCH_SIZE 
+        # The ML script reads KUBEFLOW_TRAINER_OPT_LEARNING_RATE and KUBEFLOW_TRAINER_OPT_BATCH_SIZE
         # either manually or via the Kubeflow Python SDK helper functions.
 
 status:
@@ -394,7 +394,7 @@ status:
 To accelerate the MVP and reduce risk, the evolution of the gRPC contract between the Go controller and the Python suggestion engines is divided into two phases:
 
 **Phase 1: Legacy API Adapter (Initial Release)**
-For the initial v1alpha1 release, we will use the **existing Katib gRPC API design** (`api.v1.beta1`). 
+For the initial v1alpha1 release, we will use the **existing Katib gRPC API design** (`api.v1.beta1`).
 
 - The controller will act as a translation adapter. It will map the new, strictly typed `OptimizationJob` structs (e.g., `SearchSpace`, `RandomAlgorithm`) into the legacy `Experiment` and `Trial` protobuf messages.
 - This allows us to natively reuse the existing, Python suggestion images (e.g., `ghcr.io/kubeflow/katib/suggestion-optuna:latest`) without requiring any immediate modifications to the Python microservices.
@@ -470,7 +470,7 @@ Instead of employing a single flat struct with a generic type string, the `Searc
 ### 8.6. Open Discussion: Decoupling Metric Reporting from Termination Logic
 
 **Status: Resolved (Phase 2 Roadmap)**
-Metric reporting from the `TrainJob` is strictly asynchronous and relies entirely on the **TrainJobStatus** feature gate. As defined in [KEP-2779](https://github.com/kubeflow/trainer/tree/master/proposals/2779-trainjob-progress), the Optimization controller will consume metrics directly from the standardized `TrainJob` status fields rather than deploying custom sidecars. 
+Metric reporting from the `TrainJob` is strictly asynchronous and relies entirely on the **TrainJobStatus** feature gate. As defined in [KEP-2779](https://github.com/kubeflow/trainer/tree/master/proposals/2779-trainjob-progress), the Optimization controller will consume metrics directly from the standardized `TrainJob` status fields rather than deploying custom sidecars.
 
 Pruning decisions are computed controller-side based on this monotonic metric history. A "Stop Signal" is then propagated to the training runtime as a non-blocking annotation or status field, which the Kubeflow SDK periodically polls. Synchronous "kill" calls during metric reporting create tight coupling and latency bottlenecks; by separating reporting from termination, we ensure the controller remains performant under heavy trial loads.
 
