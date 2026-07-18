@@ -349,4 +349,3 @@ class CacheInitializer(utils.DatasetProvider):
             return
 
         logging.info("Cache cluster creation completed")
-        
