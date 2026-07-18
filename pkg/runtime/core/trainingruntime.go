@@ -24,6 +24,7 @@ import (
 	"maps"
 
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -186,37 +187,38 @@ func (r *TrainingRuntime) newRuntimeInfo(
 			isMPILauncherAsNode := mlPolicy != nil && mlPolicy.MPI != nil &&
 				ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && *rJob.Name == constants.Node
 			if isTrainerAncestor || isMPILauncherAsNode {
-				typedRJob := &jobSetTemplateSpec.Spec.ReplicatedJobs[i]
-				for j := range typedRJob.Template.Spec.Template.Spec.Containers {
-					if typedRJob.Template.Spec.Template.Spec.Containers[j].Name != constants.Node {
-						continue
-					}
-					container := &typedRJob.Template.Spec.Template.Spec.Containers[j]
-					mergedRes, mergeErr := trainingruntimeutil.MergeResourceRequirements(
-						container.Resources, *trainJob.Spec.Trainer.ResourcesPerNode)
-					if mergeErr != nil {
-						return nil, mergeErr
-					}
-					container.Resources = mergedRes
-					if applyPodSpec := jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec; applyPodSpec != nil {
-						for k := range applyPodSpec.Containers {
-							if ptr.Deref(applyPodSpec.Containers[k].Name, "") != constants.Node {
-								continue
-							}
-							applyRes := &corev1ac.ResourceRequirementsApplyConfiguration{}
-							if mergedRes.Limits != nil {
-								limits := maps.Clone(mergedRes.Limits)
-								applyRes.Limits = &limits
-							}
-							if mergedRes.Requests != nil {
-								requests := maps.Clone(mergedRes.Requests)
-								applyRes.Requests = &requests
-							}
-							applyPodSpec.Containers[k].Resources = applyRes
-							break
+				if applyPodSpec := jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec; applyPodSpec != nil {
+					for k := range applyPodSpec.Containers {
+						if ptr.Deref(applyPodSpec.Containers[k].Name, "") != constants.Node {
+							continue
 						}
+						var baseRes corev1.ResourceRequirements
+						if r := applyPodSpec.Containers[k].Resources; r != nil {
+							if r.Limits != nil {
+								baseRes.Limits = *r.Limits
+							}
+							if r.Requests != nil {
+								baseRes.Requests = *r.Requests
+							}
+						}
+						mergedRes, mergeErr := trainingruntimeutil.MergeResourceRequirements(
+							baseRes, *trainJob.Spec.Trainer.ResourcesPerNode)
+						if mergeErr != nil {
+							return nil, mergeErr
+						}
+						applyRes := &corev1ac.ResourceRequirementsApplyConfiguration{}
+						if mergedRes.Limits != nil {
+							limits := maps.Clone(mergedRes.Limits)
+							applyRes.Limits = &limits
+						}
+						if mergedRes.Requests != nil {
+							requests := maps.Clone(mergedRes.Requests)
+							applyRes.Requests = &requests
+						}
+						applyPodSpec.Containers[k].Resources = applyRes
+						jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Resources = mergedRes
+						break
 					}
-					break
 				}
 			}
 		}
