@@ -12,4 +12,4 @@ Fixes #
 
 **Checklist:**
 
-- [ ] [Docs](https://www.kubeflow.org/docs/components/trainer/) included if any changes are user facing
+- [ ] [Docs](https://trainer.kubeflow.org/en/latest/) included if any changes are user facing

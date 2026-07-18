@@ -43,7 +43,6 @@ func SetupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, opt
 		mgr.GetClient(),
 		mgr.GetEventRecorder("trainer-trainjob-controller"),
 		runtimes,
-		WithWatchers(runtimeRec, clRuntimeRec),
 	).SetupWithManager(mgr, options); err != nil {
 		return trainer.TrainJobKind, err
 	}

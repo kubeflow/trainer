@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -48,6 +49,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
@@ -97,6 +99,7 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	rJobContainerNames := make(map[string]sets.Set[string])
 	for _, rJob := range jobSetSpec.ReplicatedJobs {
 		rJobContainerNames[*rJob.Name] = sets.New[string]()
+
 		// Names of initContainer and containers are unique.
 		for _, c := range rJob.Template.Spec.Template.Spec.InitContainers {
 			rJobContainerNames[*rJob.Name].Insert(*c.Name)
@@ -107,18 +110,62 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	}
 
 	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Dataset != nil {
-		if containers, ok := rJobContainerNames[constants.DatasetInitializer]; !ok {
+		containers, ok := rJobContainerNames[constants.DatasetInitializer]
+		if !ok {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.DatasetInitializer)))
 		} else if !containers.Has(constants.DatasetInitializer) {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.DatasetInitializer, constants.DatasetInitializer)))
+		} else {
+			hasVolumeMount := false
+			for _, rJob := range jobSetSpec.ReplicatedJobs {
+				if *rJob.Name != constants.DatasetInitializer {
+					continue
+				}
+				for _, c := range rJob.Template.Spec.Template.Spec.Containers {
+					if *c.Name != constants.DatasetInitializer {
+						continue
+					}
+					for _, vm := range c.VolumeMounts {
+						if *vm.Name == jobsetplgconsts.VolumeNameInitializer {
+							hasVolumeMount = true
+							break
+						}
+					}
+				}
+			}
+			if !hasVolumeMount {
+				allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volumeMount with name - %s in container %s of the %s job", jobsetplgconsts.VolumeNameInitializer, constants.DatasetInitializer, constants.DatasetInitializer)))
+			}
 		}
 	}
 
 	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Model != nil {
-		if containers, ok := rJobContainerNames[constants.ModelInitializer]; !ok {
+		containers, ok := rJobContainerNames[constants.ModelInitializer]
+		if !ok {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input modelConfig", constants.ModelInitializer)))
 		} else if !containers.Has(constants.ModelInitializer) {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)))
+		} else {
+			hasVolumeMount := false
+			for _, rJob := range jobSetSpec.ReplicatedJobs {
+				if *rJob.Name != constants.ModelInitializer {
+					continue
+				}
+				for _, c := range rJob.Template.Spec.Template.Spec.Containers {
+					if *c.Name != constants.ModelInitializer {
+						continue
+					}
+					for _, vm := range c.VolumeMounts {
+						if *vm.Name == jobsetplgconsts.VolumeNameInitializer {
+							hasVolumeMount = true
+							break
+						}
+					}
+				}
+			}
+			if !hasVolumeMount {
+				allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have volumeMount with name - %s in container %s of the %s job", jobsetplgconsts.VolumeNameInitializer, constants.ModelInitializer, constants.ModelInitializer)))
+			}
 		}
 	}
 
@@ -295,7 +342,7 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Command = container.Command
 			}
 			if container.Image != "" {
-				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Image = &container.Image
+				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Image = ptr.To(container.Image)
 			}
 			apply.UpsertEnvVars(
 				&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Env,
@@ -313,13 +360,20 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		initContainers := jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers
 		for containerIdx, container := range ps.InitContainers {
 			if containerIdx >= len(initContainers) {
-				return nil, fmt.Errorf("podSet %q initContainer %q does not have a matching initContainer in the runtime template", ps.Name, container.Name)
+				// Auto-append a new initContainer slot so plugins only need to
+				// write to the PodSet abstraction (PodSet → runtime.Container → JobSet).
+				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers = append(
+					jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers,
+					*corev1ac.Container().WithName(container.Name),
+				)
+				// Refresh the local slice after append.
+				initContainers = jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers
 			}
 			if len(container.Command) > 0 {
 				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Command = container.Command
 			}
 			if container.Image != "" {
-				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Image = &container.Image
+				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Image = ptr.To(container.Image)
 			}
 			apply.UpsertEnvVars(
 				&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Env,

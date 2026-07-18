@@ -21,6 +21,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -576,6 +577,29 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 		})
 	})
 
+	ginkgo.When("Creating a TrainJob managed by an external controller", func() {
+		ginkgo.It("should not be reconciled by the built-in controller", func() {
+			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-managed-by").
+				ManagedBy("kueue.x-k8s.io/multikueue").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), torchRuntime).
+				Obj()
+			trainJobKey := client.ObjectKeyFromObject(trainJob)
+
+			ginkgo.By("Create a TrainJob managed by MultiKueue", func() {
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Ensuring the built-in controller neither creates a JobSet nor sets any status", func() {
+				gomega.Consistently(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(testingutil.BeNotFoundError())
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.BeEmpty())
+				}, 15*time.Second, util.Interval).Should(gomega.Succeed())
+			})
+		})
+	})
+
 	ginkgo.When("Creating a TrainJob with Resource Timeouts", func() {
 		ginkgo.It("should fail the TrainJob with DeadlineExceeded when active timeout expires", func() {
 			deadline := int64(10)
@@ -664,5 +688,195 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
 		})
+	})
+
+	ginkgo.When("Updating a runtime", func() {
+		// These tests ensure that a TrainJob is using a "snapshot" of the runtime from creation time, rather than
+		// the latest value of the runtime.
+		// This is testing the "snapshot" mechanism from proposals/2599-mutable-runtimes/README.md.
+
+		const (
+			// These images are arbitrary, but are chosen to be small and to come from
+			// the kubernetes registry to avoid Docker Hub rate limits in CI.
+			initialImage = "registry.k8s.io/pause:3.9"
+			updatedImage = "registry.k8s.io/pause:3.10"
+		)
+
+		initialRuntimeSpec := trainer.TrainingRuntimeSpec{
+			Template: trainer.JobSetTemplateSpec{
+				Spec: jobsetv1alpha2.JobSetSpec{
+					ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+						{
+							Name: constants.Node,
+							Template: batchv1.JobTemplateSpec{
+								ObjectMeta: metav1.ObjectMeta{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+								Spec: batchv1.JobSpec{
+									Template: corev1.PodTemplateSpec{
+										Spec: corev1.PodSpec{
+											Containers: []corev1.Container{
+												{
+													Name:    constants.Node,
+													Image:   initialImage,
+													Command: []string{"/pause"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		updateRuntimeImage := func(spec *trainer.TrainingRuntimeSpec, newImage string) {
+			for i, rJob := range spec.Template.Spec.ReplicatedJobs {
+				if rJob.Name == constants.Node {
+					spec.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[0].Image = newImage
+				}
+			}
+		}
+
+		ginkgo.DescribeTable("a suspended TrainJob should use the original runtime configuration and not pick up the new configuration",
+			func(runtimeFactory func() client.Object, runtimeKind string) {
+				runtime := runtimeFactory()
+
+				ginkgo.By("Creating a "+runtimeKind, func() {
+					gomega.Expect(k8sClient.Create(ctx, runtime)).Should(gomega.Succeed())
+				})
+
+				ginkgo.DeferCleanup(func() {
+					_ = k8sClient.Delete(ctx, runtime)
+				})
+
+				// Create a TrainJob that references the runtime
+				trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-runtime-update").
+					RuntimeRef(trainer.SchemeGroupVersion.WithKind(runtimeKind), runtime.GetName()).
+					Obj()
+
+				ginkgo.By("Creating a TrainJob that references the "+runtimeKind, func() {
+					gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+				})
+
+				ginkgo.By("Waiting for TrainJob jobs to become active", func() {
+					gomega.Eventually(func(g gomega.Gomega) {
+						gotTrainJob := &trainer.TrainJob{}
+						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+						g.Expect(gotTrainJob.Status.JobsStatus).ShouldNot(gomega.BeEmpty())
+						for _, jobStatus := range gotTrainJob.Status.JobsStatus {
+							g.Expect(*jobStatus.Active).Should(gomega.BeNumerically(">", 0))
+						}
+					}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+				})
+
+				ginkgo.By("Pausing the TrainJob", func() {
+					gomega.Eventually(func(g gomega.Gomega) {
+						gotTrainJob := &trainer.TrainJob{}
+						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+						gotTrainJob.Spec.Suspend = ptr.To(true)
+						g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+					}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				})
+
+				ginkgo.By("Waiting for TrainJob to be suspended", func() {
+					gomega.Eventually(func(g gomega.Gomega) {
+						gotTrainJob := &trainer.TrainJob{}
+						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+						g.Expect(gotTrainJob.Status.JobsStatus).ShouldNot(gomega.BeEmpty())
+						for _, jobStatus := range gotTrainJob.Status.JobsStatus {
+							g.Expect(*jobStatus.Suspended).Should(gomega.BeNumerically(">", 0))
+						}
+					}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+				})
+
+				// Container image is NOT in JobSet's allowed mutable fields for suspended JobSets
+				// (only annotations, labels, nodeSelector, tolerations, schedulingGates are allowed)
+				ginkgo.By("Updating the runtime with a new container image", func() {
+					gomega.Eventually(func(g gomega.Gomega) {
+						// Get the runtime with the correct type based on the runtime object
+						gotRuntime := runtime.DeepCopyObject().(client.Object)
+						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(runtime), gotRuntime)).Should(gomega.Succeed())
+
+						switch runtimeKind {
+						case trainer.TrainingRuntimeKind:
+							r := gotRuntime.(*trainer.TrainingRuntime)
+							updateRuntimeImage(&r.Spec, updatedImage)
+						case trainer.ClusterTrainingRuntimeKind:
+							r := gotRuntime.(*trainer.ClusterTrainingRuntime)
+							updateRuntimeImage(&r.Spec, updatedImage)
+						default:
+							ginkgo.Fail("unexpected runtime kind: " + runtimeKind)
+						}
+
+						g.Expect(k8sClient.Update(ctx, gotRuntime)).Should(gomega.Succeed())
+					}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				})
+
+				ginkgo.By("Restarting the TrainJob by unpausing it", func() {
+					gomega.Eventually(func(g gomega.Gomega) {
+						gotTrainJob := &trainer.TrainJob{}
+						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+						gotTrainJob.Spec.Suspend = ptr.To(false)
+						g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+					}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				})
+
+				// This will fail if the TrainJob uses the updated runtime rather than the snapshot as the controller will
+				// try to update the JobSet image which is immutable.
+				ginkgo.By("Verifying the TrainJob jobs become active after resuming", func() {
+					gomega.Eventually(func(g gomega.Gomega) {
+						gotTrainJob := &trainer.TrainJob{}
+						g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
+						g.Expect(gotTrainJob.Status.JobsStatus).ShouldNot(gomega.BeEmpty())
+						// Expect jobs to be active (not suspended)
+						for _, jobStatus := range gotTrainJob.Status.JobsStatus {
+							g.Expect(*jobStatus.Active).Should(gomega.BeNumerically(">", 0))
+						}
+					}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+				})
+
+				ginkgo.By("Verifying the Runtime snapshot is garbage collected", func() {
+					snapshot := &corev1.ConfigMap{}
+					snapshotKey := client.ObjectKey{Name: trainJob.Name + "-runtime-snapshot", Namespace: ns.Name}
+
+					// check snapshot exists before deleting to avoid false-positive test result
+					gomega.Expect(k8sClient.Get(ctx, snapshotKey, snapshot)).Should(gomega.Succeed())
+
+					// delete the TrainJob and wait for GC
+					gomega.Expect(k8sClient.Delete(ctx, trainJob)).Should(gomega.Succeed())
+					gomega.Eventually(func(g gomega.Gomega) {
+						g.Expect(k8sClient.Get(ctx, snapshotKey, snapshot)).Should(testingutil.BeNotFoundError())
+					}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+				})
+			},
+			ginkgo.Entry("TrainingRuntime",
+				func() client.Object {
+					return &trainer.TrainingRuntime{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: ns.Name,
+							Name:      "test-runtime",
+						},
+						Spec: *initialRuntimeSpec.DeepCopy(),
+					}
+				},
+				trainer.TrainingRuntimeKind,
+			),
+			ginkgo.Entry("ClusterTrainingRuntime",
+				func() client.Object {
+					return &trainer.ClusterTrainingRuntime{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "cluster-runtime",
+						},
+						Spec: *initialRuntimeSpec.DeepCopy(),
+					}
+				},
+				trainer.ClusterTrainingRuntimeKind,
+			),
+		)
 	})
 })

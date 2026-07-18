@@ -27,10 +27,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
@@ -46,3 +46,26 @@ jobs:
 
       - name: Run Go E2E Tests
         run: make test-e2e || (kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer && exit 1)
+
+      # Verify that `helm uninstall` succeeds, including the pre-delete cleanup
+      # hook that removes the built-in runtimes, and that no chart resources are
+      # left behind. Only tested here on a single Kubernetes version.
+      - name: Verify Helm Uninstall
+        run: |
+          # The flux runtime is applied outside of runtime installer job, so we need to manually delete it.
+          kubectl delete clustertrainingruntime flux-distributed --ignore-not-found --timeout 3m
+
+          # --wait blocks on the pre-delete cleanup Job; a failing hook fails this step.
+          helm uninstall trainer --namespace kubeflow-system --wait
+
+          echo "Checking that no chart resources remain after uninstall..."
+          namespaced=$(kubectl get deployment,service,serviceaccount,configmap,secret,role,rolebinding \
+            -n kubeflow-system -l app.kubernetes.io/instance=trainer -o name || true)
+          clustered=$(kubectl get clusterrole,clusterrolebinding,validatingwebhookconfiguration,mutatingwebhookconfiguration \
+            -l app.kubernetes.io/instance=trainer -o name || true)
+          if [ -n "${namespaced}${clustered}" ]; then
+            echo "ERROR: resources still present after helm uninstall:"
+            printf '%s\n%s\n' "${namespaced}" "${clustered}"
+            exit 1
+          fi
+          echo "Verified: helm uninstall removed all chart resources"

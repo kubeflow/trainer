@@ -22,9 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"sort"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -86,10 +87,24 @@ func NewTrainingRuntime(ctx context.Context, c client.Client, indexer client.Fie
 
 func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
 	var trainingRuntime trainer.TrainingRuntime
-	err := r.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, &trainingRuntime)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errorNotFoundSpecifiedTrainingRuntime, err)
+	// Try to get runtime from snapshot first
+	if err := getRuntimeSnapshot(ctx, r.client, trainJob, &trainingRuntime); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("unable to get runtime snapshot: %w", err)
+		}
+
+		// Snapshot doesn't exist, load runtime from API server
+		err := r.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, &trainingRuntime)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", errorNotFoundSpecifiedTrainingRuntime, err)
+		}
+
+		// Create snapshot for future reconciliations
+		if err := createRuntimeSnapshot(ctx, r.client, trainJob, &trainingRuntime); err != nil {
+			return nil, fmt.Errorf("creating runtime snapshot: %w", err)
+		}
 	}
+
 	info, err := r.RuntimeInfo(trainJob, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy)
 	if err != nil {
 		return nil, err
@@ -235,40 +250,43 @@ func (r *TrainingRuntime) newRuntimeInfo(
 }
 
 func (r *TrainingRuntime) mergeRuntimePatches(trainJob *trainer.TrainJob, jobSetTemplateSpec *trainer.JobSetTemplateSpec) error {
+	// Capture the original ReplicatedJobs ordering since SMP may reorder the list.
+	order := make(map[string]int, len(jobSetTemplateSpec.Spec.ReplicatedJobs))
+	for i, rJob := range jobSetTemplateSpec.Spec.ReplicatedJobs {
+		order[rJob.Name] = i
+	}
+
 	for _, runtimePatch := range trainJob.Spec.RuntimePatches {
 		if runtimePatch.TrainingRuntimeSpec == nil ||
 			runtimePatch.TrainingRuntimeSpec.Template == nil ||
 			runtimePatch.TrainingRuntimeSpec.Template.Spec == nil {
 			continue
 		}
-		for _, rJobPatch := range runtimePatch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
-			if rJobPatch.Template == nil {
-				continue
-			}
-			for i, job := range jobSetTemplateSpec.Spec.ReplicatedJobs {
-				if job.Name != rJobPatch.Name {
-					continue
-				}
-				source, err := json.Marshal(job.Template)
-				if err != nil {
-					return err
-				}
-				patch, err := json.Marshal(rJobPatch.Template)
-				if err != nil {
-					return err
-				}
-				merged, err := strategicpatch.StrategicMergePatch(source, patch, batchv1.JobTemplateSpec{})
-				if err != nil {
-					return err
-				}
-				mergedTemplate := batchv1.JobTemplateSpec{}
-				if err := json.Unmarshal(merged, &mergedTemplate); err != nil {
-					return err
-				}
-				jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template = mergedTemplate
-			}
+		source, err := json.Marshal(jobSetTemplateSpec.Spec)
+		if err != nil {
+			return err
 		}
+		patch, err := json.Marshal(runtimePatch.TrainingRuntimeSpec.Template.Spec)
+		if err != nil {
+			return err
+		}
+		merged, err := strategicpatch.StrategicMergePatch(source, patch, jobsetv1alpha2.JobSetSpec{})
+		if err != nil {
+			return err
+		}
+		mergedSpec := jobsetv1alpha2.JobSetSpec{}
+		if err := json.Unmarshal(merged, &mergedSpec); err != nil {
+			return err
+		}
+		jobSetTemplateSpec.Spec = mergedSpec
 	}
+
+	// Restore the ReplicatedJobs order defined in the runtime template.
+	sort.SliceStable(jobSetTemplateSpec.Spec.ReplicatedJobs, func(i, j int) bool {
+		return order[jobSetTemplateSpec.Spec.ReplicatedJobs[i].Name] <
+			order[jobSetTemplateSpec.Spec.ReplicatedJobs[j].Name]
+	})
+
 	return nil
 }
 

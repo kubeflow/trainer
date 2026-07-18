@@ -166,7 +166,7 @@ I will be using OKE to deploy after production. To make sure there is no unneces
 
 Oracle Docs[ https://oracle.github.io/fmw-kubernetes/wccontent-domains/oracle-cloud/prepare-oke-environment/ https://github.com/oracle/weblogic-kubernetes-operator/blob/main/kubernetes/hands-on-lab/tutorials/setup.oke.ocishell.md](https://oracle.github.io/fmw-kubernetes/wccontent-domains/oracle-cloud/prepare-oke-environment/)
 
-KubeFlow Docs[ https://www.kubeflow.org/docs/components/trainer/getting-started/ https://www.kubeflow.org/docs/started/architecture/](https://www.kubeflow.org/docs/components/trainer/getting-started/)
+KubeFlow Docs[ https://trainer.kubeflow.org/en/latest/getting-started/index.html https://www.kubeflow.org/docs/started/architecture/](https://trainer.kubeflow.org/en/latest/getting-started/index.html)
 
 GitHub ACR Docs[ https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller/about-actions-runner-controller](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners-with-actions-runner-controller/about-actions-runner-controller)
 

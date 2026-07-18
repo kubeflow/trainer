@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"crypto/tls"
 	"net"
 	"os"
 	"path/filepath"
@@ -731,7 +732,7 @@ this is not: valid: yaml: content
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			options, cfg, err := Load(testScheme, tc.configFile, false)
+			options, cfg, err := Load(testScheme, tc.configFile)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("Expected error but got none")
@@ -896,40 +897,105 @@ func TestApplyClientConnection(t *testing.T) {
 	}
 }
 
-func TestLoadHTTP2(t *testing.T) {
+func TestLoadTLS(t *testing.T) {
 	testScheme := runtime.NewScheme()
 	if err := configapi.AddToScheme(testScheme); err != nil {
 		t.Fatal(err)
 	}
 
-	testcases := []struct {
-		name        string
-		enableHTTP2 bool
-		wantTLSOpts bool
+	tmpDir := t.TempDir()
+
+	writeConfig := func(name, tlsSection string) string {
+		path := filepath.Join(tmpDir, name)
+		content := `
+apiVersion: config.trainer.kubeflow.org/v1alpha1
+kind: Configuration
+` + tlsSection
+		if err := os.WriteFile(path, []byte(content), os.FileMode(0600)); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+
+	http2Config := writeConfig("http2.yaml", `
+tls:
+  nextProtos: ["h2", "http/1.1"]
+`)
+	minVersionConfig := writeConfig("min-version.yaml", `
+tls:
+  minVersion: "1.3"
+`)
+	cipherSuitesConfig := writeConfig("cipher-suites.yaml", `
+tls:
+  cipherSuites:
+    - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+    - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+`)
+	unknownConfig := writeConfig("unknown.yaml", `
+tls:
+  minVersion: "1.3"
+  cipherSuites: ["TLS_NOT_A_REAL_SUITE"]
+`)
+
+	testcases := map[string]struct {
+		configFile       string
+		wantNextProtos   []string
+		wantMinVersion   uint16
+		wantCipherSuites []uint16
 	}{
-		{
-			name:        "HTTP/2 disabled sets TLSOpts",
-			enableHTTP2: false,
-			wantTLSOpts: true,
+		"HTTP/2 is disabled by default": {
+			configFile:     "",
+			wantNextProtos: []string{"http/1.1"},
 		},
-		{
-			name:        "HTTP/2 enabled does not set TLSOpts",
-			enableHTTP2: true,
-			wantTLSOpts: false,
+		"nextProtos enables HTTP/2": {
+			configFile:     http2Config,
+			wantNextProtos: []string{"h2", "http/1.1"},
+		},
+		"minVersion is applied and HTTP/2 stays disabled": {
+			configFile:     minVersionConfig,
+			wantNextProtos: []string{"http/1.1"},
+			wantMinVersion: tls.VersionTLS13,
+		},
+		"cipherSuites are resolved to their IDs": {
+			configFile:     cipherSuitesConfig,
+			wantNextProtos: []string{"http/1.1"},
+			wantCipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			},
+		},
+		"unrecognized cipher suite is dropped without clobbering other settings": {
+			configFile:     unknownConfig,
+			wantNextProtos: []string{"http/1.1"},
+			wantMinVersion: tls.VersionTLS13,
 		},
 	}
 
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			options, _, err := Load(testScheme, "", tc.enableHTTP2)
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			options, _, err := Load(testScheme, tc.configFile)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if tc.wantTLSOpts && len(options.Metrics.TLSOpts) == 0 {
-				t.Error("Expected TLSOpts to be set for disabling HTTP/2")
+
+			if len(options.Metrics.TLSOpts) == 0 {
+				t.Fatal("Expected TLSOpts to be set")
 			}
-			if !tc.wantTLSOpts && len(options.Metrics.TLSOpts) > 0 {
-				t.Error("Expected TLSOpts to be empty when HTTP/2 is enabled")
+
+			// The webhook server must resolve TLS identically to the metrics server.
+			got := &tls.Config{}
+			for _, apply := range options.Metrics.TLSOpts {
+				apply(got)
+			}
+
+			if diff := cmp.Diff(tc.wantNextProtos, got.NextProtos); len(diff) != 0 {
+				t.Errorf("Unexpected NextProtos (-want,+got):\n%s", diff)
+			}
+			if got.MinVersion != tc.wantMinVersion {
+				t.Errorf("MinVersion = %v, want %v", got.MinVersion, tc.wantMinVersion)
+			}
+			if diff := cmp.Diff(tc.wantCipherSuites, got.CipherSuites, cmpopts.EquateEmpty()); len(diff) != 0 {
+				t.Errorf("Unexpected CipherSuites (-want,+got):\n%s", diff)
 			}
 		})
 	}

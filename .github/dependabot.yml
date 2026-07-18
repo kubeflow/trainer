@@ -115,21 +115,21 @@ updates:
       day: "monday"
     open-pull-requests-limit: 5
 
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/cmd/initializers/model"
     schedule:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
 
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/cmd/initializers/dataset"
     schedule:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
 
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/api/python_api"
     schedule:
       interval: "weekly"

@@ -32,7 +32,7 @@
 # Clean: kubectl delete trainjob volcano-example && \
 #        kubectl delete clustertrainingruntime torch-distributed-volcano
 #
-# Reference: https://www.kubeflow.org/docs/components/trainer/operator-guides/job-scheduling/volcano/
+# Reference: https://trainer.kubeflow.org/en/latest/operator-guides/job-scheduling/volcano.html
 
 apiVersion: trainer.kubeflow.org/v1alpha1
 kind: ClusterTrainingRuntime

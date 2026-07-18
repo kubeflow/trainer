@@ -17,12 +17,12 @@ name: Validate Python Lockfiles
 on:
   pull_request:
     paths:
-      - 'cmd/initializers/dataset/requirements.txt'
-      - 'cmd/initializers/dataset/requirements-lock.txt'
-      - 'cmd/initializers/model/requirements.txt'
-      - 'cmd/initializers/model/requirements-lock.txt'
+      - 'cmd/initializers/dataset/pyproject.toml'
+      - 'cmd/initializers/dataset/uv.lock'
+      - 'cmd/initializers/model/pyproject.toml'
+      - 'cmd/initializers/model/uv.lock'
       - 'api/python_api/pyproject.toml'
-      - 'api/python_api/requirements-lock.txt'
+      - 'api/python_api/uv.lock'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -36,61 +36,245 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Setup Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
-          python-version: '3.12'
-
-      - name: Install pip-tools
-        run: pip install 'pip-tools==7.5.3'
+          enable-cache: true
 
       - name: Verify lockfiles are in sync
         run: |
           set -euo pipefail
 
-          LOCKFILE_PAIRS=(
-            "cmd/initializers/dataset/requirements.txt|cmd/initializers/dataset/requirements-lock.txt"
-            "cmd/initializers/model/requirements.txt|cmd/initializers/model/requirements-lock.txt"
-            "api/python_api/pyproject.toml|api/python_api/requirements-lock.txt"
+          LOCKFILE_DIRS=(
+            "cmd/initializers/dataset"
+            "cmd/initializers/model"
+            "api/python_api"
           )
 
           FAILED=false
 
-          for pair in "${LOCKFILE_PAIRS[@]}"; do
-            source_file="${pair%%|*}"
-            lockfile="${pair##*|}"
-
-            echo "=== Checking $source_file -> $lockfile ==="
-
-            pip-compile "$source_file" -o "${lockfile}.check" --strip-extras --quiet 2>&1
-
-            # Strip auto-generated header comments before comparing — pip-compile
-            # embeds the output filename in the header, which differs between the
-            # committed lockfile and the .check file.
-            grep -v '^#' "$lockfile" > "${lockfile}.stripped"
-            grep -v '^#' "${lockfile}.check" > "${lockfile}.check.stripped"
-
-            if ! diff -q "${lockfile}.stripped" "${lockfile}.check.stripped" > /dev/null 2>&1; then
-              echo "::error::$lockfile is out of sync with $source_file. Please run 'pip-compile $source_file -o $lockfile --strip-extras' and commit the changes."
-              diff "${lockfile}.stripped" "${lockfile}.check.stripped" || true
+          for dir in "${LOCKFILE_DIRS[@]}"; do
+            echo "=== Checking $dir/uv.lock ==="
+            if ! (cd "$dir" && uv lock --check); then
+              echo "::error title=Lockfile Out of Sync::$dir/uv.lock is out of sync with pyproject.toml."
+              echo "Run 'uv lock' in $dir and commit the changes."
               FAILED=true
             else
               echo "In sync"
             fi
-
-            rm -f "${lockfile}.check" "${lockfile}.stripped" "${lockfile}.check.stripped"
           done
 
           if [ "$FAILED" = true ]; then
             echo ""
-            echo "One or more lockfiles are out of sync."
-            echo "To fix, run the following and commit the updated lockfiles:"
-            echo ""
-            echo "  pip install pip-tools"
-            echo "  pip-compile cmd/initializers/dataset/requirements.txt -o cmd/initializers/dataset/requirements-lock.txt --strip-extras"
-            echo "  pip-compile cmd/initializers/model/requirements.txt -o cmd/initializers/model/requirements-lock.txt --strip-extras"
-            echo "  pip-compile api/python_api/pyproject.toml -o api/python_api/requirements-lock.txt --strip-extras"
+            echo "One or more lockfiles are out of sync. To fix:"
+            echo "  cd cmd/initializers/dataset && uv lock"
+            echo "  cd cmd/initializers/model && uv lock"
+            echo "  cd api/python_api && uv lock"
             exit 1
           fi
+
+  check-security-regressions:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        directory:
+          - cmd/initializers/dataset
+          - cmd/initializers/model
+          - api/python_api
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          path: pr-code
+
+      - name: Checkout base branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.base_ref }}
+          path: base-code
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Audit PR branch lockfile
+        run: |
+          cd pr-code/${{ matrix.directory }}
+          rc=0
+          uv audit --preview-features audit > "$GITHUB_WORKSPACE/audit-pr.txt" 2>&1 || rc=$?
+          cat "$GITHUB_WORKSPACE/audit-pr.txt"
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+            echo "::error::uv audit failed in ${{ matrix.directory }} with exit code $rc"
+            exit 1
+          fi
+
+      - name: Audit base branch lockfile
+        run: |
+          if [ ! -f "base-code/${{ matrix.directory }}/uv.lock" ]; then
+            echo "No uv.lock on base branch for ${{ matrix.directory }} (migration PR). Skipping base audit."
+            touch "$GITHUB_WORKSPACE/audit-base.txt"
+            exit 0
+          fi
+          cd base-code/${{ matrix.directory }}
+          rc=0
+          uv audit --preview-features audit > "$GITHUB_WORKSPACE/audit-base.txt" 2>&1 || rc=$?
+          cat "$GITHUB_WORKSPACE/audit-base.txt"
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
+            echo "::error::uv audit failed in ${{ matrix.directory }} with exit code $rc"
+            exit 1
+          fi
+
+      - name: Compare scans and detect regressions
+        id: compare
+        run: |
+          echo "=== Comparing vulnerability scans for ${{ matrix.directory }} ==="
+
+          extract_vuln_details() {
+            local file="$1"
+            local current_pkg=""
+            local current_ver=""
+            while IFS= read -r line; do
+              if echo "$line" | grep -qP '^[a-zA-Z].*has \d+ known vulnerabilit'; then
+                current_pkg=$(echo "$line" | awk '{print $1}')
+                current_ver=$(echo "$line" | awk '{print $2}')
+              fi
+              if echo "$line" | grep -qP '^\- [A-Z]+-'; then
+                local advisory_id=$(echo "$line" | grep -oP '(?<=^- )[A-Z]+-[a-zA-Z0-9-]+')
+                echo "${advisory_id}|${current_pkg}|${current_ver}"
+              fi
+            done < "$file"
+          }
+
+          BASE_VULNS=$(extract_vuln_details "$GITHUB_WORKSPACE/audit-base.txt" | sort -u)
+          PR_VULNS=$(extract_vuln_details "$GITHUB_WORKSPACE/audit-pr.txt" | sort -u)
+
+          if [ -z "$BASE_VULNS" ]; then BASE_COUNT=0; else BASE_COUNT=$(echo "$BASE_VULNS" | wc -l); fi
+          if [ -z "$PR_VULNS" ]; then PR_COUNT=0; else PR_COUNT=$(echo "$PR_VULNS" | wc -l); fi
+
+          echo "Base branch vulnerabilities: $BASE_COUNT"
+          echo "PR branch vulnerabilities: $PR_COUNT"
+
+          if [ -n "$PR_VULNS" ]; then
+            BASE_KEYS=$(echo "$BASE_VULNS" | cut -d'|' -f1,2 | sort -u)
+            NEW_VULNS=""
+            while IFS='|' read -r advisory_id pkg ver; do
+              KEY="${advisory_id}|${pkg}"
+              if ! echo "$BASE_KEYS" | grep -qxF "$KEY"; then
+                NEW_VULNS="${NEW_VULNS}${advisory_id}|${pkg}|${ver}\n"
+              fi
+            done <<< "$PR_VULNS"
+            NEW_VULNS=$(echo -e "$NEW_VULNS" | sed '/^$/d')
+          else
+            NEW_VULNS=""
+          fi
+
+          if [ -n "$NEW_VULNS" ]; then
+            echo ""
+            echo "NEW vulnerabilities detected in ${{ matrix.directory }}:"
+            echo "$NEW_VULNS"
+            echo ""
+            echo "::warning title=Security Alert::${{ matrix.directory }}: This PR introduces new vulnerabilities."
+            echo "new_cves_found=true" >> $GITHUB_OUTPUT
+
+            echo "new_cves<<EOF" >> $GITHUB_OUTPUT
+            echo "| Advisory ID | Package | Version |" >> $GITHUB_OUTPUT
+            echo "| :--- | :--- | :--- |" >> $GITHUB_OUTPUT
+
+            while IFS='|' read -r advisory_id pkg ver; do
+              [ -z "$advisory_id" ] && continue
+              ADVISORY=$(grep -P "^- ${advisory_id}:" "$GITHUB_WORKSPACE/audit-pr.txt" | grep -oP 'https://\S+' | head -1 || true)
+              if [ -n "$ADVISORY" ]; then
+                echo "| [$advisory_id]($ADVISORY) | $pkg | $ver |" >> $GITHUB_OUTPUT
+              else
+                echo "| $advisory_id | $pkg | $ver |" >> $GITHUB_OUTPUT
+              fi
+            done <<< "$NEW_VULNS"
+
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "No new vulnerabilities introduced by this PR in ${{ matrix.directory }}"
+            echo "new_cves_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on PR with regression details
+        continue-on-error: true
+        if: always() && steps.compare.outputs.new_cves_found == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const dir = '${{ matrix.directory }}';
+            const newCves = `${{ steps.compare.outputs.new_cves }}`;
+            const commentMarker = `<!-- lockfile-security-check-${dir.replace(/\//g, '-')} -->`;
+            const body = [
+              commentMarker,
+              `## Security Regression Detected: \`${dir}\``,
+              '',
+              'This PR introduces new vulnerabilities not present in the base branch:',
+              '',
+              newCves,
+              '',
+              `> **Note:** This check is informational and does not block merging.`,
+              '',
+              '### How to Fix',
+              '1. Run `uv lock --upgrade-package <pkg>` for each affected package',
+              '2. If the package is a transitive dependency, try upgrading its parent packages',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const existingComment = comments.find(c => c.body.includes(commentMarker));
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                comment_id: existingComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body,
+              });
+            }
+
+      - name: Delete security comment when resolved
+        continue-on-error: true
+        if: success() && steps.compare.outputs.new_cves_found == 'false'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const dir = '${{ matrix.directory }}';
+            const commentMarker = `<!-- lockfile-security-check-${dir.replace(/\//g, '-')} -->`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const existingComment = comments.find(c => c.body.includes(commentMarker));
+
+            if (existingComment) {
+              await github.rest.issues.deleteComment({
+                comment_id: existingComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+              console.log(`Security comment deleted for ${dir} - vulnerabilities resolved!`);
+            }
