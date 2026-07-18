@@ -4,7 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
   "huggingface-hub>=1.24.0,<1.25",
-  "opendal>=0.47.1",
+  "opendal>=0.47.3",
   "kubernetes>=35.0.0",
 ]
 
