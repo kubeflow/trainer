@@ -26,11 +26,12 @@ from pkg.initializers.dataset.huggingface import (
 @pytest.mark.parametrize(
     "storage_uri, expected",
     [
+        ("hf://cnn_dailymail", "cnn_dailymail"),
         ("hf://username/dataset-name", "username/dataset-name"),
         ("hf://org/dataset-v1", "org/dataset-v1"),
     ],
 )
-def test_parse_huggingface_storage_uri_valid(storage_uri, expected):
+def test_parse_huggingface_storage_uri(storage_uri, expected):
     assert parse_huggingface_storage_uri(storage_uri) == expected
 
 
@@ -38,10 +39,10 @@ def test_parse_huggingface_storage_uri_valid(storage_uri, expected):
     "storage_uri",
     [
         "hf://",
-        "hf://username",
         "hf:///dataset",
         "hf://username/",
         "hf://username/dataset/extra",
+        "hf://username//dataset",
         "s3://bucket/dataset",
         "username/dataset",
     ],
@@ -49,7 +50,8 @@ def test_parse_huggingface_storage_uri_valid(storage_uri, expected):
 def test_parse_huggingface_storage_uri_invalid(storage_uri):
     expected_message = (
         f"Invalid HuggingFace storage URI {storage_uri!r}: "
-        "expected format hf://<USER_NAME>/<DATASET_NAME>"
+        "expected format hf://<DATASET_NAME> or "
+        "hf://<USER_OR_ORG>/<DATASET_NAME>"
     )
 
     with pytest.raises(ValueError) as exc_info:
@@ -73,9 +75,9 @@ def test_parse_huggingface_storage_uri_invalid(storage_uri):
         ),
         (
             "Minimal config without token",
-            {"storage_uri": "hf://username/dataset-name"},
+            {"storage_uri": "hf://cnn_dailymail"},
             {
-                "storage_uri": "hf://username/dataset-name",
+                "storage_uri": "hf://cnn_dailymail",
                 "ignore_patterns": None,
                 "access_token": None,
             },
@@ -122,6 +124,18 @@ def test_load_config(test_name, test_config, expected):
                 "expected_repo_id": "org/dataset-v1",
             },
         ),
+        (
+            "Successful download without username",
+            {
+                "config": {
+                    "storage_uri": "hf://cnn_dailymail",
+                    "ignore_patterns": None,
+                    "access_token": None,
+                },
+                "should_login": False,
+                "expected_repo_id": "cnn_dailymail",
+            },
+        ),
     ],
 )
 def test_download_dataset(test_name, test_case):
@@ -153,4 +167,3 @@ def test_download_dataset(test_name, test_case):
             ignore_patterns=test_case["config"]["ignore_patterns"],
         )
     print("Test execution completed")
-    

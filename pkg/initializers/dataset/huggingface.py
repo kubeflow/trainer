@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-from urllib.parse import urlparse
 
 import huggingface_hub
 
@@ -30,32 +29,35 @@ logging.basicConfig(
 def parse_huggingface_storage_uri(storage_uri: str) -> str:
     """Parse HuggingFace dataset storage URI.
 
-    Expected format: hf://<USER_NAME>/<DATASET_NAME>
+    Expected formats:
+    - hf://<DATASET_NAME>
+    - hf://<USER_OR_ORG>/<DATASET_NAME>
     """
     prefix = "hf://"
     if not storage_uri.startswith(prefix):
         raise ValueError(
             f"Invalid HuggingFace storage URI {storage_uri!r}: "
-            "expected format hf://<USER_NAME>/<DATASET_NAME>"
+            "expected format hf://<DATASET_NAME> or "
+            "hf://<USER_OR_ORG>/<DATASET_NAME>"
         )
 
-    storage_uri_parsed = urlparse(storage_uri)
-    path_parts = storage_uri_parsed.path.split("/")
+    dataset_uri = storage_uri[len(prefix) :]
+    parts = dataset_uri.split("/")
 
     if (
-        not storage_uri_parsed.netloc
-        or len(path_parts) != 2
-        or path_parts[0]
-        or not path_parts[1]
-        or storage_uri_parsed.query
-        or storage_uri_parsed.fragment
+        not dataset_uri
+        or dataset_uri.startswith("/")
+        or dataset_uri.endswith("/")
+        or any(not part for part in parts)
+        or len(parts) > 2
     ):
         raise ValueError(
             f"Invalid HuggingFace storage URI {storage_uri!r}: "
-            "expected format hf://<USER_NAME>/<DATASET_NAME>"
+            "expected format hf://<DATASET_NAME> or "
+            "hf://<USER_OR_ORG>/<DATASET_NAME>"
         )
 
-    return f"{storage_uri_parsed.netloc}/{path_parts[0]}"
+    return dataset_uri
 
 
 class HuggingFace(utils.DatasetProvider):
@@ -81,4 +83,3 @@ class HuggingFace(utils.DatasetProvider):
         )
 
         logging.info("Dataset has been downloaded")
-        
