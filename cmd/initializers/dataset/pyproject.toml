@@ -3,7 +3,7 @@ name = "dataset-initializer"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-  "huggingface-hub>=1.14.0,<1.15",
+  "huggingface-hub>=1.24.0,<1.25",
   "opendal>=0.47.1",
   "kubernetes>=35.0.0",
 ]
