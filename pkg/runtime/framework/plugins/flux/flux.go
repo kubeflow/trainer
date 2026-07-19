@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	jobsetapply "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -110,9 +109,13 @@ func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobO
 	fluxPolicy := runtimeInfo.RuntimePolicy.MLPolicySource.Flux
 
 	// We require at least 1 proc per node. Zero or fewer does not make sense.
-	if fluxPolicy.NumProcPerNode != nil && *fluxPolicy.NumProcPerNode < 1 {
+	numProcPerNode := fluxPolicy.NumProcPerNode
+	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumProcPerNode != nil {
+		numProcPerNode = newJobObj.Spec.Trainer.NumProcPerNode
+	}
+	if numProcPerNode != nil && *numProcPerNode < 1 {
 		numProcPerNodePath := field.NewPath("spec").Child("trainer").Child("numProcPerNode")
-		allErrs = append(allErrs, field.Invalid(numProcPerNodePath, *fluxPolicy.NumProcPerNode, "must be greater than or equal to 1 for Flux TrainJob"))
+		allErrs = append(allErrs, field.Invalid(numProcPerNodePath, *numProcPerNode, "must be greater than or equal to 1 for Flux TrainJob"))
 	}
 
 	// Iterate through Trainer's internal PodSet abstraction
@@ -128,7 +131,6 @@ func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobO
 	return nil, allErrs
 }
 
-// EnforceMLPolicy updates the JobSet
 func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Flux == nil {
 		return nil
@@ -151,26 +153,19 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 
 	// Define the Init Container. This has a spack view with flux pre-built, and we add to an emptyDir
 	// with configuration that is then accessible to the application. The OS/version should match.
-	// For VolumeMounts, you can still use corev1ac because runtime.Container
-	// methods accept the corev1ac types for nested fields
-	fluxInstaller := corev1ac.Container().
-		WithName(constants.FluxInstallerContainerName).
-		WithImage(settings["FLUX_VIEW_IMAGE"]).
-		WithCommand([]string{"/bin/bash", "/etc/flux-config/init.sh"}...).
-		WithVolumeMounts(
-			corev1ac.VolumeMount().
+	fluxInstaller := runtime.Container{
+		Name:    constants.FluxInstallerContainerName,
+		Image:   settings["FLUX_VIEW_IMAGE"],
+		Command: []string{"/bin/bash", "/etc/flux-config/init.sh"},
+		VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+			*corev1ac.VolumeMount().
 				WithName(constants.FluxInstallVolumeName).
 				WithMountPath(constants.FluxVolumePath),
-			corev1ac.VolumeMount().
+			*corev1ac.VolumeMount().
 				WithName(configMapName).
 				WithMountPath(constants.FluxConfigVolumeName).
 				WithReadOnly(true),
-		)
-
-	// Making changes directly to the PodSet allows them to persist
-	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetapply.JobSetSpecApplyConfiguration](info)
-	if !ok {
-		return nil
+		},
 	}
 
 	// Update the PodSets (Abstractions for the ReplicatedJobs)
@@ -187,10 +182,12 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 		apply.UpsertVolumes(&info.TemplateSpec.PodSets[psIdx].Volumes, sharedVolumes...)
 		apply.UpsertVolumes(&info.TemplateSpec.PodSets[psIdx].Volumes, *curveVolume)
 
-		// Important! We have to add this to the JobSet to actually take
-		jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers = append(
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers,
-			*fluxInstaller,
+		// Append to the PodSet abstract structure.
+		// The JobSet plugin's Build() sync loop will automatically create a
+		// matching initContainer slot in the JobSetSpec.
+		info.TemplateSpec.PodSets[psIdx].InitContainers = append(
+			info.TemplateSpec.PodSets[psIdx].InitContainers,
+			fluxInstaller,
 		)
 
 		// Update Containers in the PodSet

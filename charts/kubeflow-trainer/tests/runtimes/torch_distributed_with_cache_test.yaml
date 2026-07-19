@@ -1,5 +1,4 @@
-#
-# Copyright 2025 The Kubeflow authors.
+# Copyright The Kubeflow Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,23 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
-suite: Test torch-distributed-with-cache ClusterTrainingRuntime
+suite: Test torch-distributed-with-cache runtime in installer ConfigMap
 templates:
-  - templates/runtimes/data-cache/torch-distributed-with-cache.yaml
+  - templates/runtimes/configmap.yaml
 release:
   name: kubeflow-trainer
   namespace: kubeflow-trainer
 tests:
-  - it: Should not render ClusterTrainingRuntime when dataCache.runtimes.torchDistributedWithCache.enabled is false
+  - it: Should not include the runtime when torchDistributedWithCache is disabled
     set:
       dataCache:
         enabled: true
-        cacheImage:
-          registry: ghcr.io
-          repository: kubeflow/trainer/data-cache
-          tag: ""
         runtimes:
           torchDistributedWithCache:
             enabled: false
@@ -40,10 +34,6 @@ tests:
     set:
       dataCache:
         enabled: false
-        cacheImage:
-          registry: ghcr.io
-          repository: kubeflow/trainer/data-cache
-          tag: "v1.0.0"
         runtimes:
           torchDistributedWithCache:
             enabled: true
@@ -51,89 +41,24 @@ tests:
       - failedTemplate:
           errorMessage: "dataCache.runtimes.torchDistributedWithCache.enabled requires dataCache.enabled to be true"
 
-  - it: Should render ClusterTrainingRuntime when enabled and dataCache is enabled
+  - it: Should include torch-distributed-with-cache when enabled and dataCache is enabled
     set:
       dataCache:
         enabled: true
         cacheImage:
-          registry: ghcr.io
-          repository: kubeflow/trainer/data-cache
-          tag: "v1.0.0"
+          tag: v1.0.0
         runtimes:
           torchDistributedWithCache:
             enabled: true
     asserts:
       - hasDocuments:
           count: 1
-      - isKind:
-          of: ClusterTrainingRuntime
-      - equal:
-          path: metadata.name
-          value: torch-distributed-with-cache
-
-  - it: Should have correct framework label
-    set:
-      dataCache:
-        enabled: true
-        cacheImage:
-          registry: ghcr.io
-          repository: kubeflow/trainer/data-cache
-          tag: "v1.0.0"
-        runtimes:
-          torchDistributedWithCache:
-            enabled: true
-    asserts:
-      - equal:
-          path: metadata.labels["trainer.kubeflow.org/framework"]
-          value: torch
-
-  - it: Should use correct serviceAccountName for dataset-initializer
-    set:
-      dataCache:
-        enabled: true
-        cacheImage:
-          registry: ghcr.io
-          repository: kubeflow/trainer/data-cache
-          tag: "v1.0.0"
-        runtimes:
-          torchDistributedWithCache:
-            enabled: true
-    asserts:
-      - equal:
-          path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.serviceAccountName
-          value: kubeflow-trainer-cache-initializer
-
-  - it: Should use custom cacheImage tag when specified
-    set:
-      dataCache:
-        enabled: true
-        cacheImage:
-          registry: ghcr.io
-          repository: kubeflow/trainer/data-cache
-          tag: "v1.0.0"
-        runtimes:
-          torchDistributedWithCache:
-            enabled: true
-    asserts:
       - matchRegex:
-          path: spec.template.spec.replicatedJobs[0].template.spec.template.spec.containers[0].env[0].value
+          path: data["runtimes.yaml"]
+          pattern: "name: torch-distributed-with-cache"
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: "serviceAccountName: kubeflow-trainer-cache-initializer"
+      - matchRegex:
+          path: data["runtimes.yaml"]
           pattern: "ghcr.io/kubeflow/trainer/data-cache:v1.0.0"
-
-  - it: Should have dataset-initializer depend on node job
-    set:
-      dataCache:
-        enabled: true
-        cacheImage:
-          registry: ghcr.io
-          repository: kubeflow/trainer/data-cache
-          tag: "v1.0.0"
-        runtimes:
-          torchDistributedWithCache:
-            enabled: true
-    asserts:
-      - equal:
-          path: spec.template.spec.replicatedJobs[1].dependsOn[0].name
-          value: dataset-initializer
-      - equal:
-          path: spec.template.spec.replicatedJobs[1].dependsOn[0].status
-          value: Complete

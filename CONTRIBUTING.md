@@ -1,7 +1,7 @@
 # Developer Guide
 
 This guide explains how to contribute to the Kubeflow Trainer V2 project.
-For the Kubeflow Trainer documentation, please check [the official Kubeflow documentation](https://www.kubeflow.org/docs/components/trainer/overview/).
+For the Kubeflow Trainer documentation, please check [the official Kubeflow documentation](https://trainer.kubeflow.org/en/latest/overview/index.html).
 
 ## AI Assistant Tooling
 

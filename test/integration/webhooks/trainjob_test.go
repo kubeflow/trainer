@@ -17,6 +17,8 @@ limitations under the License.
 package webhooks
 
 import (
+	"strings"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -196,6 +198,50 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				testingutil.BeForbiddenError()),
+
+			ginkgo.Entry("Should fail in creating TrainJob with Flux numProcPerNode < 1",
+				func() *trainer.TrainJob {
+					trainingRuntime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{
+							Flux: &trainer.FluxMLPolicySource{},
+						},
+					}
+					gomega.Expect(k8sClient.Update(ctx, trainingRuntime)).To(gomega.Succeed())
+
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(
+							trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind),
+							runtimeName,
+						).
+						Trainer(&trainer.Trainer{
+							NumProcPerNode: ptr.To[int32](0),
+						}).
+						Obj()
+				},
+				testingutil.BeForbiddenError(),
+			),
+			ginkgo.Entry("Should fail in creating TrainJob with reserved flux-installer init container",
+				func() *trainer.TrainJob {
+					trainingRuntime.Spec.MLPolicy = &trainer.MLPolicy{
+						MLPolicySource: trainer.MLPolicySource{
+							Flux: &trainer.FluxMLPolicySource{},
+						},
+					}
+					trainingRuntime.Spec = testingutil.MakeTrainingRuntimeSpecWrapper(trainingRuntime.Spec).
+						InitContainer(constants.Node, constants.FluxInstallerContainerName, "ubuntu:22.04").
+						Obj()
+
+					gomega.Expect(k8sClient.Update(ctx, trainingRuntime)).To(gomega.Succeed())
+
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(
+							trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind),
+							runtimeName,
+						).
+						Obj()
+				},
+				testingutil.BeForbiddenError(),
+			),
 			ginkgo.Entry("Should fail with invalid dataset storageUri",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
@@ -298,6 +344,50 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should succeed to create TrainJob with trainer command item at the max length",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
+						Trainer(&trainer.Trainer{
+							Command: []string{strings.Repeat("a", 1048576)},
+						}).
+						Obj()
+				},
+				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should fail to create TrainJob with trainer command item exceeding the max length",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
+						Trainer(&trainer.Trainer{
+							Command: []string{strings.Repeat("a", 1048576+1)},
+						}).
+						Obj()
+				},
+				testingutil.BeInvalidError(),
+			),
+			ginkgo.Entry("Should succeed to create TrainJob with trainer args item at the max length",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
+						Trainer(&trainer.Trainer{
+							Args: []string{strings.Repeat("a", 1048576)},
+						}).
+						Obj()
+				},
+				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should fail to create TrainJob with trainer args item exceeding the max length",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), runtimeName).
+						Trainer(&trainer.Trainer{
+							Args: []string{strings.Repeat("a", 1048576+1)},
+						}).
+						Obj()
+				},
+				testingutil.BeInvalidError(),
 			),
 		)
 		ginkgo.DescribeTable("RFC1035-compliant TrainJob name validation", func(trainJob func() *trainer.TrainJob, errorMatcher gomega.OmegaMatcher) {

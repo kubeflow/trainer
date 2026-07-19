@@ -25,7 +25,7 @@ For more information, please see the
 
 - [Blog post announcement](https://blog.kubeflow.org/trainer/intro/)
 
-- [Migration guide from the Training Operator v1](https://www.kubeflow.org/docs/components/trainer/operator-guides/migration/)
+- [Migration guide from the Training Operator v1](https://trainer.kubeflow.org/en/latest/operator-guides/migration.html)
 
 ## Breaking Changes
 

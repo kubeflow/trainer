@@ -25,6 +25,10 @@ endif
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 REPO := github.com/kubeflow/trainer
 TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
+# Year-less copyright header prepended to generated manifests (controller-gen
+# emits none). Single source of truth shared with the boilerplate verifier.
+BOILERPLATE_HEADER := $(PROJECT_DIR)/hack/boilerplate/boilerplate.sh.txt
+HELM_BOILERPLATE_HEADER := $(PROJECT_DIR)/hack/boilerplate/boilerplate.helm.txt
 # Location to install tool binaries
 LOCALBIN ?= $(PROJECT_DIR)/bin
 
@@ -169,7 +173,22 @@ manifests: controller-gen ## Generate manifests.
 		output:crd:artifacts:config=manifests/base/crds \
 		output:rbac:artifacts:config=manifests/base/rbac \
 		output:webhook:artifacts:config=manifests/base/webhook
-	cp -f manifests/base/crds/trainer.kubeflow.org_*.yaml $(TRAINER_CHART_DIR)/crds/
+	@# controller-gen emits no license header. Prepend the year-less
+	@# boilerplate to each generated manifest. controller-gen rewrites these
+	@# files in full on every run, so prepending here once is idempotent.
+	@# Copy the header-free CRDs into the chart before adding the kustomize (#)
+	@# header, so the chart templates can use the Helm-style license block.
+	cp -f manifests/base/crds/trainer.kubeflow.org_*.yaml $(TRAINER_CHART_DIR)/templates/crd/
+	@for f in manifests/base/crds/trainer.kubeflow.org_*.yaml \
+			manifests/base/rbac/role.yaml \
+			manifests/base/webhook/manifests.yaml; do \
+		{ cat $(BOILERPLATE_HEADER); echo; cat "$$f"; } > "$$f.tmp" && mv "$$f.tmp" "$$f"; \
+	done
+	# Prepend the Helm license block and wrap the chart CRD templates so
+	# installation can be toggled via `crds.enabled`.
+	for f in $(TRAINER_CHART_DIR)/templates/crd/trainer.kubeflow.org_*.yaml; do \
+		{ cat $(HELM_BOILERPLATE_HEADER); echo; echo '{{- if .Values.crds.enabled }}'; cat $$f; echo '{{- end }}'; } > $$f.tmp && mv $$f.tmp $$f; \
+	done
 
 .PHONY: generate
 generate: go-mod-download manifests helm-docs ## Generate APIs.
@@ -198,7 +217,7 @@ golangci-lint: golangci-lint-install golangci-lint-kal ## Run golangci-lint to v
 
 .PHONY: verify-boilerplate
 verify-boilerplate: ## Verify copyright boilerplate headers in source files.
-	python3 hack/boilerplate/boilerplate.py
+	python3 hack/boilerplate/boilerplate.py --base-ref "$(TARGET_BRANCH)"
 
 # Instructions to run tests.
 .PHONY: test
@@ -211,19 +230,18 @@ test-integration: ginkgo envtest jobset-operator-crd scheduler-plugins-crd volca
 
 .PHONY: test-python
 test-python: ## Run Python unit test.
-	pip install pytest
-	pip install -r ./cmd/initializers/dataset/requirements.txt
+	uv sync --locked --no-dev --directory ./cmd/initializers/dataset
+	uv sync --locked --no-dev --directory ./cmd/initializers/model
 
-	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/dataset
-	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/model
-	PYTHONPATH=$(PROJECT_DIR) pytest ./pkg/initializers/utils
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/dataset
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/model
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/utils
 
 .PHONY: test-python-integration
 test-python-integration: ## Run Python integration test.
-	pip install pytest
-	pip install -r ./cmd/initializers/dataset/requirements.txt
+	uv sync --locked --no-dev --directory ./cmd/initializers/dataset
 
-	PYTHONPATH=$(PROJECT_DIR) pytest ./test/integration/initializers
+	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/test/integration/initializers
 
 .PHONY: test-rust
 test-rust: ## Run Rust unit test.

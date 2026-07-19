@@ -142,7 +142,7 @@
    <footer class="landing-footer">
    <div class="footer-inner">
    <p>We are a <a href="https://www.cncf.io/">Cloud Native Computing Foundation</a> project.</p>
-   <p class="footer-copy">&copy; 2026 The Kubeflow Authors &middot; Documentation distributed under CC BY 4.0</p>
+   <p class="footer-copy">&copy; The Kubeflow Authors &middot; Documentation distributed under CC BY 4.0</p>
    </div>
    </footer>
 

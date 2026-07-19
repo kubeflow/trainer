@@ -1293,6 +1293,14 @@ func (m *MLPolicySourceWrapper) MPIPolicy(numProcPerNode *int32, MPImplementatio
 	return m
 }
 
+func (m *MLPolicySourceWrapper) FluxPolicy(numProcPerNode *int32) *MLPolicySourceWrapper {
+	if m.Flux == nil {
+		m.Flux = &trainer.FluxMLPolicySource{}
+	}
+	m.Flux.NumProcPerNode = numProcPerNode
+	return m
+}
+
 func (m *MLPolicySourceWrapper) Obj() *trainer.MLPolicySource {
 	return &m.MLPolicySource
 }

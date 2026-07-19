@@ -33,7 +33,7 @@ Before writing code, agents should:
 - Review CRD schemas in `pkg/apis/` before changing API structures
 - Call out for any breaking changes introduced and follow the deprecation policy
 
-For additional context see [the Kubeflow Trainer docs](https://www.kubeflow.org/docs/components/trainer/overview/).
+For additional context see [the Kubeflow Trainer docs](https://trainer.kubeflow.org/en/latest/overview/index.html).
 
 ## Repository Map
 

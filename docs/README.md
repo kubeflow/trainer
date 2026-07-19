@@ -2,4 +2,4 @@
 
 Welcome to Kubeflow Trainer!
 
-The Kubeflow Trainer documentation is available on [kubeflow.org](https://www.kubeflow.org/docs/components/trainer/).
+The Kubeflow Trainer documentation is available on [trainer.kubeflow.org](https://trainer.kubeflow.org/en/latest/).

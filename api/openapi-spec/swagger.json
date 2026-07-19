@@ -13295,7 +13295,7 @@
         ],
         "properties": {
           "action": {
-            "description": "action to take if the rule is matched.",
+            "description": "action to take if the rule is matched. Valid values are FailJobSet, RestartJobSet, RestartJobSetAndIgnoreMaxRestarts, RestartJob, RestartJobAndIgnoreMaxRestarts.",
             "type": "string",
             "default": ""
           },
@@ -13454,7 +13454,9 @@
             "x-kubernetes-list-map-keys": [
               "name"
             ],
-            "x-kubernetes-list-type": "map"
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
           },
           "startupPolicy": {
             "description": "startupPolicy configures in what order jobs must be started Deprecated: StartupPolicy is deprecated, please use the DependsOn API.",
@@ -13514,7 +13516,9 @@
             "x-kubernetes-list-map-keys": [
               "type"
             ],
-            "x-kubernetes-list-type": "map"
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "type",
+            "x-kubernetes-patch-strategy": "merge"
           },
           "currentInPlaceRestartAttempt": {
             "description": "currentInPlaceRestartAttempt tracks the current in-place restart attempt of the JobSet. It is read by the agent. If the in-place restart attempt of the Pod is equal to currentInPlaceRestartAttempt, the agent should lift its barrier to allow the worker container to start running.",
@@ -13540,16 +13544,18 @@
             "x-kubernetes-list-map-keys": [
               "name"
             ],
-            "x-kubernetes-list-type": "map"
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
           },
           "restarts": {
-            "description": "restarts tracks the number of times the JobSet has restarted (i.e. recreated in case of RecreateAll policy).",
+            "description": "restarts tracks the number of times the JobSet has been globally restarted. That is, restarts is the number of times the restart action RestartJobSet or RestartJobSetAndIgnoreMaxRestarts have been executed and led to the recreation of all Jobs.",
             "type": "integer",
             "format": "int32",
             "default": 0
           },
           "restartsCountTowardsMax": {
-            "description": "restartsCountTowardsMax tracks the number of times the JobSet has restarted that counts towards the maximum allowed number of restarts.",
+            "description": "restartsCountTowardsMax tracks the number of times the JobSet has been globally restarted that counts towards the maximum allowed number of restarts. That is, restartsCountTowardsMax is the number of times the restart action RestartJobSet has been executed and led to the recreation of all Jobs.",
             "type": "integer",
             "format": "int32"
           },
@@ -13597,7 +13603,9 @@
             "x-kubernetes-list-map-keys": [
               "name"
             ],
-            "x-kubernetes-list-type": "map"
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
           },
           "groupName": {
             "description": "groupName defines the name of the group this ReplicatedJob belongs to. Defaults to \"default\"",
@@ -13647,6 +13655,26 @@
             "type": "integer",
             "format": "int32",
             "default": 0
+          },
+          "jobRestarts": {
+            "description": "jobRestarts tracks the number of times the Jobs have been individually restarted. That is, jobRestarts[jobIndex] is the number of times the restart action RestartJob or RestartJobAndIgnoreMaxRestarts have been executed for the Job with index jobIndex and led to its recreation without affecting the other Jobs.",
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-kubernetes-list-type": "atomic"
+          },
+          "jobRestartsCountTowardsMax": {
+            "description": "jobRestartsCountTowardsMax tracks the number of times the Jobs have been individually restarted that count towards the maximum allowed number of restarts. That is, jobRestartsCountTowardsMax[jobIndex] is the number of times the restart action RestartJob has been executed for the Job with index jobIndex and led to its recreation without affecting the other Jobs.",
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "x-kubernetes-list-type": "atomic"
           },
           "name": {
             "description": "name of the ReplicatedJob.",

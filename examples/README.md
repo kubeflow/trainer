@@ -75,9 +75,9 @@ kubectl apply -f yaml/02-runtime-patches.yaml
 
 ## Documentation
 
-- [Kubeflow Trainer Documentation](https://www.kubeflow.org/docs/components/trainer/)
-- [Getting Started Guide](https://www.kubeflow.org/docs/components/trainer/getting-started/)
-- [Runtime Guide](https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/)
+- [Kubeflow Trainer Documentation](https://trainer.kubeflow.org/en/latest/)
+- [Getting Started Guide](https://trainer.kubeflow.org/en/latest/getting-started/index.html)
+- [Runtime Guide](https://trainer.kubeflow.org/en/latest/operator-guides/runtime.html)
 - [Kubeflow SDK Documentation](https://sdk.kubeflow.org/en/latest/)
 
 ## Contributing

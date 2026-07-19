@@ -1,5 +1,4 @@
-#
-# Copyright 2026 The Kubeflow authors.
+# Copyright 2026 The Kubeflow Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
 # Default values for trainer.
 # This is a YAML-formatted file.
@@ -23,6 +21,12 @@ nameOverride: ""
 
 # -- String to fully override release name.
 fullnameOverride: ""
+
+crds:
+  # -- Whether to install the Trainer CRDs (TrainJob, TrainingRuntime, ClusterTrainingRuntime) with the chart.
+  # Set to `false` if you manage the CRDs outside of the chart (for example, applying them separately).
+  # This replaces Helm's built-in `--skip-crds` flag, which no longer applies now that the CRDs are chart templates.
+  enabled: true
 
 jobset:
   # -- Whether to install jobset as a dependency managed by trainer.
@@ -104,7 +108,7 @@ manager:
     runAsNonRoot: true
     capabilities:
       drop:
-      - ALL
+        - ALL
     seccompProfile:
       type: RuntimeDefault
 
@@ -187,6 +191,35 @@ runtimes:
   # -- Enable all default runtimes (torch, deepspeed, mlx, jax, torchtune) when set to true.
   # Individual runtime settings will be ignored if this is enabled.
   defaultEnabled: false
+
+  # -- Common labels applied to every built-in runtime.
+  # The built-in ClusterTrainingRuntime are validated ahead of time.
+  commonLabels:
+    trainer.kubeflow.org/webhook-validation: disabled
+
+  # -- Configuration for the runtimes installer.
+  # The built-in runtimes are applied by a post-install/post-upgrade Helm hook Job
+  # so that the ClusterTrainingRuntime CRD is registered before the runtimes are created.
+  # The same Job re-applies (server-side) the runtimes on `helm upgrade`.
+  installer:
+    image:
+      # -- Installer image registry. The image only needs a shell and a package
+      # manager; `kubectl` is installed by the Job at runtime.
+      registry: docker.io
+      # -- Installer image repository.
+      repository: alpine
+      # -- Installer image tag.
+      tag: "3.21"
+    # -- Image pull secrets for the installer Job.
+    imagePullSecrets: []
+    # -- Pod resource requests and limits for the installer Job.
+    resources: {}
+    # -- Node selector for the installer Job pods.
+    nodeSelector: {}
+    # -- Affinity for the installer Job pods.
+    affinity: {}
+    # -- Tolerations for the installer Job pods.
+    tolerations: []
 
   # -- PyTorch distributed training runtime (no custom images required)
   torchDistributed:

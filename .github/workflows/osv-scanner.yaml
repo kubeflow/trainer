@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 name: OSV-Scanner Vulnerability Scan
 
 on:
@@ -15,10 +29,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
@@ -54,7 +68,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security tab
         if: always() && hashFiles('osv-results.sarif') != ''
-        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v4
         with:
           sarif_file: osv-results.sarif
           category: kubeflow-trainer-osv-scanner
@@ -219,12 +233,22 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Setup Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+      - name: Checkout kubeflow/sdk helper scripts
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          python-version: '3.12'
+          repository: kubeflow/sdk
+          sparse-checkout: .github/scripts
+          path: sdk-checkout
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install packaging
+        run: pip install packaging
 
       - name: Install OSV-Scanner
         run: |
@@ -239,9 +263,6 @@ jobs:
           chmod +x osv-scanner
           sudo mv osv-scanner /usr/local/bin/
 
-      - name: Install pip-tools
-        run: pip install 'pip-tools==7.5.3'
-
       - name: Run OSV-Scanner (SARIF for Security Tab)
         continue-on-error: true
         run: |
@@ -249,9 +270,9 @@ jobs:
           osv-scanner scan \
             --format sarif \
             --output osv-results-python.sarif \
-            -L cmd/initializers/dataset/requirements-lock.txt \
-            -L cmd/initializers/model/requirements-lock.txt \
-            -L api/python_api/requirements-lock.txt || rc=$?
+            -L cmd/initializers/dataset/uv.lock \
+            -L cmd/initializers/model/uv.lock \
+            -L api/python_api/uv.lock || rc=$?
           if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
             echo "::error::OSV-Scanner failed with unexpected exit code $rc"
             exit 1
@@ -259,7 +280,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security tab
         if: always() && hashFiles('osv-results-python.sarif') != ''
-        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v4
         with:
           sarif_file: osv-results-python.sarif
           category: kubeflow-trainer-osv-scanner-python
@@ -270,24 +291,28 @@ jobs:
           osv-scanner scan \
             --format json \
             --output osv-results-python.json \
-            -L cmd/initializers/dataset/requirements-lock.txt \
-            -L cmd/initializers/model/requirements-lock.txt \
-            -L api/python_api/requirements-lock.txt || rc=$?
+            -L cmd/initializers/dataset/uv.lock \
+            -L cmd/initializers/model/uv.lock \
+            -L api/python_api/uv.lock || rc=$?
           if [ "$rc" -ne 0 ] && [ "$rc" -ne 1 ]; then
             echo "::error::OSV-Scanner failed with unexpected exit code $rc"
             exit 1
+          fi
+          if [ -f osv-results-python.json ] && [ -s osv-results-python.json ]; then
+            jq empty osv-results-python.json
           fi
 
       - name: Process vulnerabilities and apply fixes
         id: fixer
         run: |
           set -euo pipefail
-
           if [ ! -f osv-results-python.json ] || [ ! -s osv-results-python.json ]; then
             echo "No scan results found."
             echo "updates_found=false" >> $GITHUB_OUTPUT
             exit 0
           fi
+
+          CURRENT_DATE=$(date +%Y-%m-%d)
 
           FIX_DATA=$(jq -r '
             [
@@ -308,9 +333,11 @@ jobs:
                 url: ($vuln.references[0].url // "https://osv.dev/vulnerability/\($vuln.id)")
               }
             ] |
+            group_by([.pkg, .id]) |
+            map(sort_by(.fix | split(".") | map(tonumber? // 0)) | last) |
             .[] |
             "\(.pkg)|\(.ver)|\(.fix)|\(.id)|\(.url)"
-          ' osv-results-python.json \
+          ' osv-results-python.json 2>/dev/null \
             | sort -t'|' -k1,1 -k4,4 -k3,3Vr \
             | awk -F'|' '!seen[$1,$4]++' \
           )
@@ -321,15 +348,10 @@ jobs:
             exit 0
           fi
 
-          echo "Fixable vulnerabilities found:"
-          echo "$FIX_DATA"
-          echo ""
-
-          # Map lockfiles back to their source requirements files
-          LOCKFILES=(
-            "cmd/initializers/dataset/requirements-lock.txt|cmd/initializers/dataset/requirements.txt"
-            "cmd/initializers/model/requirements-lock.txt|cmd/initializers/model/requirements.txt"
-            "api/python_api/requirements-lock.txt|api/python_api/pyproject.toml"
+          LOCKFILE_DIRS=(
+            "cmd/initializers/dataset"
+            "cmd/initializers/model"
+            "api/python_api"
           )
 
           rm -f applied_fixes.txt
@@ -340,63 +362,58 @@ jobs:
             echo ""
             echo "=== Processing: $pkg $current_ver -> $fix_ver ($advisory_id) ==="
 
-            # Escape dots in package name for safe use in grep/sed regex
-            pkg_re=$(echo "$pkg" | sed 's/\./\\./g')
+            for dir in "${LOCKFILE_DIRS[@]}"; do
+              [ ! -f "$dir/uv.lock" ] && continue
 
-            FIXED=false
-            for mapping in "${LOCKFILES[@]}"; do
-              lockfile="${mapping%%|*}"
-              source_file="${mapping##*|}"
-
-              # Check if this lockfile contains the vulnerable package (case-insensitive)
-              if ! grep -qi "^${pkg_re}==" "$lockfile"; then
+              if ! grep -qi "name = \"${pkg}\"" "$dir/uv.lock"; then
                 continue
               fi
 
-              echo "Found $pkg in $lockfile (source: $source_file)"
+              echo "Found $pkg in $dir/uv.lock"
 
-              cp "$lockfile" "${lockfile}.bak"
-              cp "$source_file" "${source_file}.bak"
+              (
+                cd "$dir"
 
-              # Detect if pkg is a direct dependency and update the constraint in-place.
-              # Uses packaging.requirements.Requirement for exact name matching (no prefix
-              # collision) and specifier intersection (preserves extras and upper bounds).
-              UPDATE_RESULT=$(python3 hack/scripts/update-source-dep.py "$pkg" "$fix_ver" "$source_file")
+                LOCK_RC=0
+                uv lock --upgrade-package "$pkg" 2>&1 || LOCK_RC=$?
+                if [ "$LOCK_RC" -ne 0 ]; then
+                  echo "Warning: uv lock failed for $pkg in $dir (exit code $LOCK_RC), skipping"
+                  exit 0
+                fi
 
-              if [ "$UPDATE_RESULT" = "direct" ]; then
-                echo "Direct dependency — updated version constraint in $source_file"
-              else
-                echo "Transitive dependency — upgrading via pip-compile"
-              fi
+                TREE_RC=0
+                TREE_OUTPUT=$(uv tree --package "$pkg" 2>&1) || TREE_RC=$?
+                NATURAL_VER=""
+                if [ "$TREE_RC" -eq 0 ]; then
+                  NATURAL_VER=$(echo "$TREE_OUTPUT" | \
+                    python3 "$GITHUB_WORKSPACE/sdk-checkout/.github/scripts/extract_version.py" "$pkg") || true
+                fi
 
-              # Regenerate the lockfile, upgrading the specific package
-              COMPILE_RC=0
-              pip-compile "$source_file" -o "$lockfile" --upgrade-package "${pkg}>=${fix_ver}" --strip-extras --quiet 2>&1 || COMPILE_RC=$?
-              if [ "$COMPILE_RC" -ne 0 ]; then
-                echo "::warning::pip-compile failed for $source_file (exit code $COMPILE_RC), skipping"
-                mv "${lockfile}.bak" "$lockfile"
-                mv "${source_file}.bak" "$source_file"
-                continue
-              fi
+                if [ -z "$NATURAL_VER" ]; then
+                  echo "Warning: Could not parse version for $pkg after upgrade"
+                  exit 0
+                fi
 
-              # Verify the fix was applied (case-insensitive)
-              INSTALLED_VER=$(grep -i "^${pkg_re}==" "$lockfile" | sed 's/.*==//' || true)
-              if [ -z "$INSTALLED_VER" ]; then
-                echo "::warning::$pkg not found in $lockfile after pip-compile (may have been removed), skipping"
-                rm -f "${lockfile}.bak" "${source_file}.bak"
-                continue
-              fi
+                CMP_EXIT=0
+                python3 "$GITHUB_WORKSPACE/sdk-checkout/.github/scripts/compare_versions.py" \
+                  "$NATURAL_VER" "$fix_ver" || CMP_EXIT=$?
 
-              rm -f "${lockfile}.bak" "${source_file}.bak"
-
-              echo "Installed version: ${INSTALLED_VER}"
-              printf '%s\n' "| ${pkg}==${INSTALLED_VER} | [$advisory_id]($advisory_url) |" >> applied_fixes.txt
-              FIXED=true
+                if [ "$CMP_EXIT" -eq 2 ]; then
+                  echo "Warning: Could not parse versions for $pkg, skipping"
+                  exit 0
+                elif [ "$CMP_EXIT" -eq 0 ]; then
+                  echo "Natural upgrade insufficient ($NATURAL_VER < $fix_ver). Adding override..."
+                  python3 "$GITHUB_WORKSPACE/sdk-checkout/.github/scripts/update_overrides.py" \
+                    "$pkg" "${pkg}==${fix_ver}" "$CURRENT_DATE" "$advisory_url"
+                  uv lock --upgrade-package "$pkg" 2>&1 || true
+                  printf '%s\n' "- ${pkg}==${fix_ver} (override) | [$advisory_id]($advisory_url)" \
+                    >> "$GITHUB_WORKSPACE/applied_fixes.txt"
+                else
+                  printf '%s\n' "- ${pkg}==${NATURAL_VER} (upgraded) | [$advisory_id]($advisory_url)" \
+                    >> "$GITHUB_WORKSPACE/applied_fixes.txt"
+                fi
+              )
             done
-
-            if [ "$FIXED" = false ]; then
-              echo "::warning::Could not find $pkg in any lockfile, skipping"
-            fi
           done <<< "$FIX_DATA"
 
           if [ ! -s applied_fixes.txt ]; then
@@ -420,12 +437,12 @@ jobs:
           commit-message: "fix: nightly automated Python dependency update for security vulnerabilities"
           title: "fix: nightly security Python dependency updates"
           add-paths: |
-            cmd/initializers/dataset/requirements.txt
-            cmd/initializers/dataset/requirements-lock.txt
-            cmd/initializers/model/requirements.txt
-            cmd/initializers/model/requirements-lock.txt
+            cmd/initializers/dataset/uv.lock
+            cmd/initializers/dataset/pyproject.toml
+            cmd/initializers/model/uv.lock
+            cmd/initializers/model/pyproject.toml
+            api/python_api/uv.lock
             api/python_api/pyproject.toml
-            api/python_api/requirements-lock.txt
           body: |
             ## Security Update (Python)
 
@@ -437,7 +454,7 @@ jobs:
             | :--- | :--- |
             ${{ steps.fixer.outputs.fix_details }}
 
-            **Verification:** Updated via `pip-compile` lockfile regeneration.
+            **Verification:** Updated via `uv lock --upgrade-package`.
 
             > **Note:** This PR was created with `GITHUB_TOKEN`, which does not trigger `pull_request` workflows.
             > CI checks will not run automatically. Push an empty commit (`git commit --allow-empty -m "trigger CI"`)
