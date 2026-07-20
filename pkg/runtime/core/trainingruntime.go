@@ -24,12 +24,14 @@ import (
 	"maps"
 	"sort"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -44,6 +46,7 @@ import (
 	fwkcore "github.com/kubeflow/trainer/v2/pkg/runtime/framework/core"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
 	idxer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
+	trainingruntimeutil "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
 
 var (
@@ -161,6 +164,7 @@ func (r *TrainingRuntime) newRuntimeInfo(
 	if err != nil {
 		return nil, err
 	}
+
 	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: jobsetv1alpha2.GroupVersion.String(),
@@ -189,18 +193,48 @@ func (r *TrainingRuntime) newRuntimeInfo(
 			if labelAncestor, ok := metadata.Labels[constants.LabelTrainJobAncestor]; ok {
 				if labelAncestor == constants.AncestorTrainer && mlPolicy != nil {
 					count = ptr.Deref(mlPolicy.NumNodes, 1)
-
-					// Apply resourcesPerNode from TrainJob to the template spec
-					if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
-						for j := range jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
-							if jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Name == constants.Node {
-								jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Resources = *trainJob.Spec.Trainer.ResourcesPerNode.DeepCopy()
-								break
-							}
-						}
-					}
 				}
 				ancestor = &labelAncestor
+			}
+		}
+		if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
+			isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer && mlPolicy != nil
+			isMPILauncherAsNode := mlPolicy != nil && mlPolicy.MPI != nil &&
+				ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && *rJob.Name == constants.Node
+			if isTrainerAncestor || isMPILauncherAsNode {
+				if applyPodSpec := jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec; applyPodSpec != nil {
+					for k := range applyPodSpec.Containers {
+						if ptr.Deref(applyPodSpec.Containers[k].Name, "") != constants.Node {
+							continue
+						}
+						var baseRes corev1.ResourceRequirements
+						if r := applyPodSpec.Containers[k].Resources; r != nil {
+							if r.Limits != nil {
+								baseRes.Limits = *r.Limits
+							}
+							if r.Requests != nil {
+								baseRes.Requests = *r.Requests
+							}
+						}
+						mergedRes, mergeErr := trainingruntimeutil.MergeResourceRequirements(
+							baseRes, *trainJob.Spec.Trainer.ResourcesPerNode)
+						if mergeErr != nil {
+							return nil, mergeErr
+						}
+						applyRes := &corev1ac.ResourceRequirementsApplyConfiguration{}
+						if mergedRes.Limits != nil {
+							limits := maps.Clone(mergedRes.Limits)
+							applyRes.Limits = &limits
+						}
+						if mergedRes.Requests != nil {
+							requests := maps.Clone(mergedRes.Requests)
+							applyRes.Requests = &requests
+						}
+						applyPodSpec.Containers[k].Resources = applyRes
+						jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Resources = mergedRes
+						break
+					}
+				}
 			}
 		}
 		opts = append(opts, runtime.WithPodSet(
