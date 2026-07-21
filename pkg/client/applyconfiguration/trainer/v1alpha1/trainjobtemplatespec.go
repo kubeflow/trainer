@@ -24,15 +24,9 @@ import (
 
 // TrainJobTemplateSpecApplyConfiguration represents a declarative configuration of the TrainJobTemplateSpec type for use
 // with apply.
-//
-// TrainJobTemplateSpec describes the metadata and spec of the TrainJobs created by the OptimizationJob.
 type TrainJobTemplateSpecApplyConfiguration struct {
-	// Standard object's metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Specification of the desired behavior of the TrainJob.
-	// Hyperparameters are injected into this template dynamically by the controller
-	// via prefixed environment variables (KUBEFLOW_OPT_*) and metadata annotations.
-	Spec *TrainJobSpecApplyConfiguration `json:"spec,omitempty"`
+	Spec                             *TrainJobSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // TrainJobTemplateSpecApplyConfiguration constructs a declarative configuration of the TrainJobTemplateSpec type for use with

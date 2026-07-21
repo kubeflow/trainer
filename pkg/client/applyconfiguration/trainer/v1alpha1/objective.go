@@ -22,10 +22,10 @@ import (
 
 // ObjectiveApplyConfiguration represents a declarative configuration of the Objective type for use
 // with apply.
-//
-// Objective defines the metric and goal for the OptimizationJob.
 type ObjectiveApplyConfiguration struct {
-	Metric    *string                             `json:"metric,omitempty"`
+	// Metric specifies the name of the objective metric to track. Defaults to "loss".
+	Metric *string `json:"metric,omitempty"`
+	// Direction specifies the optimization goal. Defaults to "Minimize".
 	Direction *trainerv1alpha1.ObjectiveDirection `json:"direction,omitempty"`
 }
 

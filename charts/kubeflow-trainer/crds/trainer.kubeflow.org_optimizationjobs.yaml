@@ -39,31 +39,51 @@ spec:
           spec:
             description: OptimizationJobSpec defines the desired state of OptimizationJob.
             properties:
+              numTrials:
+                description: NumTrials is the total number of trials to run.
+                format: int32
+                maximum: 100
+                minimum: 1
+                type: integer
               objectives:
                 items:
-                  description: Objective defines the metric and goal for the OptimizationJob.
                   properties:
                     direction:
+                      default: Minimize
+                      description: Direction specifies the optimization goal. Defaults
+                        to "Minimize".
                       enum:
-                      - maximize
-                      - minimize
+                      - Maximize
+                      - Minimize
                       type: string
                     metric:
+                      default: loss
+                      description: Metric specifies the name of the objective metric
+                        to track. Defaults to "loss".
+                      maxLength: 64
                       minLength: 1
                       type: string
-                  required:
-                  - direction
-                  - metric
                   type: object
+                maxItems: 1
                 minItems: 1
                 type: array
-                x-kubernetes-list-type: atomic
+                x-kubernetes-list-map-keys:
+                - metric
+                x-kubernetes-list-type: map
+              parallelTrials:
+                default: 1
+                description: ParallelTrials is the number of trials to run in parallel.
+                  Defaults to 1.
+                format: int32
+                maximum: 100
+                minimum: 1
+                type: integer
               parameters:
                 items:
-                  description: Parameter defines a single hyperparameter and its search
-                    space.
                   properties:
                     name:
+                      description: Name is the name of the hyperparameter.
+                      maxLength: 64
                       minLength: 1
                       type: string
                     searchSpace:
@@ -75,11 +95,14 @@ spec:
                             a discrete set of unordered strings.
                           properties:
                             choices:
+                              description: Choices is the set of strings to sample
+                                from.
                               items:
                                 type: string
+                              maxItems: 100
                               minItems: 1
                               type: array
-                              x-kubernetes-list-type: atomic
+                              x-kubernetes-list-type: set
                           required:
                           - choices
                           type: object
@@ -88,22 +111,32 @@ spec:
                             distribution over [Min, Max].
                           properties:
                             max:
-                              minLength: 1
+                              maxLength: 64
                               type: string
+                              x-kubernetes-validations:
+                              - message: value must be a valid numeric value
+                                rule: self.matches('^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$')
                             min:
-                              minLength: 1
+                              maxLength: 64
                               type: string
+                              x-kubernetes-validations:
+                              - message: value must be a valid numeric value
+                                rule: self.matches('^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$')
                             type:
+                              default: Float
                               description: Type specifies the underlying data type.
-                                Defaults to "float".
+                                Defaults to "Float".
+                              enum:
+                              - Int
+                              - Float
                               type: string
                           required:
                           - max
                           - min
+                          - type
                           type: object
                           x-kubernetes-validations:
-                          - message: min must be strictly greater than 0 for a log-uniform
-                              distribution
+                          - message: min must be strictly greater than 0
                             rule: double(self.min) > 0.0
                           - message: min must be strictly less than max
                             rule: double(self.min) < double(self.max)
@@ -112,14 +145,29 @@ spec:
                             over [Min, Max].
                           properties:
                             max:
-                              minLength: 1
+                              maxLength: 64
                               type: string
+                              x-kubernetes-validations:
+                              - message: value must be a valid numeric value
+                                rule: self.matches('^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$')
                             min:
-                              minLength: 1
+                              maxLength: 64
+                              type: string
+                              x-kubernetes-validations:
+                              - message: value must be a valid numeric value
+                                rule: self.matches('^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$')
+                            type:
+                              default: Float
+                              description: Type specifies the underlying data type.
+                                Defaults to "Float".
+                              enum:
+                              - Int
+                              - Float
                               type: string
                           required:
                           - max
                           - min
+                          - type
                           type: object
                           x-kubernetes-validations:
                           - message: min must be strictly less than max
@@ -128,55 +176,36 @@ spec:
                       x-kubernetes-validations:
                       - message: Exactly one search space distribution configuration
                           must be provided
-                        rule: '(has(self.uniform) ? 1 : 0) + (has(self.logUniform)
-                          ? 1 : 0) + (has(self.categorical) ? 1 : 0) == 1'
+                        rule: '[has(self.uniform), has(self.logUniform), has(self.categorical)].filter(x,
+                          x).size() == 1'
                   required:
                   - name
                   - searchSpace
                   type: object
+                maxItems: 100
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
               searchAlgorithm:
-                description: SearchAlgorithm explicitly separates initial sampling
-                  from mid-run pruning.
                 properties:
-                  bayesian:
-                    properties:
-                      acquisitionFunction:
-                        enum:
-                        - ucb
-                        - ei
-                        - pi
-                        type: string
-                      initialTrials:
-                        format: int32
-                        minimum: 1
-                        type: integer
-                    type: object
                   grid:
-                    description: GridAlgorithm is intentionally empty; step-intervals
-                      are derived from SearchSpace.Int.Step.
                     type: object
                   random:
                     properties:
-                      randomState:
+                      seed:
                         format: int64
                         type: integer
                     type: object
                 type: object
                 x-kubernetes-validations:
                 - message: Exactly one search algorithm configuration must be provided
-                  rule: '[has(self.random), has(self.grid), has(self.bayesian)].filter(x,
-                    x).size() == 1'
+                  rule: '[has(self.random), has(self.grid)].filter(x, x).size() ==
+                    1'
               trainJobTemplate:
-                description: TrainJobTemplate wraps the underlying TrainJob workload
-                  and its metadata.
                 properties:
                   metadata:
-                    description: Standard object's metadata.
                     properties:
                       annotations:
                         additionalProperties:
@@ -199,10 +228,8 @@ spec:
                     - message: name and namespace cannot be set in a template.
                       rule: '!has(self.name) && !has(self.namespace)'
                   spec:
-                    description: |-
-                      Specification of the desired behavior of the TrainJob.
-                      Hyperparameters are injected into this template dynamically by the controller
-                      via prefixed environment variables (KUBEFLOW_OPT_*) and metadata annotations.
+                    description: TrainJobSpec represents specification of the desired
+                      TrainJob.
                     properties:
                       activeDeadlineSeconds:
                         description: |-
@@ -6452,40 +6479,16 @@ spec:
                 required:
                 - spec
                 type: object
-              trialConfig:
-                description: TrialConfig controls the orchestration of the trials.
-                properties:
-                  maxFailedTrials:
-                    format: int32
-                    minimum: 0
-                    type: integer
-                  numTrials:
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  parallelTrials:
-                    format: int32
-                    minimum: 1
-                    type: integer
-                type: object
-                x-kubernetes-validations:
-                - message: parallelTrials cannot exceed numTrials
-                  rule: '!has(self.parallelTrials) || !has(self.numTrials) || self.parallelTrials
-                    <= self.numTrials'
             required:
             - objectives
             - parameters
-            - searchAlgorithm
             - trainJobTemplate
-            - trialConfig
             type: object
+            x-kubernetes-validations:
+            - message: parallelTrials cannot exceed numTrials
+              rule: self.parallelTrials <= self.numTrials
           status:
-            description: OptimizationJobStatus defines the observed state of OptimizationJob.
             properties:
-              active:
-                format: int32
-                minimum: 0
-                type: integer
               conditions:
                 items:
                   description: Condition contains details for one aspect of the current
@@ -6545,17 +6548,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
-              failed:
-                format: int32
-                minimum: 0
-                type: integer
-              phase:
-                description: OptimizationJobPhase represents the current phase of
-                  the OptimizationJob.
-                type: string
               result:
-                description: Result caches the highest performing parameters based
-                  on the Objective.
+                description: Result tracks the parameters of the highest performing
+                  trial.
                 properties:
                   parameters:
                     items:
@@ -6574,6 +6569,7 @@ spec:
                       - name
                       - value
                       type: object
+                    maxItems: 100
                     type: array
                     x-kubernetes-list-map-keys:
                     - name
@@ -6586,10 +6582,6 @@ spec:
                 required:
                 - trainJobName
                 type: object
-              succeeded:
-                format: int32
-                minimum: 0
-                type: integer
             type: object
         type: object
     served: true

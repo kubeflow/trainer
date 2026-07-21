@@ -16,13 +16,19 @@
 
 package v1alpha1
 
+import (
+	trainerv1alpha1 "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+)
+
 // UniformSpaceApplyConfiguration represents a declarative configuration of the UniformSpace type for use
 // with apply.
 //
 // UniformSpace defines a continuous uniform distribution over [Min, Max].
 type UniformSpaceApplyConfiguration struct {
-	Min *string `json:"min,omitempty"`
-	Max *string `json:"max,omitempty"`
+	Min *trainerv1alpha1.Double `json:"min,omitempty"`
+	Max *trainerv1alpha1.Double `json:"max,omitempty"`
+	// Type specifies the underlying data type. Defaults to "Float".
+	Type *trainerv1alpha1.ParameterType `json:"type,omitempty"`
 }
 
 // UniformSpaceApplyConfiguration constructs a declarative configuration of the UniformSpace type for use with
@@ -34,7 +40,7 @@ func UniformSpace() *UniformSpaceApplyConfiguration {
 // WithMin sets the Min field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Min field is set to the value of the last call.
-func (b *UniformSpaceApplyConfiguration) WithMin(value string) *UniformSpaceApplyConfiguration {
+func (b *UniformSpaceApplyConfiguration) WithMin(value trainerv1alpha1.Double) *UniformSpaceApplyConfiguration {
 	b.Min = &value
 	return b
 }
@@ -42,7 +48,15 @@ func (b *UniformSpaceApplyConfiguration) WithMin(value string) *UniformSpaceAppl
 // WithMax sets the Max field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Max field is set to the value of the last call.
-func (b *UniformSpaceApplyConfiguration) WithMax(value string) *UniformSpaceApplyConfiguration {
+func (b *UniformSpaceApplyConfiguration) WithMax(value trainerv1alpha1.Double) *UniformSpaceApplyConfiguration {
 	b.Max = &value
+	return b
+}
+
+// WithType sets the Type field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Type field is set to the value of the last call.
+func (b *UniformSpaceApplyConfiguration) WithType(value trainerv1alpha1.ParameterType) *UniformSpaceApplyConfiguration {
+	b.Type = &value
 	return b
 }

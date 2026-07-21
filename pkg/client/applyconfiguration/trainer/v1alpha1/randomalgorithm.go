@@ -19,7 +19,7 @@ package v1alpha1
 // RandomAlgorithmApplyConfiguration represents a declarative configuration of the RandomAlgorithm type for use
 // with apply.
 type RandomAlgorithmApplyConfiguration struct {
-	RandomState *int64 `json:"randomState,omitempty"`
+	Seed *int64 `json:"seed,omitempty"`
 }
 
 // RandomAlgorithmApplyConfiguration constructs a declarative configuration of the RandomAlgorithm type for use with
@@ -28,10 +28,10 @@ func RandomAlgorithm() *RandomAlgorithmApplyConfiguration {
 	return &RandomAlgorithmApplyConfiguration{}
 }
 
-// WithRandomState sets the RandomState field in the declarative configuration to the given value
+// WithSeed sets the Seed field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RandomState field is set to the value of the last call.
-func (b *RandomAlgorithmApplyConfiguration) WithRandomState(value int64) *RandomAlgorithmApplyConfiguration {
-	b.RandomState = &value
+// If called multiple times, the Seed field is set to the value of the last call.
+func (b *RandomAlgorithmApplyConfiguration) WithSeed(value int64) *RandomAlgorithmApplyConfiguration {
+	b.Seed = &value
 	return b
 }

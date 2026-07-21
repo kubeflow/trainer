@@ -13759,18 +13759,6 @@
           }
         }
       },
-      "trainer.v1alpha1.BayesianAlgorithm": {
-        "type": "object",
-        "properties": {
-          "acquisitionFunction": {
-            "type": "string"
-          },
-          "initialTrials": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
       "trainer.v1alpha1.CategoricalSpace": {
         "description": "CategoricalSpace defines a search space over a discrete set of unordered strings.",
         "type": "object",
@@ -13779,12 +13767,13 @@
         ],
         "properties": {
           "choices": {
+            "description": "Choices is the set of strings to sample from.",
             "type": "array",
             "items": {
               "type": "string",
               "default": ""
             },
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "set"
           }
         }
       },
@@ -13968,7 +13957,6 @@
         }
       },
       "trainer.v1alpha1.GridAlgorithm": {
-        "description": "GridAlgorithm is intentionally empty; step-intervals are derived from SearchSpace.Int.Step.",
         "type": "object"
       },
       "trainer.v1alpha1.Initializer": {
@@ -14148,7 +14136,8 @@
         "type": "object",
         "required": [
           "min",
-          "max"
+          "max",
+          "type"
         ],
         "properties": {
           "max": {
@@ -14160,8 +14149,9 @@
             "default": ""
           },
           "type": {
-            "description": "Type specifies the underlying data type. Defaults to \"float\".",
-            "type": "string"
+            "description": "Type specifies the underlying data type. Defaults to \"Float\".",
+            "type": "string",
+            "default": ""
           }
         }
       },
@@ -14337,20 +14327,15 @@
         }
       },
       "trainer.v1alpha1.Objective": {
-        "description": "Objective defines the metric and goal for the OptimizationJob.",
         "type": "object",
-        "required": [
-          "metric",
-          "direction"
-        ],
         "properties": {
           "direction": {
-            "type": "string",
-            "default": ""
+            "description": "Direction specifies the optimization goal. Defaults to \"Minimize\".",
+            "type": "string"
           },
           "metric": {
-            "type": "string",
-            "default": ""
+            "description": "Metric specifies the name of the objective metric to track. Defaults to \"loss\".",
+            "type": "string"
           }
         }
       },
@@ -14433,12 +14418,15 @@
         "type": "object",
         "required": [
           "objectives",
-          "searchAlgorithm",
           "parameters",
-          "trialConfig",
           "trainJobTemplate"
         ],
         "properties": {
+          "numTrials": {
+            "description": "NumTrials is the total number of trials to run.",
+            "type": "integer",
+            "format": "int32"
+          },
           "objectives": {
             "type": "array",
             "items": {
@@ -14449,7 +14437,15 @@
                 }
               ]
             },
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-map-keys": [
+              "metric"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "parallelTrials": {
+            "description": "ParallelTrials is the number of trials to run in parallel. Defaults to 1.",
+            "type": "integer",
+            "format": "int32"
           },
           "parameters": {
             "type": "array",
@@ -14467,41 +14463,21 @@
             "x-kubernetes-list-type": "map"
           },
           "searchAlgorithm": {
-            "description": "SearchAlgorithm explicitly separates initial sampling from mid-run pruning.",
-            "default": {},
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.SearchAlgorithm"
-              }
-            ]
+            "$ref": "#/components/schemas/trainer.v1alpha1.SearchAlgorithm"
           },
           "trainJobTemplate": {
-            "description": "TrainJobTemplate wraps the underlying TrainJob workload and its metadata.",
             "default": {},
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobTemplateSpec"
               }
             ]
-          },
-          "trialConfig": {
-            "default": {},
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.TrialConfig"
-              }
-            ]
           }
         }
       },
       "trainer.v1alpha1.OptimizationJobStatus": {
-        "description": "OptimizationJobStatus defines the observed state of OptimizationJob.",
         "type": "object",
         "properties": {
-          "active": {
-            "type": "integer",
-            "format": "int32"
-          },
           "conditions": {
             "type": "array",
             "items": {
@@ -14517,29 +14493,12 @@
             ],
             "x-kubernetes-list-type": "map"
           },
-          "failed": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "phase": {
-            "type": "string"
-          },
           "result": {
-            "description": "Result caches the highest performing parameters based on the Objective.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/trainer.v1alpha1.Result"
-              }
-            ]
-          },
-          "succeeded": {
-            "type": "integer",
-            "format": "int32"
+            "$ref": "#/components/schemas/trainer.v1alpha1.Result"
           }
         }
       },
       "trainer.v1alpha1.Parameter": {
-        "description": "Parameter defines a single hyperparameter and its search space.",
         "type": "object",
         "required": [
           "name",
@@ -14547,6 +14506,7 @@
         ],
         "properties": {
           "name": {
+            "description": "Name is the name of the hyperparameter.",
             "type": "string",
             "default": ""
           },
@@ -14774,7 +14734,7 @@
       "trainer.v1alpha1.RandomAlgorithm": {
         "type": "object",
         "properties": {
-          "randomState": {
+          "seed": {
             "type": "integer",
             "format": "int64"
           }
@@ -14881,12 +14841,8 @@
         }
       },
       "trainer.v1alpha1.SearchAlgorithm": {
-        "description": "SearchAlgorithm defines the hyperparameter sampling configuration.",
         "type": "object",
         "properties": {
-          "bayesian": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.BayesianAlgorithm"
-          },
           "grid": {
             "$ref": "#/components/schemas/trainer.v1alpha1.GridAlgorithm"
           },
@@ -14907,23 +14863,6 @@
           },
           "uniform": {
             "$ref": "#/components/schemas/trainer.v1alpha1.UniformSpace"
-          }
-        }
-      },
-      "trainer.v1alpha1.SettingKV": {
-        "type": "object",
-        "required": [
-          "name",
-          "value"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "default": ""
-          },
-          "value": {
-            "type": "string",
-            "default": ""
           }
         }
       },
@@ -15120,14 +15059,12 @@
         }
       },
       "trainer.v1alpha1.TrainJobTemplateSpec": {
-        "description": "TrainJobTemplateSpec describes the metadata and spec of the TrainJobs created by the OptimizationJob.",
         "type": "object",
         "required": [
           "spec"
         ],
         "properties": {
           "metadata": {
-            "description": "Standard object's metadata.",
             "default": {},
             "allOf": [
               {
@@ -15136,7 +15073,6 @@
             ]
           },
           "spec": {
-            "description": "Specification of the desired behavior of the TrainJob. Hyperparameters are injected into this template dynamically by the controller via prefixed environment variables (KUBEFLOW_OPT_*) and metadata annotations.",
             "default": {},
             "allOf": [
               {
@@ -15360,30 +15296,13 @@
           }
         }
       },
-      "trainer.v1alpha1.TrialConfig": {
-        "description": "TrialConfig controls the orchestration of the trials.",
-        "type": "object",
-        "properties": {
-          "maxFailedTrials": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "numTrials": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "parallelTrials": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
       "trainer.v1alpha1.UniformSpace": {
         "description": "UniformSpace defines a continuous uniform distribution over [Min, Max].",
         "type": "object",
         "required": [
           "min",
-          "max"
+          "max",
+          "type"
         ],
         "properties": {
           "max": {
@@ -15391,6 +15310,11 @@
             "default": ""
           },
           "min": {
+            "type": "string",
+            "default": ""
+          },
+          "type": {
+            "description": "Type specifies the underlying data type. Defaults to \"Float\".",
             "type": "string",
             "default": ""
           }

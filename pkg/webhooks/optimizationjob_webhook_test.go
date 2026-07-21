@@ -31,48 +31,37 @@ func TestOptimizationJobDefault(t *testing.T) {
 		inputObj *trainer.OptimizationJob
 		wantObj  *trainer.OptimizationJob
 	}{
-		"Empty TrialConfig fields get defaulted": {
+		"Empty limits and algorithms get defaulted": {
 			inputObj: &trainer.OptimizationJob{
-				Spec: trainer.OptimizationJobSpec{
-					SearchAlgorithm: trainer.SearchAlgorithm{
-						Random: &trainer.RandomAlgorithm{},
-					},
-					TrialConfig: trainer.TrialConfig{},
-				},
+				Spec: trainer.OptimizationJobSpec{},
 			},
 			wantObj: &trainer.OptimizationJob{
 				Spec: trainer.OptimizationJobSpec{
-					SearchAlgorithm: trainer.SearchAlgorithm{
-						Random: &trainer.RandomAlgorithm{},
-					},
-					TrialConfig: trainer.TrialConfig{
-						ParallelTrials: ptr.To(int32(1)), // Defaulted
-						NumTrials:      ptr.To(int32(1)), // Defaulted
+					ParallelTrials: ptr.To(int32(1)), // Defaulted
+					NumTrials:      ptr.To(int32(1)), // Defaulted
+					SearchAlgorithm: &trainer.SearchAlgorithm{
+						Random: &trainer.RandomAlgorithm{}, // Defaulted
 					},
 				},
 			},
 		},
-		"Existing TrialConfig fields are preserved": {
+		"Existing limits and algorithms are preserved": {
 			inputObj: &trainer.OptimizationJob{
 				Spec: trainer.OptimizationJobSpec{
-					SearchAlgorithm: trainer.SearchAlgorithm{
-						Bayesian: &trainer.BayesianAlgorithm{},
+					SearchAlgorithm: &trainer.SearchAlgorithm{
+						Grid: &trainer.GridAlgorithm{},
 					},
-					TrialConfig: trainer.TrialConfig{
-						ParallelTrials: ptr.To(int32(5)),
-						NumTrials:      ptr.To(int32(20)),
-					},
+					ParallelTrials: ptr.To(int32(5)),
+					NumTrials:      ptr.To(int32(20)),
 				},
 			},
 			wantObj: &trainer.OptimizationJob{
 				Spec: trainer.OptimizationJobSpec{
-					SearchAlgorithm: trainer.SearchAlgorithm{
-						Bayesian: &trainer.BayesianAlgorithm{},
+					SearchAlgorithm: &trainer.SearchAlgorithm{
+						Grid: &trainer.GridAlgorithm{}, // Preserved
 					},
-					TrialConfig: trainer.TrialConfig{
-						ParallelTrials: ptr.To(int32(5)),  // Preserved
-						NumTrials:      ptr.To(int32(20)), // Preserved
-					},
+					ParallelTrials: ptr.To(int32(5)),  // Preserved
+					NumTrials:      ptr.To(int32(20)), // Preserved
 				},
 			},
 		},
@@ -89,6 +78,71 @@ func TestOptimizationJobDefault(t *testing.T) {
 
 			if diff := cmp.Diff(tc.wantObj, tc.inputObj); len(diff) != 0 {
 				t.Errorf("Unexpected defaulting result (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestOptimizationJobValidateUpdate(t *testing.T) {
+	oldObj := &trainer.OptimizationJob{
+		Spec: trainer.OptimizationJobSpec{
+			Objectives: []trainer.Objective{
+				{Metric: ptr.To("loss")},
+			},
+			Parameters: []trainer.Parameter{
+				{Name: "learning_rate"},
+			},
+			TrainJobTemplate: trainer.TrainJobTemplateSpec{},
+			NumTrials:        ptr.To(int32(10)),
+		},
+	}
+
+	cases := map[string]struct {
+		updateFn func(obj *trainer.OptimizationJob)
+		wantErr  bool
+	}{
+		"Valid update: scaling up trials": {
+			updateFn: func(obj *trainer.OptimizationJob) {
+				obj.Spec.NumTrials = ptr.To(int32(20))
+			},
+			wantErr: false,
+		},
+		"Invalid update: changing objectives": {
+			updateFn: func(obj *trainer.OptimizationJob) {
+				obj.Spec.Objectives = []trainer.Objective{
+					{Metric: ptr.To("accuracy")},
+				}
+			},
+			wantErr: true,
+		},
+		"Invalid update: changing parameters": {
+			updateFn: func(obj *trainer.OptimizationJob) {
+				obj.Spec.Parameters = []trainer.Parameter{
+					{Name: "batch_size"},
+				}
+			},
+			wantErr: true,
+		},
+		"Invalid update: changing TrainJobTemplate": {
+			updateFn: func(obj *trainer.OptimizationJob) {
+				obj.Spec.TrainJobTemplate.ObjectMeta.Labels = map[string]string{"foo": "bar"}
+			},
+			wantErr: true,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			validator := &OptimizationJobValidator{}
+
+			// Create a deep copy to mutate
+			newObj := oldObj.DeepCopy()
+			tc.updateFn(newObj)
+
+			_, err := validator.ValidateUpdate(ctx, oldObj, newObj)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("ValidateUpdate() error = %v, wantErr %v", err, tc.wantErr)
 			}
 		})
 	}

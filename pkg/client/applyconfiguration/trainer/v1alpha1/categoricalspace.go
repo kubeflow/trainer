@@ -21,6 +21,7 @@ package v1alpha1
 //
 // CategoricalSpace defines a search space over a discrete set of unordered strings.
 type CategoricalSpaceApplyConfiguration struct {
+	// Choices is the set of strings to sample from.
 	Choices []string `json:"choices,omitempty"`
 }
 

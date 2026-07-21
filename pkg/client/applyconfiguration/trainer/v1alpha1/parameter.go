@@ -18,9 +18,8 @@ package v1alpha1
 
 // ParameterApplyConfiguration represents a declarative configuration of the Parameter type for use
 // with apply.
-//
-// Parameter defines a single hyperparameter and its search space.
 type ParameterApplyConfiguration struct {
+	// Name is the name of the hyperparameter.
 	Name        *string                        `json:"name,omitempty"`
 	SearchSpace *SearchSpaceApplyConfiguration `json:"searchSpace,omitempty"`
 }

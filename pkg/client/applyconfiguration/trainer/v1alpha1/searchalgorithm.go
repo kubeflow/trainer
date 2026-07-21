@@ -22,12 +22,9 @@ import (
 
 // SearchAlgorithmApplyConfiguration represents a declarative configuration of the SearchAlgorithm type for use
 // with apply.
-//
-// SearchAlgorithm defines the hyperparameter sampling configuration.
 type SearchAlgorithmApplyConfiguration struct {
-	Random   *RandomAlgorithmApplyConfiguration   `json:"random,omitempty"`
-	Grid     *trainerv1alpha1.GridAlgorithm       `json:"grid,omitempty"`
-	Bayesian *BayesianAlgorithmApplyConfiguration `json:"bayesian,omitempty"`
+	Random *RandomAlgorithmApplyConfiguration `json:"random,omitempty"`
+	Grid   *trainerv1alpha1.GridAlgorithm     `json:"grid,omitempty"`
 }
 
 // SearchAlgorithmApplyConfiguration constructs a declarative configuration of the SearchAlgorithm type for use with
@@ -49,13 +46,5 @@ func (b *SearchAlgorithmApplyConfiguration) WithRandom(value *RandomAlgorithmApp
 // If called multiple times, the Grid field is set to the value of the last call.
 func (b *SearchAlgorithmApplyConfiguration) WithGrid(value trainerv1alpha1.GridAlgorithm) *SearchAlgorithmApplyConfiguration {
 	b.Grid = &value
-	return b
-}
-
-// WithBayesian sets the Bayesian field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Bayesian field is set to the value of the last call.
-func (b *SearchAlgorithmApplyConfiguration) WithBayesian(value *BayesianAlgorithmApplyConfiguration) *SearchAlgorithmApplyConfiguration {
-	b.Bayesian = value
 	return b
 }

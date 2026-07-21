@@ -21,12 +21,13 @@ package v1alpha1
 //
 // OptimizationJobSpec defines the desired state of OptimizationJob.
 type OptimizationJobSpecApplyConfiguration struct {
-	Objectives []ObjectiveApplyConfiguration `json:"objectives,omitempty"`
-	// SearchAlgorithm explicitly separates initial sampling from mid-run pruning.
+	Objectives      []ObjectiveApplyConfiguration      `json:"objectives,omitempty"`
 	SearchAlgorithm *SearchAlgorithmApplyConfiguration `json:"searchAlgorithm,omitempty"`
 	Parameters      []ParameterApplyConfiguration      `json:"parameters,omitempty"`
-	TrialConfig     *TrialConfigApplyConfiguration     `json:"trialConfig,omitempty"`
-	// TrainJobTemplate wraps the underlying TrainJob workload and its metadata.
+	// NumTrials is the total number of trials to run.
+	NumTrials *int32 `json:"numTrials,omitempty"`
+	// ParallelTrials is the number of trials to run in parallel. Defaults to 1.
+	ParallelTrials   *int32                                  `json:"parallelTrials,omitempty"`
 	TrainJobTemplate *TrainJobTemplateSpecApplyConfiguration `json:"trainJobTemplate,omitempty"`
 }
 
@@ -70,11 +71,19 @@ func (b *OptimizationJobSpecApplyConfiguration) WithParameters(values ...*Parame
 	return b
 }
 
-// WithTrialConfig sets the TrialConfig field in the declarative configuration to the given value
+// WithNumTrials sets the NumTrials field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the TrialConfig field is set to the value of the last call.
-func (b *OptimizationJobSpecApplyConfiguration) WithTrialConfig(value *TrialConfigApplyConfiguration) *OptimizationJobSpecApplyConfiguration {
-	b.TrialConfig = value
+// If called multiple times, the NumTrials field is set to the value of the last call.
+func (b *OptimizationJobSpecApplyConfiguration) WithNumTrials(value int32) *OptimizationJobSpecApplyConfiguration {
+	b.NumTrials = &value
+	return b
+}
+
+// WithParallelTrials sets the ParallelTrials field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ParallelTrials field is set to the value of the last call.
+func (b *OptimizationJobSpecApplyConfiguration) WithParallelTrials(value int32) *OptimizationJobSpecApplyConfiguration {
+	b.ParallelTrials = &value
 	return b
 }
 

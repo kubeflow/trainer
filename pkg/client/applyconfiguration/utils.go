@@ -30,8 +30,6 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=trainer.kubeflow.org, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithKind("BayesianAlgorithm"):
-		return &trainerv1alpha1.BayesianAlgorithmApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("CategoricalSpace"):
 		return &trainerv1alpha1.CategoricalSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ClusterTrainingRuntime"):
@@ -122,8 +120,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.TrainJobStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainJobTemplateSpec"):
 		return &trainerv1alpha1.TrainJobTemplateSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("TrialConfig"):
-		return &trainerv1alpha1.TrialConfigApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("UniformSpace"):
 		return &trainerv1alpha1.UniformSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("VolcanoPodGroupPolicySource"):
