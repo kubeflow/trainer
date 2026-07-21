@@ -248,6 +248,84 @@ def test_download_dataset(test_name, test_case):
     print("Test execution completed")
 
 
+def test_download_dataset_creates_restricted_pss_compatible_leader_worker_set():
+    cache_initializer_instance = CacheInitializer()
+
+    config = {
+        "storage_uri": "cache://test_schema/test_table",
+        "train_job_name": "restricted-job",
+        "cache_image": "test-image:latest",
+        "iam_role": "arn:aws:iam::123456789012:role/test-role",
+        "metadata_loc": "s3://test-bucket/metadata",
+    }
+
+    with patch.object(utils, "get_config_from_env", return_value=config):
+        cache_initializer_instance.load_config()
+
+    with patch(
+        "pkg.initializers.dataset.cache.get_namespace", return_value="test-namespace"
+    ), patch("pkg.initializers.dataset.cache.config"), patch(
+        "pkg.initializers.dataset.cache.client"
+    ) as mock_client:
+
+        mock_api_client = MagicMock()
+        mock_core_v1 = MagicMock()
+        mock_custom_api = MagicMock()
+
+        mock_client.ApiClient.return_value = mock_api_client
+        mock_client.CoreV1Api.return_value = mock_core_v1
+        mock_client.CustomObjectsApi.return_value = mock_custom_api
+
+        mock_training_job = {
+            "apiVersion": "trainer.kubeflow.org/v1alpha1",
+            "kind": "TrainJob",
+            "metadata": {"name": "restricted-job", "uid": "test-uid"},
+        }
+        mock_lws_ready = {
+            "status": {"conditions": [{"type": "Available", "status": "True"}]}
+        }
+        mock_custom_api.get_namespaced_custom_object.side_effect = [
+            mock_training_job,
+            mock_lws_ready,
+        ]
+
+        cache_initializer_instance.download_dataset()
+
+        create_call = mock_custom_api.create_namespaced_custom_object.call_args
+        assert create_call.kwargs["plural"] == "leaderworkersets"
+
+        leader_worker_set = create_call.kwargs["body"]
+        leader_spec = leader_worker_set["spec"]["leaderWorkerTemplate"][
+            "leaderTemplate"
+        ]["spec"]
+        worker_spec = leader_worker_set["spec"]["leaderWorkerTemplate"][
+            "workerTemplate"
+        ]["spec"]
+        expected_pod_security_context = {
+            "runAsNonRoot": True,
+            "runAsUser": 1000,
+            "seccompProfile": {"type": "RuntimeDefault"},
+        }
+        expected_container_security_context = {
+            "allowPrivilegeEscalation": False,
+            "capabilities": {"drop": ["ALL"]},
+            "runAsNonRoot": True,
+            "runAsUser": 1000,
+            "seccompProfile": {"type": "RuntimeDefault"},
+        }
+
+        assert leader_spec["securityContext"] == expected_pod_security_context
+        assert worker_spec["securityContext"] == expected_pod_security_context
+        assert (
+            leader_spec["containers"][0]["securityContext"]
+            == expected_container_security_context
+        )
+        assert (
+            worker_spec["containers"][0]["securityContext"]
+            == expected_container_security_context
+        )
+
+
 def test_download_dataset_service_already_exists():
     """Service creation should be idempotent — a 409 AlreadyExists response
     must be treated as a no-op, not as a creation failure that triggers
