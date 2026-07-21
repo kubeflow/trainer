@@ -74,7 +74,7 @@ spec:
         template:
           spec:
             replicatedJobs:
-              - name: Node
+              - name: node
                 template:
                   spec:
                     template:
