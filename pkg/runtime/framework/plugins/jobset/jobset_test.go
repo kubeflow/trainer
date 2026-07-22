@@ -2393,6 +2393,34 @@ func TestBuild(t *testing.T) {
 				},
 			},
 		},
+		"non-trainer replicatedJob with zero replicas errors instead of dividing by zero": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:  constants.DatasetInitializer,
+						Count: ptr.To[int32](4),
+					}},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(jobsetv1alpha2ac.ReplicatedJob().
+							WithName(constants.DatasetInitializer).
+							WithReplicas(0).
+							WithTemplate(batchv1ac.JobTemplateSpec().
+								WithSpec(batchv1ac.JobSpec().
+									WithTemplate(corev1ac.PodTemplateSpec().
+										WithSpec(corev1ac.PodSpec().
+											WithContainers(corev1ac.Container().WithName(constants.DatasetInitializer)),
+										),
+									),
+								),
+							),
+						),
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Obj(),
+			wantError: fmt.Errorf("replicatedJob %s has invalid replicas %d: must be greater than or equal to 1", constants.DatasetInitializer, 0),
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

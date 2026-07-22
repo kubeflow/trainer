@@ -52,12 +52,19 @@ func TestValidateReplicatedJobs(t *testing.T) {
 				Replicas(2, constants.Launcher, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 				Obj().Spec.ReplicatedJobs,
 			wantError: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("replicas"),
-					"2", ""),
-				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"),
-					"2", ""),
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(3).Child("replicas"),
 					"2", ""),
+			},
+		},
+		"invalid non-trainer replicas below one": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				Replicas(1, constants.Node).
+				Obj().Spec.ReplicatedJobs,
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(0).Child("replicas"),
+					"0", ""),
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(1).Child("replicas"),
+					"0", ""),
 			},
 		},
 		"missing required container in replicatedJobs": {

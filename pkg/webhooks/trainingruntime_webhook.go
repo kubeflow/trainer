@@ -33,6 +33,7 @@ import (
 
 const (
 	rJobReplicasErrorMsg       = "always must be 1"
+	rJobReplicasMinErrorMsg    = "must be greater than or equal to 1"
 	rJobContainerNamesErrorMsg = "must contain the required container for the ancestor: %s"
 )
 
@@ -76,8 +77,12 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 		}
 
 		if labelAncestor, ok := rJob.Template.Labels[constants.LabelTrainJobAncestor]; ok && ancestors.Has(labelAncestor) {
-			if rJob.Replicas != 1 {
-				allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasErrorMsg))
+			if labelAncestor == constants.AncestorTrainer {
+				if rJob.Replicas != 1 {
+					allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasErrorMsg))
+				}
+			} else if rJob.Replicas < 1 {
+				allErrs = append(allErrs, field.Invalid(rJobsPath.Index(idx).Child("replicas"), rJob.Replicas, rJobReplicasMinErrorMsg))
 			}
 
 			// Validate replicated job contains the required containers.
