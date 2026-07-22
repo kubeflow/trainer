@@ -141,9 +141,6 @@ lint-manifests: kube-linter ## Run kube-linter on manifests and helm charts.
 	$(KUBE_LINTER) lint manifests/base --config .kube-linter.yaml
 	$(KUBE_LINTER) lint charts/kubeflow-trainer --config .kube-linter.yaml
 
-# Shell scripts to format and lint (all tracked *.sh files).
-SHELL_SCRIPTS = $(shell git ls-files '*.sh')
-
 # shfmt options: 2-space indent, indent switch cases, space after redirect operators.
 SHFMT_OPTIONS ?= --indent 2 --case-indent --space-redirects
 
@@ -265,7 +262,8 @@ shfmt:
 	GOBIN=$(LOCALBIN) go install mvdan.cc/sh/v3/cmd/shfmt@$(SHFMT_VERSION)
 
 .PHONY: shellcheck
-shellcheck: # download shellcheck binary
+shellcheck: ## Download shellcheck binary if required.
+	$(call download-shellcheck,$(SHELLCHECK),$(SHELLCHECK_VERSION))
 
 # Input and output location for Notebooks executed with Papermill.
 NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
