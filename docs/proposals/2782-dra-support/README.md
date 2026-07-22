@@ -9,9 +9,11 @@ Authors:
 [Dynamic Resource Allocation (DRA)](https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/)
 graduated to GA in Kubernetes 1.34, providing a modern alternative to extended resources for
 GPUs and accelerators. This KEP adds a `resourceClaims` field to `PodSpecPatch` so that data scientists can override
-or add pod-level DRA claims via `runtimePatches` in their `TrainJob` specs. Admins already
-configure claims in `ClusterTrainingRuntime` templates via the full `PodSpec`; this KEP only
-closes the gap for user overrides through `runtimePatches`.
+or add pod-level DRA claims via `runtimePatches` in their `TrainJob` specs, and updates the
+torch plugin's GPU auto-detection to recognize DRA claims so that `numProcPerNode` continues
+to work correctly without manual intervention. Admins already configure claims in
+`ClusterTrainingRuntime` templates via the full `PodSpec`; this KEP closes the gap for user
+overrides through `runtimePatches` and ensures runtime plugins remain functional with DRA.
 
 ## Motivation
 
@@ -35,6 +37,9 @@ structured API for device allocation:
   via `runtimePatches` in `TrainJob`.
 2. Rely on the existing strategic merge patch pipeline to merge claims by name with no
   controller changes.
+3. Update `GetNumGPUPerNode()` and related ML policy plugins (torch, MPI, XGBoost, Flux)
+  to derive GPU count from DRA `resourceClaims` when extended resources are absent, so
+  `numProcPerNode` auto-detection continues to work correctly.
 
 ### Non-Goals
 
@@ -132,10 +137,12 @@ type PodResourceClaim struct {
 }
 ```
 
-The field mirrors existing list fields in `PodSpecPatch`: `+listType=map` with
-`+listMapKey=name` for strategic merge patch support, and `MaxItems=32` to bound the list.
-Uses `corev1.PodResourceClaim` directly, consistent with how `corev1.Volume` and
-`corev1.Toleration` are used in `PodSpecPatch`.
+The field uses `+listType=map` with `+listMapKey=name`, consistent with the upstream
+`corev1.PodSpec.ResourceClaims` definition that drives the strategic merge patch behavior
+in `mergeRuntimePatches()`. `MaxItems=32` is a pragmatic guard to prevent accidental
+oversized patches; upstream `PodSpec` has no explicit limit but real-world DRA usage
+rarely exceeds a handful of claims per pod. Uses `corev1.PodResourceClaim` directly,
+consistent with how `corev1.Volume` and `corev1.Toleration` are used in `PodSpecPatch`.
 
 **Container-level claim references** cannot be set through `runtimePatches` because
 `ContainerPatch` does not expose a `Resources` field. Admins must pre-configure
@@ -165,9 +172,38 @@ Step-by-step:
 4. The merged `JobTemplateSpec` flows into the JobSet apply configuration and then to pods,
   where the DRA scheduler plugin allocates devices from the resolved claim template.
 
-**Torch plugin note:** The torch plugin's `GetNumGPUPerNode()` does not recognize DRA claims.
-Users must set `numProcPerNode` explicitly when using DRA without extended resources. A
-follow-up enhancement to inspect `resourceClaims` for GPU count is recommended.
+### DRA-aware GPU detection in ML policy plugins
+
+Today, `GetNumGPUPerNode()` derives GPU count by scanning `resources.Requests` and
+`resources.Limits` for resource names containing "gpu". When a pod uses DRA claims
+instead of extended resources, this function returns 0, causing the torch plugin to
+fall back to CPU-based `numProcPerNode` (wrong for GPU training).
+
+**Approach:** The DRA GPU count is resolved in the core runtime layer during PodSet
+construction, where the controller's `client.Client` and `context.Context` are already
+available. After `mergeRuntimePatches()` produces the merged `JobSetTemplateSpec`, the
+core runtime inspects each merged PodSpec's `resourceClaims`. For each
+`PodResourceClaim` referencing a `ResourceClaimTemplate`, it looks up the template
+object and sums the device request counts for GPU-class requests.
+
+The resolved count is propagated to ML policy plugins (torch, torchtune, MPI, XGBoost,
+Flux) via the existing `PodSet` struct. Each plugin uses the DRA count as a fallback
+when `GetNumGPUPerNode()` returns 0.
+
+This design:
+
+- Avoids changing the `EnforceMLPolicyPlugin` interface (which has no `context.Context`)
+- Avoids adding `client.Client` to plugin structs that do not currently store one
+- Keeps the `GetNumGPUPerNode()` signature backward compatible with all existing callers
+
+Extended resources still take priority. DRA count is only used as a fallback when no
+`nvidia.com/gpu` (or similar) extended resource is found. If the
+`ResourceClaimTemplate` cannot be resolved (not found, different namespace), the DRA
+GPU count defaults to 0 and the user can always set `numProcPerNode` explicitly.
+
+**RBAC:** The controller's `ServiceAccount` needs `get` permission on
+`resourceclaimtemplates` in the `resource.k8s.io` API group. This is added to the
+controller's `ClusterRole` manifest.
 
 ### Validation
 
@@ -186,6 +222,9 @@ admission errors. Trainer does not pre-validate `ResourceClaimTemplate` existenc
 | **Referenced `ResourceClaimTemplate` does not exist**   | DRA scheduler plugin cannot create a `ResourceClaim`. Pods stay `Pending` with `FailedScheduling` event. Trainer does not pre-validate template existence. |
 | **Invalid claim in `runtimePatches`**                   | Pod admission rejects the resulting Pod spec.                                                                                                              |
 | `**ResourceClaimTemplate` is in a different namespace** | Kubernetes rejects cross-namespace references. `ResourceClaimTemplateName` must reference a template in the same namespace as the pod.                     |
+| **DRA claims present but `ResourceClaimTemplate` not found by core** | DRA GPU count remains 0; torch falls back to CPU-based `numProcPerNode`. User can always set `numProcPerNode` explicitly to override.                     |
+| **Both extended resources AND DRA claims present**                    | Extended resources take priority for `numProcPerNode`. DRA claims are still passed through to the Pod. Users should avoid mixing both to prevent double GPU allocation. |
+| **User overrides claim name (e.g., `gpu` to `gpu-h100`)**            | Container-level `resources.claims[].name` in the runtime template must match the pod-level claim name. Mismatched names cause Pod admission failure.                   |
 
 
 After adding the field, run `make generate` to regenerate deep copy methods, OpenAPI schema,
@@ -194,13 +233,21 @@ and CRD manifests.
 ### Files modified
 
 
-| File                                                 | Change                                       |
-| ---------------------------------------------------- | -------------------------------------------- |
-| `pkg/apis/trainer/v1alpha1/trainjob_types.go`        | Add `ResourceClaims` field to `PodSpecPatch` |
-| `pkg/apis/trainer/v1alpha1/zz_generated.deepcopy.go` | Regenerated via `make generate`              |
-| `pkg/apis/trainer/v1alpha1/zz_generated.openapi.go`  | Regenerated via `make generate`              |
-| `manifests/base/crds/`                               | Regenerated CRD YAMLs with new field         |
-| `pkg/runtime/core/trainingruntime_test.go`           | Test patch merging with `resourceClaims`     |
+| File                                                 | Change                                                     |
+| ---------------------------------------------------- | ---------------------------------------------------------- |
+| `pkg/apis/trainer/v1alpha1/trainjob_types.go`        | Add `ResourceClaims` field to `PodSpecPatch`               |
+| `pkg/apis/trainer/v1alpha1/zz_generated.deepcopy.go` | Regenerated via `make generate`                            |
+| `pkg/apis/trainer/v1alpha1/zz_generated.openapi.go`  | Regenerated via `make generate`                            |
+| `manifests/base/crds/`                               | Regenerated CRD YAMLs with new field                       |
+| `pkg/runtime/runtime.go`                             | Propagate DRA GPU count via `PodSet`                       |
+| `pkg/runtime/core/trainingruntime.go`                | Resolve DRA GPU count during PodSet construction           |
+| `pkg/runtime/framework/plugins/torch/torch.go`       | Use DRA GPU count as fallback when GPU count is 0          |
+| `pkg/runtime/framework/plugins/torch/torchtune.go`   | Use DRA GPU count as fallback when GPU count is 0          |
+| `pkg/runtime/framework/plugins/mpi/mpi.go`           | Use DRA GPU count as fallback when GPU count is 0          |
+| `pkg/runtime/framework/plugins/xgboost/xgboost.go`   | Use DRA GPU count as fallback when GPU count is 0          |
+| `pkg/runtime/framework/plugins/flux/flux.go`         | Use DRA GPU count as fallback when GPU count is 0          |
+| `manifests/base/rbac/`                               | Add `resourceclaimtemplates` get permission to ClusterRole |
+| `pkg/runtime/core/trainingruntime_test.go`           | Test patch merging with `resourceClaims`                   |
 
 
 ### Test plan
@@ -219,6 +266,19 @@ to implement this enhancement.
 - User adds new claims alongside runtime defaults: both present
 - Empty resourceClaims list in patch: does not clear existing claims
 - Patch targets non-existent replicatedJob name: patch skipped, no error
+
+**`pkg/runtime/core/trainingruntime_test.go`** (add cases for DRA GPU count resolution):
+
+- Runtime template has `resourceClaims` referencing a `ResourceClaimTemplate` with 4 GPU
+  device requests: resolved DRA GPU count is 4
+- Runtime template has `resourceClaims` but template not found: DRA GPU count is 0
+- Runtime template has both extended resources and DRA claims: extended resources win
+
+**`pkg/runtime/framework/plugins/torch/torch_test.go`** (add cases):
+
+- DRA GPU count > 0, no extended resources: `numProcPerNode` derived from DRA count
+- DRA GPU count > 0 with `numProcPerNode` explicitly set: explicit value wins
+- DRA GPU count is 0, no extended resources: falls back to CPU count
 
 #### Integration tests
 
@@ -261,12 +321,9 @@ approach is consistent with how `volumes`, `tolerations`, and `nodeSelector` are
   [KEP-5729](https://github.com/kubernetes/enhancements/issues/5729) (alpha in k8s 1.36)
    and the Trainer WAS KEP ([#3219](https://github.com/kubeflow/trainer/pull/3219)). Enables
    shared device allocation across all pods in a training job.
-2. **Torch plugin DRA-aware GPU detection.** Update `GetNumGPUPerNode()` to inspect
-  `resourceClaims` and derive GPU count from `ResourceClaimTemplate` device request counts,
-   removing the requirement for users to set `numProcPerNode` explicitly with DRA.
-3. `**Resources` on `ContainerPatch`.** Allow users to add container-level `resources.claims`
+2. **`Resources` on `ContainerPatch`.** Allow users to add container-level `resources.claims`
   references via `runtimePatches` without requiring admin pre-wiring in the runtime template.
-4. **ComputeDomain integration for topology-aware scheduling.** Multi-node device allocation
+3. **ComputeDomain integration for topology-aware scheduling.** Multi-node device allocation
   for NVL72/GB200 systems via  
    [wg-device-management](https://github.com/kubernetes-sigs/wg-device-management/tree/main/topology/gpu)  
    PodGroup-level claims with ComputeDomain support.
