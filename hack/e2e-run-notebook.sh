@@ -46,9 +46,13 @@ print_results() {
         # Always show TrainJob status
         kubectl describe trainjob
         kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
-        kubectl wait trainjob --for=condition=Complete --all --timeout 30s
 
-        # Only check pod logs if pods exist (not for local backends).
+        # Collect pod logs BEFORE waiting on completion. A failed TrainJob
+        # never satisfies --for=condition=Complete, so the wait below would
+        # block for its full timeout, during which JobSet garbage-collects the
+        # failed pods and their logs are lost. Dumping logs first captures the
+        # launcher/node tracebacks that explain the failure.
+        #
         # JobSet labels every training pod with jobset-name. MPI runtimes
         # (DeepSpeed, MLX) create "launcher" and "node" jobs, while other
         # runtimes create only "node", so dump logs from all of them to help
@@ -65,6 +69,8 @@ print_results() {
         else
             echo "No training pods found (local backend used - training runs outside Kubernetes)"
         fi
+
+        kubectl wait trainjob --for=condition=Complete --all --timeout 30s
     else
         echo "Skipping kubectl commands (not a Kubernetes test)"
     fi
