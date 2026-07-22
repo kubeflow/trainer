@@ -659,6 +659,24 @@ var _ = Describe("MPIJob controller", func() {
 				}, cm)
 			}, testutil.Timeout, testutil.Interval).Should(Succeed())
 
+			By("Verifying kubectl delivery init container is present")
+			Eventually(func() bool {
+				launcher := &corev1.Pod{}
+				err := testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, launcher)
+				if err != nil {
+					return false
+				}
+				for _, ic := range launcher.Spec.InitContainers {
+					if ic.Name == kubectlDeliveryName {
+						return true
+					}
+				}
+				return false
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
 			By("Verifying launcher pod uses the user-provided ServiceAccount")
 			Eventually(func() string {
 				launcher := &corev1.Pod{}
