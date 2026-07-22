@@ -18,7 +18,36 @@ import pytest
 from kubernetes.client.rest import ApiException
 
 import pkg.initializers.utils.utils as utils
-from pkg.initializers.dataset.cache import CacheInitializer
+from pkg.initializers.dataset.cache import CacheInitializer, parse_cache_storage_uri
+
+
+@pytest.mark.parametrize(
+    ("storage_uri", "expected"),
+    [
+        ("cache://my_schema/my_table", ("my_schema", "my_table")),
+        ("cache://test_schema/test_table", ("test_schema", "test_table")),
+    ],
+)
+def test_parse_cache_storage_uri(storage_uri, expected):
+    assert parse_cache_storage_uri(storage_uri) == expected
+
+
+@pytest.mark.parametrize(
+    "storage_uri",
+    [
+        "cache://",
+        "cache://schema-only",
+        "cache:///table",
+        "cache://schema/",
+        "cache://schema/table/extra",
+    ],
+)
+def test_parse_cache_storage_uri_invalid(storage_uri):
+    with pytest.raises(
+        ValueError,
+        match="expected format cache://<SCHEMA_NAME>/<TABLE_NAME>",
+    ):
+        parse_cache_storage_uri(storage_uri)
 
 
 # Test cases for config loading

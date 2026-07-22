@@ -46,12 +46,6 @@ def parse_cache_storage_uri(storage_uri: str) -> tuple[str, str]:
     Expected format: cache://<SCHEMA_NAME>/<TABLE_NAME>
     """
     prefix = "cache://"
-    if not storage_uri.startswith(prefix):
-        raise ValueError(
-            f"Invalid cache storage URI {storage_uri!r}: "
-            "expected format cache://<SCHEMA_NAME>/<TABLE_NAME>"
-        )
-
     uri_path = storage_uri[len(prefix) :]
     parts = uri_path.split("/")
 
