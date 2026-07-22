@@ -207,6 +207,8 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 	return nil
 }
 
+func (f *Flux) SyncParallelCount(_ *runtime.Info) error { return nil }
+
 // Build creates the extra config map (configuration) and curve secret for Flux.
 func (f *Flux) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
 

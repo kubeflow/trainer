@@ -299,6 +299,29 @@ func (j *JobSet) IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJ
 	return nil
 }
 
+func (j *JobSet) SyncParallelCount(info *runtime.Info) error {
+	if info == nil {
+		return nil
+	}
+	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+	if !ok || jobSetSpec == nil {
+		return nil
+	}
+	for _, ps := range info.TemplateSpec.PodSets {
+		if ps.Count == nil {
+			continue
+		}
+		for rJobIdx := range jobSetSpec.ReplicatedJobs {
+			if jobSetSpec.ReplicatedJobs[rJobIdx].Name != nil && *jobSetSpec.ReplicatedJobs[rJobIdx].Name == ps.Name {
+				jobSetSpec.ReplicatedJobs[rJobIdx].Template.Spec.Parallelism = ps.Count
+				jobSetSpec.ReplicatedJobs[rJobIdx].Template.Spec.Completions = ps.Count
+				break
+			}
+		}
+	}
+	return nil
+}
+
 func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
 	if info == nil || trainJob == nil {
 		return nil, fmt.Errorf("runtime info or object is missing")
@@ -332,10 +355,6 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 	}
 
 	for psIdx, ps := range info.TemplateSpec.PodSets {
-		if ps.Count != nil {
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Parallelism = ps.Count
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Completions = ps.Count
-		}
 		apply.UpsertVolumes(&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Volumes, ps.Volumes...)
 		for containerIdx, container := range ps.Containers {
 			if len(container.Command) > 0 {
