@@ -26,6 +26,23 @@ on:
       - 'docs/**'
       - 'proposals/**'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: git ref (tag, branch, or SHA) to check out and build the images from
+        required: false
+        type: string
+        default: ""
+      version:
+        description: explicit image tag (e.g. v2.3.0-rc.0) to publish
+        required: false
+        type: string
+        default: ""
+      publish:
+        description: whether to push the built images to registries
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-and-publish:
@@ -33,8 +50,12 @@ jobs:
     if: github.repository == 'kubeflow/trainer'
     runs-on: cncf-ubuntu-16-64-x86
 
+    permissions:
+      contents: read
+      packages: write
+
     env:
-      SHOULD_PUBLISH: ${{ github.event_name == 'push' }}
+      SHOULD_PUBLISH: ${{ inputs.publish || github.event_name == 'push' }}
 
     strategy:
       fail-fast: false
@@ -68,6 +89,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Checkout to the release tag when called from the release workflow.
+          ref: ${{ inputs.ref }}
 
       - name: GHCR Login
         if: env.SHOULD_PUBLISH == 'true'
@@ -95,7 +119,7 @@ jobs:
             docker.io/kubeflow/${{ matrix.component-name }}
           dockerfile: ${{ matrix.dockerfile }}
           platforms: ${{ matrix.platforms }}
-          context: ${{ matrix.context }}
+          version: ${{ inputs.version }}
           push: true
 
       - name: Test Build For Component ${{ matrix.component-name }}
@@ -107,5 +131,5 @@ jobs:
             docker.io/kubeflow/${{ matrix.component-name }}
           dockerfile: ${{ matrix.dockerfile }}
           platforms: ${{ matrix.platforms }}
-          context: ${{ matrix.context }}
+          version: ${{ inputs.version }}
           push: false
