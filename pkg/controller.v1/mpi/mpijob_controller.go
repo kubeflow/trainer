@@ -62,8 +62,9 @@ import (
 )
 
 const (
-	FailedDeleteJobReason     = "FailedDeleteJob"
-	SuccessfulDeleteJobReason = "SuccessfulDeleteJob"
+	FailedDeleteJobReason      = "FailedDeleteJob"
+	SuccessfulDeleteJobReason  = "SuccessfulDeleteJob"
+	NoServiceAccountNameReason = "NoServiceAccountName"
 
 	controllerName  = "mpijob-controller"
 	labelMPIJobName = "mpi-job-name"
@@ -1041,6 +1042,9 @@ func (jc *MPIJobReconciler) newLauncher(mpiJob *kubeflowv1.MPIJob, kubectlDelive
 		if len(mpiJob.Spec.MPIReplicaSpecs[kubeflowv1.MPIJobReplicaTypeLauncher].Template.Spec.ServiceAccountName) == 0 {
 			podSpec.Spec.ServiceAccountName = launcherName
 		}
+	} else if len(mpiJob.Spec.MPIReplicaSpecs[kubeflowv1.MPIJobReplicaTypeLauncher].Template.Spec.ServiceAccountName) == 0 {
+		jc.Recorder.Eventf(mpiJob, corev1.EventTypeWarning, NoServiceAccountNameReason,
+			"Launcher has no ServiceAccountName; ensure the namespace default ServiceAccount has get, list, watch pods and create pods/exec permissions")
 	}
 
 	podSpec.Spec.InitContainers = append(podSpec.Spec.InitContainers, corev1.Container{

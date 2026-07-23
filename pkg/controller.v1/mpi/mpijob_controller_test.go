@@ -691,6 +691,50 @@ var _ = Describe("MPIJob controller", func() {
 				return launcher.Spec.ServiceAccountName
 			}, testutil.Timeout, testutil.Interval).Should(Equal(launcherSaName))
 		})
+
+		It("Should warn when no ServiceAccount is provided on the launcher", func() {
+			By("Setting DisableMPIRBACManagement to true")
+			oldDisableMPIRBACManagement := ctlrconfig.Config.DisableMPIRBACManagement
+			ctlrconfig.Config.DisableMPIRBACManagement = true
+			defer func() {
+				ctlrconfig.Config.DisableMPIRBACManagement = oldDisableMPIRBACManagement
+			}()
+
+			By("Creating an MPIJob without a user-provided ServiceAccount")
+			jobName := "test-disable-rbac-no-sa"
+
+			ctx := context.Background()
+			startTime := metav1.Now()
+			completionTime := metav1.Now()
+
+			mpiJob := newMPIJob(jobName, ptr.To[int32](1), 1, gpuResourceName, &startTime, &completionTime)
+			Expect(testK8sClient.Create(ctx, mpiJob)).Should(Succeed())
+
+			By("Reconciling until the launcher pod is created")
+			Eventually(func() error {
+				req := ctrl.Request{NamespacedName: types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      mpiJob.GetName(),
+				}}
+				_, err := reconciler.Reconcile(ctx, req)
+				return err
+			}, testutil.Timeout, testutil.Interval).Should(BeNil())
+
+			By("Verifying a warning event was recorded")
+			Eventually(func() bool {
+				eventList := &corev1.EventList{}
+				err := testK8sClient.List(ctx, eventList, client.InNamespace(metav1.NamespaceDefault))
+				if err != nil {
+					return false
+				}
+				for _, event := range eventList.Items {
+					if event.Reason == NoServiceAccountNameReason && event.InvolvedObject.Name == jobName {
+						return true
+					}
+				}
+				return false
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+		})
 	})
 
 	Context("SetupWithManager with disabled RBAC management", func() {
