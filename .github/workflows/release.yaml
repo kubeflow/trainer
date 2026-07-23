@@ -26,14 +26,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   prepare:
     name: Prepare release branch
     runs-on: ubuntu-latest
     environment:
       name: release
-    permissions:
-      contents: write
     outputs:
       version: ${{ steps.vars.outputs.version }}
       branch: ${{ steps.vars.outputs.branch }}
@@ -149,8 +151,6 @@ jobs:
   create-tag:
     name: Create and push tag
     needs: [prepare, build]
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
 
     steps:
@@ -173,14 +173,19 @@ jobs:
   publish-images:
     name: Build and Publish Images
     needs: [prepare, build, create-tag]
-    permissions:
-      contents: read
-      packages: write
     uses: ./.github/workflows/build-and-push-images.yaml
     with:
       ref: ${{ needs.prepare.outputs.version }}
       version: ${{ needs.prepare.outputs.version }}
       publish: true
+    secrets: inherit
+
+  publish-charts:
+    name: Publish Helm Charts
+    needs: [prepare, publish-images]
+    uses: ./.github/workflows/publish-helm-charts.yaml
+    with:
+      ref: ${{ needs.prepare.outputs.version }}
     secrets: inherit
 
   publish-pypi:
@@ -207,13 +212,9 @@ jobs:
 
   github-release:
     name: Create GitHub release
-    needs: [prepare, build, create-tag, publish-images, publish-pypi]
-    permissions:
-      contents: write
+    needs:
+      [prepare, build, create-tag, publish-images, publish-charts, publish-pypi]
     runs-on: ubuntu-latest
-    environment:
-      name: release
-      url: https://github.com/kubeflow/trainer/releases
 
     steps:
       - name: Checkout release branch
