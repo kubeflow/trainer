@@ -98,7 +98,7 @@ runs:
         images: ${{ inputs.image }}
         tags: |
           type=ref,event=tag
-          type=sha
+          type=sha,enable=${{ inputs.version == '' }}
           type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
 
     - name: Build and Push
