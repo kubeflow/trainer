@@ -82,20 +82,12 @@ func (w *OptimizationJobValidator) ValidateUpdate(ctx context.Context, oldObj, n
 	log := ctrl.LoggerFrom(ctx).WithName("optimizationJob-webhook")
 	log.V(5).Info("Validating update", "OptimizationJob", klog.KObj(newObj))
 
-	// Immutability Checks: Prevent changing the core experiment definition mid-flight
-	if !reflect.DeepEqual(oldObj.Spec.TrainJobTemplate, newObj.Spec.TrainJobTemplate) {
-		return nil, fmt.Errorf("OptimizationJob.Spec.TrainJobTemplate is immutable")
+	// The entire Spec is immutable. Users cannot scale limits or change parameters mid-flight.
+	// Users can only update metadata (like labels/annotations) or the Status.
+	if !reflect.DeepEqual(oldObj.Spec, newObj.Spec) {
+		return nil, fmt.Errorf("OptimizationJob.Spec is immutable and cannot be updated after creation")
 	}
 
-	if !reflect.DeepEqual(oldObj.Spec.Parameters, newObj.Spec.Parameters) {
-		return nil, fmt.Errorf("OptimizationJob.Spec.Parameters are immutable")
-	}
-
-	if !reflect.DeepEqual(oldObj.Spec.Objectives, newObj.Spec.Objectives) {
-		return nil, fmt.Errorf("OptimizationJob.Spec.Objectives are immutable")
-	}
-
-	// Note: Users ARE allowed to update NumTrials and ParallelTrials to scale the job.
 	return nil, nil
 }
 

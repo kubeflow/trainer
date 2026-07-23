@@ -101,17 +101,24 @@ func TestOptimizationJobValidateUpdate(t *testing.T) {
 		updateFn func(obj *trainer.OptimizationJob)
 		wantErr  bool
 	}{
-		"Valid update: scaling up trials": {
+		"Valid update: modifying metadata labels": {
 			updateFn: func(obj *trainer.OptimizationJob) {
-				obj.Spec.NumTrials = ptr.To(int32(20))
+				if obj.Labels == nil {
+					obj.Labels = make(map[string]string)
+				}
+				obj.Labels["new-label"] = "foo"
 			},
 			wantErr: false,
 		},
-		"Invalid update: changing objectives": {
+		"Invalid update: changing NumTrials": {
 			updateFn: func(obj *trainer.OptimizationJob) {
-				obj.Spec.Objectives = []trainer.Objective{
-					{Metric: ptr.To("accuracy")},
-				}
+				obj.Spec.NumTrials = ptr.To(int32(20))
+			},
+			wantErr: true,
+		},
+		"Invalid update: changing ParallelTrials": {
+			updateFn: func(obj *trainer.OptimizationJob) {
+				obj.Spec.ParallelTrials = ptr.To(int32(5))
 			},
 			wantErr: true,
 		},
@@ -120,12 +127,6 @@ func TestOptimizationJobValidateUpdate(t *testing.T) {
 				obj.Spec.Parameters = []trainer.Parameter{
 					{Name: "batch_size"},
 				}
-			},
-			wantErr: true,
-		},
-		"Invalid update: changing TrainJobTemplate": {
-			updateFn: func(obj *trainer.OptimizationJob) {
-				obj.Spec.TrainJobTemplate.ObjectMeta.Labels = map[string]string{"foo": "bar"}
 			},
 			wantErr: true,
 		},
