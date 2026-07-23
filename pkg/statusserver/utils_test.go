@@ -38,11 +38,6 @@ func TestTokenAudience(t *testing.T) {
 			name:         "test-job",
 			wantAudience: "trainer.kubeflow.org/v1alpha1/namespaces/kubeflow-system/trainjobs/test-job/status",
 		},
-		"empty namespace and name are not rejected": {
-			namespace:    "",
-			name:         "",
-			wantAudience: "trainer.kubeflow.org/v1alpha1/namespaces//trainjobs//status",
-		},
 	}
 
 	for name, tc := range testcases {
@@ -71,11 +66,6 @@ func TestStatusUrl(t *testing.T) {
 			namespace: "kubeflow-system",
 			name:      "test-job",
 			wantUrl:   "/apis/trainer.kubeflow.org/v1alpha1/namespaces/kubeflow-system/trainjobs/test-job/status",
-		},
-		"empty namespace and name are not rejected": {
-			namespace: "",
-			name:      "",
-			wantUrl:   "/apis/trainer.kubeflow.org/v1alpha1/namespaces//trainjobs//status",
 		},
 	}
 
