@@ -584,9 +584,10 @@ var _ = Describe("MPIJob controller", func() {
 	Context("MPIJob with disabled RBAC management", func() {
 		It("Should not create ServiceAccount, Role, or RoleBinding", func() {
 			By("Setting DisableMPIRBACManagement to true")
+			oldDisableMPIRBACManagement := ctlrconfig.Config.DisableMPIRBACManagement
 			ctlrconfig.Config.DisableMPIRBACManagement = true
 			defer func() {
-				ctlrconfig.Config.DisableMPIRBACManagement = false
+				ctlrconfig.Config.DisableMPIRBACManagement = oldDisableMPIRBACManagement
 			}()
 
 			By("Creating an MPIJob with a user-provided ServiceAccount")
@@ -702,12 +703,15 @@ var _ = Describe("MPIJob controller", func() {
 			cfg2, err := testEnv2.Start()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(cfg2).NotTo(BeNil())
-			defer testEnv2.Stop()
+			defer func() {
+				Expect(testEnv2.Stop()).NotTo(HaveOccurred())
+			}()
 
 			By("Setting DisableMPIRBACManagement to true")
+			oldDisableMPIRBACManagement := ctlrconfig.Config.DisableMPIRBACManagement
 			ctlrconfig.Config.DisableMPIRBACManagement = true
 			defer func() {
-				ctlrconfig.Config.DisableMPIRBACManagement = false
+				ctlrconfig.Config.DisableMPIRBACManagement = oldDisableMPIRBACManagement
 			}()
 
 			By("Creating a second manager with disabled RBAC management")
