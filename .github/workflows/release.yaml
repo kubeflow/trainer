@@ -170,9 +170,21 @@ jobs:
           git tag "$TAG"
           git push origin "$TAG"
 
+  publish-images:
+    name: Build and Publish Images
+    needs: [prepare, build, create-tag]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-and-push-images.yaml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      publish: true
+    secrets: inherit
+
   publish-pypi:
     name: Publish to PyPI
-    needs: [prepare, build, create-tag]
+    needs: [prepare, build, create-tag, publish-images]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -194,7 +206,7 @@ jobs:
 
   github-release:
     name: Create GitHub release
-    needs: [prepare, build, create-tag, publish-pypi]
+    needs: [prepare, build, create-tag, publish-images, publish-pypi]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -246,8 +258,16 @@ jobs:
           tag_name: ${{ needs.prepare.outputs.version }}
           name: ${{ needs.prepare.outputs.version }}
           body: ${{ steps.changelog.outputs.changelog }}
-          draft: false
+          # Create the release as a draft so assets are uploaded before publication.
+          # With immutable releases enabled, a published release locks its assets, so
+          # they must be attached while the release is still a draft.
+          draft: true
           prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
           generate_release_notes: false
           files: |
             dist/*
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ needs.prepare.outputs.version }}" --draft=false
