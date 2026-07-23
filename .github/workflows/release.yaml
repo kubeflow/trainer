@@ -178,6 +178,7 @@ jobs:
       packages: write
     uses: ./.github/workflows/build-and-push-images.yaml
     with:
+      ref: ${{ needs.prepare.outputs.version }}
       version: ${{ needs.prepare.outputs.version }}
       publish: true
     secrets: inherit
