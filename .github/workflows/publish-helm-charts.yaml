@@ -21,6 +21,13 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: git ref (tag) to check out and publish the chart from
+        required: false
+        type: string
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,6 +46,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Checkout to the release tag when called from the release workflow.
+          ref: ${{ inputs.ref }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
@@ -49,7 +59,7 @@ jobs:
 
       - name: Build, package, and push Helm chart
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "${{ github.ref }}" == refs/tags/* || -n "${{ inputs.ref }}" ]]; then
             VERSION=$(grep '^version:' ${{ env.CHART_PATH }}/Chart.yaml | awk '{print $2}')
           else
             VERSION="0.0.0-sha-$(git rev-parse --short=7 HEAD)"
