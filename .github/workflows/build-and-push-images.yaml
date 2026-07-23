@@ -28,6 +28,11 @@ on:
   workflow_dispatch:
   workflow_call:
     inputs:
+      ref:
+        description: git ref (tag, branch, or SHA) to check out and build the images from
+        required: false
+        type: string
+        default: ""
       version:
         description: explicit image tag (e.g. v2.3.0-rc.0) to publish
         required: false
@@ -84,6 +89,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Checkout to the release tag when called from the release workflow.
+          ref: ${{ inputs.ref }}
 
       - name: GHCR Login
         if: env.SHOULD_PUBLISH == 'true'
