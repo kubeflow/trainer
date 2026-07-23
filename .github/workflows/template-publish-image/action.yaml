@@ -33,6 +33,10 @@ inputs:
   push:
     required: true
     description: whether to push container images or not
+  version:
+    required: false
+    default: ""
+    description: explicit image tag (e.g. v2.3.0-rc.0) for builds not triggered by a tag push
 
 runs:
   using: composite
@@ -95,6 +99,7 @@ runs:
         tags: |
           type=ref,event=tag
           type=sha
+          type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
 
     - name: Build and Push
       uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
