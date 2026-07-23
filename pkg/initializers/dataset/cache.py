@@ -14,6 +14,7 @@
 
 import logging
 import time
+from urllib.parse import urlparse
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -40,6 +41,24 @@ def get_namespace() -> str:
         return "default"
 
 
+def parse_cache_storage_uri(storage_uri: str) -> tuple[str, str]:
+    """Parse cache storage URI.
+
+    Expected format: cache://<SCHEMA_NAME>/<TABLE_NAME>
+    """
+    storage_uri_parsed = urlparse(storage_uri)
+    schema_name = storage_uri_parsed.netloc
+    table_name = storage_uri_parsed.path.removeprefix("/")
+
+    if not schema_name or not table_name or "/" in table_name:
+        raise ValueError(
+            f"Invalid cache storage URI {storage_uri!r}: "
+            "expected format cache://<SCHEMA_NAME>/<TABLE_NAME>"
+        )
+
+    return schema_name, table_name
+
+
 class CacheInitializer(utils.DatasetProvider):
 
     def load_config(self):
@@ -48,12 +67,9 @@ class CacheInitializer(utils.DatasetProvider):
         config_dict = {k: v for k, v in config_dict.items() if v is not None}
         self.config = types.CacheDatasetInitializer(**config_dict)
 
-        # Parse schema_name and table_name from storage_uri
-        # Format: cache://<SCHEMA_NAME>/<TABLE_NAME>
-        uri_path = self.config.storage_uri[len("cache://") :]
-        parts = uri_path.split("/")
-        self.schema_name = parts[0]
-        self.table_name = parts[1]
+        self.schema_name, self.table_name = parse_cache_storage_uri(
+            self.config.storage_uri
+        )
 
     def download_dataset(self):
         """Bootstrap cache cluster with dataset"""
