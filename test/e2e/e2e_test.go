@@ -210,6 +210,80 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 
 	ginkgo.When("Creating TrainJob to perform Intel MPI workload", func() {
 		ginkgo.It("should create TrainJob with Intel MPI stub runtime reference", func() {
+			ginkgo.By("Create the mpi-intel-stub ClusterTrainingRuntime", func() {
+				runtime := &trainer.ClusterTrainingRuntime{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   intelMPIStubRuntime,
+						Labels: map[string]string{"trainer.kubeflow.org/framework": "mpi"},
+					},
+					Spec: trainer.TrainingRuntimeSpec{
+						MLPolicy: &trainer.MLPolicy{
+							NumNodes: ptr.To(int32(1)),
+							MLPolicySource: trainer.MLPolicySource{
+								MPI: &trainer.MPIMLPolicySource{
+									NumProcPerNode:    ptr.To(int32(1)),
+									MPIImplementation: ptr.To(trainer.MPIImplementationIntel),
+									SSHAuthMountPath:  ptr.To("/root/.ssh"),
+									RunLauncherAsNode: ptr.To(false),
+								},
+							},
+						},
+						Template: trainer.JobSetTemplateSpec{
+							Spec: jobsetv1alpha2.JobSetSpec{
+								Network: &jobsetv1alpha2.Network{
+									PublishNotReadyAddresses: ptr.To(true),
+								},
+								SuccessPolicy: &jobsetv1alpha2.SuccessPolicy{
+									Operator:             jobsetv1alpha2.OperatorAll,
+									TargetReplicatedJobs: []string{constants.Launcher},
+								},
+								ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+									{
+										Name: constants.Launcher,
+										Template: batchv1.JobTemplateSpec{
+											ObjectMeta: metav1.ObjectMeta{
+												Labels: map[string]string{
+													"trainer.kubeflow.org/trainjob-ancestor-step": "trainer",
+												},
+											},
+											Spec: batchv1.JobSpec{
+												Template: corev1.PodTemplateSpec{
+													Spec: corev1.PodSpec{
+														Containers: []corev1.Container{{
+															Name:    constants.Node,
+															Image:   "busybox",
+															Command: []string{"sh", "-c", "sleep 5"},
+														}},
+													},
+												},
+											},
+										},
+									},
+									{
+										Name: constants.Node,
+										Template: batchv1.JobTemplateSpec{
+											Spec: batchv1.JobSpec{
+												Template: corev1.PodTemplateSpec{
+													Spec: corev1.PodSpec{
+														Containers: []corev1.Container{{
+															Name:    constants.Node,
+															Image:   "busybox",
+															Command: []string{"sh", "-c", "sleep 120"},
+														}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				gomega.Expect(k8sClient.Create(ctx, runtime)).Should(gomega.Succeed())
+				ginkgo.DeferCleanup(k8sClient.Delete, runtime)
+			})
+
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-intel-mpi").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), intelMPIStubRuntime).
 				Obj()
@@ -280,6 +354,80 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 
 	ginkgo.When("Creating TrainJob to perform MPICH workload", func() {
 		ginkgo.It("should create TrainJob with MPICH stub runtime reference", func() {
+			ginkgo.By("Create the mpi-mpich-stub ClusterTrainingRuntime", func() {
+				runtime := &trainer.ClusterTrainingRuntime{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   mpichStubRuntime,
+						Labels: map[string]string{"trainer.kubeflow.org/framework": "mpi"},
+					},
+					Spec: trainer.TrainingRuntimeSpec{
+						MLPolicy: &trainer.MLPolicy{
+							NumNodes: ptr.To(int32(1)),
+							MLPolicySource: trainer.MLPolicySource{
+								MPI: &trainer.MPIMLPolicySource{
+									NumProcPerNode:    ptr.To(int32(1)),
+									MPIImplementation: ptr.To(trainer.MPIImplementationMPICH),
+									SSHAuthMountPath:  ptr.To("/root/.ssh"),
+									RunLauncherAsNode: ptr.To(false),
+								},
+							},
+						},
+						Template: trainer.JobSetTemplateSpec{
+							Spec: jobsetv1alpha2.JobSetSpec{
+								Network: &jobsetv1alpha2.Network{
+									PublishNotReadyAddresses: ptr.To(true),
+								},
+								SuccessPolicy: &jobsetv1alpha2.SuccessPolicy{
+									Operator:             jobsetv1alpha2.OperatorAll,
+									TargetReplicatedJobs: []string{constants.Launcher},
+								},
+								ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+									{
+										Name: constants.Launcher,
+										Template: batchv1.JobTemplateSpec{
+											ObjectMeta: metav1.ObjectMeta{
+												Labels: map[string]string{
+													"trainer.kubeflow.org/trainjob-ancestor-step": "trainer",
+												},
+											},
+											Spec: batchv1.JobSpec{
+												Template: corev1.PodTemplateSpec{
+													Spec: corev1.PodSpec{
+														Containers: []corev1.Container{{
+															Name:    constants.Node,
+															Image:   "busybox",
+															Command: []string{"sh", "-c", "sleep 5"},
+														}},
+													},
+												},
+											},
+										},
+									},
+									{
+										Name: constants.Node,
+										Template: batchv1.JobTemplateSpec{
+											Spec: batchv1.JobSpec{
+												Template: corev1.PodTemplateSpec{
+													Spec: corev1.PodSpec{
+														Containers: []corev1.Container{{
+															Name:    constants.Node,
+															Image:   "busybox",
+															Command: []string{"sh", "-c", "sleep 120"},
+														}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				gomega.Expect(k8sClient.Create(ctx, runtime)).Should(gomega.Succeed())
+				ginkgo.DeferCleanup(k8sClient.Delete, runtime)
+			})
+
 			trainJob := testingutil.MakeTrainJobWrapper(ns.Name, "e2e-test-mpich").
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), mpichStubRuntime).
 				Obj()
