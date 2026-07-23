@@ -26,7 +26,7 @@ resources:
 # Add data cache image tags
 images:
   - name: ghcr.io/kubeflow/trainer/dataset-initializer
-    newTag: latest
+    newTag: v2.3.0-rc.0
 
 # Patch namespace-rbac resources to install in default namespace
 patches:
