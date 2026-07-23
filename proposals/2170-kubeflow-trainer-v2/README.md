@@ -752,6 +752,110 @@ replicatedJobs:
                     value: AutoModelForCausalLM
 ```
 
+### The Initializer Plugin
+
+The `Initializer` Plugin is a Pipeline Framework plugin that applies
+`TrainJob.Spec.Initializer` onto the corresponding initializer PodSets of the
+`TrainingRuntime` template, independently from the JobSet plugin that
+assembles the final `JobSet`.
+
+Today, initializer wiring is applied inline by the JobSet plugin's builder,
+which forces `TrainJob`s to use only runtimes that already ship initializer
+ReplicatedJob templates. A dedicated `Initializer` Plugin allows Initializer
+configuration to flow uniformly from Trainer Configuration, TrainingRuntime
+defaults, and TrainJob overrides — and to synthesize initializer PodSets
+when the runtime template has none (see
+[kubeflow/trainer#2886](https://github.com/kubeflow/trainer/issues/2886)).
+It also provides a natural home for shared initialization across TrainJobs
+(see [KEP-3310](https://github.com/kubeflow/trainer/pull/3311)).
+
+The Initializer Plugin in Kubeflow Trainer will be responsible to:
+
+- **Configure mode** — when the resolved runtime template contains the
+  requested initializer PodSet (identified by the
+  `trainer.kubeflow.org/trainjob-ancestor-step` label), apply
+  `TrainJob.Spec.Initializer.Dataset` or `.Model` fields (`storageUri`,
+  `env`, `secretRef`) onto that container.
+- **Synthesize mode** — when the runtime template does not contain the
+  requested initializer PodSet, append a new PodSet built from Trainer
+  Configuration defaults, with TrainJob overrides applied on top.
+- Validate the Initializer spec at admission time. The plugin does **not**
+  require the runtime template to contain initializer ReplicatedJobs.
+
+The plugin implements two Pipeline Framework extension points:
+
+- `EnforceInitializer` (Build Phase): a new extension point that mutates
+  `RuntimeInfo.TemplateSpec.PodSets` to configure or append the dataset and
+  model initializer PodSets.
+- `CustomValidation` (PreExecution Phase): validates Initializer fields
+  against the resolved runtime template and Trainer Configuration.
+
+`EnforceInitializer` runs alongside `EnforceMLPolicy` and
+`EnforcePodGroupPolicy` within the Build Phase.
+
+To carry env-from-secret references through the `RuntimeInfo` abstraction,
+the `Container` type is extended with an `EnvFrom` field:
+
+```golang
+type Container struct {
+	Name         string
+	Image        string
+	Command      []string
+	Env          []corev1ac.EnvVarApplyConfiguration
+	EnvFrom      []corev1ac.EnvFromSourceApplyConfiguration
+	Ports        []corev1ac.ContainerPortApplyConfiguration
+	VolumeMounts []corev1ac.VolumeMountApplyConfiguration
+}
+```
+
+The JobSet plugin's `ComponentBuilder` writes `EnvFrom` through to the JobSet
+apply configuration in the same loop that writes `Env` and `VolumeMounts`.
+
+In synthesize mode, the Initializer Plugin appends a new `PodSet` to
+`RuntimeInfo.TemplateSpec.PodSets` with `Ancestor` set to the initializer
+label. The JobSet plugin's `ComponentBuilder` constructs a corresponding
+`ReplicatedJob` for any orphan `PodSet` whose `Ancestor` is a known
+initializer label (`dataset-initializer`, `model-initializer`); an
+unrecognized ancestor returns an error. All JobSet-shape knowledge stays
+inside the JobSet plugin.
+
+Synthesis defaults are sourced from a new `initializer` block on the
+controller-manager `Configuration` — the first domain-level field on
+`Configuration`:
+
+```golang
+type Configuration struct {
+	// ... existing fields
+	Initializer *InitializerDefaults `json:"initializer,omitempty"`
+}
+
+type InitializerDefaults struct {
+	Dataset *InitializerContainerDefaults `json:"dataset,omitempty"`
+	Model   *InitializerContainerDefaults `json:"model,omitempty"`
+}
+
+type InitializerContainerDefaults struct {
+	Image     string                       `json:"image,omitempty"`
+	MountPath string                       `json:"mountPath,omitempty"`
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+```
+
+Merge precedence for synthesis mode: Configuration defaults → TrainingRuntime
+→ TrainJob.
+
+**Synthesize scope.** Synthesis targets PVC-based initializers — a container
+that reads `storageUri` and writes to a mount path. Cache-based
+initialization (LeaderWorkerSet-backed data caches under
+`manifests/base/runtimes/data-cache/`) works via configure mode when the
+Runtime ships a `dataset-initializer` ReplicatedJob, but is not synthesized
+from Trainer Configuration; that is a future extension of
+`InitializerContainerDefaults`.
+
+Existing `TrainingRuntime`s that ship initializer ReplicatedJob templates
+continue to work unchanged. Existing `TrainJob`s are unchanged. No CRD schema
+changes are required.
+
 ### The RuntimePatches API
 
 `runtimePatches` allows controllers, admission webhooks, and custom clients to attach structured
@@ -1842,6 +1946,8 @@ On the other hand, the Internal APIs are not exposed and could not add any opera
       to any kind of resources like PodSpec.
     - `EnforceMLPolicy`: This configure MachineLearning framework specific parameters (e.x, specified in TrainingRuntime `.spec.mlPolicy`)
       to any kind of resources like PodSpec.
+    - `EnforceInitializer`: This configures dataset and model Initializer specific parameters (specified in TrainJob `.spec.initializer`)
+      to the initializer PodSpecs.
     - `PodNetwork`: This identifies Pod-to-Pod communication network endpoints for each Pod and stores them to `RuntimeInfo`.
     - `ComponentBuilder`: This builds Kubernetes resources leveraging `RuntimeInfo` and `TrainJob`.
       `RuntimeInfo` is abstracted objects extracted from runtimes like TrainingRuntime and ClusterTrainingRuntime.
