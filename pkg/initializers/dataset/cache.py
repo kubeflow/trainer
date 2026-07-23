@@ -14,6 +14,7 @@
 
 import logging
 import time
+from urllib.parse import urlparse
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -45,17 +46,17 @@ def parse_cache_storage_uri(storage_uri: str) -> tuple[str, str]:
 
     Expected format: cache://<SCHEMA_NAME>/<TABLE_NAME>
     """
-    prefix = "cache://"
-    uri_path = storage_uri[len(prefix) :]
-    parts = uri_path.split("/")
+    storage_uri_parsed = urlparse(storage_uri)
+    schema_name = storage_uri_parsed.netloc
+    table_name = storage_uri_parsed.path.removeprefix("/")
 
-    if len(parts) != 2 or not parts[0] or not parts[1]:
+    if not schema_name or not table_name or "/" in table_name:
         raise ValueError(
             f"Invalid cache storage URI {storage_uri!r}: "
             "expected format cache://<SCHEMA_NAME>/<TABLE_NAME>"
         )
 
-    return parts[0], parts[1]
+    return schema_name, table_name
 
 
 class CacheInitializer(utils.DatasetProvider):
