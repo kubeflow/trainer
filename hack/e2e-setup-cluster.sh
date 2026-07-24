@@ -170,7 +170,7 @@ if [ "${INSTALL_METHOD}" = "kustomize" ]; then
   echo "Deploy Kubeflow Trainer control plane"
   E2E_MANIFESTS_DIR="artifacts/e2e/manifests"
   mkdir -p "${E2E_MANIFESTS_DIR}"
-  cat <<EOF >"${E2E_MANIFESTS_DIR}/kustomization.yaml"
+  cat << EOF > "${E2E_MANIFESTS_DIR}/kustomization.yaml"
   apiVersion: kustomize.config.k8s.io/v1beta1
   kind: Kustomization
   resources:
@@ -205,7 +205,7 @@ EOF
   E2E_RUNTIMES_DIR="artifacts/e2e/runtimes"
   mkdir -p "${E2E_RUNTIMES_DIR}"
 
-  cat <<EOF >"${E2E_RUNTIMES_DIR}/kustomization.yaml"
+  cat << EOF > "${E2E_RUNTIMES_DIR}/kustomization.yaml"
   apiVersion: kustomize.config.k8s.io/v1beta1
   kind: Kustomization
   resources:

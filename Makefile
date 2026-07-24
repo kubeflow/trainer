@@ -44,6 +44,8 @@ HELM_CHART_TESTING_VERSION ?= v3.12.0
 HELM_DOCS_VERSION ?= v1.14.2
 YQ_VERSION ?= v4.45.1
 KUBE_LINTER_VERSION ?= v0.7.1
+SHFMT_VERSION ?= v3.13.1
+SHELLCHECK_VERSION ?= v0.11.0
 
 # Container runtime (docker or podman)
 CONTAINER_RUNTIME ?=
@@ -60,6 +62,8 @@ GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 GOLANGCI_LINT_KAL ?= $(LOCALBIN)/golangci-lint-kube-api-linter
 LINT_PKG ?= ./...
 KUBE_LINTER ?= $(LOCALBIN)/kube-linter
+SHFMT ?= $(LOCALBIN)/shfmt
+SHELLCHECK ?= $(LOCALBIN)/shellcheck
 
 ##@ General
 
@@ -140,6 +144,22 @@ uv: ## Install uv if it is not already installed.
 lint-manifests: kube-linter ## Run kube-linter on manifests and helm charts.
 	$(KUBE_LINTER) lint manifests/base --config .kube-linter.yaml
 	$(KUBE_LINTER) lint charts/kubeflow-trainer --config .kube-linter.yaml
+
+# shfmt options: 2-space indent, indent switch cases, space after redirect operators.
+SHFMT_OPTIONS ?= --indent 2 --case-indent --space-redirects
+
+# Extra shellcheck options, e.g. set SHELLCHECK_OPTIONS=--severity=warning to only fail on warnings.
+SHELLCHECK_OPTIONS ?=
+
+.PHONY: shell-fmt
+shell-fmt: shfmt
+	@echo "Running shfmt..."
+	@git ls-files -z '*.sh' | xargs -0 -I{} $(SHFMT) --write --list $(SHFMT_OPTIONS) "{}"
+
+.PHONY: shell-lint
+shell-lint: shellcheck
+	@echo "Running shellcheck..."
+	@git ls-files -z '*.sh' | xargs -0 -I{} $(SHELLCHECK) $(SHELLCHECK_OPTIONS) "{}"
 
 # Download external CRDs for Go integration testings.
 EXTERNAL_CRDS_DIR ?= $(PROJECT_DIR)/manifests/external-crds
@@ -255,6 +275,14 @@ test-e2e-setup-cluster: kind ## Setup Kind cluster for e2e test. (Set GPU_CLUSTE
 test-e2e: ginkgo ## Run Go e2e test.
 	$(GINKGO) -v ./test/e2e/...
 
+.PHONY: shfmt
+shfmt:
+	GOBIN=$(LOCALBIN) go install mvdan.cc/sh/v3/cmd/shfmt@$(SHFMT_VERSION)
+
+.PHONY: shellcheck
+shellcheck: ## Download shellcheck binary if required.
+	$(call download-shellcheck,$(SHELLCHECK),$(SHELLCHECK_VERSION))
+
 # Input and output location for Notebooks executed with Papermill.
 NOTEBOOK_INPUT=$(PROJECT_DIR)/examples/pytorch/image-classification/mnist.ipynb
 NOTEBOOK_OUTPUT=$(PROJECT_DIR)/artifacts/notebooks/trainer_output.ipynb
@@ -358,3 +386,29 @@ release: ## Create a release commit. Usage: make release VERSION=vX.Y.Z [GITHUB_
 	@echo "Release commit for $(VERSION) is ready."
 	@echo "Review the changelog changes, then commit with:"
 	@echo "  git add -A && git commit -s -m 'Prepare Release $(VERSION)'"
+
+# download-shellcheck will download a pinned shellcheck release binary if it doesn't exist.
+# shellcheck publishes .tar.gz assets from v0.11.0 onward, which avoids an
+# xz/liblzma dependency. Pinning an older SHELLCHECK_VERSION would need .tar.xz.
+# $1 - target path with name of binary (ideally with version)
+# $2 - shellcheck version (e.g. v0.11.0)
+define download-shellcheck
+@[ -f "$(1)" ] || { \
+set -e; \
+os=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+arch=$$(uname -m); \
+case "$$arch" in \
+  x86_64|amd64) arch=x86_64 ;; \
+  arm64|aarch64) arch=aarch64 ;; \
+  *) echo "Unsupported architecture: $$arch" >&2; exit 1 ;; \
+esac; \
+archive="shellcheck-$(2).$${os}.$${arch}.tar.gz"; \
+url="https://github.com/koalaman/shellcheck/releases/download/$(2)/$${archive}"; \
+echo "Downloading $${url}"; \
+tmp=$$(mktemp -d); \
+curl -fsSL "$${url}" | tar -xz -C "$${tmp}"; \
+mv "$${tmp}/shellcheck-$(2)/shellcheck" "$(1)"; \
+chmod +x "$(1)"; \
+rm -rf "$${tmp}"; \
+}
+endef
