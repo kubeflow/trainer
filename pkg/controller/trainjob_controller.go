@@ -107,14 +107,12 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	} else if !trainjob.IsTrainJobFinished(&trainJob) {
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
 		if err != nil {
-			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
-			//  the creation of the runtime resources failed and the TrainJob is backed off until
-			//  the next retry attempt.
 			// The event message is truncated to stay within the maximum length limit (1024 chars).
 			message := fmt.Sprintf("TrainJob resources reconciliation failed: %.950v", err.Error())
 			if len(err.Error()) > 950 {
 				message = fmt.Sprintf("%s ...", message)
 			}
+			setFailedCondition(&trainJob, message, trainer.TrainJobResourcesCreationFailedReason)
 			r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Reconciling", message)
 		}
 	}
@@ -253,10 +251,10 @@ func removeFailedCondition(trainJob *trainer.TrainJob) {
 }
 
 func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
-	deadlineCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
-	if deadlineCond != nil && deadlineCond.Reason != trainer.TrainJobDeadlineExceededReason {
-		deadlineCond = nil
-	}
+	// Preserve any pre-existing Failed condition from being overwritten
+	// by the runtime TrainJobStatus. This covers both terminal failures
+	// (DeadlineExceeded) and creation failures (ResourcesCreationFailed).
+	failedCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
 
 	status, err := runtime.TrainJobStatus(ctx, trainJob)
 	if err != nil {
@@ -265,8 +263,8 @@ func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJo
 	if status != nil {
 		trainJob.Status = *status
 	}
-	if deadlineCond != nil {
-		meta.SetStatusCondition(&trainJob.Status.Conditions, *deadlineCond)
+	if failedCond != nil {
+		meta.SetStatusCondition(&trainJob.Status.Conditions, *failedCond)
 	}
 	return nil
 }
