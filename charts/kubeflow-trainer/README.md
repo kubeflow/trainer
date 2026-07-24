@@ -1,6 +1,6 @@
 # kubeflow-trainer
 
-![Version: 2.3.0-rc.2](https://img.shields.io/badge/Version-2.3.0--rc.2-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)
+![Version: 2.3.0-rc.3](https://img.shields.io/badge/Version-2.3.0--rc.3-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)
 
 A Helm chart for deploying Kubeflow Trainer on Kubernetes.
 

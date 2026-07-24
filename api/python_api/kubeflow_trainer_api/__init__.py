@@ -13,4 +13,4 @@
 # limitations under the License.
 
 
-__version__ = "2.3.0rc2"
+__version__ = "2.3.0rc3"
