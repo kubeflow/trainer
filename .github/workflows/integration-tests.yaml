@@ -80,7 +80,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pip install pytest
+          pip install pytest "kubernetes<36"
           python3 -m pip install -e sdk/python; pytest -s sdk/python/test/e2e --log-cli-level=debug --namespace=default
         env:
           GANG_SCHEDULER_NAME: ${{ matrix.gang-scheduler-name }}

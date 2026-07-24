@@ -28,7 +28,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest python-dateutil urllib3 kubernetes
+          # TODO: kubernetes 36.0.0 switched to Pydantic models, breaking the
+          # FakeResponse deserialization hack in the SDK unit tests. To remove
+          # this pin, either adapt FakeResponse in
+          # sdk/python/kubeflow/training/utils/utils.py for Pydantic or mock
+          # ApiClient.deserialize directly in the test suite.
+          pip install pytest python-dateutil urllib3 "kubernetes<36"
           pip install -U './sdk/python[huggingface]'
 
       - name: Run unit test for training sdk
