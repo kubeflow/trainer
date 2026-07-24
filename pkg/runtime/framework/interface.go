@@ -51,9 +51,29 @@ type EnforceMLPolicyPlugin interface {
 	EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error
 }
 
-type PodNetworkPlugin interface {
+// EnforceInfrastructurePlugin updates runtime.Info with infrastructure concerns
+// that every TrainJob needs regardless of how it was configured: things the
+// platform must wire up, rather than things the user asked for.
+//
+// Use this interface when the plugin is not driven by a policy field. The
+// sibling interfaces are each scoped to one field of the TrainingRuntime spec
+// and activate only when a user sets it:
+//
+//   - EnforceMLPolicyPlugin        for .spec.mlPolicy (e.g. Torch, JAX)
+//   - EnforcePodGroupPolicyPlugin  for .spec.podGroupPolicy (e.g. Coscheduling)
+//
+// If you cannot name the spec field that switches your plugin on, it belongs
+// here. Current implementations are JobSet, which derives Pod-to-Pod network
+// endpoints from the PodSets, and TrainJobStatus, which injects status-server
+// configuration; neither corresponds to anything the user declares.
+//
+// Ordering is load-bearing: this phase runs after EnforceMLPolicyPlugin and
+// EnforcePodGroupPolicyPlugin, so implementations may rely on runtime.Info
+// already being shaped by those plugins. JobSet, for example, reads
+// PodSets[].Count after the ML policy has set it.
+type EnforceInfrastructurePlugin interface {
 	Plugin
-	IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) error
+	EnforceInfrastructure(info *runtime.Info, trainJob *trainer.TrainJob) error
 }
 
 type ComponentBuilderPlugin interface {
