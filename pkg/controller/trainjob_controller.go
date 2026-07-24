@@ -95,34 +95,35 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Keep track of the origin TrainJob status
 	prevTrainJob := trainJob.DeepCopy()
 
-	// Let's clear the failed condition that could have been set previously.
-	// An external change to the TrainJob spec may transition it out of the Failed state.
-	removeFailedCondition(&trainJob)
-
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
 	runtime, ok := r.runtimes[runtimeRefGK]
 	if !ok {
 		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
-		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
-	} else if !trainjob.IsTrainJobFinished(&trainJob) {
-		err = r.reconcileObjects(ctx, runtime, &trainJob)
-		if err != nil {
-			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
-			//  the creation of the runtime resources failed and the TrainJob is backed off until
-			//  the next retry attempt.
-			// The event message is truncated to stay within the maximum length limit (1024 chars).
-			message := fmt.Sprintf("TrainJob resources reconciliation failed: %.950v", err.Error())
-			if len(err.Error()) > 950 {
-				message = fmt.Sprintf("%s ...", message)
+		setRuntimeNotSupportedFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK))
+	} else {
+		removeTransientFailedCondition(&trainJob)
+		if !trainjob.IsTrainJobFinished(&trainJob) {
+			err = r.reconcileObjects(ctx, runtime, &trainJob)
+			if err != nil {
+				// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
+				//  the creation of the runtime resources failed and the TrainJob is backed off until
+				//  the next retry attempt.
+				// The event message is truncated to stay within the maximum length limit (1024 chars).
+				message := fmt.Sprintf("TrainJob resources reconciliation failed: %.950v", err.Error())
+				if len(err.Error()) > 950 {
+					message = fmt.Sprintf("%s ...", message)
+				}
+				r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Reconciling", message)
 			}
-			r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Reconciling", message)
 		}
 	}
 
 	setSuspendedCondition(&trainJob)
 
-	if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
-		err = errors.Join(err, statusErr)
+	if ok {
+		if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
+			err = errors.Join(err, statusErr)
+		}
 	}
 
 	if deadlineResult, deadlineErr := r.reconcileDeadline(ctx, &trainJob); deadlineErr != nil || deadlineResult.RequeueAfter > 0 {
@@ -244,12 +245,19 @@ func setFailedCondition(trainJob *trainer.TrainJob, message, reason string) {
 	meta.SetStatusCondition(&trainJob.Status.Conditions, newCond)
 }
 
-func removeFailedCondition(trainJob *trainer.TrainJob) {
+func setRuntimeNotSupportedFailedCondition(trainJob *trainer.TrainJob, message string) {
 	cond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
-	if cond != nil && cond.Reason == trainer.TrainJobDeadlineExceededReason {
+	if cond != nil && cond.Status == metav1.ConditionTrue && cond.Reason != trainer.TrainJobRuntimeNotSupportedReason {
 		return
 	}
-	meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobFailed)
+	setFailedCondition(trainJob, message, trainer.TrainJobRuntimeNotSupportedReason)
+}
+
+func removeTransientFailedCondition(trainJob *trainer.TrainJob) {
+	cond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
+	if cond != nil && cond.Reason == trainer.TrainJobRuntimeNotSupportedReason {
+		meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobFailed)
+	}
 }
 
 func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
