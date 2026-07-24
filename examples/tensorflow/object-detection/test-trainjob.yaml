@@ -1,0 +1,156 @@
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: tensorflow-yolo-gpu-test
+  namespace: default
+spec:
+  runtimeRef:
+    name: torch-distributed
+  trainer:
+    image: tensorflow/tensorflow:2.15.0-gpu
+    command:
+      - python
+      - -c
+      - |
+        import os
+        import json
+        import tensorflow as tf
+        import numpy as np
+        
+        print("=" * 80)
+        print("TensorFlow YOLO Object Detection Test")
+        print("=" * 80)
+        
+        # Check TensorFlow and GPU setup
+        print(f"\nTensorFlow version: {tf.__version__}")
+        gpus = tf.config.list_physical_devices('GPU')
+        print(f"GPU devices available: {len(gpus)}")
+        for i, gpu in enumerate(gpus):
+            print(f"  GPU {i}: {gpu}")
+        
+        # Check distributed training config
+        tf_config = os.environ.get('TF_CONFIG')
+        if tf_config:
+            print(f"\nDistributed Training Configuration:")
+            config = json.loads(tf_config)
+            print(f"  Task type: {config['task']['type']}")
+            print(f"  Task index: {config['task']['index']}")
+            print(f"  Cluster: {json.dumps(config['cluster'], indent=4)}")
+            
+            # Setup MultiWorkerMirroredStrategy
+            strategy = tf.distribute.MultiWorkerMirroredStrategy()
+            print(f"\nDistributed Strategy: MultiWorkerMirroredStrategy")
+            print(f"  Number of replicas: {strategy.num_replicas_in_sync}")
+        else:
+            # Single device
+            if gpus:
+                strategy = tf.distribute.OneDeviceStrategy(device="/gpu:0")
+            else:
+                strategy = tf.distribute.OneDeviceStrategy(device="/cpu:0")
+            print(f"\nSingle Device Strategy")
+        
+        # Build simplified YOLO-like model
+        print("\n" + "=" * 80)
+        print("Building YOLOv3-tiny Model")
+        print("=" * 80)
+        
+        with strategy.scope():
+            inputs = tf.keras.Input(shape=(416, 416, 3))
+            
+            # Simplified backbone
+            x = tf.keras.layers.Conv2D(16, 3, padding='same', activation='relu')(inputs)
+            x = tf.keras.layers.MaxPooling2D(2)(x)
+            x = tf.keras.layers.Conv2D(32, 3, padding='same', activation='relu')(x)
+            x = tf.keras.layers.MaxPooling2D(2)(x)
+            x = tf.keras.layers.Conv2D(64, 3, padding='same', activation='relu')(x)
+            x = tf.keras.layers.MaxPooling2D(2)(x)
+            
+            # Detection head
+            x = tf.keras.layers.Conv2D(128, 3, padding='same', activation='relu')(x)
+            outputs = tf.keras.layers.Conv2D(255, 1, padding='same')(x)  # 3 anchors * (5 + 80 classes)
+            
+            model = tf.keras.Model(inputs=inputs, outputs=outputs)
+            
+            # Compile model
+            model.compile(
+                optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+                loss='mse',
+                metrics=['mae']
+            )
+        
+        print(f"\nModel built successfully!")
+        print(f"Total parameters: {model.count_params():,}")
+        
+        # Create synthetic training data
+        print("\n" + "=" * 80)
+        print("Creating Synthetic Dataset")
+        print("=" * 80)
+        
+        batch_size = 4
+        num_batches = 10
+        
+        def data_generator():
+            for _ in range(num_batches):
+                images = np.random.rand(batch_size, 416, 416, 3).astype(np.float32)
+                labels = np.random.rand(batch_size, 52, 52, 255).astype(np.float32)
+                yield images, labels
+        
+        dataset = tf.data.Dataset.from_generator(
+            data_generator,
+            output_signature=(
+                tf.TensorSpec(shape=(batch_size, 416, 416, 3), dtype=tf.float32),
+                tf.TensorSpec(shape=(batch_size, 52, 52, 255), dtype=tf.float32),
+            )
+        )
+        dataset = dataset.prefetch(tf.data.AUTOTUNE)
+        
+        print(f"Dataset created: {num_batches} batches of {batch_size} images")
+        
+        # Train the model
+        print("\n" + "=" * 80)
+        print("Training Model")
+        print("=" * 80)
+        
+        history = model.fit(
+            dataset,
+            epochs=3,
+            verbose=1
+        )
+        
+        print("\n" + "=" * 80)
+        print("Training Results")
+        print("=" * 80)
+        print(f"Final loss: {history.history['loss'][-1]:.6f}")
+        print(f"Final MAE: {history.history['mae'][-1]:.6f}")
+        
+        # Test inference
+        print("\n" + "=" * 80)
+        print("Testing Inference")
+        print("=" * 80)
+        
+        test_image = np.random.rand(1, 416, 416, 3).astype(np.float32)
+        prediction = model.predict(test_image, verbose=0)
+        print(f"Prediction shape: {prediction.shape}")
+        print(f"Prediction range: [{prediction.min():.4f}, {prediction.max():.4f}]")
+        
+        # Save model (only on chief worker)
+        if not tf_config or config['task']['index'] == 0:
+            model_path = '/tmp/yolo_test_model.h5'
+            model.save(model_path)
+            print(f"\nModel saved to: {model_path}")
+        
+        print("\n" + "=" * 80)
+        print("✅ TensorFlow YOLO Test Completed Successfully!")
+        print("=" * 80)
+    
+    numNodes: 2
+    resourcesPerNode:
+      limits:
+        nvidia.com/gpu: 1
+        memory: 16Gi
+        cpu: 4
+      requests:
+        nvidia.com/gpu: 1
+        memory: 16Gi
+        cpu: 4
+
