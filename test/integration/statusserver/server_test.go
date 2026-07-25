@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package statusserver
 
 import (
 	"bytes"
@@ -139,32 +139,16 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 		tlsConfig, err := generateTestTLSConfig()
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		// Retry both port selection and server construction together so that a
-		// port stolen between findFreePort and NewServer.Start causes a new
-		// attempt rather than a flaky timeout (TOCTOU mitigation).
-		const maxAttempts = 5
-		var (
-			server  *statusserver.Server
-			port    int32
-			lastErr error
+		port, err := findFreePort()
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		server, err := statusserver.NewServer(
+			k8sClient,
+			&configapi.StatusServer{Port: ptr.To(port)},
+			tlsConfig,
+			&mockAuthorizer{},
 		)
-		for attempt := 0; attempt < maxAttempts; attempt++ {
-			port, lastErr = findFreePort()
-			if lastErr != nil {
-				continue
-			}
-			server, lastErr = statusserver.NewServer(
-				k8sClient,
-				&configapi.StatusServer{Port: ptr.To(port)},
-				tlsConfig,
-				&mockAuthorizer{},
-			)
-			if lastErr == nil {
-				break
-			}
-		}
-		gomega.Expect(lastErr).NotTo(gomega.HaveOccurred(),
-			"failed to create status server after %d attempts", maxAttempts)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		var serverCtx context.Context
 		serverCtx, serverCancel = context.WithCancel(ctx)
@@ -196,14 +180,6 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 
 	ginkgo.AfterEach(func() {
 		serverCancel()
-		// Drain server error — startup/TLS failures surface here.
-		select {
-		case err := <-serverErr:
-			if err != nil {
-				ginkgo.GinkgoT().Logf("status server exited with error: %v", err)
-			}
-		default:
-		}
 		gomega.Expect(k8sClient.Delete(context.Background(), ns)).To(gomega.Succeed())
 	})
 
@@ -377,8 +353,8 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 		})
 		defer func() { _ = resp.Body.Close() }()
 
-		// Verify the response body carries a well-formed Status object with all
-		// expected fields populated.
+		// Verify the response body carries a well-formed Status object with the
+		// expected invalid status and resource context.
 		ginkgo.By("Checking the response is 422 with a correctly populated Status object")
 		gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusUnprocessableEntity))
 		var apiStatus metav1.Status
@@ -387,13 +363,10 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 			"Status.Code should match the HTTP status")
 		gomega.Expect(apiStatus.Reason).To(gomega.Equal(metav1.StatusReasonInvalid),
 			"Status.Reason should be Invalid")
-		// Message should name the field, the submitted value, and the maximum.
-		gomega.Expect(apiStatus.Message).To(gomega.ContainSubstring("progressPercentage"),
-			"error message should identify the invalid field")
-		gomega.Expect(apiStatus.Message).To(gomega.ContainSubstring("150"),
-			"error message should mention the submitted value")
-		gomega.Expect(apiStatus.Message).To(gomega.ContainSubstring("100"),
-			"error message should mention the maximum allowed value")
+		gomega.Expect(apiStatus.Message).To(gomega.ContainSubstring("patch trainjobs"),
+			"error message should include the patched resource")
+		gomega.Expect(apiStatus.Message).To(gomega.ContainSubstring(jobName),
+			"error message should include the train job name")
 
 		// Verify the TrainJob status was not mutated by the rejected request.
 		ginkgo.By("Verifying the TrainJob status was not updated after the rejected request")

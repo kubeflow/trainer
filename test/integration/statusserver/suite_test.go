@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package statusserver
 
 import (
 	"context"
@@ -30,8 +30,8 @@ import (
 
 var (
 	cfg       *rest.Config
-	k8sClient client.Client
 	ctx       context.Context
+	k8sClient client.Client
 	fwk       *framework.Framework
 )
 
@@ -40,3 +40,9 @@ func TestAPIs(t *testing.T) {
 
 	ginkgo.RunSpecs(t, "Kubeflow Trainer StatusServer Suite")
 }
+
+var _ = ginkgo.BeforeSuite(func() {
+	fwk = &framework.Framework{}
+	cfg = fwk.Init()
+	ctx, k8sClient = fwk.RunManager(cfg, false)
+})
