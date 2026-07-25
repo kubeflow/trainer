@@ -128,7 +128,7 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 	ginkgo.BeforeAll(func() {
 		fwk = &framework.Framework{}
 		cfg = fwk.Init()
-		ctx, k8sClient = fwk.RunManager(cfg, true)
+		ctx, k8sClient = fwk.RunManager(cfg, false)
 	})
 
 	ginkgo.AfterAll(func() {
