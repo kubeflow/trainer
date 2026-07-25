@@ -50,11 +50,19 @@ may need to skip TLS verification for local debugging).
 The Helm chart includes a pre-built Grafana dashboard that provides out-of-the-box visibility into
 controller health and TrainJob lifecycle. It is disabled by default.
 
-To enable it, set `grafanaDashboard.enabled` in your Helm values:
+To enable all dashboards, set `grafanaDashboard.defaultEnabled` in your Helm values:
 
 ```yaml
 grafanaDashboard:
-  enabled: true
+  defaultEnabled: true
+```
+
+To enable specific dashboards:
+
+```yaml
+grafanaDashboard:
+  controllerHealth:
+    enabled: true
 ```
 
 This creates a ConfigMap labeled with `grafana_dashboard: "1"` for
@@ -66,7 +74,7 @@ To place the dashboard in a specific Grafana folder, use annotations:
 
 ```yaml
 grafanaDashboard:
-  enabled: true
+  defaultEnabled: true
   annotations:
     grafana_folder: "Kubeflow"
 ```

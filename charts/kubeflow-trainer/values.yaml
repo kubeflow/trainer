@@ -162,18 +162,24 @@ webhook:
   failurePolicy: Fail
 
 grafanaDashboard:
-  # -- Whether to install the default Grafana dashboard ConfigMap.
+  # -- Enable all default Grafana dashboards when set to true.
+  # Individual dashboard settings will be ignored if this is enabled.
   # Intended for environments running Grafana with sidecar dashboard auto-discovery.
-  enabled: false
+  defaultEnabled: false
 
-  # -- Labels applied to the dashboard ConfigMap.
+  # -- Labels applied to the dashboard ConfigMaps.
   # Match your Grafana sidecar label selector.
   labels:
     grafana_dashboard: "1"
 
-  # -- Annotations applied to the dashboard ConfigMap.
+  # -- Annotations applied to the dashboard ConfigMaps.
   # Use to set Grafana folder: grafana_folder: "Kubeflow"
   annotations: {}
+
+  # -- Controller health and TrainJob lifecycle dashboard
+  controllerHealth:
+    # -- Enable deployment of the controller health dashboard
+    enabled: false
 
 dataCache:
   # -- Enable/disable data cache support (LWS dependency, ClusterRole).
