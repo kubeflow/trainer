@@ -223,7 +223,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by(controller, result) (rate(controller_runtime_reconcile_total{namespace=~\"$namespace\", job=~\"$job\", controller=~\"$controller\"}[5m]))",
+          "expr": "sum by(controller, result) (rate(controller_runtime_reconcile_total{namespace=~\"$namespace\", job=~\"$job\", controller=~\"$controller\"}[$__rate_interval]))",
           "legendFormat": "{{controller}} / {{result}}",
           "range": true,
           "refId": "A"
@@ -264,7 +264,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by(le, controller) (rate(controller_runtime_reconcile_time_seconds_bucket{namespace=~\"$namespace\", job=~\"$job\", controller=~\"$controller\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by(le, controller) (rate(controller_runtime_reconcile_time_seconds_bucket{namespace=~\"$namespace\", job=~\"$job\", controller=~\"$controller\"}[$__rate_interval])))",
           "legendFormat": "{{controller}}",
           "range": true,
           "refId": "A"
@@ -359,7 +359,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by(name) (rate(workqueue_retries_total{namespace=~\"$namespace\", job=~\"$job\"}[5m]))",
+          "expr": "sum by(name) (rate(workqueue_retries_total{namespace=~\"$namespace\", job=~\"$job\"}[$__rate_interval]))",
           "legendFormat": "{{name}}",
           "range": true,
           "refId": "A"
@@ -413,7 +413,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by(result) (rate(controller_runtime_reconcile_total{namespace=~\"$namespace\", job=~\"$job\", controller=\"trainjob_controller\"}[5m]))",
+          "expr": "sum by(result) (rate(controller_runtime_reconcile_total{namespace=~\"$namespace\", job=~\"$job\", controller=\"trainjob_controller\"}[$__rate_interval]))",
           "legendFormat": "{{result}}",
           "range": true,
           "refId": "A"
@@ -454,7 +454,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(controller_runtime_reconcile_total{namespace=~\"$namespace\", job=~\"$job\", controller=\"trainjob_controller\", result=\"error\"}[5m]))",
+          "expr": "sum(rate(controller_runtime_reconcile_total{namespace=~\"$namespace\", job=~\"$job\", controller=\"trainjob_controller\", result=\"error\"}[$__rate_interval]))",
           "legendFormat": "errors",
           "range": true,
           "refId": "A"
@@ -495,7 +495,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by(le) (rate(controller_runtime_reconcile_time_seconds_bucket{namespace=~\"$namespace\", job=~\"$job\", controller=\"trainjob_controller\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(controller_runtime_reconcile_time_seconds_bucket{namespace=~\"$namespace\", job=~\"$job\", controller=\"trainjob_controller\"}[$__rate_interval])))",
           "legendFormat": "p95",
           "range": true,
           "refId": "A"
