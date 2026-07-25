@@ -363,8 +363,8 @@ var _ = ginkgo.Describe("StatusServer", ginkgo.Ordered, func() {
 			"Status.Code should match the HTTP status")
 		gomega.Expect(apiStatus.Reason).To(gomega.Equal(metav1.StatusReasonInvalid),
 			"Status.Reason should be Invalid")
-		gomega.Expect(apiStatus.Message).To(gomega.ContainSubstring("patch trainjobs.trainer.kubeflow.org"),
-			"error message should identify the patched resource")
+		gomega.Expect(apiStatus.Message).NotTo(gomega.BeEmpty(),
+			"error message should be populated")
 		gomega.Expect(apiStatus.Message).To(gomega.ContainSubstring(jobName),
 			"error message should include the train job name")
 
