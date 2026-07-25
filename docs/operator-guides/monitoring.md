@@ -5,7 +5,7 @@ and the optional Grafana dashboard shipped with the Helm chart.
 
 ## Prerequisites
 
-- Kubeflow Trainer installed via [Helm chart](installation.md#install-with-helm-charts) or kustomize manifests
+- Kubeflow Trainer installed via [Helm chart](installation.md#installing-the-kubeflow-trainer-controller-manager) or kustomize manifests
 - Prometheus configured to scrape the controller's metrics endpoint
 
 :::{note}
