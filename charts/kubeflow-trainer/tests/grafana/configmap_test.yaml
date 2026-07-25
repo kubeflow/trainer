@@ -1,5 +1,5 @@
 #
-# Copyright 2026 The Kubeflow authors.
+# Copyright The Kubeflow authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,21 +21,43 @@ release:
   name: kubeflow-trainer
   namespace: kubeflow-trainer
 tests:
-  - it: Should not render ConfigMap when grafanaDashboard.enabled is false
+  - it: Should not render ConfigMap when all dashboards are disabled
     set:
       grafanaDashboard:
-        enabled: false
+        defaultEnabled: false
+        controllerHealth:
+          enabled: false
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: Should render ConfigMap when grafanaDashboard.enabled is true
+  - it: Should render ConfigMap when defaultEnabled is true
     set:
       grafanaDashboard:
-        enabled: true
+        defaultEnabled: true
         labels:
           grafana_dashboard: "1"
         annotations: {}
+        controllerHealth:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: kubeflow-trainer-grafana-dashboard
+
+  - it: Should render ConfigMap when controllerHealth.enabled is true
+    set:
+      grafanaDashboard:
+        defaultEnabled: false
+        labels:
+          grafana_dashboard: "1"
+        annotations: {}
+        controllerHealth:
+          enabled: true
     asserts:
       - hasDocuments:
           count: 1
@@ -48,10 +70,12 @@ tests:
   - it: Should have grafana_dashboard label for sidecar auto-discovery
     set:
       grafanaDashboard:
-        enabled: true
+        defaultEnabled: true
         labels:
           grafana_dashboard: "1"
         annotations: {}
+        controllerHealth:
+          enabled: false
     asserts:
       - equal:
           path: metadata.labels["grafana_dashboard"]
@@ -60,10 +84,12 @@ tests:
   - it: Should have app.kubernetes.io/component label
     set:
       grafanaDashboard:
-        enabled: true
+        defaultEnabled: true
         labels:
           grafana_dashboard: "1"
         annotations: {}
+        controllerHealth:
+          enabled: false
     asserts:
       - equal:
           path: metadata.labels["app.kubernetes.io/component"]
@@ -72,10 +98,12 @@ tests:
   - it: Should contain dashboard JSON data key
     set:
       grafanaDashboard:
-        enabled: true
+        defaultEnabled: true
         labels:
           grafana_dashboard: "1"
         annotations: {}
+        controllerHealth:
+          enabled: false
     asserts:
       - isNotEmpty:
           path: data["kubeflow-trainer-dashboard.json"]
@@ -83,11 +111,13 @@ tests:
   - it: Should support custom annotations
     set:
       grafanaDashboard:
-        enabled: true
+        defaultEnabled: true
         labels:
           grafana_dashboard: "1"
         annotations:
           grafana_folder: "Kubeflow"
+        controllerHealth:
+          enabled: false
     asserts:
       - equal:
           path: metadata.annotations.grafana_folder
@@ -96,11 +126,13 @@ tests:
   - it: Should support custom labels
     set:
       grafanaDashboard:
-        enabled: true
+        defaultEnabled: true
         labels:
           grafana_dashboard: "1"
           custom-label: "custom-value"
         annotations: {}
+        controllerHealth:
+          enabled: false
     asserts:
       - equal:
           path: metadata.labels["custom-label"]
