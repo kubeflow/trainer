@@ -20,6 +20,7 @@ var Config struct {
 	PyTorchInitContainerImage        string
 	MPIKubectlDeliveryImage          string
 	PyTorchInitContainerMaxTries     int
+	DisableMPIRBACManagement         bool
 }
 
 const (

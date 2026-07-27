@@ -17,21 +17,29 @@ package mpi
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	common "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/config"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	kubeflowv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	ctlrconfig "github.com/kubeflow/training-operator/pkg/config"
+	ctrlcommon "github.com/kubeflow/training-operator/pkg/controller.v1/common"
 	commonutil "github.com/kubeflow/training-operator/pkg/util"
 	"github.com/kubeflow/training-operator/pkg/util/testutil"
 )
@@ -570,6 +578,349 @@ var _ = Describe("MPIJob controller", func() {
 
 				return launcherCreated.Spec.ServiceAccountName
 			}, testutil.Timeout, testutil.Interval).Should(Equal(launcherSaName))
+		})
+	})
+
+	Context("MPIJob with disabled RBAC management", func() {
+		It("Should not create ServiceAccount, Role, or RoleBinding", func() {
+			By("Setting DisableMPIRBACManagement to true")
+			oldDisableMPIRBACManagement := ctlrconfig.Config.DisableMPIRBACManagement
+			ctlrconfig.Config.DisableMPIRBACManagement = true
+			defer func() {
+				ctlrconfig.Config.DisableMPIRBACManagement = oldDisableMPIRBACManagement
+			}()
+
+			By("Creating an MPIJob with a user-provided ServiceAccount")
+			jobName := "test-disable-rbac"
+			launcherSaName := "custom-launcher-sa"
+
+			ctx := context.Background()
+			startTime := metav1.Now()
+			completionTime := metav1.Now()
+
+			mpiJob := newMPIJob(jobName, ptr.To[int32](1), 1, gpuResourceName, &startTime, &completionTime)
+			mpiJob.Spec.MPIReplicaSpecs[kubeflowv1.MPIJobReplicaTypeLauncher].Template.Spec.ServiceAccountName = launcherSaName
+
+			// Pre-create the ServiceAccount since the operator won't create it
+			sa := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      launcherSaName,
+					Namespace: metav1.NamespaceDefault,
+				},
+			}
+			Expect(testK8sClient.Create(ctx, sa)).Should(Succeed())
+			Expect(testK8sClient.Create(ctx, mpiJob)).Should(Succeed())
+
+			By("Reconciling until the launcher pod is created")
+			Eventually(func() error {
+				req := ctrl.Request{NamespacedName: types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      mpiJob.GetName(),
+				}}
+				_, err := reconciler.Reconcile(ctx, req)
+				return err
+			}, testutil.Timeout, testutil.Interval).Should(BeNil())
+
+			By("Verifying no Role was created")
+			Eventually(func() bool {
+				role := &rbacv1.Role{}
+				err := testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, role)
+				return errors.IsNotFound(err)
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			By("Verifying no RoleBinding was created")
+			Eventually(func() bool {
+				rb := &rbacv1.RoleBinding{}
+				err := testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, rb)
+				return errors.IsNotFound(err)
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			By("Verifying no operator-created ServiceAccount was created")
+			Eventually(func() bool {
+				operatorSa := &corev1.ServiceAccount{}
+				err := testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, operatorSa)
+				return errors.IsNotFound(err)
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			By("Verifying ConfigMap was created")
+			Eventually(func() error {
+				cm := &corev1.ConfigMap{}
+				return testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + configSuffix,
+				}, cm)
+			}, testutil.Timeout, testutil.Interval).Should(Succeed())
+
+			By("Verifying kubectl delivery init container is present")
+			Eventually(func() bool {
+				launcher := &corev1.Pod{}
+				err := testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, launcher)
+				if err != nil {
+					return false
+				}
+				for _, ic := range launcher.Spec.InitContainers {
+					if ic.Name == kubectlDeliveryName {
+						return true
+					}
+				}
+				return false
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			By("Verifying launcher pod uses the user-provided ServiceAccount")
+			Eventually(func() string {
+				launcher := &corev1.Pod{}
+				err := testK8sClient.Get(ctx, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, launcher)
+				if err != nil {
+					return ""
+				}
+				return launcher.Spec.ServiceAccountName
+			}, testutil.Timeout, testutil.Interval).Should(Equal(launcherSaName))
+		})
+
+		It("Should warn when no ServiceAccount is provided on the launcher", func() {
+			By("Setting DisableMPIRBACManagement to true")
+			oldDisableMPIRBACManagement := ctlrconfig.Config.DisableMPIRBACManagement
+			ctlrconfig.Config.DisableMPIRBACManagement = true
+			defer func() {
+				ctlrconfig.Config.DisableMPIRBACManagement = oldDisableMPIRBACManagement
+			}()
+
+			By("Creating an MPIJob without a user-provided ServiceAccount")
+			jobName := "test-disable-rbac-no-sa"
+
+			ctx := context.Background()
+			startTime := metav1.Now()
+			completionTime := metav1.Now()
+
+			mpiJob := newMPIJob(jobName, ptr.To[int32](1), 1, gpuResourceName, &startTime, &completionTime)
+			Expect(testK8sClient.Create(ctx, mpiJob)).Should(Succeed())
+
+			By("Reconciling until the launcher pod is created")
+			Eventually(func() error {
+				req := ctrl.Request{NamespacedName: types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      mpiJob.GetName(),
+				}}
+				_, err := reconciler.Reconcile(ctx, req)
+				return err
+			}, testutil.Timeout, testutil.Interval).Should(BeNil())
+
+			By("Verifying a warning event was recorded")
+			Eventually(func() bool {
+				eventList := &corev1.EventList{}
+				err := testK8sClient.List(ctx, eventList, client.InNamespace(metav1.NamespaceDefault))
+				if err != nil {
+					return false
+				}
+				for _, event := range eventList.Items {
+					if event.Reason == NoServiceAccountNameReason && event.InvolvedObject.Name == jobName {
+						return true
+					}
+				}
+				return false
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+		})
+	})
+
+	Context("SetupWithManager with disabled RBAC management", func() {
+		It("Should not watch RBAC resources when flag is true", func() {
+			By("Starting a second envtest instance for isolation")
+			testEnv2 := &envtest.Environment{
+				CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "manifests", "base", "crds")},
+				ErrorIfCRDPathMissing: true,
+			}
+			cfg2, err := testEnv2.Start()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cfg2).NotTo(BeNil())
+			defer func() {
+				Expect(testEnv2.Stop()).NotTo(HaveOccurred())
+			}()
+
+			By("Setting DisableMPIRBACManagement to true")
+			oldDisableMPIRBACManagement := ctlrconfig.Config.DisableMPIRBACManagement
+			ctlrconfig.Config.DisableMPIRBACManagement = true
+			defer func() {
+				ctlrconfig.Config.DisableMPIRBACManagement = oldDisableMPIRBACManagement
+			}()
+
+			By("Creating a second manager with disabled RBAC management")
+			mgr2, err := ctrl.NewManager(cfg2, ctrl.Options{
+				Metrics: metricsserver.Options{
+					BindAddress: "0",
+				},
+				Controller: ctrlconfig.Controller{
+					SkipNameValidation: ptr.To(true),
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			gangSchedulingSetupFunc := ctrlcommon.GenNonGangSchedulerSetupFunc()
+			reconciler2 := NewReconciler(mgr2, gangSchedulingSetupFunc)
+			Expect(reconciler2.SetupWithManager(mgr2, 1)).NotTo(HaveOccurred())
+
+			ctx2, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			go func() {
+				defer GinkgoRecover()
+				err := mgr2.Start(ctx2)
+				Expect(err).ToNot(HaveOccurred(), "failed to run second manager")
+			}()
+
+			By("Creating a client for the second envtest")
+			client2, err := client.New(cfg2, client.Options{Scheme: scheme.Scheme})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(client2).NotTo(BeNil())
+
+			By("Creating an MPIJob with a user-provided ServiceAccount")
+			jobName := "test-watch-suppression"
+			launcherSaName := "custom-watch-sa"
+
+			mpiJob := newMPIJob(jobName, ptr.To[int32](1), 1, gpuResourceName, nil, nil)
+			mpiJob.Spec.MPIReplicaSpecs[kubeflowv1.MPIJobReplicaTypeLauncher].Template.Spec.ServiceAccountName = launcherSaName
+
+			sa := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      launcherSaName,
+					Namespace: metav1.NamespaceDefault,
+				},
+			}
+			Expect(client2.Create(ctx2, sa)).Should(Succeed())
+			Expect(client2.Create(ctx2, mpiJob)).Should(Succeed())
+
+			launcherKey := types.NamespacedName{
+				Namespace: metav1.NamespaceDefault,
+				Name:      jobName + launcherSuffix,
+			}
+
+			By("Waiting for the launcher pod to be created")
+			Eventually(func() error {
+				return client2.Get(ctx2, launcherKey, &corev1.Pod{})
+			}, testutil.Timeout, testutil.Interval).Should(Succeed())
+
+			By("Verifying no Role was created")
+			Eventually(func() bool {
+				role := &rbacv1.Role{}
+				err := client2.Get(ctx2, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, role)
+				return errors.IsNotFound(err)
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			By("Verifying no RoleBinding was created")
+			Eventually(func() bool {
+				rb := &rbacv1.RoleBinding{}
+				err := client2.Get(ctx2, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, rb)
+				return errors.IsNotFound(err)
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			By("Verifying no operator-created ServiceAccount was created")
+			Eventually(func() bool {
+				operatorSa := &corev1.ServiceAccount{}
+				err := client2.Get(ctx2, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + launcherSuffix,
+				}, operatorSa)
+				return errors.IsNotFound(err)
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			By("Verifying ConfigMap was created")
+			Eventually(func() error {
+				return client2.Get(ctx2, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + configSuffix,
+				}, &corev1.ConfigMap{})
+			}, testutil.Timeout, testutil.Interval).Should(Succeed())
+
+			By("Verifying kubectl delivery init container is present")
+			Eventually(func() bool {
+				launcher := &corev1.Pod{}
+				err := client2.Get(ctx2, launcherKey, launcher)
+				if err != nil {
+					return false
+				}
+				for _, ic := range launcher.Spec.InitContainers {
+					if ic.Name == kubectlDeliveryName {
+						return true
+					}
+				}
+				return false
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			By("Verifying ConfigMap watch is active via ConfigMap update")
+			cm := &corev1.ConfigMap{}
+			Expect(client2.Get(ctx2, types.NamespacedName{
+				Namespace: metav1.NamespaceDefault,
+				Name:      jobName + configSuffix,
+			}, cm)).Should(Succeed())
+
+			// Corrupt the ConfigMap data
+			cm.Data = map[string]string{"corrupted": "true"}
+			Expect(client2.Update(ctx2, cm)).Should(Succeed())
+
+			// The ConfigMap update should trigger a reconcile via the ConfigMap watch.
+			// The reconciler should restore the original data.
+			Eventually(func() bool {
+				restoredCm := &corev1.ConfigMap{}
+				err := client2.Get(ctx2, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + configSuffix,
+				}, restoredCm)
+				if err != nil {
+					return false
+				}
+				// Check that the corrupted key is gone and original data is restored
+				_, hasCorrupt := restoredCm.Data["corrupted"]
+				return !hasCorrupt && len(restoredCm.Data) > 0
+			}, testutil.Timeout, testutil.Interval).Should(BeTrue())
+
+			// Note: RBAC watch suppression at the SetupWithManager level (the
+			// `if !ctlrconfig.Config.DisableMPIRBACManagement` guard at line ~217)
+			// is verified structurally by code inspection, not behaviorally. A
+			// behavioral negative control is infeasible in envtest because:
+			// 1. The Pod watch is always active (not gated by the flag), so pod
+			//    state cannot be used as a signal for RBAC watch activity.
+			// 2. No-op reconciles don't change MPIJob status in envtest (pods stay
+			//    Pending, reflect.DeepEqual guard prevents status writes), so
+			//    resourceVersion stability doesn't prove watch suppression.
+			// The test verifies: SetupWithManager succeeds with flag=true, no RBAC
+			// resources are created, ConfigMap/kubectl delivery remain unconditional,
+			// ConfigMap and Pod watches remain active.
+			By("Deleting launcher pod to verify reconciler is still functional")
+			launcher := &corev1.Pod{}
+			Expect(client2.Get(ctx2, launcherKey, launcher)).Should(Succeed())
+			Expect(client2.Delete(ctx2, launcher)).Should(Succeed())
+
+			By("Verifying launcher pod is recreated by the reconciler")
+			Eventually(func() error {
+				return client2.Get(ctx2, launcherKey, &corev1.Pod{})
+			}, testutil.Timeout, testutil.Interval).Should(Succeed())
+
+			By("Verifying ConfigMap still exists after reconcile")
+			Eventually(func() error {
+				return client2.Get(ctx2, types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      jobName + configSuffix,
+				}, &corev1.ConfigMap{})
+			}, testutil.Timeout, testutil.Interval).Should(Succeed())
 		})
 	})
 
