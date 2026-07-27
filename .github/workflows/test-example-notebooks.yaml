@@ -28,7 +28,7 @@ jobs:
 
       - name: Install Python Dependencies
         run: |
-          pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5 "kubernetes<36"
+          pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5 "kubernetes<36" "fastjsonschema<2.22"
 
       - name: Run Jupyter Notebook with Papermill
         shell: bash
