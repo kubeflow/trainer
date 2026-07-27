@@ -22,7 +22,7 @@ This chart bootstraps a [Kubernetes Trainer](https://github.com/kubeflow/trainer
 Install the released version:
 
 ```bash
-export VERSION=v2.1.0
+export VERSION=v2.2.1
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --namespace kubeflow-system \
     --create-namespace \
