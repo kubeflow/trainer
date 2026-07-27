@@ -245,49 +245,6 @@ func TestValidate(t *testing.T) {
 			},
 			newObj: &trainer.TrainJob{},
 		},
-		"invalid when runtime policy numProcPerNode is less than one": {
-			info: &runtime.Info{
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicySource: &trainer.MLPolicySource{
-						Flux: &trainer.FluxMLPolicySource{
-							NumProcPerNode: ptr.To[int32](0),
-						},
-					},
-				},
-			},
-			newObj: &trainer.TrainJob{},
-			wantError: field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec").Child("trainer").Child("numProcPerNode"),
-					int32(0),
-					"must be greater than or equal to 1 for Flux TrainJob",
-				),
-			},
-		},
-		"invalid when trainJob numProcPerNode is less than one": {
-			info: &runtime.Info{
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicySource: &trainer.MLPolicySource{
-						Flux: &trainer.FluxMLPolicySource{
-							NumProcPerNode: ptr.To[int32](1),
-						},
-					},
-				},
-			},
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(0).
-					Obj(),
-				).
-				Obj(),
-			wantError: field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec").Child("trainer").Child("numProcPerNode"),
-					int32(0),
-					"must be greater than or equal to 1 for Flux TrainJob",
-				),
-			},
-		},
 		"invalid when node podSet includes reserved flux installer init container": {
 			info: &runtime.Info{
 				RuntimePolicy: runtime.RuntimePolicy{

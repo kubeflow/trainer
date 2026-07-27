@@ -100,22 +100,10 @@ func (f *Flux) Name() string {
 	return Name
 }
 
-func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, _ *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Flux == nil {
 		return nil, allErrs
-	}
-
-	fluxPolicy := runtimeInfo.RuntimePolicy.MLPolicySource.Flux
-
-	// We require at least 1 proc per node. Zero or fewer does not make sense.
-	numProcPerNode := fluxPolicy.NumProcPerNode
-	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumProcPerNode != nil {
-		numProcPerNode = newJobObj.Spec.Trainer.NumProcPerNode
-	}
-	if numProcPerNode != nil && *numProcPerNode < 1 {
-		numProcPerNodePath := field.NewPath("spec").Child("trainer").Child("numProcPerNode")
-		allErrs = append(allErrs, field.Invalid(numProcPerNodePath, *numProcPerNode, "must be greater than or equal to 1 for Flux TrainJob"))
 	}
 
 	// Iterate through Trainer's internal PodSet abstraction
