@@ -5791,6 +5791,7 @@ spec:
                   numNodes:
                     description: numNodes is the number of training nodes.
                     format: int32
+                    minimum: 0
                     type: integer
                   numProcPerNode:
                     description: |-
@@ -5799,6 +5800,9 @@ spec:
                       For the Torch runtime the value defaults to `auto` and can be overridden with an int.
                     format: int32
                     type: integer
+                    x-kubernetes-validations:
+                    - message: numProcPerNode must be greater than or equal to 1
+                      rule: self >= 1
                   resourcesPerNode:
                     description: resourcesPerNode defines the compute resources for
                       each training node.
