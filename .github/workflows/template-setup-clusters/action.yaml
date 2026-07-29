@@ -59,8 +59,8 @@ runs:
       shell: bash
       working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/sdk
       run: |
-        echo "Install Kubeflow SDK with dev dependencies (Kubeflow APIs from master)"
-        make install-dev
+        echo "Install Kubeflow SDK with the Notebook dependencies (Kubeflow APIs from master)"
+        make install-dev extras=docker groups="--no-default-groups --group notebooks"
 
         echo "Override Kubeflow Trainer API models with this PR's version"
         uv pip install -e "${{ env.GOPATH }}/src/github.com/kubeflow/trainer/api/python_api"
