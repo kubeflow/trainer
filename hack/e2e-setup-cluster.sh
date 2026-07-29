@@ -158,8 +158,11 @@ load_image_to_kind "${CONTROLLER_MANAGER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${DATASET_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${MODEL_INITIALIZER_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${TRAINER_CI_IMAGE}" "${CLUSTER_NAME}"
-load_image_to_kind "${MLX_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
-load_image_to_kind "${DEEPSPEED_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
+# TODO (andreyvelich): GPU runners run out of disk when we load DeepSpeed and MLX images.
+# load_image_to_kind "${MLX_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
+if [ "${CLUSTER_TYPE}" != "gpu" ]; then
+  load_image_to_kind "${DEEPSPEED_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
+fi
 load_image_to_kind "${XGBOOST_RUNTIME_CI_IMAGE}" "${CLUSTER_NAME}"
 load_image_to_kind "${JAX_RUNTIME_IMAGE}" "${CLUSTER_NAME}"
 

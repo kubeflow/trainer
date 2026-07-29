@@ -65,7 +65,6 @@ runs:
         echo "Override Kubeflow Trainer API models with this PR's version"
         uv pip install -e "${{ env.GOPATH }}/src/github.com/kubeflow/trainer/api/python_api"
 
-
         # Trainer's hack/e2e-run-notebook.sh calls `papermill` from PATH
         echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
