@@ -146,33 +146,9 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
 			})
 
-			// Wait for jobs to become active
-			ginkgo.By("Wait for TrainJob jobs to become active", func() {
-				gomega.Eventually(func(g gomega.Gomega) {
-					gotTrainJob := &trainer.TrainJob{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
-					g.Expect(gotTrainJob.Status.JobsStatus).Should(gomega.BeComparableTo([]trainer.JobStatus{
-						{
-							Name:      constants.Launcher,
-							Ready:     ptr.To(int32(0)),
-							Succeeded: ptr.To(int32(0)),
-							Failed:    ptr.To(int32(0)),
-							Active:    ptr.To(int32(1)),
-							Suspended: ptr.To(int32(0)),
-						},
-						{
-							Name:      constants.Node,
-							Ready:     ptr.To(int32(0)),
-							Succeeded: ptr.To(int32(0)),
-							Failed:    ptr.To(int32(0)),
-							Active:    ptr.To(int32(1)),
-							Suspended: ptr.To(int32(0)),
-						},
-					}, util.SortJobsStatus))
-				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
-			})
-
 			// Wait for TrainJob to be in Succeeded status.
+			// Skip the intermediate "Active" assertion: the DeepSpeed launcher has no
+			// long-running command, so it can finish before both jobs are observed Active.
 			ginkgo.By("Wait for TrainJob to be in Succeeded status", func() {
 				gomega.Eventually(func(g gomega.Gomega) {
 					gotTrainJob := &trainer.TrainJob{}
