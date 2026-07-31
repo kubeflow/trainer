@@ -28,6 +28,7 @@ from pkg.initializers.dataset.__main__ import main
                 "storage_uri": "hf://dataset/path",
                 "access_token": "test_token",
                 "expected_error": None,
+                "expected_error_match": None,
             },
         ),
         (
@@ -35,6 +36,15 @@ from pkg.initializers.dataset.__main__ import main
             {
                 "storage_uri": "s3://dataset/path",
                 "expected_error": None,
+                "expected_error_match": None,
+            },
+        ),
+        (
+            "Successful download with Data Cache provider",
+            {
+                "storage_uri": "cache://dataset/path",
+                "expected_error": None,
+                "expected_error_match": None,
             },
         ),
         (
@@ -42,7 +52,17 @@ from pkg.initializers.dataset.__main__ import main
             {
                 "storage_uri": None,
                 "access_token": None,
-                "expected_error": Exception,
+                "expected_error": ValueError,
+                "expected_error_match": "STORAGE_URI environment variable must be set",
+            },
+        ),
+        (
+            "Empty storage URI environment variable",
+            {
+                "storage_uri": "",
+                "access_token": None,
+                "expected_error": ValueError,
+                "expected_error_match": "STORAGE_URI environment variable must be set",
             },
         ),
         (
@@ -50,7 +70,11 @@ from pkg.initializers.dataset.__main__ import main
             {
                 "storage_uri": "invalid://dataset/path",
                 "access_token": None,
-                "expected_error": Exception,
+                "expected_error": ValueError,
+                "expected_error_match": (
+                    "Unsupported dataset storage URI scheme 'invalid': expected one of "
+                    "'hf', 'cache', or 's3'"
+                ),
             },
         ),
     ],
@@ -59,16 +83,15 @@ def test_dataset_main(test_name, test_case, mock_env_vars):
     """Test main script with different scenarios"""
     print(f"Running test: {test_name}")
 
-    # Setup mock environment variables
     env_vars = {
         "STORAGE_URI": test_case["storage_uri"],
         "ACCESS_TOKEN": test_case.get("access_token", None),
     }
     mock_env_vars(**env_vars)
 
-    # Setup mock instances
     mock_hf_instance = MagicMock()
     mock_s3_instance = MagicMock()
+    mock_cache_instance = MagicMock()
 
     with patch(
         "pkg.initializers.dataset.huggingface.HuggingFace",
@@ -76,27 +99,43 @@ def test_dataset_main(test_name, test_case, mock_env_vars):
     ) as mock_hf, patch(
         "pkg.initializers.dataset.s3.S3",
         return_value=mock_s3_instance,
-    ) as mock_s3:
+    ) as mock_s3, patch(
+        "pkg.initializers.dataset.cache.CacheInitializer",
+        return_value=mock_cache_instance,
+    ) as mock_cache:
 
-        # Execute test
         if test_case["expected_error"]:
-            with pytest.raises(test_case["expected_error"]):
+            with pytest.raises(
+                test_case["expected_error"],
+                match=test_case["expected_error_match"],
+            ):
                 main()
         else:
             main()
 
-            # Verify appropriate provider instance methods were called
-            if test_case["storage_uri"] and test_case["storage_uri"].startswith(
-                "hf://"
-            ):
+            storage_uri = test_case["storage_uri"]
+            if storage_uri.startswith("hf://"):
+                mock_hf.assert_called_once()
                 mock_hf_instance.load_config.assert_called_once()
                 mock_hf_instance.download_dataset.assert_called_once()
-                mock_hf.assert_called_once()
-            elif test_case["storage_uri"] and test_case["storage_uri"].startswith(
-                "s3://"
-            ):
+                mock_s3.assert_not_called()
+                mock_cache.assert_not_called()
+            elif storage_uri.startswith("s3://"):
+                mock_s3.assert_called_once()
                 mock_s3_instance.load_config.assert_called_once()
                 mock_s3_instance.download_dataset.assert_called_once()
-                mock_s3.assert_called_once()
+                mock_hf.assert_not_called()
+                mock_cache.assert_not_called()
+            elif storage_uri.startswith("cache://"):
+                mock_cache.assert_called_once()
+                mock_cache_instance.load_config.assert_called_once()
+                mock_cache_instance.download_dataset.assert_called_once()
+                mock_hf.assert_not_called()
+                mock_s3.assert_not_called()
+
+        if test_case["expected_error"]:
+            mock_hf.assert_not_called()
+            mock_s3.assert_not_called()
+            mock_cache.assert_not_called()
 
     print("Test execution completed")
