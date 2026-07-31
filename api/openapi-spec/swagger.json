@@ -13787,6 +13787,24 @@
           }
         }
       },
+      "trainer.v1alpha1.CategoricalSpace": {
+        "description": "CategoricalSpace defines a search space over a discrete set of unordered strings.",
+        "type": "object",
+        "required": [
+          "choices"
+        ],
+        "properties": {
+          "choices": {
+            "description": "Choices is the set of strings to sample from.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "default": ""
+            },
+            "x-kubernetes-list-type": "set"
+          }
+        }
+      },
       "trainer.v1alpha1.ClusterTrainingRuntime": {
         "description": "ClusterTrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced by TrainJob that created in *any* namespace.",
         "type": "object",
@@ -14011,6 +14029,9 @@
           }
         }
       },
+      "trainer.v1alpha1.GridAlgorithm": {
+        "type": "object"
+      },
       "trainer.v1alpha1.Initializer": {
         "description": "Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.",
         "type": "object",
@@ -14183,6 +14204,30 @@
           }
         }
       },
+      "trainer.v1alpha1.LogUniformSpace": {
+        "description": "LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].",
+        "type": "object",
+        "required": [
+          "min",
+          "max",
+          "type"
+        ],
+        "properties": {
+          "max": {
+            "type": "string",
+            "default": ""
+          },
+          "min": {
+            "type": "string",
+            "default": ""
+          },
+          "type": {
+            "description": "Type specifies the underlying data type. Defaults to \"Float\".",
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
       "trainer.v1alpha1.MLPolicy": {
         "description": "MLPolicy represents configuration for the model training with ML-specific parameters.",
         "type": "object",
@@ -14351,6 +14396,218 @@
           "storageUri": {
             "description": "storageUri is the URI for the model provider. If set, it may be empty, or it must be a valid URI format (e.g., s3://bucket/path, gs://bucket/path).",
             "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.Objective": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "description": "Direction specifies the optimization goal. Defaults to \"Minimize\".",
+            "type": "string"
+          },
+          "metric": {
+            "description": "Metric specifies the name of the objective metric to track. Defaults to \"loss\".",
+            "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJob": {
+        "description": "OptimizationJob is the Schema for the optimizationjobs API.",
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJobSpec"
+              }
+            ]
+          },
+          "status": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJobStatus"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobList": {
+        "description": "OptimizationJobList contains a list of OptimizationJob.",
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJob"
+                }
+              ]
+            }
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobSpec": {
+        "description": "OptimizationJobSpec defines the desired state of OptimizationJob.",
+        "type": "object",
+        "required": [
+          "objectives",
+          "parameters",
+          "trainJobTemplate"
+        ],
+        "properties": {
+          "numTrials": {
+            "description": "NumTrials is the total number of trials to run.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "objectives": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.Objective"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "metric"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "parallelTrials": {
+            "description": "ParallelTrials is the number of trials to run in parallel. Defaults to 1.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.Parameter"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "searchAlgorithm": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.SearchAlgorithm"
+          },
+          "trainJobTemplate": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobTemplateSpec"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobStatus": {
+        "type": "object",
+        "properties": {
+          "conditions": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "type"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "result": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.Result"
+          }
+        }
+      },
+      "trainer.v1alpha1.Parameter": {
+        "type": "object",
+        "required": [
+          "name",
+          "searchSpace"
+        ],
+        "properties": {
+          "name": {
+            "description": "Name is the name of the hyperparameter.",
+            "type": "string",
+            "default": ""
+          },
+          "searchSpace": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.SearchSpace"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.ParameterAssignment": {
+        "description": "ParameterAssignment represents a single hyperparameter and its assigned value.",
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "default": ""
+          },
+          "value": {
+            "type": "string",
+            "default": ""
           }
         }
       },
@@ -14552,6 +14809,15 @@
           }
         }
       },
+      "trainer.v1alpha1.RandomAlgorithm": {
+        "type": "object",
+        "properties": {
+          "seed": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "trainer.v1alpha1.ReplicatedJobPatch": {
         "description": "ReplicatedJobPatch defines patches for a specific replicated job within the JobSet.",
         "type": "object",
@@ -14570,6 +14836,35 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobTemplatePatch"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.Result": {
+        "description": "Result tracks the parameters of the highest performing trial.",
+        "type": "object",
+        "required": [
+          "trainJobName"
+        ],
+        "properties": {
+          "parameters": {
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.ParameterAssignment"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "trainJobName": {
+            "description": "TrainJobName is the name of the underlying TrainJob that achieved this result.",
+            "type": "string",
+            "default": ""
           }
         }
       },
@@ -14620,6 +14915,32 @@
           "name": {
             "description": "name of the runtime being referenced. When namespaced-scoped TrainingRuntime is used, the TrainJob must have the same namespace as the deployed runtime.",
             "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.SearchAlgorithm": {
+        "type": "object",
+        "properties": {
+          "grid": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.GridAlgorithm"
+          },
+          "random": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.RandomAlgorithm"
+          }
+        }
+      },
+      "trainer.v1alpha1.SearchSpace": {
+        "description": "SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.",
+        "type": "object",
+        "properties": {
+          "categorical": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.CategoricalSpace"
+          },
+          "logUniform": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.LogUniformSpace"
+          },
+          "uniform": {
+            "$ref": "#/components/schemas/trainer.v1alpha1.UniformSpace"
           }
         }
       },
@@ -14820,6 +15141,30 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.TrainerStatus"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.TrainJobTemplateSpec": {
+        "type": "object",
+        "required": [
+          "spec"
+        ],
+        "properties": {
+          "metadata": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobSpec"
               }
             ]
           }
@@ -15036,6 +15381,30 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobSetTemplatePatch"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.UniformSpace": {
+        "description": "UniformSpace defines a continuous uniform distribution over [Min, Max].",
+        "type": "object",
+        "required": [
+          "min",
+          "max",
+          "type"
+        ],
+        "properties": {
+          "max": {
+            "type": "string",
+            "default": ""
+          },
+          "min": {
+            "type": "string",
+            "default": ""
+          },
+          "type": {
+            "description": "Type specifies the underlying data type. Defaults to \"Float\".",
+            "type": "string",
+            "default": ""
           }
         }
       },
