@@ -20,6 +20,8 @@ package v1alpha1
 
 type ClusterTrainingRuntimeExpansion interface{}
 
+type OptimizationJobExpansion interface{}
+
 type TrainJobExpansion interface{}
 
 type TrainingRuntimeExpansion interface{}
