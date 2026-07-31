@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # coding: utf-8
 
 """
@@ -27,8 +41,8 @@ class TrainerV1alpha1Result(BaseModel):
     """
     Result tracks the parameters of the highest performing trial.
     """ # noqa: E501
-    parameters: Optional[List[TrainerV1alpha1ParameterAssignment]] = None
-    train_job_name: StrictStr = Field(description="TrainJobName is the name of the underlying TrainJob that achieved this result.", alias="trainJobName")
+    parameters: Optional[List[TrainerV1alpha1ParameterAssignment]] = Field(default=None, description="parameters is the list of parameters for the result.")
+    train_job_name: StrictStr = Field(description="trainJobName is the name of the underlying TrainJob that achieved this result.", alias="trainJobName")
     __properties: ClassVar[List[str]] = ["parameters", "trainJobName"]
 
     model_config = ConfigDict(
@@ -90,7 +104,7 @@ class TrainerV1alpha1Result(BaseModel):
 
         _obj = cls.model_validate({
             "parameters": [TrainerV1alpha1ParameterAssignment.from_dict(_item) for _item in obj["parameters"]] if obj.get("parameters") is not None else None,
-            "trainJobName": obj.get("trainJobName") if obj.get("trainJobName") is not None else ''
+            "trainJobName": obj.get("trainJobName")
         })
         return _obj
 

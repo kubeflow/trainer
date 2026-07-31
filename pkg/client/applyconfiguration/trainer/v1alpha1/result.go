@@ -23,9 +23,10 @@ package v1alpha1
 //
 // Result tracks the parameters of the highest performing trial.
 type ResultApplyConfiguration struct {
-	// TrainJobName is the name of the underlying TrainJob that achieved this result.
-	TrainJobName *string                                 `json:"trainJobName,omitempty"`
-	Parameters   []ParameterAssignmentApplyConfiguration `json:"parameters,omitempty"`
+	// trainJobName is the name of the underlying TrainJob that achieved this result.
+	TrainJobName *string `json:"trainJobName,omitempty"`
+	// parameters is the list of parameters for the result.
+	Parameters []ParameterAssignmentApplyConfiguration `json:"parameters,omitempty"`
 }
 
 // ResultApplyConfiguration constructs a declarative configuration of the Result type for use with

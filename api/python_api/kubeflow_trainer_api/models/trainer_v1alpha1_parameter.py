@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # coding: utf-8
 
 """
@@ -25,10 +39,10 @@ from typing_extensions import Self
 
 class TrainerV1alpha1Parameter(BaseModel):
     """
-    Parameter defines a single hyperparameter and its search space.
+    TrainerV1alpha1Parameter
     """ # noqa: E501
-    name: StrictStr
-    search_space: TrainerV1alpha1SearchSpace = Field(alias="searchSpace")
+    name: StrictStr = Field(description="name is the name of the hyperparameter.")
+    search_space: TrainerV1alpha1SearchSpace = Field(description="searchSpace is the search space for the hyperparameter.", alias="searchSpace")
     __properties: ClassVar[List[str]] = ["name", "searchSpace"]
 
     model_config = ConfigDict(
@@ -85,7 +99,7 @@ class TrainerV1alpha1Parameter(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "name": obj.get("name") if obj.get("name") is not None else '',
+            "name": obj.get("name"),
             "searchSpace": TrainerV1alpha1SearchSpace.from_dict(obj["searchSpace"]) if obj.get("searchSpace") is not None else None
         })
         return _obj

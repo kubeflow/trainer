@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # coding: utf-8
 
 """
@@ -17,7 +31,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_apis_meta_v1_condition import IoK8sApimachineryPkgApisMetaV1Condition
 from kubeflow_trainer_api.models.trainer_v1alpha1_result import TrainerV1alpha1Result
@@ -26,15 +40,11 @@ from typing_extensions import Self
 
 class TrainerV1alpha1OptimizationJobStatus(BaseModel):
     """
-    OptimizationJobStatus defines the observed state of OptimizationJob.
+    OptimizationJobStatus is the status of the optimization job.
     """ # noqa: E501
-    active: Optional[StrictInt] = None
-    conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = None
-    failed: Optional[StrictInt] = None
-    phase: Optional[StrictStr] = None
-    result: Optional[TrainerV1alpha1Result] = Field(default=None, description="Result caches the highest performing parameters based on the Objective.")
-    succeeded: Optional[StrictInt] = None
-    __properties: ClassVar[List[str]] = ["active", "conditions", "failed", "phase", "result", "succeeded"]
+    conditions: Optional[List[IoK8sApimachineryPkgApisMetaV1Condition]] = Field(default=None, description="conditions is the list of conditions for the optimization job.")
+    result: Optional[TrainerV1alpha1Result] = Field(default=None, description="result is the result of the optimization job.")
+    __properties: ClassVar[List[str]] = ["conditions", "result"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -97,12 +107,8 @@ class TrainerV1alpha1OptimizationJobStatus(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "active": obj.get("active"),
             "conditions": [IoK8sApimachineryPkgApisMetaV1Condition.from_dict(_item) for _item in obj["conditions"]] if obj.get("conditions") is not None else None,
-            "failed": obj.get("failed"),
-            "phase": obj.get("phase"),
-            "result": TrainerV1alpha1Result.from_dict(obj["result"]) if obj.get("result") is not None else None,
-            "succeeded": obj.get("succeeded")
+            "result": TrainerV1alpha1Result.from_dict(obj["result"]) if obj.get("result") is not None else None
         })
         return _obj
 

@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # coding: utf-8
 
 """
@@ -17,21 +31,19 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_random_algorithm import TrainerV1alpha1RandomAlgorithm
-from kubeflow_trainer_api.models.trainer_v1alpha1_setting_kv import TrainerV1alpha1SettingKV
 from typing import Optional, Set
 from typing_extensions import Self
 
 class TrainerV1alpha1SearchAlgorithm(BaseModel):
     """
-    SearchAlgorithm defines the hyperparameter sampling configuration.
+    TrainerV1alpha1SearchAlgorithm
     """ # noqa: E501
-    provider: Optional[StrictStr] = Field(default=None, description="Provider specifies the backend suggestion engine. Defaults to \"optuna\" if omitted.")
-    provider_settings: Optional[List[TrainerV1alpha1SettingKV]] = Field(default=None, description="ProviderSettings passes raw engine kwargs down to the backend microservice.", alias="providerSettings")
-    random: Optional[TrainerV1alpha1RandomAlgorithm] = None
-    __properties: ClassVar[List[str]] = ["provider", "providerSettings", "random"]
+    grid: Optional[Dict[str, Any]] = Field(default=None, description="grid is the grid search algorithm.")
+    random: Optional[TrainerV1alpha1RandomAlgorithm] = Field(default=None, description="random is the random search algorithm.")
+    __properties: ClassVar[List[str]] = ["grid", "random"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -72,13 +84,6 @@ class TrainerV1alpha1SearchAlgorithm(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in provider_settings (list)
-        _items = []
-        if self.provider_settings:
-            for _item_provider_settings in self.provider_settings:
-                if _item_provider_settings:
-                    _items.append(_item_provider_settings.to_dict())
-            _dict['providerSettings'] = _items
         # override the default output from pydantic by calling `to_dict()` of random
         if self.random:
             _dict['random'] = self.random.to_dict()
@@ -94,8 +99,7 @@ class TrainerV1alpha1SearchAlgorithm(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "provider": obj.get("provider"),
-            "providerSettings": [TrainerV1alpha1SettingKV.from_dict(_item) for _item in obj["providerSettings"]] if obj.get("providerSettings") is not None else None,
+            "grid": obj.get("grid"),
             "random": TrainerV1alpha1RandomAlgorithm.from_dict(obj["random"]) if obj.get("random") is not None else None
         })
         return _obj

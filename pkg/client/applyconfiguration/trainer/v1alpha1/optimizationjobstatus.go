@@ -24,9 +24,13 @@ import (
 
 // OptimizationJobStatusApplyConfiguration represents a declarative configuration of the OptimizationJobStatus type for use
 // with apply.
+//
+// OptimizationJobStatus is the status of the optimization job.
 type OptimizationJobStatusApplyConfiguration struct {
+	// conditions is the list of conditions for the optimization job.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	Result     *ResultApplyConfiguration        `json:"result,omitempty"`
+	// result is the result of the optimization job.
+	Result *ResultApplyConfiguration `json:"result,omitempty"`
 }
 
 // OptimizationJobStatusApplyConfiguration constructs a declarative configuration of the OptimizationJobStatus type for use with

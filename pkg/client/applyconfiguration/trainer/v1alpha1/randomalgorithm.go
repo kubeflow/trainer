@@ -20,7 +20,10 @@ package v1alpha1
 
 // RandomAlgorithmApplyConfiguration represents a declarative configuration of the RandomAlgorithm type for use
 // with apply.
+//
+// RandomAlgorithm is the random search algorithm.
 type RandomAlgorithmApplyConfiguration struct {
+	// seed is the seed for the random search algorithm.
 	Seed *int64 `json:"seed,omitempty"`
 }
 

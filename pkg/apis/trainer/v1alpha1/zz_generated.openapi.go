@@ -477,7 +477,7 @@ func schema_pkg_apis_trainer_v1alpha1_CategoricalSpace(ref common.ReferenceCallb
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Choices is the set of strings to sample from.",
+							Description: "choices is the set of strings to sample from.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -836,7 +836,8 @@ func schema_pkg_apis_trainer_v1alpha1_GridAlgorithm(ref common.ReferenceCallback
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "GridAlgorithm is the grid search algorithm.",
+				Type:        []string{"object"},
 			},
 		},
 	}
@@ -1085,28 +1086,27 @@ func schema_pkg_apis_trainer_v1alpha1_LogUniformSpace(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"min": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "min is the minimum value of the log-uniform search space.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"max": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "max is the maximum value of the log-uniform search space.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Type specifies the underlying data type. Defaults to \"Float\".",
-							Default:     "",
+							Description: "type specifies the underlying data type. Defaults to \"Float\".",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"min", "max", "type"},
+				Required: []string{"min", "max"},
 			},
 		},
 	}
@@ -1335,14 +1335,14 @@ func schema_pkg_apis_trainer_v1alpha1_Objective(ref common.ReferenceCallback) co
 				Properties: map[string]spec.Schema{
 					"metric": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Metric specifies the name of the objective metric to track. Defaults to \"loss\".",
+							Description: "metric specifies the name of the objective metric to track. Defaults to \"loss\".",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"direction": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Direction specifies the optimization goal. Defaults to \"Minimize\".",
+							Description: "direction specifies the optimization goal. Defaults to \"Minimize\".",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1357,7 +1357,7 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJob(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "OptimizationJob is the Schema for the optimizationjobs API.",
+				Description: "OptimizationJob is the Schema for the optimizationjobs API. OptimizationJob is the Schema for the optimizationjobs API.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -1376,23 +1376,26 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJob(ref common.ReferenceCallba
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+							Description: "metadata is the object meta for the optimization job.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobSpec"),
+							Description: "spec is the spec for the optimization job.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobStatus"),
+							Description: "status is the status for the optimization job.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobStatus"),
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -1423,13 +1426,15 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobList(ref common.ReferenceCa
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
+							Description: "listMeta is the list meta for the optimization job list.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
+							Description: "items is the list of optimization jobs.",
+							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -1466,7 +1471,8 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
+							Description: "objectives is the list of objectives to optimize.",
+							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -1479,7 +1485,8 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 					},
 					"searchAlgorithm": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SearchAlgorithm"),
+							Description: "searchAlgorithm is the algorithm to use for searching over the hyperparameters.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SearchAlgorithm"),
 						},
 					},
 					"parameters": {
@@ -1492,7 +1499,8 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
+							Description: "parameters is the list of hyperparameters to search over.",
+							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -1505,22 +1513,23 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobSpec(ref common.ReferenceCa
 					},
 					"numTrials": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NumTrials is the total number of trials to run.",
+							Description: "numTrials is the total number of trials to run.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"parallelTrials": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ParallelTrials is the number of trials to run in parallel. Defaults to 1.",
+							Description: "parallelTrials is the number of trials to run in parallel. Defaults to 1.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"trainJobTemplate": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTemplateSpec"),
+							Description: "trainJobTemplate is the template for the train job to run.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTemplateSpec"),
 						},
 					},
 				},
@@ -1536,7 +1545,8 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobStatus(ref common.Reference
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "OptimizationJobStatus is the status of the optimization job.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"conditions": {
 						VendorExtensible: spec.VendorExtensible{
@@ -1548,7 +1558,8 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobStatus(ref common.Reference
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
+							Description: "conditions is the list of conditions for the optimization job.",
+							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -1561,7 +1572,9 @@ func schema_pkg_apis_trainer_v1alpha1_OptimizationJobStatus(ref common.Reference
 					},
 					"result": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Result"),
+							Description: "result is the result of the optimization job.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Result"),
 						},
 					},
 				},
@@ -1580,16 +1593,15 @@ func schema_pkg_apis_trainer_v1alpha1_Parameter(ref common.ReferenceCallback) co
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is the name of the hyperparameter.",
-							Default:     "",
+							Description: "name is the name of the hyperparameter.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"searchSpace": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SearchSpace"),
+							Description: "searchSpace is the search space for the hyperparameter.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.SearchSpace"),
 						},
 					},
 				},
@@ -1610,16 +1622,16 @@ func schema_pkg_apis_trainer_v1alpha1_ParameterAssignment(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "name is the name of the hyperparameter.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "value is the value of the hyperparameter.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -1900,12 +1912,14 @@ func schema_pkg_apis_trainer_v1alpha1_RandomAlgorithm(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "RandomAlgorithm is the random search algorithm.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"seed": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int64",
+							Description: "seed is the seed for the random search algorithm.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
@@ -1952,8 +1966,7 @@ func schema_pkg_apis_trainer_v1alpha1_Result(ref common.ReferenceCallback) commo
 				Properties: map[string]spec.Schema{
 					"trainJobName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TrainJobName is the name of the underlying TrainJob that achieved this result.",
-							Default:     "",
+							Description: "trainJobName is the name of the underlying TrainJob that achieved this result.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1968,7 +1981,8 @@ func schema_pkg_apis_trainer_v1alpha1_Result(ref common.ReferenceCallback) commo
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
+							Description: "parameters is the list of parameters for the result.",
+							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -2066,12 +2080,14 @@ func schema_pkg_apis_trainer_v1alpha1_SearchAlgorithm(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"random": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RandomAlgorithm"),
+							Description: "random is the random search algorithm.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.RandomAlgorithm"),
 						},
 					},
 					"grid": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.GridAlgorithm"),
+							Description: "grid is the grid search algorithm.",
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.GridAlgorithm"),
 						},
 					},
 				},
@@ -2091,17 +2107,23 @@ func schema_pkg_apis_trainer_v1alpha1_SearchSpace(ref common.ReferenceCallback) 
 				Properties: map[string]spec.Schema{
 					"uniform": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.UniformSpace"),
+							Description: "uniform is the uniform search space.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.UniformSpace"),
 						},
 					},
 					"logUniform": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogUniformSpace"),
+							Description: "logUniform is the log-uniform search space.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogUniformSpace"),
 						},
 					},
 					"categorical": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CategoricalSpace"),
+							Description: "categorical is the categorical search space.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CategoricalSpace"),
 						},
 					},
 				},
@@ -2381,18 +2403,21 @@ func schema_pkg_apis_trainer_v1alpha1_TrainJobTemplateSpec(ref common.ReferenceC
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "TrainJobTemplateSpec is the template for the train job to run.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+							Description: "metadata is the metadata for the train job.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobSpec"),
+							Description: "spec is the spec for the train job.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobSpec"),
 						},
 					},
 				},
@@ -2720,28 +2745,27 @@ func schema_pkg_apis_trainer_v1alpha1_UniformSpace(ref common.ReferenceCallback)
 				Properties: map[string]spec.Schema{
 					"min": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "min is the minimum value of the uniform search space.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"max": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "max is the maximum value of the uniform search space.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Type specifies the underlying data type. Defaults to \"Float\".",
-							Default:     "",
+							Description: "type specifies the underlying data type. Defaults to \"Float\".",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"min", "max", "type"},
+				Required: []string{"min", "max"},
 			},
 		},
 	}

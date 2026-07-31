@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # coding: utf-8
 
 """
@@ -17,13 +31,12 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Any, ClassVar, Dict, List
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.trainer_v1alpha1_objective import TrainerV1alpha1Objective
 from kubeflow_trainer_api.models.trainer_v1alpha1_parameter import TrainerV1alpha1Parameter
 from kubeflow_trainer_api.models.trainer_v1alpha1_search_algorithm import TrainerV1alpha1SearchAlgorithm
 from kubeflow_trainer_api.models.trainer_v1alpha1_train_job_template_spec import TrainerV1alpha1TrainJobTemplateSpec
-from kubeflow_trainer_api.models.trainer_v1alpha1_trial_config import TrainerV1alpha1TrialConfig
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -31,12 +44,13 @@ class TrainerV1alpha1OptimizationJobSpec(BaseModel):
     """
     OptimizationJobSpec defines the desired state of OptimizationJob.
     """ # noqa: E501
-    objectives: List[TrainerV1alpha1Objective]
-    parameters: List[TrainerV1alpha1Parameter]
-    search_algorithm: TrainerV1alpha1SearchAlgorithm = Field(description="SearchAlgorithm explicitly separates initial sampling from mid-run pruning.", alias="searchAlgorithm")
-    train_job_template: TrainerV1alpha1TrainJobTemplateSpec = Field(description="TrainJobTemplate wraps the underlying TrainJob workload and its metadata.", alias="trainJobTemplate")
-    trial_config: TrainerV1alpha1TrialConfig = Field(alias="trialConfig")
-    __properties: ClassVar[List[str]] = ["objectives", "parameters", "searchAlgorithm", "trainJobTemplate", "trialConfig"]
+    num_trials: Optional[StrictInt] = Field(default=None, description="numTrials is the total number of trials to run.", alias="numTrials")
+    objectives: List[TrainerV1alpha1Objective] = Field(description="objectives is the list of objectives to optimize.")
+    parallel_trials: Optional[StrictInt] = Field(default=None, description="parallelTrials is the number of trials to run in parallel. Defaults to 1.", alias="parallelTrials")
+    parameters: List[TrainerV1alpha1Parameter] = Field(description="parameters is the list of hyperparameters to search over.")
+    search_algorithm: Optional[TrainerV1alpha1SearchAlgorithm] = Field(default=None, description="searchAlgorithm is the algorithm to use for searching over the hyperparameters.", alias="searchAlgorithm")
+    train_job_template: TrainerV1alpha1TrainJobTemplateSpec = Field(description="trainJobTemplate is the template for the train job to run.", alias="trainJobTemplate")
+    __properties: ClassVar[List[str]] = ["numTrials", "objectives", "parallelTrials", "parameters", "searchAlgorithm", "trainJobTemplate"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -97,9 +111,6 @@ class TrainerV1alpha1OptimizationJobSpec(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of train_job_template
         if self.train_job_template:
             _dict['trainJobTemplate'] = self.train_job_template.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of trial_config
-        if self.trial_config:
-            _dict['trialConfig'] = self.trial_config.to_dict()
         return _dict
 
     @classmethod
@@ -112,11 +123,12 @@ class TrainerV1alpha1OptimizationJobSpec(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
+            "numTrials": obj.get("numTrials"),
             "objectives": [TrainerV1alpha1Objective.from_dict(_item) for _item in obj["objectives"]] if obj.get("objectives") is not None else None,
+            "parallelTrials": obj.get("parallelTrials"),
             "parameters": [TrainerV1alpha1Parameter.from_dict(_item) for _item in obj["parameters"]] if obj.get("parameters") is not None else None,
             "searchAlgorithm": TrainerV1alpha1SearchAlgorithm.from_dict(obj["searchAlgorithm"]) if obj.get("searchAlgorithm") is not None else None,
-            "trainJobTemplate": TrainerV1alpha1TrainJobTemplateSpec.from_dict(obj["trainJobTemplate"]) if obj.get("trainJobTemplate") is not None else None,
-            "trialConfig": TrainerV1alpha1TrialConfig.from_dict(obj["trialConfig"]) if obj.get("trialConfig") is not None else None
+            "trainJobTemplate": TrainerV1alpha1TrainJobTemplateSpec.from_dict(obj["trainJobTemplate"]) if obj.get("trainJobTemplate") is not None else None
         })
         return _obj
 

@@ -25,8 +25,10 @@ import (
 // SearchAlgorithmApplyConfiguration represents a declarative configuration of the SearchAlgorithm type for use
 // with apply.
 type SearchAlgorithmApplyConfiguration struct {
+	// random is the random search algorithm.
 	Random *RandomAlgorithmApplyConfiguration `json:"random,omitempty"`
-	Grid   *trainerv1alpha1.GridAlgorithm     `json:"grid,omitempty"`
+	// grid is the grid search algorithm.
+	Grid *trainerv1alpha1.GridAlgorithm `json:"grid,omitempty"`
 }
 
 // SearchAlgorithmApplyConfiguration constructs a declarative configuration of the SearchAlgorithm type for use with

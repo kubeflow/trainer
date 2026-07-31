@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # coding: utf-8
 
 """
@@ -17,7 +31,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List
 from typing import Optional, Set
 from typing_extensions import Self
@@ -26,8 +40,8 @@ class TrainerV1alpha1ParameterAssignment(BaseModel):
     """
     ParameterAssignment represents a single hyperparameter and its assigned value.
     """ # noqa: E501
-    name: StrictStr
-    value: StrictStr
+    name: StrictStr = Field(description="name is the name of the hyperparameter.")
+    value: StrictStr = Field(description="value is the value of the hyperparameter.")
     __properties: ClassVar[List[str]] = ["name", "value"]
 
     model_config = ConfigDict(
@@ -81,8 +95,8 @@ class TrainerV1alpha1ParameterAssignment(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "name": obj.get("name") if obj.get("name") is not None else '',
-            "value": obj.get("value") if obj.get("value") is not None else ''
+            "name": obj.get("name"),
+            "value": obj.get("value")
         })
         return _obj
 

@@ -26,9 +26,13 @@ import (
 
 // TrainJobTemplateSpecApplyConfiguration represents a declarative configuration of the TrainJobTemplateSpec type for use
 // with apply.
+//
+// TrainJobTemplateSpec is the template for the train job to run.
 type TrainJobTemplateSpecApplyConfiguration struct {
+	// metadata is the metadata for the train job.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *TrainJobSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec is the spec for the train job.
+	Spec *TrainJobSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // TrainJobTemplateSpecApplyConfiguration constructs a declarative configuration of the TrainJobTemplateSpec type for use with

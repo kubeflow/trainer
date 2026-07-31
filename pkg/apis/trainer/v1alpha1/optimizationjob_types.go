@@ -27,71 +27,85 @@ const (
 )
 
 type Objective struct {
-	// Metric specifies the name of the objective metric to track. Defaults to "loss".
+	// metric specifies the name of the objective metric to track. Defaults to "loss".
 	// +kubebuilder:default=loss
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=64
 	// +optional
-	Metric *string `json:"metric,omitempty"`
+	Metric string `json:"metric,omitempty"`
 
-	// Direction specifies the optimization goal. Defaults to "Minimize".
+	// direction specifies the optimization goal. Defaults to "Minimize".
 	// +kubebuilder:default=Minimize
 	// +optional
-	Direction *ObjectiveDirection `json:"direction,omitempty"`
+	Direction ObjectiveDirection `json:"direction,omitempty"`
 }
 
 // OptimizationJobSpec defines the desired state of OptimizationJob.
+// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="OptimizationJobSpec is immutable and cannot be updated after creation"
 // +kubebuilder:validation:XValidation:rule="self.parallelTrials <= self.numTrials",message="parallelTrials cannot exceed numTrials"
 type OptimizationJobSpec struct {
+	// objectives is the list of objectives to optimize.
 	// +listType=map
 	// +listMapKey=metric
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=1
 	// +required
-	Objectives []Objective `json:"objectives"`
+	Objectives []Objective `json:"objectives,omitempty"`
 
+	// searchAlgorithm is the algorithm to use for searching over the hyperparameters.
+	// +kubebuilder:default={random: {}}
 	// +optional
 	SearchAlgorithm *SearchAlgorithm `json:"searchAlgorithm,omitempty"`
 
+	// parameters is the list of hyperparameters to search over.
 	// +listType=map
 	// +listMapKey=name
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=100
 	// +required
-	Parameters []Parameter `json:"parameters"`
+	Parameters []Parameter `json:"parameters,omitempty"`
 
-	// NumTrials is the total number of trials to run.
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=100
-	// +optional
-	NumTrials *int32 `json:"numTrials,omitempty"`
-
-	// ParallelTrials is the number of trials to run in parallel. Defaults to 1.
+	// numTrials is the total number of trials to run.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=100
 	// +optional
-	ParallelTrials *int32 `json:"parallelTrials,omitempty"`
+	NumTrials int32 `json:"numTrials,omitempty"`
 
+	// parallelTrials is the number of trials to run in parallel. Defaults to 1.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	ParallelTrials int32 `json:"parallelTrials,omitempty"`
+
+	// trainJobTemplate is the template for the train job to run.
 	// +required
-	TrainJobTemplate TrainJobTemplateSpec `json:"trainJobTemplate"`
+	TrainJobTemplate TrainJobTemplateSpec `json:"trainJobTemplate,omitzero"`
 }
 
 // +kubebuilder:validation:XValidation:rule="[has(self.random), has(self.grid)].filter(x, x).size() == 1",message="Exactly one search algorithm configuration must be provided"
 type SearchAlgorithm struct {
+	// random is the random search algorithm.
 	// +optional
 	Random *RandomAlgorithm `json:"random,omitempty"`
+
+	// grid is the grid search algorithm.
 	// +optional
 	Grid *GridAlgorithm `json:"grid,omitempty"`
 }
 
+// RandomAlgorithm is the random search algorithm.
 type RandomAlgorithm struct {
+	// seed is the seed for the random search algorithm.
 	// +optional
 	Seed *int64 `json:"seed,omitempty"`
 }
 
+// GridAlgorithm is the grid search algorithm.
 type GridAlgorithm struct{}
 
+// ParameterType is the type of the parameter.
 // +kubebuilder:validation:Enum=Int;Float
 type ParameterType string
 
@@ -103,14 +117,17 @@ const (
 // SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.
 // +kubebuilder:validation:XValidation:rule="[has(self.uniform), has(self.logUniform), has(self.categorical)].filter(x, x).size() == 1",message="Exactly one search space distribution configuration must be provided"
 type SearchSpace struct {
+	// uniform is the uniform search space.
 	// +optional
-	Uniform *UniformSpace `json:"uniform,omitempty"`
+	Uniform UniformSpace `json:"uniform,omitempty,omitzero"`
 
+	// logUniform is the log-uniform search space.
 	// +optional
-	LogUniform *LogUniformSpace `json:"logUniform,omitempty"`
+	LogUniform LogUniformSpace `json:"logUniform,omitempty,omitzero"`
 
+	// categorical is the categorical search space.
 	// +optional
-	Categorical *CategoricalSpace `json:"categorical,omitempty"`
+	Categorical CategoricalSpace `json:"categorical,omitempty,omitzero"`
 }
 
 // +kubebuilder:validation:Pattern="^-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?$"
@@ -120,94 +137,119 @@ type Double string
 // UniformSpace defines a continuous uniform distribution over [Min, Max].
 // +kubebuilder:validation:XValidation:rule="double(self.min) < double(self.max)",message="min must be strictly less than max"
 type UniformSpace struct {
+	// min is the minimum value of the uniform search space.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:MinLength=1
 	// +required
-	Min Double `json:"min"`
+	Min Double `json:"min,omitempty"`
 
+	// max is the maximum value of the uniform search space.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:MinLength=1
 	// +required
-	Max Double `json:"max"`
+	Max Double `json:"max,omitempty"`
 
-	// Type specifies the underlying data type. Defaults to "Float".
+	// type specifies the underlying data type. Defaults to "Float".
 	// +kubebuilder:default=Float
-	// +required
-	Type ParameterType `json:"type"`
+	// +optional
+	Type ParameterType `json:"type,omitempty"`
 }
 
 // LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].
 // +kubebuilder:validation:XValidation:rule="double(self.min) > 0.0",message="min must be strictly greater than 0"
 // +kubebuilder:validation:XValidation:rule="double(self.min) < double(self.max)",message="min must be strictly less than max"
 type LogUniformSpace struct {
+	// min is the minimum value of the log-uniform search space.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:MinLength=1
 	// +required
-	Min Double `json:"min"`
+	Min Double `json:"min,omitempty"`
 
+	// max is the maximum value of the log-uniform search space.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:MinLength=1
 	// +required
-	Max Double `json:"max"`
+	Max Double `json:"max,omitempty"`
 
-	// Type specifies the underlying data type. Defaults to "Float".
+	// type specifies the underlying data type. Defaults to "Float".
 	// +kubebuilder:default=Float
-	// +required
-	Type ParameterType `json:"type"`
+	// +optional
+	Type ParameterType `json:"type,omitempty"`
 }
 
 // CategoricalSpace defines a search space over a discrete set of unordered strings.
 type CategoricalSpace struct {
-	// Choices is the set of strings to sample from.
+	// choices is the set of strings to sample from.
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=100
+	// +kubebuilder:validation:items:MaxLength=256
 	// +listType=set
 	// +required
-	Choices []string `json:"choices"`
+	Choices []string `json:"choices,omitempty"`
 }
 
 type Parameter struct {
-	// Name is the name of the hyperparameter.
+	// name is the name of the hyperparameter.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=64
 	// +required
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
 
+	// searchSpace is the search space for the hyperparameter.
 	// +required
-	SearchSpace SearchSpace `json:"searchSpace"`
+	SearchSpace *SearchSpace `json:"searchSpace,omitempty"`
 }
 
 // ParameterAssignment represents a single hyperparameter and its assigned value.
 type ParameterAssignment struct {
+	// name is the name of the hyperparameter.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=64
 	// +required
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
 
+	// value is the value of the hyperparameter.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=64
 	// +required
-	Value string `json:"value"`
+	Value string `json:"value,omitempty"`
 }
 
+// TrainJobTemplateSpec is the template for the train job to run.
 type TrainJobTemplateSpec struct {
+	// metadata is the metadata for the train job.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="!has(self.name) && !has(self.namespace)", message="name and namespace cannot be set in a template."
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// spec is the spec for the train job.
 	// +required
 	Spec TrainJobSpec `json:"spec,omitzero"`
 }
 
+// OptimizationJobStatus is the status of the optimization job.
 type OptimizationJobStatus struct {
+	// conditions is the list of conditions for the optimization job.
 	// +listType=map
 	// +listMapKey=type
+	// +kubebuilder:validation:MaxItems=100
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
+	// result is the result of the optimization job.
 	// +optional
-	Result *Result `json:"result,omitempty"`
+	Result Result `json:"result,omitempty,omitzero"`
 }
 
 // Result tracks the parameters of the highest performing trial.
 type Result struct {
-	// TrainJobName is the name of the underlying TrainJob that achieved this result.
+	// trainJobName is the name of the underlying TrainJob that achieved this result.
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
 	// +required
-	TrainJobName string `json:"trainJobName"`
+	TrainJobName string `json:"trainJobName,omitempty"`
 
+	// parameters is the list of parameters for the result.
 	// +listType=map
 	// +listMapKey=name
 	// +kubebuilder:validation:MaxItems=100
@@ -215,24 +257,39 @@ type Result struct {
 	Parameters []ParameterAssignment `json:"parameters,omitempty"`
 }
 
+// OptimizationJob is the Schema for the optimizationjobs API.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // OptimizationJob is the Schema for the optimizationjobs API.
 type OptimizationJob struct {
-	metav1.TypeMeta   `json:",inline"`
+	// typeMeta is the type meta for the optimization job.
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the object meta for the optimization job.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   OptimizationJobSpec   `json:"spec,omitempty"`
-	Status OptimizationJobStatus `json:"status,omitempty"`
+	// spec is the spec for the optimization job.
+	// +required
+	Spec OptimizationJobSpec `json:"spec,omitempty,omitzero"`
+
+	// status is the status for the optimization job.
+	// +optional
+	Status *OptimizationJobStatus `json:"status,omitempty,omitzero"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // OptimizationJobList contains a list of OptimizationJob.
 type OptimizationJobList struct {
+	// typeMeta is the type meta for the optimization job list.
 	metav1.TypeMeta `json:",inline"`
+
+	// listMeta is the list meta for the optimization job list.
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []OptimizationJob `json:"items"`
+
+	// items is the list of optimization jobs.
+	Items []OptimizationJob `json:"items"`
 }

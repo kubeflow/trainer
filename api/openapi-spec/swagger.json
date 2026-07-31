@@ -13795,7 +13795,7 @@
         ],
         "properties": {
           "choices": {
-            "description": "Choices is the set of strings to sample from.",
+            "description": "choices is the set of strings to sample from.",
             "type": "array",
             "items": {
               "type": "string",
@@ -14030,6 +14030,7 @@
         }
       },
       "trainer.v1alpha1.GridAlgorithm": {
+        "description": "GridAlgorithm is the grid search algorithm.",
         "type": "object"
       },
       "trainer.v1alpha1.Initializer": {
@@ -14209,22 +14210,20 @@
         "type": "object",
         "required": [
           "min",
-          "max",
-          "type"
+          "max"
         ],
         "properties": {
           "max": {
-            "type": "string",
-            "default": ""
+            "description": "max is the maximum value of the log-uniform search space.",
+            "type": "string"
           },
           "min": {
-            "type": "string",
-            "default": ""
+            "description": "min is the minimum value of the log-uniform search space.",
+            "type": "string"
           },
           "type": {
-            "description": "Type specifies the underlying data type. Defaults to \"Float\".",
-            "type": "string",
-            "default": ""
+            "description": "type specifies the underlying data type. Defaults to \"Float\".",
+            "type": "string"
           }
         }
       },
@@ -14403,18 +14402,21 @@
         "type": "object",
         "properties": {
           "direction": {
-            "description": "Direction specifies the optimization goal. Defaults to \"Minimize\".",
+            "description": "direction specifies the optimization goal. Defaults to \"Minimize\".",
             "type": "string"
           },
           "metric": {
-            "description": "Metric specifies the name of the objective metric to track. Defaults to \"loss\".",
+            "description": "metric specifies the name of the objective metric to track. Defaults to \"loss\".",
             "type": "string"
           }
         }
       },
       "trainer.v1alpha1.OptimizationJob": {
-        "description": "OptimizationJob is the Schema for the optimizationjobs API.",
+        "description": "OptimizationJob is the Schema for the optimizationjobs API. OptimizationJob is the Schema for the optimizationjobs API.",
         "type": "object",
+        "required": [
+          "spec"
+        ],
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -14425,6 +14427,7 @@
             "type": "string"
           },
           "metadata": {
+            "description": "metadata is the object meta for the optimization job.",
             "default": {},
             "allOf": [
               {
@@ -14433,6 +14436,7 @@
             ]
           },
           "spec": {
+            "description": "spec is the spec for the optimization job.",
             "default": {},
             "allOf": [
               {
@@ -14441,7 +14445,7 @@
             ]
           },
           "status": {
-            "default": {},
+            "description": "status is the status for the optimization job.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJobStatus"
@@ -14462,6 +14466,7 @@
             "type": "string"
           },
           "items": {
+            "description": "items is the list of optimization jobs.",
             "type": "array",
             "items": {
               "default": {},
@@ -14477,6 +14482,7 @@
             "type": "string"
           },
           "metadata": {
+            "description": "listMeta is the list meta for the optimization job list.",
             "default": {},
             "allOf": [
               {
@@ -14496,11 +14502,12 @@
         ],
         "properties": {
           "numTrials": {
-            "description": "NumTrials is the total number of trials to run.",
+            "description": "numTrials is the total number of trials to run.",
             "type": "integer",
             "format": "int32"
           },
           "objectives": {
+            "description": "objectives is the list of objectives to optimize.",
             "type": "array",
             "items": {
               "default": {},
@@ -14516,11 +14523,12 @@
             "x-kubernetes-list-type": "map"
           },
           "parallelTrials": {
-            "description": "ParallelTrials is the number of trials to run in parallel. Defaults to 1.",
+            "description": "parallelTrials is the number of trials to run in parallel. Defaults to 1.",
             "type": "integer",
             "format": "int32"
           },
           "parameters": {
+            "description": "parameters is the list of hyperparameters to search over.",
             "type": "array",
             "items": {
               "default": {},
@@ -14536,9 +14544,15 @@
             "x-kubernetes-list-type": "map"
           },
           "searchAlgorithm": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.SearchAlgorithm"
+            "description": "searchAlgorithm is the algorithm to use for searching over the hyperparameters.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.SearchAlgorithm"
+              }
+            ]
           },
           "trainJobTemplate": {
+            "description": "trainJobTemplate is the template for the train job to run.",
             "default": {},
             "allOf": [
               {
@@ -14549,9 +14563,11 @@
         }
       },
       "trainer.v1alpha1.OptimizationJobStatus": {
+        "description": "OptimizationJobStatus is the status of the optimization job.",
         "type": "object",
         "properties": {
           "conditions": {
+            "description": "conditions is the list of conditions for the optimization job.",
             "type": "array",
             "items": {
               "default": {},
@@ -14567,7 +14583,13 @@
             "x-kubernetes-list-type": "map"
           },
           "result": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.Result"
+            "description": "result is the result of the optimization job.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.Result"
+              }
+            ]
           }
         }
       },
@@ -14579,12 +14601,11 @@
         ],
         "properties": {
           "name": {
-            "description": "Name is the name of the hyperparameter.",
-            "type": "string",
-            "default": ""
+            "description": "name is the name of the hyperparameter.",
+            "type": "string"
           },
           "searchSpace": {
-            "default": {},
+            "description": "searchSpace is the search space for the hyperparameter.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.SearchSpace"
@@ -14602,12 +14623,12 @@
         ],
         "properties": {
           "name": {
-            "type": "string",
-            "default": ""
+            "description": "name is the name of the hyperparameter.",
+            "type": "string"
           },
           "value": {
-            "type": "string",
-            "default": ""
+            "description": "value is the value of the hyperparameter.",
+            "type": "string"
           }
         }
       },
@@ -14810,9 +14831,11 @@
         }
       },
       "trainer.v1alpha1.RandomAlgorithm": {
+        "description": "RandomAlgorithm is the random search algorithm.",
         "type": "object",
         "properties": {
           "seed": {
+            "description": "seed is the seed for the random search algorithm.",
             "type": "integer",
             "format": "int64"
           }
@@ -14847,6 +14870,7 @@
         ],
         "properties": {
           "parameters": {
+            "description": "parameters is the list of parameters for the result.",
             "type": "array",
             "items": {
               "default": {},
@@ -14862,9 +14886,8 @@
             "x-kubernetes-list-type": "map"
           },
           "trainJobName": {
-            "description": "TrainJobName is the name of the underlying TrainJob that achieved this result.",
-            "type": "string",
-            "default": ""
+            "description": "trainJobName is the name of the underlying TrainJob that achieved this result.",
+            "type": "string"
           }
         }
       },
@@ -14922,10 +14945,20 @@
         "type": "object",
         "properties": {
           "grid": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.GridAlgorithm"
+            "description": "grid is the grid search algorithm.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.GridAlgorithm"
+              }
+            ]
           },
           "random": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.RandomAlgorithm"
+            "description": "random is the random search algorithm.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.RandomAlgorithm"
+              }
+            ]
           }
         }
       },
@@ -14934,13 +14967,31 @@
         "type": "object",
         "properties": {
           "categorical": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.CategoricalSpace"
+            "description": "categorical is the categorical search space.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.CategoricalSpace"
+              }
+            ]
           },
           "logUniform": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.LogUniformSpace"
+            "description": "logUniform is the log-uniform search space.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.LogUniformSpace"
+              }
+            ]
           },
           "uniform": {
-            "$ref": "#/components/schemas/trainer.v1alpha1.UniformSpace"
+            "description": "uniform is the uniform search space.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.UniformSpace"
+              }
+            ]
           }
         }
       },
@@ -15147,12 +15198,14 @@
         }
       },
       "trainer.v1alpha1.TrainJobTemplateSpec": {
+        "description": "TrainJobTemplateSpec is the template for the train job to run.",
         "type": "object",
         "required": [
           "spec"
         ],
         "properties": {
           "metadata": {
+            "description": "metadata is the metadata for the train job.",
             "default": {},
             "allOf": [
               {
@@ -15161,6 +15214,7 @@
             ]
           },
           "spec": {
+            "description": "spec is the spec for the train job.",
             "default": {},
             "allOf": [
               {
@@ -15389,22 +15443,20 @@
         "type": "object",
         "required": [
           "min",
-          "max",
-          "type"
+          "max"
         ],
         "properties": {
           "max": {
-            "type": "string",
-            "default": ""
+            "description": "max is the maximum value of the uniform search space.",
+            "type": "string"
           },
           "min": {
-            "type": "string",
-            "default": ""
+            "description": "min is the minimum value of the uniform search space.",
+            "type": "string"
           },
           "type": {
-            "description": "Type specifies the underlying data type. Defaults to \"Float\".",
-            "type": "string",
-            "default": ""
+            "description": "type specifies the underlying data type. Defaults to \"Float\".",
+            "type": "string"
           }
         }
       },

@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # coding: utf-8
 
 """
@@ -17,17 +31,17 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, StrictStr
-from typing import Any, ClassVar, Dict, List
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
 class TrainerV1alpha1Objective(BaseModel):
     """
-    Objective defines the metric and goal for the OptimizationJob.
+    TrainerV1alpha1Objective
     """ # noqa: E501
-    direction: StrictStr
-    metric: StrictStr
+    direction: Optional[StrictStr] = Field(default=None, description="direction specifies the optimization goal. Defaults to \"Minimize\".")
+    metric: Optional[StrictStr] = Field(default=None, description="metric specifies the name of the objective metric to track. Defaults to \"loss\".")
     __properties: ClassVar[List[str]] = ["direction", "metric"]
 
     model_config = ConfigDict(
@@ -81,8 +95,8 @@ class TrainerV1alpha1Objective(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "direction": obj.get("direction") if obj.get("direction") is not None else '',
-            "metric": obj.get("metric") if obj.get("metric") is not None else ''
+            "direction": obj.get("direction"),
+            "metric": obj.get("metric")
         })
         return _obj
 

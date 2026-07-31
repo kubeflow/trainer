@@ -23,7 +23,9 @@ package v1alpha1
 //
 // ParameterAssignment represents a single hyperparameter and its assigned value.
 type ParameterAssignmentApplyConfiguration struct {
-	Name  *string `json:"name,omitempty"`
+	// name is the name of the hyperparameter.
+	Name *string `json:"name,omitempty"`
+	// value is the value of the hyperparameter.
 	Value *string `json:"value,omitempty"`
 }
 

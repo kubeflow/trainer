@@ -1,3 +1,17 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # coding: utf-8
 
 """
@@ -27,13 +41,13 @@ from typing_extensions import Self
 
 class TrainerV1alpha1OptimizationJob(BaseModel):
     """
-    OptimizationJob is the Schema for the optimizationjobs API.
+    OptimizationJob is the Schema for the optimizationjobs API. OptimizationJob is the Schema for the optimizationjobs API.
     """ # noqa: E501
     api_version: Optional[StrictStr] = Field(default=None, description="APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources", alias="apiVersion")
     kind: Optional[StrictStr] = Field(default=None, description="Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds")
-    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = None
-    spec: Optional[TrainerV1alpha1OptimizationJobSpec] = None
-    status: Optional[TrainerV1alpha1OptimizationJobStatus] = None
+    metadata: Optional[IoK8sApimachineryPkgApisMetaV1ObjectMeta] = Field(default=None, description="metadata is the object meta for the optimization job.")
+    spec: TrainerV1alpha1OptimizationJobSpec = Field(description="spec is the spec for the optimization job.")
+    status: Optional[TrainerV1alpha1OptimizationJobStatus] = Field(default=None, description="status is the status for the optimization job.")
     __properties: ClassVar[List[str]] = ["apiVersion", "kind", "metadata", "spec", "status"]
 
     model_config = ConfigDict(

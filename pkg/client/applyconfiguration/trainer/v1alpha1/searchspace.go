@@ -23,8 +23,11 @@ package v1alpha1
 //
 // SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.
 type SearchSpaceApplyConfiguration struct {
-	Uniform     *UniformSpaceApplyConfiguration     `json:"uniform,omitempty"`
-	LogUniform  *LogUniformSpaceApplyConfiguration  `json:"logUniform,omitempty"`
+	// uniform is the uniform search space.
+	Uniform *UniformSpaceApplyConfiguration `json:"uniform,omitempty"`
+	// logUniform is the log-uniform search space.
+	LogUniform *LogUniformSpaceApplyConfiguration `json:"logUniform,omitempty"`
+	// categorical is the categorical search space.
 	Categorical *CategoricalSpaceApplyConfiguration `json:"categorical,omitempty"`
 }
 

@@ -23,13 +23,17 @@ package v1alpha1
 //
 // OptimizationJobSpec defines the desired state of OptimizationJob.
 type OptimizationJobSpecApplyConfiguration struct {
-	Objectives      []ObjectiveApplyConfiguration      `json:"objectives,omitempty"`
+	// objectives is the list of objectives to optimize.
+	Objectives []ObjectiveApplyConfiguration `json:"objectives,omitempty"`
+	// searchAlgorithm is the algorithm to use for searching over the hyperparameters.
 	SearchAlgorithm *SearchAlgorithmApplyConfiguration `json:"searchAlgorithm,omitempty"`
-	Parameters      []ParameterApplyConfiguration      `json:"parameters,omitempty"`
-	// NumTrials is the total number of trials to run.
+	// parameters is the list of hyperparameters to search over.
+	Parameters []ParameterApplyConfiguration `json:"parameters,omitempty"`
+	// numTrials is the total number of trials to run.
 	NumTrials *int32 `json:"numTrials,omitempty"`
-	// ParallelTrials is the number of trials to run in parallel. Defaults to 1.
-	ParallelTrials   *int32                                  `json:"parallelTrials,omitempty"`
+	// parallelTrials is the number of trials to run in parallel. Defaults to 1.
+	ParallelTrials *int32 `json:"parallelTrials,omitempty"`
+	// trainJobTemplate is the template for the train job to run.
 	TrainJobTemplate *TrainJobTemplateSpecApplyConfiguration `json:"trainJobTemplate,omitempty"`
 }
 

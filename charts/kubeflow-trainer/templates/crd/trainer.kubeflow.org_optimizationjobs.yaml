@@ -34,7 +34,9 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: OptimizationJob is the Schema for the optimizationjobs API.
+        description: |-
+          OptimizationJob is the Schema for the optimizationjobs API.
+          OptimizationJob is the Schema for the optimizationjobs API.
         properties:
           apiVersion:
             description: |-
@@ -54,20 +56,22 @@ spec:
           metadata:
             type: object
           spec:
-            description: OptimizationJobSpec defines the desired state of OptimizationJob.
+            description: spec is the spec for the optimization job.
             properties:
               numTrials:
-                description: NumTrials is the total number of trials to run.
+                default: 1
+                description: numTrials is the total number of trials to run.
                 format: int32
                 maximum: 100
                 minimum: 1
                 type: integer
               objectives:
+                description: objectives is the list of objectives to optimize.
                 items:
                   properties:
                     direction:
                       default: Minimize
-                      description: Direction specifies the optimization goal. Defaults
+                      description: direction specifies the optimization goal. Defaults
                         to "Minimize".
                       enum:
                       - Maximize
@@ -75,7 +79,7 @@ spec:
                       type: string
                     metric:
                       default: loss
-                      description: Metric specifies the name of the objective metric
+                      description: metric specifies the name of the objective metric
                         to track. Defaults to "loss".
                       maxLength: 64
                       minLength: 1
@@ -89,32 +93,32 @@ spec:
                 x-kubernetes-list-type: map
               parallelTrials:
                 default: 1
-                description: ParallelTrials is the number of trials to run in parallel.
+                description: parallelTrials is the number of trials to run in parallel.
                   Defaults to 1.
                 format: int32
                 maximum: 100
                 minimum: 1
                 type: integer
               parameters:
+                description: parameters is the list of hyperparameters to search over.
                 items:
                   properties:
                     name:
-                      description: Name is the name of the hyperparameter.
+                      description: name is the name of the hyperparameter.
                       maxLength: 64
                       minLength: 1
                       type: string
                     searchSpace:
-                      description: SearchSpace acts as a Discriminated Union (OneOf)
-                        supporting flexible statistical distributions.
+                      description: searchSpace is the search space for the hyperparameter.
                       properties:
                         categorical:
-                          description: CategoricalSpace defines a search space over
-                            a discrete set of unordered strings.
+                          description: categorical is the categorical search space.
                           properties:
                             choices:
-                              description: Choices is the set of strings to sample
+                              description: choices is the set of strings to sample
                                 from.
                               items:
+                                maxLength: 256
                                 type: string
                               maxItems: 100
                               minItems: 1
@@ -124,20 +128,25 @@ spec:
                           - choices
                           type: object
                         logUniform:
-                          description: LogUniformSpace defines a continuous log-uniform
-                            distribution over [Min, Max].
+                          description: logUniform is the log-uniform search space.
                           properties:
                             max:
+                              description: max is the maximum value of the log-uniform
+                                search space.
                               maxLength: 64
+                              minLength: 1
                               pattern: ^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$
                               type: string
                             min:
+                              description: min is the minimum value of the log-uniform
+                                search space.
                               maxLength: 64
+                              minLength: 1
                               pattern: ^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$
                               type: string
                             type:
                               default: Float
-                              description: Type specifies the underlying data type.
+                              description: type specifies the underlying data type.
                                 Defaults to "Float".
                               enum:
                               - Int
@@ -146,7 +155,6 @@ spec:
                           required:
                           - max
                           - min
-                          - type
                           type: object
                           x-kubernetes-validations:
                           - message: min must be strictly greater than 0
@@ -154,20 +162,25 @@ spec:
                           - message: min must be strictly less than max
                             rule: double(self.min) < double(self.max)
                         uniform:
-                          description: UniformSpace defines a continuous uniform distribution
-                            over [Min, Max].
+                          description: uniform is the uniform search space.
                           properties:
                             max:
+                              description: max is the maximum value of the uniform
+                                search space.
                               maxLength: 64
+                              minLength: 1
                               pattern: ^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$
                               type: string
                             min:
+                              description: min is the minimum value of the uniform
+                                search space.
                               maxLength: 64
+                              minLength: 1
                               pattern: ^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$
                               type: string
                             type:
                               default: Float
-                              description: Type specifies the underlying data type.
+                              description: type specifies the underlying data type.
                                 Defaults to "Float".
                               enum:
                               - Int
@@ -176,7 +189,6 @@ spec:
                           required:
                           - max
                           - min
-                          - type
                           type: object
                           x-kubernetes-validations:
                           - message: min must be strictly less than max
@@ -198,12 +210,19 @@ spec:
                 - name
                 x-kubernetes-list-type: map
               searchAlgorithm:
+                default:
+                  random: {}
+                description: searchAlgorithm is the algorithm to use for searching
+                  over the hyperparameters.
                 properties:
                   grid:
+                    description: grid is the grid search algorithm.
                     type: object
                   random:
+                    description: random is the random search algorithm.
                     properties:
                       seed:
+                        description: seed is the seed for the random search algorithm.
                         format: int64
                         type: integer
                     type: object
@@ -213,8 +232,11 @@ spec:
                   rule: '[has(self.random), has(self.grid)].filter(x, x).size() ==
                     1'
               trainJobTemplate:
+                description: trainJobTemplate is the template for the train job to
+                  run.
                 properties:
                   metadata:
+                    description: metadata is the metadata for the train job.
                     properties:
                       annotations:
                         additionalProperties:
@@ -237,8 +259,7 @@ spec:
                     - message: name and namespace cannot be set in a template.
                       rule: '!has(self.name) && !has(self.namespace)'
                   spec:
-                    description: TrainJobSpec represents specification of the desired
-                      TrainJob.
+                    description: spec is the spec for the train job.
                     properties:
                       activeDeadlineSeconds:
                         description: |-
@@ -6505,11 +6526,17 @@ spec:
             - trainJobTemplate
             type: object
             x-kubernetes-validations:
+            - message: OptimizationJobSpec is immutable and cannot be updated after
+                creation
+              rule: self == oldSelf
             - message: parallelTrials cannot exceed numTrials
               rule: self.parallelTrials <= self.numTrials
           status:
+            description: status is the status for the optimization job.
             properties:
               conditions:
+                description: conditions is the list of conditions for the optimization
+                  job.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -6564,24 +6591,27 @@ spec:
                   - status
                   - type
                   type: object
+                maxItems: 100
                 type: array
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
               result:
-                description: Result tracks the parameters of the highest performing
-                  trial.
+                description: result is the result of the optimization job.
                 properties:
                   parameters:
+                    description: parameters is the list of parameters for the result.
                     items:
                       description: ParameterAssignment represents a single hyperparameter
                         and its assigned value.
                       properties:
                         name:
+                          description: name is the name of the hyperparameter.
                           maxLength: 64
                           minLength: 1
                           type: string
                         value:
+                          description: value is the value of the hyperparameter.
                           maxLength: 64
                           minLength: 1
                           type: string
@@ -6595,14 +6625,17 @@ spec:
                     - name
                     x-kubernetes-list-type: map
                   trainJobName:
-                    description: TrainJobName is the name of the underlying TrainJob
+                    description: trainJobName is the name of the underlying TrainJob
                       that achieved this result.
+                    maxLength: 63
                     minLength: 1
                     type: string
                 required:
                 - trainJobName
                 type: object
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true

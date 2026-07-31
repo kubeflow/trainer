@@ -27,9 +27,11 @@ import (
 //
 // LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].
 type LogUniformSpaceApplyConfiguration struct {
+	// min is the minimum value of the log-uniform search space.
 	Min *trainerv1alpha1.Double `json:"min,omitempty"`
+	// max is the maximum value of the log-uniform search space.
 	Max *trainerv1alpha1.Double `json:"max,omitempty"`
-	// Type specifies the underlying data type. Defaults to "Float".
+	// type specifies the underlying data type. Defaults to "Float".
 	Type *trainerv1alpha1.ParameterType `json:"type,omitempty"`
 }
 
