@@ -95,8 +95,9 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Keep track of the origin TrainJob status
 	prevTrainJob := trainJob.DeepCopy()
 
-	// Let's clear the failed condition that could have been set previously.
-	// An external change to the TrainJob spec may transition it out of the Failed state.
+	// Clear a recoverable Failed condition when the referenced runtime becomes available.
+	// Terminal failures must be preserved so finished TrainJobs are not reconciled again
+	// after their JobSet is TTL-deleted.
 	removeFailedCondition(&trainJob)
 
 	runtimeRefGK := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainJob.Spec.RuntimeRef)
@@ -245,10 +246,9 @@ func setFailedCondition(trainJob *trainer.TrainJob, message, reason string) {
 
 func removeFailedCondition(trainJob *trainer.TrainJob) {
 	cond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
-	if cond != nil && cond.Reason == trainer.TrainJobDeadlineExceededReason {
-		return
+	if cond != nil && cond.Reason == trainer.TrainJobRuntimeNotSupportedReason {
+		meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobFailed)
 	}
-	meta.RemoveStatusCondition(&trainJob.Status.Conditions, trainer.TrainJobFailed)
 }
 
 func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
