@@ -36,7 +36,7 @@ structured API for device allocation:
 ### Goals
 
 1. Add `ResourceClaimsPerNode` to `Trainer` so users can request DRA claims at the same
-  top-level API as `resourcesPerNode`, with optional `containers` targeting (defaults to
+  top-level API as `resourcesPerNode`, with optional `containerNames` targeting (defaults to
    `node` only).
 2. Have the controller apply those claims to the trainer node PodSpec and automatically
   wire container-level `resources.claims` on the target containers.
@@ -61,10 +61,53 @@ structured API for device allocation:
    and is not ready for Trainer integration.
 3. **Replacing existing** `resources.requests/limits` **GPU scheduling.** Extended resources
   (`nvidia.com/gpu`) remain valid. DRA is an additional scheduling path.
+4. **Automated ResourceClaimTemplate creation across namespaces.** Templates are
+  namespace-scoped; this KEP does not automate copying or syncing them into workload
+   namespaces. Admins create templates in each namespace manually (or via external tooling).
+   Controller-managed provisioning is deferred to Phase 2.
 
 
 
-## User Story
+## User Stories
+
+### Admin: setting up DRA accelerator options
+
+A platform admin wants to offer H100 and A100 GPU options to data scientists. They create
+`ResourceClaimTemplates` in each workload namespace:
+
+```yaml
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: h100-80gb-template
+  namespace: ml-team
+spec:
+  spec:
+    devices:
+      requests:
+        - name: gpu
+          deviceClassName: h100
+          count: 8
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: a100-40gb-template
+  namespace: ml-team
+spec:
+  spec:
+    devices:
+      requests:
+        - name: gpu
+          deviceClassName: a100
+          count: 4
+```
+
+The admin repeats this for each workload namespace. Users then select from the available
+templates via `resourceClaimsPerNode`. The admin controls which GPU types and counts are
+available; users cannot override the device count.
+
+### Data scientist: requesting DRA devices
 
 A data scientist wants to fine-tune on H100s using DRA. Instead of nesting claims under
 `runtimePatches`, they set DRA next to the existing trainer fields:
@@ -88,7 +131,7 @@ spec:
         resourceClaimTemplateName: h100-80gb-template
 ```
 
-When no `containers` field is specified, the controller wires the claim to the `node`
+When no `containerNames` field is specified, the controller wires the claim to the `node`
 container only. This is the 90% use case.
 
 **Advanced case — targeting specific containers:**
@@ -97,19 +140,19 @@ container only. This is the 90% use case.
     resourceClaimsPerNode:
       - name: gpu
         resourceClaimTemplateName: h100-80gb-template
-        containers:
+        containerNames:
           - node
           - gpu-preprocessor
 ```
 
-When `containers` is specified, the controller wires the claim **only** to the listed
+When `containerNames` is specified, the controller wires the claim **only** to the listed
 containers. The claim is not auto-wired to containers not in the list.
 
 The controller:
 
 1. Sets pod-level `resourceClaims` on the trainer `node` replicatedJob.
 2. Wires container-level `resources.claims` — on the `node` container by default, or on
-  the containers listed in `containers` if specified.
+  the containers listed in `containerNames` if specified.
 3. Resolves GPU count from the `ResourceClaimTemplate` for `numProcPerNode` auto-detection.
 
 This keeps DRA at the same accessibility level as `resourcesPerNode`.
@@ -137,7 +180,7 @@ type Trainer struct {
 	// resourceClaimsPerNode defines the DRA ResourceClaims for each training node.
 	// The controller applies these claims to the trainer node PodSpec and wires
 	// container-level resources.claims on the specified containers (defaults to the
-	// node container only when Containers is empty).
+	// node container only when ContainerNames is empty).
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/
 	// +listType=map
 	// +listMapKey=name
@@ -167,12 +210,12 @@ type TrainerResourceClaim struct {
 	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must be set.
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
 
-	// Containers is the list of container names that should receive this claim
+	// ContainerNames is the list of container names that should receive this claim
 	// in their resources.claims. When empty, the claim is wired to the "node"
 	// container only (the default training container). When specified, the claim
 	// is wired only to the listed containers.
 	// +optional
-	Containers []string `json:"containers,omitempty"`
+	ContainerNames []string `json:"containerNames,omitempty"`
 }
 ```
 
@@ -187,8 +230,8 @@ application (same place `resourcesPerNode` is applied today):
   from `ResourceClaimsPerNode` (the `Name`, `ResourceClaimName`, and
    `ResourceClaimTemplateName` fields map directly to `corev1.PodResourceClaim`).
 2. **Container-level:** for each claim, wire `resources.claims` on the target containers:
-  - If `containers` is **empty**: wire to the `node` container only (default).
-  - If `containers` is **specified**: wire only to the listed containers. Containers not in
+  - If `containerNames` is **empty**: wire to the `node` container only (default).
+  - If `containerNames` is **specified**: wire only to the listed containers. Containers not in
   the list do not get the claim.
 3. **Precedence:** if both `resourceClaimsPerNode` and a `runtimePatches` claim override
   exist, `resourceClaimsPerNode` wins for the trainer node (same pattern as
@@ -196,6 +239,31 @@ application (same place `resourcesPerNode` is applied today):
 
 This avoids the bifurcated UX of setting GPUs via `resourcesPerNode` while setting DRA
 via deep `runtimePatches`.
+
+**Example: resulting JobSet PodSpec**
+
+Given this TrainJob input:
+
+```yaml
+trainer:
+  resourceClaimsPerNode:
+    - name: gpu
+      resourceClaimTemplateName: h100-80gb-template
+```
+
+The controller produces this on the `node` replicatedJob's PodSpec:
+
+```yaml
+spec:
+  resourceClaims:
+    - name: gpu
+      resourceClaimTemplateName: h100-80gb-template
+  containers:
+    - name: node
+      resources:
+        claims:
+          - name: gpu
+```
 
 #### Advanced: `PodSpecPatch.ResourceClaims`
 
@@ -218,6 +286,63 @@ type PodSpecPatch struct {
 
 `MaxItems=32` is a pragmatic guard; upstream `PodSpec` has no explicit limit but real-world
 DRA usage rarely exceeds a handful of claims per pod.
+
+**Example: PodSpecPatch via runtimePatches**
+
+A user wants to add a DRA claim to a non-node replicatedJob (e.g., a `preprocessor`):
+
+```yaml
+runtimePatches:
+  - manager: user
+    trainingRuntimeSpec:
+      template:
+        spec:
+          replicatedJobs:
+            - name: preprocessor
+              template:
+                spec:
+                  template:
+                    spec:
+                      resourceClaims:
+                        - name: accel
+                          resourceClaimTemplateName: t4-template
+```
+
+The strategic merge patch adds the claim to the `preprocessor` replicatedJob's PodSpec.
+Container-level `resources.claims` must be pre-wired in the runtime template for this path.
+
+#### Admin-defined DRA in TrainingRuntime / ClusterTrainingRuntime
+
+Admins can pre-configure DRA claims in a runtime template. The full `PodSpec` is available
+in the runtime, so both pod-level and container-level claims are set directly:
+
+```yaml
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: torch-h100
+spec:
+  template:
+    spec:
+      replicatedJobs:
+        - name: node
+          template:
+            spec:
+              template:
+                spec:
+                  resourceClaims:
+                    - name: gpu
+                      resourceClaimTemplateName: h100-80gb-template
+                  containers:
+                    - name: node
+                      resources:
+                        claims:
+                          - name: gpu
+```
+
+When a user creates a TrainJob referencing this runtime, the resulting JobSet inherits
+the DRA claims. If the user also sets `resourceClaimsPerNode`, their claims take
+precedence for the trainer node.
 
 ### Application flow
 
@@ -246,13 +371,14 @@ are available before submitting a TrainJob. This mirrors how the SDK already lis
 **New SDK method:**
 
 ```python
-def list_resource_claim_templates(self, namespace: str) -> list[ResourceClaimTemplate]:
-    """List ResourceClaimTemplates available in the given namespace."""
+def list_resource_claim_templates(self, namespace: str = None) -> list[ResourceClaimTemplate]:
+    """List ResourceClaimTemplates available in the given namespace.
+    Defaults to the client's configured namespace."""
 ```
 
-This issues a standard `list` API call against `resource.k8s.io/v1beta1` (or `v1` on  
-k8s 1.34+) in the user's namespace and returns the available templates. Users can then  
-reference the template name in `resourceClaimsPerNode.resourceClaimTemplateName`.
+This issues a standard `list` API call against `resource.k8s.io/v1beta1` (or `v1` on
+k8s 1.34+). Defaults to the client's current namespace, matching the existing SDK
+pattern for `list_training_runtimes`.
 
 ### GPU count is admin-controlled
 
@@ -295,9 +421,20 @@ fall back to CPU-based `numProcPerNode` (wrong for GPU training).
 **Approach:** The DRA GPU count is resolved in the core runtime layer during PodSet
 construction, where the controller's `client.Client` and `context.Context` are already
 available. After claims are applied to the merged `JobSetTemplateSpec`, the core runtime
-inspects each merged PodSpec's `resourceClaims`. For each `PodResourceClaim` referencing a
-`ResourceClaimTemplate`, it looks up the template object and sums the device request counts
-for GPU-class requests.
+inspects each merged PodSpec's `resourceClaims`:
+
+- For `ResourceClaimTemplateName`: look up the `ResourceClaimTemplate` and inspect
+  `spec.devices.requests[]`.
+- For `ResourceClaimName`: look up the `ResourceClaim` object directly and inspect
+  its device requests.
+
+For each device request, the controller checks whether the `deviceClassName` contains
+"gpu" (same heuristic as `GetNumGPUPerNode` matching resource names containing "gpu")
+and sums the `count` for matching requests.
+
+**Admin requirement:** For auto-detection to work, the `DeviceClass` must have "gpu" in
+its name (e.g., `gpu`, `h100-gpu`, `nvidia-gpu`). If the name doesn't match, the DRA
+GPU count defaults to 0 and the user can set `numProcPerNode` explicitly.
 
 The resolved count is propagated to ML policy plugins (torch, torchtune, MPI, XGBoost,
 Flux) via the existing `PodSet` struct. Each plugin uses the DRA count as a fallback
@@ -315,8 +452,8 @@ Extended resources still take priority. DRA count is only used as a fallback whe
 GPU count defaults to 0 and the user can always set `numProcPerNode` explicitly.
 
 **RBAC:** The controller's `ServiceAccount` needs `get` permission on
-`resourceclaimtemplates` in the `resource.k8s.io` API group. This is added to the
-controller's `ClusterRole` manifest.
+`resourceclaimtemplates` and `resourceclaims` in the `resource.k8s.io` API group. This
+is added to the controller's `ClusterRole` manifest.
 
 ### Validation
 
@@ -341,8 +478,8 @@ scheduling or admission errors.
 | **DRA claims present but template not resolved by core**  | DRA GPU count remains 0; torch falls back to CPU-based `numProcPerNode`. User can set `numProcPerNode` explicitly.                                              |
 | **Both extended resources AND DRA claims present**        | Extended resources take priority for `numProcPerNode`. Users should avoid mixing both to prevent double GPU allocation.                                         |
 | **Different GPU counts**                                  | Device count lives in the `ResourceClaimTemplate`. Different counts require different templates. Admins create templates for each count; users cannot override. |
-| **User wants claim on sidecar, not node**                 | User sets `containers: [sidecar-name]` on the claim. The controller wires the claim only to that container; the `node` container does not get it.               |
-| `containers` **lists a name that does not exist**         | Kubernetes rejects the pod at admission (container `resources.claims` references a non-existent container). Trainer does not pre-validate container names.      |
+| **User wants claim on sidecar, not node**                 | User sets `containerNames: [sidecar-name]` on the claim. The controller wires the claim only to that container; the `node` container does not get it.           |
+| **`containerNames` lists a name that does not exist**     | Kubernetes rejects the pod at admission (container `resources.claims` references a non-existent container). Trainer does not pre-validate container names.      |
 
 
 After adding the fields, run `make generate` to regenerate deep copy methods, OpenAPI schema,
@@ -365,7 +502,7 @@ and CRD manifests.
 | `pkg/runtime/framework/plugins/mpi/mpi.go`               | Use DRA GPU count as fallback when GPU count is 0                            |
 | `pkg/runtime/framework/plugins/xgboost/xgboost.go`       | Use DRA GPU count as fallback when GPU count is 0                            |
 | `pkg/runtime/framework/plugins/flux/flux.go`             | Use DRA GPU count as fallback when GPU count is 0                            |
-| `manifests/base/rbac/`                                   | Add `resourceclaimtemplates` get permission to ClusterRole                   |
+| `manifests/base/rbac/`                                   | Add `resourceclaimtemplates` and `resourceclaims` get permission to ClusterRole |
 | `pkg/runtime/core/trainingruntime_test.go`               | Test top-level claims application, container targeting, and merge behavior   |
 | `sdk/python/kubeflow/trainer/api_client.py` (or similar) | Add `list_resource_claim_templates(namespace)` method                        |
 
@@ -383,9 +520,9 @@ to implement this enhancement.
 
 `**pkg/runtime/core/trainingruntime_test.go`:**
 
-- `resourceClaimsPerNode` set with no `containers`: node PodSpec gets claims and `node` container gets `resources.claims`
-- `resourceClaimsPerNode` set with `containers: [node, sidecar]`: both containers get `resources.claims`
-- `resourceClaimsPerNode` set with `containers: [sidecar]`: only sidecar gets `resources.claims`, not `node`
+- `resourceClaimsPerNode` set with no `containerNames`: node PodSpec gets claims and `node` container gets `resources.claims`
+- `resourceClaimsPerNode` set with `containerNames: [node, sidecar]`: both containers get `resources.claims`
+- `resourceClaimsPerNode` set with `containerNames: [sidecar]`: only sidecar gets `resources.claims`, not `node`
 - Runtime template has default claims, user sets `resourceClaimsPerNode`: user claims win on trainer node
 - User also patches via `runtimePatches`: `resourceClaimsPerNode` still wins for trainer node
 - Empty `resourceClaimsPerNode`: runtime defaults preserved
