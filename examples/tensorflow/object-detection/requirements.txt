@@ -1,0 +1,22 @@
+# TensorFlow Object Detection Example Requirements
+# Compatible with Python 3.11+
+
+# Core ML Framework
+tensorflow>=2.15.0,<2.16.0
+
+# Kubeflow SDK for distributed training
+kubeflow>=0.1.0
+
+# Data processing and visualization
+numpy>=1.24.0
+opencv-python-headless>=4.8.0
+
+# Optional: For loading COCO dataset
+tensorflow-datasets>=4.9.0
+
+# Optional: For image augmentation
+albumentations>=1.3.0
+
+# Optional: For visualization
+matplotlib>=3.7.0
+pillow>=10.0.0
