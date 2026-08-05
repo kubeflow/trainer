@@ -11,9 +11,9 @@ Related:
 
 ## Summary
 
-In the Phase 1 design of [KEP-3562](../2605-optimization-job-crd/README.md), the `OptimizationJob` controller reconstructs trial history by listing child `TrainJob` objects and reading their parameter annotations and terminal metrics. This makes completed `TrainJob` objects load-bearing for the optimization itself. If a trial `TrainJob` is deleted — manually, by a cluster cleanup policy, or by the TTL-based lifecycle direction the Trainer project is moving toward — the experiment history is silently lost. The suggestion service, which rebuilds its state from that history on every `GetSuggestions` call, can then re-propose already-explored points or skew the sampler.
+In the Phase 1 design of [KEP-3562](../2605-optimization-job-crd/README.md), the `OptimizationJob` controller reconstructs trial history by listing child `TrainJob` objects and reading their parameter annotations and terminal metrics. This makes completed `TrainJob` objects load-bearing for the optimization itself. If a trial `TrainJob` is deleted (manually, by a cluster cleanup policy, or by the TTL-based lifecycle direction the Trainer project is moving toward), the experiment history is silently lost. The suggestion service, which rebuilds its state from that history on every `GetSuggestions` call, can then re-propose already-explored points or skew the sampler.
 
-This KEP proposes making the `OptimizationJob` self-contained by recording a strongly-typed trial history in `OptimizationJob.status.trials`. The controller writes one record per trial when it creates the trial `TrainJob` (the parameters are known at that moment, because the controller generated them) and patches that record exactly once when the trial reaches a terminal state. Suggestion snapshots are then assembled entirely from `status.trials`. The optimization state lives on the `OptimizationJob` itself, nothing is ever read back from a child that might have been deleted, and the controller remains stateless — all state stays in the Kubernetes API server, preserving the stateless-provider architecture of KEP-3562.
+This KEP proposes making the `OptimizationJob` self-contained by recording a strongly-typed trial history in `OptimizationJob.status.trials`. The controller writes one record per trial when it creates the trial `TrainJob` (the parameters are known at that moment, because the controller generated them) and patches that record exactly once when the trial reaches a terminal state. Suggestion snapshots are then assembled entirely from `status.trials`. The optimization state lives on the `OptimizationJob` itself, nothing is ever read back from a child that might have been deleted, and the controller remains stateless: all state stays in the Kubernetes API server, preserving the stateless-provider architecture of KEP-3562.
 
 ## Motivation
 
@@ -23,7 +23,7 @@ The deletion pressure on finished trials is real and growing:
 
 - Finished trial `TrainJob` objects can be deleted manually or by cluster-level cleanup tooling today, and the underlying JobSet API already supports `ttlSecondsAfterFinished`.
 - [KEP-2899](../2899-resource-timeouts/README.md) exists because finished jobs accumulate and bloat etcd. Its initial release ships `ActiveDeadlineSeconds`, and it explicitly lists `TTLSecondsAfterFinished` on the TrainJob API as a future plan. When that lands, automatic deletion of finished trials becomes a first-class, supported behavior.
-- A 100-trial `OptimizationJob` produces on the order of 100 finished `TrainJob` objects (plus their JobSets) — exactly the accumulation that cleanup policies target.
+- A 100-trial `OptimizationJob` produces on the order of 100 finished `TrainJob` objects (plus their JobSets), which is exactly the accumulation that cleanup policies target.
 
 Today, deleting any completed trial `TrainJob` corrupts a running optimization. The controller rebuilds an incomplete history, and the stateless suggestion provider silently degrades.
 
@@ -50,18 +50,18 @@ Storing history natively in status also improves observability and unblocks SDK 
 
 ## Proposal
 
-Add an optional `trials` list to `OptimizationJobStatus`, owned exclusively by the controller. Each trial's record is created together with its `TrainJob` and finalized exactly once at terminal state. Because the record is written *before* the child ever runs, no information is ever recoverable only from the child: deleting a trial `TrainJob` at any point — running or finished — can no longer lose history. No finalizers on child resources are required (see [Alternatives](#alternatives) for the rejected finalizer design).
+Add an optional `trials` list to `OptimizationJobStatus`, owned exclusively by the controller. Each trial's record is created together with its `TrainJob` and finalized exactly once at terminal state. Because the record is written *before* the child ever runs, no information is ever recoverable only from the child: deleting a trial `TrainJob` at any point, running or finished, can no longer lose history. No finalizers on child resources are required (see [Alternatives](#alternatives) for the rejected finalizer design).
 
 ### User Stories
 
 **Story 1: Platform operator enabling cleanup of finished trials**
 
-- **As a Platform Operator**, I want finished trial `TrainJob` objects to be deletable — manually today, and automatically once TTL cleanup lands per the KEP-2899 future plan — without corrupting running optimizations.
+- **As a Platform Operator**, I want finished trial `TrainJob` objects to be deletable without corrupting running optimizations, whether deleted manually today or automatically once TTL cleanup lands per the KEP-2899 future plan.
 - **Motivation:** A single `OptimizationJob` can leave up to 100 finished `TrainJob` objects (and their JobSets) in etcd. With native history, they can be cleaned up as soon as they finish, while `status.result` and `status.trials` remain intact.
 
 **Story 2: Data scientist auditing an experiment**
 
-- **As a Data Scientist**, I want to inspect a finished `OptimizationJob` and see every trial's hyperparameters, objective value, and outcome — including *why* a trial failed — in one place.
+- **As a Data Scientist**, I want to inspect a finished `OptimizationJob` and see every trial's hyperparameters, objective value, and outcome (including *why* a trial failed) in one place.
 - **Motivation:** Avoid querying (possibly deleted) `TrainJob` objects or standing up an external experiment tracker just to answer what a given trial evaluated and what it scored.
 
 ```yaml
@@ -115,7 +115,7 @@ status:
 
 ### API
 
-Only the new field and types are shown; `conditions` and `result` on `OptimizationJobStatus` are unchanged from KEP-3562. `status.result` is retained as a convenience projection of `trials` (the best terminal trial) — no breaking change to the existing status API.
+Only the new field and types are shown; `conditions` and `result` on `OptimizationJobStatus` are unchanged from KEP-3562. `status.result` is retained as a convenience projection of `trials` (the best terminal trial), so there is no breaking change to the existing status API.
 
 ```go
 type OptimizationJobStatus struct {
@@ -205,18 +205,18 @@ type TrialResult struct {
 
 Notes:
 
-- `ParameterAssignment` is the existing type from the KEP-3562 API — the same one used by `status.result`.
+- `ParameterAssignment` is the existing type from the KEP-3562 API, the same one used by `status.result`.
 - `Metric` is the existing `{name, value string}` type introduced by KEP-2779 for `TrainJob.status.trainerStatus.metrics`. Reusing it keeps values consistent end to end: they are copied verbatim at terminal state.
 - `Metrics` is a list so that multi-objective optimization ([#3799](https://github.com/kubeflow/trainer/issues/3799)) needs no structural change; Phase 1 populates only the single configured objective metric.
-- The `Running`/`Succeeded`/`Failed` states mirror the trial lifecycle; `Reason` carries the failure taxonomy that the KEP-3562 review identified as important (distinguishing bad-hyperparameter failures from infrastructure failures and from misconfiguration). Notably, a trial that *succeeded* as a workload but reported no objective metric is recorded as `Failed` with `Reason: MetricsUnavailable` — suggestion providers must exclude it from sampler input either way, and the reason makes the misconfiguration visible and countable rather than silently discarded.
+- The `Running`/`Succeeded`/`Failed` states mirror the trial lifecycle; `Reason` carries the failure taxonomy that the KEP-3562 review identified as important (distinguishing bad-hyperparameter failures from infrastructure failures and from misconfiguration). Notably, a trial that *succeeded* as a workload but reported no objective metric is recorded as `Failed` with `Reason: MetricsUnavailable`: suggestion providers must exclude it from sampler input either way, and the reason makes the misconfiguration visible and countable rather than silently discarded.
 
 ### Controller semantics
 
-1. **On generating a suggestion:** the controller appends a `TrialResult` with `State: Running`, the assigned `Parameters`, and `CreationTime`, keyed by the (deterministically generated) trial `TrainJob` name — and then creates the trial `TrainJob`. The append happens first; both operations are idempotent, so a crash between them converges on the next reconcile (record exists, child missing and non-terminal: re-create the child with the same name and parameters).
-2. **On observing a terminal child:** the controller patches the record once — `State`, `Metrics` (from `status.trainerStatus.metrics`), `Reason` if failed, and `CompletionTime` (from the terminal condition's `lastTransitionTime`) — and updates `status.result` if this trial improves the objective. A record that is already terminal is never modified again.
-3. **On observing a deleted or deleting child whose record is still `Running`:** the record is patched to `Failed` with `Reason: TrainJobDeleted`. No history is lost — the parameters were recorded at creation.
+1. **On generating a suggestion:** the controller appends a `TrialResult` with `State: Running`, the assigned `Parameters`, and `CreationTime`, keyed by the (deterministically generated) trial `TrainJob` name, and then creates the trial `TrainJob`. The append happens first; both operations are idempotent, so a crash between them converges on the next reconcile (record exists, child missing and non-terminal: re-create the child with the same name and parameters).
+2. **On observing a terminal child:** the controller patches the record once, setting `State`, `Metrics` (from `status.trainerStatus.metrics`), `Reason` if failed, and `CompletionTime` (from the terminal condition's `lastTransitionTime`), and updates `status.result` if this trial improves the objective. A record that is already terminal is never modified again.
+3. **On observing a deleted or deleting child whose record is still `Running`:** the record is patched to `Failed` with `Reason: TrainJobDeleted`. No history is lost, because the parameters were recorded at creation.
 4. **Suggestion snapshots:** the history passed to `GetSuggestions` is assembled entirely from `status.trials` (terminal records as completed trials, `Running` records as in-flight trials), replacing the Phase 1 list-and-parse of child annotations. The gRPC payload shape is unchanged. This also bounds the snapshot the algorithm service receives, which is relevant to the scalability concern about very large (~1500-trial) histories raised in the [KEP-3562 review](https://github.com/kubeflow/trainer/pull/3565#discussion_r3579906248).
-5. **History bound:** before launching a trial, the controller checks that the `trials` list has room under its cap. If it does not (pathological failure churn), the controller stops launching trials and sets a `Failed` condition with reason `TrialHistoryExhausted` — an explicit, observable outcome rather than a rejected status write wedging the reconcile loop.
+5. **History bound:** before launching a trial, the controller checks that the `trials` list has room under its cap. If it does not (pathological failure churn), the controller stops launching trials and sets a `Failed` condition with reason `TrialHistoryExhausted`: an explicit, observable outcome rather than a rejected status write wedging the reconcile loop.
 6. **Status writes:** the controller uses Server-Side Apply with a dedicated field manager for `status.trials`. Writes are bounded at two per trial (creation and terminal patch). On conflict, the write is retried on the next reconcile; because records are keyed by `trainJobName` and terminal patches are idempotent, retries converge.
 
 ### Deletion and lifecycle interactions
@@ -225,16 +225,60 @@ Notes:
 - **Deleting the `OptimizationJob`:** child `TrainJob` objects are garbage collected through the existing owner references, exactly as in Phase 1. Status dies with the object, as expected.
 - **TTL/GC cleanup of finished trials:** fully supported. A finished trial's record is complete before the child becomes deletable.
 
+### Implementation plan
+
+#### Reconcile flow
+
+One pass of the `OptimizationJob` reconcile loop under this design:
+
+1. List child `TrainJob` objects (informer cache) and load `status.trials`.
+2. For every record in `status.trials` with `State: Running`:
+   - Child terminal: stage the terminal patch (state, metrics, reason, completion time).
+   - Child missing or has a deletion timestamp: stage a `Failed`/`TrainJobDeleted` patch.
+   - Child missing but record was just created (crash between record append and child creation): re-create the `TrainJob` using the name and parameters stored in the record.
+3. If capacity allows (`parallelTrials` not saturated, `numTrials` not reached, `trials` under its cap): call `GetSuggestions` with the snapshot assembled from `status.trials`, stage new `Running` records for the returned assignments, then create the corresponding `TrainJob` objects only after the status write succeeds.
+4. Apply all staged `status.trials` changes in a single SSA patch (field manager `optimizationjob-trial-history`, one write per reconcile regardless of how many trials changed), update `status.result` and conditions in the same patch.
+
+Step 4 writing before step 3's child creation preserves the record-before-child invariant; every other ordering risk collapses into "re-reconcile and converge" because all patches are keyed by `trainJobName` and idempotent.
+
+#### Snapshot mapping to the gRPC adapter
+
+Phase 1 keeps the Katib `api.v1.beta1` contract via the adapter in the controller (parent KEP §7.2). The only change is the adapter's input source:
+
+| gRPC field (per past trial) | Phase 1 source (annotations) | This KEP (status) |
+|---|---|---|
+| `Trial.name` | child `TrainJob` name | `TrialResult.TrainJobName` |
+| `Trial.spec.parameter_assignments` | JSON annotation on child | `TrialResult.Parameters` |
+| `Trial.status.observation.metrics` | child `status.trainerStatus.metrics` | `TrialResult.Metrics` |
+| `Trial.status.condition` | child conditions | `TrialResult.State`/`Reason` |
+
+`Running` records map to in-flight trials in the request, so batch-aware samplers keep seeing pending assignments. The suggestion service is unchanged.
+
+#### Trial naming
+
+The controller derives the trial `TrainJob` name before the record is written (`<optimizationjob-name>-trial-<n>`, where `n` is a monotonically increasing counter derived from the number of existing records). The name is then persisted in the record and reused on any retry, which is what makes step 2's re-creation path safe. The exact scheme is an implementation detail of the controller PR; the KEP-level requirement is only name-persisted-before-create.
+
+#### Code layout and PR breakdown
+
+| Deliverable | Where | Depends on |
+|---|---|---|
+| `Trials`, `TrialResult`, `TrialState` API types + CEL + generated artifacts (`make generate`) | `pkg/apis/trainer/v1alpha1` | API PR [#3552](https://github.com/kubeflow/trainer/pull/3552) |
+| Record lifecycle + SSA writer (using the existing `pkg/apply` helpers) | OptimizationJob controller | controller PR [#3828](https://github.com/kubeflow/trainer/pull/3828) |
+| Snapshot source flip in the gRPC adapter | same controller package | dual-write step complete |
+| Integration/E2E tests | `test/integration/`, `test/e2e/` | above |
+
+The controller work lands as a follow-up to [#3828](https://github.com/kubeflow/trainer/pull/3828) rather than rewriting it: Phase 1's annotation write path stays untouched during the dual-write step, and the annotation *read* path is deleted only at the flip. This keeps each PR small and reviewable and avoids conflicting with the in-flight implementation.
+
 ### Compatibility and phasing
 
-The field is optional and additive on `v1alpha1` — no version bump, no migration. Rollout in two steps aligned with the KEP-3562 phases:
+The field is optional and additive on `v1alpha1`: no version bump, no migration. Rollout in two steps aligned with the KEP-3562 phases:
 
 1. The controller populates `status.trials` while keeping the Phase 1 annotation-based snapshot as the source (dual-write, annotation-read).
 2. The snapshot source flips to `status.trials`, and the interaction with deletion and TTL/GC cleanup of trial `TrainJob` objects is documented as supported.
 
 ### Risks and Mitigations
 
-**Status object growth.** With the realistic record size (~0.5 KB: name, a handful of parameters, one or two metrics, timestamps), the cap of 1000 records yields ~500 KB — under etcd's ~1.5 MB request limit. The schema-permitted worst case is larger (up to 100 maximum-length parameters per trial is expressible), which is why the controller enforces the bound *before* appending (controller semantics, point 5) instead of relying on the schema cap: the failure mode is an explicit `TrialHistoryExhausted` condition, never a rejected status write.
+**Status object growth.** With the realistic record size (~0.5 KB: name, a handful of parameters, one or two metrics, timestamps), the cap of 1000 records yields ~500 KB, under etcd's ~1.5 MB request limit. The schema-permitted worst case is larger (up to 100 maximum-length parameters per trial is expressible), which is why the controller enforces the bound *before* appending (controller semantics, point 5) instead of relying on the schema cap: the failure mode is an explicit `TrialHistoryExhausted` condition, never a rejected status write.
 
 **Status update conflict pressure.** Writes are bounded at two per trial, records are keyed by `trainJobName` (`listType=map`, SSA-friendly), and all patches are idempotent. With `parallelTrials <= 100`, several children can go terminal within one reconcile; the SSA field manager and next-reconcile retry (controller semantics, point 6) make this safe without a transaction.
 
@@ -252,7 +296,7 @@ The field is optional and additive on `v1alpha1` — no version bump, no migrati
 - Snapshot assembly from `status.trials` equals the Phase 1 annotation-derived snapshot for identical cluster state.
 - History bound: launch refusal and `TrialHistoryExhausted` condition when the cap is reached.
 
-#### Integration tests (envtest, Ginkgo — `test/integration/`)
+#### Integration tests (envtest, Ginkgo, `test/integration/`)
 
 - Record-then-create ordering: controller crash between record append and child creation converges (child created with same name and parameters on restart).
 - Deleting a *running* trial `TrainJob` yields a `Failed`/`TrainJobDeleted` record and does not stall the optimization.
@@ -286,7 +330,7 @@ The field is optional and additive on `v1alpha1` — no version bump, no migrati
 
 ### Status quo: reconstruct history from TrainJob annotations only
 
-The Phase 1 design, already implemented in the controller ([#3828](https://github.com/kubeflow/trainer/pull/3828)). Simple, but it makes retained `TrainJob` objects load-bearing and is fundamentally incompatible with deletion of trials — the motivating bug of this KEP.
+The Phase 1 design, already implemented in the controller ([#3828](https://github.com/kubeflow/trainer/pull/3828)). Simple, but it makes retained `TrainJob` objects load-bearing and is fundamentally incompatible with deletion of trials, which is the motivating bug of this KEP.
 
 ### Terminal-only records guarded by a child finalizer
 
@@ -304,4 +348,4 @@ A ConfigMap per `OptimizationJob` avoids status-size concerns but splits the sou
 
 ### Store history in the suggestion service
 
-Would make the provider stateful again — the exact architecture (Katib DB / stateful sidecars) that KEP-3562 replaces. Rejected.
+Would make the provider stateful again, recreating the exact architecture (Katib DB / stateful sidecars) that KEP-3562 replaces. Rejected.
