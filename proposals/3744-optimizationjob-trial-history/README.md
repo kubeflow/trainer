@@ -125,8 +125,10 @@ type OptimizationJobStatus struct {
 	// owned by the controller and used as the canonical suggestion snapshot.
 	// Each record is created with its trial TrainJob and updated exactly once
 	// when the trial reaches a terminal state.
-	// The cap must stay >= the maximum allowed spec.numTrials plus headroom
-	// for failed trials, which do not count toward numTrials; raise them together.
+	// The cap must stay >= the maximum allowed spec.numTrials, with headroom
+	// for failed trials in case they do not consume the numTrials budget
+	// (their exact accounting depends on the trial failure policy, which is
+	// still an open design in KEP-3562); raise the two limits together.
 	// +listType=map
 	// +listMapKey=trainJobName
 	// +kubebuilder:validation:MaxItems=1000
@@ -212,7 +214,7 @@ Notes:
 
 ### Controller semantics
 
-1. **On generating a suggestion:** the controller appends a `TrialResult` with `State: Running`, the assigned `Parameters`, and `CreationTime`, keyed by the (deterministically generated) trial `TrainJob` name, and then creates the trial `TrainJob`. The append happens first; both operations are idempotent, so a crash between them converges on the next reconcile (record exists, child missing and non-terminal: re-create the child with the same name and parameters).
+1. **On generating a suggestion:** the controller appends a `TrialResult` with `State: Running`, the assigned `Parameters`, and `CreationTime`, keyed by the generated trial `TrainJob` name, and then creates the trial `TrainJob`. The append happens first, so the parameters are durable before the child exists; a crash between the two converges on the next reconcile by marking the childless record `Failed`/`TrainJobDeleted` (see the reconcile flow for why the controller never re-creates instead).
 2. **On observing a terminal child:** the controller patches the record once, setting `State`, `Metrics` (from `status.trainerStatus.metrics`), `Reason` if failed, and `CompletionTime` (from the terminal condition's `lastTransitionTime`), and updates `status.result` if this trial improves the objective. A record that is already terminal is never modified again.
 3. **On observing a deleted or deleting child whose record is still `Running`:** the record is patched to `Failed` with `Reason: TrainJobDeleted`. No history is lost, because the parameters were recorded at creation.
 4. **Suggestion snapshots:** the history passed to `GetSuggestions` is assembled entirely from `status.trials` (terminal records as completed trials, `Running` records as in-flight trials), replacing the Phase 1 list-and-parse of child annotations. The gRPC payload shape is unchanged. This also bounds the snapshot the algorithm service receives, which is relevant to the scalability concern about very large (~1500-trial) histories raised in the [KEP-3562 review](https://github.com/kubeflow/trainer/pull/3565#discussion_r3579906248).
@@ -234,8 +236,9 @@ One pass of the `OptimizationJob` reconcile loop under this design:
 1. List child `TrainJob` objects (informer cache) and load `status.trials`.
 2. For every record in `status.trials` with `State: Running`:
    - Child terminal: stage the terminal patch (state, metrics, reason, completion time).
-   - Child missing or has a deletion timestamp: stage a `Failed`/`TrainJobDeleted` patch.
-   - Child missing but record was just created (crash between record append and child creation): re-create the `TrainJob` using the name and parameters stored in the record.
+   - Child missing or has a deletion timestamp: stage a `Failed`/`TrainJobDeleted` patch, unless an in-flight creation expectation exists for that name (see below).
+
+   A `Running` record with no child is ambiguous from the API server alone: a crash between record append and child creation looks identical to a user deleting the child. The controller resolves this with the in-memory expectations pattern used by the upstream Job controller: a staged creation registers an expectation, and a missing child is only tolerated while its expectation is pending. After a controller restart the expectations are empty, so a missing child is uniformly treated as deleted and the record is marked `Failed`/`TrainJobDeleted`. The controller therefore never resurrects a trial the user deliberately removed; the cost is that a crash inside the append-to-create window converts that one suggestion into a failed record instead of retrying it, which is safe and rare.
 3. If capacity allows (`parallelTrials` not saturated, `numTrials` not reached, `trials` under its cap): call `GetSuggestions` with the snapshot assembled from `status.trials`, stage new `Running` records for the returned assignments, then create the corresponding `TrainJob` objects only after the status write succeeds.
 4. Apply all staged `status.trials` changes in a single SSA patch (field manager `optimizationjob-trial-history`, one write per reconcile regardless of how many trials changed), update `status.result` and conditions in the same patch.
 
@@ -256,7 +259,7 @@ Phase 1 keeps the Katib `api.v1.beta1` contract via the adapter in the controlle
 
 #### Trial naming
 
-The controller derives the trial `TrainJob` name before the record is written (`<optimizationjob-name>-trial-<n>`, where `n` is a monotonically increasing counter derived from the number of existing records). The name is then persisted in the record and reused on any retry, which is what makes step 2's re-creation path safe. The exact scheme is an implementation detail of the controller PR; the KEP-level requirement is only name-persisted-before-create.
+The controller derives the trial `TrainJob` name before the record is written (`<optimizationjob-name>-trial-<n>`, where `n` is a monotonically increasing counter derived from the number of existing records). Persisting the name in the record before the child exists is what keeps record and child correlated across crashes and lets the expectations check key on a concrete name. The exact scheme is an implementation detail of the controller PR; the KEP-level requirement is only name-persisted-before-create.
 
 #### Code layout and PR breakdown
 
@@ -278,7 +281,7 @@ The field is optional and additive on `v1alpha1`: no version bump, no migration.
 
 ### Risks and Mitigations
 
-**Status object growth.** With the realistic record size (~0.5 KB: name, a handful of parameters, one or two metrics, timestamps), the cap of 1000 records yields ~500 KB, under etcd's ~1.5 MB request limit. The schema-permitted worst case is larger (up to 100 maximum-length parameters per trial is expressible), which is why the controller enforces the bound *before* appending (controller semantics, point 5) instead of relying on the schema cap: the failure mode is an explicit `TrialHistoryExhausted` condition, never a rejected status write.
+**Status object growth.** With the realistic record size (~0.5 KB: name, a handful of parameters, one or two metrics, timestamps), the cap of 1000 records yields ~500 KB, under etcd's ~1.5 MB request limit. The schema-permitted worst case is larger (up to 100 maximum-length parameters per trial is expressible), which is why the controller enforces the bound *before* appending (controller semantics, point 5) instead of relying on the schema cap: the failure mode is an explicit `TrialHistoryExhausted` condition, never a rejected status write. The CEL rules on `TrialResult` are not in tension with this principle: they reject only writes that violate the record's own invariants (a `Succeeded` record without metrics, a terminal record without a completion time), which can occur only through a controller bug. Rejecting those loudly at the API boundary is deliberate fail-fast; the principle above is about never letting *normal* operation (many failed trials) depend on a write the API server may refuse.
 
 **Status update conflict pressure.** Writes are bounded at two per trial, records are keyed by `trainJobName` (`listType=map`, SSA-friendly), and all patches are idempotent. With `parallelTrials <= 100`, several children can go terminal within one reconcile; the SSA field manager and next-reconcile retry (controller semantics, point 6) make this safe without a transaction.
 
@@ -287,6 +290,8 @@ The field is optional and additive on `v1alpha1`: no version bump, no migration.
 **Records for running trials add churn relative to terminal-only writes.** Accepted deliberately: one extra write per trial is the price of closing every deletion race without child finalizers (see Alternatives), and it makes the suggestion snapshot fully self-contained.
 
 ### Test Plan
+
+- [x] I/we understand the owners of the involved components may require updates to existing tests to make this code solid enough prior to committing the changes necessary to implement this enhancement.
 
 #### Unit tests
 
@@ -298,7 +303,8 @@ The field is optional and additive on `v1alpha1`: no version bump, no migration.
 
 #### Integration tests (envtest, Ginkgo, `test/integration/`)
 
-- Record-then-create ordering: controller crash between record append and child creation converges (child created with same name and parameters on restart).
+- Record-then-create ordering: controller crash (restart) between record append and child creation converges by marking the childless record `Failed`/`TrainJobDeleted`; no duplicate or resurrected `TrainJob` is created.
+- Never-resurrect rule: a trial `TrainJob` deleted by a user while `Running` stays deleted after controller restart.
 - Deleting a *running* trial `TrainJob` yields a `Failed`/`TrainJobDeleted` record and does not stall the optimization.
 - Deleting a *completed* trial `TrainJob` changes neither `status.trials` nor subsequent suggestions.
 - Deleting the `OptimizationJob` cascades cleanly: no children left in `Terminating`.
