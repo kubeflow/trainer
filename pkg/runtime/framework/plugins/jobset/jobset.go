@@ -98,14 +98,26 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	// TODO (andreyvelich): Refactor this test to verify the ancestor label in PodTemplate.
 	rJobContainerNames := make(map[string]sets.Set[string])
 	for _, rJob := range jobSetSpec.ReplicatedJobs {
-		rJobContainerNames[*rJob.Name] = sets.New[string]()
+		if rJob.Name == nil {
+			continue
+		}
+		rJobName := *rJob.Name
+		rJobContainerNames[rJobName] = sets.New[string]()
+
+		if rJob.Template == nil || rJob.Template.Spec == nil || rJob.Template.Spec.Template == nil || rJob.Template.Spec.Template.Spec == nil {
+			continue
+		}
 
 		// Names of initContainer and containers are unique.
 		for _, c := range rJob.Template.Spec.Template.Spec.InitContainers {
-			rJobContainerNames[*rJob.Name].Insert(*c.Name)
+			if c.Name != nil {
+				rJobContainerNames[rJobName].Insert(*c.Name)
+			}
 		}
 		for _, c := range rJob.Template.Spec.Template.Spec.Containers {
-			rJobContainerNames[*rJob.Name].Insert(*c.Name)
+			if c.Name != nil {
+				rJobContainerNames[rJobName].Insert(*c.Name)
+			}
 		}
 	}
 

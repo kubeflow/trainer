@@ -730,3 +730,69 @@ func TestFindContainerByName(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractResourcePerNodeFromRuntime(t *testing.T) {
+	cases := map[string]struct {
+		info *Info
+		want *corev1.ResourceRequirements
+	}{
+		"nil template spec in replicated job": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().WithName("node"),
+						),
+				},
+			},
+			want: nil,
+		},
+		"valid replicated job resources": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName("node").
+								WithTemplate(
+									batchv1ac.JobTemplateSpec().
+										WithSpec(
+											batchv1ac.JobSpec().
+												WithTemplate(
+													corev1ac.PodTemplateSpec().
+														WithSpec(
+															corev1ac.PodSpec().
+																WithContainers(
+																	corev1ac.Container().
+																		WithName("node").
+																		WithResources(
+																			corev1ac.ResourceRequirements().
+																				WithRequests(corev1.ResourceList{
+																					corev1.ResourceCPU: resource.MustParse("2"),
+																				}),
+																		),
+																),
+														),
+												),
+										),
+								),
+						),
+				},
+			},
+			want: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("2"),
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := ExtractResourcePerNodeFromRuntime(tc.info)
+			if diff := cmp.Diff(tc.want, got); len(diff) != 0 {
+				t.Errorf("Unexpected ResourceRequirements (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
