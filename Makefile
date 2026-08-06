@@ -322,10 +322,15 @@ release: ## Create a release commit. Usage: make release VERSION=vX.Y.Z [GITHUB_
 		MAJOR_MINOR=$$(echo "$(VERSION)" | $(SED) 's/^v//' | cut -d. -f1,2); \
 		CHANGELOG_PATH="CHANGELOG/CHANGELOG-$$MAJOR_MINOR.md"; \
 		RELEASE_BRANCH="release-$$MAJOR_MINOR"; \
-		RELEASE_SHA=$$(git rev-parse --verify --quiet "refs/remotes/upstream/$$RELEASE_BRANCH") || { \
-			echo "Error: branch $$RELEASE_BRANCH not found on upstream. Run: git fetch upstream $$RELEASE_BRANCH"; \
-			exit 1; \
-		}; \
+		RELEASE_SHA=$$(git rev-parse --verify --quiet "refs/remotes/upstream/$$RELEASE_BRANCH" || true); \
+		if [ -z "$$RELEASE_SHA" ]; then \
+			if [ -f "$$CHANGELOG_PATH" ]; then \
+				echo "Error: branch $$RELEASE_BRANCH not found on upstream, but $$CHANGELOG_PATH exists. Run: git fetch upstream $$RELEASE_BRANCH"; \
+				exit 1; \
+			fi; \
+			RELEASE_SHA=$$(git rev-parse HEAD); \
+			echo "Branch $$RELEASE_BRANCH does not exist yet (new release line $$MAJOR_MINOR, created by the release workflow); using HEAD"; \
+		fi; \
 		PATCH=$$(echo "$(VERSION)" | cut -d. -f3); \
 		if [ "$$PATCH" -gt 0 ]; then \
 			PREV_TAG="$$(echo "$(VERSION)" | cut -d. -f1,2).$$((PATCH - 1))"; \
@@ -337,7 +342,7 @@ release: ## Create a release commit. Usage: make release VERSION=vX.Y.Z [GITHUB_
 			echo "Error: cannot determine the previous release tag for $(VERSION)"; \
 			exit 1; \
 		fi; \
-		echo "Generating changelog for $(VERSION) (range: $$PREV_TAG..$$RELEASE_BRANCH @ $$RELEASE_SHA)"; \
+		echo "Generating changelog for $(VERSION) (range: $$PREV_TAG..$$RELEASE_SHA)"; \
 		touch "$$CHANGELOG_PATH"; \
 		docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -e GITHUB_TOKEN \
 			-v $(PROJECT_DIR):/app -w /app ghcr.io/orhun/git-cliff/git-cliff:latest \
