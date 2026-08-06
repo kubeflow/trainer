@@ -1,5 +1,5 @@
 /*
-Copyright The Kubeflow Authors.
+Copyright 2026 The Kubeflow Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,51 @@ limitations under the License.
 
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	// OptimizationJobKind is the Kind name for the OptimizationJob.
+	OptimizationJobKind string = "OptimizationJob"
+)
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.conditions[-1:].type`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:validation:XValidation:rule="self.metadata.name.matches('^[a-z]([-a-z0-9]*[a-z0-9])?$')", message="metadata.name must match RFC 1035 DNS label format"
+// +kubebuilder:validation:XValidation:rule="size(self.metadata.name) <= 63", message="metadata.name must be no more than 63 characters"
+
+// OptimizationJob represents configuration of a hyperparameter optimization job.
+type OptimizationJob struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata of the OptimizationJob.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// spec of the OptimizationJob.
+	// +optional
+	Spec OptimizationJobSpec `json:"spec,omitzero"`
+
+	// status of OptimizationJob.
+	// +optional
+	Status OptimizationJobStatus `json:"status,omitzero"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+
+// OptimizationJobList is a list of OptimizationJobs.
+type OptimizationJobList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []OptimizationJob `json:"items"`
+}
 
 // +kubebuilder:validation:Enum=Maximize;Minimize
 type ObjectiveDirection string
@@ -25,43 +69,6 @@ const (
 	ObjectiveDirectionMaximize ObjectiveDirection = "Maximize"
 	ObjectiveDirectionMinimize ObjectiveDirection = "Minimize"
 )
-
-// OptimizationJob is the Schema for the optimizationjobs API.
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-// OptimizationJob is the Schema for the optimizationjobs API.
-type OptimizationJob struct {
-	// typeMeta is the type meta for the optimization job.
-	metav1.TypeMeta `json:",inline"`
-
-	// metadata is the object meta for the optimization job.
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	// spec is the spec for the optimization job.
-	// +required
-	Spec OptimizationJobSpec `json:"spec,omitempty,omitzero"`
-
-	// status is the status for the optimization job.
-	// +optional
-	Status *OptimizationJobStatus `json:"status,omitempty,omitzero"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:object:root=true
-// OptimizationJobList contains a list of OptimizationJob.
-type OptimizationJobList struct {
-	// typeMeta is the type meta for the optimization job list.
-	metav1.TypeMeta `json:",inline"`
-
-	// listMeta is the list meta for the optimization job list.
-	metav1.ListMeta `json:"metadata,omitempty"`
-
-	// items is the list of optimization jobs.
-	Items []OptimizationJob `json:"items"`
-}
 
 // OptimizationJobSpec defines the desired state of OptimizationJob.
 // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="OptimizationJobSpec is immutable and cannot be updated after creation"
@@ -72,7 +79,7 @@ type OptimizationJobSpec struct {
 	// +listType=map
 	// +listMapKey=metric
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=1
+	// +kubebuilder:validation:MaxItems=10
 	// +required
 	Objectives []Objective `json:"objectives,omitempty"`
 
@@ -264,6 +271,41 @@ type TrainJobTemplateSpec struct {
 	Spec TrainJobSpec `json:"spec,omitzero"`
 }
 
+// ObjectiveMetricValue represents a single objective metric and its value.
+type ObjectiveMetricValue struct {
+	// metric is the name of the objective metric.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=64
+	// +required
+	Metric string `json:"metric,omitempty"`
+
+	// value is the reported value for the objective metric.
+	// +required
+	Value string `json:"value,omitempty"`
+}
+
+// OptimalTrial represents a trial on the optimal Pareto front (supporting single and multi-objective optimization).
+type OptimalTrial struct {
+	// trainJobName is the name of the underlying TrainJob that achieved this result.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +required
+	TrainJobName string `json:"trainJobName,omitempty"`
+
+	// metrics achieved by this optimal trial (multi-metric support).
+	// +listType=map
+	// +listMapKey=metric
+	// +optional
+	Metrics []ObjectiveMetricValue `json:"metrics,omitempty"`
+
+	// parameters assigned to this trial.
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=100
+	// +optional
+	Parameters []ParameterAssignment `json:"parameters,omitempty"`
+}
+
 // OptimizationJobStatus is the status of the optimization job.
 type OptimizationJobStatus struct {
 	// conditions is the list of conditions for the optimization job.
@@ -273,23 +315,7 @@ type OptimizationJobStatus struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// result is the result of the optimization job.
+	// results tracks optimal trials (Pareto front for multi-objective optimization).
 	// +optional
-	Result Result `json:"result,omitempty,omitzero"`
-}
-
-// Result tracks the parameters of the highest performing trial.
-type Result struct {
-	// trainJobName is the name of the underlying TrainJob that achieved this result.
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=63
-	// +required
-	TrainJobName string `json:"trainJobName,omitempty"`
-
-	// parameters is the list of parameters for the result.
-	// +listType=map
-	// +listMapKey=name
-	// +kubebuilder:validation:MaxItems=100
-	// +optional
-	Parameters []ParameterAssignment `json:"parameters,omitempty"`
+	Results []OptimalTrial `json:"results,omitempty,omitzero"`
 }
