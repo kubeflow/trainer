@@ -90,48 +90,135 @@ func GetFinalObjectiveMetric(tj *trainer.TrainJob, metricName string) (*trainer.
 	return nil, 0, fmt.Errorf("%w: %q", ErrObjectiveMetricMissing, metricName)
 }
 
-func ExtractBestResult(optJob *trainer.OptimizationJob, trainJobs []trainer.TrainJob) *trainer.Result {
-	if len(optJob.Spec.Objectives) == 0 || optJob.Spec.Objectives[0].Metric == "" {
+type candidateTrial struct {
+	job          *trainer.TrainJob
+	metricFloats []float64
+	metricValues []trainer.ObjectiveMetricValue
+}
+
+func ExtractOptimalTrials(optJob *trainer.OptimizationJob, trainJobs []trainer.TrainJob) []trainer.OptimalTrial {
+	if optJob == nil || len(optJob.Spec.Objectives) == 0 || len(trainJobs) == 0 {
 		return nil
 	}
 
-	targetMetric := optJob.Spec.Objectives[0].Metric
+	var candidates []candidateTrial
+	for i := range trainJobs {
+		tj := &trainJobs[i]
+		valid := true
+		floats := make([]float64, len(optJob.Spec.Objectives))
+		vals := make([]trainer.ObjectiveMetricValue, len(optJob.Spec.Objectives))
 
-	var bestJob *trainer.TrainJob
-	var bestVal float64
-
-	for i, tj := range trainJobs {
-		_, val, err := GetFinalObjectiveMetric(&tj, targetMetric)
-		if err != nil {
-			continue
+		for j, obj := range optJob.Spec.Objectives {
+			if obj.Metric == "" {
+				valid = false
+				break
+			}
+			metric, floatVal, err := GetFinalObjectiveMetric(tj, obj.Metric)
+			if err != nil {
+				valid = false
+				break
+			}
+			floats[j] = floatVal
+			vals[j] = trainer.ObjectiveMetricValue{
+				Metric: obj.Metric,
+				Value:  metric.Value,
+			}
 		}
 
-		if bestJob == nil {
-			bestJob = &trainJobs[i]
-			bestVal = val
-		} else if optJob.Spec.Objectives[0].Direction == trainer.ObjectiveDirectionMaximize && val > bestVal {
-			bestJob = &trainJobs[i]
-			bestVal = val
-		} else if optJob.Spec.Objectives[0].Direction == trainer.ObjectiveDirectionMinimize && val < bestVal {
-			bestJob = &trainJobs[i]
-			bestVal = val
+		if valid {
+			candidates = append(candidates, candidateTrial{
+				job:          tj,
+				metricFloats: floats,
+				metricValues: vals,
+			})
 		}
 	}
 
-	if bestJob == nil {
+	if len(candidates) == 0 {
 		return nil
 	}
 
-	res := &trainer.Result{
-		TrainJobName: bestJob.Name,
+	// Single-objective optimization: return the single best trial.
+	if len(optJob.Spec.Objectives) == 1 {
+		bestIdx := 0
+		dir := optJob.Spec.Objectives[0].Direction
+		for i := 1; i < len(candidates); i++ {
+			if dir == trainer.ObjectiveDirectionMaximize {
+				if candidates[i].metricFloats[0] > candidates[bestIdx].metricFloats[0] {
+					bestIdx = i
+				}
+			} else {
+				if candidates[i].metricFloats[0] < candidates[bestIdx].metricFloats[0] {
+					bestIdx = i
+				}
+			}
+		}
+		return []trainer.OptimalTrial{buildOptimalTrial(candidates[bestIdx])}
+	}
+
+	// Multi-objective optimization: Pareto front (non-dominated trials).
+	var optimalTrials []trainer.OptimalTrial
+	for i := range candidates {
+		dominated := false
+		for j := range candidates {
+			if i == j {
+				continue
+			}
+			if dominates(candidates[j], candidates[i], optJob.Spec.Objectives) {
+				dominated = true
+				break
+			}
+		}
+		if !dominated {
+			optimalTrials = append(optimalTrials, buildOptimalTrial(candidates[i]))
+		}
+	}
+
+	// Sort deterministically by TrainJobName
+	sort.Slice(optimalTrials, func(i, j int) bool {
+		return optimalTrials[i].TrainJobName < optimalTrials[j].TrainJobName
+	})
+
+	return optimalTrials
+}
+
+func dominates(a, b candidateTrial, objectives []trainer.Objective) bool {
+	strictlyBetter := false
+	for k, obj := range objectives {
+		valA := a.metricFloats[k]
+		valB := b.metricFloats[k]
+
+		if obj.Direction == trainer.ObjectiveDirectionMaximize {
+			if valA < valB {
+				return false
+			}
+			if valA > valB {
+				strictlyBetter = true
+			}
+		} else { // Minimize
+			if valA > valB {
+				return false
+			}
+			if valA < valB {
+				strictlyBetter = true
+			}
+		}
+	}
+	return strictlyBetter
+}
+
+func buildOptimalTrial(c candidateTrial) trainer.OptimalTrial {
+	res := trainer.OptimalTrial{
+		TrainJobName: c.job.Name,
+		Metrics:      c.metricValues,
 	}
 
 	// Sort parameters alphabetically to avoid non-deterministic status updates
 	paramMap := make(map[string]string)
 	var paramNames []string
 
-	if bestJob.Spec.Trainer != nil {
-		for _, env := range bestJob.Spec.Trainer.Env {
+	if c.job.Spec.Trainer != nil {
+		for _, env := range c.job.Spec.Trainer.Env {
 			if strings.HasPrefix(env.Name, constants.EnvVarPrefix) {
 				paramName := strings.TrimPrefix(env.Name, constants.EnvVarPrefix)
 				paramNames = append(paramNames, paramName)
@@ -159,12 +246,18 @@ func BuildSuggestionRequest(optJob *trainer.OptimizationJob, trainJobs []trainer
 
 	var targetMetric string
 	var objectiveType katibapi.ObjectiveType
+	var additionalMetrics []string
 	if len(optJob.Spec.Objectives) > 0 && optJob.Spec.Objectives[0].Metric != "" {
 		targetMetric = optJob.Spec.Objectives[0].Metric
 		if optJob.Spec.Objectives[0].Direction == trainer.ObjectiveDirectionMaximize {
 			objectiveType = katibapi.ObjectiveType_MAXIMIZE
 		} else {
 			objectiveType = katibapi.ObjectiveType_MINIMIZE
+		}
+		for _, obj := range optJob.Spec.Objectives[1:] {
+			if obj.Metric != "" {
+				additionalMetrics = append(additionalMetrics, obj.Metric)
+			}
 		}
 	}
 
@@ -213,8 +306,9 @@ func BuildSuggestionRequest(optJob *trainer.OptimizationJob, trainJobs []trainer
 					AlgorithmName: algorithmName,
 				},
 				Objective: &katibapi.ObjectiveSpec{
-					Type:                objectiveType,
-					ObjectiveMetricName: targetMetric,
+					Type:                  objectiveType,
+					ObjectiveMetricName:   targetMetric,
+					AdditionalMetricNames: additionalMetrics,
 				},
 				ParameterSpecs: &katibapi.ExperimentSpec_ParameterSpecs{
 					Parameters: grpcParams,
@@ -240,7 +334,9 @@ func BuildSuggestionRequest(optJob *trainer.OptimizationJob, trainJobs []trainer
 			Name: tj.Name,
 			Spec: &katibapi.TrialSpec{
 				Objective: &katibapi.ObjectiveSpec{
-					ObjectiveMetricName: targetMetric,
+					Type:                  objectiveType,
+					ObjectiveMetricName:   targetMetric,
+					AdditionalMetricNames: additionalMetrics,
 				},
 				ParameterAssignments: &katibapi.TrialSpec_ParameterAssignments{
 					Assignments: []*katibapi.ParameterAssignment{},
@@ -266,16 +362,21 @@ func BuildSuggestionRequest(optJob *trainer.OptimizationJob, trainJobs []trainer
 
 		// Reconstruct Trial metrics or pass in-flight state
 		if trainjob.IsTrainJobFinished(&tj) {
-			metric, _, err := GetFinalObjectiveMetric(&tj, targetMetric)
-			if err != nil {
-				return nil, fmt.Errorf("completed trial %q: %w", tj.Name, err)
+			var obsMetrics []*katibapi.Metric
+			for _, obj := range optJob.Spec.Objectives {
+				metric, _, err := GetFinalObjectiveMetric(&tj, obj.Metric)
+				if err != nil {
+					return nil, fmt.Errorf("completed trial %q: %w", tj.Name, err)
+				}
+				obsMetrics = append(obsMetrics, &katibapi.Metric{
+					Name:  metric.Name,
+					Value: metric.Value,
+				})
 			}
 			trial.Status = &katibapi.TrialStatus{
 				Condition: katibapi.TrialStatus_SUCCEEDED,
 				Observation: &katibapi.Observation{
-					Metrics: []*katibapi.Metric{
-						{Name: metric.Name, Value: metric.Value},
-					},
+					Metrics: obsMetrics,
 				},
 			}
 		} else {

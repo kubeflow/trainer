@@ -181,11 +181,11 @@ func TestGetFinalObjectiveMetric(t *testing.T) {
 	}
 }
 
-func TestExtractBestResult(t *testing.T) {
+func TestExtractOptimalTrials(t *testing.T) {
 	cases := map[string]struct {
 		optJob    *trainer.OptimizationJob
 		trainJobs []trainer.TrainJob
-		want      *trainer.Result
+		want      []trainer.OptimalTrial
 	}{
 		"no objectives returns nil": {
 			optJob: &trainer.OptimizationJob{
@@ -253,11 +253,16 @@ func TestExtractBestResult(t *testing.T) {
 					},
 				},
 			},
-			want: &trainer.Result{
-				TrainJobName: "tj-high",
-				Parameters: []trainer.ParameterAssignment{
-					{Name: "epochs", Value: "10"},
-					{Name: "lr", Value: "0.01"},
+			want: []trainer.OptimalTrial{
+				{
+					TrainJobName: "tj-high",
+					Parameters: []trainer.ParameterAssignment{
+						{Name: "epochs", Value: "10"},
+						{Name: "lr", Value: "0.01"},
+					},
+					Metrics: []trainer.ObjectiveMetricValue{
+						{Metric: "accuracy", Value: "0.95"},
+					},
 				},
 			},
 		},
@@ -307,10 +312,15 @@ func TestExtractBestResult(t *testing.T) {
 					},
 				},
 			},
-			want: &trainer.Result{
-				TrainJobName: "tj-low-loss",
-				Parameters: []trainer.ParameterAssignment{
-					{Name: "lr", Value: "0.001"},
+			want: []trainer.OptimalTrial{
+				{
+					TrainJobName: "tj-low-loss",
+					Parameters: []trainer.ParameterAssignment{
+						{Name: "lr", Value: "0.001"},
+					},
+					Metrics: []trainer.ObjectiveMetricValue{
+						{Metric: "loss", Value: "0.25"},
+					},
 				},
 			},
 		},
@@ -346,10 +356,15 @@ func TestExtractBestResult(t *testing.T) {
 					},
 				},
 			},
-			want: &trainer.Result{
-				TrainJobName: "tj-multi-epoch",
-				Parameters: []trainer.ParameterAssignment{
-					{Name: "lr", Value: "0.01"},
+			want: []trainer.OptimalTrial{
+				{
+					TrainJobName: "tj-multi-epoch",
+					Parameters: []trainer.ParameterAssignment{
+						{Name: "lr", Value: "0.01"},
+					},
+					Metrics: []trainer.ObjectiveMetricValue{
+						{Metric: "accuracy", Value: "0.88"},
+					},
 				},
 			},
 		},
@@ -387,13 +402,112 @@ func TestExtractBestResult(t *testing.T) {
 			},
 			want: nil,
 		},
+		"multi-objective returns pareto front (non-dominated trials)": {
+			optJob: &trainer.OptimizationJob{
+				Spec: trainer.OptimizationJobSpec{
+					Objectives: []trainer.Objective{
+						{Metric: "accuracy", Direction: trainer.ObjectiveDirectionMaximize},
+						{Metric: "latency", Direction: trainer.ObjectiveDirectionMinimize},
+					},
+				},
+			},
+			trainJobs: []trainer.TrainJob{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "tj-1"},
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{{Name: constants.EnvVarPrefix + "lr", Value: "0.01"}},
+						},
+					},
+					Status: trainer.TrainJobStatus{
+						TrainerStatus: &trainer.TrainerStatus{
+							Metrics: []trainer.Metric{
+								{Name: "accuracy", Value: "0.90"},
+								{Name: "latency", Value: "100"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "tj-2"},
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{{Name: constants.EnvVarPrefix + "lr", Value: "0.05"}},
+						},
+					},
+					Status: trainer.TrainJobStatus{
+						TrainerStatus: &trainer.TrainerStatus{
+							Metrics: []trainer.Metric{
+								{Name: "accuracy", Value: "0.95"},
+								{Name: "latency", Value: "150"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "tj-3"},
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{{Name: constants.EnvVarPrefix + "lr", Value: "0.02"}},
+						},
+					},
+					Status: trainer.TrainJobStatus{
+						TrainerStatus: &trainer.TrainerStatus{
+							Metrics: []trainer.Metric{
+								// Dominated by tj-1 (lower accuracy and higher latency)
+								{Name: "accuracy", Value: "0.85"},
+								{Name: "latency", Value: "120"},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "tj-4-incomplete"},
+					Spec: trainer.TrainJobSpec{
+						Trainer: &trainer.Trainer{
+							Env: []corev1.EnvVar{{Name: constants.EnvVarPrefix + "lr", Value: "0.03"}},
+						},
+					},
+					Status: trainer.TrainJobStatus{
+						TrainerStatus: &trainer.TrainerStatus{
+							Metrics: []trainer.Metric{
+								// Missing latency objective
+								{Name: "accuracy", Value: "0.99"},
+							},
+						},
+					},
+				},
+			},
+			want: []trainer.OptimalTrial{
+				{
+					TrainJobName: "tj-1",
+					Parameters: []trainer.ParameterAssignment{
+						{Name: "lr", Value: "0.01"},
+					},
+					Metrics: []trainer.ObjectiveMetricValue{
+						{Metric: "accuracy", Value: "0.90"},
+						{Metric: "latency", Value: "100"},
+					},
+				},
+				{
+					TrainJobName: "tj-2",
+					Parameters: []trainer.ParameterAssignment{
+						{Name: "lr", Value: "0.05"},
+					},
+					Metrics: []trainer.ObjectiveMetricValue{
+						{Metric: "accuracy", Value: "0.95"},
+						{Metric: "latency", Value: "150"},
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got := ExtractBestResult(tc.optJob, tc.trainJobs)
+			got := ExtractOptimalTrials(tc.optJob, tc.trainJobs)
 			if diff := cmp.Diff(tc.want, got); diff != "" {
-				t.Errorf("ExtractBestResult() mismatch (-want +got):\n%s", diff)
+				t.Errorf("ExtractOptimalTrials() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -684,4 +798,69 @@ func TestBuildSuggestionRequest(t *testing.T) {
 			t.Errorf("unexpected parameter assignments for trial 2: %+v", t2.Spec.ParameterAssignments.Assignments)
 		}
 	})
+
+	t.Run("multi-objective suggestion request populates additional metric names and observations", func(t *testing.T) {
+		optJob := &trainer.OptimizationJob{
+			ObjectMeta: metav1.ObjectMeta{Name: "optjob-multi"},
+			Spec: trainer.OptimizationJobSpec{
+				SearchAlgorithm: &trainer.SearchAlgorithm{
+					Random: &trainer.RandomAlgorithm{},
+				},
+				Objectives: []trainer.Objective{
+					{Metric: "accuracy", Direction: trainer.ObjectiveDirectionMaximize},
+					{Metric: "latency", Direction: trainer.ObjectiveDirectionMinimize},
+				},
+			},
+		}
+
+		trainJobs := []trainer.TrainJob{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "trial-1"},
+				Status: trainer.TrainJobStatus{
+					Conditions: []metav1.Condition{
+						{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue},
+					},
+					TrainerStatus: &trainer.TrainerStatus{
+						Metrics: []trainer.Metric{
+							{Name: "accuracy", Value: "0.95"},
+							{Name: "latency", Value: "120"},
+						},
+					},
+				},
+			},
+		}
+
+		req, err := BuildSuggestionRequest(optJob, trainJobs, 1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if req.Experiment.Spec.Objective.ObjectiveMetricName != "accuracy" {
+			t.Errorf("expected primary metric 'accuracy', got %q", req.Experiment.Spec.Objective.ObjectiveMetricName)
+		}
+		if diff := cmp.Diff([]string{"latency"}, req.Experiment.Spec.Objective.AdditionalMetricNames); diff != "" {
+			t.Errorf("additional metrics mismatch (-want +got):\n%s", diff)
+		}
+
+		if len(req.Trials) != 1 {
+			t.Fatalf("expected 1 trial, got %d", len(req.Trials))
+		}
+		t1 := req.Trials[0]
+		if t1.Spec.Objective.ObjectiveMetricName != "accuracy" {
+			t.Errorf("expected trial primary metric 'accuracy', got %q", t1.Spec.Objective.ObjectiveMetricName)
+		}
+		if diff := cmp.Diff([]string{"latency"}, t1.Spec.Objective.AdditionalMetricNames); diff != "" {
+			t.Errorf("trial additional metrics mismatch (-want +got):\n%s", diff)
+		}
+		if len(t1.Status.Observation.Metrics) != 2 {
+			t.Fatalf("expected 2 observed metrics, got %d", len(t1.Status.Observation.Metrics))
+		}
+		if t1.Status.Observation.Metrics[0].Name != "accuracy" || t1.Status.Observation.Metrics[0].Value != "0.95" {
+			t.Errorf("unexpected metric 0: %+v", t1.Status.Observation.Metrics[0])
+		}
+		if t1.Status.Observation.Metrics[1].Name != "latency" || t1.Status.Observation.Metrics[1].Value != "120" {
+			t.Errorf("unexpected metric 1: %+v", t1.Status.Observation.Metrics[1])
+		}
+	})
 }
+

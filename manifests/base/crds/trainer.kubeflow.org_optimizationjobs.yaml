@@ -28,12 +28,18 @@ spec:
     singular: optimizationjob
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[-1:].type
+      name: State
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: |-
-          OptimizationJob is the Schema for the optimizationjobs API.
-          OptimizationJob is the Schema for the optimizationjobs API.
+        description: OptimizationJob represents configuration of a hyperparameter
+          optimization job.
         properties:
           apiVersion:
             description: APIVersion defines the versioned schema of this representation
@@ -46,7 +52,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec is the spec for the optimization job.
+            description: spec of the OptimizationJob.
             properties:
               numTrials:
                 default: 1
@@ -76,7 +82,7 @@ spec:
                   required:
                   - metric
                   type: object
-                maxItems: 1
+                maxItems: 10
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:
@@ -6381,7 +6387,7 @@ spec:
                 and LogUniform are not supported.
               rule: '!has(self.searchAlgorithm.grid) || self.parameters.all(p, has(p.searchSpace.categorical))'
           status:
-            description: status is the status for the optimization job.
+            description: status of OptimizationJob.
             properties:
               conditions:
                 description: conditions is the list of conditions for the optimization
@@ -6439,47 +6445,79 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
-              result:
-                description: result is the result of the optimization job.
-                properties:
-                  parameters:
-                    description: parameters is the list of parameters for the result.
-                    items:
-                      description: ParameterAssignment represents a single hyperparameter
-                        and its assigned value.
-                      properties:
-                        name:
-                          description: name is the name of the hyperparameter.
-                          maxLength: 64
-                          minLength: 1
-                          type: string
-                        value:
-                          description: value is the value of the hyperparameter.
-                          maxLength: 64
-                          minLength: 1
-                          type: string
-                      required:
+              results:
+                description: results tracks optimal trials (Pareto front for multi-objective
+                  optimization).
+                items:
+                  description: OptimalTrial represents a trial on the optimal Pareto
+                    front (supporting single and multi-objective optimization).
+                  properties:
+                    metrics:
+                      description: metrics achieved by this optimal trial (multi-metric
+                        support).
+                      items:
+                        description: ObjectiveMetricValue represents a single objective
+                          metric and its value.
+                        properties:
+                          metric:
+                            description: metric is the name of the objective metric.
+                            maxLength: 64
+                            minLength: 1
+                            type: string
+                          value:
+                            description: value is the reported value for the objective
+                              metric.
+                            type: string
+                        required:
+                        - metric
+                        - value
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - metric
+                      x-kubernetes-list-type: map
+                    parameters:
+                      description: parameters assigned to this trial.
+                      items:
+                        description: ParameterAssignment represents a single hyperparameter
+                          and its assigned value.
+                        properties:
+                          name:
+                            description: name is the name of the hyperparameter.
+                            maxLength: 64
+                            minLength: 1
+                            type: string
+                          value:
+                            description: value is the value of the hyperparameter.
+                            maxLength: 64
+                            minLength: 1
+                            type: string
+                        required:
+                        - name
+                        - value
+                        type: object
+                      maxItems: 100
+                      type: array
+                      x-kubernetes-list-map-keys:
                       - name
-                      - value
-                      type: object
-                    maxItems: 100
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
-                  trainJobName:
-                    description: trainJobName is the name of the underlying TrainJob
-                      that achieved this result.
-                    maxLength: 63
-                    minLength: 1
-                    type: string
-                required:
-                - trainJobName
-                type: object
+                      x-kubernetes-list-type: map
+                    trainJobName:
+                      description: trainJobName is the name of the underlying TrainJob
+                        that achieved this result.
+                      maxLength: 63
+                      minLength: 1
+                      type: string
+                  required:
+                  - trainJobName
+                  type: object
+                type: array
             type: object
-        required:
-        - spec
         type: object
+        x-kubernetes-validations:
+        - message: metadata.name must match RFC 1035 DNS label format
+          rule: self.metadata.name.matches('^[a-z]([-a-z0-9]*[a-z0-9])?$')
+        - message: metadata.name must be no more than 63 characters
+          rule: size(self.metadata.name) <= 63
     served: true
     storage: true
     subresources:
