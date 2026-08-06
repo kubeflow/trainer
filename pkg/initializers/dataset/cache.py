@@ -14,6 +14,7 @@
 
 import logging
 import time
+from collections.abc import Callable
 from urllib.parse import urlparse
 
 from kubernetes import client, config
@@ -57,6 +58,41 @@ def parse_cache_storage_uri(storage_uri: str) -> tuple[str, str]:
         )
 
     return schema_name, table_name
+
+
+class CreatedResources:
+    """Kubernetes resources created by one invocation, undoable as a group."""
+
+    def __init__(self) -> None:
+        self._resources: list[tuple[str, Callable[[], object]]] = []
+
+    def create(
+        self,
+        description: str,
+        create: Callable[[], object],
+        delete: Callable[[], object],
+    ) -> None:
+        """Create a resource unless it already exists, tracking it for rollback."""
+        try:
+            create()
+        except ApiException as e:
+            # 409 means someone else owns it — usually this same initializer on an
+            # earlier attempt — so it must survive our rollback.
+            if e.status == 409:
+                logging.info(f"{description} already exists, skipping creation")
+                return
+            raise
+        logging.info(f"Created {description}")
+        self._resources.append((description, delete))
+
+    def roll_back(self) -> None:
+        """Delete what this invocation created, newest first, without masking the failure."""
+        for description, delete in reversed(self._resources):
+            try:
+                delete()
+                logging.info(f"Cleaned up {description}")
+            except Exception as cleanup_error:
+                logging.error(f"Error cleaning up {description}: {cleanup_error}")
 
 
 class CacheInitializer(utils.DatasetProvider):
@@ -132,7 +168,9 @@ class CacheInitializer(utils.DatasetProvider):
             )
         except ApiException as e:
             logging.error(f"Failed to get TrainJob {train_job_name}: {e}")
-            return
+            raise
+
+        resources = CreatedResources()
 
         try:
             # Create ServiceAccount
@@ -148,19 +186,16 @@ class CacheInitializer(utils.DatasetProvider):
                 )
             )
 
-            try:
-                core_v1.create_namespaced_service_account(
+            service_account_name = service_account.metadata.name
+            resources.create(
+                f"ServiceAccount {service_account_name}",
+                lambda: core_v1.create_namespaced_service_account(
                     namespace=namespace, body=service_account
-                )
-                logging.info(f"Created ServiceAccount {service_account.metadata.name}")
-            except ApiException as e:
-                if e.status == 409:
-                    logging.info(
-                        f"ServiceAccount {service_account.metadata.name} "
-                        f"already exists, skipping creation"
-                    )
-                else:
-                    raise e
+                ),
+                lambda: core_v1.delete_namespaced_service_account(
+                    name=service_account_name, namespace=namespace
+                ),
+            )
 
             # Prepare environment variables
             env_vars = []
@@ -268,14 +303,24 @@ class CacheInitializer(utils.DatasetProvider):
             }
 
             # Create LeaderWorkerSet
-            custom_api.create_namespaced_custom_object(
-                group="leaderworkerset.x-k8s.io",
-                version="v1",
-                namespace=namespace,
-                plural="leaderworkersets",
-                body=lws_body,
+            lws_name = lws_body["metadata"]["name"]
+            resources.create(
+                f"LeaderWorkerSet {lws_name}",
+                lambda: custom_api.create_namespaced_custom_object(
+                    group="leaderworkerset.x-k8s.io",
+                    version="v1",
+                    namespace=namespace,
+                    plural="leaderworkersets",
+                    body=lws_body,
+                ),
+                lambda: custom_api.delete_namespaced_custom_object(
+                    group="leaderworkerset.x-k8s.io",
+                    version="v1",
+                    namespace=namespace,
+                    plural="leaderworkersets",
+                    name=lws_name,
+                ),
             )
-            logging.info(f"Created LeaderWorkerSet {lws_body['metadata']['name']}")
 
             # Create Service
             service = client.V1Service(
@@ -294,17 +339,16 @@ class CacheInitializer(utils.DatasetProvider):
                 ),
             )
 
-            try:
-                core_v1.create_namespaced_service(namespace=namespace, body=service)
-                logging.info(f"Created Service {service.metadata.name}")
-            except ApiException as e:
-                if e.status == 409:
-                    logging.info(
-                        f"Service {service.metadata.name} already exists, "
-                        f"skipping creation"
-                    )
-                else:
-                    raise e
+            service_name = service.metadata.name
+            resources.create(
+                f"Service {service_name}",
+                lambda: core_v1.create_namespaced_service(
+                    namespace=namespace, body=service
+                ),
+                lambda: core_v1.delete_namespaced_service(
+                    name=service_name, namespace=namespace
+                ),
+            )
 
             # Wait for LeaderWorkerSet to become ready
             # TODO:// refactor to use watch API
@@ -332,15 +376,11 @@ class CacheInitializer(utils.DatasetProvider):
                 except ApiException as e:
                     raise e
 
-        except ApiException as e:
+        # Not just ApiException: a connection error or a malformed response leaves the
+        # same half-built cluster behind, and it has to be rolled back too.
+        except Exception as e:
             logging.error(f"Cache cluster creation failed: {e}")
-            # Cleanup on failure
-            try:
-                core_v1.delete_namespaced_service_account(
-                    name=f"{train_job_name}-cache", namespace=namespace
-                )
-            except Exception as cleanup_error:
-                logging.error(f"Error cleaning up ServiceAccount: {cleanup_error}")
-            return
+            resources.roll_back()
+            raise
 
         logging.info("Cache cluster creation completed")

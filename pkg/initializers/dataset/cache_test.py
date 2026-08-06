@@ -327,3 +327,143 @@ def test_download_dataset_service_already_exists():
 
         # Must not trigger cleanup of the ServiceAccount.
         mock_core_v1.delete_namespaced_service_account.assert_not_called()
+
+
+TRAIN_JOB = {
+    "apiVersion": "trainer.kubeflow.org/v1alpha1",
+    "kind": "TrainJob",
+    "metadata": {"name": "cache-job", "uid": "test-uid"},
+}
+
+LWS_READY = {"status": {"conditions": [{"type": "Available", "status": "True"}]}}
+
+
+def build_initializer() -> CacheInitializer:
+    """Build a CacheInitializer with a minimal valid config."""
+    initializer = CacheInitializer()
+    config = {
+        "storage_uri": "cache://test_schema/test_table",
+        "train_job_name": "cache-job",
+        "cache_image": "test-image:latest",
+        "iam_role": "arn:aws:iam::123456789012:role/test-role",
+        "metadata_loc": "s3://test-bucket/metadata",
+    }
+    with patch.object(utils, "get_config_from_env", return_value=config):
+        initializer.load_config()
+    return initializer
+
+
+@pytest.fixture
+def k8s_mocks():
+    """Patch the Kubernetes clients the cache initializer builds."""
+    with patch(
+        "pkg.initializers.dataset.cache.get_namespace", return_value="test-namespace"
+    ), patch("pkg.initializers.dataset.cache.config"), patch(
+        "pkg.initializers.dataset.cache.client"
+    ) as mock_client:
+        core_v1 = MagicMock()
+        custom_api = MagicMock()
+        mock_client.ApiClient.return_value = MagicMock()
+        mock_client.CoreV1Api.return_value = core_v1
+        mock_client.CustomObjectsApi.return_value = custom_api
+        # The real client echoes back the name given to V1ObjectMeta, and the
+        # initializer reads it off the object to address deletes.
+        mock_client.V1ServiceAccount.return_value.metadata.name = "cache-job-cache"
+        mock_client.V1Service.return_value.metadata.name = "cache-job-cache-service"
+        yield core_v1, custom_api
+
+
+def test_download_dataset_raises_when_trainjob_lookup_fails(k8s_mocks):
+    core_v1, custom_api = k8s_mocks
+    custom_api.get_namespaced_custom_object.side_effect = ApiException(status=500)
+
+    with pytest.raises(ApiException):
+        build_initializer().download_dataset()
+
+    core_v1.create_namespaced_service_account.assert_not_called()
+
+
+def test_download_dataset_keeps_preexisting_service_account_on_failure(k8s_mocks):
+    """A retry must not delete a ServiceAccount an earlier attempt left behind."""
+    core_v1, custom_api = k8s_mocks
+    core_v1.create_namespaced_service_account.side_effect = ApiException(
+        status=409, reason="AlreadyExists"
+    )
+    # A single-element side_effect turns an unexpected entry into the readiness
+    # loop into StopIteration rather than an endless hang.
+    custom_api.get_namespaced_custom_object.side_effect = [TRAIN_JOB]
+    custom_api.create_namespaced_custom_object.side_effect = ApiException(status=500)
+
+    with pytest.raises(ApiException):
+        build_initializer().download_dataset()
+
+    core_v1.delete_namespaced_service_account.assert_not_called()
+
+
+def test_download_dataset_leader_worker_set_already_exists(k8s_mocks):
+    core_v1, custom_api = k8s_mocks
+    custom_api.create_namespaced_custom_object.side_effect = ApiException(
+        status=409, reason="AlreadyExists"
+    )
+    custom_api.get_namespaced_custom_object.side_effect = [TRAIN_JOB, LWS_READY]
+
+    build_initializer().download_dataset()
+
+    core_v1.delete_namespaced_service_account.assert_not_called()
+
+
+def test_download_dataset_rolls_back_resources_it_created(k8s_mocks):
+    core_v1, custom_api = k8s_mocks
+    manager = MagicMock()
+    manager.attach_mock(core_v1, "core")
+    manager.attach_mock(custom_api, "custom")
+    custom_api.get_namespaced_custom_object.side_effect = [TRAIN_JOB]
+    core_v1.create_namespaced_service.side_effect = ApiException(status=500)
+
+    with pytest.raises(ApiException):
+        build_initializer().download_dataset()
+
+    core_v1.delete_namespaced_service_account.assert_called_once_with(
+        name="cache-job-cache", namespace="test-namespace"
+    )
+    custom_api.delete_namespaced_custom_object.assert_called_once_with(
+        group="leaderworkerset.x-k8s.io",
+        version="v1",
+        namespace="test-namespace",
+        plural="leaderworkersets",
+        name="cache-job-cache",
+    )
+    # The Service is what failed, so it was never ours to delete.
+    core_v1.delete_namespaced_service.assert_not_called()
+    # Newest first, so nothing is deleted while something still depends on it.
+    assert [name for name, _, _ in manager.mock_calls if ".delete_" in name] == [
+        "custom.delete_namespaced_custom_object",
+        "core.delete_namespaced_service_account",
+    ]
+
+
+def test_download_dataset_rolls_back_on_non_api_errors(k8s_mocks):
+    """A connection error is as half-built as a 500, and must roll back too."""
+    core_v1, custom_api = k8s_mocks
+    custom_api.get_namespaced_custom_object.side_effect = [TRAIN_JOB]
+    core_v1.create_namespaced_service.side_effect = ConnectionError("connection reset")
+
+    with pytest.raises(ConnectionError):
+        build_initializer().download_dataset()
+
+    core_v1.delete_namespaced_service_account.assert_called_once()
+    custom_api.delete_namespaced_custom_object.assert_called_once()
+
+
+def test_download_dataset_cleanup_failure_does_not_mask_original_error(k8s_mocks):
+    core_v1, custom_api = k8s_mocks
+    custom_api.get_namespaced_custom_object.side_effect = [TRAIN_JOB]
+    core_v1.create_namespaced_service.side_effect = ApiException(status=500)
+    custom_api.delete_namespaced_custom_object.side_effect = ApiException(status=403)
+
+    with pytest.raises(ApiException) as excinfo:
+        build_initializer().download_dataset()
+
+    assert excinfo.value.status == 500
+    # Best effort: one failed delete must not strand the rest of the rollback.
+    core_v1.delete_namespaced_service_account.assert_called_once()
