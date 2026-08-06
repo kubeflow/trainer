@@ -35,6 +35,7 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
@@ -75,6 +76,8 @@ func wantJobSetWithMergedGPU(ns, name, uid string, requests corev1.ResourceList,
 }
 
 func TestTrainingRuntimeNewObjects(t *testing.T) {
+	features.SetFeatureGateDuringTest(t, features.TrainJobStatus, false)
+
 	resRequests := corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("1"),
 	}

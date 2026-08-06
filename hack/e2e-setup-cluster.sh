@@ -181,15 +181,6 @@ if [ "${INSTALL_METHOD}" = "kustomize" ]; then
   images:
   - name: "${CONTROLLER_MANAGER_CI_IMAGE_NAME}"
     newTag: "${CI_IMAGE_TAG}"
-  patches:
-  - patch: |-
-      # enable feature flags
-      - op: add
-        path: /spec/template/spec/containers/0/args/-
-        value: --feature-gates=TrainJobStatus=true
-    target:
-      kind: Deployment
-      name: kubeflow-trainer-controller-manager
 EOF
 
   kubectl apply --server-side -k "${E2E_MANIFESTS_DIR}"
@@ -250,7 +241,6 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
     --set runtimes.mlxDistributed.image.tag=${CI_IMAGE_TAG} \
     --set runtimes.deepspeedDistributed.image.tag=${CI_IMAGE_TAG} \
     --set image.tag=${CI_IMAGE_TAG} \
-    --set manager.config.featureGates.TrainJobStatus=true \
     --wait
 fi
 
