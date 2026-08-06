@@ -222,6 +222,52 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 				},
 				testingutil.BeInvalidError(),
 			),
+			ginkgo.Entry("Should succeed to create trainingRuntime with mlPolicy.numNodes=1",
+				func() *trainer.TrainingRuntime {
+					return makeRuntimeWithNumNodes(ns.Name, 1)
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create trainingRuntime with mlPolicy.numNodes=0",
+				func() *trainer.TrainingRuntime {
+					return makeRuntimeWithNumNodes(ns.Name, 0)
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to create trainingRuntime with negative mlPolicy.numNodes",
+				func() *trainer.TrainingRuntime {
+					return makeRuntimeWithNumNodes(ns.Name, -1)
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed to create trainingRuntime with mpi.numProcPerNode=1",
+				func() *trainer.TrainingRuntime {
+					return makeRuntimeWithMPINumProcPerNode(ns.Name, 1)
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create trainingRuntime with mpi.numProcPerNode=0",
+				func() *trainer.TrainingRuntime {
+					return makeRuntimeWithMPINumProcPerNode(ns.Name, 0)
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to create trainingRuntime with negative mpi.numProcPerNode",
+				func() *trainer.TrainingRuntime {
+					return makeRuntimeWithMPINumProcPerNode(ns.Name, -1)
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed to create trainingRuntime with positive coscheduling.scheduleTimeoutSeconds",
+				func() *trainer.TrainingRuntime {
+					return makeRuntimeWithScheduleTimeout(ns.Name, 120)
+				},
+				gomega.Succeed()),
+			// Zero stays valid because it is documented to select the default timeout.
+			ginkgo.Entry("Should succeed to create trainingRuntime with coscheduling.scheduleTimeoutSeconds=0",
+				func() *trainer.TrainingRuntime {
+					return makeRuntimeWithScheduleTimeout(ns.Name, 0)
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create trainingRuntime with negative coscheduling.scheduleTimeoutSeconds",
+				func() *trainer.TrainingRuntime {
+					return makeRuntimeWithScheduleTimeout(ns.Name, -1)
+				},
+				testingutil.BeInvalidError()),
 		)
 		ginkgo.DescribeTable("Defaulting TrainingRuntime on creation", func(trainingRuntime func() *trainer.TrainingRuntime, wantTrainingRuntime func() *trainer.TrainingRuntime) {
 			created := trainingRuntime()
@@ -412,3 +458,35 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 		)
 	})
 })
+
+func makeRuntimeWithMLPolicy(nsName string, policy *trainer.MLPolicy) *trainer.TrainingRuntime {
+	base := testingutil.MakeTrainingRuntimeWrapper(nsName, "runtime")
+	return base.
+		RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(base.Obj().Spec).
+			WithMLPolicy(policy).
+			Obj()).
+		Obj()
+}
+
+func makeRuntimeWithNumNodes(nsName string, numNodes int32) *trainer.TrainingRuntime {
+	return makeRuntimeWithMLPolicy(nsName, testingutil.MakeMLPolicyWrapper().
+		WithNumNodes(numNodes).
+		Obj())
+}
+
+func makeRuntimeWithMPINumProcPerNode(nsName string, numProcPerNode int32) *trainer.TrainingRuntime {
+	return makeRuntimeWithMLPolicy(nsName, testingutil.MakeMLPolicyWrapper().
+		WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+			MPIPolicy(ptr.To(numProcPerNode), trainer.MPIImplementationOpenMPI, nil, nil).
+			Obj()).
+		Obj())
+}
+
+func makeRuntimeWithScheduleTimeout(nsName string, timeout int32) *trainer.TrainingRuntime {
+	base := testingutil.MakeTrainingRuntimeWrapper(nsName, "runtime")
+	return base.
+		RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(base.Obj().Spec).
+			PodGroupPolicyCoschedulingSchedulingTimeout(timeout).
+			Obj()).
+		Obj()
+}

@@ -100,6 +100,9 @@ spec:
                           Defaults to 1.
                         format: int32
                         type: integer
+                        x-kubernetes-validations:
+                        - message: NumProcPerNode in mpiPolicy must be >= 1
+                          rule: self >= 1
                       runLauncherAsNode:
                         default: false
                         description: |-
@@ -120,6 +123,9 @@ spec:
                       Defaults to 1.
                     format: int32
                     type: integer
+                    x-kubernetes-validations:
+                    - message: NumNodes in mlPolicy must be >= 1
+                      rule: self >= 1
                   torch:
                     description: torch defines the configuration for the PyTorch runtime.
                     properties:
@@ -204,6 +210,7 @@ spec:
                           If the scheduling timeout is equal to 0, the default value is used.
                           Defaults to 60 seconds.
                         format: int32
+                        minimum: 0
                         type: integer
                     type: object
                   volcano:

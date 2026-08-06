@@ -274,6 +274,7 @@ type Trainer struct {
 
 	// numNodes is the number of training nodes.
 	// TODO (andreyvelich): Do we want to support dynamic num of nodes in TrainJob for PyTorch elastic: `--nnodes=1:4` ?
+	// +kubebuilder:validation:XValidation:rule="self >= 1",message="NumNodes in trainer must be >= 1"
 	// +optional
 	NumNodes *int32 `json:"numNodes,omitempty"`
 
@@ -284,6 +285,7 @@ type Trainer struct {
 	// numProcPerNode is the number of processes/workers/slots on every training node.
 	// For the MPI runtime only int value can be set to represent number of slots per node.
 	// For the Torch runtime the value defaults to `auto` and can be overridden with an int.
+	// +kubebuilder:validation:XValidation:rule="self >= 1",message="NumProcPerNode in trainer must be >= 1"
 	// +optional
 	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
 }

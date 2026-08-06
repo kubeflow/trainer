@@ -199,6 +199,8 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 				},
 				testingutil.BeForbiddenError()),
 
+			// The spec.trainer.numProcPerNode marker now rejects this at schema validation,
+			// before the Flux plugin's own check can return a Forbidden error.
 			ginkgo.Entry("Should fail in creating TrainJob with Flux numProcPerNode < 1",
 				func() *trainer.TrainJob {
 					trainingRuntime.Spec.MLPolicy = &trainer.MLPolicy{
@@ -218,7 +220,7 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						}).
 						Obj()
 				},
-				testingutil.BeForbiddenError(),
+				testingutil.BeInvalidError(),
 			),
 			ginkgo.Entry("Should fail in creating TrainJob with reserved flux-installer init container",
 				func() *trainer.TrainJob {
@@ -688,6 +690,36 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should succeed to create TrainJob with trainer.numNodes=1",
+				func() *trainer.TrainJob {
+					return makeTrainJobWithTrainer(ns.Name, testingutil.MakeTrainJobTrainerWrapper().NumNodes(1).Obj())
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create TrainJob with trainer.numNodes=0",
+				func() *trainer.TrainJob {
+					return makeTrainJobWithTrainer(ns.Name, testingutil.MakeTrainJobTrainerWrapper().NumNodes(0).Obj())
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to create TrainJob with negative trainer.numNodes",
+				func() *trainer.TrainJob {
+					return makeTrainJobWithTrainer(ns.Name, testingutil.MakeTrainJobTrainerWrapper().NumNodes(-1).Obj())
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed to create TrainJob with trainer.numProcPerNode=1",
+				func() *trainer.TrainJob {
+					return makeTrainJobWithTrainer(ns.Name, testingutil.MakeTrainJobTrainerWrapper().NumProcPerNode(1).Obj())
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create TrainJob with trainer.numProcPerNode=0",
+				func() *trainer.TrainJob {
+					return makeTrainJobWithTrainer(ns.Name, testingutil.MakeTrainJobTrainerWrapper().NumProcPerNode(0).Obj())
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to create TrainJob with negative trainer.numProcPerNode",
+				func() *trainer.TrainJob {
+					return makeTrainJobWithTrainer(ns.Name, testingutil.MakeTrainJobTrainerWrapper().NumProcPerNode(-1).Obj())
+				},
+				testingutil.BeInvalidError()),
 		)
 		ginkgo.DescribeTable("Defaulting TrainJob on creation", func(trainJob func() *trainer.TrainJob, wantTrainJob func() *trainer.TrainJob) {
 			created := trainJob()
@@ -905,3 +937,10 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 		)
 	})
 })
+
+func makeTrainJobWithTrainer(nsName string, tr *trainer.Trainer) *trainer.TrainJob {
+	return testingutil.MakeTrainJobWrapper(nsName, "trainer-numeric-markers").
+		RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+		Trainer(tr).
+		Obj()
+}
