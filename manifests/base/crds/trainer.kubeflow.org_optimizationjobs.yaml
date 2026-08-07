@@ -6504,6 +6504,11 @@ spec:
             x-kubernetes-validations:
             - message: parallelTrials cannot exceed numTrials
               rule: self.parallelTrials <= self.numTrials
+            - message: grid search requires every parameter to use a categorical search
+                space; uniform and logUniform are continuous and cannot be enumerated
+                without a step field
+              rule: '!(has(self.searchAlgorithm) && has(self.searchAlgorithm.grid))
+                || self.parameters.all(p, has(p.searchSpace.categorical))'
           status:
             properties:
               conditions:

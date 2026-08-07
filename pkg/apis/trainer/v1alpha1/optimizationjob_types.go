@@ -42,6 +42,7 @@ type Objective struct {
 
 // OptimizationJobSpec defines the desired state of OptimizationJob.
 // +kubebuilder:validation:XValidation:rule="self.parallelTrials <= self.numTrials",message="parallelTrials cannot exceed numTrials"
+// +kubebuilder:validation:XValidation:rule="!(has(self.searchAlgorithm) && has(self.searchAlgorithm.grid)) || self.parameters.all(p, has(p.searchSpace.categorical))",message="grid search requires every parameter to use a categorical search space; uniform and logUniform are continuous and cannot be enumerated without a step field"
 type OptimizationJobSpec struct {
 	// +listType=map
 	// +listMapKey=metric

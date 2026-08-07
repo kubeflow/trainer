@@ -129,4 +129,132 @@ var _ = ginkgo.Describe("OptimizationJob Webhook", ginkgo.Ordered, func() {
 				}),
 		)
 	})
+
+	ginkgo.When("Validating OptimizationJob on creation", func() {
+		// makeJob builds a minimal valid OptimizationJob and applies the given
+		// mutation so each case only expresses what it is testing.
+		makeJob := func(mutate func(*trainer.OptimizationJob)) *trainer.OptimizationJob {
+			job := &trainer.OptimizationJob{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-validation-",
+					Namespace:    ns.Name,
+				},
+				Spec: trainer.OptimizationJobSpec{
+					Objectives: []trainer.Objective{
+						{
+							Metric:    ptr.To("accuracy"),
+							Direction: ptr.To(trainer.ObjectiveDirectionMaximize),
+						},
+					},
+					Parameters: []trainer.Parameter{
+						{
+							Name: "optimizer",
+							SearchSpace: trainer.SearchSpace{
+								Categorical: &trainer.CategoricalSpace{
+									Choices: []string{"sgd", "adam"},
+								},
+							},
+						},
+					},
+					SearchAlgorithm: &trainer.SearchAlgorithm{
+						Grid: &trainer.GridAlgorithm{},
+					},
+					NumTrials:      ptr.To(int32(2)),
+					ParallelTrials: ptr.To(int32(1)),
+					TrainJobTemplate: trainer.TrainJobTemplateSpec{
+						Spec: trainer.TrainJobSpec{
+							RuntimeRef: trainer.RuntimeRef{
+								Name:     "dummy-runtime",
+								APIGroup: ptr.To(trainer.SchemeGroupVersion.Group),
+								Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
+							},
+							Trainer: &trainer.Trainer{
+								Image: ptr.To("my-training-image:latest"),
+							},
+						},
+					},
+				},
+			}
+			if mutate != nil {
+				mutate(job)
+			}
+			return job
+		}
+
+		ginkgo.DescribeTable("Validating OptimizationJob on creation", func(job func() *trainer.OptimizationJob, wantErr bool) {
+			err := k8sClient.Create(ctx, job())
+			if wantErr {
+				gomega.Expect(err).To(gomega.HaveOccurred())
+			} else {
+				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+			}
+		},
+			ginkgo.Entry("Should accept grid search over categorical parameters",
+				func() *trainer.OptimizationJob { return makeJob(nil) },
+				false),
+			ginkgo.Entry("Should reject grid search with a uniform parameter (CEL)",
+				func() *trainer.OptimizationJob {
+					return makeJob(func(j *trainer.OptimizationJob) {
+						j.Spec.Parameters[0].SearchSpace = trainer.SearchSpace{
+							Uniform: &trainer.UniformSpace{
+								Min:  "0.01",
+								Max:  "0.1",
+								Type: trainer.ParameterTypeFloat,
+							},
+						}
+					})
+				},
+				true),
+			ginkgo.Entry("Should reject grid search with an Int uniform parameter (CEL)",
+				func() *trainer.OptimizationJob {
+					return makeJob(func(j *trainer.OptimizationJob) {
+						j.Spec.Parameters[0].SearchSpace = trainer.SearchSpace{
+							Uniform: &trainer.UniformSpace{
+								Min:  "1",
+								Max:  "10",
+								Type: trainer.ParameterTypeInt,
+							},
+						}
+					})
+				},
+				true),
+			ginkgo.Entry("Should reject grid search with a logUniform parameter (CEL)",
+				func() *trainer.OptimizationJob {
+					return makeJob(func(j *trainer.OptimizationJob) {
+						j.Spec.Parameters[0].SearchSpace = trainer.SearchSpace{
+							LogUniform: &trainer.LogUniformSpace{
+								Min:  "0.001",
+								Max:  "0.1",
+								Type: trainer.ParameterTypeFloat,
+							},
+						}
+					})
+				},
+				true),
+			ginkgo.Entry("Should reject grid search when numTrials exceeds combinations (webhook)",
+				func() *trainer.OptimizationJob {
+					return makeJob(func(j *trainer.OptimizationJob) {
+						// 2 choices -> at most 2 combinations, ask for 3.
+						j.Spec.NumTrials = ptr.To(int32(3))
+					})
+				},
+				true),
+			ginkgo.Entry("Should accept random search with a continuous parameter",
+				func() *trainer.OptimizationJob {
+					return makeJob(func(j *trainer.OptimizationJob) {
+						j.Spec.SearchAlgorithm = &trainer.SearchAlgorithm{
+							Random: &trainer.RandomAlgorithm{},
+						}
+						j.Spec.Parameters[0].SearchSpace = trainer.SearchSpace{
+							Uniform: &trainer.UniformSpace{
+								Min:  "0.01",
+								Max:  "0.1",
+								Type: trainer.ParameterTypeFloat,
+							},
+						}
+					})
+				},
+				false),
+		)
+	})
 })
