@@ -59,8 +59,8 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 	})
 
 	ginkgo.When("Creating ClusterTrainingRuntime", func() {
-		ginkgo.DescribeTable("", func(runtime func() *trainer.ClusterTrainingRuntime) {
-			gomega.Expect(k8sClient.Create(ctx, runtime())).Should(gomega.Succeed())
+		ginkgo.DescribeTable("", func(runtime func() *trainer.ClusterTrainingRuntime, errorMatcher gomega.OmegaMatcher) {
+			gomega.Expect(k8sClient.Create(ctx, runtime())).Should(errorMatcher)
 		},
 			ginkgo.Entry("Should succeed to create ClusterTrainingRuntime",
 				func() *trainer.ClusterTrainingRuntime {
@@ -70,7 +70,38 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 							testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
 								Obj()).
 						Obj()
-				}),
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create ClusterTrainingRuntime with a negative coscheduling timeout",
+				func() *trainer.ClusterTrainingRuntime {
+					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							PodGroupPolicyCoschedulingSchedulingTimeout(-1).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed to create ClusterTrainingRuntime with a zero coscheduling timeout",
+				func() *trainer.ClusterTrainingRuntime {
+					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							PodGroupPolicyCoschedulingSchedulingTimeout(0).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should succeed to create ClusterTrainingRuntime with a positive coscheduling timeout",
+				func() *trainer.ClusterTrainingRuntime {
+					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							PodGroupPolicyCoschedulingSchedulingTimeout(60).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed()),
 		)
 	})
 })

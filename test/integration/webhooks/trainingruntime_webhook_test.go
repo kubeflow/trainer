@@ -240,6 +240,39 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 				},
 				testingutil.BeInvalidError(),
 			),
+			ginkgo.Entry("Should fail to create trainingRuntime with a negative coscheduling timeout",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							PodGroupPolicyCoschedulingSchedulingTimeout(-1).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError(),
+			),
+			ginkgo.Entry("Should succeed to create trainingRuntime with a zero coscheduling timeout",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							PodGroupPolicyCoschedulingSchedulingTimeout(0).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed(),
+			),
+			ginkgo.Entry("Should succeed to create trainingRuntime with a positive coscheduling timeout",
+				func() *trainer.TrainingRuntime {
+					baseRuntime := testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime")
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							PodGroupPolicyCoschedulingSchedulingTimeout(60).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed(),
+			),
 		)
 		ginkgo.DescribeTable("Defaulting TrainingRuntime on creation", func(trainingRuntime func() *trainer.TrainingRuntime, wantTrainingRuntime func() *trainer.TrainingRuntime) {
 			created := trainingRuntime()
