@@ -70,6 +70,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-trainer-kubeflow-org-v1alpha1-optimizationjob
+  failurePolicy: Fail
+  name: validator.optimizationjob.trainer.kubeflow.org
+  rules:
+  - apiGroups:
+    - trainer.kubeflow.org
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - optimizationjobs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-trainer-kubeflow-org-v1alpha1-trainingruntime
   failurePolicy: Fail
   name: validator.trainingruntime.trainer.kubeflow.org
