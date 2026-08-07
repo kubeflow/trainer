@@ -327,3 +327,135 @@ def test_download_dataset_service_already_exists():
 
         # Must not trigger cleanup of the ServiceAccount.
         mock_core_v1.delete_namespaced_service_account.assert_not_called()
+
+
+def _load_cache_initializer(config):
+    cache_initializer_instance = CacheInitializer()
+    with patch.object(utils, "get_config_from_env", return_value=config):
+        cache_initializer_instance.load_config()
+    return cache_initializer_instance
+
+
+def _mock_kubernetes_clients(mock_client, train_job_name="test-job"):
+    mock_api_client = MagicMock()
+    mock_core_v1 = MagicMock()
+    mock_custom_api = MagicMock()
+
+    mock_client.ApiClient.return_value = mock_api_client
+    mock_client.CoreV1Api.return_value = mock_core_v1
+    mock_client.CustomObjectsApi.return_value = mock_custom_api
+
+    mock_training_job = {
+        "apiVersion": "trainer.kubeflow.org/v1alpha1",
+        "kind": "TrainJob",
+        "metadata": {"name": train_job_name, "uid": "test-uid"},
+    }
+    mock_lws_ready = {
+        "status": {"conditions": [{"type": "Available", "status": "True"}]}
+    }
+    mock_custom_api.get_namespaced_custom_object.side_effect = [
+        mock_training_job,
+        mock_lws_ready,
+    ]
+
+    return mock_core_v1, mock_custom_api
+
+
+_DEFAULT_CONFIG = {
+    "storage_uri": "cache://test_schema/test_table",
+    "train_job_name": "test-job",
+    "cache_image": "test-image:latest",
+    "iam_role": "arn:aws:iam::123456789012:role/test-role",
+    "metadata_loc": "s3://test-bucket/metadata",
+}
+
+
+def test_download_dataset_train_job_get_failure_raises():
+    """TrainJob API errors must fail the initializer instead of returning."""
+    cache_initializer_instance = _load_cache_initializer(_DEFAULT_CONFIG)
+
+    with patch(
+        "pkg.initializers.dataset.cache.get_namespace", return_value="test-namespace"
+    ), patch("pkg.initializers.dataset.cache.config"), patch(
+        "pkg.initializers.dataset.cache.client"
+    ) as mock_client:
+        mock_core_v1, mock_custom_api = _mock_kubernetes_clients(mock_client)
+        mock_custom_api.get_namespaced_custom_object.side_effect = ApiException(
+            status=500, reason="Internal Server Error"
+        )
+
+        with pytest.raises(ApiException) as exc_info:
+            cache_initializer_instance.download_dataset()
+
+        assert exc_info.value.status == 500
+        mock_core_v1.create_namespaced_service_account.assert_not_called()
+        mock_core_v1.delete_namespaced_service_account.assert_not_called()
+
+
+def test_download_dataset_leader_worker_set_already_exists_is_idempotent():
+    """Pre-existing ServiceAccount and LeaderWorkerSet must not trigger cleanup."""
+    cache_initializer_instance = _load_cache_initializer(_DEFAULT_CONFIG)
+
+    with patch(
+        "pkg.initializers.dataset.cache.get_namespace", return_value="test-namespace"
+    ), patch("pkg.initializers.dataset.cache.config"), patch(
+        "pkg.initializers.dataset.cache.client"
+    ) as mock_client:
+        mock_core_v1, mock_custom_api = _mock_kubernetes_clients(mock_client)
+        mock_core_v1.create_namespaced_service_account.side_effect = ApiException(
+            status=409, reason="AlreadyExists"
+        )
+        mock_custom_api.create_namespaced_custom_object.side_effect = ApiException(
+            status=409, reason="AlreadyExists"
+        )
+
+        cache_initializer_instance.download_dataset()
+
+        mock_core_v1.delete_namespaced_service_account.assert_not_called()
+        mock_custom_api.delete_namespaced_custom_object.assert_not_called()
+
+
+def test_download_dataset_failure_cleans_up_only_created_resources():
+    """Cleanup should delete only resources created in the current invocation."""
+    cache_initializer_instance = _load_cache_initializer(_DEFAULT_CONFIG)
+
+    with patch(
+        "pkg.initializers.dataset.cache.get_namespace", return_value="test-namespace"
+    ), patch("pkg.initializers.dataset.cache.config"), patch(
+        "pkg.initializers.dataset.cache.client"
+    ) as mock_client:
+        mock_core_v1, mock_custom_api = _mock_kubernetes_clients(mock_client)
+        mock_core_v1.create_namespaced_service_account.side_effect = ApiException(
+            status=409, reason="AlreadyExists"
+        )
+        mock_custom_api.create_namespaced_custom_object.side_effect = ApiException(
+            status=500, reason="Internal Server Error"
+        )
+
+        with pytest.raises(ApiException) as exc_info:
+            cache_initializer_instance.download_dataset()
+
+        assert exc_info.value.status == 500
+        mock_core_v1.delete_namespaced_service_account.assert_not_called()
+        mock_custom_api.delete_namespaced_custom_object.assert_not_called()
+
+
+def test_download_dataset_failure_cleans_up_newly_created_service_account():
+    cache_initializer_instance = _load_cache_initializer(_DEFAULT_CONFIG)
+
+    with patch(
+        "pkg.initializers.dataset.cache.get_namespace", return_value="test-namespace"
+    ), patch("pkg.initializers.dataset.cache.config"), patch(
+        "pkg.initializers.dataset.cache.client"
+    ) as mock_client:
+        mock_core_v1, mock_custom_api = _mock_kubernetes_clients(mock_client)
+        mock_custom_api.create_namespaced_custom_object.side_effect = ApiException(
+            status=500, reason="Internal Server Error"
+        )
+
+        with pytest.raises(ApiException):
+            cache_initializer_instance.download_dataset()
+
+        mock_core_v1.delete_namespaced_service_account.assert_called_once_with(
+            name="test-job-cache", namespace="test-namespace"
+        )
