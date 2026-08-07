@@ -40,10 +40,10 @@ echo "Python root: $foundroot"
 
 # If we found the right python, ensure it's linked (old link does not work)
 if [[ -f "${pythonversion}" ]]; then
-   rm -rf $viewroot/bin/python3
-   rm -rf $viewroot/bin/python
-   ln -s ${pythonversion} $viewroot/lib/python  || true
-   ln -s ${pythonversion} $viewroot/lib/python3 || true
+  rm -rf $viewroot/bin/python3
+  rm -rf $viewroot/bin/python
+  ln -s ${pythonversion} $viewroot/lib/python || true
+  ln -s ${pythonversion} $viewroot/lib/python3 || true
 fi
 
 # Ensure we have flux's python on the path
@@ -51,7 +51,7 @@ export PYTHONPATH=${PYTHONPATH:-""}:${foundroot}/site-packages
 export FLUX_RC_EXTRA=$viewroot/etc/flux/rc1.d
 
 # Write a script to load fluxion
-cat <<EOT >> /tmp/load-fluxion.sh
+cat << EOT >> /tmp/load-fluxion.sh
 flux module remove sched-simple
 flux module load sched-fluxion-resource
 flux module load sched-fluxion-qmanager
@@ -59,7 +59,7 @@ EOT
 mv /tmp/load-fluxion.sh ${viewbase}/load-fluxion.sh
 
 # Write an easy file we can source for the environment
-cat <<EOT >> /tmp/flux-view.sh
+cat << EOT >> /tmp/flux-view.sh
 #!/bin/bash
 export PATH=$PATH
 export PYTHONPATH=$PYTHONPATH
@@ -106,8 +106,8 @@ brokerOptions="-Scron.directory=${configroot}/etc/flux/system/cron.d \
 
 # Run an interactive cluster, giving no command to flux start
 run_interactive_cluster() {
-    echo "🌀 flux broker --config-path ${cfg} ${brokerOptions}"
-    flux broker --config-path ${cfg} ${brokerOptions}
+  echo "🌀 flux broker --config-path ${cfg} ${brokerOptions}"
+  flux broker --config-path ${cfg} ${brokerOptions}
 }
 
 # Start flux with the original entrypoint
@@ -122,29 +122,28 @@ if [ "$(hostname)" = "${mainHost}" ]; then
     flags="%s  "
     echo "Flags for flux are ${flags}"
     echo "🌀 flux start  -o --config ${cfg} ${brokerOptions} flux submit ${flags} --quiet --watch ${command}"
-	flux start  -o --config ${cfg} ${brokerOptions} flux run ${flags} ${command}
+    flux start -o --config ${cfg} ${brokerOptions} flux run ${flags} ${command}
   fi
 
 # Block run by workers
 else
 
-    # We basically sleep/wait until the lead broker is ready
-    echo "🌀 flux start  -o --config ${configroot}/etc/flux/config ${brokerOptions}"
+  # We basically sleep/wait until the lead broker is ready
+  echo "🌀 flux start  -o --config ${configroot}/etc/flux/config ${brokerOptions}"
 
-    # We can keep trying forever, don't care if worker is successful or not
-    # Unless retry count is set, in which case we stop after retries
-    while true
-    do
-        flux start -o --config ${configroot}/etc/flux/config ${brokerOptions}
-        retval=$?
-        if [[ "${retval}" -eq 0 ]] || [[ "false" == "true" ]]; then
-             echo "The follower worker exited cleanly. Goodbye!"
-             break
-        fi
-        echo "Return value for follower worker is ${retval}"
-        echo "😪 Sleeping 15s to try again..."
-        sleep 15
-    done
+  # We can keep trying forever, don't care if worker is successful or not
+  # Unless retry count is set, in which case we stop after retries
+  while true; do
+    flux start -o --config ${configroot}/etc/flux/config ${brokerOptions}
+    retval=$?
+    if [[ "${retval}" -eq 0 ]] || [[ "false" == "true" ]]; then
+      echo "The follower worker exited cleanly. Goodbye!"
+      break
+    fi
+    echo "Return value for follower worker is ${retval}"
+    echo "😪 Sleeping 15s to try again..."
+    sleep 15
+  done
 fi
 
 # Marker of completion, if needed
