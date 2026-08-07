@@ -27,16 +27,28 @@ logging.basicConfig(
 )
 
 
+def _get_storage_uri() -> str:
+    storage_uri = os.environ.get(utils.STORAGE_URI_ENV)
+    if not storage_uri:
+        logging.error("STORAGE_URI env variable must be set.")
+        raise ValueError("STORAGE_URI environment variable must be set")
+    return storage_uri
+
+
+def _unsupported_scheme_error(scheme: str) -> ValueError:
+    return ValueError(
+        f"Unsupported model storage URI scheme {scheme!r}: expected one of "
+        f"{utils.HF_SCHEME!r} or {utils.S3_SCHEME!r}"
+    )
+
+
 def main():
     logging.info("Starting pre-trained model initialization")
 
-    try:
-        storage_uri = os.environ[utils.STORAGE_URI_ENV]
-    except Exception as e:
-        logging.error("STORAGE_URI env variable must be set.")
-        raise e
+    storage_uri = _get_storage_uri()
+    scheme = urlparse(storage_uri).scheme
 
-    match urlparse(storage_uri).scheme:
+    match scheme:
         # TODO (andreyvelich): Implement more model providers.
         case utils.HF_SCHEME:
             hf = HuggingFace()
@@ -48,9 +60,12 @@ def main():
             s3.download_model()
         case _:
             logging.error(
-                f"STORAGE_URI must have the valid model provider. STORAGE_URI: {storage_uri}"
+                "Unsupported model storage URI scheme %r: expected one of %r or %r",
+                scheme,
+                utils.HF_SCHEME,
+                utils.S3_SCHEME,
             )
-            raise Exception
+            raise _unsupported_scheme_error(scheme)
 
 
 if __name__ == "__main__":
