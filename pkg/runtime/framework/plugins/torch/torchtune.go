@@ -43,15 +43,21 @@ func validateTorchTune(runtimeInfo *runtime.Info, newObj *trainer.TrainJob) (adm
 		allErrs = append(allErrs, field.Invalid(runtimeRefNamePath, newObj.Spec.RuntimeRef.Name, fmt.Sprintf("must have a supported pretrained model, invalid model configured: %v", model)))
 	}
 
+	var numNodes int32 = 1
+	var trainerArgs []string
+	if newObj.Spec.Trainer != nil {
+		numNodes = ptr.Deref(newObj.Spec.Trainer.NumNodes, 1)
+		trainerArgs = newObj.Spec.Trainer.Args
+	}
+
 	numNodesRefPath := specPath.Child("trainer").Child("numNodes")
-	numNodes := ptr.Deref(newObj.Spec.Trainer.NumNodes, 1)
 	if numNodes > 1 && model != constants.TORCHTUNE_MODEL_LLAMA3_3_70B {
 		allErrs = append(allErrs, field.Invalid(numNodesRefPath, numNodes, fmt.Sprintf("must be 1 for %v model", model)))
 	}
 
 	numProcPerNodeRefPath := specPath.Child("trainer").Child("numProcPerNode")
 	numProcPerNode := intstr.FromString("auto")
-	if newObj.Spec.Trainer.NumProcPerNode != nil {
+	if newObj.Spec.Trainer != nil && newObj.Spec.Trainer.NumProcPerNode != nil {
 		numProcPerNode = intstr.FromInt32(*newObj.Spec.Trainer.NumProcPerNode)
 	}
 	resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(runtimeInfo), corev1.ResourceRequirements{})
@@ -66,17 +72,21 @@ func validateTorchTune(runtimeInfo *runtime.Info, newObj *trainer.TrainJob) (adm
 		resourcePerNodeRefPath := specPath.Child("trainer").Child("resourcesPerNode")
 		if !strings.Contains(config, constants.TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix) &&
 			(model == constants.TORCHTUNE_MODEL_LLAMA3_2_1B || model == constants.TORCHTUNE_MODEL_LLAMA3_2_3B) {
+			var resPerNode *corev1.ResourceRequirements
+			if newObj.Spec.Trainer != nil {
+				resPerNode = newObj.Spec.Trainer.ResourcesPerNode
+			}
 			allErrs = append(
 				allErrs,
 				field.Invalid(numProcPerNodeRefPath, numProcPerNode, fmt.Sprintf("must be auto or 1 for %v model when using QLoRA", model)),
-				field.Invalid(resourcePerNodeRefPath, newObj.Spec.Trainer.ResourcesPerNode, fmt.Sprintf("must have gpu resource with value 1 for %v model when using QLoRA", model)),
+				field.Invalid(resourcePerNodeRefPath, resPerNode, fmt.Sprintf("must have gpu resource with value 1 for %v model when using QLoRA", model)),
 			)
 		}
 	}
 	// LoRA fine-tuning is not supported for multi-node training in TorchTune.
 	// getRecipeAndConfig silently falls through to full_finetune_distributed when
 	// numNodes > 1, discarding LoRA args without any user-visible error.
-	if numNodes > 1 && (isLoraConfigEnabled(newObj.Spec.Trainer.Args) || isUseQLoraFinetune(newObj.Spec.Trainer.Args)) {
+	if numNodes > 1 && (isLoraConfigEnabled(trainerArgs) || isUseQLoraFinetune(trainerArgs)) {
 		allErrs = append(allErrs, field.Invalid(
 			numNodesRefPath,
 			numNodes,
@@ -89,7 +99,7 @@ func validateTorchTune(runtimeInfo *runtime.Info, newObj *trainer.TrainJob) (adm
 	// are injected by the runtime via extractOverridesFromRuntime and must not be
 	// overridden by the user.
 	trainerArgsPath := specPath.Child("trainer").Child("args")
-	for i, arg := range newObj.Spec.Trainer.Args {
+	for i, arg := range trainerArgs {
 		key := strings.SplitN(arg, "=", 2)[0]
 		if constants.TorchTuneImmutableConfigs.Has(key) {
 			allErrs = append(allErrs, field.Invalid(
@@ -108,21 +118,25 @@ func validateTorchTune(runtimeInfo *runtime.Info, newObj *trainer.TrainJob) (adm
 func getRecipeAndConfig(numNodes int32, numProcPerNode intstr.IntOrString, gpuQ int, trainJob *trainer.TrainJob) (string, string) {
 	recipe := constants.TorchTuneFullFinetuneDistributed
 	suffix := constants.TorchTuneFullFinetuneMultiDevicesConfigSuffix
+	var trainerArgs []string
+	if trainJob != nil && trainJob.Spec.Trainer != nil {
+		trainerArgs = trainJob.Spec.Trainer.Args
+	}
 	if numNodes == 1 && (numProcPerNode.Type == intstr.Int && numProcPerNode.IntVal == 1 || gpuQ == 1) {
-		if isUseQLoraFinetune(trainJob.Spec.Trainer.Args) {
+		if isUseQLoraFinetune(trainerArgs) {
 			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
 			suffix = constants.TorchTuneQLoRAFinetuneSingleDeviceConfigSuffix
-		} else if isLoraConfigEnabled(trainJob.Spec.Trainer.Args) {
+		} else if isLoraConfigEnabled(trainerArgs) {
 			recipe = constants.TorchTuneLoRAFinetuneSingleDevice
 			suffix = constants.TorchTuneLoRAFinetuneSingleDeviceConfigSuffix
 		} else {
 			recipe = constants.TorchTuneFullFinetuneSingleDevice
 			suffix = constants.TorchTuneFullFinetuneSingleDeviceConfigSuffix
 		}
-	} else if numNodes == 1 && isUseQLoraFinetune(trainJob.Spec.Trainer.Args) {
+	} else if numNodes == 1 && isUseQLoraFinetune(trainerArgs) {
 		recipe = constants.TorchTuneLoRAFinetuneDistributed
 		suffix = constants.TorchTuneQLoRAFinetuneDistributedConfigSuffix
-	} else if numNodes == 1 && isLoraConfigEnabled(trainJob.Spec.Trainer.Args) {
+	} else if numNodes == 1 && isLoraConfigEnabled(trainerArgs) {
 		recipe = constants.TorchTuneLoRAFinetuneDistributed
 		suffix = constants.TorchTuneLoRAFinetuneDistributedConfigSuffix
 	} else if numNodes > 1 {
@@ -177,6 +191,9 @@ func extractOverridesFromRuntime(info *runtime.Info) []string {
 	}
 
 	for _, rJob := range jobSetSpec.ReplicatedJobs {
+		if rJob.Template == nil || rJob.Template.Spec == nil || rJob.Template.Spec.Template == nil || rJob.Template.Spec.Template.Spec == nil {
+			continue
+		}
 		jobMetadata := rJob.Template.ObjectMetaApplyConfiguration
 		if jobMetadata == nil || jobMetadata.Labels == nil {
 			continue
