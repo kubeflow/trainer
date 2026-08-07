@@ -15,6 +15,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from kubernetes.client.rest import ApiException
 
 from pkg.initializers.dataset.__main__ import main
 
@@ -53,6 +54,14 @@ from pkg.initializers.dataset.__main__ import main
                 "expected_error": Exception,
             },
         ),
+        (
+            "Cache provider propagates Kubernetes API failures",
+            {
+                "storage_uri": "cache://test_schema/test_table",
+                "access_token": None,
+                "expected_error": ApiException,
+            },
+        ),
     ],
 )
 def test_dataset_main(test_name, test_case, mock_env_vars):
@@ -69,6 +78,7 @@ def test_dataset_main(test_name, test_case, mock_env_vars):
     # Setup mock instances
     mock_hf_instance = MagicMock()
     mock_s3_instance = MagicMock()
+    mock_cache_instance = MagicMock()
 
     with patch(
         "pkg.initializers.dataset.huggingface.HuggingFace",
@@ -76,7 +86,15 @@ def test_dataset_main(test_name, test_case, mock_env_vars):
     ) as mock_hf, patch(
         "pkg.initializers.dataset.s3.S3",
         return_value=mock_s3_instance,
-    ) as mock_s3:
+    ) as mock_s3, patch(
+        "pkg.initializers.dataset.cache.CacheInitializer",
+        return_value=mock_cache_instance,
+    ) as mock_cache:
+
+        if test_case["expected_error"] is ApiException:
+            mock_cache_instance.download_dataset.side_effect = ApiException(
+                status=500, reason="Internal Server Error"
+            )
 
         # Execute test
         if test_case["expected_error"]:
@@ -98,5 +116,11 @@ def test_dataset_main(test_name, test_case, mock_env_vars):
                 mock_s3_instance.load_config.assert_called_once()
                 mock_s3_instance.download_dataset.assert_called_once()
                 mock_s3.assert_called_once()
+            elif test_case["storage_uri"] and test_case["storage_uri"].startswith(
+                "cache://"
+            ):
+                mock_cache_instance.load_config.assert_called_once()
+                mock_cache_instance.download_dataset.assert_called_once()
+                mock_cache.assert_called_once()
 
     print("Test execution completed")

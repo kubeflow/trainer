@@ -328,28 +328,25 @@ class CacheInitializer(utils.DatasetProvider):
             # Wait for LeaderWorkerSet to become ready
             # TODO:// refactor to use watch API
             while True:
-                try:
-                    lws = custom_api.get_namespaced_custom_object(
-                        group="leaderworkerset.x-k8s.io",
-                        version="v1",
-                        plural="leaderworkersets",
-                        name=lws_body["metadata"]["name"],
-                        namespace=namespace,
+                lws = custom_api.get_namespaced_custom_object(
+                    group="leaderworkerset.x-k8s.io",
+                    version="v1",
+                    plural="leaderworkersets",
+                    name=lws_body["metadata"]["name"],
+                    namespace=namespace,
+                )
+
+                conditions = lws.get("status", {}).get("conditions", [])
+                if any(
+                    c["type"] == "Available" and c["status"] == "True"
+                    for c in conditions
+                ):
+                    logging.info(
+                        f"LeaderWorkerSet {lws_body['metadata']['name']} is ready"
                     )
+                    break
 
-                    conditions = lws.get("status", {}).get("conditions", [])
-                    if any(
-                        c["type"] == "Available" and c["status"] == "True"
-                        for c in conditions
-                    ):
-                        logging.info(
-                            f"LeaderWorkerSet {lws_body['metadata']['name']} is ready"
-                        )
-                        break
-
-                    time.sleep(5)
-                except ApiException as e:
-                    raise e
+                time.sleep(5)
 
         except ApiException as e:
             logging.error(f"Cache cluster creation failed: {e}")
