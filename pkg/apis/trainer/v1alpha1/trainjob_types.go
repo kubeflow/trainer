@@ -77,6 +77,10 @@ const (
 	// when the referenced TrainingRuntime is not supported.
 	TrainJobRuntimeNotSupportedReason string = "TrainingRuntimeNotSupported"
 
+	// TrainJobResourcesCreationFailedReason is the "Failed" condition reason
+	// when the creation of runtime resources fails.
+	TrainJobResourcesCreationFailedReason string = "ResourcesCreationFailed"
+
 	// TrainJobDeadlineExceededReason is the "Failed" condition reason
 	// when the TrainJob exceeds its ActiveDeadlineSeconds.
 	// Matches the Kubernetes Job behavior.
