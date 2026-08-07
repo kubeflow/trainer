@@ -26,6 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
@@ -383,6 +385,208 @@ func TestJAXEnforceMLPolicy(t *testing.T) {
 				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected RuntimeInfo (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestJAXValidate(t *testing.T) {
+	cases := map[string]struct {
+		runtimeInfo *runtime.Info
+		trainJob    *trainer.TrainJob
+		wantErrs    field.ErrorList
+	}{
+		"no action when info is nil": {
+			runtimeInfo: nil,
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+		},
+		"no action when mlPolicySource is nil": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().Obj(),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+		},
+		"no action when JAX policy is nil": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().Obj()).
+						Obj(),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+		},
+		"no action when trainer is nil": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							JAXPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
+			trainJob: &trainer.TrainJob{},
+		},
+		"pass when no envs configured": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							JAXPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Obj(),
+		},
+		"pass when non reserved envs configured": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							JAXPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						Env(
+							[]corev1.EnvVar{
+								{Name: "USER_ENV", Value: "123"},
+							}...,
+						).
+						Obj(),
+				).
+				Obj(),
+		},
+		"reject when reserved envs configured": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							JAXPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						Env(
+							[]corev1.EnvVar{
+								{Name: "JAX_NUM_PROCESSES", Value: "2"},
+							}...,
+						).
+						Obj(),
+				).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec", "trainer", "env"),
+					[]corev1.EnvVar{
+						{Name: "JAX_NUM_PROCESSES", Value: "2"},
+					},
+					fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(sets.New[string](constants.JAXEnvNumProcesses))),
+				),
+			},
+		},
+		"reject when all reserved envs configured": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							JAXPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						Env(
+							[]corev1.EnvVar{
+								{Name: "JAX_NUM_PROCESSES", Value: "4"},
+								{Name: "JAX_PROCESS_ID", Value: "0"},
+								{Name: "JAX_COORDINATOR_ADDRESS", Value: "coord:29500"},
+							}...,
+						).
+						Obj(),
+				).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec", "trainer", "env"),
+					[]corev1.EnvVar{
+						{Name: "JAX_NUM_PROCESSES", Value: "4"},
+						{Name: "JAX_PROCESS_ID", Value: "0"},
+						{Name: "JAX_COORDINATOR_ADDRESS", Value: "coord:29500"},
+					},
+					fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(sets.New[string](constants.JAXEnvNumProcesses, constants.JAXEnvProcessID, constants.JAXEnvCoordinatorAddress))),
+				),
+			},
+		},
+		"reject mixed reserved and non reserved envs": {
+			runtimeInfo: runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							JAXPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+			),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						Env(
+							[]corev1.EnvVar{
+								{Name: "JAX_NUM_PROCESSES", Value: "2"},
+								{Name: "MY_VAR", Value: "foo"},
+							}...,
+						).
+						Obj(),
+				).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec", "trainer", "env"),
+					[]corev1.EnvVar{
+						{Name: "JAX_NUM_PROCESSES", Value: "2"},
+						{Name: "MY_VAR", Value: "foo"},
+					},
+					fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(sets.New[string](constants.JAXEnvNumProcesses))),
+				),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cliBuilder := utiltesting.NewClientBuilder()
+			p, err := New(ctx, cliBuilder.Build(), nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to create JAX plugin: %v", err)
+			}
+
+			_, errs := p.(framework.CustomValidationPlugin).Validate(ctx, tc.runtimeInfo, nil, tc.trainJob)
+			if diff := cmp.Diff(tc.wantErrs, errs); len(diff) != 0 {
+				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}
 		})
 	}
