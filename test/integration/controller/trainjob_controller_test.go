@@ -730,6 +730,26 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 						},
 					}))
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Deleting the failed JobSet")
+				gomega.Expect(k8sClient.Delete(ctx, &jobsetv1alpha2.JobSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: trainJobKey.Namespace,
+						Name:      trainJobKey.Name,
+					},
+				})).Should(gomega.Succeed())
+
+				ginkgo.By("Checking that the JobSet stays deleted and the TrainJob remains failed")
+				gomega.Consistently(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, trainJobKey, &jobsetv1alpha2.JobSet{})).Should(testingutil.BeNotFoundError())
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					g.Expect(gotTrainJob.Status.Conditions).Should(gomega.ContainElement(gomega.And(
+						gomega.HaveField("Type", trainer.TrainJobFailed),
+						gomega.HaveField("Status", metav1.ConditionTrue),
+						gomega.HaveField("Reason", jobsetconsts.FailedJobsReason),
+					)))
+				}, util.ConsistentDuration, util.Interval).Should(gomega.Succeed())
 			})
 
 			ginkgo.It("Should synchronize JobsStatus from JobSet ReplicatedJobsStatus", func() {
