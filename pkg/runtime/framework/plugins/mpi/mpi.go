@@ -49,8 +49,6 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 )
 
-// TODO : Support MPICH and IntelMPI implementations.
-
 type MPI struct {
 	client client.Client
 	scheme *apiruntime.Scheme
@@ -92,11 +90,12 @@ func (m *MPI) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobOb
 			allErrs = append(allErrs, field.Invalid(numNodesPath, newJobObj.Spec.Trainer.NumNodes, "must have 1 when MPI trainingRuntime with enabled runLauncherAsNode does not have either launcher and node"))
 		}
 	}
-	// Check reserved MPI envs.
+	// Check reserved MPI envs based on the configured implementation.
 	if trainJobTrainer := newJobObj.Spec.Trainer; trainJobTrainer != nil {
+		reservedEnvs := reservedEnvNamesForImplementation(runtimeInfo.RuntimePolicy.MLPolicySource.MPI.MPIImplementation)
 		mpiEnvs := sets.New[string]()
 		for _, env := range trainJobTrainer.Env {
-			if constants.MPIReservedEnvNames.Has(env.Name) {
+			if reservedEnvs.Has(env.Name) {
 				mpiEnvs.Insert(env.Name)
 			}
 		}
@@ -222,6 +221,26 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 							WithName(constants.OpenMPIEnvKeyRSHArgs).
 							WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 					)
+				case trainer.MPIImplementationIntel:
+					apply.UpsertEnvVars(
+						&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Env,
+						*corev1ac.EnvVar().
+							WithName(constants.IntelMPIEnvHostFile).
+							WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+						*corev1ac.EnvVar().
+							WithName(constants.IntelMPIEnvBootstrapExecExtraArgs).
+							WithValue(constants.IntelMPIEnvDefaultValueBootstrapExecExtraArgs),
+					)
+				case trainer.MPIImplementationMPICH:
+					apply.UpsertEnvVars(
+						&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Env,
+						*corev1ac.EnvVar().
+							WithName(constants.MPICHEnvHostFile).
+							WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+						*corev1ac.EnvVar().
+							WithName(constants.MPICHEnvLauncherExtraArgs).
+							WithValue(constants.MPICHEnvDefaultValueLauncherExtraArgs),
+					)
 				default:
 					return fmt.Errorf("MPI implementation for %v doesn't supported", info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation)
 				}
@@ -326,6 +345,10 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 			for e := range ps.Endpoints {
 				fmt.Fprintf(&hostFile, "%s slots=%d\n", e, slots)
 			}
+		case trainer.MPIImplementationIntel, trainer.MPIImplementationMPICH:
+			for e := range ps.Endpoints {
+				fmt.Fprintf(&hostFile, "%s:%d\n", e, slots)
+			}
 		}
 	}
 	return corev1ac.ConfigMap(fmt.Sprintf("%s%s", trainJob.Name, constants.MPIHostfileConfigMapSuffix), trainJob.Namespace).
@@ -343,4 +366,18 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 
 func isNode(runLauncherAsNode bool, ps runtime.PodSet) bool {
 	return (runLauncherAsNode && ps.Name == constants.Launcher) || ps.Name == constants.Node
+}
+
+func reservedEnvNamesForImplementation(impl *trainer.MPIImplementation) sets.Set[string] {
+	if impl == nil {
+		return constants.OpenMPIReservedEnvNames
+	}
+	switch *impl {
+	case trainer.MPIImplementationIntel:
+		return constants.IntelMPIReservedEnvNames
+	case trainer.MPIImplementationMPICH:
+		return constants.MPICHReservedEnvNames
+	default:
+		return constants.OpenMPIReservedEnvNames
+	}
 }
