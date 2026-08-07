@@ -41,7 +41,7 @@ class TrainerV1alpha1Objective(BaseModel):
     TrainerV1alpha1Objective
     """ # noqa: E501
     direction: Optional[StrictStr] = Field(default=None, description="direction specifies the optimization goal. Defaults to \"Minimize\".")
-    metric: StrictStr = Field(description="metric specifies the name of the objective metric to track. Defaults to \"loss\".")
+    metric: StrictStr = Field(description="metric specifies the name of the objective metric to track.")
     __properties: ClassVar[List[str]] = ["direction", "metric"]
 
     model_config = ConfigDict(

@@ -14409,7 +14409,7 @@
             "type": "string"
           },
           "metric": {
-            "description": "metric specifies the name of the objective metric to track. Defaults to \"loss\".",
+            "description": "metric specifies the name of the objective metric to track.",
             "type": "string"
           }
         }

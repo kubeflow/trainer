@@ -66,7 +66,7 @@ type OptimizationJobList struct {
 // OptimizationJobSpec defines the desired state of OptimizationJob.
 // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="OptimizationJobSpec is immutable and cannot be updated after creation"
 // +kubebuilder:validation:XValidation:rule="self.parallelTrials <= self.numTrials",message="parallelTrials cannot exceed numTrials"
-// +kubebuilder:validation:XValidation:rule="!has(self.searchAlgorithm.grid) || self.parameters.all(p, has(p.categorical))",message="Grid search requires all parameters to be Categorical; Uniform and LogUniform are not supported."
+// +kubebuilder:validation:XValidation:rule="!has(self.searchAlgorithm.grid) || self.parameters.all(p, has(p.searchSpace.categorical))",message="Grid search requires all parameters to be Categorical; Uniform and LogUniform are not supported."
 type OptimizationJobSpec struct {
 	// objectives is the list of objectives to optimize.
 	// +listType=map

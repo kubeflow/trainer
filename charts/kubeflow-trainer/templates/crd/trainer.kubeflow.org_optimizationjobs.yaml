@@ -72,7 +72,7 @@ spec:
                       type: string
                     metric:
                       description: metric specifies the name of the objective metric
-                        to track. Defaults to "loss".
+                        to track.
                       maxLength: 64
                       minLength: 1
                       type: string
@@ -6236,7 +6236,7 @@ spec:
               rule: self.parallelTrials <= self.numTrials
             - message: Grid search requires all parameters to be Categorical; Uniform
                 and LogUniform are not supported.
-              rule: '!has(self.searchAlgorithm.grid) || self.parameters.all(p, has(p.categorical))'
+              rule: '!has(self.searchAlgorithm.grid) || self.parameters.all(p, has(p.searchSpace.categorical))'
           status:
             description: status is the status for the optimization job.
             properties:

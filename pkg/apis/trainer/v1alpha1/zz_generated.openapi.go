@@ -1335,7 +1335,7 @@ func schema_pkg_apis_trainer_v1alpha1_Objective(ref common.ReferenceCallback) co
 				Properties: map[string]spec.Schema{
 					"metric": {
 						SchemaProps: spec.SchemaProps{
-							Description: "metric specifies the name of the objective metric to track. Defaults to \"loss\".",
+							Description: "metric specifies the name of the objective metric to track.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
