@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -20,83 +21,131 @@ from pkg.initializers.dataset.__main__ import main
 
 
 @pytest.mark.parametrize(
-    "test_name, test_case",
+    "test_case",
     [
-        (
-            "Successful download with HuggingFace provider",
+        pytest.param(
             {
                 "storage_uri": "hf://dataset/path",
-                "access_token": "test_token",
+                "expected_provider": "hf",
                 "expected_error": None,
+                "expected_error_match": None,
             },
+            id="huggingface-provider",
         ),
-        (
-            "Successful download with S3 provider",
+        pytest.param(
+            {
+                "storage_uri": "cache://schema/table",
+                "expected_provider": "cache",
+                "expected_error": None,
+                "expected_error_match": None,
+            },
+            id="cache-provider",
+        ),
+        pytest.param(
             {
                 "storage_uri": "s3://dataset/path",
+                "expected_provider": "s3",
                 "expected_error": None,
+                "expected_error_match": None,
             },
+            id="s3-provider",
         ),
-        (
-            "Missing storage URI environment variable",
+        pytest.param(
             {
                 "storage_uri": None,
-                "access_token": None,
-                "expected_error": Exception,
+                "expected_provider": None,
+                "expected_error": ValueError,
+                "expected_error_match": (
+                    "STORAGE_URI environment variable must be set"
+                ),
             },
+            id="missing-storage-uri",
         ),
-        (
-            "Invalid storage URI scheme",
+        pytest.param(
+            {
+                "storage_uri": "",
+                "expected_provider": None,
+                "expected_error": ValueError,
+                "expected_error_match": (
+                    "STORAGE_URI environment variable must be set"
+                ),
+            },
+            id="empty-storage-uri",
+        ),
+        pytest.param(
             {
                 "storage_uri": "invalid://dataset/path",
-                "access_token": None,
-                "expected_error": Exception,
+                "expected_provider": None,
+                "expected_error": ValueError,
+                "expected_error_match": (
+                    "Unsupported dataset storage URI scheme 'invalid'"
+                ),
             },
+            id="unsupported-provider",
         ),
     ],
 )
-def test_dataset_main(test_name, test_case, mock_env_vars):
-    """Test main script with different scenarios"""
-    print(f"Running test: {test_name}")
+def test_dataset_main(test_case, mock_env_vars):
+    """Test dataset provider dispatch and invalid storage URI handling."""
+    mock_env_vars(STORAGE_URI=test_case["storage_uri"])
 
-    # Setup mock environment variables
-    env_vars = {
-        "STORAGE_URI": test_case["storage_uri"],
-        "ACCESS_TOKEN": test_case.get("access_token", None),
-    }
-    mock_env_vars(**env_vars)
-
-    # Setup mock instances
     mock_hf_instance = MagicMock()
+    mock_cache_instance = MagicMock()
     mock_s3_instance = MagicMock()
 
-    with patch(
-        "pkg.initializers.dataset.huggingface.HuggingFace",
-        return_value=mock_hf_instance,
-    ) as mock_hf, patch(
-        "pkg.initializers.dataset.s3.S3",
-        return_value=mock_s3_instance,
-    ) as mock_s3:
+    mock_hf = MagicMock(return_value=mock_hf_instance)
+    mock_cache = MagicMock(return_value=mock_cache_instance)
+    mock_s3 = MagicMock(return_value=mock_s3_instance)
 
-        # Execute test
-        if test_case["expected_error"]:
-            with pytest.raises(test_case["expected_error"]):
+    mock_provider_modules = {
+        "pkg.initializers.dataset.huggingface": MagicMock(
+            HuggingFace=mock_hf,
+        ),
+        "pkg.initializers.dataset.cache": MagicMock(
+            CacheInitializer=mock_cache,
+        ),
+        "pkg.initializers.dataset.s3": MagicMock(
+            S3=mock_s3,
+        ),
+    }
+
+    provider_mocks = {
+        "hf": (mock_hf, mock_hf_instance),
+        "cache": (mock_cache, mock_cache_instance),
+        "s3": (mock_s3, mock_s3_instance),
+    }
+
+    with patch.dict(sys.modules, mock_provider_modules):
+        if test_case["expected_error"] is not None:
+            with pytest.raises(
+                test_case["expected_error"],
+                match=test_case["expected_error_match"],
+            ):
                 main()
-        else:
-            main()
 
-            # Verify appropriate provider instance methods were called
-            if test_case["storage_uri"] and test_case["storage_uri"].startswith(
-                "hf://"
-            ):
-                mock_hf_instance.load_config.assert_called_once()
-                mock_hf_instance.download_dataset.assert_called_once()
-                mock_hf.assert_called_once()
-            elif test_case["storage_uri"] and test_case["storage_uri"].startswith(
-                "s3://"
-            ):
-                mock_s3_instance.load_config.assert_called_once()
-                mock_s3_instance.download_dataset.assert_called_once()
-                mock_s3.assert_called_once()
+            for provider_constructor, provider_instance in provider_mocks.values():
+                provider_constructor.assert_not_called()
+                provider_instance.load_config.assert_not_called()
+                provider_instance.download_dataset.assert_not_called()
 
-    print("Test execution completed")
+            return
+
+        main()
+
+        expected_provider = test_case["expected_provider"]
+        expected_constructor, expected_instance = provider_mocks[expected_provider]
+
+        expected_constructor.assert_called_once_with()
+        expected_instance.load_config.assert_called_once_with()
+        expected_instance.download_dataset.assert_called_once_with()
+
+        for provider_name, (
+            provider_constructor,
+            provider_instance,
+        ) in provider_mocks.items():
+            if provider_name == expected_provider:
+                continue
+
+            provider_constructor.assert_not_called()
+            provider_instance.load_config.assert_not_called()
+            provider_instance.download_dataset.assert_not_called()
