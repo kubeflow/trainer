@@ -45,7 +45,7 @@ const (
 // Entries are separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	TrainJobStatus: {Default: false, PreRelease: featuregate.Alpha},
+	TrainJobStatus: {Default: true, PreRelease: featuregate.GA},
 }
 
 func SetFeatureGateDuringTest(tb testing.TB, f featuregate.Feature, value bool) {
