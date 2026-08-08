@@ -157,6 +157,7 @@ type CoschedulingPodGroupPolicySource struct {
 	// If the scheduling timeout is equal to 0, the default value is used.
 	// Defaults to 60 seconds.
 	// +kubebuilder:default=60
+	// +kubebuilder:validation:XValidation:rule="self >= 0",message="scheduleTimeoutSeconds must be greater than or equal to 0"
 	// +optional
 	ScheduleTimeoutSeconds *int32 `json:"scheduleTimeoutSeconds,omitempty"`
 }
