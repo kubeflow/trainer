@@ -43,6 +43,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(GroupVersion,
 		&TrainJob{},
 		&TrainJobList{},
+		&OptimizationJob{},
+		&OptimizationJobList{},
 		&ClusterTrainingRuntime{},
 		&ClusterTrainingRuntimeList{},
 		&TrainingRuntime{},
