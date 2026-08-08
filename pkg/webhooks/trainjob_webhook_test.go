@@ -403,3 +403,64 @@ func TestValidateCreate(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateUpdate(t *testing.T) {
+	cases := map[string]struct {
+		oldObj                 *trainer.TrainJob
+		newObj                 *trainer.TrainJob
+		clusterTrainingRuntime *trainer.ClusterTrainingRuntime
+		wantError              field.ErrorList
+		wantWarnings           admission.Warnings
+	}{
+		"RuntimeRef modified: forbidden error": {
+			oldObj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Obj(),
+			newObj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "other-runtime").
+				Obj(),
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("other-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				field.Forbidden(field.NewPath("spec").Child("runtimeRef"), "runtimeRef is immutable"),
+			},
+			wantWarnings: nil,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			clientBuilder := testingutil.NewClientBuilder()
+			if tc.clusterTrainingRuntime != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.clusterTrainingRuntime)
+			}
+
+			runtimes, err := runtimecore.New(context.Background(), clientBuilder.Build(), testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			validator := &TrainJobValidator{
+				runtimes: runtimes,
+			}
+
+			warnings, err := validator.ValidateUpdate(ctx, tc.oldObj, tc.newObj)
+			if diff := cmp.Diff(tc.wantWarnings, warnings); len(diff) != 0 {
+				t.Errorf("Unexpected warnings from ValidateUpdate (-want, +got): %s", diff)
+			}
+			if diff := cmp.Diff(tc.wantError.ToAggregate(), err, cmpopts.IgnoreFields(field.Error{}, "Detail")); len(diff) != 0 {
+				t.Errorf("Unexpected error from ValidateUpdate (-want, +got): %s", diff)
+			}
+		})
+	}
+}

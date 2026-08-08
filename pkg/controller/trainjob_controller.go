@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -252,10 +253,10 @@ func removeFailedCondition(trainJob *trainer.TrainJob) {
 }
 
 func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
-	deadlineCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
-	if deadlineCond != nil && deadlineCond.Reason != trainer.TrainJobDeadlineExceededReason {
-		deadlineCond = nil
+	if runtime == nil {
+		return nil
 	}
+	existingConds := slices.Clone(trainJob.Status.Conditions)
 
 	status, err := runtime.TrainJobStatus(ctx, trainJob)
 	if err != nil {
@@ -264,8 +265,8 @@ func setTrainJobStatus(ctx context.Context, runtime jobruntimes.Runtime, trainJo
 	if status != nil {
 		trainJob.Status = *status
 	}
-	if deadlineCond != nil {
-		meta.SetStatusCondition(&trainJob.Status.Conditions, *deadlineCond)
+	for _, cond := range existingConds {
+		meta.SetStatusCondition(&trainJob.Status.Conditions, cond)
 	}
 	return nil
 }

@@ -2757,3 +2757,40 @@ func TestSyncParallelCount(t *testing.T) {
 		})
 	}
 }
+
+func TestJobSet_Validate(t *testing.T) {
+	cases := map[string]struct {
+		info     *runtime.Info
+		oldJob   *trainer.TrainJob
+		newJob   *trainer.TrainJob
+		wantErrs field.ErrorList
+	}{
+		"nil template spec in replicated job does not panic": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().WithName("node"),
+						),
+				},
+			},
+			oldJob:   utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainjob").Obj(),
+			newJob:   utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainjob").Obj(),
+			wantErrs: nil,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cli := utiltesting.NewClientBuilder().Build()
+			p, err := New(ctx, cli, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+			_, errs := p.(framework.CustomValidationPlugin).Validate(ctx, tc.info, tc.oldJob, tc.newJob)
+			if diff := cmp.Diff(tc.wantErrs, errs); len(diff) != 0 {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
