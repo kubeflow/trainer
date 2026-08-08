@@ -118,7 +118,7 @@ func TestNew(t *testing.T) {
 					&jobset.JobSet{},
 					&mpi.MPI{},
 				},
-				podNetworkPlugins: []framework.PodNetworkPlugin{
+				enforceInfrastructurePlugins: []framework.EnforceInfrastructurePlugin{
 					&jobset.JobSet{},
 				},
 				componentBuilderPlugins: []framework.ComponentBuilderPlugin{
@@ -2566,7 +2566,7 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 	}
 }
 
-func TestPodNetworkPlugins(t *testing.T) {
+func TestEnforceInfrastructurePlugins(t *testing.T) {
 	cases := map[string]struct {
 		registry        fwkplugins.Registry
 		runtimeInfo     *runtime.Info
@@ -2666,7 +2666,7 @@ func TestPodNetworkPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = fwk.RunPodNetworkPlugins(tc.runtimeInfo, tc.trainJob)
+			err = fwk.RunEnforceInfrastructurePlugins(tc.runtimeInfo, tc.trainJob)
 			if diff := cmp.Diff(tc.wantError, err); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}

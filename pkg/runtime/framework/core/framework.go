@@ -40,9 +40,9 @@ type Framework struct {
 	plugins                      map[string]framework.Plugin
 	enforceMLPlugins             []framework.EnforceMLPolicyPlugin
 	enforcePodGroupPolicyPlugins []framework.EnforcePodGroupPolicyPlugin
+	enforceInfrastructurePlugins []framework.EnforceInfrastructurePlugin
 	customValidationPlugins      []framework.CustomValidationPlugin
 	watchExtensionPlugins        []framework.WatchExtensionPlugin
-	podNetworkPlugins            []framework.PodNetworkPlugin
 	componentBuilderPlugins      []framework.ComponentBuilderPlugin
 	trainJobStatusPlugin         framework.TrainJobStatusPlugin
 }
@@ -68,14 +68,14 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 		if p, ok := plugin.(framework.EnforcePodGroupPolicyPlugin); ok {
 			f.enforcePodGroupPolicyPlugins = append(f.enforcePodGroupPolicyPlugins, p)
 		}
+		if p, ok := plugin.(framework.EnforceInfrastructurePlugin); ok {
+			f.enforceInfrastructurePlugins = append(f.enforceInfrastructurePlugins, p)
+		}
 		if p, ok := plugin.(framework.CustomValidationPlugin); ok {
 			f.customValidationPlugins = append(f.customValidationPlugins, p)
 		}
 		if p, ok := plugin.(framework.WatchExtensionPlugin); ok {
 			f.watchExtensionPlugins = append(f.watchExtensionPlugins, p)
-		}
-		if p, ok := plugin.(framework.PodNetworkPlugin); ok {
-			f.podNetworkPlugins = append(f.podNetworkPlugins, p)
 		}
 		if p, ok := plugin.(framework.ComponentBuilderPlugin); ok {
 			f.componentBuilderPlugins = append(f.componentBuilderPlugins, p)
@@ -91,6 +91,7 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 	return f, nil
 }
 
+// RunEnforceMLPolicyPlugins runs all plugins that implement EnforceMLPolicyPlugin.
 func (f *Framework) RunEnforceMLPolicyPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	for _, plugin := range f.enforceMLPlugins {
 		if err := plugin.EnforceMLPolicy(info, trainJob); err != nil {
@@ -100,9 +101,22 @@ func (f *Framework) RunEnforceMLPolicyPlugins(info *runtime.Info, trainJob *trai
 	return nil
 }
 
+// RunEnforcePodGroupPolicyPlugins runs all plugins that implement EnforcePodGroupPolicyPlugin.
 func (f *Framework) RunEnforcePodGroupPolicyPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	for _, plugin := range f.enforcePodGroupPolicyPlugins {
 		if err := plugin.EnforcePodGroupPolicy(info, trainJob); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RunEnforceInfrastructurePlugins runs all plugins that implement
+// EnforceInfrastructurePlugin. It runs after the ML policy and PodGroup policy
+// phases, which implementations may rely on.
+func (f *Framework) RunEnforceInfrastructurePlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
+	for _, plugin := range f.enforceInfrastructurePlugins {
+		if err := plugin.EnforceInfrastructure(info, trainJob); err != nil {
 			return err
 		}
 	}
@@ -124,15 +138,8 @@ func (f *Framework) RunCustomValidationPlugins(ctx context.Context, info *runtim
 	return aggregatedWarnings, aggregatedErrors
 }
 
-func (f *Framework) RunPodNetworkPlugins(info *runtime.Info, trainJob *trainer.TrainJob) error {
-	for _, plugin := range f.podNetworkPlugins {
-		if err := plugin.IdentifyPodNetwork(info, trainJob); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
+// RunComponentBuilderPlugins runs all plugins that implement ComponentBuilderPlugin
+// and aggregates the Kubernetes resources they build.
 func (f *Framework) RunComponentBuilderPlugins(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
 	for _, plugin := range f.componentBuilderPlugins {
 		if err := plugin.SyncParallelCount(info); err != nil {
