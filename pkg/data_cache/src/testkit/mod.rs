@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod config;
-pub mod head;
-pub mod health;
-#[cfg(any(test, feature = "local-fixtures"))]
-pub mod testkit;
-pub mod worker;
+//! Test helpers for validating the data cache without an object store.
+//!
+//! This module is compiled only for test builds and for builds that explicitly
+//! enable the `local-fixtures` feature. It is never part of the `head` or
+//! `worker` binaries shipped in the container image.
+
+pub mod local_table;
