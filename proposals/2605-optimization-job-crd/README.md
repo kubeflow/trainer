@@ -14,8 +14,9 @@
 6. [Sample YAML (Phase 1)](#6-sample-yaml-phase-1)
 7. [Reconciliation & Architecture (Phase 1)](#7-reconciliation--architecture-phase-1)
 8. [Open Discussions](#8-open-discussions)
-9. [Implementation History](#9-implementation-history)
-10. [Alternatives](#10-alternatives)
+9. [Phase 2: Kubeflow SDK Integration](#9-phase-2-kubeflow-sdk-integration)
+10. [Implementation History](#10-implementation-history)
+11. [Alternatives](#11-alternatives)
 
 ---
 
@@ -474,16 +475,175 @@ Metric reporting from the `TrainJob` is strictly asynchronous and relies entirel
 
 Pruning decisions are computed controller-side based on this monotonic metric history. A "Stop Signal" is then propagated to the training runtime as a non-blocking annotation or status field, which the Kubeflow SDK periodically polls. Synchronous "kill" calls during metric reporting create tight coupling and latency bottlenecks; by separating reporting from termination, we ensure the controller remains performant under heavy trial loads.
 
-## Implementation History
+## 9. Phase 2: Kubeflow SDK Integration
+
+This section defines the Python SDK (https://github.com/kubeflow/sdk) client APIs for the
+`OptimizationJob` CRD. It replaces the "[Separate KEP for this integration]" placeholder from
+Story 4 and follows the direction agreed on the Kubeflow SDK & ML Experience call (2026-07-29):
+
+- **Keep the single `TrainerClient()`.** Data scientists should not switch between disparate
+  clients to train and to tune. Training and hyperparameter optimization are parts of the same
+  workflow.
+- **APIs must be easy to understand from the ML Engineer's point of view.** The same
+  `TrainJobTemplate` used for training is reused for optimization, and hyperparameter
+  consumption inside the training function requires no YAML or CLI argument changes.
+
+### 9.1. User-Facing API: `TrainerClient().optimize()`
+
+The `optimize()` method is added to the existing `TrainerClient`, alongside `train()`. It
+accepts the same trial template concepts that `train()` already uses, plus the optimization
+configuration types that exist in the SDK today (`kubeflow.optimizer.types`):
+
+```python
+from kubeflow.optimizer import Objective, RandomSearch, Search, TrialConfig
+from kubeflow.trainer import CustomTrainer, TrainerClient, TrainJobTemplate
+
+
+def train_fn():
+    from kubeflow.trainer import get_hyperparameters
+
+    hps = get_hyperparameters()  # {"learning_rate": 0.0021, "batch_size": "32"}
+    ...
+
+
+client = TrainerClient()
+
+job_name = client.optimize(
+    trial_template=TrainJobTemplate(
+        trainer=CustomTrainer(func=train_fn),
+        runtime="torch-distributed",
+    ),
+    search_space={
+        "learning_rate": Search.loguniform(0.0001, 0.1),
+        "batch_size": Search.choice([16, 32, 64]),
+    },
+    objectives=[Objective(metric="val_loss", direction="minimize")],
+    trial_config=TrialConfig(num_trials=20, parallel_trials=4),
+    algorithm=RandomSearch(random_state=42),
+)
+
+client.wait_for_optimization_job_status(job_name)
+best = client.get_best_results(job_name)  # Result(parameters={...}, metrics=[...])
+```
+
+`optimize()` builds an `OptimizationJob` custom resource (group `trainer.kubeflow.org`,
+version `v1alpha1`) and submits it via the Kubernetes API. The `trainJobTemplate` in the spec
+is produced by the exact same internal spec builder that `train()` uses, so runtimes,
+initializers, and custom trainers behave identically for training and for trials.
+
+Lifecycle methods added to `TrainerClient`, mirroring the existing TrainJob methods:
+
+| Method | Behavior |
+| --- | --- |
+| `optimize(...) -> str` | Create the OptimizationJob, return its generated name. |
+| `get_optimization_job(name)` | Read the CR, map `status.conditions` to `Created`/`Complete`/`Failed`. |
+| `list_optimization_jobs()` | List OptimizationJobs in the namespace. |
+| `wait_for_optimization_job_status(name, status={...}, timeout, polling_interval, callbacks)` | Poll until a desired status; raise on unexpected `Failed`. |
+| `get_best_results(name)` | Read `status.result` (trainJobName + parameter assignments). |
+| `get_optimization_job_logs(name, trial_name=None, follow=False)` | Delegate to TrainJob log streaming; defaults to the best trial. |
+| `get_optimization_job_events(name)` | Kubernetes events for the OptimizationJob and its TrainJobs. |
+| `delete_optimization_job(name)` | Delete the CR. |
+
+Because trials are plain `TrainJob` resources, every trial is also individually accessible
+through the existing `get_job()`, `get_job_logs()`, and `get_job_events()` APIs — no
+Trial-specific SDK surface is needed.
+
+### 9.2. In-Trial Helper: `get_hyperparameters()`
+
+Per Section 8.2, the controller injects suggestions as `KUBEFLOW_TRAINER_OPT_<PARAM_NAME>`
+environment variables. The SDK provides the helper promised there:
+
+```python
+def get_hyperparameters() -> dict[str, int | float | str]:
+    """Read hyperparameter suggestions injected by the OptimizationJob controller."""
+```
+
+- Scans the environment for the `KUBEFLOW_TRAINER_OPT_` prefix and strips it, lower-casing
+  the remaining key back to the parameter name.
+- Values from `uniform`/`logUniform` spaces are coerced with the CRD `type`
+  (`Int` -> `int`, `Float` -> `float`); `categorical` choices remain strings.
+- Returns an empty dict when running outside an optimization trial, so the same training
+  function works unchanged under `train()`.
+
+### 9.3. SDK-to-CRD Type Mapping
+
+The SDK reuses the existing search-space and algorithm types from KEP-46 so users don't
+learn a second vocabulary. Numeric bounds are serialized as strings to satisfy the CRD
+`Double` pattern:
+
+| SDK (today) | OptimizationJob CRD |
+| --- | --- |
+| `Search.uniform(min, max)` | `searchSpace.uniform {min: "...", max: "...", type: Float}` |
+| `Search.loguniform(min, max)` | `searchSpace.logUniform {min: "...", max: "...", type: Float}` |
+| `Search.choice([...])` | `searchSpace.categorical {choices: [...]}` (values stringified) |
+| `Objective(metric, direction="minimize")` | `objectives[0] {metric, direction: Minimize}` |
+| `RandomSearch(random_state=N)` | `searchAlgorithm.random {seed: N}` |
+| `GridSearch()` | `searchAlgorithm.grid {}` |
+| `TrialConfig(num_trials, parallel_trials)` | `numTrials`, `parallelTrials` |
+
+Constraints surfaced client-side as `ValueError` before submission, matching CRD validation:
+exactly one objective (multi-objective is a Phase 2/3 CRD goal), and
+`TrialConfig.max_failed_trials` is rejected until a `TrialPolicy` exists in the CRD.
+
+### 9.4. Results and Trial History
+
+Phase 1 status exposes only `status.result` (best trial name + parameter assignments), so
+`get_best_results()` returns those parameters, and metrics/trial listings are limited until
+[KEP-3744](https://github.com/kubeflow/trainer/pull/3856) stores trial history natively in
+the OptimizationJob status. Once KEP-3744 lands, `get_optimization_job(name).trials` and the
+metrics in `Result` are populated from status without additional API calls.
+
+### 9.5. Migration from the Katib-Backed OptimizerClient
+
+The existing `OptimizerClient` (KEP-46) maps the same Python types onto Katib `Experiment`
+CRs. Transition plan:
+
+1. **Introduce** `TrainerClient().optimize()` targeting `OptimizationJob` (this section).
+   The Katib-backed `OptimizerClient` remains untouched and fully supported.
+2. **Deprecate** `OptimizerClient` with a warning once the OptimizationJob controller is
+   released and feature parity for Random/Grid search is verified.
+3. **Remove** the Katib backend in a future SDK major/minor release, per the standard
+   Kubeflow deprecation policy.
+
+Because both paths share the `Search`/`Objective`/`TrialConfig` types, user migration is
+limited to swapping `OptimizerClient().optimize(...)` for `TrainerClient().optimize(...)`.
+
+### 9.6. Implementation Notes & Open Questions
+
+- A working prototype of the CR construction, status mapping, and unit-test approach exists
+  in [kubeflow/sdk#726](https://github.com/kubeflow/sdk/pull/726) (held pending this design).
+  It validates the type mappings above against a mocked Kubernetes API; E2E validation is
+  blocked until the OptimizationJob controller merges.
+- **Open:** whether `get_optimization_job()`-style names are kept, or the existing
+  `get_job()`/`wait_for_job_status()` methods gain a job-type abstraction instead.
+- **Open:** whether the optimization types (`Search`, `Objective`, `TrialConfig`) are
+  re-exported from `kubeflow.trainer` so a single import namespace covers the whole workflow.
+- **Open:** whether generated Python models for `trainer.kubeflow.org/v1alpha1` types are
+  published in `kubeflow-trainer-api` before the SDK integration merges, or the SDK builds
+  plain dictionaries in the interim.
+
+## 10. Implementation History
 
 - **2026-06-01:** Initial KEP draft creation for the `OptimizationJob` CRD.
+- **2026-08-09:** Added Phase 2 Kubeflow SDK integration design (`TrainerClient().optimize()`).
 
-## 10. Alternatives
+## 11. Alternatives
 
 ### Extend Existing Katib Experiment and Trial CRDs
 
 Instead of introducing the `OptimizationJob` CRD, we could have updated the existing Katib `Experiment` and `Trial` CRDs to support `TrainJob` references.
 Katib's current architecture is fundamentally built around unstructured YAML templates and arbitrary CRD support, relying heavily on brittle regex string substitution (e.g., `${searchSpace.lr}`). Fitting this legacy structure to support the strictly typed `TrainJob` v2 API would require massive breaking changes to Katib or result in a disjointed user experience. Introducing a purpose-built `OptimizationJob` ensures tight coupling with `TrainJob` and native Kubernetes validation.
+
+### Standalone OptimizerClient Backend for OptimizationJob (SDK)
+
+For Phase 2, instead of extending `TrainerClient`, the trainer-native backend could be added
+as a second backend of the existing `OptimizerClient`, selected via a dedicated backend
+config (prototyped in [kubeflow/sdk#726](https://github.com/kubeflow/sdk/pull/726)). This
+was rejected on the SDK & ML Experience call (2026-07-29): it keeps training and tuning in
+two separate clients, forces users to choose a backend for what is an implementation detail,
+and contradicts the goal of a single, MLE-friendly entry point. The prototype's internals
+(spec construction, status mapping, tests) carry over to the `TrainerClient().optimize()`
+design unchanged.
 
 ### Stateful Sidecars with Persistent Storage
 
