@@ -46,5 +46,11 @@ func SetupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, opt
 	).SetupWithManager(mgr, options); err != nil {
 		return trainer.TrainJobKind, err
 	}
+	if err := NewOptimizationJobReconciler(
+		mgr.GetClient(),
+		mgr.GetEventRecorder("trainer-optimizationjob-controller"),
+	).SetupWithManager(mgr, options); err != nil {
+		return trainer.OptimizationJobKind, err
+	}
 	return "", nil
 }
