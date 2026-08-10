@@ -42,7 +42,7 @@ type Info struct {
 	// Scheduler parameters to add to the RuntimeJobTemplate.
 	Scheduler *Scheduler
 	// TemplateSpec is TrainingRuntime Template object.
-	// ObjApply podSpecs and this PodSets should be kept in sync by PreComponentBuilderPlugin.SyncParallelCount.
+	// ObjApply PodSpecs and PodSets should be kept in sync by PreComponentBuilderPlugin.PreBuildSync.
 	TemplateSpec TemplateSpec
 }
 
