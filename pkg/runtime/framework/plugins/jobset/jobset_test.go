@@ -311,6 +311,172 @@ func TestJobSet(t *testing.T) {
 				},
 			},
 		},
+		"parallelism and completions are synced for multiple podSets matched by replicatedJob name": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Obj(),
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Launcher,
+							Count: ptr.To[int32](1),
+						},
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](5),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(2).
+										WithCompletions(2).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+			wantInfo: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Launcher,
+							Count: ptr.To[int32](1),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-launcher-0-0.trainJob")
+							},
+						},
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](5),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-node-0-0.trainJob")
+								yield("trainJob-node-0-1.trainJob")
+								yield("trainJob-node-0-2.trainJob")
+								yield("trainJob-node-0-3.trainJob")
+								yield("trainJob-node-0-4.trainJob")
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(5).
+										WithCompletions(5).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+		},
+		"podSet with no matching replicatedJob name is skipped": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "non-existent",
+							Count: ptr.To[int32](3),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+			wantInfo: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "non-existent",
+							Count: ptr.To[int32](3),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -2429,331 +2595,6 @@ func TestBuild(t *testing.T) {
 				}),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
-			}
-		})
-	}
-}
-
-func TestSyncParallelCount(t *testing.T) {
-	cases := map[string]struct {
-		info      *runtime.Info
-		wantInfo  *runtime.Info
-		wantError error
-	}{
-		"no action when info is nil": {},
-		"no action when template.spec is not JobSet": {
-			info: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{
-						{
-							Name:  constants.Node,
-							Count: ptr.To[int32](3),
-						},
-					},
-					ObjApply: batchv1ac.JobSpec(),
-				},
-			},
-			wantInfo: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{
-						{
-							Name:  constants.Node,
-							Count: ptr.To[int32](3),
-						},
-					},
-					ObjApply: batchv1ac.JobSpec(),
-				},
-			},
-		},
-		"parallelism and completions are synced for matching replicatedJob by name": {
-			info: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{
-						{
-							Name:  constants.Node,
-							Count: ptr.To[int32](4),
-						},
-					},
-					ObjApply: jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(1).
-										WithCompletions(1).
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().WithName(constants.Node),
-												),
-											),
-										),
-									),
-								),
-						),
-				},
-			},
-			wantInfo: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{
-						{
-							Name:  constants.Node,
-							Count: ptr.To[int32](4),
-						},
-					},
-					ObjApply: jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(4).
-										WithCompletions(4).
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().WithName(constants.Node),
-												),
-											),
-										),
-									),
-								),
-						),
-				},
-			},
-		},
-		"multiple podSets synced to corresponding replicatedJobs": {
-			info: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{
-						{
-							Name:  constants.Launcher,
-							Count: ptr.To[int32](1),
-						},
-						{
-							Name:  constants.Node,
-							Count: ptr.To[int32](5),
-						},
-					},
-					ObjApply: jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Launcher).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(1).
-										WithCompletions(1).
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().WithName(constants.Node),
-												),
-											),
-										),
-									),
-								),
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(2).
-										WithCompletions(2).
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().WithName(constants.Node),
-												),
-											),
-										),
-									),
-								),
-						),
-				},
-			},
-			wantInfo: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{
-						{
-							Name:  constants.Launcher,
-							Count: ptr.To[int32](1),
-						},
-						{
-							Name:  constants.Node,
-							Count: ptr.To[int32](5),
-						},
-					},
-					ObjApply: jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Launcher).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(1).
-										WithCompletions(1).
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().WithName(constants.Node),
-												),
-											),
-										),
-									),
-								),
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(5).
-										WithCompletions(5).
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().WithName(constants.Node),
-												),
-											),
-										),
-									),
-								),
-						),
-				},
-			},
-		},
-		"podSet with nil count is skipped": {
-			info: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{
-						{
-							Name: constants.Node,
-						},
-					},
-					ObjApply: jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(2).
-										WithCompletions(2).
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().WithName(constants.Node),
-												),
-											),
-										),
-									),
-								),
-						),
-				},
-			},
-			wantInfo: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{
-						{
-							Name: constants.Node,
-						},
-					},
-					ObjApply: jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(2).
-										WithCompletions(2).
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().WithName(constants.Node),
-												),
-											),
-										),
-									),
-								),
-						),
-				},
-			},
-		},
-		"podSet with no matching replicatedJob name is skipped": {
-			info: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{
-						{
-							Name:  "non-existent",
-							Count: ptr.To[int32](3),
-						},
-					},
-					ObjApply: jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(1).
-										WithCompletions(1).
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().WithName(constants.Node),
-												),
-											),
-										),
-									),
-								),
-						),
-				},
-			},
-			wantInfo: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					PodSets: []runtime.PodSet{
-						{
-							Name:  "non-existent",
-							Count: ptr.To[int32](3),
-						},
-					},
-					ObjApply: jobsetv1alpha2ac.JobSetSpec().
-						WithReplicatedJobs(
-							jobsetv1alpha2ac.ReplicatedJob().
-								WithName(constants.Node).
-								WithTemplate(batchv1ac.JobTemplateSpec().
-									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(1).
-										WithCompletions(1).
-										WithTemplate(corev1ac.PodTemplateSpec().
-											WithSpec(corev1ac.PodSpec().
-												WithContainers(
-													corev1ac.Container().WithName(constants.Node),
-												),
-											),
-										),
-									),
-								),
-						),
-				},
-			},
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			var cancel func()
-			ctx, cancel = context.WithCancel(ctx)
-			t.Cleanup(cancel)
-			cli := utiltesting.NewClientBuilder().Build()
-			p, err := New(ctx, cli, nil, nil)
-			if err != nil {
-				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
-			}
-			err = p.(*JobSet).SyncParallelCount(tc.info)
-			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
-				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
-			}
-			if diff := cmp.Diff(tc.wantInfo, tc.info,
-				cmpopts.SortSlices(func(a, b string) bool { return a < b }),
-				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
-			); len(diff) != 0 {
-				t.Errorf("Unexpected Info from SyncParallelCount (-want,+got):\n%s", diff)
 			}
 		})
 	}
