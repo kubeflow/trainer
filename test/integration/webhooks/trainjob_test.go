@@ -897,11 +897,11 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						}).
 						Obj()
 				},
-				func(job *trainer.TrainJob) *trainer.TrainJob {
-					job.Spec.RuntimePatches[0].TrainingRuntimeSpec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(600))
-					return job
-				},
-				testingutil.BeInvalidError()),
+			func(job *trainer.TrainJob) *trainer.TrainJob {
+				job.Spec.RuntimePatches[0].TrainingRuntimeSpec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(600))
+				return job
+			},
+			testingutil.BeForbiddenError()),
 		)
 	})
 })
