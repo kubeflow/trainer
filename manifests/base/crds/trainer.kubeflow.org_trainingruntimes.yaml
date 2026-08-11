@@ -180,6 +180,10 @@ spec:
                           to schedule PodGroup for gang-scheduling.
                         format: int32
                         type: integer
+                        x-kubernetes-validations:
+                        - message: scheduleTimeoutSeconds must be greater than or
+                            equal to 0
+                          rule: self >= 0
                     type: object
                   volcano:
                     description: volcano plugin for gang-scheduling.
