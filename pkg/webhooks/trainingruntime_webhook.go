@@ -105,7 +105,9 @@ func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorLis
 }
 
 func (w *TrainingRuntimeValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.TrainingRuntime) (admission.Warnings, error) {
-	return nil, nil
+	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
+	log.V(5).Info("Validating update", "trainingRuntime", klog.KObj(newObj))
+	return nil, validateReplicatedJobs(newObj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
 }
 
 func (w *TrainingRuntimeValidator) ValidateDelete(ctx context.Context, obj *trainer.TrainingRuntime) (admission.Warnings, error) {
