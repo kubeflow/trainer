@@ -38,10 +38,10 @@ from typing_extensions import Self
 
 class TrainerV1alpha1NormalSpace(BaseModel):
     """
-    NormalSpace defines a continuous normal (Gaussian) distribution.
+    NormalSpace defines a continuous normal (Gaussian) distribution centered on Mean with standard deviation StdDev.
     """ # noqa: E501
-    mean: StrictStr
-    std_dev: StrictStr = Field(alias="stdDev")
+    mean: StrictStr = Field(description="mean is the center of the normal search space.")
+    std_dev: StrictStr = Field(description="stdDev is the standard deviation of the normal search space.", alias="stdDev")
     __properties: ClassVar[List[str]] = ["mean", "stdDev"]
 
     model_config = ConfigDict(
@@ -95,8 +95,8 @@ class TrainerV1alpha1NormalSpace(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "mean": obj.get("mean") if obj.get("mean") is not None else '',
-            "stdDev": obj.get("stdDev") if obj.get("stdDev") is not None else ''
+            "mean": obj.get("mean"),
+            "stdDev": obj.get("stdDev")
         })
         return _obj
 

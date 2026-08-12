@@ -66,7 +66,7 @@ type OptimizationJobList struct {
 // OptimizationJobSpec defines the desired state of OptimizationJob.
 // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="OptimizationJobSpec is immutable and cannot be updated after creation"
 // +kubebuilder:validation:XValidation:rule="self.parallelTrials <= self.numTrials",message="parallelTrials cannot exceed numTrials"
-// +kubebuilder:validation:XValidation:rule="!has(self.searchAlgorithm.grid) || self.parameters.all(p, has(p.searchSpace.categorical))",message="Grid search requires all parameters to be Categorical; Uniform and LogUniform are not supported."
+// +kubebuilder:validation:XValidation:rule="!has(self.searchAlgorithm.grid) || self.parameters.all(p, has(p.searchSpace.categorical))",message="Grid search requires all parameters to be Categorical; continuous distributions are not supported."
 type OptimizationJobSpec struct {
 	// objectives is the list of objectives to optimize.
 	// +listType=map
@@ -143,7 +143,7 @@ type RandomAlgorithm struct {
 type GridAlgorithm struct{}
 
 // SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.
-// +kubebuilder:validation:ExactlyOneOf=uniform;logUniform;categorical
+// +kubebuilder:validation:ExactlyOneOf=uniform;logUniform;normal;logNormal;categorical
 type SearchSpace struct {
 	// uniform is the uniform search space.
 	// +optional
@@ -152,6 +152,14 @@ type SearchSpace struct {
 	// logUniform is the log-uniform search space.
 	// +optional
 	LogUniform LogUniformSpace `json:"logUniform,omitempty,omitzero"`
+
+	// normal is the normal (Gaussian) search space.
+	// +optional
+	Normal NormalSpace `json:"normal,omitempty,omitzero"`
+
+	// logNormal is the log-normal search space.
+	// +optional
+	LogNormal LogNormalSpace `json:"logNormal,omitempty,omitzero"`
 
 	// categorical is the categorical search space.
 	// +optional
@@ -203,6 +211,42 @@ type LogUniformSpace struct {
 	// +kubebuilder:default=Float
 	// +optional
 	Type ParameterType `json:"type,omitempty"`
+}
+
+// NormalSpace defines a continuous normal (Gaussian) distribution centered on
+// Mean with standard deviation StdDev.
+// +kubebuilder:validation:XValidation:rule="double(self.stdDev) > 0.0",message="stdDev must be strictly greater than 0"
+type NormalSpace struct {
+	// mean is the center of the normal search space.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Mean Double `json:"mean,omitempty"`
+
+	// stdDev is the standard deviation of the normal search space.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	StdDev Double `json:"stdDev,omitempty"`
+}
+
+// LogNormalSpace defines a continuous log-normal distribution, that is a
+// distribution whose logarithm is normal with center Mean and standard
+// deviation StdDev. Mean and StdDev are therefore expressed in log space, so
+// Mean may be negative while the sampled values are always positive.
+// +kubebuilder:validation:XValidation:rule="double(self.stdDev) > 0.0",message="stdDev must be strictly greater than 0"
+type LogNormalSpace struct {
+	// mean is the center of the log-normal search space, in log space.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	Mean Double `json:"mean,omitempty"`
+
+	// stdDev is the standard deviation of the log-normal search space, in log space.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	StdDev Double `json:"stdDev,omitempty"`
 }
 
 // ParameterType is the type of the parameter.
