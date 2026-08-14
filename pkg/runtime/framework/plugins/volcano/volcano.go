@@ -109,9 +109,9 @@ func (v *Volcano) Validate(ctx context.Context, info *runtime.Info, _, newObj *t
 				priorityClassName := rj.Template.Spec.Template.Spec.PriorityClassName
 				if priorityClassName != nil {
 					pcName := *priorityClassName
-					// Skip two special keywords which indicate the highest priorities
+					// Skip two special keywords which indicate the highest priorities.
 					if pcName == "system-cluster-critical" || pcName == "system-node-critical" {
-						return nil, allErrs
+						continue
 					}
 					// Any other name must be defined by creating a PriorityClass object with that name.
 					var pc schedulingv1.PriorityClass
