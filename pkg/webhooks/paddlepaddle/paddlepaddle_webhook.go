@@ -42,9 +42,8 @@ var (
 type Webhook struct{}
 
 func SetupWebhook(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(&trainingoperator.PaddleJob{}).
-		WithValidator(&Webhook{}).
+	return ctrl.NewWebhookManagedBy(mgr, &trainingoperator.PaddleJob{}).
+		WithCustomValidator(&Webhook{}).
 		Complete()
 }
 
