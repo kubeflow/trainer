@@ -82,6 +82,18 @@ const (
 	// {"type": "Suspended", "status": "True", "reason": "Resumed"} condition.
 	TrainJobResumedMessage = "TrainJob is resumed"
 
+	// OptimizationJobComplete is the status condition type indicating all trials finished successfully.
+	OptimizationJobComplete string = "Complete"
+
+	// OptimizationJobFailed is the status condition type indicating the optimization job failed.
+	OptimizationJobFailed string = "Failed"
+
+	// OptimizationJobRunning is the status condition type indicating the optimization job is actively running trials.
+	OptimizationJobRunning string = "Running"
+
+	// OptimizationJobCreated is the status condition type indicating the Algorithm service is running.
+	OptimizationJobCreated string = "Created"
+
 	// TrainJobDeadlineExceededMessage is the status condition message for the
 	// {"type": "Failed", "reason": "DeadlineExceeded"} condition
 	// when the TrainJob exceeds its ActiveDeadlineSeconds.
