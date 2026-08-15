@@ -34,13 +34,13 @@ jobs:
             python-version: "3.10"
           - kubernetes-version: v1.33.7
             gang-scheduler-name: "none"
-            python-version: "3.8"
+            python-version: "3.11"
           - kubernetes-version: v1.35.0
             gang-scheduler-name: "scheduler-plugins"
             python-version: "3.10"
           - kubernetes-version: v1.34.3
             gang-scheduler-name: "scheduler-plugins"
-            python-version: "3.9"
+            python-version: "3.11"
           - kubernetes-version: v1.33.7
             gang-scheduler-name: "scheduler-plugins"
             python-version: "3.11"
@@ -49,7 +49,7 @@ jobs:
             python-version: "3.10"
           - kubernetes-version: v1.34.3
             gang-scheduler-name: "volcano"
-            python-version: "3.8"
+            python-version: "3.11"
           - kubernetes-version: v1.33.7
             gang-scheduler-name: "volcano"
             python-version: "3.10"

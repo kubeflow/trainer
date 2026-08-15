@@ -27,7 +27,11 @@ REQUIRES = [
     "six>=1.10",
     "setuptools>=21.0.0",
     "urllib3>=1.15.1",
-    "kubernetes>=27.2.0",
+    # The vendored api_client.py is swagger-codegen output and only understands
+    # swagger-codegen type names. kubernetes 36.0.0 switched its models to
+    # openapi-generator, which emits "dict[str, str]" where the older client
+    # emitted "dict(str, str)", and deserialisation fails against it.
+    "kubernetes>=27.2.0,<36",
     "retrying>=1.3.3",
 ]
 
@@ -48,8 +52,6 @@ setuptools.setup(
         "Intended Audience :: Developers",
         "Intended Audience :: Education",
         "Intended Audience :: Science/Research",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "License :: OSI Approved :: Apache Software License",
