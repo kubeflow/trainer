@@ -673,7 +673,6 @@ active Pods and PodGroups associated with this Job.
 Users must design their workload to gracefully handle this.
 Suspending a Job will reset the StartTime field of the Job.
 
-
 Defaults to false.
 | *`managedBy`* __string__ | ManagedBy is used to indicate the controller or entity that manages a job.
 The value must be either an empty, 'kubeflow.org/training-operator' or

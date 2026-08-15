@@ -22,8 +22,18 @@ import (
 
 // JAXJobSpecApplyConfiguration represents a declarative configuration of the JAXJobSpec type for use
 // with apply.
+//
+// JAXJobSpec is a desired state description of the JAXJob.
 type JAXJobSpecApplyConfiguration struct {
-	RunPolicy       *RunPolicyApplyConfiguration                             `json:"runPolicy,omitempty"`
+	// RunPolicy encapsulates various runtime policies of the distributed training
+	// job, for example how to clean up resources and how long the job can stay
+	// active.
+	RunPolicy *RunPolicyApplyConfiguration `json:"runPolicy,omitempty"`
+	// A map of JAXReplicaType (type) to ReplicaSpec (value). Specifies the JAX cluster configuration.
+	// For example,
+	// {
+	// "Worker": JAXReplicaSpec,
+	// }
 	JAXReplicaSpecs map[kubefloworgv1.ReplicaType]*kubefloworgv1.ReplicaSpec `json:"jaxReplicaSpecs,omitempty"`
 }
 

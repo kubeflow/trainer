@@ -17,10 +17,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/applyconfiguration/kubeflow.org/v1"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	applyconfigurationkubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/applyconfiguration/kubeflow.org/v1"
 	scheme "github.com/kubeflow/training-operator/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,36 +36,37 @@ type PaddleJobsGetter interface {
 
 // PaddleJobInterface has methods to work with PaddleJob resources.
 type PaddleJobInterface interface {
-	Create(ctx context.Context, paddleJob *v1.PaddleJob, opts metav1.CreateOptions) (*v1.PaddleJob, error)
-	Update(ctx context.Context, paddleJob *v1.PaddleJob, opts metav1.UpdateOptions) (*v1.PaddleJob, error)
+	Create(ctx context.Context, paddleJob *kubefloworgv1.PaddleJob, opts metav1.CreateOptions) (*kubefloworgv1.PaddleJob, error)
+	Update(ctx context.Context, paddleJob *kubefloworgv1.PaddleJob, opts metav1.UpdateOptions) (*kubefloworgv1.PaddleJob, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, paddleJob *v1.PaddleJob, opts metav1.UpdateOptions) (*v1.PaddleJob, error)
+	UpdateStatus(ctx context.Context, paddleJob *kubefloworgv1.PaddleJob, opts metav1.UpdateOptions) (*kubefloworgv1.PaddleJob, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PaddleJob, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.PaddleJobList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*kubefloworgv1.PaddleJob, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*kubefloworgv1.PaddleJobList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PaddleJob, err error)
-	Apply(ctx context.Context, paddleJob *kubefloworgv1.PaddleJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PaddleJob, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *kubefloworgv1.PaddleJob, err error)
+	Apply(ctx context.Context, paddleJob *applyconfigurationkubefloworgv1.PaddleJobApplyConfiguration, opts metav1.ApplyOptions) (result *kubefloworgv1.PaddleJob, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, paddleJob *kubefloworgv1.PaddleJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PaddleJob, err error)
+	ApplyStatus(ctx context.Context, paddleJob *applyconfigurationkubefloworgv1.PaddleJobApplyConfiguration, opts metav1.ApplyOptions) (result *kubefloworgv1.PaddleJob, err error)
 	PaddleJobExpansion
 }
 
 // paddleJobs implements PaddleJobInterface
 type paddleJobs struct {
-	*gentype.ClientWithListAndApply[*v1.PaddleJob, *v1.PaddleJobList, *kubefloworgv1.PaddleJobApplyConfiguration]
+	*gentype.ClientWithListAndApply[*kubefloworgv1.PaddleJob, *kubefloworgv1.PaddleJobList, *applyconfigurationkubefloworgv1.PaddleJobApplyConfiguration]
 }
 
 // newPaddleJobs returns a PaddleJobs
 func newPaddleJobs(c *KubeflowV1Client, namespace string) *paddleJobs {
 	return &paddleJobs{
-		gentype.NewClientWithListAndApply[*v1.PaddleJob, *v1.PaddleJobList, *kubefloworgv1.PaddleJobApplyConfiguration](
+		gentype.NewClientWithListAndApply[*kubefloworgv1.PaddleJob, *kubefloworgv1.PaddleJobList, *applyconfigurationkubefloworgv1.PaddleJobApplyConfiguration](
 			"paddlejobs",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.PaddleJob { return &v1.PaddleJob{} },
-			func() *v1.PaddleJobList { return &v1.PaddleJobList{} }),
+			func() *kubefloworgv1.PaddleJob { return &kubefloworgv1.PaddleJob{} },
+			func() *kubefloworgv1.PaddleJobList { return &kubefloworgv1.PaddleJobList{} },
+		),
 	}
 }

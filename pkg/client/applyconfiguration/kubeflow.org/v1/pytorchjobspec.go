@@ -22,11 +22,28 @@ import (
 
 // PyTorchJobSpecApplyConfiguration represents a declarative configuration of the PyTorchJobSpec type for use
 // with apply.
+//
+// For PyTorch launch/run related spec declaration, please see the following doc for more detail:
+// https://pytorch.org/docs/stable/elastic/run.html
+// Or run command `torchrun --help` for a brief description.
+// PyTorchJobSpec is a desired state description of the PyTorchJob.
 type PyTorchJobSpecApplyConfiguration struct {
-	RunPolicy           *RunPolicyApplyConfiguration                             `json:"runPolicy,omitempty"`
-	ElasticPolicy       *ElasticPolicyApplyConfiguration                         `json:"elasticPolicy,omitempty"`
+	// RunPolicy encapsulates various runtime policies of the distributed training
+	// job, for example how to clean up resources and how long the job can stay
+	// active.
+	RunPolicy     *RunPolicyApplyConfiguration     `json:"runPolicy,omitempty"`
+	ElasticPolicy *ElasticPolicyApplyConfiguration `json:"elasticPolicy,omitempty"`
+	// A map of PyTorchReplicaType (type) to ReplicaSpec (value). Specifies the PyTorch cluster configuration.
+	// For example,
+	// {
+	// "Master": PyTorchReplicaSpec,
+	// "Worker": PyTorchReplicaSpec,
+	// }
 	PyTorchReplicaSpecs map[kubefloworgv1.ReplicaType]*kubefloworgv1.ReplicaSpec `json:"pytorchReplicaSpecs,omitempty"`
-	NprocPerNode        *string                                                  `json:"nprocPerNode,omitempty"`
+	// Number of workers per node; supported values: [auto, cpu, gpu, int].
+	// For more, https://github.com/pytorch/pytorch/blob/26f7f470df64d90e092081e39507e4ac751f55d6/torch/distributed/run.py#L629-L658.
+	// Defaults to auto.
+	NprocPerNode *string `json:"nprocPerNode,omitempty"`
 }
 
 // PyTorchJobSpecApplyConfiguration constructs a declarative configuration of the PyTorchJobSpec type for use with

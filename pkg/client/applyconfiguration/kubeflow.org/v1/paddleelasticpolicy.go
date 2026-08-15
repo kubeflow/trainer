@@ -23,10 +23,22 @@ import (
 // PaddleElasticPolicyApplyConfiguration represents a declarative configuration of the PaddleElasticPolicy type for use
 // with apply.
 type PaddleElasticPolicyApplyConfiguration struct {
-	MinReplicas *int32          `json:"minReplicas,omitempty"`
-	MaxReplicas *int32          `json:"maxReplicas,omitempty"`
-	MaxRestarts *int32          `json:"maxRestarts,omitempty"`
-	Metrics     []v2.MetricSpec `json:"metrics,omitempty"`
+	// minReplicas is the lower limit for the number of replicas to which the training job
+	// can scale down.  It defaults to null.
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+	// upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas, defaults to null.
+	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
+	// MaxRestarts is the limit for restart times of pods in elastic mode.
+	MaxRestarts *int32 `json:"maxRestarts,omitempty"`
+	// Metrics contains the specifications which are used to calculate the
+	// desired replica count (the maximum replica count across all metrics will
+	// be used).  The desired replica count is calculated with multiplying the
+	// ratio between the target value and the current value by the current
+	// number of pods. Ergo, metrics used must decrease as the pod count is
+	// increased, and vice-versa.  See the individual metric source types for
+	// more information about how each type of metric must respond.
+	// If not set, the HPA will not be created.
+	Metrics []v2.MetricSpec `json:"metrics,omitempty"`
 }
 
 // PaddleElasticPolicyApplyConfiguration constructs a declarative configuration of the PaddleElasticPolicy type for use with

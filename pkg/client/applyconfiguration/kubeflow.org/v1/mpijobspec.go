@@ -17,17 +17,28 @@
 package v1
 
 import (
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
 )
 
 // MPIJobSpecApplyConfiguration represents a declarative configuration of the MPIJobSpec type for use
 // with apply.
 type MPIJobSpecApplyConfiguration struct {
-	SlotsPerWorker  *int32                             `json:"slotsPerWorker,omitempty"`
-	CleanPodPolicy  *v1.CleanPodPolicy                 `json:"cleanPodPolicy,omitempty"`
-	MPIReplicaSpecs map[v1.ReplicaType]*v1.ReplicaSpec `json:"mpiReplicaSpecs,omitempty"`
-	MainContainer   *string                            `json:"mainContainer,omitempty"`
-	RunPolicy       *RunPolicyApplyConfiguration       `json:"runPolicy,omitempty"`
+	// Specifies the number of slots per worker used in hostfile.
+	// Defaults to 1.
+	SlotsPerWorker *int32 `json:"slotsPerWorker,omitempty"`
+	// CleanPodPolicy defines the policy that whether to kill pods after the job completes.
+	// Defaults to None.
+	CleanPodPolicy *kubefloworgv1.CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
+	// `MPIReplicaSpecs` contains maps from `MPIReplicaType` to `ReplicaSpec` that
+	// specify the MPI replicas to run.
+	MPIReplicaSpecs map[kubefloworgv1.ReplicaType]*kubefloworgv1.ReplicaSpec `json:"mpiReplicaSpecs,omitempty"`
+	// MainContainer specifies name of the main container which
+	// executes the MPI code.
+	MainContainer *string `json:"mainContainer,omitempty"`
+	// `RunPolicy` encapsulates various runtime policies of the distributed training
+	// job, for example how to clean up resources and how long the job can stay
+	// active.
+	RunPolicy *RunPolicyApplyConfiguration `json:"runPolicy,omitempty"`
 }
 
 // MPIJobSpecApplyConfiguration constructs a declarative configuration of the MPIJobSpec type for use with
@@ -47,7 +58,7 @@ func (b *MPIJobSpecApplyConfiguration) WithSlotsPerWorker(value int32) *MPIJobSp
 // WithCleanPodPolicy sets the CleanPodPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CleanPodPolicy field is set to the value of the last call.
-func (b *MPIJobSpecApplyConfiguration) WithCleanPodPolicy(value v1.CleanPodPolicy) *MPIJobSpecApplyConfiguration {
+func (b *MPIJobSpecApplyConfiguration) WithCleanPodPolicy(value kubefloworgv1.CleanPodPolicy) *MPIJobSpecApplyConfiguration {
 	b.CleanPodPolicy = &value
 	return b
 }
@@ -56,9 +67,9 @@ func (b *MPIJobSpecApplyConfiguration) WithCleanPodPolicy(value v1.CleanPodPolic
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the MPIReplicaSpecs field,
 // overwriting an existing map entries in MPIReplicaSpecs field with the same key.
-func (b *MPIJobSpecApplyConfiguration) WithMPIReplicaSpecs(entries map[v1.ReplicaType]*v1.ReplicaSpec) *MPIJobSpecApplyConfiguration {
+func (b *MPIJobSpecApplyConfiguration) WithMPIReplicaSpecs(entries map[kubefloworgv1.ReplicaType]*kubefloworgv1.ReplicaSpec) *MPIJobSpecApplyConfiguration {
 	if b.MPIReplicaSpecs == nil && len(entries) > 0 {
-		b.MPIReplicaSpecs = make(map[v1.ReplicaType]*v1.ReplicaSpec, len(entries))
+		b.MPIReplicaSpecs = make(map[kubefloworgv1.ReplicaType]*kubefloworgv1.ReplicaSpec, len(entries))
 	}
 	for k, v := range entries {
 		b.MPIReplicaSpecs[k] = v

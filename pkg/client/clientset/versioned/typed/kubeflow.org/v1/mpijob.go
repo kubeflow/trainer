@@ -17,10 +17,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/applyconfiguration/kubeflow.org/v1"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	applyconfigurationkubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/applyconfiguration/kubeflow.org/v1"
 	scheme "github.com/kubeflow/training-operator/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,36 +36,37 @@ type MPIJobsGetter interface {
 
 // MPIJobInterface has methods to work with MPIJob resources.
 type MPIJobInterface interface {
-	Create(ctx context.Context, mPIJob *v1.MPIJob, opts metav1.CreateOptions) (*v1.MPIJob, error)
-	Update(ctx context.Context, mPIJob *v1.MPIJob, opts metav1.UpdateOptions) (*v1.MPIJob, error)
+	Create(ctx context.Context, mPIJob *kubefloworgv1.MPIJob, opts metav1.CreateOptions) (*kubefloworgv1.MPIJob, error)
+	Update(ctx context.Context, mPIJob *kubefloworgv1.MPIJob, opts metav1.UpdateOptions) (*kubefloworgv1.MPIJob, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, mPIJob *v1.MPIJob, opts metav1.UpdateOptions) (*v1.MPIJob, error)
+	UpdateStatus(ctx context.Context, mPIJob *kubefloworgv1.MPIJob, opts metav1.UpdateOptions) (*kubefloworgv1.MPIJob, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.MPIJob, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.MPIJobList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*kubefloworgv1.MPIJob, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*kubefloworgv1.MPIJobList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.MPIJob, err error)
-	Apply(ctx context.Context, mPIJob *kubefloworgv1.MPIJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.MPIJob, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *kubefloworgv1.MPIJob, err error)
+	Apply(ctx context.Context, mPIJob *applyconfigurationkubefloworgv1.MPIJobApplyConfiguration, opts metav1.ApplyOptions) (result *kubefloworgv1.MPIJob, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, mPIJob *kubefloworgv1.MPIJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.MPIJob, err error)
+	ApplyStatus(ctx context.Context, mPIJob *applyconfigurationkubefloworgv1.MPIJobApplyConfiguration, opts metav1.ApplyOptions) (result *kubefloworgv1.MPIJob, err error)
 	MPIJobExpansion
 }
 
 // mPIJobs implements MPIJobInterface
 type mPIJobs struct {
-	*gentype.ClientWithListAndApply[*v1.MPIJob, *v1.MPIJobList, *kubefloworgv1.MPIJobApplyConfiguration]
+	*gentype.ClientWithListAndApply[*kubefloworgv1.MPIJob, *kubefloworgv1.MPIJobList, *applyconfigurationkubefloworgv1.MPIJobApplyConfiguration]
 }
 
 // newMPIJobs returns a MPIJobs
 func newMPIJobs(c *KubeflowV1Client, namespace string) *mPIJobs {
 	return &mPIJobs{
-		gentype.NewClientWithListAndApply[*v1.MPIJob, *v1.MPIJobList, *kubefloworgv1.MPIJobApplyConfiguration](
+		gentype.NewClientWithListAndApply[*kubefloworgv1.MPIJob, *kubefloworgv1.MPIJobList, *applyconfigurationkubefloworgv1.MPIJobApplyConfiguration](
 			"mpijobs",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.MPIJob { return &v1.MPIJob{} },
-			func() *v1.MPIJobList { return &v1.MPIJobList{} }),
+			func() *kubefloworgv1.MPIJob { return &kubefloworgv1.MPIJob{} },
+			func() *kubefloworgv1.MPIJobList { return &kubefloworgv1.MPIJobList{} },
+		),
 	}
 }

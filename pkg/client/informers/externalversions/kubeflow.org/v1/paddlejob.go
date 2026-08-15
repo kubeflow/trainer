@@ -17,15 +17,16 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	apiskubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
 	versioned "github.com/kubeflow/training-operator/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/kubeflow/training-operator/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "github.com/kubeflow/training-operator/pkg/client/listers/kubeflow.org/v1"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/listers/kubeflow.org/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -34,7 +35,7 @@ import (
 // PaddleJobs.
 type PaddleJobInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.PaddleJobLister
+	Lister() kubefloworgv1.PaddleJobLister
 }
 
 type paddleJobInformer struct {
@@ -47,42 +48,67 @@ type paddleJobInformer struct {
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewPaddleJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPaddleJobInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewPaddleJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredPaddleJobInformer constructs a new informer for PaddleJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredPaddleJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+	return NewPaddleJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewPaddleJobInformerWithOptions constructs a new informer for PaddleJob type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewPaddleJobInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "kubeflow.org", Version: "v1", Resource: "paddlejobs"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.KubeflowV1().PaddleJobs(namespace).List(context.TODO(), options)
+				return client.KubeflowV1().PaddleJobs(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.KubeflowV1().PaddleJobs(namespace).Watch(context.TODO(), options)
+				return client.KubeflowV1().PaddleJobs(namespace).Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.KubeflowV1().PaddleJobs(namespace).List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.KubeflowV1().PaddleJobs(namespace).Watch(ctx, opts)
+			},
+		}, client),
+		&apiskubefloworgv1.PaddleJob{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&kubefloworgv1.PaddleJob{},
-		resyncPeriod,
-		indexers,
 	)
 }
 
 func (f *paddleJobInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPaddleJobInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewPaddleJobInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *paddleJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&kubefloworgv1.PaddleJob{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiskubefloworgv1.PaddleJob{}, f.defaultInformer)
 }
 
-func (f *paddleJobInformer) Lister() v1.PaddleJobLister {
-	return v1.NewPaddleJobLister(f.Informer().GetIndexer())
+func (f *paddleJobInformer) Lister() kubefloworgv1.PaddleJobLister {
+	return kubefloworgv1.NewPaddleJobLister(f.Informer().GetIndexer())
 }

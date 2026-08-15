@@ -22,7 +22,11 @@ import (
 
 // XGBoostJobSpecApplyConfiguration represents a declarative configuration of the XGBoostJobSpec type for use
 // with apply.
+//
+// XGBoostJobSpec defines the desired state of XGBoostJob
 type XGBoostJobSpecApplyConfiguration struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
 	RunPolicy       *RunPolicyApplyConfiguration                             `json:"runPolicy,omitempty"`
 	XGBReplicaSpecs map[kubefloworgv1.ReplicaType]*kubefloworgv1.ReplicaSpec `json:"xgbReplicaSpecs,omitempty"`
 }

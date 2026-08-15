@@ -17,24 +17,43 @@
 package v1
 
 import (
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
 	v2 "k8s.io/api/autoscaling/v2"
 )
 
 // ElasticPolicyApplyConfiguration represents a declarative configuration of the ElasticPolicy type for use
 // with apply.
 type ElasticPolicyApplyConfiguration struct {
-	MinReplicas  *int32                       `json:"minReplicas,omitempty"`
-	MaxReplicas  *int32                       `json:"maxReplicas,omitempty"`
-	RDZVBackend  *v1.RDZVBackend              `json:"rdzvBackend,omitempty"`
-	RDZVPort     *int32                       `json:"rdzvPort,omitempty"`
-	RDZVHost     *string                      `json:"rdzvHost,omitempty"`
-	RDZVID       *string                      `json:"rdzvId,omitempty"`
-	RDZVConf     []RDZVConfApplyConfiguration `json:"rdzvConf,omitempty"`
-	Standalone   *bool                        `json:"standalone,omitempty"`
-	NProcPerNode *int32                       `json:"nProcPerNode,omitempty"`
-	MaxRestarts  *int32                       `json:"maxRestarts,omitempty"`
-	Metrics      []v2.MetricSpec              `json:"metrics,omitempty"`
+	// minReplicas is the lower limit for the number of replicas to which the training job
+	// can scale down.  It defaults to null.
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+	// upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas, defaults to null.
+	MaxReplicas *int32                     `json:"maxReplicas,omitempty"`
+	RDZVBackend *kubefloworgv1.RDZVBackend `json:"rdzvBackend,omitempty"`
+	RDZVPort    *int32                     `json:"rdzvPort,omitempty"`
+	RDZVHost    *string                    `json:"rdzvHost,omitempty"`
+	RDZVID      *string                    `json:"rdzvId,omitempty"`
+	// RDZVConf contains additional rendezvous configuration (<key1>=<value1>,<key2>=<value2>,...).
+	RDZVConf []RDZVConfApplyConfiguration `json:"rdzvConf,omitempty"`
+	// Start a local standalone rendezvous backend that is represented by a C10d TCP store
+	// on port 29400. Useful when launching single-node, multi-worker job. If specified
+	// --rdzv_backend, --rdzv_endpoint, --rdzv_id are auto-assigned; any explicitly set values
+	// are ignored.
+	Standalone *bool `json:"standalone,omitempty"`
+	// Number of workers per node; supported values: [auto, cpu, gpu, int].
+	// Deprecated: This API is deprecated in v1.7+
+	// Use .spec.nprocPerNode instead.
+	NProcPerNode *int32 `json:"nProcPerNode,omitempty"`
+	MaxRestarts  *int32 `json:"maxRestarts,omitempty"`
+	// Metrics contains the specifications which are used to calculate the
+	// desired replica count (the maximum replica count across all metrics will
+	// be used).  The desired replica count is calculated with multiplying the
+	// ratio between the target value and the current value by the current
+	// number of pods. Ergo, metrics used must decrease as the pod count is
+	// increased, and vice-versa.  See the individual metric source types for
+	// more information about how each type of metric must respond.
+	// If not set, the HPA will not be created.
+	Metrics []v2.MetricSpec `json:"metrics,omitempty"`
 }
 
 // ElasticPolicyApplyConfiguration constructs a declarative configuration of the ElasticPolicy type for use with
@@ -62,7 +81,7 @@ func (b *ElasticPolicyApplyConfiguration) WithMaxReplicas(value int32) *ElasticP
 // WithRDZVBackend sets the RDZVBackend field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RDZVBackend field is set to the value of the last call.
-func (b *ElasticPolicyApplyConfiguration) WithRDZVBackend(value v1.RDZVBackend) *ElasticPolicyApplyConfiguration {
+func (b *ElasticPolicyApplyConfiguration) WithRDZVBackend(value kubefloworgv1.RDZVBackend) *ElasticPolicyApplyConfiguration {
 	b.RDZVBackend = &value
 	return b
 }

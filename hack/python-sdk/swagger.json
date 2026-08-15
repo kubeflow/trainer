@@ -23,7 +23,6 @@
           "description": "Metrics contains the specifications which are used to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated with multiplying the ratio between the target value and the current value by the current number of pods. Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond. If not set, the HPA will not be created.",
           "type": "array",
           "items": {
-            "default": {},
             "$ref": "#/definitions/k8s.io.api.autoscaling.v2.MetricSpec"
           }
         },
@@ -44,7 +43,6 @@
           "description": "RDZVConf contains additional rendezvous configuration (\u003ckey1\u003e=\u003cvalue1\u003e,\u003ckey2\u003e=\u003cvalue2\u003e,...).",
           "type": "array",
           "items": {
-            "default": {},
             "$ref": "#/definitions/kubeflow.org.v1.RDZVConf"
           }
         },
@@ -107,7 +105,6 @@
           "description": "List of JAXJobs.",
           "type": "array",
           "items": {
-            "default": {},
             "$ref": "#/definitions/kubeflow.org.v1.JAXJob"
           }
         },
@@ -192,7 +189,6 @@
           "description": "Conditions is an array of current observed job conditions.",
           "type": "array",
           "items": {
-            "default": {},
             "$ref": "#/definitions/kubeflow.org.v1.JobCondition"
           }
         },
@@ -251,7 +247,6 @@
         "items": {
           "type": "array",
           "items": {
-            "default": {},
             "$ref": "#/definitions/kubeflow.org.v1.MPIJob"
           }
         },
@@ -315,7 +310,6 @@
           "description": "Metrics contains the specifications which are used to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated with multiplying the ratio between the target value and the current value by the current number of pods. Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond. If not set, the HPA will not be created.",
           "type": "array",
           "items": {
-            "default": {},
             "$ref": "#/definitions/k8s.io.api.autoscaling.v2.MetricSpec"
           }
         },
@@ -369,7 +363,6 @@
           "description": "List of PaddleJobs.",
           "type": "array",
           "items": {
-            "default": {},
             "$ref": "#/definitions/kubeflow.org.v1.PaddleJob"
           }
         },
@@ -453,7 +446,6 @@
           "description": "List of PyTorchJobs.",
           "type": "array",
           "items": {
-            "default": {},
             "$ref": "#/definitions/kubeflow.org.v1.PyTorchJob"
           }
         },
@@ -663,7 +655,6 @@
           "description": "List of TFJobs.",
           "type": "array",
           "items": {
-            "default": {},
             "$ref": "#/definitions/kubeflow.org.v1.TFJob"
           }
         },
@@ -748,7 +739,6 @@
         "items": {
           "type": "array",
           "items": {
-            "default": {},
             "$ref": "#/definitions/kubeflow.org.v1.XGBoostJob"
           }
         },

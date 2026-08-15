@@ -22,11 +22,25 @@ import (
 
 // TFJobSpecApplyConfiguration represents a declarative configuration of the TFJobSpec type for use
 // with apply.
+//
+// TFJobSpec is a desired state description of the TFJob.
 type TFJobSpecApplyConfiguration struct {
-	RunPolicy           *RunPolicyApplyConfiguration                             `json:"runPolicy,omitempty"`
-	SuccessPolicy       *kubefloworgv1.SuccessPolicy                             `json:"successPolicy,omitempty"`
-	TFReplicaSpecs      map[kubefloworgv1.ReplicaType]*kubefloworgv1.ReplicaSpec `json:"tfReplicaSpecs,omitempty"`
-	EnableDynamicWorker *bool                                                    `json:"enableDynamicWorker,omitempty"`
+	// RunPolicy encapsulates various runtime policies of the distributed training
+	// job, for example how to clean up resources and how long the job can stay
+	// active.
+	RunPolicy *RunPolicyApplyConfiguration `json:"runPolicy,omitempty"`
+	// SuccessPolicy defines the policy to mark the TFJob as succeeded.
+	// Default to "", using the default rules.
+	SuccessPolicy *kubefloworgv1.SuccessPolicy `json:"successPolicy,omitempty"`
+	// A map of TFReplicaType (type) to ReplicaSpec (value). Specifies the TF cluster configuration.
+	// For example,
+	// {
+	// "PS": ReplicaSpec,
+	// "Worker": ReplicaSpec,
+	// }
+	TFReplicaSpecs map[kubefloworgv1.ReplicaType]*kubefloworgv1.ReplicaSpec `json:"tfReplicaSpecs,omitempty"`
+	// A switch to enable dynamic worker
+	EnableDynamicWorker *bool `json:"enableDynamicWorker,omitempty"`
 }
 
 // TFJobSpecApplyConfiguration constructs a declarative configuration of the TFJobSpec type for use with

@@ -23,12 +23,26 @@ import (
 
 // JobStatusApplyConfiguration represents a declarative configuration of the JobStatus type for use
 // with apply.
+//
+// JobStatus represents the current observed state of the training Job.
 type JobStatusApplyConfiguration struct {
-	Conditions        []JobConditionApplyConfiguration                           `json:"conditions,omitempty"`
-	ReplicaStatuses   map[kubefloworgv1.ReplicaType]*kubefloworgv1.ReplicaStatus `json:"replicaStatuses,omitempty"`
-	StartTime         *metav1.Time                                               `json:"startTime,omitempty"`
-	CompletionTime    *metav1.Time                                               `json:"completionTime,omitempty"`
-	LastReconcileTime *metav1.Time                                               `json:"lastReconcileTime,omitempty"`
+	// Conditions is an array of current observed job conditions.
+	Conditions []JobConditionApplyConfiguration `json:"conditions,omitempty"`
+	// ReplicaStatuses is map of ReplicaType and ReplicaStatus,
+	// specifies the status of each replica.
+	ReplicaStatuses map[kubefloworgv1.ReplicaType]*kubefloworgv1.ReplicaStatus `json:"replicaStatuses,omitempty"`
+	// Represents time when the job was acknowledged by the job controller.
+	// It is not guaranteed to be set in happens-before order across separate operations.
+	// It is represented in RFC3339 form and is in UTC.
+	StartTime *metav1.Time `json:"startTime,omitempty"`
+	// Represents time when the job was completed. It is not guaranteed to
+	// be set in happens-before order across separate operations.
+	// It is represented in RFC3339 form and is in UTC.
+	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
+	// Represents last time when the job was reconciled. It is not guaranteed to
+	// be set in happens-before order across separate operations.
+	// It is represented in RFC3339 form and is in UTC.
+	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty"`
 }
 
 // JobStatusApplyConfiguration constructs a declarative configuration of the JobStatus type for use with

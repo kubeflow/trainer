@@ -27,27 +27,27 @@ type FakeKubeflowV1 struct {
 }
 
 func (c *FakeKubeflowV1) JAXJobs(namespace string) v1.JAXJobInterface {
-	return &FakeJAXJobs{c, namespace}
+	return newFakeJAXJobs(c, namespace)
 }
 
 func (c *FakeKubeflowV1) MPIJobs(namespace string) v1.MPIJobInterface {
-	return &FakeMPIJobs{c, namespace}
+	return newFakeMPIJobs(c, namespace)
 }
 
 func (c *FakeKubeflowV1) PaddleJobs(namespace string) v1.PaddleJobInterface {
-	return &FakePaddleJobs{c, namespace}
+	return newFakePaddleJobs(c, namespace)
 }
 
 func (c *FakeKubeflowV1) PyTorchJobs(namespace string) v1.PyTorchJobInterface {
-	return &FakePyTorchJobs{c, namespace}
+	return newFakePyTorchJobs(c, namespace)
 }
 
 func (c *FakeKubeflowV1) TFJobs(namespace string) v1.TFJobInterface {
-	return &FakeTFJobs{c, namespace}
+	return newFakeTFJobs(c, namespace)
 }
 
 func (c *FakeKubeflowV1) XGBoostJobs(namespace string) v1.XGBoostJobInterface {
-	return &FakeXGBoostJobs{c, namespace}
+	return newFakeXGBoostJobs(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -17,10 +17,10 @@
 package v1
 
 import (
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // XGBoostJobLister helps list XGBoostJobs.
@@ -28,7 +28,7 @@ import (
 type XGBoostJobLister interface {
 	// List lists all XGBoostJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.XGBoostJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.XGBoostJob, err error)
 	// XGBoostJobs returns an object that can list and get XGBoostJobs.
 	XGBoostJobs(namespace string) XGBoostJobNamespaceLister
 	XGBoostJobListerExpansion
@@ -36,17 +36,17 @@ type XGBoostJobLister interface {
 
 // xGBoostJobLister implements the XGBoostJobLister interface.
 type xGBoostJobLister struct {
-	listers.ResourceIndexer[*v1.XGBoostJob]
+	listers.ResourceIndexer[*kubefloworgv1.XGBoostJob]
 }
 
 // NewXGBoostJobLister returns a new XGBoostJobLister.
 func NewXGBoostJobLister(indexer cache.Indexer) XGBoostJobLister {
-	return &xGBoostJobLister{listers.New[*v1.XGBoostJob](indexer, v1.Resource("xgboostjob"))}
+	return &xGBoostJobLister{listers.New[*kubefloworgv1.XGBoostJob](indexer, kubefloworgv1.Resource("xgboostjob"))}
 }
 
 // XGBoostJobs returns an object that can list and get XGBoostJobs.
 func (s *xGBoostJobLister) XGBoostJobs(namespace string) XGBoostJobNamespaceLister {
-	return xGBoostJobNamespaceLister{listers.NewNamespaced[*v1.XGBoostJob](s.ResourceIndexer, namespace)}
+	return xGBoostJobNamespaceLister{listers.NewNamespaced[*kubefloworgv1.XGBoostJob](s.ResourceIndexer, namespace)}
 }
 
 // XGBoostJobNamespaceLister helps list and get XGBoostJobs.
@@ -54,15 +54,15 @@ func (s *xGBoostJobLister) XGBoostJobs(namespace string) XGBoostJobNamespaceList
 type XGBoostJobNamespaceLister interface {
 	// List lists all XGBoostJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.XGBoostJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.XGBoostJob, err error)
 	// Get retrieves the XGBoostJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.XGBoostJob, error)
+	Get(name string) (*kubefloworgv1.XGBoostJob, error)
 	XGBoostJobNamespaceListerExpansion
 }
 
 // xGBoostJobNamespaceLister implements the XGBoostJobNamespaceLister
 // interface.
 type xGBoostJobNamespaceLister struct {
-	listers.ResourceIndexer[*v1.XGBoostJob]
+	listers.ResourceIndexer[*kubefloworgv1.XGBoostJob]
 }

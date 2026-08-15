@@ -17,179 +17,31 @@
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
 	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/applyconfiguration/kubeflow.org/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	typedkubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/clientset/versioned/typed/kubeflow.org/v1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakePyTorchJobs implements PyTorchJobInterface
-type FakePyTorchJobs struct {
+// fakePyTorchJobs implements PyTorchJobInterface
+type fakePyTorchJobs struct {
+	*gentype.FakeClientWithListAndApply[*v1.PyTorchJob, *v1.PyTorchJobList, *kubefloworgv1.PyTorchJobApplyConfiguration]
 	Fake *FakeKubeflowV1
-	ns   string
 }
 
-var pytorchjobsResource = v1.SchemeGroupVersion.WithResource("pytorchjobs")
-
-var pytorchjobsKind = v1.SchemeGroupVersion.WithKind("PyTorchJob")
-
-// Get takes name of the pyTorchJob, and returns the corresponding pyTorchJob object, and an error if there is any.
-func (c *FakePyTorchJobs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PyTorchJob, err error) {
-	emptyResult := &v1.PyTorchJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(pytorchjobsResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakePyTorchJobs(fake *FakeKubeflowV1, namespace string) typedkubefloworgv1.PyTorchJobInterface {
+	return &fakePyTorchJobs{
+		gentype.NewFakeClientWithListAndApply[*v1.PyTorchJob, *v1.PyTorchJobList, *kubefloworgv1.PyTorchJobApplyConfiguration](
+			fake.Fake,
+			namespace,
+			v1.SchemeGroupVersion.WithResource("pytorchjobs"),
+			v1.SchemeGroupVersion.WithKind("PyTorchJob"),
+			func() *v1.PyTorchJob { return &v1.PyTorchJob{} },
+			func() *v1.PyTorchJobList { return &v1.PyTorchJobList{} },
+			func(dst, src *v1.PyTorchJobList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.PyTorchJobList) []*v1.PyTorchJob { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.PyTorchJobList, items []*v1.PyTorchJob) { list.Items = gentype.FromPointerSlice(items) },
+		),
+		fake,
 	}
-	return obj.(*v1.PyTorchJob), err
-}
-
-// List takes label and field selectors, and returns the list of PyTorchJobs that match those selectors.
-func (c *FakePyTorchJobs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PyTorchJobList, err error) {
-	emptyResult := &v1.PyTorchJobList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(pytorchjobsResource, pytorchjobsKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.PyTorchJobList{ListMeta: obj.(*v1.PyTorchJobList).ListMeta}
-	for _, item := range obj.(*v1.PyTorchJobList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested pyTorchJobs.
-func (c *FakePyTorchJobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(pytorchjobsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a pyTorchJob and creates it.  Returns the server's representation of the pyTorchJob, and an error, if there is any.
-func (c *FakePyTorchJobs) Create(ctx context.Context, pyTorchJob *v1.PyTorchJob, opts metav1.CreateOptions) (result *v1.PyTorchJob, err error) {
-	emptyResult := &v1.PyTorchJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(pytorchjobsResource, c.ns, pyTorchJob, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.PyTorchJob), err
-}
-
-// Update takes the representation of a pyTorchJob and updates it. Returns the server's representation of the pyTorchJob, and an error, if there is any.
-func (c *FakePyTorchJobs) Update(ctx context.Context, pyTorchJob *v1.PyTorchJob, opts metav1.UpdateOptions) (result *v1.PyTorchJob, err error) {
-	emptyResult := &v1.PyTorchJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(pytorchjobsResource, c.ns, pyTorchJob, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.PyTorchJob), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePyTorchJobs) UpdateStatus(ctx context.Context, pyTorchJob *v1.PyTorchJob, opts metav1.UpdateOptions) (result *v1.PyTorchJob, err error) {
-	emptyResult := &v1.PyTorchJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(pytorchjobsResource, "status", c.ns, pyTorchJob, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.PyTorchJob), err
-}
-
-// Delete takes name of the pyTorchJob and deletes it. Returns an error if one occurs.
-func (c *FakePyTorchJobs) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(pytorchjobsResource, c.ns, name, opts), &v1.PyTorchJob{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakePyTorchJobs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(pytorchjobsResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.PyTorchJobList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched pyTorchJob.
-func (c *FakePyTorchJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PyTorchJob, err error) {
-	emptyResult := &v1.PyTorchJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(pytorchjobsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.PyTorchJob), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied pyTorchJob.
-func (c *FakePyTorchJobs) Apply(ctx context.Context, pyTorchJob *kubefloworgv1.PyTorchJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PyTorchJob, err error) {
-	if pyTorchJob == nil {
-		return nil, fmt.Errorf("pyTorchJob provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(pyTorchJob)
-	if err != nil {
-		return nil, err
-	}
-	name := pyTorchJob.Name
-	if name == nil {
-		return nil, fmt.Errorf("pyTorchJob.Name must be provided to Apply")
-	}
-	emptyResult := &v1.PyTorchJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(pytorchjobsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.PyTorchJob), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakePyTorchJobs) ApplyStatus(ctx context.Context, pyTorchJob *kubefloworgv1.PyTorchJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PyTorchJob, err error) {
-	if pyTorchJob == nil {
-		return nil, fmt.Errorf("pyTorchJob provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(pyTorchJob)
-	if err != nil {
-		return nil, err
-	}
-	name := pyTorchJob.Name
-	if name == nil {
-		return nil, fmt.Errorf("pyTorchJob.Name must be provided to Apply")
-	}
-	emptyResult := &v1.PyTorchJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(pytorchjobsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.PyTorchJob), err
 }

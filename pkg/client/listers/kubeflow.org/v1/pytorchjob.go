@@ -17,10 +17,10 @@
 package v1
 
 import (
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PyTorchJobLister helps list PyTorchJobs.
@@ -28,7 +28,7 @@ import (
 type PyTorchJobLister interface {
 	// List lists all PyTorchJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.PyTorchJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.PyTorchJob, err error)
 	// PyTorchJobs returns an object that can list and get PyTorchJobs.
 	PyTorchJobs(namespace string) PyTorchJobNamespaceLister
 	PyTorchJobListerExpansion
@@ -36,17 +36,17 @@ type PyTorchJobLister interface {
 
 // pyTorchJobLister implements the PyTorchJobLister interface.
 type pyTorchJobLister struct {
-	listers.ResourceIndexer[*v1.PyTorchJob]
+	listers.ResourceIndexer[*kubefloworgv1.PyTorchJob]
 }
 
 // NewPyTorchJobLister returns a new PyTorchJobLister.
 func NewPyTorchJobLister(indexer cache.Indexer) PyTorchJobLister {
-	return &pyTorchJobLister{listers.New[*v1.PyTorchJob](indexer, v1.Resource("pytorchjob"))}
+	return &pyTorchJobLister{listers.New[*kubefloworgv1.PyTorchJob](indexer, kubefloworgv1.Resource("pytorchjob"))}
 }
 
 // PyTorchJobs returns an object that can list and get PyTorchJobs.
 func (s *pyTorchJobLister) PyTorchJobs(namespace string) PyTorchJobNamespaceLister {
-	return pyTorchJobNamespaceLister{listers.NewNamespaced[*v1.PyTorchJob](s.ResourceIndexer, namespace)}
+	return pyTorchJobNamespaceLister{listers.NewNamespaced[*kubefloworgv1.PyTorchJob](s.ResourceIndexer, namespace)}
 }
 
 // PyTorchJobNamespaceLister helps list and get PyTorchJobs.
@@ -54,15 +54,15 @@ func (s *pyTorchJobLister) PyTorchJobs(namespace string) PyTorchJobNamespaceList
 type PyTorchJobNamespaceLister interface {
 	// List lists all PyTorchJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.PyTorchJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.PyTorchJob, err error)
 	// Get retrieves the PyTorchJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.PyTorchJob, error)
+	Get(name string) (*kubefloworgv1.PyTorchJob, error)
 	PyTorchJobNamespaceListerExpansion
 }
 
 // pyTorchJobNamespaceLister implements the PyTorchJobNamespaceLister
 // interface.
 type pyTorchJobNamespaceLister struct {
-	listers.ResourceIndexer[*v1.PyTorchJob]
+	listers.ResourceIndexer[*kubefloworgv1.PyTorchJob]
 }
