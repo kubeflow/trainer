@@ -20,7 +20,7 @@ CRD Progress:
 - [ ] Step 5: Add controller
 - [ ] Step 6: Add testing wrappers
 - [ ] Step 7: Add integration tests
-- [ ] Step 8: Generate manifests and verify
+- [ ] Step 8: Manual manifest and Helm updates
 ```
 
 ## Key files to read first
@@ -30,6 +30,8 @@ CRD Progress:
 - **Webhook setup**: [pkg/webhooks/setup.go](../../../pkg/webhooks/setup.go)
 - **Controller setup**: [pkg/controller/setup.go](../../../pkg/controller/setup.go)
 - **Package-level markers**: [pkg/apis/trainer/v1alpha1/doc.go](../../../pkg/apis/trainer/v1alpha1/doc.go)
+- **API conventions**: [.agents/docs/api-conventions.md](../../docs/api-conventions.md) (SIG Architecture reference)
+- **API changes guide**: [.agents/docs/api_changes.md](../../docs/api_changes.md) (SIG Architecture reference)
 
 ## Step 1: Define API types
 
@@ -44,7 +46,8 @@ For a **namespaced** resource:
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:storageversion
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type NewResource struct {
     metav1.TypeMeta   `json:",inline"`
     metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -52,6 +55,11 @@ type NewResource struct {
     Status            NewResourceStatus `json:"status,omitempty"`
 }
 ```
+
+Notes on conditional markers:
+- `+kubebuilder:subresource:status` - only add when the type has a Status field (e.g., `TrainingRuntime` omits it)
+- `+kubebuilder:storageversion` - only needed when multiple API versions exist; omit while only `v1alpha1` exists
+- `+kubebuilder:printcolumn` - add for fields useful in `kubectl get` output (State and Age are standard)
 
 For a **cluster-scoped** resource, add these markers:
 
@@ -65,7 +73,6 @@ For a **cluster-scoped** resource, add these markers:
 
 ```go
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +resource:path=newresources
 // +kubebuilder:object:root=true
 type NewResourceList struct {
     metav1.TypeMeta `json:",inline"`
@@ -106,13 +113,14 @@ File: `pkg/apis/trainer/v1alpha1/groupversion_info.go`
 Add both the root type and list type to `addKnownTypes()`:
 
 ```go
-func addKnownTypes(scheme *apiruntime.Scheme) error {
-    scheme.AddKnownTypes(SchemeGroupVersion,
+func addKnownTypes(scheme *runtime.Scheme) error {
+    scheme.AddKnownTypes(GroupVersion,
         // ... existing types ...
         &NewResource{},
         &NewResourceList{},
     )
-    return metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+    metav1.AddToGroupVersion(scheme, GroupVersion)
+    return nil
 }
 ```
 
@@ -121,11 +129,17 @@ scheme is already registered globally via `trainer.AddToScheme(scheme)`.
 
 ## Step 3: Run code generation
 
+Ensure Docker is running - code generation uses containerized tools.
+
 ```bash
 make generate
 ```
 
-This runs four steps:
+This target also runs `manifests` as a prerequisite (CRD YAML, RBAC,
+webhook config generation), so there is no need to run `make manifests`
+separately.
+
+It runs four steps:
 1. `controller-gen object` - generates `zz_generated.deepcopy.go`
 2. `hack/update-codegen.sh` - generates defaults, clients, informers, listers, apply configs under `pkg/client/`, and OpenAPI specs
 3. `controller-gen object` for config API
@@ -171,15 +185,19 @@ Implement `admission.Validator[*trainer.NewResource]`:
 ```go
 type NewResourceValidator struct{ ... }
 
-func (v *NewResourceValidator) ValidateCreate(ctx context.Context, obj *trainer.NewResource) (admission.Warnings, field.ErrorList) { ... }
-func (v *NewResourceValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.NewResource) (admission.Warnings, field.ErrorList) { ... }
-func (v *NewResourceValidator) ValidateDelete(ctx context.Context, obj *trainer.NewResource) (admission.Warnings, field.ErrorList) { ... }
+func (v *NewResourceValidator) ValidateCreate(ctx context.Context, obj *trainer.NewResource) (admission.Warnings, error) { ... }
+func (v *NewResourceValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *trainer.NewResource) (admission.Warnings, error) { ... }
+func (v *NewResourceValidator) ValidateDelete(ctx context.Context, obj *trainer.NewResource) (admission.Warnings, error) { ... }
 ```
+
+The `admission.Validator` interface requires `error`, not `field.ErrorList`.
+Build a `field.ErrorList` in a validation helper, then call `.ToAggregate()`
+at the boundary to convert it to `error`.
 
 ### Register with manager
 
 ```go
-func setupNewResourceWebhook(mgr ctrl.Manager) error {
+func setupWebhookForNewResource(mgr ctrl.Manager) error {
     return ctrl.NewWebhookManagedBy(mgr, &trainer.NewResource{}).
         WithDefaulter(&NewResourceDefaulter{...}).
         WithValidator(&NewResourceValidator{...}).
@@ -190,12 +208,12 @@ func setupNewResourceWebhook(mgr ctrl.Manager) error {
 Add the call in `pkg/webhooks/setup.go`:
 
 ```go
-func Setup(mgr ctrl.Manager, runtimes map[string]runtime.Runtime) error {
+func Setup(mgr ctrl.Manager, runtimes map[string]runtime.Runtime) (string, error) {
     // ... existing calls ...
-    if err := setupNewResourceWebhook(mgr); err != nil {
-        return err
+    if err := setupWebhookForNewResource(mgr); err != nil {
+        return trainer.NewResourceKind, err
     }
-    return nil
+    return "", nil
 }
 ```
 
@@ -243,12 +261,21 @@ func (r *NewResourceReconciler) SetupWithManager(mgr ctrl.Manager, options contr
 
 File: `pkg/controller/setup.go`
 
-Add the controller to `SetupControllers()`:
+Add the controller to `SetupControllers()`. This function returns
+`(string, error)` - the failing Kind alongside the error. Dependencies
+come from the manager:
 
 ```go
-newResourceReconciler := NewNewResourceReconciler(client, recorder)
-if err := newResourceReconciler.SetupWithManager(mgr, options); err != nil {
-    return fmt.Errorf("setting up NewResource controller: %w", err)
+func SetupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, options controller.Options) (string, error) {
+    // ... existing calls ...
+    newResourceRec := NewNewResourceReconciler(
+        mgr.GetClient(),
+        mgr.GetEventRecorder("trainer-newresource-controller"),
+    )
+    if err := newResourceRec.SetupWithManager(mgr, options); err != nil {
+        return trainer.NewResourceKind, err
+    }
+    return "", nil
 }
 ```
 
@@ -270,17 +297,30 @@ File: `test/integration/controller/<newresource>_controller_test.go`
 
 Pattern:
 - Use `ginkgo.Ordered` container
-- `BeforeAll`: call `fwk.Init()` + `fwk.RunManager(cfg, true)`
+- `BeforeAll`: call `fwk.Init()` + `fwk.RunManager(cfg, true)` which returns `(context.Context, client.Client)`
+- `AfterAll`: call `fwk.Teardown()` to stop the envtest control plane
 - `BeforeEach`: create a fresh namespace
 - Use builder wrappers from `pkg/util/testing`
 - Assert expected child resource creation and status conditions
 
+```go
+ginkgo.BeforeAll(func() {
+    fwk = &framework.Framework{}
+    cfg = fwk.Init()
+    ctx, k8sClient = fwk.RunManager(cfg, true)
+})
+ginkgo.AfterAll(func() {
+    fwk.Teardown()
+})
+```
+
 ### Webhook tests
 
-File: `test/integration/webhooks/<newresource>_test.go`
+File: `test/integration/webhooks/<newresource>_webhook_test.go`
 
 Pattern:
-- `BeforeAll`: call `fwk.Init()` + `fwk.RunManager(cfg, false)` (no controllers)
+- `BeforeAll`: call `fwk.Init()` + `fwk.RunManager(cfg, false)` + `AfterAll` with `fwk.Teardown()`
+- The `false` argument only gates controller registration - `RunManager` always sets up webhooks
 - Test validation rejection and defaulting
 
 Reference:
@@ -291,34 +331,43 @@ The integration test framework (`test/integration/framework/framework.go`)
 automatically loads CRDs from `manifests/base/crds/` and webhook configs
 from `manifests/base/webhook/manifests.yaml`.
 
-## Step 8: Generate manifests and verify
+## Step 8: Manual manifest and Helm updates
 
-```bash
-make manifests
+After `make generate` (which already runs `make manifests`), two files
+require manual edits:
+
+1. Add the new CRD to `manifests/base/crds/kustomization.yaml`:
+
+```yaml
+resources:
+  # ... existing CRDs ...
+  - trainer.kubeflow.org_newresources.yaml
 ```
 
-This generates:
-- CRD YAML in `manifests/base/crds/trainer.kubeflow.org_newresources.yaml`
-- Updated RBAC in `manifests/base/rbac/role.yaml`
-- Updated webhook config in `manifests/base/webhook/manifests.yaml`
-- CRD copied to `charts/kubeflow-trainer/templates/crd/` with Helm conditionals
-
-Then run the full validation:
-
-```bash
-make fmt
-make test
-make test-integration
-make golangci-lint
-```
+2. Add RBAC rules to `charts/kubeflow-trainer/templates/rbac/clusterrole.yaml`
+   for the new resource (get, list, watch, create, update, patch, delete on
+   the resource, its status subresource, and finalizers).
 
 ## Verification
 
-After all steps, confirm:
-- `make generate` produces no uncommitted diff (generated files are up to date)
-- `make manifests` produces no uncommitted diff
-- `make test` passes
-- `make test-integration` passes
-- `make golangci-lint` passes
+After all steps, run the full CI-equivalent validation:
+
+```bash
+go mod tidy
+make verify-boilerplate
+make generate
+make fmt
+make golangci-lint
+make test
+make test-integration
+make test-python
+make helm-unittest
+```
+
+Confirm:
+- `make generate` produces no uncommitted diff (this already includes `manifests`)
+- All test and lint targets pass
 - New CRD YAML exists in `manifests/base/crds/` and `charts/kubeflow-trainer/templates/crd/`
+- CRD is listed in `manifests/base/crds/kustomization.yaml`
+- RBAC rules are added in `charts/kubeflow-trainer/templates/rbac/clusterrole.yaml`
 - No unrelated files were modified
