@@ -40,6 +40,18 @@ rules:
   - watch
 - apiGroups:
   - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
   - events.k8s.io
   resources:
   - events
@@ -56,6 +68,18 @@ rules:
   verbs:
   - get
   - list
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -104,7 +128,6 @@ rules:
   resources:
   - clustertrainingruntimes
   - trainingruntimes
-  - trainjobs
   verbs:
   - get
   - list
@@ -115,10 +138,30 @@ rules:
   - trainer.kubeflow.org
   resources:
   - clustertrainingruntimes/finalizers
+  - optimizationjobs/status
   - trainingruntimes/finalizers
   - trainjobs/finalizers
   - trainjobs/status
   verbs:
   - get
   - patch
+  - update
+- apiGroups:
+  - trainer.kubeflow.org
+  resources:
+  - optimizationjobs
+  - trainjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - trainer.kubeflow.org
+  resources:
+  - optimizationjobs/finalizers
+  verbs:
   - update
