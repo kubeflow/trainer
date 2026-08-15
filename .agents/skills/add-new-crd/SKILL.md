@@ -357,6 +357,7 @@ go mod tidy
 make verify-boilerplate
 make generate
 make fmt
+make vet
 make golangci-lint
 make test
 make test-integration
