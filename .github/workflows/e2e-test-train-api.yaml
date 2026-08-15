@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kubernetes-version: ["v1.31.4"]
+        kubernetes-version: ["v1.35.0"]
         python-version: ["3.9", "3.10", "3.11"]
     steps:
       - name: Checkout
