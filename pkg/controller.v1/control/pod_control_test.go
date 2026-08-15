@@ -44,7 +44,7 @@ func TestCreatePods(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	k8sClient := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &corev1.SchemeGroupVersion}})
+	k8sClient := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &corev1.SchemeGroupVersion, ContentType: runtime.ContentTypeJSON}})
 
 	podControl := RealPodControl{
 		KubeClient: k8sClient,

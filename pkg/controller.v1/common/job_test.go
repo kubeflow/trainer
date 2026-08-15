@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	apiv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
 	"github.com/kubeflow/training-operator/pkg/controller.v1/control"
 	testjobv1 "github.com/kubeflow/training-operator/test_job/apis/test_job/v1"
@@ -32,6 +33,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 )
+
+// The fake clientset stamps a resource version onto list results, which is
+// irrelevant to what these tests assert.
+var ignoreListResourceVersion = cmpopts.IgnoreFields(metav1.ListMeta{}, "ResourceVersion")
 
 func TestDeletePodsAndServices(T *testing.T) {
 	pods := []runtime.Object{
@@ -134,14 +139,14 @@ func TestDeletePodsAndServices(T *testing.T) {
 			if err != nil {
 				t.Errorf("Failed to list pods: %v", err)
 			}
-			if diff := cmp.Diff(tc.wantPods, gotPods); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantPods, gotPods, ignoreListResourceVersion); len(diff) != 0 {
 				t.Errorf("Unexpected pods after running DeletePodsAndServices (-want,+got):%s\n", diff)
 			}
 			gotServices, err := fakeClient.CoreV1().Services("").List(context.Background(), metav1.ListOptions{})
 			if err != nil {
 				t.Errorf("Failed to list services: %v", err)
 			}
-			if diff := cmp.Diff(tc.wantService, gotServices); len(diff) != 0 {
+			if diff := cmp.Diff(tc.wantService, gotServices, ignoreListResourceVersion); len(diff) != 0 {
 				t.Errorf("Unexpected services after running DeletePodsAndServices (-want,+got):%s\n", diff)
 			}
 		})
