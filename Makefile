@@ -102,7 +102,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 	$(KUSTOMIZE) build manifests/base/crds | kubectl delete -f -
 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd manifests/overlays/standalone && $(KUSTOMIZE) edit set image kubeflow/training-operator=${IMG}
+	cd manifests/overlays/standalone && $(KUSTOMIZE) edit set image ghcr.io/kubeflow/training-v1/training-operator=${IMG}
 	$(KUSTOMIZE) build manifests/overlays/standalone | kubectl apply -f -
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
