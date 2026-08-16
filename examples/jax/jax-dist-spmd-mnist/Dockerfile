@@ -1,7 +1,10 @@
 FROM python:3.13
 
 RUN pip install --upgrade pip
-RUN pip install --upgrade jax[k8s] absl-py
+# Pinned to the versions this example shipped with in v1.9.3. Left unpinned,
+# pip now resolves jax 0.11.0, on which this example no longer completes within
+# the e2e test's 900s timeout.
+RUN pip install "jax[k8s]==0.6.2" "absl-py==2.3.1"
 
 RUN apt-get update && apt-get install -y \
     build-essential \
