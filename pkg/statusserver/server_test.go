@@ -22,10 +22,12 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,6 +65,74 @@ func newTestServer(t *testing.T, cfg *configapi.StatusServer, authorizer TokenAu
 	}
 
 	return httptest.NewServer(srv.httpServer.Handler)
+}
+
+// serverLifecycleTimeout bounds how long the server lifecycle test waits for the server to
+// start serving and to stop again.
+const serverLifecycleTimeout = 30 * time.Second
+
+// TestServerStartReturnsAfterContextCancel guards the invariant that Start returns
+// once its context is cancelled. Nothing but Start's own goroutine closes the
+// shutdown channel it waits on, so a regression there leaves the server runnable
+// blocked forever and the manager never finishes stopping.
+func TestServerStartReturnsAfterContextCancel(t *testing.T) {
+	// Reuse the localhost certificate httptest ships with, so that the server can
+	// serve real TLS without this test having to mint a certificate of its own.
+	certSrv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	t.Cleanup(certSrv.Close)
+
+	srv, err := NewServer(
+		utiltesting.NewClientBuilder().Build(),
+		&configapi.StatusServer{Port: ptr.To(freeLoopbackPort(t))},
+		&tls.Config{Certificates: certSrv.TLS.Certificates},
+		fakeAuthorizer{authorized: true},
+	)
+	if err != nil {
+		t.Fatalf("NewServer() error: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	stopped := make(chan error, 1)
+	go func() { stopped <- srv.Start(ctx) }()
+
+	// Wait for the server to serve before stopping it, so that the shutdown path
+	// under test is the one that runs in production.
+	isServing := probeChecker(srv.httpServer.Addr)
+	deadline := time.Now().Add(serverLifecycleTimeout)
+	for isServing(nil) != nil {
+		if time.Now().After(deadline) {
+			t.Fatal("Timed out waiting for the status server to accept TLS connections")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	cancel()
+
+	select {
+	case err := <-stopped:
+		if err != nil {
+			t.Errorf("Start() error after context cancellation: %v", err)
+		}
+	case <-time.After(serverLifecycleTimeout):
+		t.Fatal("Start() did not return after its context was cancelled")
+	}
+}
+
+// freeLoopbackPort reserves a port from the kernel and releases it again, so the
+// caller can bind it. This is racy in principle but reliable enough for a test.
+func freeLoopbackPort(t *testing.T) int32 {
+	t.Helper()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to reserve a free port: %v", err)
+	}
+	port := int32(ln.Addr().(*net.TCPAddr).Port)
+	if err := ln.Close(); err != nil {
+		t.Fatalf("Failed to release the reserved port: %v", err)
+	}
+
+	return port
 }
 
 func TestServerErrorResponses(t *testing.T) {

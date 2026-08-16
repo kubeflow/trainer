@@ -144,6 +144,16 @@ func main() {
 		setupLog.Error(err, "Could not initialize runtimes")
 		os.Exit(1)
 	}
+
+	// The status server probes must be registered before the manager starts,
+	// because controller-runtime rejects check registrations afterwards.
+	if features.Enabled(features.TrainJobStatus) {
+		if err := statusserver.RegisterProbes(mgr, cfg.StatusServer); err != nil {
+			setupLog.Error(err, "Could not register runtime status server probes")
+			os.Exit(1)
+		}
+	}
+
 	// Set up controllers and other components using goroutines to start the manager quickly.
 	go setupManagerComponents(mgr, runtimes, &cfg, certsReady)
 
