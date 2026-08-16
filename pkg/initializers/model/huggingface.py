@@ -43,15 +43,31 @@ class HuggingFace(utils.ModelProvider):
         if self.config.access_token:
             huggingface_hub.login(self.config.access_token)
 
-        # TODO (andreyvelich): We should consider to follow vLLM approach with allow patterns.
+        allow_patterns = ["*.json", "*.safetensors", "*.model", "*.txt"]
+        ignore_patterns = self.config.ignore_patterns
+
+        # By default we skip the legacy, pickle-based PyTorch weight formats
+        # in favor of safetensors, since safetensors is the safer format and
+        # downloading both is wasteful. But some repos only ship the legacy
+        # formats, so if that's the case here, allow them through instead of
+        # silently downloading nothing usable.
         # Ref: https://github.com/kubeflow/trainer/pull/2303#discussion_r1815913663
-        # TODO (andreyvelich): We should update patterns for Mistral model
-        # Ref: https://github.com/kubeflow/trainer/pull/2303#discussion_r1815914270
+        # Ref: https://github.com/kubeflow/trainer/issues/3909
+        legacy_weight_patterns = ["*.bin", "*.pt", "*.pth"]
+        if ignore_patterns and set(legacy_weight_patterns) & set(ignore_patterns):
+            repo_files = huggingface_hub.list_repo_files(model_uri)
+            has_safetensors = any(f.endswith(".safetensors") for f in repo_files)
+            if not has_safetensors:
+                allow_patterns += legacy_weight_patterns
+                ignore_patterns = [
+                    p for p in ignore_patterns if p not in legacy_weight_patterns
+                ]
+
         huggingface_hub.snapshot_download(
             repo_id=model_uri,
             local_dir=utils.MODEL_PATH,
-            allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt"],
-            ignore_patterns=self.config.ignore_patterns,
+            allow_patterns=allow_patterns,
+            ignore_patterns=ignore_patterns,
         )
 
         logging.info("Model has been downloaded")
