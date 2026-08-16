@@ -190,6 +190,9 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 			if container.Name != constants.Node {
 				continue
 			}
+			if trainJob.Spec.Trainer != nil {
+				apply.UpsertEnvVars(&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Env, apply.EnvVars(trainJob.Spec.Trainer.Env...)...)
+			}
 			apply.UpsertVolumeMounts(
 				&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].VolumeMounts,
 				[]corev1ac.VolumeMountApplyConfiguration{
