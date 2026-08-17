@@ -41,6 +41,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/config"
 	"github.com/kubeflow/trainer/v2/pkg/controller"
 	"github.com/kubeflow/trainer/v2/pkg/features"
+	"github.com/kubeflow/trainer/v2/pkg/metrics"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
 	"github.com/kubeflow/trainer/v2/pkg/statusserver"
@@ -165,6 +166,11 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 	}
 	if failedWebhook, err := webhooks.Setup(mgr, runtimes); err != nil {
 		setupLog.Error(err, "Could not create webhook", "webhook", failedWebhook)
+		os.Exit(1)
+	}
+
+	if err := metrics.SetupServer(mgr, &cfg.Metrics, cfg.TLS); err != nil {
+		setupLog.Error(err, "Could not create metrics server")
 		os.Exit(1)
 	}
 

@@ -57,9 +57,10 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration) {
 	}
 
 	o.Metrics = metricsserver.Options{
-		BindAddress:   cfg.Metrics.BindAddress,
-		SecureServing: cfg.Metrics.SecureServing != nil && *cfg.Metrics.SecureServing,
-		TLSOpts:       tlsOpts,
+		// The metrics server is always started manually in setupManagerComponents
+		// after certificates are guaranteed to be present. Disable the manager's
+		// built-in metrics server to prevent it from racing for the same port.
+		BindAddress: "0",
 	}
 
 	if cfg.Webhook.Port != nil {
