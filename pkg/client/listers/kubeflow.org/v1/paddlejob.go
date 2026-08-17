@@ -17,10 +17,10 @@
 package v1
 
 import (
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PaddleJobLister helps list PaddleJobs.
@@ -28,7 +28,7 @@ import (
 type PaddleJobLister interface {
 	// List lists all PaddleJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.PaddleJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.PaddleJob, err error)
 	// PaddleJobs returns an object that can list and get PaddleJobs.
 	PaddleJobs(namespace string) PaddleJobNamespaceLister
 	PaddleJobListerExpansion
@@ -36,17 +36,17 @@ type PaddleJobLister interface {
 
 // paddleJobLister implements the PaddleJobLister interface.
 type paddleJobLister struct {
-	listers.ResourceIndexer[*v1.PaddleJob]
+	listers.ResourceIndexer[*kubefloworgv1.PaddleJob]
 }
 
 // NewPaddleJobLister returns a new PaddleJobLister.
 func NewPaddleJobLister(indexer cache.Indexer) PaddleJobLister {
-	return &paddleJobLister{listers.New[*v1.PaddleJob](indexer, v1.Resource("paddlejob"))}
+	return &paddleJobLister{listers.New[*kubefloworgv1.PaddleJob](indexer, kubefloworgv1.Resource("paddlejob"))}
 }
 
 // PaddleJobs returns an object that can list and get PaddleJobs.
 func (s *paddleJobLister) PaddleJobs(namespace string) PaddleJobNamespaceLister {
-	return paddleJobNamespaceLister{listers.NewNamespaced[*v1.PaddleJob](s.ResourceIndexer, namespace)}
+	return paddleJobNamespaceLister{listers.NewNamespaced[*kubefloworgv1.PaddleJob](s.ResourceIndexer, namespace)}
 }
 
 // PaddleJobNamespaceLister helps list and get PaddleJobs.
@@ -54,15 +54,15 @@ func (s *paddleJobLister) PaddleJobs(namespace string) PaddleJobNamespaceLister 
 type PaddleJobNamespaceLister interface {
 	// List lists all PaddleJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.PaddleJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.PaddleJob, err error)
 	// Get retrieves the PaddleJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.PaddleJob, error)
+	Get(name string) (*kubefloworgv1.PaddleJob, error)
 	PaddleJobNamespaceListerExpansion
 }
 
 // paddleJobNamespaceLister implements the PaddleJobNamespaceLister
 // interface.
 type paddleJobNamespaceLister struct {
-	listers.ResourceIndexer[*v1.PaddleJob]
+	listers.ResourceIndexer[*kubefloworgv1.PaddleJob]
 }

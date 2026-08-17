@@ -18,14 +18,24 @@ package v1
 
 import (
 	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ReplicaSpecApplyConfiguration represents a declarative configuration of the ReplicaSpec type for use
 // with apply.
+//
+// ReplicaSpec is a description of the replica
 type ReplicaSpecApplyConfiguration struct {
-	Replicas      *int32                       `json:"replicas,omitempty"`
-	Template      *v1.PodTemplateSpec          `json:"template,omitempty"`
+	// Replicas is the desired number of replicas of the given template.
+	// If unspecified, defaults to 1.
+	Replicas *int32 `json:"replicas,omitempty"`
+	// Template is the object that describes the pod that
+	// will be created for this replica. RestartPolicy in PodTemplateSpec
+	// will be overide by RestartPolicy in ReplicaSpec
+	Template *corev1.PodTemplateSpec `json:"template,omitempty"`
+	// Restart policy for all replicas within the job.
+	// One of Always, OnFailure, Never and ExitCode.
+	// Default to Never.
 	RestartPolicy *kubefloworgv1.RestartPolicy `json:"restartPolicy,omitempty"`
 }
 
@@ -46,7 +56,7 @@ func (b *ReplicaSpecApplyConfiguration) WithReplicas(value int32) *ReplicaSpecAp
 // WithTemplate sets the Template field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Template field is set to the value of the last call.
-func (b *ReplicaSpecApplyConfiguration) WithTemplate(value v1.PodTemplateSpec) *ReplicaSpecApplyConfiguration {
+func (b *ReplicaSpecApplyConfiguration) WithTemplate(value corev1.PodTemplateSpec) *ReplicaSpecApplyConfiguration {
 	b.Template = &value
 	return b
 }

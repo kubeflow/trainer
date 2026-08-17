@@ -17,10 +17,10 @@
 package v1
 
 import (
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // JAXJobLister helps list JAXJobs.
@@ -28,7 +28,7 @@ import (
 type JAXJobLister interface {
 	// List lists all JAXJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.JAXJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.JAXJob, err error)
 	// JAXJobs returns an object that can list and get JAXJobs.
 	JAXJobs(namespace string) JAXJobNamespaceLister
 	JAXJobListerExpansion
@@ -36,17 +36,17 @@ type JAXJobLister interface {
 
 // jAXJobLister implements the JAXJobLister interface.
 type jAXJobLister struct {
-	listers.ResourceIndexer[*v1.JAXJob]
+	listers.ResourceIndexer[*kubefloworgv1.JAXJob]
 }
 
 // NewJAXJobLister returns a new JAXJobLister.
 func NewJAXJobLister(indexer cache.Indexer) JAXJobLister {
-	return &jAXJobLister{listers.New[*v1.JAXJob](indexer, v1.Resource("jaxjob"))}
+	return &jAXJobLister{listers.New[*kubefloworgv1.JAXJob](indexer, kubefloworgv1.Resource("jaxjob"))}
 }
 
 // JAXJobs returns an object that can list and get JAXJobs.
 func (s *jAXJobLister) JAXJobs(namespace string) JAXJobNamespaceLister {
-	return jAXJobNamespaceLister{listers.NewNamespaced[*v1.JAXJob](s.ResourceIndexer, namespace)}
+	return jAXJobNamespaceLister{listers.NewNamespaced[*kubefloworgv1.JAXJob](s.ResourceIndexer, namespace)}
 }
 
 // JAXJobNamespaceLister helps list and get JAXJobs.
@@ -54,15 +54,15 @@ func (s *jAXJobLister) JAXJobs(namespace string) JAXJobNamespaceLister {
 type JAXJobNamespaceLister interface {
 	// List lists all JAXJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.JAXJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.JAXJob, err error)
 	// Get retrieves the JAXJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.JAXJob, error)
+	Get(name string) (*kubefloworgv1.JAXJob, error)
 	JAXJobNamespaceListerExpansion
 }
 
 // jAXJobNamespaceLister implements the JAXJobNamespaceLister
 // interface.
 type jAXJobNamespaceLister struct {
-	listers.ResourceIndexer[*v1.JAXJob]
+	listers.ResourceIndexer[*kubefloworgv1.JAXJob]
 }

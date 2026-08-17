@@ -169,7 +169,7 @@ func (jc *JobController) ReconcileJobs(
 		commonutil.UpdateJobConditions(&jobStatus, apiv1.JobSuspended, corev1.ConditionFalse, commonutil.NewReason(jobKind, commonutil.JobResumedReason), msg)
 		now := metav1.Now()
 		jobStatus.StartTime = &now
-		jc.Recorder.Eventf(runtimeObject, corev1.EventTypeNormal, commonutil.NewReason(jobKind, commonutil.JobResumedReason), msg)
+		jc.Recorder.Event(runtimeObject, corev1.EventTypeNormal, commonutil.NewReason(jobKind, commonutil.JobResumedReason), msg)
 	}
 
 	// retrieve the previous number of retry

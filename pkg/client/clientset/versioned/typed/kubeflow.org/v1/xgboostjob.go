@@ -17,10 +17,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/applyconfiguration/kubeflow.org/v1"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	applyconfigurationkubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/applyconfiguration/kubeflow.org/v1"
 	scheme "github.com/kubeflow/training-operator/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,36 +36,37 @@ type XGBoostJobsGetter interface {
 
 // XGBoostJobInterface has methods to work with XGBoostJob resources.
 type XGBoostJobInterface interface {
-	Create(ctx context.Context, xGBoostJob *v1.XGBoostJob, opts metav1.CreateOptions) (*v1.XGBoostJob, error)
-	Update(ctx context.Context, xGBoostJob *v1.XGBoostJob, opts metav1.UpdateOptions) (*v1.XGBoostJob, error)
+	Create(ctx context.Context, xGBoostJob *kubefloworgv1.XGBoostJob, opts metav1.CreateOptions) (*kubefloworgv1.XGBoostJob, error)
+	Update(ctx context.Context, xGBoostJob *kubefloworgv1.XGBoostJob, opts metav1.UpdateOptions) (*kubefloworgv1.XGBoostJob, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, xGBoostJob *v1.XGBoostJob, opts metav1.UpdateOptions) (*v1.XGBoostJob, error)
+	UpdateStatus(ctx context.Context, xGBoostJob *kubefloworgv1.XGBoostJob, opts metav1.UpdateOptions) (*kubefloworgv1.XGBoostJob, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.XGBoostJob, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.XGBoostJobList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*kubefloworgv1.XGBoostJob, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*kubefloworgv1.XGBoostJobList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.XGBoostJob, err error)
-	Apply(ctx context.Context, xGBoostJob *kubefloworgv1.XGBoostJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.XGBoostJob, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *kubefloworgv1.XGBoostJob, err error)
+	Apply(ctx context.Context, xGBoostJob *applyconfigurationkubefloworgv1.XGBoostJobApplyConfiguration, opts metav1.ApplyOptions) (result *kubefloworgv1.XGBoostJob, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, xGBoostJob *kubefloworgv1.XGBoostJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.XGBoostJob, err error)
+	ApplyStatus(ctx context.Context, xGBoostJob *applyconfigurationkubefloworgv1.XGBoostJobApplyConfiguration, opts metav1.ApplyOptions) (result *kubefloworgv1.XGBoostJob, err error)
 	XGBoostJobExpansion
 }
 
 // xGBoostJobs implements XGBoostJobInterface
 type xGBoostJobs struct {
-	*gentype.ClientWithListAndApply[*v1.XGBoostJob, *v1.XGBoostJobList, *kubefloworgv1.XGBoostJobApplyConfiguration]
+	*gentype.ClientWithListAndApply[*kubefloworgv1.XGBoostJob, *kubefloworgv1.XGBoostJobList, *applyconfigurationkubefloworgv1.XGBoostJobApplyConfiguration]
 }
 
 // newXGBoostJobs returns a XGBoostJobs
 func newXGBoostJobs(c *KubeflowV1Client, namespace string) *xGBoostJobs {
 	return &xGBoostJobs{
-		gentype.NewClientWithListAndApply[*v1.XGBoostJob, *v1.XGBoostJobList, *kubefloworgv1.XGBoostJobApplyConfiguration](
+		gentype.NewClientWithListAndApply[*kubefloworgv1.XGBoostJob, *kubefloworgv1.XGBoostJobList, *applyconfigurationkubefloworgv1.XGBoostJobApplyConfiguration](
 			"xgboostjobs",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.XGBoostJob { return &v1.XGBoostJob{} },
-			func() *v1.XGBoostJobList { return &v1.XGBoostJobList{} }),
+			func() *kubefloworgv1.XGBoostJob { return &kubefloworgv1.XGBoostJob{} },
+			func() *kubefloworgv1.XGBoostJobList { return &kubefloworgv1.XGBoostJobList{} },
+		),
 	}
 }

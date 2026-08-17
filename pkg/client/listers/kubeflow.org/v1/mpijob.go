@@ -17,10 +17,10 @@
 package v1
 
 import (
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // MPIJobLister helps list MPIJobs.
@@ -28,7 +28,7 @@ import (
 type MPIJobLister interface {
 	// List lists all MPIJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.MPIJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.MPIJob, err error)
 	// MPIJobs returns an object that can list and get MPIJobs.
 	MPIJobs(namespace string) MPIJobNamespaceLister
 	MPIJobListerExpansion
@@ -36,17 +36,17 @@ type MPIJobLister interface {
 
 // mPIJobLister implements the MPIJobLister interface.
 type mPIJobLister struct {
-	listers.ResourceIndexer[*v1.MPIJob]
+	listers.ResourceIndexer[*kubefloworgv1.MPIJob]
 }
 
 // NewMPIJobLister returns a new MPIJobLister.
 func NewMPIJobLister(indexer cache.Indexer) MPIJobLister {
-	return &mPIJobLister{listers.New[*v1.MPIJob](indexer, v1.Resource("mpijob"))}
+	return &mPIJobLister{listers.New[*kubefloworgv1.MPIJob](indexer, kubefloworgv1.Resource("mpijob"))}
 }
 
 // MPIJobs returns an object that can list and get MPIJobs.
 func (s *mPIJobLister) MPIJobs(namespace string) MPIJobNamespaceLister {
-	return mPIJobNamespaceLister{listers.NewNamespaced[*v1.MPIJob](s.ResourceIndexer, namespace)}
+	return mPIJobNamespaceLister{listers.NewNamespaced[*kubefloworgv1.MPIJob](s.ResourceIndexer, namespace)}
 }
 
 // MPIJobNamespaceLister helps list and get MPIJobs.
@@ -54,15 +54,15 @@ func (s *mPIJobLister) MPIJobs(namespace string) MPIJobNamespaceLister {
 type MPIJobNamespaceLister interface {
 	// List lists all MPIJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.MPIJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.MPIJob, err error)
 	// Get retrieves the MPIJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.MPIJob, error)
+	Get(name string) (*kubefloworgv1.MPIJob, error)
 	MPIJobNamespaceListerExpansion
 }
 
 // mPIJobNamespaceLister implements the MPIJobNamespaceLister
 // interface.
 type mPIJobNamespaceLister struct {
-	listers.ResourceIndexer[*v1.MPIJob]
+	listers.ResourceIndexer[*kubefloworgv1.MPIJob]
 }

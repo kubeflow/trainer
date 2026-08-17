@@ -17,10 +17,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/applyconfiguration/kubeflow.org/v1"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	applyconfigurationkubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/applyconfiguration/kubeflow.org/v1"
 	scheme "github.com/kubeflow/training-operator/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -36,36 +36,37 @@ type JAXJobsGetter interface {
 
 // JAXJobInterface has methods to work with JAXJob resources.
 type JAXJobInterface interface {
-	Create(ctx context.Context, jAXJob *v1.JAXJob, opts metav1.CreateOptions) (*v1.JAXJob, error)
-	Update(ctx context.Context, jAXJob *v1.JAXJob, opts metav1.UpdateOptions) (*v1.JAXJob, error)
+	Create(ctx context.Context, jAXJob *kubefloworgv1.JAXJob, opts metav1.CreateOptions) (*kubefloworgv1.JAXJob, error)
+	Update(ctx context.Context, jAXJob *kubefloworgv1.JAXJob, opts metav1.UpdateOptions) (*kubefloworgv1.JAXJob, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, jAXJob *v1.JAXJob, opts metav1.UpdateOptions) (*v1.JAXJob, error)
+	UpdateStatus(ctx context.Context, jAXJob *kubefloworgv1.JAXJob, opts metav1.UpdateOptions) (*kubefloworgv1.JAXJob, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.JAXJob, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.JAXJobList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*kubefloworgv1.JAXJob, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*kubefloworgv1.JAXJobList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.JAXJob, err error)
-	Apply(ctx context.Context, jAXJob *kubefloworgv1.JAXJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.JAXJob, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *kubefloworgv1.JAXJob, err error)
+	Apply(ctx context.Context, jAXJob *applyconfigurationkubefloworgv1.JAXJobApplyConfiguration, opts metav1.ApplyOptions) (result *kubefloworgv1.JAXJob, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, jAXJob *kubefloworgv1.JAXJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.JAXJob, err error)
+	ApplyStatus(ctx context.Context, jAXJob *applyconfigurationkubefloworgv1.JAXJobApplyConfiguration, opts metav1.ApplyOptions) (result *kubefloworgv1.JAXJob, err error)
 	JAXJobExpansion
 }
 
 // jAXJobs implements JAXJobInterface
 type jAXJobs struct {
-	*gentype.ClientWithListAndApply[*v1.JAXJob, *v1.JAXJobList, *kubefloworgv1.JAXJobApplyConfiguration]
+	*gentype.ClientWithListAndApply[*kubefloworgv1.JAXJob, *kubefloworgv1.JAXJobList, *applyconfigurationkubefloworgv1.JAXJobApplyConfiguration]
 }
 
 // newJAXJobs returns a JAXJobs
 func newJAXJobs(c *KubeflowV1Client, namespace string) *jAXJobs {
 	return &jAXJobs{
-		gentype.NewClientWithListAndApply[*v1.JAXJob, *v1.JAXJobList, *kubefloworgv1.JAXJobApplyConfiguration](
+		gentype.NewClientWithListAndApply[*kubefloworgv1.JAXJob, *kubefloworgv1.JAXJobList, *applyconfigurationkubefloworgv1.JAXJobApplyConfiguration](
 			"jaxjobs",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.JAXJob { return &v1.JAXJob{} },
-			func() *v1.JAXJobList { return &v1.JAXJobList{} }),
+			func() *kubefloworgv1.JAXJob { return &kubefloworgv1.JAXJob{} },
+			func() *kubefloworgv1.JAXJobList { return &kubefloworgv1.JAXJobList{} },
+		),
 	}
 }

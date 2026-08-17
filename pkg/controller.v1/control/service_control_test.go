@@ -48,6 +48,7 @@ func TestCreateService(t *testing.T) {
 		Host: testServer.URL,
 		ContentConfig: restclient.ContentConfig{
 			GroupVersion: &v1.SchemeGroupVersion,
+			ContentType:  runtime.ContentTypeJSON,
 		},
 	})
 
@@ -97,6 +98,7 @@ func TestCreateServicesWithControllerRef(t *testing.T) {
 		Host: testServer.URL,
 		ContentConfig: restclient.ContentConfig{
 			GroupVersion: &v1.SchemeGroupVersion,
+			ContentType:  runtime.ContentTypeJSON,
 		},
 	})
 

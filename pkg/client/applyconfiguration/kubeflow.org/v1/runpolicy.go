@@ -17,19 +17,50 @@
 package v1
 
 import (
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
 )
 
 // RunPolicyApplyConfiguration represents a declarative configuration of the RunPolicy type for use
 // with apply.
+//
+// RunPolicy encapsulates various runtime policies of the distributed training
+// job, for example how to clean up resources and how long the job can stay
+// active.
 type RunPolicyApplyConfiguration struct {
-	CleanPodPolicy          *v1.CleanPodPolicy                  `json:"cleanPodPolicy,omitempty"`
-	TTLSecondsAfterFinished *int32                              `json:"ttlSecondsAfterFinished,omitempty"`
-	ActiveDeadlineSeconds   *int64                              `json:"activeDeadlineSeconds,omitempty"`
-	BackoffLimit            *int32                              `json:"backoffLimit,omitempty"`
-	SchedulingPolicy        *SchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
-	Suspend                 *bool                               `json:"suspend,omitempty"`
-	ManagedBy               *string                             `json:"managedBy,omitempty"`
+	// CleanPodPolicy defines the policy to kill pods after the job completes.
+	// Default to None.
+	CleanPodPolicy *kubefloworgv1.CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
+	// TTLSecondsAfterFinished is the TTL to clean up jobs.
+	// It may take extra ReconcilePeriod seconds for the cleanup, since
+	// reconcile gets called periodically.
+	// Default to infinite.
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
+	// Specifies the duration in seconds relative to the startTime that the job may be active
+	// before the system tries to terminate it; value must be positive integer.
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
+	// Optional number of retries before marking this job failed.
+	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
+	// SchedulingPolicy defines the policy related to scheduling, e.g. gang-scheduling
+	SchedulingPolicy *SchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
+	// suspend specifies whether the Job controller should create Pods or not.
+	// If a Job is created with suspend set to true, no Pods are created by
+	// the Job controller. If a Job is suspended after creation (i.e. the
+	// flag goes from false to true), the Job controller will delete all
+	// active Pods and PodGroups associated with this Job.
+	// Users must design their workload to gracefully handle this.
+	// Suspending a Job will reset the StartTime field of the Job.
+	//
+	// Defaults to false.
+	Suspend *bool `json:"suspend,omitempty"`
+	// ManagedBy is used to indicate the controller or entity that manages a job.
+	// The value must be either an empty, 'kubeflow.org/training-operator' or
+	// 'kueue.x-k8s.io/multikueue'.
+	// The training-operator reconciles a job which doesn't have this
+	// field at all or the field value is the reserved string
+	// 'kubeflow.org/training-operator', but delegates reconciling the job
+	// with 'kueue.x-k8s.io/multikueue' to the Kueue.
+	// The field is immutable.
+	ManagedBy *string `json:"managedBy,omitempty"`
 }
 
 // RunPolicyApplyConfiguration constructs a declarative configuration of the RunPolicy type for use with
@@ -41,7 +72,7 @@ func RunPolicy() *RunPolicyApplyConfiguration {
 // WithCleanPodPolicy sets the CleanPodPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CleanPodPolicy field is set to the value of the last call.
-func (b *RunPolicyApplyConfiguration) WithCleanPodPolicy(value v1.CleanPodPolicy) *RunPolicyApplyConfiguration {
+func (b *RunPolicyApplyConfiguration) WithCleanPodPolicy(value kubefloworgv1.CleanPodPolicy) *RunPolicyApplyConfiguration {
 	b.CleanPodPolicy = &value
 	return b
 }

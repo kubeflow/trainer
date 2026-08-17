@@ -46,3 +46,12 @@ go run ${OPENAPI_PKG}/cmd/openapi-gen \
   --output-file "zz_generated.openapi.go" \
   --report-filename "${TRAINING_OPERATOR_ROOT}/hack/violation_exception_v1.list" \
   "${TRAINING_OPERATOR_ROOT}/pkg/apis/kubeflow.org/v1"
+
+# defaulter-gen emits imports for every package it traverses, including ones the
+# generated code does not reference, so prune them from the generated output.
+GOIMPORTS_VERSION=v0.49.0
+go install golang.org/x/tools/cmd/goimports@${GOIMPORTS_VERSION}
+echo "Pruning unused imports from the generated code"
+"$(go env GOPATH)"/bin/goimports -w \
+  "${TRAINING_OPERATOR_ROOT}/pkg/apis" \
+  "${TRAINING_OPERATOR_ROOT}/pkg/client"

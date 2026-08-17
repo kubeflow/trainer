@@ -17,15 +17,16 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	apiskubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
 	versioned "github.com/kubeflow/training-operator/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/kubeflow/training-operator/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "github.com/kubeflow/training-operator/pkg/client/listers/kubeflow.org/v1"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/listers/kubeflow.org/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -34,7 +35,7 @@ import (
 // JAXJobs.
 type JAXJobInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.JAXJobLister
+	Lister() kubefloworgv1.JAXJobLister
 }
 
 type jAXJobInformer struct {
@@ -47,42 +48,67 @@ type jAXJobInformer struct {
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewJAXJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredJAXJobInformer(client, namespace, resyncPeriod, indexers, nil)
+	return NewJAXJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
 }
 
 // NewFilteredJAXJobInformer constructs a new informer for JAXJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredJAXJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+	return NewJAXJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewJAXJobInformerWithOptions constructs a new informer for JAXJob type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewJAXJobInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	gvr := schema.GroupVersionResource{Group: "kubeflow.org", Version: "v1", Resource: "jaxjobs"}
+	identifier := options.InformerName.WithResource(gvr)
+	tweakListOptions := options.TweakListOptions
+	return cache.NewSharedIndexInformerWithOptions(
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.KubeflowV1().JAXJobs(namespace).List(context.TODO(), options)
+				return client.KubeflowV1().JAXJobs(namespace).List(context.Background(), opts)
 			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
-					tweakListOptions(&options)
+					tweakListOptions(&opts)
 				}
-				return client.KubeflowV1().JAXJobs(namespace).Watch(context.TODO(), options)
+				return client.KubeflowV1().JAXJobs(namespace).Watch(context.Background(), opts)
 			},
+			ListWithContextFunc: func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.KubeflowV1().JAXJobs(namespace).List(ctx, opts)
+			},
+			WatchFuncWithContext: func(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&opts)
+				}
+				return client.KubeflowV1().JAXJobs(namespace).Watch(ctx, opts)
+			},
+		}, client),
+		&apiskubefloworgv1.JAXJob{},
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: options.ResyncPeriod,
+			Indexers:     options.Indexers,
+			Identifier:   identifier,
 		},
-		&kubefloworgv1.JAXJob{},
-		resyncPeriod,
-		indexers,
 	)
 }
 
 func (f *jAXJobInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredJAXJobInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewJAXJobInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *jAXJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&kubefloworgv1.JAXJob{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiskubefloworgv1.JAXJob{}, f.defaultInformer)
 }
 
-func (f *jAXJobInformer) Lister() v1.JAXJobLister {
-	return v1.NewJAXJobLister(f.Informer().GetIndexer())
+func (f *jAXJobInformer) Lister() kubefloworgv1.JAXJobLister {
+	return kubefloworgv1.NewJAXJobLister(f.Informer().GetIndexer())
 }

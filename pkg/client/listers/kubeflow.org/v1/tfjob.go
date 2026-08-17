@@ -17,10 +17,10 @@
 package v1
 
 import (
-	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // TFJobLister helps list TFJobs.
@@ -28,7 +28,7 @@ import (
 type TFJobLister interface {
 	// List lists all TFJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.TFJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.TFJob, err error)
 	// TFJobs returns an object that can list and get TFJobs.
 	TFJobs(namespace string) TFJobNamespaceLister
 	TFJobListerExpansion
@@ -36,17 +36,17 @@ type TFJobLister interface {
 
 // tFJobLister implements the TFJobLister interface.
 type tFJobLister struct {
-	listers.ResourceIndexer[*v1.TFJob]
+	listers.ResourceIndexer[*kubefloworgv1.TFJob]
 }
 
 // NewTFJobLister returns a new TFJobLister.
 func NewTFJobLister(indexer cache.Indexer) TFJobLister {
-	return &tFJobLister{listers.New[*v1.TFJob](indexer, v1.Resource("tfjob"))}
+	return &tFJobLister{listers.New[*kubefloworgv1.TFJob](indexer, kubefloworgv1.Resource("tfjob"))}
 }
 
 // TFJobs returns an object that can list and get TFJobs.
 func (s *tFJobLister) TFJobs(namespace string) TFJobNamespaceLister {
-	return tFJobNamespaceLister{listers.NewNamespaced[*v1.TFJob](s.ResourceIndexer, namespace)}
+	return tFJobNamespaceLister{listers.NewNamespaced[*kubefloworgv1.TFJob](s.ResourceIndexer, namespace)}
 }
 
 // TFJobNamespaceLister helps list and get TFJobs.
@@ -54,15 +54,15 @@ func (s *tFJobLister) TFJobs(namespace string) TFJobNamespaceLister {
 type TFJobNamespaceLister interface {
 	// List lists all TFJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.TFJob, err error)
+	List(selector labels.Selector) (ret []*kubefloworgv1.TFJob, err error)
 	// Get retrieves the TFJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.TFJob, error)
+	Get(name string) (*kubefloworgv1.TFJob, error)
 	TFJobNamespaceListerExpansion
 }
 
 // tFJobNamespaceLister implements the TFJobNamespaceLister
 // interface.
 type tFJobNamespaceLister struct {
-	listers.ResourceIndexer[*v1.TFJob]
+	listers.ResourceIndexer[*kubefloworgv1.TFJob]
 }

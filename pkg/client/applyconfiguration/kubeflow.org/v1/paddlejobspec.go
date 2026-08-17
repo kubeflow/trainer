@@ -22,9 +22,21 @@ import (
 
 // PaddleJobSpecApplyConfiguration represents a declarative configuration of the PaddleJobSpec type for use
 // with apply.
+//
+// PaddleJobSpec is a desired state description of the PaddleJob.
 type PaddleJobSpecApplyConfiguration struct {
-	RunPolicy          *RunPolicyApplyConfiguration                             `json:"runPolicy,omitempty"`
-	ElasticPolicy      *PaddleElasticPolicyApplyConfiguration                   `json:"elasticPolicy,omitempty"`
+	// RunPolicy encapsulates various runtime policies of the distributed training
+	// job, for example how to clean up resources and how long the job can stay
+	// active.
+	RunPolicy *RunPolicyApplyConfiguration `json:"runPolicy,omitempty"`
+	// ElasticPolicy holds the elastic policy for paddle job.
+	ElasticPolicy *PaddleElasticPolicyApplyConfiguration `json:"elasticPolicy,omitempty"`
+	// A map of PaddleReplicaType (type) to ReplicaSpec (value). Specifies the Paddle cluster configuration.
+	// For example,
+	// {
+	// "Master": PaddleReplicaSpec,
+	// "Worker": PaddleReplicaSpec,
+	// }
 	PaddleReplicaSpecs map[kubefloworgv1.ReplicaType]*kubefloworgv1.ReplicaSpec `json:"paddleReplicaSpecs,omitempty"`
 }
 

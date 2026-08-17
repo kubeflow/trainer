@@ -17,17 +17,26 @@
 package v1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ReplicaStatusApplyConfiguration represents a declarative configuration of the ReplicaStatus type for use
 // with apply.
+//
+// ReplicaStatus represents the current observed state of the replica.
 type ReplicaStatusApplyConfiguration struct {
-	Active        *int32                              `json:"active,omitempty"`
-	Succeeded     *int32                              `json:"succeeded,omitempty"`
-	Failed        *int32                              `json:"failed,omitempty"`
-	LabelSelector *v1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
-	Selector      *string                             `json:"selector,omitempty"`
+	// The number of actively running pods.
+	Active *int32 `json:"active,omitempty"`
+	// The number of pods which reached phase Succeeded.
+	Succeeded *int32 `json:"succeeded,omitempty"`
+	// The number of pods which reached phase Failed.
+	Failed *int32 `json:"failed,omitempty"`
+	// Deprecated: Use Selector instead
+	LabelSelector *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
+	// A Selector is a label query over a set of resources. The result of matchLabels and
+	// matchExpressions are ANDed. An empty Selector matches all objects. A null
+	// Selector matches no objects.
+	Selector *string `json:"selector,omitempty"`
 }
 
 // ReplicaStatusApplyConfiguration constructs a declarative configuration of the ReplicaStatus type for use with
@@ -63,7 +72,7 @@ func (b *ReplicaStatusApplyConfiguration) WithFailed(value int32) *ReplicaStatus
 // WithLabelSelector sets the LabelSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LabelSelector field is set to the value of the last call.
-func (b *ReplicaStatusApplyConfiguration) WithLabelSelector(value *v1.LabelSelectorApplyConfiguration) *ReplicaStatusApplyConfiguration {
+func (b *ReplicaStatusApplyConfiguration) WithLabelSelector(value *metav1.LabelSelectorApplyConfiguration) *ReplicaStatusApplyConfiguration {
 	b.LabelSelector = value
 	return b
 }

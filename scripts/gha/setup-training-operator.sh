@@ -24,7 +24,7 @@ kind load docker-image ${TRAINING_CI_IMAGE} --name ${KIND_CLUSTER}
 
 echo "Update training operator manifest with newly built image"
 cd manifests/overlays/standalone
-kustomize edit set image kubeflow/training-operator=${TRAINING_CI_IMAGE}
+kustomize edit set image ghcr.io/kubeflow/training-v1/training-operator=${TRAINING_CI_IMAGE}
 
 echo "Installing training operator manifests"
 kustomize build . | kubectl apply --server-side -f -

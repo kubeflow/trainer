@@ -17,179 +17,31 @@
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1 "github.com/kubeflow/training-operator/pkg/apis/kubeflow.org/v1"
 	kubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/applyconfiguration/kubeflow.org/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	typedkubefloworgv1 "github.com/kubeflow/training-operator/pkg/client/clientset/versioned/typed/kubeflow.org/v1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeJAXJobs implements JAXJobInterface
-type FakeJAXJobs struct {
+// fakeJAXJobs implements JAXJobInterface
+type fakeJAXJobs struct {
+	*gentype.FakeClientWithListAndApply[*v1.JAXJob, *v1.JAXJobList, *kubefloworgv1.JAXJobApplyConfiguration]
 	Fake *FakeKubeflowV1
-	ns   string
 }
 
-var jaxjobsResource = v1.SchemeGroupVersion.WithResource("jaxjobs")
-
-var jaxjobsKind = v1.SchemeGroupVersion.WithKind("JAXJob")
-
-// Get takes name of the jAXJob, and returns the corresponding jAXJob object, and an error if there is any.
-func (c *FakeJAXJobs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.JAXJob, err error) {
-	emptyResult := &v1.JAXJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(jaxjobsResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeJAXJobs(fake *FakeKubeflowV1, namespace string) typedkubefloworgv1.JAXJobInterface {
+	return &fakeJAXJobs{
+		gentype.NewFakeClientWithListAndApply[*v1.JAXJob, *v1.JAXJobList, *kubefloworgv1.JAXJobApplyConfiguration](
+			fake.Fake,
+			namespace,
+			v1.SchemeGroupVersion.WithResource("jaxjobs"),
+			v1.SchemeGroupVersion.WithKind("JAXJob"),
+			func() *v1.JAXJob { return &v1.JAXJob{} },
+			func() *v1.JAXJobList { return &v1.JAXJobList{} },
+			func(dst, src *v1.JAXJobList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.JAXJobList) []*v1.JAXJob { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.JAXJobList, items []*v1.JAXJob) { list.Items = gentype.FromPointerSlice(items) },
+		),
+		fake,
 	}
-	return obj.(*v1.JAXJob), err
-}
-
-// List takes label and field selectors, and returns the list of JAXJobs that match those selectors.
-func (c *FakeJAXJobs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.JAXJobList, err error) {
-	emptyResult := &v1.JAXJobList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(jaxjobsResource, jaxjobsKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.JAXJobList{ListMeta: obj.(*v1.JAXJobList).ListMeta}
-	for _, item := range obj.(*v1.JAXJobList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested jAXJobs.
-func (c *FakeJAXJobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(jaxjobsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a jAXJob and creates it.  Returns the server's representation of the jAXJob, and an error, if there is any.
-func (c *FakeJAXJobs) Create(ctx context.Context, jAXJob *v1.JAXJob, opts metav1.CreateOptions) (result *v1.JAXJob, err error) {
-	emptyResult := &v1.JAXJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(jaxjobsResource, c.ns, jAXJob, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.JAXJob), err
-}
-
-// Update takes the representation of a jAXJob and updates it. Returns the server's representation of the jAXJob, and an error, if there is any.
-func (c *FakeJAXJobs) Update(ctx context.Context, jAXJob *v1.JAXJob, opts metav1.UpdateOptions) (result *v1.JAXJob, err error) {
-	emptyResult := &v1.JAXJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(jaxjobsResource, c.ns, jAXJob, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.JAXJob), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeJAXJobs) UpdateStatus(ctx context.Context, jAXJob *v1.JAXJob, opts metav1.UpdateOptions) (result *v1.JAXJob, err error) {
-	emptyResult := &v1.JAXJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(jaxjobsResource, "status", c.ns, jAXJob, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.JAXJob), err
-}
-
-// Delete takes name of the jAXJob and deletes it. Returns an error if one occurs.
-func (c *FakeJAXJobs) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(jaxjobsResource, c.ns, name, opts), &v1.JAXJob{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeJAXJobs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(jaxjobsResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.JAXJobList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched jAXJob.
-func (c *FakeJAXJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.JAXJob, err error) {
-	emptyResult := &v1.JAXJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(jaxjobsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.JAXJob), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied jAXJob.
-func (c *FakeJAXJobs) Apply(ctx context.Context, jAXJob *kubefloworgv1.JAXJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.JAXJob, err error) {
-	if jAXJob == nil {
-		return nil, fmt.Errorf("jAXJob provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(jAXJob)
-	if err != nil {
-		return nil, err
-	}
-	name := jAXJob.Name
-	if name == nil {
-		return nil, fmt.Errorf("jAXJob.Name must be provided to Apply")
-	}
-	emptyResult := &v1.JAXJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(jaxjobsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.JAXJob), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeJAXJobs) ApplyStatus(ctx context.Context, jAXJob *kubefloworgv1.JAXJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.JAXJob, err error) {
-	if jAXJob == nil {
-		return nil, fmt.Errorf("jAXJob provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(jAXJob)
-	if err != nil {
-		return nil, err
-	}
-	name := jAXJob.Name
-	if name == nil {
-		return nil, fmt.Errorf("jAXJob.Name must be provided to Apply")
-	}
-	emptyResult := &v1.JAXJob{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(jaxjobsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.JAXJob), err
 }

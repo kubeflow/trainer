@@ -17,18 +17,21 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
 // SchedulingPolicyApplyConfiguration represents a declarative configuration of the SchedulingPolicy type for use
 // with apply.
+//
+// SchedulingPolicy encapsulates various scheduling policies of the distributed training
+// job, for example `minAvailable` for gang-scheduling.
 type SchedulingPolicyApplyConfiguration struct {
-	MinAvailable           *int32                                 `json:"minAvailable,omitempty"`
-	Queue                  *string                                `json:"queue,omitempty"`
-	MinResources           *map[v1.ResourceName]resource.Quantity `json:"minResources,omitempty"`
-	PriorityClass          *string                                `json:"priorityClass,omitempty"`
-	ScheduleTimeoutSeconds *int32                                 `json:"scheduleTimeoutSeconds,omitempty"`
+	MinAvailable           *int32                                     `json:"minAvailable,omitempty"`
+	Queue                  *string                                    `json:"queue,omitempty"`
+	MinResources           *map[corev1.ResourceName]resource.Quantity `json:"minResources,omitempty"`
+	PriorityClass          *string                                    `json:"priorityClass,omitempty"`
+	ScheduleTimeoutSeconds *int32                                     `json:"scheduleTimeoutSeconds,omitempty"`
 }
 
 // SchedulingPolicyApplyConfiguration constructs a declarative configuration of the SchedulingPolicy type for use with
@@ -56,7 +59,7 @@ func (b *SchedulingPolicyApplyConfiguration) WithQueue(value string) *Scheduling
 // WithMinResources sets the MinResources field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MinResources field is set to the value of the last call.
-func (b *SchedulingPolicyApplyConfiguration) WithMinResources(value map[v1.ResourceName]resource.Quantity) *SchedulingPolicyApplyConfiguration {
+func (b *SchedulingPolicyApplyConfiguration) WithMinResources(value map[corev1.ResourceName]resource.Quantity) *SchedulingPolicyApplyConfiguration {
 	b.MinResources = &value
 	return b
 }

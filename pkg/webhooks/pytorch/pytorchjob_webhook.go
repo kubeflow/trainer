@@ -42,9 +42,8 @@ var (
 type Webhook struct{}
 
 func SetupWebhook(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(&trainingoperator.PyTorchJob{}).
-		WithValidator(&Webhook{}).
+	return ctrl.NewWebhookManagedBy(mgr, &trainingoperator.PyTorchJob{}).
+		WithCustomValidator(&Webhook{}).
 		Complete()
 }
 
