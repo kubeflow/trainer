@@ -25,6 +25,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/util/cert"
 	"github.com/kubeflow/trainer/v2/pkg/util/tlsconfig"
 )
 
@@ -43,6 +44,9 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.ControllerMetrics, tlsOpts *co
 	}
 
 	if secureServing {
+		// CertDir must match the path cert-controller writes to; the metrics server
+		// default (/tmp/k8s-metrics-server/serving-certs) differs from the webhook path.
+		opts.CertDir = cert.GetCertDir()
 		opts.TLSOpts = []func(*tls.Config){
 			func(c *tls.Config) {
 				tlsconfig.Apply(c, tlsOpts)
