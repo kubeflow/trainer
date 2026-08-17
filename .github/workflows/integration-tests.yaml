@@ -16,7 +16,7 @@ jobs:
     # strategy:
     #   fail-fast: false
     #   matrix:
-    #     kubernetes-version: ["v1.33.7", "v1.34.3", "v1.35.0"]
+    #     kubernetes-version: ["v1.34.3", "v1.35.0"]
     #     gang-scheduler-name: ["none", "scheduler-plugins", "volcano"]
     # ```
     # The difference is that each combination is randomly assigned various Python versions
@@ -32,16 +32,10 @@ jobs:
           - kubernetes-version: v1.34.3
             gang-scheduler-name: "none"
             python-version: "3.10"
-          - kubernetes-version: v1.33.7
-            gang-scheduler-name: "none"
-            python-version: "3.11"
           - kubernetes-version: v1.35.0
             gang-scheduler-name: "scheduler-plugins"
             python-version: "3.10"
           - kubernetes-version: v1.34.3
-            gang-scheduler-name: "scheduler-plugins"
-            python-version: "3.11"
-          - kubernetes-version: v1.33.7
             gang-scheduler-name: "scheduler-plugins"
             python-version: "3.11"
           - kubernetes-version: v1.35.0
@@ -50,9 +44,6 @@ jobs:
           - kubernetes-version: v1.34.3
             gang-scheduler-name: "volcano"
             python-version: "3.11"
-          - kubernetes-version: v1.33.7
-            gang-scheduler-name: "volcano"
-            python-version: "3.10"
 
     steps:
       - name: Checkout
