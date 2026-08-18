@@ -111,6 +111,15 @@ type OptimizationJobSpec struct {
 	// trainJobTemplate is the template for the train job to run.
 	// +required
 	TrainJobTemplate TrainJobTemplateSpec `json:"trainJobTemplate,omitzero"`
+
+	// suspend specifies whether the OptimizationJob controller should suspend trial execution.
+	// Defaults to false.
+	// +optional
+	Suspend *bool `json:"suspend,omitempty"`
+
+	// managedBy is used to indicate the controller or entity that manages an OptimizationJob.
+	// +optional
+	ManagedBy *string `json:"managedBy,omitempty"`
 }
 
 type Objective struct {

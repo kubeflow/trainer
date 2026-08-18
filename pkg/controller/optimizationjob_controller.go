@@ -25,9 +25,11 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -43,6 +45,8 @@ const (
 	OptimizationJobComplete string = "Complete"
 	// OptimizationJobFailed means that trial execution encountered an error.
 	OptimizationJobFailed string = "Failed"
+	// OptimizationJobSuspended means that trial execution is suspended (e.g. by Kueue).
+	OptimizationJobSuspended string = "Suspended"
 
 	// EnvOptParamPrefix is the prefix used for injected hyperparameter environment variables.
 	EnvOptParamPrefix = "KUBEFLOW_TRAINER_OPT_"
@@ -81,8 +85,31 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
+	// Skip jobs managed by external controllers (e.g. MultiKueue)
+	if optJob.Spec.ManagedBy != nil && *optJob.Spec.ManagedBy != "trainer.kubeflow.org/optimizationjob-controller" {
+		r.log.V(2).Info("Skipping OptimizationJob managed by external controller", "managedBy", *optJob.Spec.ManagedBy)
+		return ctrl.Result{}, nil
+	}
+
+	// Keep track of original status for SSA / MergeFrom patch calculation
+	prevOptJob := optJob.DeepCopy()
+
 	if optJob.Status == nil {
 		optJob.Status = &trainer.OptimizationJobStatus{}
+	}
+
+	// Handle Kueue suspension gating
+	isSuspended := ptr.Deref(optJob.Spec.Suspend, false)
+	if isSuspended {
+		meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
+			Type:               OptimizationJobSuspended,
+			Status:             metav1.ConditionTrue,
+			Reason:             "OptimizationJobSuspended",
+			Message:            "OptimizationJob trial creation is suspended by Kueue",
+			LastTransitionTime: metav1.Now(),
+		})
+	} else {
+		meta.RemoveStatusCondition(&optJob.Status.Conditions, OptimizationJobSuspended)
 	}
 
 	// 1. Initialize status conditions if empty.
@@ -94,9 +121,6 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			Message:            "OptimizationJob is initializing trials",
 			LastTransitionTime: metav1.Now(),
 		})
-		if err := r.client.Status().Update(ctx, &optJob); err != nil {
-			return ctrl.Result{}, err
-		}
 	}
 
 	// 2. Fetch all child TrainJobs owned by this OptimizationJob.
@@ -139,22 +163,36 @@ func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
+	// Dynamically track best trial result as trials finish
+	if bestResult != nil {
+		optJob.Status.Result = *bestResult
+	}
+
 	// 3. Check if all trials are finished.
-	if completedCount+failedCount >= totalTrials {
-		if meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
+	allFinished := (completedCount+failedCount >= totalTrials)
+	if allFinished {
+		meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
 			Type:               OptimizationJobComplete,
 			Status:             metav1.ConditionTrue,
 			Reason:             "MaxTrialsReached",
 			Message:            fmt.Sprintf("Completed %d of %d trials", completedCount, totalTrials),
 			LastTransitionTime: metav1.Now(),
-		}) {
-			if bestResult != nil {
-				optJob.Status.Result = *bestResult
-			}
-			if err := r.client.Status().Update(ctx, &optJob); err != nil {
-				return ctrl.Result{}, err
-			}
+		})
+	}
+
+	// Patch status cleanly if status changed (matching TrainJob controller & PR #3362 pattern)
+	if prevOptJob.Status == nil || !equality.Semantic.DeepEqual(optJob.Status, prevOptJob.Status) {
+		if err := r.client.Status().Patch(ctx, &optJob, client.MergeFrom(prevOptJob)); err != nil {
+			return ctrl.Result{}, err
 		}
+	}
+
+	if allFinished {
+		return ctrl.Result{}, nil
+	}
+
+	if isSuspended {
+		r.log.V(2).Info("OptimizationJob is suspended, skipping trial creation", "optimizationJob", optJob.Name)
 		return ctrl.Result{}, nil
 	}
 

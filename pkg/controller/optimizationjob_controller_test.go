@@ -200,3 +200,82 @@ func TestOptimizationJobReconciler_Reconcile(t *testing.T) {
 		t.Errorf("expected OptimizationJob to have Complete status condition")
 	}
 }
+
+func TestOptimizationJobReconcile_Suspend(t *testing.T) {
+	scheme := setupScheme(t)
+
+	optJob := &trainer.OptimizationJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "suspended-optjob",
+			Namespace: "default",
+		},
+		Spec: trainer.OptimizationJobSpec{
+			Suspend: ptr.To(true),
+			Objectives: []trainer.Objective{
+				{Metric: "val_loss"},
+			},
+			Parameters: []trainer.Parameter{
+				{
+					Name: "lr",
+					SearchSpace: &trainer.SearchSpace{
+						Categorical: trainer.CategoricalSpace{
+							Choices: []string{"0.01", "0.001"},
+						},
+					},
+				},
+			},
+			NumTrials:      2,
+			ParallelTrials: 1,
+			TrainJobTemplate: trainer.TrainJobTemplateSpec{
+				Spec: trainer.TrainJobSpec{
+					Trainer: &trainer.Trainer{
+						Image: ptr.To("docker.io/my-org/model:latest"),
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(optJob).
+		WithStatusSubresource(optJob).
+		Build()
+
+	reconciler := NewOptimizationJobReconciler(fakeClient, events.NewFakeRecorder(100))
+
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "suspended-optjob",
+			Namespace: "default",
+		},
+	}
+
+	if _, err := reconciler.Reconcile(context.Background(), req); err != nil {
+		t.Fatalf("unexpected error during suspended reconcile: %v", err)
+	}
+
+	var trainJobList trainer.TrainJobList
+	if err := fakeClient.List(context.Background(), &trainJobList); err != nil {
+		t.Fatalf("failed to list trainjobs: %v", err)
+	}
+	if len(trainJobList.Items) != 0 {
+		t.Errorf("expected 0 trial TrainJobs while suspended, got %d", len(trainJobList.Items))
+	}
+
+	var updatedOptJob trainer.OptimizationJob
+	if err := fakeClient.Get(context.Background(), req.NamespacedName, &updatedOptJob); err != nil {
+		t.Fatalf("failed to get updated OptimizationJob: %v", err)
+	}
+
+	hasSuspended := false
+	for _, c := range updatedOptJob.Status.Conditions {
+		if c.Type == OptimizationJobSuspended && c.Status == metav1.ConditionTrue {
+			hasSuspended = true
+			break
+		}
+	}
+	if !hasSuspended {
+		t.Errorf("expected OptimizationJob to have Suspended status condition")
+	}
+}
