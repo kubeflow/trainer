@@ -53,7 +53,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pip install pytest
+          pip install pytest "kubernetes<36"
           python3 -m pip install -e sdk/python[huggingface]
           pytest -s sdk/python/test/e2e-fine-tune-llm/test_e2e_pytorch_fine_tune_llm.py --log-cli-level=debug
         env:
