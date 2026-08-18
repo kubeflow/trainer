@@ -104,6 +104,57 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						Obj()
 				},
 				testingutil.BeForbiddenError()),
+			ginkgo.Entry("Should fail in creating trainJob with negative numNodes",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						Trainer(testingutil.MakeTrainJobTrainerWrapper().
+							NumNodes(-1).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed in creating trainJob with zero numNodes",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						Trainer(testingutil.MakeTrainJobTrainerWrapper().
+							NumNodes(0).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail in creating trainJob with negative numProcPerNode",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						Trainer(testingutil.MakeTrainJobTrainerWrapper().
+							NumProcPerNode(-5).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail in creating trainJob with zero numProcPerNode",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						Trainer(testingutil.MakeTrainJobTrainerWrapper().
+							NumProcPerNode(0).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should succeed in creating trainJob with positive numNodes and numProcPerNode",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), runtimeName).
+						Trainer(testingutil.MakeTrainJobTrainerWrapper().
+							NumNodes(1).
+							NumProcPerNode(1).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed()),
 			ginkgo.Entry("Should succeed in creating trainJob with namespace scoped trainingRuntime",
 				func() *trainer.TrainJob {
 					return testingutil.MakeTrainJobWrapper(ns.Name, jobName).
@@ -218,7 +269,9 @@ var _ = ginkgo.Describe("TrainJob Webhook", ginkgo.Ordered, func() {
 						}).
 						Obj()
 				},
-				testingutil.BeForbiddenError(),
+				// numProcPerNode: 0 is rejected by the CRD schema before the Flux
+				// plugin webhook runs, so the error is Invalid, not Forbidden.
+				testingutil.BeInvalidError(),
 			),
 			ginkgo.Entry("Should fail in creating TrainJob with reserved flux-installer init container",
 				func() *trainer.TrainJob {

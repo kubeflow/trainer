@@ -274,6 +274,7 @@ type MPIMLPolicySource struct {
 	// This value is equal to the number of slots for each node in the hostfile.
 	// Defaults to 1.
 	// +kubebuilder:default=1
+	// +kubebuilder:validation:XValidation:rule="self >= 1",message="NumProcPerNode in mpiPolicy must be >= 1"
 	// +optional
 	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
 

@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// ClusterTrainingRuntimes returns a ClusterTrainingRuntimeInformer.
 	ClusterTrainingRuntimes() ClusterTrainingRuntimeInformer
+	// OptimizationJobs returns a OptimizationJobInformer.
+	OptimizationJobs() OptimizationJobInformer
 	// TrainJobs returns a TrainJobInformer.
 	TrainJobs() TrainJobInformer
 	// TrainingRuntimes returns a TrainingRuntimeInformer.
@@ -46,6 +48,11 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // ClusterTrainingRuntimes returns a ClusterTrainingRuntimeInformer.
 func (v *version) ClusterTrainingRuntimes() ClusterTrainingRuntimeInformer {
 	return &clusterTrainingRuntimeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// OptimizationJobs returns a OptimizationJobInformer.
+func (v *version) OptimizationJobs() OptimizationJobInformer {
+	return &optimizationJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // TrainJobs returns a TrainJobInformer.

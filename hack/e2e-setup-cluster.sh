@@ -241,7 +241,7 @@ elif [ "${INSTALL_METHOD}" = "helm" ]; then
   # Build Helm dependencies
   helm dependency build charts/kubeflow-trainer
 
-  # Install Trainer via Helm
+  # Install Trainer via Helm, skipping CRD management
   helm install trainer charts/kubeflow-trainer \
     --namespace ${NAMESPACE} \
     --create-namespace \

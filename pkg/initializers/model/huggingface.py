@@ -43,14 +43,13 @@ class HuggingFace(utils.ModelProvider):
         if self.config.access_token:
             huggingface_hub.login(self.config.access_token)
 
-        # TODO (andreyvelich): We should consider to follow vLLM approach with allow patterns.
+        # TODO (andreyvelich): We should consider to follow vLLM approach with allow patterns,
+        # including a fallback to *.bin/*.pt/*.pth when a repo has no safetensors.
         # Ref: https://github.com/kubeflow/trainer/pull/2303#discussion_r1815913663
-        # TODO (andreyvelich): We should update patterns for Mistral model
-        # Ref: https://github.com/kubeflow/trainer/pull/2303#discussion_r1815914270
         huggingface_hub.snapshot_download(
             repo_id=model_uri,
             local_dir=utils.MODEL_PATH,
-            allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt"],
+            allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt", "*.gguf"],
             ignore_patterns=self.config.ignore_patterns,
         )
 

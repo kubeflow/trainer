@@ -168,7 +168,7 @@ volcano-crd: ## Copy the CRDs from Volcano repository to the manifests/external-
 # Instructions for code generation.
 .PHONY: manifests
 manifests: controller-gen ## Generate manifests.
-	$(CONTROLLER_GEN) "crd:generateEmbeddedObjectMeta=true" rbac:roleName=kubeflow-trainer-controller-manager webhook \
+	$(CONTROLLER_GEN) "crd:generateEmbeddedObjectMeta=true,maxDescLen=128" rbac:roleName=kubeflow-trainer-controller-manager webhook \
 		paths="./pkg/apis/trainer/v1alpha1/...;./pkg/controller/...;./pkg/runtime/...;./pkg/webhooks/...;./pkg/util/cert/..." \
 		output:crd:artifacts:config=manifests/base/crds \
 		output:rbac:artifacts:config=manifests/base/rbac \
@@ -322,34 +322,31 @@ release: ## Create a release commit. Usage: make release VERSION=vX.Y.Z [GITHUB_
 		MAJOR_MINOR=$$(echo "$(VERSION)" | $(SED) 's/^v//' | cut -d. -f1,2); \
 		CHANGELOG_PATH="CHANGELOG/CHANGELOG-$$MAJOR_MINOR.md"; \
 		RELEASE_BRANCH="release-$$MAJOR_MINOR"; \
-		RELEASE_SHA=$$(git rev-parse --verify --quiet "refs/remotes/upstream/$$RELEASE_BRANCH"); \
-		if [ -n "$$RELEASE_SHA" ]; then \
-			PREV_TAG=$$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*rc*' "$$RELEASE_SHA" 2>/dev/null || true); \
-			if [ -n "$$PREV_TAG" ]; then \
-				CLIFF_SCOPE="$$PREV_TAG..$$RELEASE_SHA"; \
-				echo "Generating changelog for $(VERSION) (range: $$PREV_TAG..$$RELEASE_BRANCH @ $$RELEASE_SHA)"; \
-			else \
-				CLIFF_SCOPE="--unreleased"; \
-				echo "Generating changelog for $(VERSION) (no prior tag on $$RELEASE_BRANCH; using --unreleased)"; \
+		RELEASE_SHA=$$(git rev-parse --verify --quiet "refs/remotes/upstream/$$RELEASE_BRANCH" || true); \
+		if [ -z "$$RELEASE_SHA" ]; then \
+			if [ -f "$$CHANGELOG_PATH" ]; then \
+				echo "Error: branch $$RELEASE_BRANCH not found on upstream, but $$CHANGELOG_PATH exists. Run: git fetch upstream $$RELEASE_BRANCH"; \
+				exit 1; \
 			fi; \
-		elif [ ! -f "$$CHANGELOG_PATH" ]; then \
-			CLIFF_SCOPE="--unreleased"; \
-			echo "Generating changelog for $(VERSION) (new release line $$MAJOR_MINOR, branch $$RELEASE_BRANCH not created yet; using --unreleased)"; \
+			RELEASE_SHA=$$(git rev-parse HEAD); \
+			echo "Branch $$RELEASE_BRANCH does not exist yet (new release line $$MAJOR_MINOR, created by the release workflow); using HEAD"; \
+		fi; \
+		PATCH=$$(echo "$(VERSION)" | cut -d. -f3); \
+		if [ "$$PATCH" -gt 0 ]; then \
+			PREV_TAG="$$(echo "$(VERSION)" | cut -d. -f1,2).$$((PATCH - 1))"; \
 		else \
-			echo "Error: branch $$RELEASE_BRANCH not found locally or on upstream, but $$CHANGELOG_PATH exists. Run: git fetch upstream $$RELEASE_BRANCH"; \
+			PREV_MINOR=$$(( $$(echo "$(VERSION)" | cut -d. -f2) - 1 )); \
+			PREV_TAG=$$(git tag --list "$$(echo "$(VERSION)" | cut -d. -f1).$$PREV_MINOR.*" | grep -vE -- '(rc)' | sort -t. -k3,3nr | head -1 || true); \
+		fi; \
+		if [ -z "$$PREV_TAG" ]; then \
+			echo "Error: cannot determine the previous release tag for $(VERSION)"; \
 			exit 1; \
 		fi; \
-		CLIFF_CMD="docker run --rm -u $$(id -u):$$(id -g) -v $(PROJECT_DIR):/app"; \
-		if [ -n "$(GITHUB_TOKEN)" ]; then \
-			CLIFF_CMD="$$CLIFF_CMD -e GITHUB_TOKEN=$(GITHUB_TOKEN)"; \
-		fi; \
-		CLIFF_CMD="$$CLIFF_CMD -w /app ghcr.io/orhun/git-cliff/git-cliff:latest $$CLIFF_SCOPE --tag $(VERSION)"; \
-		if [ -f "$$CHANGELOG_PATH" ]; then \
-			$$CLIFF_CMD --prepend "$$CHANGELOG_PATH"; \
-		else \
-			$$CLIFF_CMD -o "$$CHANGELOG_PATH"; \
-			printf '%s\n' "$$(cat "$$CHANGELOG_PATH")" > "$$CHANGELOG_PATH"; \
-		fi; \
+		echo "Generating changelog for $(VERSION) (range: $$PREV_TAG..$$RELEASE_SHA)"; \
+		touch "$$CHANGELOG_PATH"; \
+		docker run --rm -u $$(id -u):$$(id -g) -e HOME=/tmp -e GITHUB_TOKEN \
+			-v $(PROJECT_DIR):/app -w /app ghcr.io/orhun/git-cliff/git-cliff:latest \
+			"$$PREV_TAG..$$RELEASE_SHA" --tag $(VERSION) --prepend "$$CHANGELOG_PATH"; \
 		echo "Changelog generated at $$CHANGELOG_PATH"; \
 	fi
 	@echo "Regenerating files for $(VERSION)"

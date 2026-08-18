@@ -13787,6 +13787,24 @@
           }
         }
       },
+      "trainer.v1alpha1.CategoricalSpace": {
+        "description": "CategoricalSpace defines a search space over a discrete set of unordered strings.",
+        "type": "object",
+        "required": [
+          "choices"
+        ],
+        "properties": {
+          "choices": {
+            "description": "choices is the set of strings to sample from.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "default": ""
+            },
+            "x-kubernetes-list-type": "set"
+          }
+        }
+      },
       "trainer.v1alpha1.ClusterTrainingRuntime": {
         "description": "ClusterTrainingRuntime represents a training runtime which can be referenced as part of `runtimeRef` API in TrainJob. This resource is a cluster-scoped and can be referenced by TrainJob that created in *any* namespace.",
         "type": "object",
@@ -14011,6 +14029,10 @@
           }
         }
       },
+      "trainer.v1alpha1.GridAlgorithm": {
+        "description": "GridAlgorithm is the grid search algorithm.",
+        "type": "object"
+      },
       "trainer.v1alpha1.Initializer": {
         "description": "Initializer represents the desired configuration for the dataset and model initialization. It is used to initialize the assets (dataset and pre-trained model) and pre-process data.",
         "type": "object",
@@ -14183,6 +14205,28 @@
           }
         }
       },
+      "trainer.v1alpha1.LogUniformSpace": {
+        "description": "LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].",
+        "type": "object",
+        "required": [
+          "min",
+          "max"
+        ],
+        "properties": {
+          "max": {
+            "description": "max is the maximum value of the log-uniform search space.",
+            "type": "string"
+          },
+          "min": {
+            "description": "min is the minimum value of the log-uniform search space.",
+            "type": "string"
+          },
+          "type": {
+            "description": "type specifies the underlying data type. Defaults to \"Float\".",
+            "type": "string"
+          }
+        }
+      },
       "trainer.v1alpha1.MLPolicy": {
         "description": "MLPolicy represents configuration for the model training with ML-specific parameters.",
         "type": "object",
@@ -14350,6 +14394,243 @@
           },
           "storageUri": {
             "description": "storageUri is the URI for the model provider. If set, it may be empty, or it must be a valid URI format (e.g., s3://bucket/path, gs://bucket/path).",
+            "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.Objective": {
+        "type": "object",
+        "required": [
+          "metric"
+        ],
+        "properties": {
+          "direction": {
+            "description": "direction specifies the optimization goal. Defaults to \"Minimize\".",
+            "type": "string"
+          },
+          "metric": {
+            "description": "metric specifies the name of the objective metric to track.",
+            "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJob": {
+        "description": "OptimizationJob is the Schema for the optimizationjobs API. OptimizationJob is the Schema for the optimizationjobs API.",
+        "type": "object",
+        "required": [
+          "spec"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "description": "metadata is the object meta for the optimization job.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "description": "spec is the spec for the optimization job.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJobSpec"
+              }
+            ]
+          },
+          "status": {
+            "description": "status is the status for the optimization job.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJobStatus"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobList": {
+        "description": "OptimizationJobList contains a list of OptimizationJob.",
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "description": "items is the list of optimization jobs.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.OptimizationJob"
+                }
+              ]
+            }
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "description": "listMeta is the list meta for the optimization job list.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobSpec": {
+        "description": "OptimizationJobSpec defines the desired state of OptimizationJob.",
+        "type": "object",
+        "required": [
+          "objectives",
+          "parameters",
+          "trainJobTemplate"
+        ],
+        "properties": {
+          "numTrials": {
+            "description": "numTrials is the total number of trials to run.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "objectives": {
+            "description": "objectives is the list of objectives to optimize.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.Objective"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "metric"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "parallelTrials": {
+            "description": "parallelTrials is the number of trials to run in parallel. Defaults to 1.",
+            "type": "integer",
+            "format": "int32"
+          },
+          "parameters": {
+            "description": "parameters is the list of hyperparameters to search over.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.Parameter"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "searchAlgorithm": {
+            "description": "searchAlgorithm is the algorithm to use for searching over the hyperparameters.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.SearchAlgorithm"
+              }
+            ]
+          },
+          "trainJobTemplate": {
+            "description": "trainJobTemplate is the template for the train job to run.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobTemplateSpec"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.OptimizationJobStatus": {
+        "description": "OptimizationJobStatus is the status of the optimization job.",
+        "type": "object",
+        "properties": {
+          "conditions": {
+            "description": "conditions is the list of conditions for the optimization job.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "type"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "result": {
+            "description": "result is the result of the optimization job.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.Result"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.Parameter": {
+        "type": "object",
+        "required": [
+          "name",
+          "searchSpace"
+        ],
+        "properties": {
+          "name": {
+            "description": "name is the name of the hyperparameter.",
+            "type": "string"
+          },
+          "searchSpace": {
+            "description": "searchSpace is the search space for the hyperparameter.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.SearchSpace"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.ParameterAssignment": {
+        "description": "ParameterAssignment represents a single hyperparameter and its assigned value.",
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "description": "name is the name of the hyperparameter.",
+            "type": "string"
+          },
+          "value": {
+            "description": "value is the value of the hyperparameter.",
             "type": "string"
           }
         }
@@ -14552,6 +14833,17 @@
           }
         }
       },
+      "trainer.v1alpha1.RandomAlgorithm": {
+        "description": "RandomAlgorithm is the random search algorithm.",
+        "type": "object",
+        "properties": {
+          "seed": {
+            "description": "seed is the seed for the random search algorithm.",
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "trainer.v1alpha1.ReplicatedJobPatch": {
         "description": "ReplicatedJobPatch defines patches for a specific replicated job within the JobSet.",
         "type": "object",
@@ -14570,6 +14862,35 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobTemplatePatch"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.Result": {
+        "description": "Result tracks the parameters of the highest performing trial.",
+        "type": "object",
+        "required": [
+          "trainJobName"
+        ],
+        "properties": {
+          "parameters": {
+            "description": "parameters is the list of parameters for the result.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.ParameterAssignment"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "trainJobName": {
+            "description": "trainJobName is the name of the underlying TrainJob that achieved this result.",
+            "type": "string"
           }
         }
       },
@@ -14620,6 +14941,60 @@
           "name": {
             "description": "name of the runtime being referenced. When namespaced-scoped TrainingRuntime is used, the TrainJob must have the same namespace as the deployed runtime.",
             "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.SearchAlgorithm": {
+        "type": "object",
+        "properties": {
+          "grid": {
+            "description": "grid is the grid search algorithm.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.GridAlgorithm"
+              }
+            ]
+          },
+          "random": {
+            "description": "random is the random search algorithm.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.RandomAlgorithm"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.SearchSpace": {
+        "description": "SearchSpace acts as a Discriminated Union (OneOf) supporting flexible statistical distributions.",
+        "type": "object",
+        "properties": {
+          "categorical": {
+            "description": "categorical is the categorical search space.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.CategoricalSpace"
+              }
+            ]
+          },
+          "logUniform": {
+            "description": "logUniform is the log-uniform search space.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.LogUniformSpace"
+              }
+            ]
+          },
+          "uniform": {
+            "description": "uniform is the uniform search space.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.UniformSpace"
+              }
+            ]
           }
         }
       },
@@ -14820,6 +15195,33 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.TrainerStatus"
+              }
+            ]
+          }
+        }
+      },
+      "trainer.v1alpha1.TrainJobTemplateSpec": {
+        "description": "TrainJobTemplateSpec is the template for the train job to run.",
+        "type": "object",
+        "required": [
+          "spec"
+        ],
+        "properties": {
+          "metadata": {
+            "description": "metadata is the metadata for the train job.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ]
+          },
+          "spec": {
+            "description": "spec is the spec for the train job.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.TrainJobSpec"
               }
             ]
           }
@@ -15036,6 +15438,28 @@
                 "$ref": "#/components/schemas/trainer.v1alpha1.JobSetTemplatePatch"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.UniformSpace": {
+        "description": "UniformSpace defines a continuous uniform distribution over [Min, Max].",
+        "type": "object",
+        "required": [
+          "min",
+          "max"
+        ],
+        "properties": {
+          "max": {
+            "description": "max is the maximum value of the uniform search space.",
+            "type": "string"
+          },
+          "min": {
+            "description": "min is the minimum value of the uniform search space.",
+            "type": "string"
+          },
+          "type": {
+            "description": "type specifies the underlying data type. Defaults to \"Float\".",
+            "type": "string"
           }
         }
       },

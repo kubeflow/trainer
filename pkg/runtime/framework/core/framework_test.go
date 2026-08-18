@@ -118,7 +118,7 @@ func TestNew(t *testing.T) {
 					&jobset.JobSet{},
 					&mpi.MPI{},
 				},
-				podNetworkPlugins: []framework.PodNetworkPlugin{
+				preComponentBuilderPlugins: []framework.PreComponentBuilderPlugin{
 					&jobset.JobSet{},
 				},
 				componentBuilderPlugins: []framework.ComponentBuilderPlugin{
@@ -2566,7 +2566,7 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 	}
 }
 
-func TestPodNetworkPlugins(t *testing.T) {
+func TestRunPreComponentBuilderPlugins(t *testing.T) {
 	cases := map[string]struct {
 		registry        fwkplugins.Registry
 		runtimeInfo     *runtime.Info
@@ -2574,7 +2574,7 @@ func TestPodNetworkPlugins(t *testing.T) {
 		wantError       error
 		wantRuntimeInfo *runtime.Info
 	}{
-		"Pod network is calculated by jobset plugin": {
+		"Pod network and parallel count are synced by jobset plugin": {
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				Obj(),
 			registry: fwkplugins.NewRegistry(),
@@ -2633,8 +2633,8 @@ func TestPodNetworkPlugins(t *testing.T) {
 								WithName(constants.Node).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(1).
-										WithCompletions(1).
+										WithParallelism(2).
+										WithCompletions(2).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -2666,7 +2666,7 @@ func TestPodNetworkPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = fwk.RunPodNetworkPlugins(tc.runtimeInfo, tc.trainJob)
+			err = fwk.RunPreComponentBuilderPlugins(tc.runtimeInfo, tc.trainJob)
 			if diff := cmp.Diff(tc.wantError, err); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
