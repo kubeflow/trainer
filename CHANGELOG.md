@@ -1,5 +1,19 @@
 # Changelog
 
+# [v1.9.4](https://github.com/kubeflow/training-operator/tree/v1.9.4) (2026-08-18)
+
+## New Features
+
+- [release-1.9] Bump v1 Kubernetes dependencies to 1.36 ([#3924](https://github.com/kubeflow/trainer/pull/3924) by [@robert-bell](https://github.com/robert-bell))
+
+## Bug Fixes
+
+- fix: respect cleanPodPolicy when job exceeds backoffLimit ([#3420](https://github.com/kubeflow/trainer/pull/3420) by [@AviadHayumi](https://github.com/AviadHayumi))
+- fix(sdk): always add queue label regardless of queue existence ([#3221](https://github.com/kubeflow/trainer/pull/3221) by [@puwun](https://github.com/puwun))
+- fix(docker): support multi-arch build for kubectl-delivery image ([#3078](https://github.com/kubeflow/trainer/pull/3078) by [@jsl9208](https://github.com/jsl9208))
+
+[Full Changelog](https://github.com/kubeflow/trainer/compare/v1.9.3...v1.9.4)
+
 # [v1.9.3](https://github.com/kubeflow/training-operator/tree/v1.9.3) (2025-07-17)
 
 ## New Features
