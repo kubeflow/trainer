@@ -505,6 +505,56 @@ func TestJobSet(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
+	nodePatch := func(podSpecPatch trainer.PodSpecPatch) []trainer.RuntimePatch {
+		return []trainer.RuntimePatch{{
+			Manager: "test.io/manager",
+			TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+				Template: &trainer.JobSetTemplatePatch{
+					Spec: &trainer.JobSetSpecPatch{
+						ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+							Name: constants.Node,
+							Template: &trainer.JobTemplatePatch{
+								Spec: &trainer.JobSpecPatch{
+									Template: &trainer.PodTemplatePatch{Spec: &podSpecPatch},
+								},
+							},
+						}},
+					},
+				},
+			},
+		}}
+	}
+	patchContainerWithInitContainerName := nodePatch(trainer.PodSpecPatch{
+		Containers: []trainer.ContainerPatch{{Name: "warmup"}},
+	})
+	patchInitContainerWithContainerName := nodePatch(trainer.PodSpecPatch{
+		InitContainers: []trainer.ContainerPatch{{Name: constants.Node}},
+	})
+	nodeJobWithInitContainer := &runtime.Info{
+		TemplateSpec: runtime.TemplateSpec{
+			ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+				ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+					{
+						Name: ptr.To(constants.Node),
+						Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+							Spec: &batchv1ac.JobSpecApplyConfiguration{
+								Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+									Spec: &corev1ac.PodSpecApplyConfiguration{
+										InitContainers: []corev1ac.ContainerApplyConfiguration{
+											{Name: ptr.To("warmup")},
+										},
+										Containers: []corev1ac.ContainerApplyConfiguration{
+											{Name: ptr.To(constants.Node)},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 	cases := map[string]struct {
 		info         *runtime.Info
 		oldObj       *trainer.TrainJob
@@ -1115,6 +1165,24 @@ func TestValidate(t *testing.T) {
 						},
 					},
 					fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", constants.Node)),
+			},
+		},
+		"runtimePatches patch a container with the name of an initContainer": {
+			info: nodeJobWithInitContainer,
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				RuntimePatches(patchContainerWithInitContainerName).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimePatchesPath, patchContainerWithInitContainerName,
+					fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", constants.Node)),
+			},
+		},
+		"runtimePatches patch an initContainer with the name of a container": {
+			info: nodeJobWithInitContainer,
+			newObj: utiltesting.MakeTrainJobWrapper("default", "test").
+				RuntimePatches(patchInitContainerWithContainerName).Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimePatchesPath, patchInitContainerWithContainerName,
+					fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", constants.Node)),
 			},
 		},
 		"runtimePatches contain envs for reserved container": {
