@@ -48,6 +48,7 @@ jobs:
             examples
             framework
             initializer
+            kep
             manifests
             runtimes
             scripts
