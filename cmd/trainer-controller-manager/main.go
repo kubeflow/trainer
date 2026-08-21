@@ -139,7 +139,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	setupProbeEndpoints(mgr, certsReady)
+	setupProbeEndpoints(mgr, certsReady, options.LivenessEndpointName, options.ReadinessEndpointName)
 	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer(), &cfg)
 	if err != nil {
 		setupLog.Error(err, "Could not initialize runtimes")
@@ -192,8 +192,8 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 	}
 }
 
-func setupProbeEndpoints(mgr ctrl.Manager, certsReady <-chan struct{}) {
-	defer setupLog.Info("Probe endpoints are configured on healthz and readyz")
+func setupProbeEndpoints(mgr ctrl.Manager, certsReady <-chan struct{}, livenessPath, readinessPath string) {
+	defer setupLog.Info("Probe endpoints are configured", "liveness", livenessPath, "readiness", readinessPath)
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
