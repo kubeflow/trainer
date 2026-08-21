@@ -435,6 +435,64 @@ The core successful conditions for the Phase 1 MVP are:
 - **Complete**: The conditions of the `TrialPolicy` have been satisfied (e.g., the desired `NumTrials` have successfully finished) and the best result has been recorded.
 - **Failed**: The `OptimizationJob` encountered a terminal error preventing further execution (e.g., the backend suggestion gRPC service crashed).
 
+### 7.5 gRPC API Schema
+
+This section defines the schema for the contract between the OptimizationJob controller and a search algorithm provider. The service is named `SearchAlgorithmService` to align with `spec.searchAlgorithm` in the CRD.
+
+The schema lives at `pkg/apis/optimizer/v1alpha1/search_algorithm.proto`.
+
+**Constraints the schema has to satisfy**
+
+Three properties this KEP already commits to are not expressible through the Katib `api.v1.beta1` messages, which is what shapes the design below.
+
+**A restarted provider cannot resume a job.** 7.3 specifies that the controller passes a full, point-in-time snapshot and that the provider calculates the next parameters and returns them, "forgetting" the interaction immediately. In the Optuna service, a completed trial is matched back to an Optuna trial number by string-joining its sorted assignments into a key such as `lr:0.01,batch:32` ([`base_service.py:105-108`](https://github.com/kubeflow/katib/blob/master/pkg/suggestion/v1beta1/optuna/base_service.py#L105-L108)). That index is populated only in `_ask`, and `optuna.create_study` is called with no storage backend ([`base_service.py:45`](https://github.com/kubeflow/katib/blob/master/pkg/suggestion/v1beta1/optuna/base_service.py#L45)), so both live in process memory. After a provider restart the controller replays history as specified, every trial misses the empty index, and `_tell` raises `ValueError("An unknown trial has been passed in the GetSuggestion request.")` ([`base_service.py:98-102`](https://github.com/kubeflow/katib/blob/master/pkg/suggestion/v1beta1/optuna/base_service.py#L98-L102)), failing the RPC. The controller is stateless; the provider is the only component that remembers, and it cannot be restarted.
+
+**Failed trials cannot be represented.** `Trial.convert` forwards only `SUCCEEDED` and `EARLYSTOPPED` ([`trial.py:40-52`](https://github.com/kubeflow/katib/blob/master/pkg/suggestion/v1beta1/internal/trial.py#L40-L52)), so a failed trial is never passed to `study.tell` and its Optuna trial stays `RUNNING` for the lifetime of the study. TPE is configured with `constant_liar=True` ([`service.py:113-114`](https://github.com/kubeflow/katib/blob/master/pkg/suggestion/v1beta1/optuna/service.py#L113-L114)), which treats a running trial as a pessimistic in-flight observation, so that region of the search space stays penalised. This is what #3743 needs to express.
+
+**`logUniform` reaches the sampler as `uniform`.** `FeasibleSpace` carries a `distribution` field. On the consumer side an unset distribution is normalised to `None` ([`search_space.py:83-91`](https://github.com/kubeflow/katib/blob/master/pkg/suggestion/v1beta1/internal/search_space.py#L83-L91)), and `None` shares a branch with explicit `UNIFORM` ([`base_service.py:115`](https://github.com/kubeflow/katib/blob/master/pkg/suggestion/v1beta1/optuna/base_service.py#L115)), producing `log=False`. A log-uniform search space is then sampled on a linear scale with no error raised. This is the same class of defect as kubeflow/katib#2666 and kubeflow/katib#2679.
+
+**Design**
+
+**Trial identity comes from the TrainJob name.** `SuggestRequest` carries `trial_names`, allocated by the controller before the call, and the provider returns one suggestion per name. This removes the assignment-string join: a trial is identified by the name of the TrainJob that runs it, which is stable across a restart of either component. It also makes the call idempotent, since a retried reconcile re-sends the same names.
+
+**History carries trial state.** `TrialRecord.state` distinguishes `RUNNING`, `SUCCEEDED`, `FAILED` and `EARLY_STOPPED`, so a provider can record a failure as a terminal state rather than leaving a trial in flight.
+
+**Search space and algorithm are `oneof`s, mirroring the CRD.** An unsupported combination, such as numeric bounds on a categorical parameter, cannot be expressed on the wire. The distribution defect above originates in a flat message where every field is always present.
+
+**Numeric bounds stay decimal strings.** The CRD encodes `min` and `max` as strings with a regex permitting exponent notation, to avoid float parsing differences between the Go controller and a Python provider. The schema carries them verbatim.
+
+`objective_value` uses explicit presence, since a metric of `0.0` is a valid result and has to be distinguishable from a trial that reported nothing.
+
+**Message size**
+
+gRPC defaults to a 4 MiB receive limit, and the send side is unlimited, so an oversized request fails at the receiver rather than the sender. `OptimizationJobSpec` caps `numTrials` at 100, which keeps `SuggestRequest` well inside that limit. If the cap is raised, `trials` is the field that grows, and a cursor would be preferable to raising the limit.
+
+**File placement and code generation**
+
+The schema is placed under `pkg/apis/optimizer/v1alpha1/` rather than `pkg/apis/trainer/v1alpha1/`. The latter declares `+k8s:deepcopy-gen=package` in `doc.go`, and `make generate` runs `controller-gen` over `./pkg/apis/...` recursively, so generated protobuf types placed there would have DeepCopy methods generated over `protoimpl.MessageState`. A sibling package with no generator markers is type-checked and produces nothing.
+
+`hack/update-codegen.sh` is unaffected, since `code-generator` discovers inputs by grepping for marker comments that `protoc-gen-go` output does not carry.
+
+Two mechanical notes for whoever wires up generation:
+
+- `make verify-boilerplate` checks generated `.go` files against
+  `boilerplate.go.txt`, and `protoc-gen-go` emits `//` line comments rather than
+  a `/* */` block, so the header has to be prepended after generation.
+  `hack/python-api/gen-api.sh` already does this for OpenAPI output.
+- `google.golang.org/grpc` is not currently a direct dependency of the module.
+
+Following Katib, generation would use `buf`. The schema passes `buf lint` with the `DEFAULT` rule set.
+
+**Open questions**
+
+1. Whether `SearchAlgorithmService` should also serve pruning methods, or
+   whether pruning belongs in a separate service. ASHA and Hyperband decide by
+   comparing a trial against others at the same rung, and that state lives in
+   the same Optuna study the sampler uses. Deferred per the discussion on #3828.
+2. Intermediate metrics are not in this schema. Optuna pruners are driven by
+   `trial.report(value, step)` and `should_prune()`, so #3802 will need a
+   per-trial `(step, value)` series added to `TrialRecord`.
+
 ## 8. Design Decisions & Open Discussions
 
 ### 8.1. Decision: Decoupling the gRPC Contract
