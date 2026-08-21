@@ -237,6 +237,9 @@ test-python: ## Run Python unit test.
 	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/model
 	PYTHONPATH=$(PROJECT_DIR) uv run --with pytest --directory ./cmd/initializers/dataset pytest $(PROJECT_DIR)/pkg/initializers/utils
 
+	pip install -r ./cmd/trainers/grpo/requirements.txt
+	pytest ./cmd/trainers/grpo
+
 .PHONY: test-python-integration
 test-python-integration: ## Run Python integration test.
 	uv sync --locked --no-dev --directory ./cmd/initializers/dataset
