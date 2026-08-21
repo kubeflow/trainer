@@ -16,6 +16,7 @@ import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
+from kubernetes.client.rest import ApiException
 
 from pkg.initializers.dataset.__main__ import main
 
@@ -83,6 +84,16 @@ from pkg.initializers.dataset.__main__ import main
             },
             id="unsupported-provider",
         ),
+        pytest.param(
+            {
+                "storage_uri": "cache://test_schema/test_table",
+                "expected_provider": "cache",
+                "expected_error": ApiException,
+                "expected_error_match": None,
+                "provider_raises_on_download": "cache",
+            },
+            id="cache-provider-api-failure",
+        ),
     ],
 )
 def test_dataset_main(test_case, mock_env_vars):
@@ -96,6 +107,11 @@ def test_dataset_main(test_case, mock_env_vars):
     mock_hf = MagicMock(return_value=mock_hf_instance)
     mock_cache = MagicMock(return_value=mock_cache_instance)
     mock_s3 = MagicMock(return_value=mock_s3_instance)
+
+    if test_case.get("provider_raises_on_download") == "cache":
+        mock_cache_instance.download_dataset.side_effect = ApiException(
+            status=500, reason="Internal Server Error"
+        )
 
     mock_provider_modules = {
         "pkg.initializers.dataset.huggingface": MagicMock(
@@ -123,10 +139,29 @@ def test_dataset_main(test_case, mock_env_vars):
             ):
                 main()
 
-            for provider_constructor, provider_instance in provider_mocks.values():
-                provider_constructor.assert_not_called()
-                provider_instance.load_config.assert_not_called()
-                provider_instance.download_dataset.assert_not_called()
+            if test_case.get("provider_raises_on_download"):
+                expected_provider = test_case["expected_provider"]
+                expected_constructor, expected_instance = provider_mocks[
+                    expected_provider
+                ]
+                expected_constructor.assert_called_once_with()
+                expected_instance.load_config.assert_called_once_with()
+                expected_instance.download_dataset.assert_called_once_with()
+
+                for provider_name, (
+                    provider_constructor,
+                    provider_instance,
+                ) in provider_mocks.items():
+                    if provider_name == expected_provider:
+                        continue
+                    provider_constructor.assert_not_called()
+                    provider_instance.load_config.assert_not_called()
+                    provider_instance.download_dataset.assert_not_called()
+            else:
+                for provider_constructor, provider_instance in provider_mocks.values():
+                    provider_constructor.assert_not_called()
+                    provider_instance.load_config.assert_not_called()
+                    provider_instance.download_dataset.assert_not_called()
 
             return
 

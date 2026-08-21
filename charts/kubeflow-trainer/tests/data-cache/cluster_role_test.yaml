@@ -52,7 +52,7 @@ tests:
               - leaderworkerset.x-k8s.io
             resources:
               - leaderworkersets
-            verbs: ["create", "get", "list", "watch"]
+            verbs: ["create", "delete", "get", "list", "watch"]
 
   - it: Should have correct rules for services
     set:
@@ -66,7 +66,7 @@ tests:
               - ""
             resources:
               - services
-            verbs: ["create", "get", "list", "watch"]
+            verbs: ["create", "delete", "get", "list", "watch"]
 
   - it: Should have correct rules for serviceaccounts
     set:
