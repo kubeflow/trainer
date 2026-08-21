@@ -98,14 +98,33 @@ func (r *ClusterTrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBu
 
 func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	clusterTrainingRuntime := &trainer.ClusterTrainingRuntime{}
-	if err := r.client.Get(ctx, client.ObjectKey{
-		Name: new.Spec.RuntimeRef.Name,
-	}, clusterTrainingRuntime); err != nil {
-		return nil, field.ErrorList{
-			field.Invalid(field.NewPath("spec", "RuntimeRef"), new.Spec.RuntimeRef,
-				fmt.Sprintf("%v: specified clusterTrainingRuntime must be created before the TrainJob is created", err)),
+	// On update, resolve the runtime from the snapshot the TrainJob was built from, so that
+	// editing or deleting the live ClusterTrainingRuntime cannot retroactively break validation
+	// for an already-reconciled TrainJob (e.g. on resume from suspend). Fall back to the live
+	// object when no snapshot exists yet, matching NewObjects.
+	useSnapshot := false
+	if old != nil {
+		if err := getRuntimeSnapshot(ctx, r.client, new, clusterTrainingRuntime); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, field.ErrorList{
+					field.InternalError(field.NewPath("spec", "RuntimeRef"), fmt.Errorf("unable to get runtime snapshot: %w", err)),
+				}
+			}
+		} else {
+			useSnapshot = true
 		}
 	}
+	if !useSnapshot {
+		if err := r.client.Get(ctx, client.ObjectKey{
+			Name: new.Spec.RuntimeRef.Name,
+		}, clusterTrainingRuntime); err != nil {
+			return nil, field.ErrorList{
+				field.Invalid(field.NewPath("spec", "RuntimeRef"), new.Spec.RuntimeRef,
+					fmt.Sprintf("%v: specified clusterTrainingRuntime must be created before the TrainJob is created", err)),
+			}
+		}
+	}
+
 	var warnings admission.Warnings
 	if trainingruntime.IsSupportDeprecated(clusterTrainingRuntime.Labels) {
 		warnings = append(warnings, fmt.Sprintf(
@@ -114,6 +133,7 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
+
 	info, _ := r.newRuntimeInfo(new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy)
 	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)
 	if len(fwWarnings) != 0 {
