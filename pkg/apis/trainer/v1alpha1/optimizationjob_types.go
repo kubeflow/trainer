@@ -164,6 +164,7 @@ type Double string
 
 // UniformSpace defines a continuous uniform distribution over [Min, Max].
 // +kubebuilder:validation:XValidation:rule="double(self.min) < double(self.max)",message="min must be strictly less than max"
+// +kubebuilder:validation:XValidation:rule="self.type != 'Int' || (double(self.min) >= -9007199254740992.0 && double(self.min) <= 9007199254740992.0 && double(self.max) >= -9007199254740992.0 && double(self.max) <= 9007199254740992.0 && double(self.min) == double(int(double(self.min))) && double(self.max) == double(int(double(self.max))))",message="min and max must be whole numbers with magnitude at most 2^53 when type is Int"
 type UniformSpace struct {
 	// min is the minimum value of the uniform search space.
 	// +kubebuilder:validation:Type=string
@@ -186,6 +187,7 @@ type UniformSpace struct {
 // LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].
 // +kubebuilder:validation:XValidation:rule="double(self.min) > 0.0",message="min must be strictly greater than 0"
 // +kubebuilder:validation:XValidation:rule="double(self.min) < double(self.max)",message="min must be strictly less than max"
+// +kubebuilder:validation:XValidation:rule="self.type != 'Int' || (double(self.min) >= -9007199254740992.0 && double(self.min) <= 9007199254740992.0 && double(self.max) >= -9007199254740992.0 && double(self.max) <= 9007199254740992.0 && double(self.min) == double(int(double(self.min))) && double(self.max) == double(int(double(self.max))))",message="min and max must be whole numbers with magnitude at most 2^53 when type is Int"
 type LogUniformSpace struct {
 	// min is the minimum value of the log-uniform search space.
 	// +kubebuilder:validation:Type=string
