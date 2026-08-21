@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -52,6 +53,9 @@ type TrainJobReconciler struct {
 	client   client.Client
 	recorder events.EventRecorder
 	runtimes map[string]jobruntimes.Runtime
+	// clock is the time source for the activeDeadlineSeconds arithmetic. Tests
+	// substitute a fake clock so the requeue delay can be asserted exactly.
+	clock clock.PassiveClock
 }
 
 var _ reconcile.Reconciler = (*TrainJobReconciler)(nil)
@@ -67,6 +71,7 @@ func NewTrainJobReconciler(
 		client:   client,
 		recorder: recorder,
 		runtimes: runtimes,
+		clock:    clock.RealClock{},
 	}
 }
 
@@ -161,7 +166,7 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 		return ctrl.Result{}
 	}
 	deadline := startTime.Add(time.Duration(trainJob.Spec.ActiveDeadlineSeconds) * time.Second)
-	now := time.Now()
+	now := r.clock.Now()
 	if now.After(deadline) {
 		ctrl.LoggerFrom(ctx).V(2).Info("TrainJob deadline exceeded, marking as failed",
 			"activeDeadlineSeconds", trainJob.Spec.ActiveDeadlineSeconds,
@@ -176,7 +181,7 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 		}
 		return ctrl.Result{}
 	}
-	requeueAfter := time.Until(deadline)
+	requeueAfter := deadline.Sub(now)
 	if requeueAfter <= 0 {
 		requeueAfter = 1 * time.Second
 	}
