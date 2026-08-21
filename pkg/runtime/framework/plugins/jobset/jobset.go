@@ -171,7 +171,6 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 
 	allErrs = append(allErrs, j.checkRuntimePatchesImmutability(ctx, oldObj, newObj)...)
 
-	// TODO (andreyvelich): Validate Volumes, VolumeMounts, and Tolerations.
 	for _, runtimePatch := range newObj.Spec.RuntimePatches {
 		allErrs = append(allErrs, validation.IsDomainPrefixedPath(runtimePatchesPath.Child("manager"), runtimePatch.Manager)...)
 		if runtimePatch.TrainingRuntimeSpec == nil || runtimePatch.TrainingRuntimeSpec.Template == nil ||
@@ -190,10 +189,49 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 				continue
 			}
 			podSpecPatch := rJobPatch.Template.Spec.Template.Spec
+
+			// Validate Volumes for duplicate names
+			volumeNames := sets.New[string]()
+			for _, vol := range podSpecPatch.Volumes {
+				if vol.Name == "" {
+					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+						fmt.Sprintf("volume in replicated job %s must have a name", rJobPatch.Name)))
+					continue
+				}
+				if volumeNames.Has(vol.Name) {
+					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+						fmt.Sprintf("duplicate volume name %q in replicated job %s", vol.Name, rJobPatch.Name)))
+				} else {
+					volumeNames.Insert(vol.Name)
+				}
+			}
+
 			for _, c := range podSpecPatch.InitContainers {
 				if !containers.Has(c.Name) {
 					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 						fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", rJobPatch.Name)))
+				}
+				// Validate VolumeMounts in InitContainers
+				mountPaths := sets.New[string]()
+				for _, vm := range c.VolumeMounts {
+					if vm.Name == "" {
+						allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+							fmt.Sprintf("volumeMount in initContainer %s of replicated job %s must have a name", c.Name, rJobPatch.Name)))
+						continue
+					}
+					if !volumeNames.Has(vm.Name) {
+						allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+							fmt.Sprintf("volumeMount %q in initContainer %s of replicated job %s references non-existent volume", vm.Name, c.Name, rJobPatch.Name)))
+					}
+					if vm.MountPath == "" {
+						allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+							fmt.Sprintf("volumeMount %q in initContainer %s of replicated job %s must have a mountPath", vm.Name, c.Name, rJobPatch.Name)))
+					} else if mountPaths.Has(vm.MountPath) {
+						allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+							fmt.Sprintf("duplicate mountPath %q in initContainer %s of replicated job %s", vm.MountPath, c.Name, rJobPatch.Name)))
+					} else {
+						mountPaths.Insert(vm.MountPath)
+					}
 				}
 			}
 			for _, c := range podSpecPatch.Containers {
@@ -203,6 +241,45 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 				} else if len(c.Env) > 0 && (c.Name == constants.DatasetInitializer || c.Name == constants.ModelInitializer || c.Name == constants.Node) {
 					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 						fmt.Sprintf("must not have envs for the %s, %s, %s containers", constants.DatasetInitializer, constants.ModelInitializer, constants.Node)))
+				}
+				// Validate VolumeMounts in Containers
+				mountPaths := sets.New[string]()
+				for _, vm := range c.VolumeMounts {
+					if vm.Name == "" {
+						allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+							fmt.Sprintf("volumeMount in container %s of replicated job %s must have a name", c.Name, rJobPatch.Name)))
+						continue
+					}
+					if !volumeNames.Has(vm.Name) {
+						allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+							fmt.Sprintf("volumeMount %q in container %s of replicated job %s references non-existent volume", vm.Name, c.Name, rJobPatch.Name)))
+					}
+					if vm.MountPath == "" {
+						allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+							fmt.Sprintf("volumeMount %q in container %s of replicated job %s must have a mountPath", vm.Name, c.Name, rJobPatch.Name)))
+					} else if mountPaths.Has(vm.MountPath) {
+						allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+							fmt.Sprintf("duplicate mountPath %q in container %s of replicated job %s", vm.MountPath, c.Name, rJobPatch.Name)))
+					} else {
+						mountPaths.Insert(vm.MountPath)
+					}
+				}
+			}
+
+			// Validate Tolerations
+			for _, tol := range podSpecPatch.Tolerations {
+				if tol.Operator != "" && tol.Operator != "Equal" && tol.Operator != "Exists" {
+					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+						fmt.Sprintf("toleration in replicated job %s has invalid operator %q (must be Equal or Exists)", rJobPatch.Name, tol.Operator)))
+				}
+				if tol.Effect != "" && tol.Effect != "NoSchedule" && tol.Effect != "PreferNoSchedule" && tol.Effect != "NoExecute" {
+					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+						fmt.Sprintf("toleration in replicated job %s has invalid effect %q (must be NoSchedule, PreferNoSchedule, or NoExecute)", rJobPatch.Name, tol.Effect)))
+				}
+				// If operator is Equal, value must be present (Kubernetes behavior)
+				if tol.Operator == "Equal" && tol.Value == "" && tol.Key != "" {
+					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
+						fmt.Sprintf("toleration in replicated job %s with operator Equal must have a value when key is specified", rJobPatch.Name)))
 				}
 			}
 		}
