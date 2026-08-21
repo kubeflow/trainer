@@ -48,6 +48,10 @@ jobs:
         run: |
           make generate
           git diff --exit-code || (echo 'Please run "make generate" to generate assets' && exit 1);
+      - name: Verify CRD packaging
+        run: |
+          make verify-crd-packaging
+          make test-crd-packaging
       - name: Check go fmt
         run: |
           make fmt

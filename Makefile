@@ -197,6 +197,14 @@ generate: go-mod-download manifests helm-docs ## Generate APIs.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate/boilerplate.go.txt" paths="./pkg/apis/config/v1alpha1/..."
 	CONTAINER_RUNTIME=$(CONTAINER_RUNTIME) hack/python-api/gen-api.sh
 
+.PHONY: verify-crd-packaging
+verify-crd-packaging: ## Verify CRDs are packaged consistently for Kustomize and Helm.
+	hack/verify-crd-packaging.sh
+
+.PHONY: test-crd-packaging
+test-crd-packaging: ## Run tests for the CRD packaging verifier.
+	hack/verify-crd-packaging_test.sh
+
 .PHONY: go-mod-download
 go-mod-download: ## Run go mod download to download modules.
 	go mod download
