@@ -222,6 +222,24 @@ var _ = ginkgo.Describe("TrainingRuntime marker validations and defaulting", gin
 				},
 				testingutil.BeInvalidError(),
 			),
+			ginkgo.Entry("Should fail to create trainingRuntime with mpi.numProcPerNode < 1",
+				func() *trainer.TrainingRuntime {
+					return testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(
+							testingutil.MakeTrainingRuntimeWrapper(ns.Name, "runtime").Obj().Spec).
+							WithMLPolicy(
+								testingutil.MakeMLPolicyWrapper().
+									WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+										MPIPolicy(ptr.To[int32](0), trainer.MPIImplementationOpenMPI, nil, nil).
+										Obj(),
+									).
+									Obj(),
+							).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError(),
+			),
 		)
 		ginkgo.DescribeTable("Defaulting TrainingRuntime on creation", func(trainingRuntime func() *trainer.TrainingRuntime, wantTrainingRuntime func() *trainer.TrainingRuntime) {
 			created := trainingRuntime()
