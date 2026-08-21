@@ -277,3 +277,20 @@ func TestExtractOverridesFromRuntime(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateTorchTune_NilTrainer(t *testing.T) {
+	trainJob := utiltesting.MakeTrainJobWrapper("default", "torchtune-job").
+		RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "torchtune-llama3.2-1b").
+		Obj()
+	trainJob.Spec.Trainer = nil
+
+	_, errs := validateTorchTune(runtime.NewInfo(), trainJob)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected validation errors for nil trainer: %v", errs)
+	}
+
+	recipe, config := getRecipeAndConfig(1, intstr.FromString("auto"), 1, trainJob)
+	if recipe == "" || config == "" {
+		t.Errorf("Expected non-empty recipe and config for nil trainer, got recipe=%q config=%q", recipe, config)
+	}
+}
