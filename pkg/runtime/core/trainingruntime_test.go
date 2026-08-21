@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
@@ -2235,6 +2236,73 @@ func TestRuntimeInfo(t *testing.T) {
 
 			if !strings.Contains(err.Error(), "unsupported runtimeTemplateSpec") {
 				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestTrainingRuntimeValidateObjects(t *testing.T) {
+	resRequests := corev1.ResourceList{
+		corev1.ResourceCPU: resource.MustParse("1"),
+	}
+
+	validRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
+		RuntimeSpec(
+			testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+				Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+				Obj(),
+		).Obj()
+
+	cases := map[string]struct {
+		trainJob        *trainer.TrainJob
+		existingRuntime *trainer.TrainingRuntime
+		wantErrs        field.ErrorList
+	}{
+		"succeeds when runtime exists and is valid": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Obj(),
+			existingRuntime: validRuntime,
+			wantErrs:        nil,
+		},
+		"returns field error when runtime does not exist": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "nonexistent-runtime").
+				Obj(),
+			existingRuntime: nil,
+			wantErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "runtimeRef"), nil, "specified trainingRuntime must be created before the TrainJob is created"),
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			clientBuilder := testingutil.NewClientBuilder()
+			if tc.existingRuntime != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.existingRuntime)
+			}
+			c := clientBuilder.Build()
+
+			// Initialize the runtime factory
+			runtimeFactory, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize TrainingRuntime: %v", err)
+			}
+
+			trainingRuntime, ok := runtimeFactory.(*TrainingRuntime)
+			if !ok {
+				t.Fatal("Expected TrainingRuntime type")
+			}
+
+			// Call ValidateObjects
+			_, fieldErrors := trainingRuntime.ValidateObjects(ctx, nil, tc.trainJob)
+
+			if diff := cmp.Diff(tc.wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); diff != "" {
+				t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
 			}
 		})
 	}
