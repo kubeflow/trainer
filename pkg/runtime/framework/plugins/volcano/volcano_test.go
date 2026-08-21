@@ -496,6 +496,83 @@ func TestValidate(t *testing.T) {
 			},
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
 		},
+		"reserved priorityClassName on one ReplicatedJob must not skip validation of the rest": {
+			info: runtime.NewInfo(
+				runtime.WithPodGroupPolicy(&trainer.PodGroupPolicy{
+					PodGroupPolicySource: trainer.PodGroupPolicySource{
+						Volcano: &trainer.VolcanoPodGroupPolicySource{},
+					},
+				}),
+				runtime.WithTemplateSpecObjApply(
+					jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-cluster-critical"),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("non-existent"),
+											),
+										),
+									),
+								),
+						),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("templateSpec").Child("priorityClassName"),
+					"non-existent",
+					`PriorityClass "non-existent" doesn't exist: priorityclasses.scheduling.k8s.io "non-existent" not found`,
+				),
+			},
+		},
+		"reserved priorityClassName on multiple ReplicatedJobs are all skipped": {
+			info: runtime.NewInfo(
+				runtime.WithPodGroupPolicy(&trainer.PodGroupPolicy{
+					PodGroupPolicySource: trainer.PodGroupPolicySource{
+						Volcano: &trainer.VolcanoPodGroupPolicySource{},
+					},
+				}),
+				runtime.WithTemplateSpecObjApply(
+					jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-cluster-critical"),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-node-critical"),
+											),
+										),
+									),
+								),
+						),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+		},
 	}
 
 	for name, tc := range cases {
