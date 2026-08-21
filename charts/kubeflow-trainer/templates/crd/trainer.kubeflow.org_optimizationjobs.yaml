@@ -121,6 +121,30 @@ spec:
                           required:
                           - choices
                           type: object
+                        logNormal:
+                          description: logNormal is the log-normal search space.
+                          properties:
+                            mean:
+                              description: mean is the center of the log-normal search
+                                space, in log space.
+                              maxLength: 64
+                              minLength: 1
+                              pattern: ^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$
+                              type: string
+                            stdDev:
+                              description: stdDev is the standard deviation of the
+                                log-normal search space, in log space.
+                              maxLength: 64
+                              minLength: 1
+                              pattern: ^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$
+                              type: string
+                          required:
+                          - mean
+                          - stdDev
+                          type: object
+                          x-kubernetes-validations:
+                          - message: stdDev must be strictly greater than 0
+                            rule: double(self.stdDev) > 0.0
                         logUniform:
                           description: logUniform is the log-uniform search space.
                           properties:
@@ -155,6 +179,30 @@ spec:
                             rule: double(self.min) > 0.0
                           - message: min must be strictly less than max
                             rule: double(self.min) < double(self.max)
+                        normal:
+                          description: normal is the normal (Gaussian) search space.
+                          properties:
+                            mean:
+                              description: mean is the center of the normal search
+                                space.
+                              maxLength: 64
+                              minLength: 1
+                              pattern: ^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$
+                              type: string
+                            stdDev:
+                              description: stdDev is the standard deviation of the
+                                normal search space.
+                              maxLength: 64
+                              minLength: 1
+                              pattern: ^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$
+                              type: string
+                          required:
+                          - mean
+                          - stdDev
+                          type: object
+                          x-kubernetes-validations:
+                          - message: stdDev must be strictly greater than 0
+                            rule: double(self.stdDev) > 0.0
                         uniform:
                           description: uniform is the uniform search space.
                           properties:
@@ -190,8 +238,8 @@ spec:
                       type: object
                       x-kubernetes-validations:
                       - message: exactly one of the fields in [uniform logUniform
-                          categorical] must be set
-                        rule: '[has(self.uniform),has(self.logUniform),has(self.categorical)].filter(x,x==true).size()
+                          normal logNormal categorical] must be set
+                        rule: '[has(self.uniform),has(self.logUniform),has(self.normal),has(self.logNormal),has(self.categorical)].filter(x,x==true).size()
                           == 1'
                   required:
                   - name
@@ -6239,8 +6287,8 @@ spec:
               rule: self == oldSelf
             - message: parallelTrials cannot exceed numTrials
               rule: self.parallelTrials <= self.numTrials
-            - message: Grid search requires all parameters to be Categorical; Uniform
-                and LogUniform are not supported.
+            - message: Grid search requires all parameters to be Categorical; continuous
+                distributions are not supported.
               rule: '!has(self.searchAlgorithm.grid) || self.parameters.all(p, has(p.searchSpace.categorical))'
           status:
             description: status is the status for the optimization job.
