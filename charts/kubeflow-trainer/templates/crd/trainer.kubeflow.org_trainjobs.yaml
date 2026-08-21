@@ -2088,9 +2088,6 @@ spec:
                                                         x-kubernetes-list-map-keys:
                                                         - name
                                                         x-kubernetes-list-type: map
-                                                        x-kubernetes-validations:
-                                                        - message: field is immutable
-                                                          rule: self == oldSelf
                                                       imagePullSecrets:
                                                         description: imagePullSecrets
                                                           patches the image pull secrets
@@ -2115,9 +2112,6 @@ spec:
                                                         x-kubernetes-list-map-keys:
                                                         - name
                                                         x-kubernetes-list-type: map
-                                                        x-kubernetes-validations:
-                                                        - message: field is immutable
-                                                          rule: self == oldSelf
                                                       initContainers:
                                                         description: initContainers
                                                           patches the init containers
@@ -2632,9 +2626,6 @@ spec:
                                                         x-kubernetes-list-map-keys:
                                                         - name
                                                         x-kubernetes-list-type: map
-                                                        x-kubernetes-validations:
-                                                        - message: field is immutable
-                                                          rule: self == oldSelf
                                                       nodeSelector:
                                                         additionalProperties:
                                                           type: string
@@ -2851,9 +2842,6 @@ spec:
                                                                 type: string
                                                             type: object
                                                         type: object
-                                                        x-kubernetes-validations:
-                                                        - message: field is immutable
-                                                          rule: self == oldSelf
                                                       serviceAccountName:
                                                         description: serviceAccountName
                                                           patches the service account
@@ -2861,9 +2849,6 @@ spec:
                                                           job templates.
                                                         maxLength: 253
                                                         type: string
-                                                        x-kubernetes-validations:
-                                                        - message: field is immutable
-                                                          rule: self == oldSelf
                                                       terminationGracePeriodSeconds:
                                                         description: |-
                                                           terminationGracePeriodSeconds patches the termination grace period for Pods
@@ -2871,9 +2856,6 @@ spec:
                                                         format: int64
                                                         minimum: 0
                                                         type: integer
-                                                        x-kubernetes-validations:
-                                                        - message: field is immutable
-                                                          rule: self == oldSelf
                                                       tolerations:
                                                         description: tolerations patches
                                                           the Pod's tolerations.
@@ -4990,9 +4972,6 @@ spec:
                                                         x-kubernetes-list-map-keys:
                                                         - name
                                                         x-kubernetes-list-type: map
-                                                        x-kubernetes-validations:
-                                                        - message: field is immutable
-                                                          rule: self == oldSelf
                                                     type: object
                                                 type: object
                                             type: object
