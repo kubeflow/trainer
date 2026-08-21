@@ -42,6 +42,13 @@ Job queueing and resource management with Kueue
 Gang scheduling with NVIDIA KAI Scheduler
 ::::
 
+::::{grid-item-card} Slurm Bridge
+:link: slurm-bridge
+:link-type: doc
+
+Schedule TrainJobs on hybrid Kubernetes and Slurm clusters
+::::
+
 :::::
 
 ----
@@ -55,4 +62,5 @@ coscheduling
 volcano
 Kueue <https://kueue.sigs.k8s.io/docs/tasks/run/trainjobs/>
 kai
+slurm-bridge
 ```

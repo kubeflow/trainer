@@ -26,3 +26,4 @@ supported plugins.
 - Learn how to configure advanced scheduling with [Volcano Scheduler](volcano.md).
 - Learn how to configure job queueing and resource management with [Kueue](https://kueue.sigs.k8s.io/docs/tasks/run/trainjobs/).
 - Learn how to configure gang scheduling with [KAI Scheduler](kai.md).
+- Learn how to schedule TrainJobs with [Slurm Bridge](slurm-bridge.md).
