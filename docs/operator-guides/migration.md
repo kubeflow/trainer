@@ -88,6 +88,120 @@ spec:
       - "--epochs=1"
 ```
 
+### Migrate MPIJob to TrainJob
+
+The following example demonstrates how to migrate the `tensorflow-benchmarks`
+workload from the legacy `MPIJob` API to the `TrainJob` API. It is based on the
+MPIJob configuration in the [legacy MPI guide](../legacy-v1/user-guides/mpi).
+
+#### Old: MPIJob (v1)
+
+```yaml
+apiVersion: kubeflow.org/v1
+kind: MPIJob
+metadata:
+  name: tensorflow-benchmarks
+spec:
+  slotsPerWorker: 2
+  runPolicy:
+    cleanPodPolicy: Running
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        spec:
+          containers:
+            - name: tensorflow-benchmarks
+              image: mpioperator/tensorflow-benchmarks:latest
+              command:
+                - mpirun
+                - --allow-run-as-root
+                - -np
+                - "2"
+                - -bind-to
+                - none
+                - -map-by
+                - slot
+                - python
+                - scripts/tf_cnn_benchmarks/tf_cnn_benchmarks.py
+                - --model=resnet101
+                - --batch_size=64
+                - --variable_update=horovod
+    Worker:
+      replicas: 1
+      template:
+        spec:
+          containers:
+            - name: tensorflow-benchmarks
+              image: mpioperator/tensorflow-benchmarks:latest
+```
+
+#### New: TrainJob (v2)
+
+```yaml
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: tensorflow-benchmarks
+spec:
+  runtimeRef:
+    apiGroup: trainer.kubeflow.org
+    name: <mpi-runtime>
+    kind: ClusterTrainingRuntime
+  trainer:
+    numNodes: 1
+    image: mpioperator/tensorflow-benchmarks:latest
+    command:
+      - mpirun
+      - --allow-run-as-root
+      - -np
+      - "2"
+      - -bind-to
+      - none
+      - -map-by
+      - slot
+      - python
+      - scripts/tf_cnn_benchmarks/tf_cnn_benchmarks.py
+      - --model=resnet101
+      - --batch_size=64
+      - --variable_update=horovod
+```
+
+There is not currently a generic MPI runtime in `manifests/base/runtimes`, so
+`<mpi-runtime>` is a placeholder. Reference an appropriate MPI-enabled
+`TrainingRuntime` or `ClusterTrainingRuntime` for your environment.
+
+MPI configuration is defined in the referenced runtime through its
+`mlPolicy.mpi` configuration, rather than in the `TrainJob` specification.
+
+For example:
+
+```yaml
+spec:
+  mlPolicy:
+    numNodes: 1
+    mpi:
+      numProcPerNode: 2
+      mpiImplementation: OpenMPI
+      sshAuthMountPath: /home/mpiuser/.ssh
+      runLauncherAsNode: true
+```
+
+The MPI policy provides the configuration required to launch distributed MPI
+workloads. The `numProcPerNode` field defines the number of MPI processes per
+training node.
+
+When migrating from `MPIJob` to `TrainJob`, the MPI-specific configuration is
+moved from the `MPIJob` specification into the reusable runtime configuration.
+This allows platform administrators to define the MPI environment once and
+reuse it across multiple `TrainJobs`.
+
+Map `MPIJob.spec.slotsPerWorker` to `TrainJob` runtime
+`spec.mlPolicy.mpi.numProcPerNode`. In this example, both values are `2`.
+
+The `mpiImplementation` field specifies the MPI implementation used by the
+runtime. For the OpenMPI configuration, set it to `OpenMPI`.
+
 ### Kubeflow Trainer Python SDK
 
 Kubeflow Trainer uses Kubeflow Python SDK to allow AI practitioners interact with Kubeflow Trainer
