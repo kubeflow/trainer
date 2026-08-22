@@ -320,6 +320,18 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 				fmt.Sprintf("%v: specified trainingRuntime must be created before the TrainJob is created", err)),
 		}
 	}
+	var warnings admission.Warnings
+	if trainingruntimeutil.IsSupportDeprecated(trainingRuntime.Labels) {
+		warnings = append(warnings, fmt.Sprintf(
+			"Referenced TrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
+			trainingRuntime.Name,
+			constants.RuntimeDeprecationPolicyURL,
+		))
+	}
 	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
-	return r.framework.RunCustomValidationPlugins(ctx, info, old, new)
+	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)
+	if len(fwWarnings) != 0 {
+		warnings = append(warnings, fwWarnings...)
+	}
+	return warnings, errs
 }
