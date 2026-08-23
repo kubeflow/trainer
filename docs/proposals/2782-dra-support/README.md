@@ -364,14 +364,14 @@ Step-by-step:
 
 ### SDK changes
 
-The Kubeflow Training SDK must be updated so users can discover which `ResourceClaimTemplates`
+The Kubeflow SDK must be updated so users can discover which `ResourceClaimTemplates`
 are available before submitting a TrainJob. This mirrors how the SDK already lists
 `TrainingRuntime` / `ClusterTrainingRuntime` objects.
 
 **New SDK method:**
 
 ```python
-def list_resource_claim_templates(self, namespace: str = None) -> list[ResourceClaimTemplate]:
+def list_resource_claim_templates(self) -> list[ResourceClaimTemplate]:
     """List ResourceClaimTemplates available in the given namespace.
     Defaults to the client's configured namespace."""
 ```
