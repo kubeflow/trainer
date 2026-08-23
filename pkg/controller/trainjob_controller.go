@@ -117,8 +117,12 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	setSuspendedCondition(&trainJob)
 
-	if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
-		err = errors.Join(err, statusErr)
+	// An unsupported runtime reference has no runtime to derive the status from, and the
+	// failed condition set above must reach the status patch below.
+	if ok {
+		if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
+			err = errors.Join(err, statusErr)
+		}
 	}
 
 	deadlineResult := r.reconcileDeadline(ctx, &trainJob)
