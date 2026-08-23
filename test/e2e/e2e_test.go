@@ -49,6 +49,9 @@ const (
 //go:embed testdata/status_update.py
 var statusUpdateScript string
 
+//go:embed testdata/mlx_distributed.py
+var mlxDistributedScript string
+
 var _ = ginkgo.Describe("TrainJob e2e", func() {
 	// Each test runs in a separate namespace.
 	var ns *corev1.Namespace
@@ -195,7 +198,8 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), mlxRuntime).
 				Trainer(&trainer.Trainer{
 					NumNodes: ptr.To(int32(2)),
-					Command:  []string{"mpirun", "sleep", "10"},
+					Command:  []string{"mpirun", "python3", "-c"},
+					Args:     []string{mlxDistributedScript},
 				}).
 				Obj()
 
@@ -210,7 +214,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
 					nodeStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Node)
 					g.Expect(ok).Should(gomega.BeTrue())
-					g.Expect(nodeStatus.Active).Should(gomega.Equal(ptr.To(int32(1))))
+					g.Expect(nodeStatus.Active).Should(gomega.Equal(ptr.To(int32(2))))
 					g.Expect(nodeStatus.Failed).Should(gomega.Equal(ptr.To(int32(0))))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
