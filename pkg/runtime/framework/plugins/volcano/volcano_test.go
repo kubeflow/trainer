@@ -496,7 +496,7 @@ func TestValidate(t *testing.T) {
 			},
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
 		},
-		"reserved priorityClassName on one ReplicatedJob must not skip validation of the rest": {
+		"a valid priorityClassName on one ReplicatedJob must not skip validation of the rest": {
 			info: runtime.NewInfo(
 				runtime.WithPodGroupPolicy(&trainer.PodGroupPolicy{
 					PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -529,6 +529,12 @@ func TestValidate(t *testing.T) {
 						),
 				),
 			),
+			objs: []client.Object{
+				&schedulingv1.PriorityClass{
+					ObjectMeta: metav1.ObjectMeta{Name: "system-cluster-critical"},
+					Value:      2000000000,
+				},
+			},
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
 			wantError: field.ErrorList{
 				field.Invalid(
@@ -538,7 +544,7 @@ func TestValidate(t *testing.T) {
 				),
 			},
 		},
-		"reserved priorityClassName on multiple ReplicatedJobs are all skipped": {
+		"built-in system priorityClassNames are validated like any other name": {
 			info: runtime.NewInfo(
 				runtime.WithPodGroupPolicy(&trainer.PodGroupPolicy{
 					PodGroupPolicySource: trainer.PodGroupPolicySource{
@@ -571,6 +577,16 @@ func TestValidate(t *testing.T) {
 						),
 				),
 			),
+			objs: []client.Object{
+				&schedulingv1.PriorityClass{
+					ObjectMeta: metav1.ObjectMeta{Name: "system-cluster-critical"},
+					Value:      2000000000,
+				},
+				&schedulingv1.PriorityClass{
+					ObjectMeta: metav1.ObjectMeta{Name: "system-node-critical"},
+					Value:      2000001000,
+				},
+			},
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
 		},
 	}

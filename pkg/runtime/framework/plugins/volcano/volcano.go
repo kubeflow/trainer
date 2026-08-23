@@ -109,11 +109,8 @@ func (v *Volcano) Validate(ctx context.Context, info *runtime.Info, _, newObj *t
 				priorityClassName := rj.Template.Spec.Template.Spec.PriorityClassName
 				if priorityClassName != nil {
 					pcName := *priorityClassName
-					// Skip two special keywords which indicate the highest priorities.
-					if pcName == "system-cluster-critical" || pcName == "system-node-critical" {
-						continue
-					}
-					// Any other name must be defined by creating a PriorityClass object with that name.
+					// Every name, including the built-in system-cluster-critical and
+					// system-node-critical, must resolve to a PriorityClass object.
 					var pc schedulingv1.PriorityClass
 					if err := v.client.Get(ctx, types.NamespacedName{Name: pcName}, &pc); err != nil {
 						allErrs = append(allErrs, field.Invalid(specPath.Child("templateSpec").Child("priorityClassName"),
