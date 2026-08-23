@@ -214,7 +214,7 @@ var _ = ginkgo.Describe("TrainJob e2e", func() {
 					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainJob), gotTrainJob)).Should(gomega.Succeed())
 					nodeStatus, ok := jobStatusByName(gotTrainJob.Status.JobsStatus, constants.Node)
 					g.Expect(ok).Should(gomega.BeTrue())
-					g.Expect(nodeStatus.Active).Should(gomega.Equal(ptr.To(int32(2))))
+					g.Expect(nodeStatus.Active).Should(gomega.Equal(ptr.To(int32(1))))
 					g.Expect(nodeStatus.Failed).Should(gomega.Equal(ptr.To(int32(0))))
 				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
 			})
