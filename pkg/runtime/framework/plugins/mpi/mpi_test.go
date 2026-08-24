@@ -372,11 +372,14 @@ trainJob-node-1-1.trainJob slots=1
 					Obj(),
 			},
 		},
-		"numProcPerNode is set to number of GPUs in TrainJob": {
+		"numProcPerNode is set to number of GPUs in the resolved node resources": {
 			info: &runtime.Info{
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{
+						"custom.com/gpu": resource.MustParse("5"),
+					}),
 					PodSets: []runtime.PodSet{
 						{
 							Name:  constants.Launcher,
@@ -410,7 +413,7 @@ trainJob-node-1-1.trainJob slots=1
 					utiltesting.MakeTrainJobTrainerWrapper().
 						NumNodes(1).
 						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
-							"custom.com/gpu": resource.MustParse("5"),
+							corev1.ResourceMemory: resource.MustParse("32Gi"),
 						}).
 						Obj()).
 				Obj(),
@@ -418,6 +421,9 @@ trainJob-node-1-1.trainJob slots=1
 				Labels:      make(map[string]string),
 				Annotations: make(map[string]string),
 				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: utiltesting.MakeJobSetSpecApplyWithNodeResources(corev1.ResourceList{
+						"custom.com/gpu": resource.MustParse("5"),
+					}),
 					PodSets: []runtime.PodSet{
 						{
 							Name:  constants.Launcher,
