@@ -165,6 +165,11 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	var updateRequest trainer.UpdateTrainJobStatusRequest
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&updateRequest); err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			badRequest(w, s.log, "Payload too large", metav1.StatusReasonRequestEntityTooLarge, http.StatusRequestEntityTooLarge)
+			return
+		}
 		s.log.V(5).Error(err, "Failed to parse runtime status", "namespace", namespace, "trainJobName", trainJobName)
 		badRequest(w, s.log, "Invalid payload", metav1.StatusReasonInvalid, http.StatusUnprocessableEntity)
 		return
