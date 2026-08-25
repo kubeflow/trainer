@@ -682,7 +682,9 @@ graduate upstream:
 
 ```go
 // +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.podGroupPolicy))",message="scheduling and podGroupPolicy are mutually exclusive"
-// +kubebuilder:validation:XValidation:rule="!has(self.scheduling) || self.template.spec.replicatedJobs.all(r, !has(r.template.spec.template.spec.schedulingGroup))",message="Pod templates must not set schedulingGroup, it is owned by the TrainJob controller"
+// +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template.spec.scheduling))",message="JobSet scheduling must not be set, it is owned by the TrainJob controller"
+// +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec.scheduling)))",message="Job scheduling must not be set, it is owned by the TrainJob controller"
+// +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec.template.spec.schedulingGroup)))",message="Pod schedulingGroup must not be set, it is owned by the TrainJob controller"
 type TrainingRuntimeSpec struct {
 
     // scheduling defines the Workload-Aware Scheduling configuration for TrainJobs which
@@ -873,8 +875,8 @@ The TrainingRuntime and ClusterTrainingRuntime validation enforces that:
   `Workload` cap of 8. Level 3 multiplies the template count by the ReplicatedJob's `replicas`, so
   a runtime with many replicas can exceed the cap; it is rejected rather than partitioned across
   multiple `Workloads`.
-- `spec.template` Pod templates do not set `spec.schedulingGroup`, which is owned by the
-  controller.
+- The JobSet `spec.scheduling`, the Job `spec.scheduling`, and the Pod `spec.schedulingGroup` are
+  all owned by the TrainJob controller, since TrainJob owns the `Workload`.
 
 The TrainJob validating webhook enforces that:
 
