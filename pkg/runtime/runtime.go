@@ -263,7 +263,12 @@ func RuntimeRefToRuntimeRegistryKey(runtimeRef trainer.RuntimeRef) string {
 func ExtractResourcePerNodeFromRuntime(info *Info) *corev1.ResourceRequirements {
 	if jobSetSpec, ok := TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info); ok {
 		for _, rJob := range jobSetSpec.ReplicatedJobs {
-			if rJob.Name != nil && *rJob.Name == constants.Node || rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer {
+			if rJob.Template == nil || rJob.Template.Spec == nil || rJob.Template.Spec.Template == nil || rJob.Template.Spec.Template.Spec == nil {
+				continue
+			}
+			isTrainerJob := (rJob.Name != nil && *rJob.Name == constants.Node) ||
+				(rJob.Template.Labels != nil && rJob.Template.Labels[constants.LabelTrainJobAncestor] == constants.AncestorTrainer)
+			if isTrainerJob {
 				for _, container := range rJob.Template.Spec.Template.Spec.Containers {
 					if container.Name != nil && *container.Name == constants.Node && container.Resources != nil {
 						res := &corev1.ResourceRequirements{
