@@ -60,7 +60,7 @@ func (r *TrainingRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	log := ctrl.LoggerFrom(ctx).WithValues("trainingRuntime", klog.KObj(&runtime))
-	ctrl.LoggerInto(ctx, log)
+	ctx = ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling TrainingRuntime")
 
 	prevRuntime := runtime.DeepCopy()

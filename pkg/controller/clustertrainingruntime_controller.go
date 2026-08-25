@@ -59,8 +59,8 @@ func (r *ClusterTrainingRuntimeReconciler) Reconcile(ctx context.Context, reques
 	if err := r.client.Get(ctx, request.NamespacedName, &clRuntime); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log := r.log.WithValues("clusterTrainingRuntime", klog.KObj(&clRuntime))
-	ctrl.LoggerInto(ctx, log)
+	log := ctrl.LoggerFrom(ctx).WithValues("clusterTrainingRuntime", klog.KObj(&clRuntime))
+	ctx = ctrl.LoggerInto(ctx, log)
 	log.V(2).Info("Reconciling ClusterTrainingRuntime")
 
 	prevClRuntime := clRuntime.DeepCopy()
