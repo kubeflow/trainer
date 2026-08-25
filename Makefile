@@ -44,6 +44,7 @@ HELM_CHART_TESTING_VERSION ?= v3.12.0
 HELM_DOCS_VERSION ?= v1.14.2
 YQ_VERSION ?= v4.45.1
 KUBE_LINTER_VERSION ?= v0.7.1
+VOLCANO_VERSION ?= v1.13.1
 
 # Container runtime (docker or podman)
 CONTAINER_RUNTIME ?=
@@ -156,14 +157,12 @@ scheduler-plugins-crd: ## Copy the CRDs from the Scheduler Plugins repository to
 	mkdir -p $(EXTERNAL_CRDS_DIR)/scheduler-plugins/
 	cp -f $(SCHEDULER_PLUGINS_ROOT)/manifests/coscheduling/* $(EXTERNAL_CRDS_DIR)/scheduler-plugins
 
-VOLCANO_APIS_ROOT = $(shell go list -m -f "{{.Dir}}" volcano.sh/apis)
-VOLCANO_VERSION = $(shell basename $(VOLCANO_APIS_ROOT) | cut -d'@' -f2)
 VOLCANO_CRD_URL = https://raw.githubusercontent.com/volcano-sh/volcano/$(VOLCANO_VERSION)/config/crd/volcano/bases/scheduling.volcano.sh_podgroups.yaml
 
 .PHONY: volcano-crd
 volcano-crd: ## Copy the CRDs from Volcano repository to the manifests/external-crds directory.
 	mkdir -p $(EXTERNAL_CRDS_DIR)/volcano/
-	curl -sSL $(VOLCANO_CRD_URL) -o $(EXTERNAL_CRDS_DIR)/volcano/scheduling.volcano.sh_podgroups.yaml
+	curl -fsSL $(VOLCANO_CRD_URL) -o $(EXTERNAL_CRDS_DIR)/volcano/scheduling.volcano.sh_podgroups.yaml
 
 # Instructions for code generation.
 .PHONY: manifests
