@@ -86,7 +86,7 @@ spec:
   spec:
     devices:
       requests:
-        - name: gpu
+        - name: gpu # "gpu" in the request name enables numProcPerNode auto-detection
           deviceClassName: h100
           count: 8
 ---
@@ -104,7 +104,10 @@ spec:
           count: 4
 ```
 
-The admin repeats this for each workload namespace. Users then select from the available
+The admin repeats this for each workload namespace. For `numProcPerNode` auto-detection to
+work, the device request `name` in the template must contain "gpu" (see
+[DRA-aware GPU detection](#dra-aware-gpu-detection-in-ml-policy-plugins)); this requirement is
+called out in the admin-facing DRA guide added to `docs/`. Users then select from the available
 templates via `resourceClaimsPerNode`. The admin controls which GPU types and counts are
 available; users cannot override the device count.
 
@@ -444,8 +447,9 @@ minimum version for this feature) in the client's current namespace, matching `l
 ```python
 @dataclass
 class DeviceRequest:
-    device: str        # spec.spec.devices.requests[].exactly.deviceClassName
-    device_count: int  # spec.spec.devices.requests[].exactly.count (1 when unset)
+    name: str                      # spec.spec.devices.requests[].name
+    device_class_name: str | None  # spec.spec.devices.requests[].exactly.deviceClassName
+    device_count: int | None       # spec.spec.devices.requests[].exactly.count
 
 
 @dataclass
@@ -459,7 +463,7 @@ The goal is to expose just enough for a user to pick a template, using the same 
 
 ```python
 >>> for rct in TrainerClient().list_resource_claim_templates():
-...     print(rct.name, [(d.device, d.device_count) for d in rct.device_requests])
+...     print(rct.name, [(d.device_class_name, d.device_count) for d in rct.device_requests])
 h100-x8   [('gpu.nvidia.com', 8)]
 h100-rdma [('gpu.nvidia.com', 8), ('rdma.example.com', 1)]
 ```
@@ -467,7 +471,9 @@ h100-rdma [('gpu.nvidia.com', 8), ('rdma.example.com', 1)]
 `device_requests` is a list because a template can request several device classes, e.g. GPUs
 plus a NIC or a NUMA-aligned CPU set.
 
-Deliberately not exposed for now, to keep the surface small: the device request `name`,
+The `exactly` fields are optional because a request can instead use `firstAvailable`
+sub-requests; in that case `device_class_name` and `device_count` are `None` and users fall back
+to reading the template directly. Deliberately not exposed for now, to keep the surface small:
 `allocationMode` (`All` makes `count` meaningless), device `selectors` and `constraints`,
 `config`, and `firstAvailable` sub-requests. The template `namespace` is also omitted since it
 is always the client namespace. Any of these can be added later without a breaking change.
@@ -587,13 +593,18 @@ inspects each merged PodSpec's `resourceClaims`:
 - For a `ResourceClaimName` set through the `runtimePatches` escape hatch: look up the
   `ResourceClaim` object directly and inspect its device requests.
 
-For each device request, the controller checks whether the `deviceClassName` contains
-"gpu" (same heuristic as `GetNumGPUPerNode` matching resource names containing "gpu")
-and sums the `count` for matching requests.
+For each device request, the controller checks whether the request `name`
+(`spec.devices.requests[].name`) contains "gpu" (same heuristic as `GetNumGPUPerNode`
+matching resource names containing "gpu") and sums the `count` for matching requests.
+The request name is used rather than `deviceClassName` because it is free text the admin
+fully controls when authoring the template, while DeviceClass names are defined by the
+installed DRA drivers.
 
-**Admin requirement:** For auto-detection to work, the `DeviceClass` must have "gpu" in
-its name (e.g., `gpu`, `h100-gpu`, `nvidia-gpu`). If the name doesn't match, the DRA
-GPU count defaults to 0 and the user can set `numProcPerNode` explicitly.
+**Admin requirement:** For auto-detection to work, the device request `name` in the
+`ResourceClaimTemplate` must contain "gpu" (e.g., `gpu`, `h100-gpu`). If no request name
+matches, the DRA GPU count defaults to 0 and the user can set `numProcPerNode` explicitly.
+This requirement is documented in the admin-facing DRA setup guide (see Files modified),
+alongside the `ResourceClaimTemplate` examples.
 
 The resolved count is propagated to ML policy plugins (torch, torchtune, MPI, XGBoost,
 Flux) via the existing `PodSet` struct. Each plugin uses the DRA count as a fallback
@@ -671,6 +682,7 @@ and CRD manifests.
 | `manifests/base/rbac/`                                   | Add `resourceclaimtemplates` and `resourceclaims` get permission to ClusterRole |
 | `pkg/runtime/core/trainingruntime_test.go`               | Test top-level claims application and merge behavior                         |
 | `sdk/python/kubeflow/trainer/api_client.py` (or similar) | Add `list_resource_claim_templates(namespace)` method                        |
+| `docs/` (Trainer website)                                | Admin DRA setup guide: template examples, "gpu" request naming requirement for auto-detection |
 
 
 
