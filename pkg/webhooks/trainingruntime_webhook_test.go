@@ -17,17 +17,65 @@ limitations under the License.
 package webhooks
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/klog/v2/ktesting"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
+
+func TestTrainingRuntimeValidateCreate(t *testing.T) {
+	cases := map[string]struct {
+		labels   map[string]string
+		warnings admission.Warnings
+	}{
+		"no deprecation label": {
+			labels:   nil,
+			warnings: nil,
+		},
+		"support=deprecated": {
+			labels: map[string]string{constants.LabelSupport: constants.SupportDeprecated},
+			warnings: admission.Warnings{
+				"TrainingRuntime \"test-runtime\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: " + constants.RuntimeDeprecationPolicyURL,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			obj := testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").Obj()
+			// Set valid replicas to avoid validation errors
+			for i := range obj.Spec.Template.Spec.ReplicatedJobs {
+				obj.Spec.Template.Spec.ReplicatedJobs[i].Replicas = 1
+			}
+
+			if len(tc.labels) != 0 {
+				obj.Labels = tc.labels
+			}
+
+			validator := &TrainingRuntimeValidator{}
+			warnings, err := validator.ValidateCreate(ctx, obj)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.warnings, warnings); diff != "" {
+				t.Fatalf("unexpected warnings (-want, +got): %s", diff)
+			}
+		})
+	}
+}
 
 func TestValidateReplicatedJobs(t *testing.T) {
 	cases := map[string]struct {
