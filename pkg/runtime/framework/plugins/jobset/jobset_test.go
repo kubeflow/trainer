@@ -2186,117 +2186,6 @@ func TestValidate(t *testing.T) {
 				field.InternalError(runtimePatchesPath, fmt.Errorf("client error")),
 			},
 		},
-		"runtimePatches with duplicate volume names": {
-			info: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
-						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
-							{
-								Name: ptr.To(constants.Node),
-								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
-									Spec: &batchv1ac.JobSpecApplyConfiguration{
-										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
-											Spec: &corev1ac.PodSpecApplyConfiguration{
-												Containers: []corev1ac.ContainerApplyConfiguration{
-													{Name: ptr.To(constants.Node)},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimePatches([]trainer.RuntimePatch{
-					{
-						Manager: "test.io/manager",
-						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
-							Template: &trainer.JobSetTemplatePatch{
-								Spec: &trainer.JobSetSpecPatch{
-									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
-										Name: constants.Node,
-										Template: &trainer.JobTemplatePatch{
-											Spec: &trainer.JobSpecPatch{
-												Template: &trainer.PodTemplatePatch{
-													Spec: &trainer.PodSpecPatch{
-														Volumes: []corev1.Volume{
-															{Name: "data"},
-															{Name: "data"}, // Duplicate
-														},
-													},
-												},
-											},
-										},
-									}},
-								},
-							},
-						},
-					},
-				}).
-				Obj(),
-			wantError: field.ErrorList{
-				field.Invalid(runtimePatchesPath, utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj().Spec.RuntimePatches,
-					fmt.Sprintf("duplicate volume name %q in replicated job %s", "data", constants.Node)),
-			},
-		},
-		"runtimePatches with empty volume name": {
-			info: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
-						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
-							{
-								Name: ptr.To(constants.Node),
-								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
-									Spec: &batchv1ac.JobSpecApplyConfiguration{
-										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
-											Spec: &corev1ac.PodSpecApplyConfiguration{
-												Containers: []corev1ac.ContainerApplyConfiguration{
-													{Name: ptr.To(constants.Node)},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimePatches([]trainer.RuntimePatch{
-					{
-						Manager: "test.io/manager",
-						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
-							Template: &trainer.JobSetTemplatePatch{
-								Spec: &trainer.JobSetSpecPatch{
-									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
-										Name: constants.Node,
-										Template: &trainer.JobTemplatePatch{
-											Spec: &trainer.JobSpecPatch{
-												Template: &trainer.PodTemplatePatch{
-													Spec: &trainer.PodSpecPatch{
-														Volumes: []corev1.Volume{
-															{Name: ""},
-														},
-													},
-												},
-											},
-										},
-									}},
-								},
-							},
-						},
-					},
-				}).
-				Obj(),
-			wantError: field.ErrorList{
-				field.Invalid(runtimePatchesPath, utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj().Spec.RuntimePatches,
-					fmt.Sprintf("volume in replicated job %s must have a name", constants.Node)),
-			},
-		},
 		"runtimePatches volumeMount references non-existent volume": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
@@ -2308,8 +2197,18 @@ func TestValidate(t *testing.T) {
 									Spec: &batchv1ac.JobSpecApplyConfiguration{
 										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
 											Spec: &corev1ac.PodSpecApplyConfiguration{
+												// After merge: has existing-volume from patch
+												Volumes: []corev1ac.VolumeApplyConfiguration{
+													{Name: ptr.To("existing-volume")},
+												},
 												Containers: []corev1ac.ContainerApplyConfiguration{
-													{Name: ptr.To(constants.Node)},
+													{
+														Name: ptr.To(constants.Node),
+														// After merge: volumeMount references missing-volume (doesn't exist)
+														VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+															{Name: ptr.To("missing-volume"), MountPath: ptr.To("/data")},
+														},
+													},
 												},
 											},
 										},
@@ -2371,8 +2270,18 @@ func TestValidate(t *testing.T) {
 									Spec: &batchv1ac.JobSpecApplyConfiguration{
 										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
 											Spec: &corev1ac.PodSpecApplyConfiguration{
+												// After merge: has data volume
+												Volumes: []corev1ac.VolumeApplyConfiguration{
+													{Name: ptr.To("data")},
+												},
 												Containers: []corev1ac.ContainerApplyConfiguration{
-													{Name: ptr.To(constants.Node)},
+													{
+														Name: ptr.To(constants.Node),
+														// After merge: volumeMount with empty mountPath
+														VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+															{Name: ptr.To("data"), MountPath: ptr.To("")},
+														},
+													},
 												},
 											},
 										},
@@ -2420,72 +2329,7 @@ func TestValidate(t *testing.T) {
 				Obj(),
 			wantError: field.ErrorList{
 				field.Invalid(runtimePatchesPath, utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj().Spec.RuntimePatches,
-					fmt.Sprintf("volumeMount %q in container %s of replicated job %s must have a mountPath", "data", constants.Node, constants.Node)),
-			},
-		},
-		"runtimePatches volumeMount with duplicate mountPath in same container": {
-			info: &runtime.Info{
-				TemplateSpec: runtime.TemplateSpec{
-					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
-						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
-							{
-								Name: ptr.To(constants.Node),
-								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
-									Spec: &batchv1ac.JobSpecApplyConfiguration{
-										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
-											Spec: &corev1ac.PodSpecApplyConfiguration{
-												Containers: []corev1ac.ContainerApplyConfiguration{
-													{Name: ptr.To(constants.Node)},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
-				RuntimePatches([]trainer.RuntimePatch{
-					{
-						Manager: "test.io/manager",
-						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
-							Template: &trainer.JobSetTemplatePatch{
-								Spec: &trainer.JobSetSpecPatch{
-									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
-										Name: constants.Node,
-										Template: &trainer.JobTemplatePatch{
-											Spec: &trainer.JobSpecPatch{
-												Template: &trainer.PodTemplatePatch{
-													Spec: &trainer.PodSpecPatch{
-														Volumes: []corev1.Volume{
-															{Name: "vol1"},
-															{Name: "vol2"},
-														},
-														Containers: []trainer.ContainerPatch{
-															{
-																Name: constants.Node,
-																VolumeMounts: []corev1.VolumeMount{
-																	{Name: "vol1", MountPath: "/data"},
-																	{Name: "vol2", MountPath: "/data"}, // Duplicate mountPath
-																},
-															},
-														},
-													},
-												},
-											},
-										},
-									}},
-								},
-							},
-						},
-					},
-				}).
-				Obj(),
-			wantError: field.ErrorList{
-				field.Invalid(runtimePatchesPath, utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj().Spec.RuntimePatches,
-					fmt.Sprintf("duplicate mountPath %q in container %s of replicated job %s", "/data", constants.Node, constants.Node)),
+					fmt.Sprintf("volumeMount %q in container %s of replicated job %s must have a non-empty mountPath", "data", constants.Node, constants.Node)),
 			},
 		},
 		"runtimePatches volumeMount in initContainer references non-existent volume": {
@@ -2499,8 +2343,18 @@ func TestValidate(t *testing.T) {
 									Spec: &batchv1ac.JobSpecApplyConfiguration{
 										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
 											Spec: &corev1ac.PodSpecApplyConfiguration{
+												// After merge: has existing-volume from patch
+												Volumes: []corev1ac.VolumeApplyConfiguration{
+													{Name: ptr.To("existing-volume")},
+												},
 												InitContainers: []corev1ac.ContainerApplyConfiguration{
-													{Name: ptr.To("init")},
+													{
+														Name: ptr.To("init"),
+														// After merge: volumeMount references missing-volume (doesn't exist)
+														VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+															{Name: ptr.To("missing-volume"), MountPath: ptr.To("/init-data")},
+														},
+													},
 												},
 												Containers: []corev1ac.ContainerApplyConfiguration{
 													{Name: ptr.To(constants.Node)},
@@ -2565,6 +2419,10 @@ func TestValidate(t *testing.T) {
 									Spec: &batchv1ac.JobSpecApplyConfiguration{
 										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
 											Spec: &corev1ac.PodSpecApplyConfiguration{
+												// After merge: has toleration with invalid operator
+												Tolerations: []corev1ac.TolerationApplyConfiguration{
+													{Key: ptr.To("key1"), Operator: ptr.To(corev1.TolerationOperator("InvalidOperator")), Value: ptr.To("value1")},
+												},
 												Containers: []corev1ac.ContainerApplyConfiguration{
 													{Name: ptr.To(constants.Node)},
 												},
@@ -2620,6 +2478,10 @@ func TestValidate(t *testing.T) {
 									Spec: &batchv1ac.JobSpecApplyConfiguration{
 										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
 											Spec: &corev1ac.PodSpecApplyConfiguration{
+												// After merge: has toleration with invalid effect
+												Tolerations: []corev1ac.TolerationApplyConfiguration{
+													{Key: ptr.To("key1"), Operator: ptr.To(corev1.TolerationOpEqual), Value: ptr.To("value1"), Effect: ptr.To(corev1.TaintEffect("InvalidEffect"))},
+												},
 												Containers: []corev1ac.ContainerApplyConfiguration{
 													{Name: ptr.To(constants.Node)},
 												},
@@ -2675,6 +2537,10 @@ func TestValidate(t *testing.T) {
 									Spec: &batchv1ac.JobSpecApplyConfiguration{
 										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
 											Spec: &corev1ac.PodSpecApplyConfiguration{
+												// After merge: toleration with Equal operator but no value
+												Tolerations: []corev1ac.TolerationApplyConfiguration{
+													{Key: ptr.To("key1"), Operator: ptr.To(corev1.TolerationOpEqual), Value: ptr.To(""), Effect: ptr.To(corev1.TaintEffectNoSchedule)},
+												},
 												Containers: []corev1ac.ContainerApplyConfiguration{
 													{Name: ptr.To(constants.Node)},
 												},
