@@ -222,8 +222,8 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 				Obj(),
 			existingRuntime: deprecatedRuntime,
 			wantErrs:        nil,
-			wantWarnings: []string{
-				`Referenced ClusterTrainingRuntime "deprecated-runtime" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: https://trainer.kubeflow.org/en/latest/operator-guides/runtime.html#runtime-deprecation-policy`,
+			wantWarnings: admission.Warnings{
+				`Referenced ClusterTrainingRuntime "deprecated-runtime" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: ` + constants.RuntimeDeprecationPolicyURL,
 			},
 		},
 	}
