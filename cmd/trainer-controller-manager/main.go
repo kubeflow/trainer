@@ -159,7 +159,7 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 	<-certsReady
 	setupLog.Info("Certs ready")
 
-	if failedCtrlName, err := controller.SetupControllers(mgr, runtimes, ctrlpkg.Options{}); err != nil {
+	if failedCtrlName, err := controller.SetupControllers(mgr, runtimes, ctrlpkg.Options{}, nil); err != nil {
 		setupLog.Error(err, "Could not create controller", "controller", failedCtrlName)
 		os.Exit(1)
 	}

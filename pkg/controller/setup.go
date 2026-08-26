@@ -24,7 +24,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 )
 
-func SetupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, options controller.Options) (string, error) {
+func SetupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, options controller.Options, suggestionClient SearchAlgorithmClient) (string, error) {
 	runtimeRec := NewTrainingRuntimeReconciler(
 		mgr.GetClient(),
 		mgr.GetEventRecorder("trainer-trainingruntime-controller"),
@@ -45,6 +45,14 @@ func SetupControllers(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, opt
 		runtimes,
 	).SetupWithManager(mgr, options); err != nil {
 		return trainer.TrainJobKind, err
+	}
+	if err := NewOptimizationJobReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		mgr.GetEventRecorderFor("optimizationjob-controller"),
+		nil,
+	).SetupWithManager(mgr, options); err != nil {
+		return "OptimizationJob", err
 	}
 	return "", nil
 }

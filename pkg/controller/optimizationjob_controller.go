@@ -19,19 +19,19 @@ package controller
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
 
+	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlpkg "sigs.k8s.io/controller-runtime/pkg/controller"
@@ -40,357 +40,308 @@ import (
 	katibapi "github.com/kubeflow/katib/pkg/apis/manager/v1beta1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	optimizationjob "github.com/kubeflow/trainer/v2/pkg/util/optimizationjob"
+	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
-const (
-	// TrainJob condition types
-	TrainJobComplete string = "Complete"
-	TrainJobFailed   string = "Failed"
-)
-
-const (
-	// OptunaGRPCServicePort is the default port exposed by the Katib suggestion-optuna image
-	OptunaGRPCServicePort int32 = 6789
-)
-
-// SuggestionProvider abstracts the gRPC call so we can mock it in unit tests
-type SuggestionProvider interface {
+// SearchAlgorithmClient abstracts the gRPC call so we can mock it in unit tests
+type SearchAlgorithmClient interface {
 	GetSuggestions(ctx context.Context, addr string, req *katibapi.GetSuggestionsRequest) ([][]trainer.ParameterAssignment, error)
 }
 
-// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=optimizationjobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=optimizationjobs,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=optimizationjobs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=optimizationjobs/finalizers,verbs=update
-// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 
 type OptimizationJobReconciler struct {
 	client.Client
-	Scheme           *runtime.Scheme
-	SuggestionClient SuggestionProvider
+	Scheme                *runtime.Scheme
+	Log                   logr.Logger
+	Recorder              record.EventRecorder
+	SearchAlgorithmClient SearchAlgorithmClient
 }
 
 func NewOptimizationJobReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
-	suggestionClient SuggestionProvider,
+	recorder record.EventRecorder,
+	algorithmClient SearchAlgorithmClient,
 ) *OptimizationJobReconciler {
-	// Fall back to the real client for production if nil is passed
-	if suggestionClient == nil {
-		suggestionClient = &RealSuggestionClient{}
+	if algorithmClient == nil {
+		algorithmClient = &DefaultSearchAlgorithmClient{}
 	}
 
 	return &OptimizationJobReconciler{
-		Client:           client,
-		Scheme:           scheme,
-		SuggestionClient: suggestionClient,
+		Client:                client,
+		Scheme:                scheme,
+		Log:                   ctrl.Log.WithName("optimizationjob-controller"),
+		Recorder:              recorder,
+		SearchAlgorithmClient: algorithmClient,
 	}
 }
 
 func (r *OptimizationJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx).WithName("optimizationjob-controller")
+	log := r.Log.WithValues("optimizationJob", req.NamespacedName)
+	ctx = ctrl.LoggerInto(ctx, log)
 
-	// 1. Fetch the OptimizationJob instance
 	optJob := &trainer.OptimizationJob{}
 	if err := r.Get(ctx, req.NamespacedName, optJob); err != nil {
-		if errors.IsNotFound(err) {
-			return ctrl.Result{}, nil // Job was deleted
-		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	if optJob.Status == nil {
 		optJob.Status = &trainer.OptimizationJobStatus{}
 	}
 
-	// 2. Ignore completed jobs
-	if isJobCompleted(optJob) {
-		return ctrl.Result{}, nil
-	}
+	prevOptJob := optJob.DeepCopy()
 
-	// ========================================================================
-	// 3. Ensure the Optuna Suggestion Service is Running
-	// ========================================================================
-
-	// 3a. Ensure Deployment exists
-	deploymentName := fmt.Sprintf("%s-optuna", optJob.Name)
-	var deploy appsv1.Deployment
-	if err := r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: req.Namespace}, &deploy); err != nil {
-		if errors.IsNotFound(err) {
-			log.Info("Creating Optuna Suggestion Deployment", "Deployment.Name", deploymentName)
-			newDeploy := r.constructOptunaDeployment(optJob, deploymentName)
-			if err := r.Create(ctx, newDeploy); err != nil {
-				meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
-					Type:    "Created",
-					Status:  metav1.ConditionFalse,
-					Reason:  "AlgorithmServiceDeploymentCreationFailed",
-					Message: fmt.Sprintf("Failed to create Optuna deployment: %v", err),
-				})
-				if updateErr := r.Status().Update(ctx, optJob); updateErr != nil {
-					log.Error(updateErr, "Failed to update OptimizationJob status")
-				}
-				return ctrl.Result{}, err
+	// Defer the single Status Patch operation
+	defer func() {
+		if !equality.Semantic.DeepEqual(optJob.Status, prevOptJob.Status) {
+			patchErr := r.Status().Patch(ctx, optJob, client.MergeFrom(prevOptJob))
+			if patchErr != nil {
+				log.Error(patchErr, "Failed to patch OptimizationJob status")
 			}
-			// Requeue immediately after creation to let the status update
-			return ctrl.Result{Requeue: true}, nil
 		}
-		return ctrl.Result{}, err
+	}()
+
+	// 1. Fetch Owned TrainJobs
+	var allTrainJobs trainer.TrainJobList
+	if listErr := r.List(ctx, &allTrainJobs, client.InNamespace(req.Namespace)); listErr != nil {
+		log.Error(listErr, "Unable to list TrainJobs")
+		return ctrl.Result{}, listErr
 	}
 
-	// Check for Running state of Optuna pod deployment before moving ahead.
-
-	// 3b. Ensure Service exists
-	var svc corev1.Service
-	if err := r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: req.Namespace}, &svc); err != nil {
-		if errors.IsNotFound(err) {
-			log.Info("Creating Optuna Suggestion Service", "Service.Name", deploymentName)
-			newSvc := r.constructOptunaService(optJob, deploymentName)
-			if err := r.Create(ctx, newSvc); err != nil {
-				meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
-					Type:    "Created",
-					Status:  metav1.ConditionFalse,
-					Reason:  "AlgorithmServiceCreationFailed",
-					Message: fmt.Sprintf("Failed to create Optuna service: %v", err),
-				})
-				if updateErr := r.Status().Update(ctx, optJob); updateErr != nil {
-					log.Error(updateErr, "Failed to update OptimizationJob status")
-				}
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{Requeue: true}, nil
-		}
-		return ctrl.Result{}, err
-	}
-
-	// Check if the Pod backing the deployment is running and ready.
-	if deploy.Status.AvailableReplicas == 0 {
-		log.Info("Optuna suggestion pod is not yet ready, waiting...")
-		// The deployment exists, but the pod isn't ready. Requeue after 3 seconds.
-		return ctrl.Result{RequeueAfter: 3 * time.Second}, nil
-	}
-
-	// 3c. Mark Created = True once Optuna service resources are provisioned AND running
-	if !meta.IsStatusConditionTrue(optJob.Status.Conditions, "Created") {
-		meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
-			Type:    "Created",
-			Status:  metav1.ConditionTrue,
-			Reason:  "AlgorithmServiceCreated",
-			Message: "Optuna suggestion service is running",
-		})
-		if err := r.Status().Update(ctx, optJob); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-
-	// ========================================================================
-	// 4. Analyze Current Trial (TrainJob) States
-	// ========================================================================
-
-	var childTrainJobs trainer.TrainJobList
-	if err := r.List(ctx, &childTrainJobs, client.InNamespace(req.Namespace), client.MatchingLabels{
-		"trainer.kubeflow.org/optimizationjob-name": optJob.Name,
-	}); err != nil {
-		log.Error(err, "unable to list child TrainJobs")
-		return ctrl.Result{}, err
-	}
-
-	var activeTrials, succeededTrials, failedTrials int32
 	var validTrainJobs []trainer.TrainJob
+	var activeTrials, succeededTrials, failedTrials int32
 
-	for _, tj := range childTrainJobs.Items {
-		isOwner := false
-		for _, ownerRef := range tj.GetOwnerReferences() {
-			if ownerRef.UID == optJob.UID {
-				isOwner = true
-				break
-			}
-		}
-		if !isOwner {
+	for _, tj := range allTrainJobs.Items {
+		if owner := metav1.GetControllerOf(&tj); owner == nil || owner.UID != optJob.UID {
 			continue
 		}
-
 		validTrainJobs = append(validTrainJobs, tj)
 
-		if isTrainJobSucceeded(&tj) {
-			succeededTrials++
-		} else if isTrainJobFailed(&tj) {
-			failedTrials++
+		if trainjob.IsTrainJobFinished(&tj) {
+			// Determine if it was successful or failed
+			if meta.IsStatusConditionTrue(tj.Status.Conditions, trainer.TrainJobFailed) {
+				failedTrials++
+			} else {
+				succeededTrials++
+			}
 		} else {
 			activeTrials++
 		}
 	}
 	totalTrials := activeTrials + succeededTrials + failedTrials
 
-	log.V(5).Info("Trial stats", "total", totalTrials, "active", activeTrials, "succeeded", succeededTrials, "failed", failedTrials)
+	// 2. Continuous Best Result Tracking
+	if bestResult := optimizationjob.ExtractBestResult(optJob, validTrainJobs); bestResult != nil {
+		optJob.Status.Result = *bestResult
+	}
 
-	// ========================================================================
-	// 5. Check for Overall Experiment Completion
-	// ========================================================================
+	// 3. Ignore completed jobs and trigger cleanup
+	if isJobCompleted(optJob) {
+		return ctrl.Result{}, r.cleanupAlgorithmService(ctx, optJob)
+	}
 
-	if optJob.Spec.NumTrials > 0 && totalTrials >= optJob.Spec.NumTrials && activeTrials == 0 {
-		if failedTrials == totalTrials {
-			log.Info("All trials failed. Marking OptimizationJob Failed.")
-			meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
-				Type:    constants.OptimizationJobFailed,
-				Status:  metav1.ConditionTrue,
-				Reason:  "AllTrialsFailed",
-				Message: fmt.Sprintf("%d out of %d trials failed", failedTrials, totalTrials),
-			})
-		} else {
-			log.Info("All trials finished. Marking OptimizationJob Complete.")
-			bestResult := r.extractBestResult(optJob, validTrainJobs)
-			if bestResult != nil {
-				optJob.Status.Result = *bestResult
-			}
-			markJobCompleted(optJob)
-		}
-
-		if err := r.Status().Update(ctx, optJob); err != nil {
-			return ctrl.Result{}, err
-		}
+	// 4. Check for Overall Experiment Failure (Phase 1 logic)
+	if failedTrials > 0 {
+		log.Info("A trial failed. Marking OptimizationJob Failed.")
+		meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
+			Type:    constants.OptimizationJobFailed,
+			Status:  metav1.ConditionTrue,
+			Reason:  "TrialFailed",
+			Message: fmt.Sprintf("%d trial(s) failed", failedTrials),
+		})
 		return ctrl.Result{}, nil
 	}
 
-	// ========================================================================
-	// 6. Scale Up New Trials based on Budget Constraints (via Optuna gRPC)
-	// ========================================================================
-
-	var parallelLimit int32 = 1
-	if optJob.Spec.ParallelTrials > 0 {
-		parallelLimit = optJob.Spec.ParallelTrials
+	// 5. Check for Overall Experiment Completion
+	if totalTrials >= optJob.Spec.NumTrials && activeTrials == 0 {
+		log.Info("All trials finished. Marking OptimizationJob Complete.")
+		meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
+			Type:    constants.OptimizationJobComplete,
+			Status:  metav1.ConditionTrue,
+			Reason:  "OptimizationJobCompleted",
+			Message: "All trials have completed successfully",
+		})
+		return ctrl.Result{}, nil
 	}
 
-	var totalLimit int32 = 1
-	if optJob.Spec.NumTrials > 0 {
-		totalLimit = optJob.Spec.NumTrials
+	// 6. Ensure the Algorithm Service is Running
+	isServiceReady, srvErr := r.createAlgorithmServiceIfNecessary(ctx, optJob)
+	if srvErr != nil {
+		return ctrl.Result{}, srvErr
+	}
+	if !isServiceReady {
+		log.Info("Search algorithm service is not yet ready.")
+		return ctrl.Result{}, nil
 	}
 
-	trialsToSpawn := parallelLimit - activeTrials
-	trialsRemaining := totalLimit - totalTrials
+	if !meta.IsStatusConditionTrue(optJob.Status.Conditions, constants.OptimizationJobCreated) {
+		meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
+			Type:    constants.OptimizationJobCreated,
+			Status:  metav1.ConditionTrue,
+			Reason:  "AlgorithmServiceCreated",
+			Message: "Search algorithm service is running",
+		})
+	}
 
-	// Prevent overshooting the total budget
+	// 7. Scale Up New Trials based on Budget Constraints
+	if activeTrials >= optJob.Spec.ParallelTrials {
+		// We are at maximum concurrency, exit early.
+		return ctrl.Result{}, nil
+	}
+
+	trialsToSpawn := optJob.Spec.ParallelTrials - activeTrials
+	trialsRemaining := optJob.Spec.NumTrials - totalTrials
+
 	if trialsToSpawn > trialsRemaining {
 		trialsToSpawn = trialsRemaining
 	}
 
+	// TODO: Implement cache Expectations to prevent over-spawning trials due to cache sync delays.
 	if trialsToSpawn > 0 {
-		suggestionReq := r.buildSuggestionRequest(optJob, childTrainJobs.Items, trialsToSpawn)
-		serviceAddr := fmt.Sprintf("%s-optuna.%s.svc:%d", optJob.Name, optJob.Namespace, OptunaGRPCServicePort)
-
-		suggestions, err := r.SuggestionClient.GetSuggestions(ctx, serviceAddr, suggestionReq)
-		if err != nil {
-			log.Error(err, "Failed to fetch suggestions from Optuna gRPC service")
-
-			// Mark OptimizationJob as Failed (Terminal Condition)
-			meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
-				Type:    constants.OptimizationJobFailed,
-				Status:  metav1.ConditionTrue,
-				Reason:  "SuggestionServiceFailed",
-				Message: fmt.Sprintf("Optuna gRPC service error: %v", err),
-			})
-			if updateErr := r.Status().Update(ctx, optJob); updateErr != nil {
-				return ctrl.Result{}, updateErr
-			}
-			return ctrl.Result{}, nil // Do not requeue terminal failure
-		}
-
-		// Spawn a TrainJob trial for each suggestion
-		for i, paramAssignments := range suggestions {
-			trialIndex := totalTrials + int32(i)
-			newTrainJob := r.constructTrainJob(optJob, paramAssignments, trialIndex)
-
-			log.Info("Creating a new TrainJob trial with Optuna suggestions", "TrainJob.Name", newTrainJob.Name)
-			if err := r.Create(ctx, newTrainJob); err != nil {
-				if errors.IsAlreadyExists(err) {
-					log.Info("TrainJob already exists (cache race detected), skipping", "TrainJob.Name", newTrainJob.Name)
-					continue
-				}
-
-				log.Error(err, "Failed to create new TrainJob", "TrainJob.Name", newTrainJob.Name)
-
-				meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
-					Type:    "Created",
-					Status:  metav1.ConditionFalse,
-					Reason:  "TrainJobsCreationFailed", // Matches KEP Section 7.4
-					Message: fmt.Sprintf("Failed to create TrainJob %s: %v", newTrainJob.Name, err),
-				})
-				if updateErr := r.Status().Update(ctx, optJob); updateErr != nil {
-					log.Error(updateErr, "Failed to update OptimizationJob status")
-				}
-				return ctrl.Result{}, err
-			}
-		}
-	}
-
-	// ========================================================================
-	// 7. Sync OptimizationJob Status (Active counts, etc.)
-	// ========================================================================
-
-	if activeTrials > 0 && !meta.IsStatusConditionTrue(optJob.Status.Conditions, "Running") {
-		meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
-			Type:    "Running",
-			Status:  metav1.ConditionTrue,
-			Reason:  "TrialsRunning",
-			Message: fmt.Sprintf("%d trial(s) actively running", activeTrials),
-		})
-		if err := r.Status().Update(ctx, optJob); err != nil {
-			log.Error(err, "Failed to update Running condition")
-			return ctrl.Result{}, err
+		if spawnErr := r.createTrainJobs(ctx, optJob, validTrainJobs, trialsToSpawn); spawnErr != nil {
+			return ctrl.Result{}, spawnErr
 		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
-// constructTrainJob merges the TrainJobTemplate with the suggested parameters
-func (r *OptimizationJobReconciler) constructTrainJob(optJob *trainer.OptimizationJob, params []trainer.ParameterAssignment, index int32) *trainer.TrainJob {
+func (r *OptimizationJobReconciler) createAlgorithmServiceIfNecessary(ctx context.Context, optJob *trainer.OptimizationJob) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	// Create/Update Deployment via SSA
+	deploy, err := r.constructAlgorithmDeployment(optJob)
+	if err != nil {
+		return false, err
+	}
+	if err := r.Patch(ctx, deploy, client.Apply, client.ForceOwnership, client.FieldOwner("optimizationjob-controller")); err != nil {
+		log.Error(err, "Failed to apply algorithm Deployment")
+		return false, err
+	}
+
+	// Create/Update Service via SSA
+	svc, err := r.constructAlgorithmService(optJob)
+	if err != nil {
+		return false, err
+	}
+	if err := r.Patch(ctx, svc, client.Apply, client.ForceOwnership, client.FieldOwner("optimizationjob-controller")); err != nil {
+		log.Error(err, "Failed to apply algorithm Service")
+		return false, err
+	}
+
+	// Fetch current state to check readiness
+	deploymentName := optimizationjob.GetAlgorithmServiceName(optJob)
+
+	var currentDeploy appsv1.Deployment
+	if err := r.Get(ctx, types.NamespacedName{Name: deploymentName, Namespace: optJob.Namespace}, &currentDeploy); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+
+	if currentDeploy.Status.AvailableReplicas == 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (r *OptimizationJobReconciler) cleanupAlgorithmService(ctx context.Context, optJob *trainer.OptimizationJob) error {
+	log := ctrl.LoggerFrom(ctx)
+	deploymentName := optimizationjob.GetAlgorithmServiceName(optJob)
+
+	deploy := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: deploymentName, Namespace: optJob.Namespace},
+	}
+	if err := client.IgnoreNotFound(r.Delete(ctx, deploy)); err != nil {
+		log.Error(err, "Failed to cleanup Algorithm Deployment")
+		return err
+	}
+
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: deploymentName, Namespace: optJob.Namespace},
+	}
+	if err := client.IgnoreNotFound(r.Delete(ctx, svc)); err != nil {
+		log.Error(err, "Failed to cleanup Algorithm Service")
+		return err
+	}
+	return nil
+}
+
+func (r *OptimizationJobReconciler) createTrainJobs(ctx context.Context, optJob *trainer.OptimizationJob, trainJobs []trainer.TrainJob, trialsToSpawn int32) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	serviceName := optimizationjob.GetAlgorithmServiceName(optJob)
+	serviceAddr := fmt.Sprintf("%s.%s.svc:%d", serviceName, optJob.Namespace, constants.SearchAlgorithmServicePort)
+
+	// Pass both completed and in-flight trials to rebuild the stateless Optuna study
+	suggestionReq := optimizationjob.BuildSuggestionRequest(optJob, trainJobs, trialsToSpawn)
+
+	suggestions, err := r.SearchAlgorithmClient.GetSuggestions(ctx, serviceAddr, suggestionReq)
+	if err != nil {
+		log.Error(err, "Failed to fetch suggestions from gRPC service")
+		// Exponential backoff for transient gRPC errors instead of terminating the job.
+		return err
+	}
+
+	// TODO: For extreme scale (ParallelTrials > 100), implement a WorkQueue pattern to spawn TrainJobs.
+	for _, paramAssignments := range suggestions {
+		newTrainJob, err := r.constructTrainJob(optJob, paramAssignments)
+		if err != nil {
+			return err
+		}
+		if err := r.Create(ctx, newTrainJob); err != nil {
+			if errors.IsAlreadyExists(err) {
+				continue
+			}
+			msg := fmt.Sprintf("Failed to create TrainJob trial: %v", err)
+			log.Error(err, msg)
+			r.Recorder.Eventf(optJob, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", msg)
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *OptimizationJobReconciler) constructTrainJob(optJob *trainer.OptimizationJob, params []trainer.ParameterAssignment) (*trainer.TrainJob, error) {
 	tj := &trainer.TrainJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-trial-%d", optJob.Name, index),
-			Namespace: optJob.Namespace,
+			GenerateName: fmt.Sprintf("%s-trial-", optJob.Name),
+			Namespace:    optJob.Namespace,
+			Annotations:  make(map[string]string),
 			Labels: map[string]string{
-				"trainer.kubeflow.org/optimizationjob-name": optJob.Name,
+				constants.OptimizationJobNameLabel: optJob.Name,
 			},
-			Annotations: make(map[string]string),
 		},
 		Spec: *optJob.Spec.TrainJobTemplate.Spec.DeepCopy(),
 	}
 
-	// Copy original annotations from template
-	for k, v := range optJob.Spec.TrainJobTemplate.Annotations {
-		tj.Annotations[k] = v
-	}
-
-	// Ensure Trainer exists to prevent nil pointer panics when injecting envs
 	if tj.Spec.Trainer == nil {
 		tj.Spec.Trainer = &trainer.Trainer{}
 	}
 
-	// Inject parameters as Annotations and Environment Variables
 	for _, param := range params {
-		// Annotation for stateless history tracking (Optimization controller reads this)
-		tj.Annotations[fmt.Sprintf("trainer.kubeflow.org/opt-param-%s", param.Name)] = param.Value
-
-		// Env Var for SDK consumption (Training script reads this)
-		envName := fmt.Sprintf("KUBEFLOW_TRAINER_OPT_%s", strings.ToUpper(param.Name))
+		envName := fmt.Sprintf("%s%s", constants.EnvVarPrefix, param.Name)
 		tj.Spec.Trainer.Env = append(tj.Spec.Trainer.Env, corev1.EnvVar{
 			Name:  envName,
 			Value: param.Value,
 		})
 	}
 
-	// Set OptimizationJob as the owner
 	if err := controllerutil.SetControllerReference(optJob, tj, r.Scheme); err != nil {
-		klog.Error(err, "Failed to set controller reference")
+		r.Log.Error(err, "Failed to set controller reference")
+		return nil, err
 	}
 
-	return tj
+	return tj, nil
 }
 
-// SetupWithManager registers the controller
 func (r *OptimizationJobReconciler) SetupWithManager(mgr ctrl.Manager, options ctrlpkg.Options) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("optimizationjob-controller").
@@ -402,8 +353,6 @@ func (r *OptimizationJobReconciler) SetupWithManager(mgr ctrl.Manager, options c
 		Complete(r)
 }
 
-// --- Helper Functions ---
-
 func isJobCompleted(optJob *trainer.OptimizationJob) bool {
 	if optJob == nil || optJob.Status == nil || len(optJob.Status.Conditions) == 0 {
 		return false
@@ -412,35 +361,13 @@ func isJobCompleted(optJob *trainer.OptimizationJob) bool {
 		meta.IsStatusConditionTrue(optJob.Status.Conditions, constants.OptimizationJobFailed)
 }
 
-func isTrainJobSucceeded(tj *trainer.TrainJob) bool {
-	if tj == nil || len(tj.Status.Conditions) == 0 {
-		return false
-	}
-	return meta.IsStatusConditionTrue(tj.Status.Conditions, TrainJobComplete)
-}
-
-func isTrainJobFailed(tj *trainer.TrainJob) bool {
-	if tj == nil || len(tj.Status.Conditions) == 0 {
-		return false
-	}
-	return meta.IsStatusConditionTrue(tj.Status.Conditions, TrainJobFailed)
-}
-
-func markJobCompleted(optJob *trainer.OptimizationJob) {
-	meta.SetStatusCondition(&optJob.Status.Conditions, metav1.Condition{
-		Type:    constants.OptimizationJobComplete,
-		Status:  metav1.ConditionTrue,
-		Reason:  "OptimizationJobCompleted",
-		Message: "All trials have completed successfully",
-	})
-}
-
-func (r *OptimizationJobReconciler) constructOptunaDeployment(optJob *trainer.OptimizationJob, name string) *appsv1.Deployment {
+func (r *OptimizationJobReconciler) constructAlgorithmDeployment(optJob *trainer.OptimizationJob) (*appsv1.Deployment, error) {
+	name := optimizationjob.GetAlgorithmServiceName(optJob)
 	labels := map[string]string{
-		"app": name,
-		"trainer.kubeflow.org/optimizationjob-name": optJob.Name,
+		constants.OptimizationJobNameLabel: optJob.Name,
 	}
 
+	// TODO: Allow users to configure the Optuna suggestion deployment (e.g., resources, tolerations, affinity).
 	deploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -457,13 +384,21 @@ func (r *OptimizationJobReconciler) constructOptunaDeployment(optJob *trainer.Op
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name: "optuna-suggestion",
-							// Using the existing Katib Optuna image for phase 1
-							Image: "docker.io/kubeflowkatib/suggestion-optuna:latest",
+							Name:  "search-algorithm",
+							Image: constants.DefaultSearchAlgorithmImage,
 							Ports: []corev1.ContainerPort{
 								{
-									ContainerPort: OptunaGRPCServicePort,
+									ContainerPort: constants.SearchAlgorithmServicePort,
 								},
+							},
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									GRPC: &corev1.GRPCAction{
+										Port: constants.SearchAlgorithmServicePort,
+									},
+								},
+								InitialDelaySeconds: 2,
+								PeriodSeconds:       5,
 							},
 						},
 					},
@@ -472,17 +407,18 @@ func (r *OptimizationJobReconciler) constructOptunaDeployment(optJob *trainer.Op
 		},
 	}
 
-	// Make the OptimizationJob the owner so this deployment is garbage collected when the job is deleted
 	if err := controllerutil.SetControllerReference(optJob, deploy, r.Scheme); err != nil {
-		klog.Error(err, "Failed to set controller reference for Optuna Deployment")
+		r.Log.Error(err, "Failed to set controller reference for Algorithm Deployment")
+		return nil, err
 	}
 
-	return deploy
+	return deploy, nil
 }
 
-func (r *OptimizationJobReconciler) constructOptunaService(optJob *trainer.OptimizationJob, name string) *corev1.Service {
+func (r *OptimizationJobReconciler) constructAlgorithmService(optJob *trainer.OptimizationJob) (*corev1.Service, error) {
+	name := optimizationjob.GetAlgorithmServiceName(optJob)
 	labels := map[string]string{
-		"app": name,
+		constants.OptimizationJobNameLabel: optJob.Name,
 	}
 
 	svc := &corev1.Service{
@@ -495,159 +431,25 @@ func (r *OptimizationJobReconciler) constructOptunaService(optJob *trainer.Optim
 			Ports: []corev1.ServicePort{
 				{
 					Name:     "grpc",
-					Port:     OptunaGRPCServicePort,
+					Port:     constants.SearchAlgorithmServicePort,
 					Protocol: corev1.ProtocolTCP,
 				},
 			},
 		},
 	}
 
-	// Make the OptimizationJob the owner
 	if err := controllerutil.SetControllerReference(optJob, svc, r.Scheme); err != nil {
-		klog.Error(err, "Failed to set controller reference for Optuna Service")
+		r.Log.Error(err, "Failed to set controller reference for Algorithm Service")
+		return nil, err
 	}
 
-	return svc
+	return svc, nil
 }
 
-func (r *OptimizationJobReconciler) buildSuggestionRequest(optJob *trainer.OptimizationJob, trainJobs []trainer.TrainJob, trialsToSpawn int32) *katibapi.GetSuggestionsRequest {
+type DefaultSearchAlgorithmClient struct{}
 
-	// 1. Map Objective Direction & Metric
-	var targetMetric string
-	var optunaObjType katibapi.ObjectiveType
-	if len(optJob.Spec.Objectives) > 0 && optJob.Spec.Objectives[0].Metric != "" {
-		targetMetric = optJob.Spec.Objectives[0].Metric
-		if optJob.Spec.Objectives[0].Direction == trainer.ObjectiveDirectionMaximize {
-			optunaObjType = katibapi.ObjectiveType_MAXIMIZE
-		} else {
-			optunaObjType = katibapi.ObjectiveType_MINIMIZE
-		}
-	}
-
-	// 2. Map Search Space Parameters
-	var grpcParams []*katibapi.ParameterSpec
-	for _, p := range optJob.Spec.Parameters {
-		if p.SearchSpace == nil {
-			continue
-		}
-
-		paramType := katibapi.ParameterType_DOUBLE
-
-		if p.SearchSpace.Uniform.Type == trainer.ParameterTypeInt ||
-			p.SearchSpace.LogUniform.Type == trainer.ParameterTypeInt {
-			paramType = katibapi.ParameterType_INT
-		}
-
-		paramSpec := &katibapi.ParameterSpec{
-			Name:          p.Name,
-			ParameterType: paramType,
-		}
-
-		if p.SearchSpace.Uniform.Min != "" || p.SearchSpace.Uniform.Max != "" {
-
-			paramSpec.FeasibleSpace = &katibapi.FeasibleSpace{
-				Min: string(p.SearchSpace.Uniform.Min),
-				Max: string(p.SearchSpace.Uniform.Max),
-			}
-
-		} else if p.SearchSpace.LogUniform.Min != "" || p.SearchSpace.LogUniform.Max != "" {
-
-			paramSpec.FeasibleSpace = &katibapi.FeasibleSpace{
-				Min: string(p.SearchSpace.LogUniform.Min),
-				Max: string(p.SearchSpace.LogUniform.Max),
-			}
-
-		} else if len(p.SearchSpace.Categorical.Choices) > 0 {
-
-			paramSpec.ParameterType = katibapi.ParameterType_CATEGORICAL
-			paramSpec.FeasibleSpace = &katibapi.FeasibleSpace{
-				List: p.SearchSpace.Categorical.Choices,
-			}
-		}
-
-		grpcParams = append(grpcParams, paramSpec)
-	}
-
-	req := &katibapi.GetSuggestionsRequest{
-		Experiment: &katibapi.Experiment{
-			Name: optJob.Name,
-			Spec: &katibapi.ExperimentSpec{
-				Algorithm: &katibapi.AlgorithmSpec{
-					AlgorithmName: getAlgorithmName(optJob),
-				},
-				Objective: &katibapi.ObjectiveSpec{
-					Type:                optunaObjType,
-					ObjectiveMetricName: targetMetric,
-				},
-				ParameterSpecs: &katibapi.ExperimentSpec_ParameterSpecs{
-					Parameters: grpcParams,
-				},
-			},
-		},
-		CurrentRequestNumber: trialsToSpawn,
-		TotalRequestNumber:   0,
-	}
-
-	// Iterate through all TrainJobs owned by this OptimizationJob
-	for _, tj := range trainJobs {
-		req.TotalRequestNumber++
-
-		trial := &katibapi.Trial{
-			Name: tj.Name,
-			Spec: &katibapi.TrialSpec{
-				ParameterAssignments: &katibapi.TrialSpec_ParameterAssignments{
-					Assignments: []*katibapi.ParameterAssignment{},
-				},
-			},
-		}
-
-		// 1. Reconstruct ParameterAssignments from the stateless Annotations
-		prefix := "trainer.kubeflow.org/opt-param-"
-		for k, v := range tj.Annotations {
-			if strings.HasPrefix(k, prefix) {
-				paramName := strings.TrimPrefix(k, prefix)
-				trial.Spec.ParameterAssignments.Assignments = append(
-					trial.Spec.ParameterAssignments.Assignments,
-					&katibapi.ParameterAssignment{
-						Name:  paramName,
-						Value: v,
-					},
-				)
-			}
-		}
-
-		// 2. Reconstruct Trial metrics from TrainJobStatus
-		if tj.Status.TrainerStatus != nil && len(tj.Status.TrainerStatus.Metrics) > 0 {
-			for _, m := range tj.Status.TrainerStatus.Metrics {
-				if m.Name == targetMetric {
-					trial.Status = &katibapi.TrialStatus{
-						Observation: &katibapi.Observation{
-							Metrics: []*katibapi.Metric{
-								{
-									Name:  m.Name,
-									Value: m.Value,
-								},
-							},
-						},
-					}
-					break // Found the target objective metric
-				}
-			}
-		}
-
-		req.Trials = append(req.Trials, trial)
-	}
-
-	return req
-}
-
-// RealSuggestionClient implements SuggestionProvider to connect to a real Optuna pod
-type RealSuggestionClient struct{}
-
-// GetSuggestions establishes a gRPC connection to the Optuna pod and fetches parameter assignments
-func (c *RealSuggestionClient) GetSuggestions(ctx context.Context, addr string, req *katibapi.GetSuggestionsRequest) ([][]trainer.ParameterAssignment, error) {
-	// Establish insecure gRPC connection to the Optuna Service inside the cluster
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock(), grpc.WithTimeout(time.Second*3))
+func (c *DefaultSearchAlgorithmClient) GetSuggestions(ctx context.Context, addr string, req *katibapi.GetSuggestionsRequest) ([][]trainer.ParameterAssignment, error) {
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}
@@ -655,15 +457,12 @@ func (c *RealSuggestionClient) GetSuggestions(ctx context.Context, addr string, 
 
 	client := katibapi.NewSuggestionClient(conn)
 
-	// Call the gRPC method
 	reply, err := client.GetSuggestions(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	var allAssignments [][]trainer.ParameterAssignment
-
-	// Map Katib's protobuf reply back to our native v1alpha1 ParameterAssignment structs
 	for _, pAssignments := range reply.ParameterAssignments {
 		var assignments []trainer.ParameterAssignment
 		for _, assignment := range pAssignments.Assignments {
@@ -676,75 +475,4 @@ func (c *RealSuggestionClient) GetSuggestions(ctx context.Context, addr string, 
 	}
 
 	return allAssignments, nil
-}
-
-// Helper function to map the new API algorithm block to the legacy Katib string name
-func getAlgorithmName(optJob *trainer.OptimizationJob) string {
-	if optJob.Spec.SearchAlgorithm != nil {
-		if optJob.Spec.SearchAlgorithm.Random != nil {
-			return "random"
-		}
-		if optJob.Spec.SearchAlgorithm.Grid != nil {
-			return "grid"
-		}
-		// For other Optuna specific algorithms (like TPE), to be added later.
-	}
-	// Default fallback
-	return "random"
-}
-
-func (r *OptimizationJobReconciler) extractBestResult(optJob *trainer.OptimizationJob, trainJobs []trainer.TrainJob) *trainer.Result {
-	if len(optJob.Spec.Objectives) == 0 || optJob.Spec.Objectives[0].Metric == "" {
-		return nil
-	}
-
-	targetMetric := optJob.Spec.Objectives[0].Metric
-	isMaximize := optJob.Spec.Objectives[0].Direction == trainer.ObjectiveDirectionMaximize
-
-	var bestJob *trainer.TrainJob
-	var bestVal float64
-
-	for i, tj := range trainJobs {
-		if tj.Status.TrainerStatus == nil {
-			continue
-		}
-		for _, m := range tj.Status.TrainerStatus.Metrics {
-			if m.Name == targetMetric {
-				var val float64
-				if _, err := fmt.Sscanf(m.Value, "%f", &val); err != nil {
-					continue
-				}
-				if bestJob == nil {
-					bestJob = &trainJobs[i]
-					bestVal = val
-				} else if isMaximize && val > bestVal {
-					bestJob = &trainJobs[i]
-					bestVal = val
-				} else if !isMaximize && val < bestVal {
-					bestJob = &trainJobs[i]
-					bestVal = val
-				}
-			}
-		}
-	}
-
-	if bestJob == nil {
-		return nil
-	}
-
-	res := &trainer.Result{
-		TrainJobName: bestJob.Name,
-	}
-
-	prefix := "trainer.kubeflow.org/opt-param-"
-	for k, v := range bestJob.Annotations {
-		if strings.HasPrefix(k, prefix) {
-			res.Parameters = append(res.Parameters, trainer.ParameterAssignment{
-				Name:  strings.TrimPrefix(k, prefix),
-				Value: v,
-			})
-		}
-	}
-
-	return res
 }

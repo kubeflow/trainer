@@ -88,9 +88,6 @@ const (
 	// OptimizationJobFailed is the status condition type indicating the optimization job failed.
 	OptimizationJobFailed string = "Failed"
 
-	// OptimizationJobRunning is the status condition type indicating the optimization job is actively running trials.
-	OptimizationJobRunning string = "Running"
-
 	// OptimizationJobCreated is the status condition type indicating the Algorithm service is running.
 	OptimizationJobCreated string = "Created"
 
@@ -288,6 +285,18 @@ const (
 
 	// XGBoostEnvNumWorker is the env name for the total number of workers.
 	XGBoostEnvNumWorker string = "DMLC_NUM_WORKER"
+
+	// SearchAlgorithmServicePort is the port for the Optuna GRPC service.
+	SearchAlgorithmServicePort int32 = 6789
+
+	// EnvVarPrefix is the prefix for the Optuna environment variables.
+	EnvVarPrefix string = "KUBEFLOW_TRAINER_OPT_"
+
+	// DefaultSearchAlgorithmImage is the image for the Optuna search algorithm.
+	DefaultSearchAlgorithmImage string = "docker.io/kubeflowkatib/suggestion-optuna:v0.17.0"
+
+	// OptimizationJobNameLabel is the label for the OptimizationJob name.
+	OptimizationJobNameLabel string = "trainer.kubeflow.org/optimization-job"
 )
 
 const (

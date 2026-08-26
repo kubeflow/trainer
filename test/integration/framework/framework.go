@@ -49,8 +49,9 @@ import (
 )
 
 type Framework struct {
-	testEnv *envtest.Environment
-	cancel  context.CancelFunc
+	testEnv          *envtest.Environment
+	cancel           context.CancelFunc
+	SuggestionClient controller.SuggestionProvider
 }
 
 func (f *Framework) Init() *rest.Config {
@@ -114,7 +115,7 @@ func (f *Framework) RunManager(cfg *rest.Config, startControllers bool) (context
 			// https://github.com/kubernetes-sigs/controller-runtime/pull/2902#issuecomment-2284194683
 			// https://github.com/kubernetes-sigs/controller-runtime/issues/2994
 			SkipNameValidation: ptr.To(true),
-		})
+		}, f.SuggestionClient)
 		gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), "controller", failedCtrlName)
 		gomega.ExpectWithOffset(1, failedCtrlName).To(gomega.BeEmpty())
 	}

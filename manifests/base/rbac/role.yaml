@@ -44,10 +44,8 @@ rules:
   - services
   verbs:
   - create
-  - delete
   - get
   - list
-  - patch
   - update
   - watch
 - apiGroups:
@@ -76,10 +74,8 @@ rules:
   - deployments
   verbs:
   - create
-  - delete
   - get
   - list
-  - patch
   - update
   - watch
 - apiGroups:
@@ -127,6 +123,7 @@ rules:
   - trainer.kubeflow.org
   resources:
   - clustertrainingruntimes
+  - optimizationjobs
   - trainingruntimes
   verbs:
   - get
@@ -149,19 +146,11 @@ rules:
 - apiGroups:
   - trainer.kubeflow.org
   resources:
-  - optimizationjobs
   - trainjobs
   verbs:
   - create
-  - delete
   - get
   - list
   - patch
   - update
   - watch
-- apiGroups:
-  - trainer.kubeflow.org
-  resources:
-  - optimizationjobs/finalizers
-  verbs:
-  - update
