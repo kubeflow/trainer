@@ -245,18 +245,12 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 				t.Fatalf("Failed to initialize TrainingRuntime: %v", err)
 			}
 
-			runtimeFactory, err := NewClusterTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			clTrainingRuntime, err := NewClusterTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
-				t.Fatalf("Failed to initialize ClusterTrainingRuntime: %v", err)
+				t.Fatal(err)
 			}
 
-			clusterRuntime, ok := runtimeFactory.(*ClusterTrainingRuntime)
-			if !ok {
-				t.Fatal("Expected ClusterTrainingRuntime type")
-			}
-
-			// Call ValidateObjects
-			warnings, fieldErrors := clusterRuntime.ValidateObjects(ctx, nil, tc.trainJob)
+			warnings, fieldErrors := clTrainingRuntime.ValidateObjects(ctx, nil, tc.trainJob)
 
 			if diff := cmp.Diff(tc.wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); diff != "" {
 				t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
