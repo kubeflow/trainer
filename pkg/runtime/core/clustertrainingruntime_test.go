@@ -212,7 +212,11 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 				Obj(),
 			existingRuntime: nil,
 			wantErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "RuntimeRef"), nil, "specified clusterTrainingRuntime must be created before the TrainJob is created"),
+				field.Invalid(field.NewPath("spec", "RuntimeRef"), trainer.RuntimeRef{
+					Name:     "nonexistent-runtime",
+					APIGroup: ptr.To(trainer.GroupVersion.Group),
+					Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
+				}, ""),
 			},
 			wantWarnings: nil,
 		},
