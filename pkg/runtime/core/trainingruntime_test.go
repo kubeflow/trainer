@@ -2271,7 +2271,11 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 				Obj(),
 			existingRuntime: nil,
 			wantErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "runtimeRef"), nil, "specified trainingRuntime must be created before the TrainJob is created"),
+				field.Invalid(field.NewPath("spec", "runtimeRef"), trainer.RuntimeRef{
+					Name:     "nonexistent-runtime",
+					APIGroup: ptr.To(trainer.GroupVersion.Group),
+					Kind:     ptr.To(trainer.TrainingRuntimeKind),
+				}, ""),
 			},
 		},
 	}
