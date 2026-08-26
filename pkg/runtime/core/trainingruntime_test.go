@@ -2301,7 +2301,7 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 			// Call ValidateObjects
 			_, fieldErrors := trainingRuntime.ValidateObjects(ctx, nil, tc.trainJob)
 
-			if diff := cmp.Diff(tc.wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail", "BadValue")); diff != "" {
+			if diff := cmp.Diff(tc.wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail")); diff != "" {
 				t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
 			}
 		})
