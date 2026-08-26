@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
@@ -50,7 +51,30 @@ func (j *Jax) Name() string {
 }
 
 func (j *Jax) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
-	return nil, nil
+	var allErrs field.ErrorList
+
+	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.JAX == nil {
+		return nil, allErrs
+	}
+
+	if newObj.Spec.Trainer != nil {
+		jaxEnvs := sets.New[string]()
+		for _, env := range newObj.Spec.Trainer.Env {
+			if constants.JAXReservedEnvNames.Has(env.Name) {
+				jaxEnvs.Insert(env.Name)
+			}
+		}
+
+		if jaxEnvs.Len() > 0 {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("spec", "trainer", "env"),
+				newObj.Spec.Trainer.Env,
+				fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", sets.List(jaxEnvs)),
+			))
+		}
+	}
+
+	return nil, allErrs
 }
 
 func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
