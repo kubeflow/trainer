@@ -196,7 +196,7 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 		trainJob        *trainer.TrainJob
 		existingRuntime *trainer.ClusterTrainingRuntime
 		wantErrs        field.ErrorList
-		wantWarnings    []string
+		wantWarnings    admission.Warnings
 	}{
 		"succeeds when runtime exists and is valid": {
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
