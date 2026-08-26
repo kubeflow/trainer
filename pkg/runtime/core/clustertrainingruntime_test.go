@@ -185,23 +185,9 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 }
 
 func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
-	resRequests := corev1.ResourceList{
-		corev1.ResourceCPU: resource.MustParse("1"),
-	}
+	validRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj()
 
-	validRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
-		RuntimeSpec(
-			testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Spec).
-				Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-				Obj(),
-		).Obj()
-
-	deprecatedRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("deprecated-runtime").
-		RuntimeSpec(
-			testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("deprecated-runtime").Spec).
-				Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-				Obj(),
-		).Obj()
+	deprecatedRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("deprecated-runtime").Obj()
 	deprecatedRuntime.Labels = map[string]string{
 		constants.LabelSupport: constants.SupportDeprecated,
 	}
