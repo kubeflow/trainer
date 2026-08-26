@@ -71,18 +71,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - authentication.k8s.io
-  resources:
-  - tokenreviews
-  verbs:
-  - create
-- apiGroups:
-  - authorization.k8s.io
-  resources:
-  - subjectaccessreviews
-  verbs:
-  - create
-- apiGroups:
   - apps
   resources:
   - deployments
@@ -94,6 +82,18 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -139,6 +139,7 @@ rules:
   - trainer.kubeflow.org
   resources:
   - clustertrainingruntimes
+  - optimizationjobs
   - trainingruntimes
   verbs:
   - get
@@ -161,19 +162,11 @@ rules:
 - apiGroups:
   - trainer.kubeflow.org
   resources:
-  - optimizationjobs
   - trainjobs
   verbs:
   - create
-  - delete
   - get
   - list
   - patch
   - update
   - watch
-- apiGroups:
-  - trainer.kubeflow.org
-  resources:
-  - optimizationjobs/finalizers
-  verbs:
-  - update

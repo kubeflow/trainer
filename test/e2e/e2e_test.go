@@ -21,8 +21,10 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,6 +33,7 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	optutil "github.com/kubeflow/trainer/v2/pkg/util/optimizationjob"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	"github.com/kubeflow/trainer/v2/test/util"
 
@@ -869,3 +872,186 @@ func jobStatusByName(statuses []trainer.JobStatus, name string) (trainer.JobStat
 	}
 	return trainer.JobStatus{}, false
 }
+
+var _ = ginkgo.Describe("OptimizationJob e2e", func() {
+	var ns *corev1.Namespace
+
+	// Create test namespace before each test.
+	ginkgo.BeforeEach(func() {
+		ns = &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "e2e-optjob-",
+			},
+		}
+		gomega.Expect(k8sClient.Create(ctx, ns)).To(gomega.Succeed())
+
+		// Wait for namespace to exist before proceeding with test.
+		gomega.Eventually(func(g gomega.Gomega) {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ns), ns)).Should(gomega.Succeed())
+		}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+	})
+
+	// Delete test namespace after each test.
+	ginkgo.AfterEach(func() {
+		gomega.Expect(k8sClient.Delete(ctx, ns)).To(gomega.Succeed())
+	})
+
+	ginkgo.When("Creating OptimizationJob with random search algorithm", func() {
+		ginkgo.It("should provision algorithm service, run trials to completion, record best result, and perform cleanup", func() {
+			optJob := &trainer.OptimizationJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "e2e-random-optjob",
+				},
+				Spec: trainer.OptimizationJobSpec{
+					NumTrials:      1,
+					ParallelTrials: 1,
+					SearchAlgorithm: &trainer.SearchAlgorithm{
+						Random: &trainer.RandomAlgorithm{},
+					},
+					Objectives: []trainer.Objective{
+						{
+							Metric:    "accuracy",
+							Direction: trainer.ObjectiveDirectionMaximize,
+						},
+					},
+					Parameters: []trainer.Parameter{
+						{
+							Name: "learning_rate",
+							SearchSpace: &trainer.SearchSpace{
+								Uniform: trainer.UniformSpace{
+									Min:  "0.001",
+									Max:  "0.1",
+									Type: trainer.ParameterTypeFloat,
+								},
+							},
+						},
+					},
+					TrainJobTemplate: trainer.TrainJobTemplateSpec{
+						Spec: trainer.TrainJobSpec{
+							RuntimeRef: trainer.RuntimeRef{
+								Name:     torchRuntime,
+								APIGroup: ptr.To(trainer.GroupVersion.Group),
+								Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
+							},
+							Trainer: &trainer.Trainer{
+								Image:   ptr.To("python:3.11-alpine"),
+								Command: []string{"python3", "-c"},
+								Args:    []string{statusUpdateScript},
+							},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("Creating the OptimizationJob", func() {
+				gomega.Expect(k8sClient.Create(ctx, optJob)).Should(gomega.Succeed())
+			})
+
+			deployKey := client.ObjectKey{
+				Namespace: ns.Name,
+				Name:      optutil.GetAlgorithmServiceName(optJob),
+			}
+
+			ginkgo.By("Verifying search algorithm Deployment and Service are created", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, deployKey, &appsv1.Deployment{})).Should(gomega.Succeed())
+					g.Expect(k8sClient.Get(ctx, deployKey, &corev1.Service{})).Should(gomega.Succeed())
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Verifying trial TrainJob is created", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					var trainJobs trainer.TrainJobList
+					g.Expect(k8sClient.List(ctx, &trainJobs, client.InNamespace(ns.Name), client.MatchingLabels{
+						constants.OptimizationJobNameLabel: optJob.Name,
+					})).Should(gomega.Succeed())
+					g.Expect(trainJobs.Items).Should(gomega.HaveLen(1))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Verifying OptimizationJob reaches Complete status", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotOptJob := &trainer.OptimizationJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(optJob), gotOptJob)).Should(gomega.Succeed())
+					cond := meta.FindStatusCondition(gotOptJob.Status.Conditions, constants.OptimizationJobComplete)
+					g.Expect(cond).ShouldNot(gomega.BeNil())
+					g.Expect(cond.Status).Should(gomega.Equal(metav1.ConditionTrue))
+					g.Expect(cond.Reason).Should(gomega.Equal("OptimizationJobCompleted"))
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Verifying best result is populated in OptimizationJob status", func() {
+				gotOptJob := &trainer.OptimizationJob{}
+				gomega.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(optJob), gotOptJob)).Should(gomega.Succeed())
+				gomega.Expect(gotOptJob.Status.Result.TrainJobName).ShouldNot(gomega.BeEmpty())
+				gomega.Expect(gotOptJob.Status.Result.Parameters).Should(gomega.ContainElement(
+					gomega.HaveField("Name", "learning_rate"),
+				))
+			})
+
+			ginkgo.By("Verifying automated cleanup deletes algorithm Deployment and Service", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, deployKey, &appsv1.Deployment{})).Should(testingutil.BeNotFoundError())
+					g.Expect(k8sClient.Get(ctx, deployKey, &corev1.Service{})).Should(testingutil.BeNotFoundError())
+				}, util.TimeoutE2E, util.Interval).Should(gomega.Succeed())
+			})
+		})
+
+		ginkgo.It("should fail if unsupported search algorithm is configured", func() {
+			optJob := &trainer.OptimizationJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.Name,
+					Name:      "e2e-unsupported-optjob",
+				},
+				Spec: trainer.OptimizationJobSpec{
+					NumTrials:      1,
+					ParallelTrials: 1,
+					SearchAlgorithm: &trainer.SearchAlgorithm{
+						Grid: &trainer.GridAlgorithm{},
+					},
+					Objectives: []trainer.Objective{
+						{
+							Metric:    "accuracy",
+							Direction: trainer.ObjectiveDirectionMaximize,
+						},
+					},
+					Parameters: []trainer.Parameter{
+						{
+							Name: "batch_size",
+							SearchSpace: &trainer.SearchSpace{
+								Categorical: trainer.CategoricalSpace{
+									Choices: []string{"16", "32"},
+								},
+							},
+						},
+					},
+					TrainJobTemplate: trainer.TrainJobTemplateSpec{
+						Spec: trainer.TrainJobSpec{
+							RuntimeRef: trainer.RuntimeRef{
+								Name:     torchRuntime,
+								APIGroup: ptr.To(trainer.GroupVersion.Group),
+								Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
+							},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("Creating the OptimizationJob with unsupported Grid algorithm", func() {
+				gomega.Expect(k8sClient.Create(ctx, optJob)).Should(gomega.Succeed())
+			})
+
+			ginkgo.By("Verifying OptimizationJob transitions to Failed condition", func() {
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotOptJob := &trainer.OptimizationJob{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(optJob), gotOptJob)).Should(gomega.Succeed())
+					cond := meta.FindStatusCondition(gotOptJob.Status.Conditions, constants.OptimizationJobFailed)
+					g.Expect(cond).ShouldNot(gomega.BeNil())
+					g.Expect(cond.Status).Should(gomega.Equal(metav1.ConditionTrue))
+					g.Expect(cond.Reason).Should(gomega.Equal("UnsupportedSearchAlgorithm"))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
+	})
+})
