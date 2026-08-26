@@ -256,7 +256,7 @@ func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
 				t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(tc.wantWarnings, []string(warnings)); diff != "" {
+			if diff := cmp.Diff(tc.wantWarnings, warnings); diff != "" {
 				t.Errorf("Unexpected warnings (-want,+got):\n%s", diff)
 			}
 		})
