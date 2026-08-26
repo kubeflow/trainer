@@ -2291,18 +2291,11 @@ func TestTrainingRuntimeValidateObjects(t *testing.T) {
 			}
 			c := clientBuilder.Build()
 
-			// Initialize the runtime factory
-			runtimeFactory, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
 			if err != nil {
-				t.Fatalf("Failed to initialize TrainingRuntime: %v", err)
+				t.Fatal(err)
 			}
 
-			trainingRuntime, ok := runtimeFactory.(*TrainingRuntime)
-			if !ok {
-				t.Fatal("Expected TrainingRuntime type")
-			}
-
-			// Call ValidateObjects
 			_, fieldErrors := trainingRuntime.ValidateObjects(ctx, nil, tc.trainJob)
 
 			if diff := cmp.Diff(tc.wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail")); diff != "" {
