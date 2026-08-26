@@ -162,23 +162,12 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Parse request body
 	var updateRequest trainer.UpdateTrainJobStatusRequest
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&updateRequest); err != nil {
+	if err := decodeSingleJSONValue(r.Body, &updateRequest); err != nil {
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
 			badRequest(w, s.log, "Payload too large", metav1.StatusReasonRequestEntityTooLarge, http.StatusRequestEntityTooLarge)
 			return
-		}
-		s.log.V(5).Error(err, "Failed to parse runtime status", "namespace", namespace, "trainJobName", trainJobName)
-		badRequest(w, s.log, "Invalid payload", metav1.StatusReasonInvalid, http.StatusUnprocessableEntity)
-		return
-	}
-	var trailingJSON json.RawMessage
-	if err := decoder.Decode(&trailingJSON); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("multiple JSON values")
 		}
 		s.log.V(5).Error(err, "Failed to parse runtime status", "namespace", namespace, "trainJobName", trainJobName)
 		badRequest(w, s.log, "Invalid payload", metav1.StatusReasonInvalid, http.StatusUnprocessableEntity)
@@ -228,6 +217,20 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	if err := json.NewEncoder(w).Encode(updateRequest); err != nil {
 		s.log.Error(err, "Failed to write TrainJob status", "namespace", namespace, "name", trainJobName)
 	}
+}
+
+func decodeSingleJSONValue(r io.Reader, value any) error {
+	decoder := json.NewDecoder(r)
+	if err := decoder.Decode(value); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("multiple JSON values")
+		}
+		return err
+	}
+	return nil
 }
 
 // handleDefault is the default handler for unknown requests.
