@@ -28,3 +28,20 @@ tests:
           apiVersion: rbac.authorization.k8s.io/v1
           kind: ClusterRole
           name: kubeflow-trainer-controller-manager
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - trainer.kubeflow.org
+            resources:
+              - clustertrainingruntimes
+              - optimizationjobs
+              - trainingruntimes
+              - trainjobs
+            verbs:
+              - create
+              - get
+              - list
+              - patch
+              - update
+              - watch
