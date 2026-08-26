@@ -2242,16 +2242,7 @@ func TestRuntimeInfo(t *testing.T) {
 }
 
 func TestTrainingRuntimeValidateObjects(t *testing.T) {
-	resRequests := corev1.ResourceList{
-		corev1.ResourceCPU: resource.MustParse("1"),
-	}
-
-	validRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").
-		RuntimeSpec(
-			testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
-				Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
-				Obj(),
-		).Obj()
+	validRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj()
 
 	cases := map[string]struct {
 		trainJob        *trainer.TrainJob
