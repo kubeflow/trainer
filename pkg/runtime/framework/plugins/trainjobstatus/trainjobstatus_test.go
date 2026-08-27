@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
@@ -500,6 +501,321 @@ func TestBuild(t *testing.T) {
 
 			if diff := gocmp.Diff(tc.wantObjs, typedObjs, objCmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestValidate(t *testing.T) {
+	cases := map[string]struct {
+		info     *runtime.Info
+		trainJob *trainer.TrainJob
+		wantErrs field.ErrorList
+	}{
+		"no error when info is nil": {
+			info:     nil,
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+		},
+		"no error when trainer podSet is not found": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "launcher",
+							Count: ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{Name: "launcher"},
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+		},
+		"no error when no conflict exists": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     "trainer",
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									Name: constants.Node,
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().WithName("data").WithMountPath("/data"),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().WithName("data"),
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+		},
+		"no error with multiple containers without conflicts": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     "trainer",
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									Name: constants.Node,
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().WithName("data").WithMountPath("/data"),
+									},
+								},
+								{
+									Name: "sidecar",
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().WithName("logs").WithMountPath("/var/log"),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().WithName("data"),
+								*corev1ac.Volume().WithName("logs"),
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+		},
+		"error when volume named kubeflow-trainer-token exists": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     "trainer",
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{Name: constants.Node},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().WithName(tokenVolumeName),
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantErrs: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "template", "spec", "volumes"),
+					fmt.Sprintf("volume name %q in podSet %q is reserved for %s", tokenVolumeName, "trainer", Name),
+				),
+			},
+		},
+		"error when mount path is reserved with another mount name": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     "trainer",
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									Name: constants.Node,
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().WithName("custom-token-volume").WithMountPath(configMountPath),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantErrs: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "template", "spec", "containers").Index(0).Child("volumeMounts"),
+					fmt.Sprintf("volume mount path %q in container %q of podSet %q is reserved for %s", configMountPath, constants.Node, "trainer", Name),
+				),
+			},
+		},
+		"error when mount named kubeflow-trainer-token at another path": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     "trainer",
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									Name: constants.Node,
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().WithName(tokenVolumeName).WithMountPath("/other/path"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantErrs: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "template", "spec", "containers").Index(0).Child("volumeMounts"),
+					fmt.Sprintf("volume mount name %q in container %q of podSet %q is reserved for %s", tokenVolumeName, constants.Node, "trainer", Name),
+				),
+			},
+		},
+		"error when both name and path conflict": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     "trainer",
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									Name: constants.Node,
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().WithName(tokenVolumeName).WithMountPath(configMountPath),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().WithName(tokenVolumeName),
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantErrs: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "template", "spec", "volumes"),
+					fmt.Sprintf("volume name %q in podSet %q is reserved for %s", tokenVolumeName, "trainer", Name),
+				),
+				field.Forbidden(
+					field.NewPath("spec", "template", "spec", "containers").Index(0).Child("volumeMounts"),
+					fmt.Sprintf("volume mount name %q in container %q of podSet %q is reserved for %s", tokenVolumeName, constants.Node, "trainer", Name),
+				),
+				field.Forbidden(
+					field.NewPath("spec", "template", "spec", "containers").Index(0).Child("volumeMounts"),
+					fmt.Sprintf("volume mount path %q in container %q of podSet %q is reserved for %s", configMountPath, constants.Node, "trainer", Name),
+				),
+			},
+		},
+		"error in non-first container identifies that container": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     "trainer",
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									Name: constants.Node,
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().WithName("data").WithMountPath("/data"),
+									},
+								},
+								{
+									Name: "sidecar",
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().WithName("other-name").WithMountPath(configMountPath),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantErrs: field.ErrorList{
+				field.Forbidden(
+					field.NewPath("spec", "template", "spec", "containers").Index(1).Child("volumeMounts"),
+					fmt.Sprintf("volume mount path %q in container %q of podSet %q is reserved for %s", configMountPath, "sidecar", "trainer", Name),
+				),
+			},
+		},
+		"non-trainer podset with same volume name does not error": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:     "dataset-initializer",
+							Ancestor: ptr.To(constants.DatasetInitializer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									Name: "dataset-initializer",
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().WithName(tokenVolumeName).WithMountPath(configMountPath),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().WithName(tokenVolumeName),
+							},
+						},
+						{
+							Name:     "trainer",
+							Ancestor: ptr.To(constants.AncestorTrainer),
+							Count:    ptr.To[int32](1),
+							Containers: []runtime.Container{
+								{
+									Name: constants.Node,
+									VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+										*corev1ac.VolumeMount().WithName("data").WithMountPath("/data"),
+									},
+								},
+							},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().WithName("data"),
+							},
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantErrs: nil,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			cli := utiltesting.NewClientBuilder().Build()
+			cfg := &configapi.Configuration{
+				CertManagement: &configapi.CertManagement{
+					WebhookServiceName: "kubeflow-trainer-controller-manager",
+					WebhookSecretName:  "kubeflow-trainer-webhook-cert",
+				},
+				StatusServer: &configapi.StatusServer{
+					Port:  ptr.To[int32](10443),
+					QPS:   ptr.To[float32](5),
+					Burst: ptr.To[int32](10),
+				},
+			}
+
+			p, err := New(ctx, cli, nil, cfg)
+			if err != nil {
+				t.Fatalf("Failed to initialize Status plugin: %v", err)
+			}
+
+			_, errs := p.(framework.CustomValidationPlugin).Validate(ctx, tc.info, nil, tc.trainJob)
+			if diff := gocmp.Diff(tc.wantErrs, errs); len(diff) != 0 {
+				t.Errorf("Unexpected validation errors (-want, +got):\n%s", diff)
 			}
 		})
 	}
