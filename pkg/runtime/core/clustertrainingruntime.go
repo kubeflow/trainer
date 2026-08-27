@@ -97,10 +97,8 @@ func (r *ClusterTrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBu
 }
 
 func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
-	// Resolve the runtime from the snapshot the TrainJob was built from, so that editing or
-	// deleting the live ClusterTrainingRuntime cannot retroactively break validation for an
-	// already-reconciled TrainJob (e.g. on resume from suspend). Fall back to the live object
-	// when no snapshot exists yet, matching NewObjects.
+	// Validate against the snapshot the TrainJob was built from, falling back to the live
+	// runtime when no snapshot exists yet, as NewObjects does.
 	clusterTrainingRuntime := &trainer.ClusterTrainingRuntime{}
 	if err := getRuntimeSnapshot(ctx, r.client, new, clusterTrainingRuntime); err != nil {
 		if !apierrors.IsNotFound(err) {
