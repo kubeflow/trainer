@@ -102,7 +102,7 @@ This means that migrating an `MPIJob` is not a direct field-by-field conversion 
 `mpiReplicaSpecs`. The launcher/worker topology and MPI configuration move into the reusable
 runtime, while workload-specific settings move into the `TrainJob`.
 
-#### Old: MPIJob (v1)
+#### Old: MPIJob (v2beta1)
 
 ```yaml
 apiVersion: kubeflow.org/v2beta1
