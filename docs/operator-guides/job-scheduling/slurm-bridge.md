@@ -22,7 +22,7 @@ for the distinction between the two APIs.
 
 ## Prerequisites
 
-- [Kubeflow Trainer installed](../installation.md), including JobSet.
+- [Kubeflow Trainer installed](../installation.md).
 - [Slurm Bridge installed and connected to Slurm](https://github.com/SlinkyProject/slurm-bridge/blob/main/docs/quickstart.md).
 - `kubelet` and `slurmd` running on the compute nodes used by Slurm Bridge.
 - Matching Kubernetes and Slurm node names. If the names differ, label each Kubernetes Node with
@@ -111,17 +111,22 @@ Create a dedicated namespace for Slurm-scheduled TrainJobs:
 kubectl create namespace trainer-slurm
 ```
 
-Add the namespace to the Slurm Bridge Helm values:
+Add the namespace to an existing Slurm Bridge helm installation:
 
-```yaml
-admission:
-  managedNamespaces:
-    - trainer-slurm
+```bash
+helm upgrade slurm-bridge oci://ghcr.io/slinkyproject/charts/slurm-bridge \
+  --namespace slurm \
+  --reuse-values \
+  --set 'admission.managedNamespaces={trainer-slurm}'
 ```
 
-Apply the updated values when installing or upgrading Slurm Bridge. Its admission controller changes
-`spec.schedulerName` from `default-scheduler` to `slurm-bridge-scheduler` for Pods in the managed
-namespace. Pods that explicitly select another scheduler are not rewritten.
+See the
+[Slurm Bridge Helm values](https://github.com/SlinkyProject/slurm-bridge/blob/main/helm/slurm-bridge/values.yaml)
+for additional configuration options.
+
+The Slurm Bridge admission controller changes `spec.schedulerName` from `default-scheduler` to
+`slurm-bridge-scheduler` for Pods in the managed namespace. Pods that explicitly select another
+scheduler are not rewritten.
 
 ## Run a TrainJob
 
@@ -168,7 +173,8 @@ The generated `PodGroup` has the same name and namespace as the TrainJob.
 :::{note}
 Slurm Bridge uses exclusive whole-node allocations by default. Native Kubernetes CPU requests
 reserve CPU capacity in Slurm but do not constrain the container to Slurm's allocated CPU set. Use
-Slurm Bridge CPU DRA when aligned CPU isolation is required.
+[Slurm Bridge CPU DRA](https://github.com/SlinkyProject/slurm-bridge/blob/main/docs/workload.md#cpu-dra)
+when aligned CPU isolation is required.
 :::
 
 ## Verify the TrainJob
