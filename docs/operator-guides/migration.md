@@ -174,10 +174,16 @@ topology, SSH communication configuration, and hostfile generation. The MPI plug
 the OpenMPI environment but does not add `mpirun` to the command, so users should include
 `mpirun` in `trainer.command`.
 
-When `runLauncherAsNode` is disabled, `trainer.numNodes` controls the number of worker/node
-replicas and the launcher is separate. When `runLauncherAsNode` is enabled, the launcher also
-participates as a training node and the worker/node replica count is reduced accordingly. The
-runtime configuration must therefore be checked when mapping the old launcher and worker counts.
+The number of training nodes maps differently depending on the runtime's
+`mlPolicy.mpi.runLauncherAsNode`:
+
+- `runLauncherAsNode: false` — the launcher is separate and does not train, so
+  `trainer.numNodes` equals `Worker.replicas` from the old `MPIJob`.
+- `runLauncherAsNode: true` — the launcher also trains, so `trainer.numNodes` equals
+  `Worker.replicas` plus 1, and the `node` replica count becomes `numNodes - 1`.
+
+Always check the runtime before mapping the old launcher and worker counts. The MPI runtimes
+bundled with Kubeflow Trainer set `runLauncherAsNode: true`.
 
 
 ### Kubeflow Trainer Python SDK
