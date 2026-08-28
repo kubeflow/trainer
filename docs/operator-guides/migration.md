@@ -31,7 +31,8 @@ of `TrainJob` and `ClusterTrainingRuntime`.
 
 ### Migrate PyTorchJob to TrainJob
 
-The following example demonstrates how to migrate from `PyTorchJob` to `TrainJob`, utilizing the default Torch runtime:
+The following example demonstrates how to migrate from `PyTorchJob` to `TrainJob`, utilizing the
+default Torch runtime:
 
 #### Old: PyTorchJob (v1)
 
@@ -176,19 +177,18 @@ environment.
 The MPI runtime provides the distributed-training environment, including the launcher/worker
 topology, SSH communication configuration, and hostfile generation. The MPI plugin configures
 the OpenMPI environment but does not add `mpirun` to the command, so users should include
-`mpirun` in `trainer.command`. Since the plugin generates the hostfile and points OpenMPI at it
-via `OMPI_MCA_orte_default_hostfile`, the explicit `-np` flag from the old `MPIJob` command is no
-longer needed.
+`mpirun` in `trainer.command`.
 
-The number of training nodes maps differently depending on the runtime's
-`mlPolicy.mpi.runLauncherAsNode`:
-- `runLauncherAsNode: false` — the launcher is separate and does not train, so
-  `trainer.numNodes` equals `Worker.replicas` from the old `MPIJob`.
-- `runLauncherAsNode: true` — the launcher also trains, so `trainer.numNodes` equals
-  `Worker.replicas` plus 1, and the `node` replica count becomes `max(numNodes - 1, 1)`.
-Always check the runtime before mapping the old launcher and worker counts. The MPI runtimes
-bundled with Kubeflow Trainer set `runLauncherAsNode: true`, so the old example's two workers and
-one launcher correspond to `trainer.numNodes: 3` with those runtimes.
+The number of training nodes depends on the runtime's `mlPolicy.mpi.runLauncherAsNode` setting:
+
+- When `runLauncherAsNode` is disabled, the launcher is separate and `trainer.numNodes` equals the
+  old `Worker.replicas` value.
+- When `runLauncherAsNode` is enabled, the launcher also participates as a training node, and the
+  node replica count becomes `max(numNodes - 1, 1)`. Therefore, the old example's two workers and
+  one launcher require `trainer.numNodes: 3` with such a runtime.
+
+Always check the runtime before mapping the old launcher and worker counts.
+
 
 ### Kubeflow Trainer Python SDK
 
@@ -198,7 +198,7 @@ APIs without dealing with YAMLs or `kubectl`.
 Check the [Getting Started](../getting-started/index) guide to learn how
 to scale PyTorch code with `TrainJob` using Python SDK.
 
-### MPI and HPC support
+### MPI support
 
 Kubeflow Trainer currently supports OpenMPI only. See the
 [MLPolicy guide](ml-policy) for the full MPI policy reference, and the
