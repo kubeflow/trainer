@@ -302,14 +302,29 @@ func (r *TrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 }
 
 func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	// Validate against the snapshot the TrainJob was built from, falling back to the live
+	// runtime when no snapshot exists yet, as NewObjects does.
 	trainingRuntime := &trainer.TrainingRuntime{}
-	if err := r.client.Get(ctx, client.ObjectKey{
-		Namespace: new.Namespace,
-		Name:      new.Spec.RuntimeRef.Name,
-	}, trainingRuntime); err != nil {
-		return nil, field.ErrorList{
-			field.Invalid(field.NewPath("spec", "runtimeRef"), new.Spec.RuntimeRef,
-				fmt.Sprintf("%v: specified trainingRuntime must be created before the TrainJob is created", err)),
+	if err := getRuntimeSnapshot(ctx, r.client, new, trainingRuntime); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, field.ErrorList{
+				field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get runtime snapshot: %w", err)),
+			}
+		}
+		trainingRuntime = &trainer.TrainingRuntime{}
+		if err := r.client.Get(ctx, client.ObjectKey{
+			Namespace: new.Namespace,
+			Name:      new.Spec.RuntimeRef.Name,
+		}, trainingRuntime); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, field.ErrorList{
+					field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get trainingRuntime: %w", err)),
+				}
+			}
+			return nil, field.ErrorList{
+				field.Invalid(field.NewPath("spec", "runtimeRef"), new.Spec.RuntimeRef,
+					fmt.Sprintf("%v: specified trainingRuntime must be created before the TrainJob is created", err)),
+			}
 		}
 	}
 	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid

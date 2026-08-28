@@ -79,6 +79,9 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 
 		ginkgo.AfterEach(func() {
 			gomega.Expect(k8sClient.DeleteAllOf(ctx, &trainer.TrainJob{}, client.InNamespace(ns.Name))).Should(gomega.Succeed())
+			// ClusterTrainingRuntimes are cluster-scoped, so they must be cleaned up explicitly
+			// to avoid leaking between tests.
+			gomega.Expect(k8sClient.DeleteAllOf(ctx, &trainer.ClusterTrainingRuntime{})).Should(gomega.Succeed())
 		})
 
 		ginkgo.BeforeEach(func() {
@@ -2765,6 +2768,188 @@ alpha-node-0-1.alpha slots=8
 					cm := &corev1.ConfigMap{}
 					g.Expect(k8sClient.Get(ctx, snapshotKey, cm)).Should(gomega.Succeed())
 					g.Expect(cm.Data).Should(gomega.HaveKey("runtime"))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should validate an updated TrainJob against the snapshot and not the current TrainingRuntime", func() {
+				ginkgo.By("Creating the TrainingRuntime and a suspended TrainJob with a dataset initializer")
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Waiting for the runtime snapshot to be created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{
+						Name:      trainJob.Name + "-runtime-snapshot",
+						Namespace: trainJob.Namespace,
+					}, &corev1.ConfigMap{})).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Removing the dataset initializer volumeMount to make the live runtime invalid for this TrainJob")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotRuntime := &trainer.TrainingRuntime{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), gotRuntime)).Should(gomega.Succeed())
+					for i := range gotRuntime.Spec.Template.Spec.ReplicatedJobs {
+						rJob := &gotRuntime.Spec.Template.Spec.ReplicatedJobs[i]
+						if rJob.Name != constants.DatasetInitializer {
+							continue
+						}
+						containers := rJob.Template.Spec.Template.Spec.Containers
+						for j := range containers {
+							if containers[j].Name == constants.DatasetInitializer {
+								containers[j].VolumeMounts = nil
+							}
+						}
+					}
+					g.Expect(k8sClient.Update(ctx, gotRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Resuming the TrainJob should succeed using the runtime snapshot")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					gotTrainJob.Spec.Suspend = ptr.To(false)
+					g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Verifying the JobSet is resumed")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(*jobSet.Spec.Suspend).Should(gomega.BeFalse())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should validate an updated TrainJob against the snapshot and not the current ClusterTrainingRuntime", func() {
+				ginkgo.By("Creating the ClusterTrainingRuntime and a suspended TrainJob with a dataset initializer")
+				clusterTrainingRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(trainJob.Spec.RuntimeRef.Name).Obj()
+				gomega.Expect(k8sClient.Create(ctx, clusterTrainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterTrainingRuntime), clusterTrainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				trainJob.Spec.RuntimeRef.Kind = ptr.To(trainer.ClusterTrainingRuntimeKind)
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Waiting for the runtime snapshot to be created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{
+						Name:      trainJob.Name + "-runtime-snapshot",
+						Namespace: trainJob.Namespace,
+					}, &corev1.ConfigMap{})).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Removing the dataset initializer volumeMount to make the live runtime invalid for this TrainJob")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotRuntime := &trainer.ClusterTrainingRuntime{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterTrainingRuntime), gotRuntime)).Should(gomega.Succeed())
+					for i := range gotRuntime.Spec.Template.Spec.ReplicatedJobs {
+						rJob := &gotRuntime.Spec.Template.Spec.ReplicatedJobs[i]
+						if rJob.Name != constants.DatasetInitializer {
+							continue
+						}
+						containers := rJob.Template.Spec.Template.Spec.Containers
+						for j := range containers {
+							if containers[j].Name == constants.DatasetInitializer {
+								containers[j].VolumeMounts = nil
+							}
+						}
+					}
+					g.Expect(k8sClient.Update(ctx, gotRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Resuming the TrainJob should succeed using the runtime snapshot")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					gotTrainJob.Spec.Suspend = ptr.To(false)
+					g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Verifying the JobSet is resumed")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(*jobSet.Spec.Suspend).Should(gomega.BeFalse())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should validate an updated TrainJob against the snapshot after the TrainingRuntime is deleted", func() {
+				ginkgo.By("Creating the TrainingRuntime and a suspended TrainJob with a dataset initializer")
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Waiting for the runtime snapshot to be created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{
+						Name:      trainJob.Name + "-runtime-snapshot",
+						Namespace: trainJob.Namespace,
+					}, &corev1.ConfigMap{})).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Deleting the referenced TrainingRuntime")
+				gomega.Expect(k8sClient.Delete(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), &trainer.TrainingRuntime{})).Should(testingutil.BeNotFoundError())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Resuming the TrainJob should succeed using the runtime snapshot")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					gotTrainJob.Spec.Suspend = ptr.To(false)
+					g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Verifying the JobSet is resumed")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(*jobSet.Spec.Suspend).Should(gomega.BeFalse())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should validate an updated TrainJob against the snapshot after the ClusterTrainingRuntime is deleted", func() {
+				ginkgo.By("Creating the ClusterTrainingRuntime and a suspended TrainJob with a dataset initializer")
+				clusterTrainingRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(trainJob.Spec.RuntimeRef.Name).Obj()
+				gomega.Expect(k8sClient.Create(ctx, clusterTrainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterTrainingRuntime), clusterTrainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				trainJob.Spec.RuntimeRef.Kind = ptr.To(trainer.ClusterTrainingRuntimeKind)
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Waiting for the runtime snapshot to be created")
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{
+						Name:      trainJob.Name + "-runtime-snapshot",
+						Namespace: trainJob.Namespace,
+					}, &corev1.ConfigMap{})).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Deleting the referenced ClusterTrainingRuntime")
+				gomega.Expect(k8sClient.Delete(ctx, clusterTrainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterTrainingRuntime), &trainer.ClusterTrainingRuntime{})).Should(testingutil.BeNotFoundError())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Resuming the TrainJob should succeed using the runtime snapshot")
+				gomega.Eventually(func(g gomega.Gomega) {
+					gotTrainJob := &trainer.TrainJob{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, gotTrainJob)).Should(gomega.Succeed())
+					gotTrainJob.Spec.Suspend = ptr.To(false)
+					g.Expect(k8sClient.Update(ctx, gotTrainJob)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+
+				ginkgo.By("Verifying the JobSet is resumed")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(*jobSet.Spec.Suspend).Should(gomega.BeFalse())
 				}, util.Timeout, util.Interval).Should(gomega.Succeed())
 			})
 		})
