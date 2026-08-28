@@ -100,3 +100,20 @@ tests:
           path: data["runtimes.yaml"]
           pattern: |-
             (?s)- name: node.*securityContext:\s+runAsNonRoot: true\s+runAsUser: 1000\s+seccompProfile:\s+type: RuntimeDefault\s+containers:\s+- name: node\s+image: pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime\s+securityContext:\s+allowPrivilegeEscalation: false\s+capabilities:\s+drop:\s+- ALL\s+runAsNonRoot: true\s+runAsUser: 1000\s+seccompProfile:\s+type: RuntimeDefault
+
+  - it: Should mount a writable working directory for the trainer node
+    set:
+      dataCache:
+        enabled: true
+        cacheImage:
+          registry: ghcr.io
+          repository: kubeflow/trainer/data-cache
+          tag: "v1.0.0"
+        runtimes:
+          torchDistributedWithCache:
+            enabled: true
+    asserts:
+      - matchRegex:
+          path: data["runtimes.yaml"]
+          pattern: |-
+            (?s)- name: node.*volumeMounts:\s+- name: workspace\s+mountPath: /workspace.*volumes:\s+- name: workspace\s+emptyDir: \{\}

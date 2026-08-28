@@ -91,9 +91,18 @@ spec:
                       runAsUser: 1000
                       seccompProfile:
                         type: RuntimeDefault
+                    volumeMounts:
+                      - name: workspace
+                        mountPath: /workspace
                     env:
                       - name: TRAIN_JOB_NAME
                         valueFrom:
                           fieldRef:
                             apiVersion: v1
                             fieldPath: metadata.labels['jobset.sigs.k8s.io/jobset-name']
+                # The default image runs as root and owns /workspace, so the non-root
+                # trainer cannot write there. The emptyDir keeps the working directory
+                # writable without changing the image's configured WORKDIR.
+                volumes:
+                  - name: workspace
+                    emptyDir: {}

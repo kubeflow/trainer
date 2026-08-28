@@ -50,3 +50,12 @@ spec:
                         runAsUser: 1000
                         seccompProfile:
                           type: RuntimeDefault
+                      volumeMounts:
+                        - name: workspace
+                          mountPath: /workspace
+                  # The default image runs as root and owns /workspace, so the non-root
+                  # trainer cannot write there. The emptyDir keeps the working directory
+                  # writable without changing the image's configured WORKDIR.
+                  volumes:
+                    - name: workspace
+                      emptyDir: {}
