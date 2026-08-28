@@ -10,6 +10,33 @@ Before using AI agents, please review the
 [Kubeflow AI Policy](https://www.kubeflow.org/docs/about/ai_policy/) to understand
 the guidelines and responsibilities for such contributions.
 
+## Project Board
+
+The Kubeflow Trainer community uses the
+[Kubeflow Trainer project board](https://github.com/orgs/kubeflow/projects/85/views/2)
+to track ongoing work and to triage incoming issues. The board gives maintainers and
+contributors visibility into upcoming workstreams and into the pull requests that need
+attention.
+
+The board currently tracks:
+
+- Bugs that have been reported and triaged.
+- Open issues, including the ones that are ready to be picked up by new contributors.
+- Progress on [Kubeflow Enhancement Proposals (KEPs)](#kubeflow-enhancement-proposal-kep).
+- Pull requests that are tracked for the upcoming release.
+
+If you are looking for something to work on, start with the board and pick an issue that
+is not assigned yet. Comment on the issue to let the community know that you are working
+on it before you open a pull request.
+
+When you open an issue or a pull request, a maintainer adds it to the board during triage.
+Please keep the status of your items up to date so that the board reflects the real state
+of the work.
+
+The board is still a work in progress. If you have feedback on how it can be improved,
+share it in the [`#kubeflow-trainer` Slack channel](https://www.kubeflow.org/docs/about/community/#kubeflow-slack)
+or open an issue in this repository.
+
 ## Requirements
 
 - [Go](https://golang.org/) (1.26 or later)
