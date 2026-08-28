@@ -178,6 +178,9 @@ The MPI runtime provides the distributed-training environment, including the lau
 topology, SSH communication configuration, and hostfile generation. The MPI plugin configures
 the OpenMPI environment but does not add `mpirun` to the command, so users should include
 `mpirun` in `trainer.command`.
+Since the MPI plugin generates the hostfile and points OpenMPI to it through
+`OMPI_MCA_orte_default_hostfile`, the explicit `-np` flag from the old `MPIJob` command is not
+required.
 
 The number of training nodes depends on the runtime's `mlPolicy.mpi.runLauncherAsNode` setting:
 
