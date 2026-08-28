@@ -53,7 +53,21 @@ Verify that the API is available:
 
 ```bash
 kubectl api-resources --api-group=scheduling.x-k8s.io
+```
+
+```console
+NAME            SHORTNAMES   APIVERSION                     NAMESPACED   KIND
+elasticquotas   eq,eqs       scheduling.x-k8s.io/v1alpha1   true         ElasticQuota
+podgroups       pg,pgs       scheduling.x-k8s.io/v1alpha1   true         PodGroup
+```
+
+```bash
 kubectl get pods -n scheduler-plugins
+```
+
+```console
+NAME                                           READY   STATUS    RESTARTS   AGE
+scheduler-plugins-controller-7469c866f-ngc7t   1/1     Running   0          21m
 ```
 
 The API resource output should include `podgroups`.
@@ -183,7 +197,26 @@ Check the Trainer resources and scheduler-plugins PodGroup:
 
 ```bash
 kubectl get trainjobs,jobsets,jobs -n trainer-slurm
+```
+
+```console
+NAME                                          STATE      AGE
+trainjob.trainer.kubeflow.org/pytorch-slurm   Complete   76s
+
+NAME                                   TERMINALSTATE   RESTARTS   COMPLETED   SUSPENDED   AGE
+jobset.jobset.x-k8s.io/pytorch-slurm   Completed       0          True        false       76s
+
+NAME                             STATUS     COMPLETIONS   DURATION   AGE
+job.batch/pytorch-slurm-node-0   Complete   2/2           71s        76s
+```
+
+```bash
 kubectl get podgroups.scheduling.x-k8s.io -n trainer-slurm
+```
+
+```console
+NAME            PHASE      MINMEMBER   RUNNING   SUCCEEDED   FAILED   AGE
+pytorch-slurm   Finished   2                     2                    81s
 ```
 
 Inspect the scheduler, Slurm job ID, allocated Slurm node, and bound Kubernetes Node:
@@ -193,6 +226,12 @@ kubectl get pods \
   -n trainer-slurm \
   -l jobset.sigs.k8s.io/jobset-name=pytorch-slurm \
   -o custom-columns='NAME:.metadata.name,SCHEDULER:.spec.schedulerName,SLURM-JOB:.metadata.labels.scheduler\.slinky\.slurm\.net/slurm-jobid,SLURM-NODE:.metadata.annotations.slinky\.slurm\.net/slurm-node,NODE:.spec.nodeName'
+```
+
+```console
+NAME                           SCHEDULER                SLURM-JOB   SLURM-NODE                   NODE
+pytorch-slurm-node-0-0-6cv72   slurm-bridge-scheduler   2           trainer-guide-3951-worker4   trainer-guide-3951-worker4
+pytorch-slurm-node-0-1-kjn4j   slurm-bridge-scheduler   2           trainer-guide-3951-worker5   trainer-guide-3951-worker5
 ```
 
 The `scheduler.slinky.slurm.net/slurm-jobid` label confirms that Slurm Bridge submitted the external
