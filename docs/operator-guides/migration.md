@@ -87,7 +87,6 @@ spec:
       - "--epochs=1"
 ```
 
-
 ### Migrate MPIJob to TrainJob
 
 In Kubeflow Training Operator v1, an `MPIJob` defines the launcher and worker workloads directly
@@ -102,7 +101,7 @@ This means that migrating an `MPIJob` is not a direct field-by-field conversion 
 `mpiReplicaSpecs`. The launcher/worker topology and MPI configuration move into the reusable
 runtime, while workload-specific settings move into the `TrainJob`.
 
-#### Old: MPIJob (v1)
+#### Old: MPIJob (v2beta1)
 
 ```yaml
 apiVersion: kubeflow.org/v2beta1
@@ -145,7 +144,7 @@ spec:
   runtimeRef:
     apiGroup: trainer.kubeflow.org
     kind: ClusterTrainingRuntime
-    name: mpi
+    name: <mpi-runtime>
   trainer:
     numNodes: 2
     numProcPerNode: 1
@@ -156,9 +155,9 @@ spec:
       - train.py
 ```
 
-The runtime name in this example, `mpi`, represents an MPI-enabled runtime configured on the
-cluster. Runtime names are cluster-specific, so use the MPI runtime installed by your platform
-administrator.
+The runtime name in this example, `<mpi-runtime>`, is a placeholder for an MPI-enabled runtime
+configured on the cluster. Runtime names are cluster-specific, so use the MPI runtime installed by
+your platform administrator.
 
 The `TrainJob` provides:
 
@@ -166,19 +165,30 @@ The `TrainJob` provides:
 - `trainer.numNodes`: specifies the number of training nodes.
 - `trainer.numProcPerNode`: specifies the number of MPI processes or slots per node and overrides
   the value configured in the runtime. For MPI, this must be an integer.
-- `trainer.image`: specifies the container image used by the training workload.
+- `trainer.image`: specifies the container image used by the runtime's trainer container, typically
+  the launcher. It does not replace the runtime's worker/node image.
 - `trainer.command`: specifies the training command.
+
+To use a custom MPI image for worker nodes, the platform administrator must create a
+`TrainingRuntime` or `ClusterTrainingRuntime` whose node containers provide the required SSH
+environment.
 
 The MPI runtime provides the distributed-training environment, including the launcher/worker
 topology, SSH communication configuration, and hostfile generation. The MPI plugin configures
 the OpenMPI environment but does not add `mpirun` to the command, so users should include
-`mpirun` in `trainer.command`.
+`mpirun` in `trainer.command`. Since the plugin generates the hostfile and points OpenMPI at it
+via `OMPI_MCA_orte_default_hostfile`, the explicit `-np` flag from the old `MPIJob` command is no
+longer needed.
 
-When `runLauncherAsNode` is disabled, `trainer.numNodes` controls the number of worker/node
-replicas and the launcher is separate. When `runLauncherAsNode` is enabled, the launcher also
-participates as a training node and the worker/node replica count is reduced accordingly. The
-runtime configuration must therefore be checked when mapping the old launcher and worker counts.
-
+The number of training nodes maps differently depending on the runtime's
+`mlPolicy.mpi.runLauncherAsNode`:
+- `runLauncherAsNode: false` — the launcher is separate and does not train, so
+  `trainer.numNodes` equals `Worker.replicas` from the old `MPIJob`.
+- `runLauncherAsNode: true` — the launcher also trains, so `trainer.numNodes` equals
+  `Worker.replicas` plus 1, and the `node` replica count becomes `max(numNodes - 1, 1)`.
+Always check the runtime before mapping the old launcher and worker counts. The MPI runtimes
+bundled with Kubeflow Trainer set `runLauncherAsNode: true`, so the old example's two workers and
+one launcher correspond to `trainer.numNodes: 3` with those runtimes.
 
 ### Kubeflow Trainer Python SDK
 
@@ -190,19 +200,9 @@ to scale PyTorch code with `TrainJob` using Python SDK.
 
 ### MPI and HPC support
 
-Kubeflow Trainer currently supports OpenMPI. The MPI policy is documented in the
-[MLPolicy guide](ml-policy.md). Additional MPI and HPC capabilities are being developed by the
-community, including:
-
-- Intel MPI and MPICH backend support in [PR #3717](https://github.com/kubeflow/trainer/pull/3717).
-- [Flux support for HPC workloads](../user-guides/flux.md).
-- Slurm scheduling through [Slurm Bridge](https://github.com/SlinkyProject/slurm-bridge),
-  described in [PR #3951](https://github.com/kubeflow/trainer/pull/3951).
-
-Intel MPI and MPICH support is not available in the current MPI plugin. Slurm Bridge is an
-external scheduling integration rather than a bundled Trainer runtime. Availability of these
-capabilities may depend on the Kubeflow Trainer release and the status of the corresponding
-community work.
+Kubeflow Trainer currently supports OpenMPI only. See the
+[MLPolicy guide](ml-policy) for the full MPI policy reference, and the
+[Flux guide](../user-guides/flux) for HPC workloads.
 
 ### Additional information
 
