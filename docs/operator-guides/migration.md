@@ -194,21 +194,10 @@ APIs without dealing with YAMLs or `kubectl`.
 Check the [Getting Started](../getting-started/index) guide to learn how
 to scale PyTorch code with `TrainJob` using Python SDK.
 
-### MPI and HPC support
+### MPI support
 
-Kubeflow Trainer currently supports OpenMPI. The MPI policy is documented in the
-[MLPolicy guide](ml-policy.md). Additional MPI and HPC capabilities are being developed by the
-community, including:
-
-- Intel MPI and MPICH backend support in [PR #3717](https://github.com/kubeflow/trainer/pull/3717).
-- [Flux support for HPC workloads](../user-guides/flux.md).
-- Slurm scheduling through [Slurm Bridge](https://github.com/SlinkyProject/slurm-bridge),
-  described in [PR #3951](https://github.com/kubeflow/trainer/pull/3951).
-
-Intel MPI and MPICH support is not available in the current MPI plugin. Slurm Bridge is an
-external scheduling integration rather than a bundled Trainer runtime. Availability of these
-capabilities may depend on the Kubeflow Trainer release and the status of the corresponding
-community work.
+Kubeflow Trainer currently supports OpenMPI only. See the [MLPolicy guide](ml-policy) for the
+full MPI policy reference, and the [Flux guide](../user-guides/flux) for HPC workloads.
 
 ### Additional information
 
