@@ -171,7 +171,9 @@ The `TrainJob` provides:
 The MPI runtime provides the distributed-training environment, including the launcher/worker
 topology, SSH communication configuration, and hostfile generation. The MPI plugin configures
 the OpenMPI environment but does not add `mpirun` to the command, so users should include
-`mpirun` in `trainer.command`.
+`mpirun` in `trainer.command`. Since the plugin generates the hostfile and points OpenMPI at it
+via `OMPI_MCA_orte_default_hostfile`, the explicit `-np` flag from the old `MPIJob` command is no
+longer needed.
 
 The number of training nodes maps differently depending on the runtime's
 `mlPolicy.mpi.runLauncherAsNode`:
