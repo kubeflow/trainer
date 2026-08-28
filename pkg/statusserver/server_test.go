@@ -139,6 +139,7 @@ func TestServerErrorResponses(t *testing.T) {
 	cases := map[string]struct {
 		url          string
 		body         string
+		chunked      bool
 		authorized   bool
 		wantResponse *metav1.Status
 	}{
@@ -175,6 +176,19 @@ func TestServerErrorResponses(t *testing.T) {
 				Code:    http.StatusRequestEntityTooLarge,
 			},
 		},
+		"oversized chunked payload fails with 413 payload too large error": {
+			url: "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			// Generate ~1MB payload (exceeds 64kB limit) without a Content-Length header.
+			body:       `{"trainerStatus": {"metrics": [` + strings.Repeat(`{"name":"m","value":"0.5"},`, 40000) + `]}}`,
+			chunked:    true,
+			authorized: true,
+			wantResponse: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: "Payload too large",
+				Reason:  metav1.StatusReasonRequestEntityTooLarge,
+				Code:    http.StatusRequestEntityTooLarge,
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -197,6 +211,10 @@ func TestServerErrorResponses(t *testing.T) {
 			req, err := http.NewRequest("POST", ts.URL+tc.url, bytes.NewReader([]byte(tc.body)))
 			if err != nil {
 				t.Fatalf("Failed to create request: %v", err)
+			}
+			if tc.chunked {
+				req.ContentLength = -1
+				req.TransferEncoding = []string{"chunked"}
 			}
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {

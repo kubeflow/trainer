@@ -185,6 +185,7 @@ spec:
                         description: scheduleTimeoutSeconds is the maximum duration
                           to schedule PodGroup for gang-scheduling.
                         format: int32
+                        minimum: 0
                         type: integer
                     type: object
                   volcano:
