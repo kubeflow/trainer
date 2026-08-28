@@ -2239,3 +2239,98 @@ func TestRuntimeInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestTrainingRuntimeNewObjectsFluxTrainerArgs(t *testing.T) {
+	cases := map[string]struct {
+		trainerSpec *trainer.Trainer
+		wantCommand []string
+	}{
+		"the Runtime args are wrapped into the Flux entrypoint": {
+			wantCommand: []string{
+				"/bin/bash", "/etc/flux-config/entrypoint.sh", "runtime-cmd runtime-arg",
+			},
+		},
+		"the TrainJob args are wrapped into the Flux entrypoint": {
+			trainerSpec: testingutil.MakeTrainJobTrainerWrapper().
+				Container("test:trainjob", []string{"job-cmd"}, []string{"job-arg"}, nil).
+				Obj(),
+			wantCommand: []string{
+				"/bin/bash", "/etc/flux-config/entrypoint.sh", "job-cmd job-arg",
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "flux-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(
+					testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "flux-runtime").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(1).
+							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().FluxPolicy(ptr.To[int32](1)).Obj()).
+							Obj(),
+					).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime-cmd"}, []string{"runtime-arg"}, nil).
+					Obj(),
+			).Obj()
+
+			trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "flux-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "flux-runtime")
+			if tc.trainerSpec != nil {
+				trainJob = trainJob.Trainer(tc.trainerSpec)
+			}
+
+			clientBuilder := testingutil.NewClientBuilder().WithObjects(trainingRuntime)
+			c := clientBuilder.Build()
+			runtimeInstance, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			objs, err := runtimeInstance.NewObjects(ctx, trainJob.Obj())
+			if err != nil {
+				t.Fatal(err)
+			}
+			resultObjs, err := testingutil.ToObject(c.Scheme(), objs...)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			nodeContainer := findFluxTrainerContainer(t, resultObjs)
+			if diff := cmp.Diff(tc.wantCommand, nodeContainer.Command); len(diff) != 0 {
+				t.Errorf("Unexpected trainer container command (-want,+got):\n%s", diff)
+			}
+			// The entrypoint already carries the args, so the container must not receive them again.
+			if len(nodeContainer.Args) != 0 {
+				t.Errorf("Unexpected trainer container args: got %v, want none", nodeContainer.Args)
+			}
+		})
+	}
+}
+
+func findFluxTrainerContainer(t *testing.T, objs []runtime.Object) corev1.Container {
+	t.Helper()
+	for _, obj := range objs {
+		jobSet, ok := obj.(*jobsetv1alpha2.JobSet)
+		if !ok {
+			continue
+		}
+		for _, rJob := range jobSet.Spec.ReplicatedJobs {
+			if rJob.Name != constants.Node {
+				continue
+			}
+			for _, container := range rJob.Template.Spec.Template.Spec.Containers {
+				if container.Name == constants.Node {
+					return container
+				}
+			}
+		}
+	}
+	t.Fatalf("JobSet does not have the %s container in the %s replicated job", constants.Node, constants.Node)
+	return corev1.Container{}
+}

@@ -81,9 +81,12 @@ type PodSet struct {
 }
 
 type Container struct {
-	Name         string
-	Image        string
-	Command      []string
+	Name    string
+	Image   string
+	Command []string
+	// Args is inbound only: unlike Command and Image, the JobSet plugin does not sync it back,
+	// so setting it on a PodSet has no effect on the built JobSet.
+	Args         []string
 	Env          []corev1ac.EnvVarApplyConfiguration
 	Ports        []corev1ac.ContainerPortApplyConfiguration
 	VolumeMounts []corev1ac.VolumeMountApplyConfiguration
@@ -164,6 +167,7 @@ func toPodSetContainer(containerApply ...corev1ac.ContainerApplyConfiguration) i
 				Name:         ptr.Deref(cApply.Name, ""),
 				Image:        ptr.Deref(cApply.Image, ""),
 				Command:      cApply.Command,
+				Args:         cApply.Args,
 				Env:          cApply.Env,
 				Ports:        cApply.Ports,
 				VolumeMounts: cApply.VolumeMounts,
