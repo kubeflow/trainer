@@ -163,7 +163,7 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	}
 
 	var updateRequest trainer.UpdateTrainJobStatusRequest
-	if err := decodeSingleJSONValue(r.Body, &updateRequest); err != nil {
+	if err := decodeRequestPayload(r.Body, &updateRequest); err != nil {
 		var maxBytesError *http.MaxBytesError
 		if errors.As(err, &maxBytesError) {
 			badRequest(w, s.log, "Payload too large", metav1.StatusReasonRequestEntityTooLarge, http.StatusRequestEntityTooLarge)
@@ -219,11 +219,12 @@ func (s *Server) handleTrainJobRuntimeStatus(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func decodeSingleJSONValue(r io.Reader, value any) error {
+func decodeRequestPayload(r io.Reader, payload *trainer.UpdateTrainJobStatusRequest) error {
 	decoder := json.NewDecoder(r)
-	if err := decoder.Decode(value); err != nil {
+	if err := decoder.Decode(payload); err != nil {
 		return err
 	}
+	// Ensure there is no additional data in the request body.
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		if err == nil {
 			return errors.New("multiple JSON values")
