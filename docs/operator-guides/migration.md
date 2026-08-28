@@ -87,7 +87,6 @@ spec:
       - "--epochs=1"
 ```
 
-
 ### Migrate MPIJob to TrainJob
 
 In Kubeflow Training Operator v1, an `MPIJob` defines the launcher and worker workloads directly
