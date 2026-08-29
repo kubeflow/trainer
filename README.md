@@ -85,11 +85,18 @@ to install and get started with Kubeflow Trainer.
 
 ## Community
 
-The following links provide information on how to get involved in the community:
+<!-- community-start -->
+
+The following links provide information on how to get involved with the Kubeflow Trainer community:
 
 - Join our [`#kubeflow-trainer` Slack channel](https://www.kubeflow.org/docs/about/community/#kubeflow-slack).
-- Attend [the bi-weekly AutoML and Training Working Group](https://bit.ly/2PWVCkV) community meeting.
-- Check out [who is using Kubeflow Trainer](ADOPTERS.md).
+- Attend [the bi-weekly Kubeflow Trainer and Katib call](https://bit.ly/kf-trainer-meeting).
+- If you use Kubeflow Trainer, add yourself to [the ADOPTERS file](https://github.com/kubeflow/trainer/blob/master/ADOPTERS.md).
+
+Kubeflow Trainer is a Kubeflow subproject. Refer to
+[the Kubeflow community page](https://www.kubeflow.org/docs/about/community/) for more information.
+
+<!-- community-end -->
 
 ## Contributing
 

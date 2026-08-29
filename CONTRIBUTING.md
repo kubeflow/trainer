@@ -1,7 +1,6 @@
 # Contributing Guide
 
-This guide explains how to contribute to the Kubeflow Trainer V2 project.
-For the Kubeflow Trainer documentation, please check [the official Kubeflow documentation](https://trainer.kubeflow.org/en/latest/overview/index.html).
+This guide explains how to contribute to [the Kubeflow Trainer project](https://trainer.kubeflow.org/en/latest/).
 
 ## AI Assistant Tooling
 
