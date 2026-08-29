@@ -309,6 +309,11 @@ Kubeflow Trainer currently supports OpenMPI only. See the
 [MLPolicy guide](ml-policy) for the full MPI policy reference, and the
 [Flux guide](../user-guides/flux) for HPC workloads.
 
+The community is working on extending the MPI plugin's `mpiImplementation` with Intel MPI and
+MPICH backends to reach parity with MPI Operator. Follow
+[kubeflow/trainer#3712](https://github.com/kubeflow/trainer/issues/3712) to track the progress or
+to contribute.
+
 ### Additional information
 
 - Kubeflow Trainer v2 does not use separate CRDs for each framework. Instead, it implements all
