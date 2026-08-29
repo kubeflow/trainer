@@ -31,7 +31,7 @@ import (
 // OptimizationJob is the Schema for the optimizationjobs API.
 type OptimizationJobApplyConfiguration struct {
 	// typeMeta is the type meta for the optimization job.
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// metadata is the object meta for the optimization job.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec is the spec for the optimization job.

@@ -34,11 +34,39 @@ import (
 )
 
 // ClusterTrainingRuntimeInformer provides access to a shared informer and lister for
-// ClusterTrainingRuntimes.
+// ClusterTrainingRuntimes. Prefer using the type-safe variant (see [TypedClusterTrainingRuntimeInformer]).
 type ClusterTrainingRuntimeInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() trainerv1alpha1.ClusterTrainingRuntimeLister
 }
+
+// TypedClusterTrainingRuntimeInformer provides access to a shared informer and lister for
+// ClusterTrainingRuntimes, including the type-safe TypedInformer variant.
+// It is a superset of ClusterTrainingRuntimeInformer.
+type TypedClusterTrainingRuntimeInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ClusterTrainingRuntimeIndexInformer
+	Lister() trainerv1alpha1.ClusterTrainingRuntimeLister
+}
+
+// ClusterTrainingRuntimeIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ClusterTrainingRuntimeIndexInformer cache.TypedSharedIndexInformer[*apistrainerv1alpha1.ClusterTrainingRuntime]
+
+// ClusterTrainingRuntimeHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for ClusterTrainingRuntime.
+type ClusterTrainingRuntimeHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apistrainerv1alpha1.ClusterTrainingRuntime]
+
+// ClusterTrainingRuntimeDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for ClusterTrainingRuntime.
+type ClusterTrainingRuntimeDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apistrainerv1alpha1.ClusterTrainingRuntime]
+
+// ClusterTrainingRuntimeFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for ClusterTrainingRuntime.
+type ClusterTrainingRuntimeFilteringHandler = cache.TypedFilteringResourceEventHandler[*apistrainerv1alpha1.ClusterTrainingRuntime]
+
+// ClusterTrainingRuntimeIndexers is a specialization of [cache.TypedIndexers] for ClusterTrainingRuntime.
+type ClusterTrainingRuntimeIndexers = cache.TypedIndexers[*apistrainerv1alpha1.ClusterTrainingRuntime]
+
+// DeletedClusterTrainingRuntime is a specialization of [cache.DeletedObject] for ClusterTrainingRuntime.
+type DeletedClusterTrainingRuntime = cache.DeletedObject[*apistrainerv1alpha1.ClusterTrainingRuntime]
 
 type clusterTrainingRuntimeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +76,49 @@ type clusterTrainingRuntimeInformer struct {
 // NewClusterTrainingRuntimeInformer constructs a new informer for ClusterTrainingRuntime type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedClusterTrainingRuntimeInformer]).
 func NewClusterTrainingRuntimeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewClusterTrainingRuntimeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedClusterTrainingRuntimeInformer constructs a new informer for ClusterTrainingRuntime type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedClusterTrainingRuntimeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers ClusterTrainingRuntimeIndexers) ClusterTrainingRuntimeIndexInformer {
+	return NewTypedClusterTrainingRuntimeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredClusterTrainingRuntimeInformer constructs a new informer for ClusterTrainingRuntime type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredClusterTrainingRuntimeInformer]).
 func NewFilteredClusterTrainingRuntimeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewClusterTrainingRuntimeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedClusterTrainingRuntimeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredClusterTrainingRuntimeInformer constructs a new informer for ClusterTrainingRuntime type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredClusterTrainingRuntimeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers ClusterTrainingRuntimeIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ClusterTrainingRuntimeIndexInformer {
+	return NewTypedClusterTrainingRuntimeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewClusterTrainingRuntimeInformerWithOptions constructs a new informer for ClusterTrainingRuntime type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedClusterTrainingRuntimeInformerWithOptions]).
 func NewClusterTrainingRuntimeInformerWithOptions(client versioned.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedClusterTrainingRuntimeInformerWithOptions(client, options)
+}
+
+// NewTypedClusterTrainingRuntimeInformerWithOptions constructs a new informer for ClusterTrainingRuntime type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedClusterTrainingRuntimeInformerWithOptions(client versioned.Interface, options internalinterfaces.InformerOptions) ClusterTrainingRuntimeIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "trainer.kubeflow.org", Version: "v1alpha1", Resource: "clustertrainingruntimes"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.ClusterTrainingRuntime](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,17 +151,57 @@ func NewClusterTrainingRuntimeInformerWithOptions(client versioned.Interface, op
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *clusterTrainingRuntimeInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewClusterTrainingRuntimeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedClusterTrainingRuntimeInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *clusterTrainingRuntimeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apistrainerv1alpha1.ClusterTrainingRuntime{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *clusterTrainingRuntimeInformer) TypedInformer() ClusterTrainingRuntimeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.ClusterTrainingRuntime](f.factory.InformerFor(&apistrainerv1alpha1.ClusterTrainingRuntime{}, f.defaultInformer))
 }
 
 func (f *clusterTrainingRuntimeInformer) Lister() trainerv1alpha1.ClusterTrainingRuntimeLister {
 	return trainerv1alpha1.NewClusterTrainingRuntimeLister(f.Informer().GetIndexer())
+}
+
+// ToTypedClusterTrainingRuntimeInformer converts an untyped informer into a TypedClusterTrainingRuntimeInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ClusterTrainingRuntime. If that is not the case, calling type-safe methods of the returned
+// TypedClusterTrainingRuntimeInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedClusterTrainingRuntimeInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedClusterTrainingRuntimeInformer(informer ClusterTrainingRuntimeInformer) TypedClusterTrainingRuntimeInformer {
+	if informer, ok := informer.(TypedClusterTrainingRuntimeInformer); ok {
+		return informer
+	}
+	return &clusterTrainingRuntimeTypedInformerAdapter{informer}
+}
+
+type clusterTrainingRuntimeTypedInformerAdapter struct {
+	ClusterTrainingRuntimeInformer
+}
+
+func (a *clusterTrainingRuntimeTypedInformerAdapter) TypedInformer() ClusterTrainingRuntimeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.ClusterTrainingRuntime](a.Informer())
+}
+
+// ToClusterTrainingRuntimeIndexInformer converts an untyped informer into a ClusterTrainingRuntimeIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *ClusterTrainingRuntime. If that is not the case, calling type-safe methods of the returned
+// ClusterTrainingRuntimeIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a ClusterTrainingRuntimeIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToClusterTrainingRuntimeIndexInformer(informer cache.SharedIndexInformer) ClusterTrainingRuntimeIndexInformer {
+	if informer, ok := informer.(ClusterTrainingRuntimeIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.ClusterTrainingRuntime](informer)
 }

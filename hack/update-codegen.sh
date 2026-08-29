@@ -81,6 +81,7 @@ EXTRA_PACKAGES=(
   k8s.io/api/core/v1
   k8s.io/api/autoscaling/v2
   k8s.io/api/batch/v1
+  k8s.io/api/scheduling/v1alpha3
   sigs.k8s.io/jobset/api/jobset/v1alpha2
   volcano.sh/apis/pkg/apis/scheduling/v1beta1
 )

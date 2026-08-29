@@ -34,11 +34,39 @@ import (
 )
 
 // TrainingRuntimeInformer provides access to a shared informer and lister for
-// TrainingRuntimes.
+// TrainingRuntimes. Prefer using the type-safe variant (see [TypedTrainingRuntimeInformer]).
 type TrainingRuntimeInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() trainerv1alpha1.TrainingRuntimeLister
 }
+
+// TypedTrainingRuntimeInformer provides access to a shared informer and lister for
+// TrainingRuntimes, including the type-safe TypedInformer variant.
+// It is a superset of TrainingRuntimeInformer.
+type TypedTrainingRuntimeInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() TrainingRuntimeIndexInformer
+	Lister() trainerv1alpha1.TrainingRuntimeLister
+}
+
+// TrainingRuntimeIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type TrainingRuntimeIndexInformer cache.TypedSharedIndexInformer[*apistrainerv1alpha1.TrainingRuntime]
+
+// TrainingRuntimeHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for TrainingRuntime.
+type TrainingRuntimeHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apistrainerv1alpha1.TrainingRuntime]
+
+// TrainingRuntimeDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for TrainingRuntime.
+type TrainingRuntimeDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apistrainerv1alpha1.TrainingRuntime]
+
+// TrainingRuntimeFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for TrainingRuntime.
+type TrainingRuntimeFilteringHandler = cache.TypedFilteringResourceEventHandler[*apistrainerv1alpha1.TrainingRuntime]
+
+// TrainingRuntimeIndexers is a specialization of [cache.TypedIndexers] for TrainingRuntime.
+type TrainingRuntimeIndexers = cache.TypedIndexers[*apistrainerv1alpha1.TrainingRuntime]
+
+// DeletedTrainingRuntime is a specialization of [cache.DeletedObject] for TrainingRuntime.
+type DeletedTrainingRuntime = cache.DeletedObject[*apistrainerv1alpha1.TrainingRuntime]
 
 type trainingRuntimeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type trainingRuntimeInformer struct {
 // NewTrainingRuntimeInformer constructs a new informer for TrainingRuntime type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedTrainingRuntimeInformer]).
 func NewTrainingRuntimeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewTrainingRuntimeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedTrainingRuntimeInformer constructs a new informer for TrainingRuntime type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedTrainingRuntimeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers TrainingRuntimeIndexers) TrainingRuntimeIndexInformer {
+	return NewTypedTrainingRuntimeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredTrainingRuntimeInformer constructs a new informer for TrainingRuntime type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredTrainingRuntimeInformer]).
 func NewFilteredTrainingRuntimeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewTrainingRuntimeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedTrainingRuntimeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredTrainingRuntimeInformer constructs a new informer for TrainingRuntime type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredTrainingRuntimeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers TrainingRuntimeIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) TrainingRuntimeIndexInformer {
+	return NewTypedTrainingRuntimeInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewTrainingRuntimeInformerWithOptions constructs a new informer for TrainingRuntime type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedTrainingRuntimeInformerWithOptions]).
 func NewTrainingRuntimeInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedTrainingRuntimeInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedTrainingRuntimeInformerWithOptions constructs a new informer for TrainingRuntime type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedTrainingRuntimeInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) TrainingRuntimeIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "trainer.kubeflow.org", Version: "v1alpha1", Resource: "trainingruntimes"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.TrainingRuntime](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewTrainingRuntimeInformerWithOptions(client versioned.Interface, namespace
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *trainingRuntimeInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewTrainingRuntimeInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedTrainingRuntimeInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *trainingRuntimeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apistrainerv1alpha1.TrainingRuntime{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *trainingRuntimeInformer) TypedInformer() TrainingRuntimeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.TrainingRuntime](f.factory.InformerFor(&apistrainerv1alpha1.TrainingRuntime{}, f.defaultInformer))
 }
 
 func (f *trainingRuntimeInformer) Lister() trainerv1alpha1.TrainingRuntimeLister {
 	return trainerv1alpha1.NewTrainingRuntimeLister(f.Informer().GetIndexer())
+}
+
+// ToTypedTrainingRuntimeInformer converts an untyped informer into a TypedTrainingRuntimeInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *TrainingRuntime. If that is not the case, calling type-safe methods of the returned
+// TypedTrainingRuntimeInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedTrainingRuntimeInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedTrainingRuntimeInformer(informer TrainingRuntimeInformer) TypedTrainingRuntimeInformer {
+	if informer, ok := informer.(TypedTrainingRuntimeInformer); ok {
+		return informer
+	}
+	return &trainingRuntimeTypedInformerAdapter{informer}
+}
+
+type trainingRuntimeTypedInformerAdapter struct {
+	TrainingRuntimeInformer
+}
+
+func (a *trainingRuntimeTypedInformerAdapter) TypedInformer() TrainingRuntimeIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.TrainingRuntime](a.Informer())
+}
+
+// ToTrainingRuntimeIndexInformer converts an untyped informer into a TrainingRuntimeIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *TrainingRuntime. If that is not the case, calling type-safe methods of the returned
+// TrainingRuntimeIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a TrainingRuntimeIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTrainingRuntimeIndexInformer(informer cache.SharedIndexInformer) TrainingRuntimeIndexInformer {
+	if informer, ok := informer.(TrainingRuntimeIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.TrainingRuntime](informer)
 }
