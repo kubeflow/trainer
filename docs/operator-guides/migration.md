@@ -90,9 +90,10 @@ spec:
 
 ### Migrate MPIJob to TrainJob
 
-In Kubeflow Training Operator v1, an `MPIJob` defines the launcher and worker workloads directly
-through `mpiReplicaSpecs`. MPI-specific settings such as the number of processes per worker are
-also configured on the `MPIJob`.
+In Kubeflow Training Operator v1 and [MPI Operator](https://github.com/kubeflow/mpi-operator/tree/master),
+an `MPIJob` defines the launcher and worker workloads directly through `mpiReplicaSpecs`.
+MPI-specific settings such as the number of processes per worker are also configured on the
+`MPIJob`.
 
 Kubeflow Trainer v2 separates the training workload from the MPI execution environment. A
 `TrainJob` references an MPI-enabled `TrainingRuntime` or `ClusterTrainingRuntime`, while the
@@ -131,10 +132,83 @@ spec:
               image: mpi-training:latest
 ```
 
+#### New: ClusterTrainingRuntime (v2)
+
+The MPI environment is configured separately by the platform administrator in an MPI-enabled
+runtime. For example:
+
+```yaml
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: ClusterTrainingRuntime
+metadata:
+  name: mpi-runtime
+  labels:
+    trainer.kubeflow.org/framework: mpi
+spec:
+  mlPolicy:
+    numNodes: 1
+    mpi:
+      numProcPerNode: 1
+      mpiImplementation: OpenMPI
+      sshAuthMountPath: /home/mpiuser/.ssh
+      runLauncherAsNode: true
+  template:
+    spec:
+      network:
+        publishNotReadyAddresses: true
+      successPolicy:
+        operator: All
+        targetReplicatedJobs:
+          - launcher
+      replicatedJobs:
+        - name: node
+          template:
+            spec:
+              template:
+                spec:
+                  securityContext:
+                    fsGroup: 1000
+                  containers:
+                    - name: node
+                      image: ghcr.io/kubeflow/trainer/deepspeed-runtime
+                      securityContext:
+                        runAsUser: 1000
+                      command:
+                        - /usr/sbin/sshd
+                      args:
+                        - -De
+                        - -f
+                        - /home/mpiuser/.sshd_config
+                      readinessProbe:
+                        tcpSocket:
+                          port: 2222
+                        initialDelaySeconds: 5
+        - name: launcher
+          dependsOn:
+            - name: node
+              status: Ready
+          template:
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            spec:
+              template:
+                spec:
+                  securityContext:
+                    fsGroup: 1000
+                  containers:
+                    - name: node
+                      image: ghcr.io/kubeflow/trainer/deepspeed-runtime
+                      securityContext:
+                        runAsUser: 1000
+```
+
+Runtime names are cluster-specific, so use the MPI runtime installed by your platform
+administrator.
+
 #### New: TrainJob (v2)
 
-The MPI runtime is configured separately by the platform administrator. The `TrainJob` references
-that runtime and provides the workload-specific configuration:
+The `TrainJob` references that runtime and provides the workload-specific configuration:
 
 ```yaml
 apiVersion: trainer.kubeflow.org/v1alpha1
@@ -145,7 +219,7 @@ spec:
   runtimeRef:
     apiGroup: trainer.kubeflow.org
     kind: ClusterTrainingRuntime
-    name: <mpi-runtime>
+    name: mpi-runtime
   trainer:
     numNodes: 2
     numProcPerNode: 1
@@ -155,10 +229,6 @@ spec:
       - python3
       - train.py
 ```
-
-The runtime name in this example, `<mpi-runtime>`, is a placeholder for an MPI-enabled runtime
-configured on the cluster. Runtime names are cluster-specific, so use the MPI runtime installed by
-your platform administrator.
 
 The `TrainJob` provides:
 
@@ -192,6 +262,38 @@ The number of training nodes depends on the runtime's `mlPolicy.mpi.runLauncherA
 
 Always check the runtime before mapping the old launcher and worker counts.
 
+#### Interactive MPI
+
+The `TrainJob` can also keep the launcher alive so that you can `kubectl exec` into the launcher
+Pod and run `mpirun` commands yourself:
+
+```yaml
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: mpi-interactive
+spec:
+  runtimeRef:
+    name: mpi-runtime
+  trainer:
+    numNodes: 4
+    command: ["sleep", "infinity"]
+```
+
+Once the `TrainJob` is running, execute `mpirun` from the launcher Pod:
+
+```bash
+$ kubectl exec -it mpi-interactive-launcher-0-0-67q9c -- \
+    mpirun python -c "from mpi4py import MPI; import socket; c = MPI.COMM_WORLD; print(f'host={socket.gethostname()} | RANK: {c.Get_rank()}')"
+
+Warning: Permanently added '[mpi-interactive-node-0-0.mpi-interactive]:2222' (ECDSA) to the list of known hosts.
+Warning: Permanently added '[mpi-interactive-node-0-1.mpi-interactive]:2222' (ECDSA) to the list of known hosts.
+Warning: Permanently added '[mpi-interactive-node-0-2.mpi-interactive]:2222' (ECDSA) to the list of known hosts.
+host=mpi-interactive-launcher-0-0 | RANK: 0
+host=mpi-interactive-node-0-2 | RANK: 3
+host=mpi-interactive-node-0-1 | RANK: 2
+host=mpi-interactive-node-0-0 | RANK: 1
+```
 
 ### Kubeflow Trainer Python SDK
 
