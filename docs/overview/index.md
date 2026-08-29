@@ -7,6 +7,7 @@ Kubeflow Trainer is a **Kubernetes-native distributed AI platform** for scalable
 Kubeflow Trainer brings **MPI to Kubernetes** for multi-node, multi-GPU distributed jobs across HPC clusters. It integrates seamlessly with the Cloud Native AI ecosystem through tools like:
 
 - **[Kueue](https://kueue.sigs.k8s.io/)** for topology-aware scheduling and multi-cluster dispatch
+- **[Slurm Bridge](https://github.com/SlinkyProject/slurm-bridge)** for scheduling on hybrid Kubernetes and Slurm clusters
 - **[JobSet](https://github.com/kubernetes-sigs/jobset)** and **[LeaderWorkerSet](https://github.com/kubernetes-sigs/lws)** for orchestration
 - **[Coscheduling](https://github.com/kubernetes-sigs/scheduler-plugins/blob/master/pkg/coscheduling/README.md)** for gang scheduling with the Kubernetes scheduler
 - **[Volcano](https://volcano.sh/en/)** for batch scheduling
@@ -39,7 +40,7 @@ DevOps engineers and cluster operators who **deploy and manage** Kubeflow Traine
 **What you'll find:**
 - Installation and configuration guides
 - Runtime and policy management
-- Integration with schedulers (Kueue, Volcano)
+- Integration with schedulers (Kueue, Slurm Bridge, Volcano)
 - Extension framework architecture
 
 ### Contributors
@@ -81,6 +82,8 @@ Kubeflow Trainer seamlessly integrates with Kubernetes ecosystem projects like
 [Kueue](https://kueue.sigs.k8s.io/),
 [Coscheduling](https://github.com/kubernetes-sigs/scheduler-plugins/blob/master/pkg/coscheduling/README.md),
 [Volcano](https://volcano.sh/en/), or [YuniKorn](https://yunikorn.apache.org/docs/).
+With [Slurm Bridge](https://github.com/SlinkyProject/slurm-bridge), TrainJobs can also be scheduled
+by Slurm on hybrid Kubernetes and Slurm clusters.
 
 ![AI Lifecycle with Kubeflow Trainer](../images/ai-lifecycle-trainer.drawio.svg)
 

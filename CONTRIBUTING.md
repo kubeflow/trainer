@@ -1,4 +1,4 @@
-# Developer Guide
+# Contributing Guide
 
 This guide explains how to contribute to the Kubeflow Trainer V2 project.
 For the Kubeflow Trainer documentation, please check [the official Kubeflow documentation](https://trainer.kubeflow.org/en/latest/overview/index.html).
@@ -123,7 +123,7 @@ Make sure to install [pre-commit](https://pre-commit.com/) (`pip install pre-com
 
 The pre-commit hooks ensure code quality and consistency. They are executed in CI. PRs that fail to comply with the hooks will not be able to pass the corresponding CI gate. The hooks are only executed against staged files unless you run `pre-commit run --all`, in which case, they'll be executed against every file in the repository.
 
-Specific programmatically generated files listed in the `exclude` field in [.pre-commit-config.yaml](../../.pre-commit-config.yaml) are deliberately excluded from the hooks.
+Specific programmatically generated files listed in the `exclude` field in [.pre-commit-config.yaml](https://github.com/kubeflow/trainer/blob/master/.pre-commit-config.yaml) are deliberately excluded from the hooks.
 
 ## Best Practices
 
@@ -135,7 +135,7 @@ The PR titles are used to generated changelog for releases.
 PR titles must:
 
 - Follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/).
-- Have an appropriate [type and scope](./.github/workflows/check-pr-title.yaml)
+- Have an appropriate [type and scope](https://github.com/kubeflow/trainer/blob/master/.github/workflows/check-pr-title.yaml)
 
 Examples:
 
@@ -149,7 +149,7 @@ For any significant features or enhancement for Kubeflow Trainer project we foll
 [Kubeflow Enhancement Proposal process](https://github.com/kubeflow/community/tree/master/proposals).
 
 If you want to submit a significant change to the Kubeflow Trainer, please submit a new KEP under
-[./proposals](./proposals/) directory.
+[./proposals](https://github.com/kubeflow/trainer/tree/master/proposals) directory.
 
 ### Go Development
 
