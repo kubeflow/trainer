@@ -44,7 +44,7 @@ class IoK8sApiAutoscalingV2ObjectMetricStatus(BaseModel):
     ObjectMetricStatus indicates the current value of a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).
     """ # noqa: E501
     current: IoK8sApiAutoscalingV2MetricValueStatus = Field(description="current contains the current value for the given metric")
-    described_object: IoK8sApiAutoscalingV2CrossVersionObjectReference = Field(description="DescribedObject specifies the descriptions of a object,such as kind,name apiVersion", alias="describedObject")
+    described_object: IoK8sApiAutoscalingV2CrossVersionObjectReference = Field(description="describedObject specifies the descriptions of a object,such as kind,name apiVersion", alias="describedObject")
     metric: IoK8sApiAutoscalingV2MetricIdentifier = Field(description="metric identifies the target metric by name and selector")
     __properties: ClassVar[List[str]] = ["current", "describedObject", "metric"]
 

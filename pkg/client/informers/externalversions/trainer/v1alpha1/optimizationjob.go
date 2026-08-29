@@ -34,11 +34,39 @@ import (
 )
 
 // OptimizationJobInformer provides access to a shared informer and lister for
-// OptimizationJobs.
+// OptimizationJobs. Prefer using the type-safe variant (see [TypedOptimizationJobInformer]).
 type OptimizationJobInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() trainerv1alpha1.OptimizationJobLister
 }
+
+// TypedOptimizationJobInformer provides access to a shared informer and lister for
+// OptimizationJobs, including the type-safe TypedInformer variant.
+// It is a superset of OptimizationJobInformer.
+type TypedOptimizationJobInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() OptimizationJobIndexInformer
+	Lister() trainerv1alpha1.OptimizationJobLister
+}
+
+// OptimizationJobIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type OptimizationJobIndexInformer cache.TypedSharedIndexInformer[*apistrainerv1alpha1.OptimizationJob]
+
+// OptimizationJobHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for OptimizationJob.
+type OptimizationJobHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apistrainerv1alpha1.OptimizationJob]
+
+// OptimizationJobDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for OptimizationJob.
+type OptimizationJobDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apistrainerv1alpha1.OptimizationJob]
+
+// OptimizationJobFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for OptimizationJob.
+type OptimizationJobFilteringHandler = cache.TypedFilteringResourceEventHandler[*apistrainerv1alpha1.OptimizationJob]
+
+// OptimizationJobIndexers is a specialization of [cache.TypedIndexers] for OptimizationJob.
+type OptimizationJobIndexers = cache.TypedIndexers[*apistrainerv1alpha1.OptimizationJob]
+
+// DeletedOptimizationJob is a specialization of [cache.DeletedObject] for OptimizationJob.
+type DeletedOptimizationJob = cache.DeletedObject[*apistrainerv1alpha1.OptimizationJob]
 
 type optimizationJobInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type optimizationJobInformer struct {
 // NewOptimizationJobInformer constructs a new informer for OptimizationJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedOptimizationJobInformer]).
 func NewOptimizationJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewOptimizationJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedOptimizationJobInformer constructs a new informer for OptimizationJob type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedOptimizationJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers OptimizationJobIndexers) OptimizationJobIndexInformer {
+	return NewTypedOptimizationJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredOptimizationJobInformer constructs a new informer for OptimizationJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredOptimizationJobInformer]).
 func NewFilteredOptimizationJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewOptimizationJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedOptimizationJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredOptimizationJobInformer constructs a new informer for OptimizationJob type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredOptimizationJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers OptimizationJobIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) OptimizationJobIndexInformer {
+	return NewTypedOptimizationJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewOptimizationJobInformerWithOptions constructs a new informer for OptimizationJob type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedOptimizationJobInformerWithOptions]).
 func NewOptimizationJobInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedOptimizationJobInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedOptimizationJobInformerWithOptions constructs a new informer for OptimizationJob type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedOptimizationJobInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) OptimizationJobIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "trainer.kubeflow.org", Version: "v1alpha1", Resource: "optimizationjobs"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.OptimizationJob](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewOptimizationJobInformerWithOptions(client versioned.Interface, namespace
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *optimizationJobInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewOptimizationJobInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedOptimizationJobInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *optimizationJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apistrainerv1alpha1.OptimizationJob{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *optimizationJobInformer) TypedInformer() OptimizationJobIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.OptimizationJob](f.factory.InformerFor(&apistrainerv1alpha1.OptimizationJob{}, f.defaultInformer))
 }
 
 func (f *optimizationJobInformer) Lister() trainerv1alpha1.OptimizationJobLister {
 	return trainerv1alpha1.NewOptimizationJobLister(f.Informer().GetIndexer())
+}
+
+// ToTypedOptimizationJobInformer converts an untyped informer into a TypedOptimizationJobInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *OptimizationJob. If that is not the case, calling type-safe methods of the returned
+// TypedOptimizationJobInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedOptimizationJobInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedOptimizationJobInformer(informer OptimizationJobInformer) TypedOptimizationJobInformer {
+	if informer, ok := informer.(TypedOptimizationJobInformer); ok {
+		return informer
+	}
+	return &optimizationJobTypedInformerAdapter{informer}
+}
+
+type optimizationJobTypedInformerAdapter struct {
+	OptimizationJobInformer
+}
+
+func (a *optimizationJobTypedInformerAdapter) TypedInformer() OptimizationJobIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.OptimizationJob](a.Informer())
+}
+
+// ToOptimizationJobIndexInformer converts an untyped informer into a OptimizationJobIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *OptimizationJob. If that is not the case, calling type-safe methods of the returned
+// OptimizationJobIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a OptimizationJobIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToOptimizationJobIndexInformer(informer cache.SharedIndexInformer) OptimizationJobIndexInformer {
+	if informer, ok := informer.(OptimizationJobIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.OptimizationJob](informer)
 }

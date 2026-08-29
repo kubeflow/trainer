@@ -34,11 +34,39 @@ import (
 )
 
 // TrainJobInformer provides access to a shared informer and lister for
-// TrainJobs.
+// TrainJobs. Prefer using the type-safe variant (see [TypedTrainJobInformer]).
 type TrainJobInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() trainerv1alpha1.TrainJobLister
 }
+
+// TypedTrainJobInformer provides access to a shared informer and lister for
+// TrainJobs, including the type-safe TypedInformer variant.
+// It is a superset of TrainJobInformer.
+type TypedTrainJobInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() TrainJobIndexInformer
+	Lister() trainerv1alpha1.TrainJobLister
+}
+
+// TrainJobIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type TrainJobIndexInformer cache.TypedSharedIndexInformer[*apistrainerv1alpha1.TrainJob]
+
+// TrainJobHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for TrainJob.
+type TrainJobHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apistrainerv1alpha1.TrainJob]
+
+// TrainJobDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for TrainJob.
+type TrainJobDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apistrainerv1alpha1.TrainJob]
+
+// TrainJobFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for TrainJob.
+type TrainJobFilteringHandler = cache.TypedFilteringResourceEventHandler[*apistrainerv1alpha1.TrainJob]
+
+// TrainJobIndexers is a specialization of [cache.TypedIndexers] for TrainJob.
+type TrainJobIndexers = cache.TypedIndexers[*apistrainerv1alpha1.TrainJob]
+
+// DeletedTrainJob is a specialization of [cache.DeletedObject] for TrainJob.
+type DeletedTrainJob = cache.DeletedObject[*apistrainerv1alpha1.TrainJob]
 
 type trainJobInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type trainJobInformer struct {
 // NewTrainJobInformer constructs a new informer for TrainJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedTrainJobInformer]).
 func NewTrainJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewTrainJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedTrainJobInformer constructs a new informer for TrainJob type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedTrainJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers TrainJobIndexers) TrainJobIndexInformer {
+	return NewTypedTrainJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredTrainJobInformer constructs a new informer for TrainJob type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredTrainJobInformer]).
 func NewFilteredTrainJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewTrainJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedTrainJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredTrainJobInformer constructs a new informer for TrainJob type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredTrainJobInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers TrainJobIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) TrainJobIndexInformer {
+	return NewTypedTrainJobInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewTrainJobInformerWithOptions constructs a new informer for TrainJob type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedTrainJobInformerWithOptions]).
 func NewTrainJobInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedTrainJobInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedTrainJobInformerWithOptions constructs a new informer for TrainJob type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedTrainJobInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) TrainJobIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "trainer.kubeflow.org", Version: "v1alpha1", Resource: "trainjobs"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.TrainJob](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewTrainJobInformerWithOptions(client versioned.Interface, namespace string
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *trainJobInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewTrainJobInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedTrainJobInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *trainJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apistrainerv1alpha1.TrainJob{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *trainJobInformer) TypedInformer() TrainJobIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.TrainJob](f.factory.InformerFor(&apistrainerv1alpha1.TrainJob{}, f.defaultInformer))
 }
 
 func (f *trainJobInformer) Lister() trainerv1alpha1.TrainJobLister {
 	return trainerv1alpha1.NewTrainJobLister(f.Informer().GetIndexer())
+}
+
+// ToTypedTrainJobInformer converts an untyped informer into a TypedTrainJobInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *TrainJob. If that is not the case, calling type-safe methods of the returned
+// TypedTrainJobInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedTrainJobInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedTrainJobInformer(informer TrainJobInformer) TypedTrainJobInformer {
+	if informer, ok := informer.(TypedTrainJobInformer); ok {
+		return informer
+	}
+	return &trainJobTypedInformerAdapter{informer}
+}
+
+type trainJobTypedInformerAdapter struct {
+	TrainJobInformer
+}
+
+func (a *trainJobTypedInformerAdapter) TypedInformer() TrainJobIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.TrainJob](a.Informer())
+}
+
+// ToTrainJobIndexInformer converts an untyped informer into a TrainJobIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *TrainJob. If that is not the case, calling type-safe methods of the returned
+// TrainJobIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a TrainJobIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTrainJobIndexInformer(informer cache.SharedIndexInformer) TrainJobIndexInformer {
+	if informer, ok := informer.(TrainJobIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apistrainerv1alpha1.TrainJob](informer)
 }
