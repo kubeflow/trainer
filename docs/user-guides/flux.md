@@ -1,6 +1,7 @@
 # Flux Guide
 
-This guide describes how to use TrainJob to train or fine-tune AI models with a [Flux Framework](https://flux-framework.org) High Performance Computing (HPC) cluster.
+This guide describes how to run a [Flux Framework](https://flux-framework.org) High Performance
+Computing (HPC) cluster on Kubernetes with TrainJob to train or fine-tune AI models.
 
 ## Prerequisites
 

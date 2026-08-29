@@ -1,7 +1,7 @@
 # PyTorch on AMD ROCm Guide
 
-This guide describes how to use TrainJob to train or fine-tune AI models with
-[PyTorch](https://pytorch.org/) on AMD ROCm GPUs on Kubernetes.
+This guide describes how to run [PyTorch](https://pytorch.org/) on AMD ROCm GPUs on Kubernetes with
+TrainJob to train or fine-tune AI models.
 
 ---
 

@@ -1,6 +1,7 @@
 # MLX Guide
 
-This guide describes how to use TrainJob to train or fine-tune AI models with [MLX](https://ml-explore.github.io/mlx/build/html/index.html).
+This guide describes how to run [MLX](https://ml-explore.github.io/mlx/build/html/index.html) on
+Kubernetes with TrainJob to train or fine-tune AI models.
 
 ## Prerequisites
 

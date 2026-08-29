@@ -1,7 +1,7 @@
 # Megatron Guide
 
-This guide describes how to use TrainJob to train AI models with
-[Megatron-Core](https://github.com/NVIDIA/Megatron-LM) and Tensor Parallelism.
+This guide describes how to run [Megatron-Core](https://github.com/NVIDIA/Megatron-LM) on Kubernetes
+with TrainJob to train AI models with Tensor Parallelism.
 
 ## Prerequisites
 
@@ -18,12 +18,12 @@ is NVIDIA's library for training large transformer models efficiently across mul
 It provides production-grade implementations of parallelism strategies:
 
 - **Tensor Parallelism (TP)**: Splits individual layer weight matrices across GPUs. Each GPU holds
- a slice of every layer, so you can train models whose layers are too large for a single GPU's
- memory. This is the parallelism strategy covered in this guide.
+  a slice of every layer, so you can train models whose layers are too large for a single GPU's
+  memory. This is the parallelism strategy covered in this guide.
 - **Pipeline Parallelism (PP)**: Assigns different layers to different GPUs and overlaps computation
- with micro-batch pipelining.
+  with micro-batch pipelining.
 - **Data Parallelism (DP)**: Replicates the full model on each GPU and splits the data across them.
- Megatron-Core includes `DistributedDataParallel` for gradient synchronization.
+  Megatron-Core includes `DistributedDataParallel` for gradient synchronization.
 
 Since Megatron-Core uses `torchrun` as its distributed launcher, it works natively with the
 existing `torch-distributed` ClusterTrainingRuntime. No dedicated Megatron runtime is needed.
@@ -369,10 +369,10 @@ training with frameworks that create several NCCL communicators.
 When configuring your TrainJob, the relationship between `num_nodes`, `gpu` per node, and
 `TP_SIZE` matters:
 
-| Configuration | `num_nodes` | `gpu` | `TP_SIZE` | Pods | How it works |
-|---|---|---|---|---|---|
-| Multi-GPU single node | 1 | 2 | 2 | 1 | 2 workers in 1 pod, each gets a CUDA device |
-| Multi-node | 2 | 1 | 2 | 2 | 1 worker per pod, TP across nodes via NCCL |
+| Configuration         | `num_nodes` | `gpu` | `TP_SIZE` | Pods | How it works                                |
+| --------------------- | ----------- | ----- | --------- | ---- | ------------------------------------------- |
+| Multi-GPU single node | 1           | 2     | 2         | 1    | 2 workers in 1 pod, each gets a CUDA device |
+| Multi-node            | 2           | 1     | 2         | 2    | 1 worker per pod, TP across nodes via NCCL  |
 
 Both configurations give you `WORLD_SIZE=2` and `TP_SIZE=2`. Multi-GPU on a single node is
 faster (GPU-to-GPU NVLink/PCIe instead of network), but multi-node lets you scale beyond the
