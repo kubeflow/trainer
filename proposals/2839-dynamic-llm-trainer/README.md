@@ -258,6 +258,14 @@ genuinely unavailable under torchrun:
 | `--mixed_precision`, `--dynamo_backend` at launch time | Covered by `--bf16` / `--fp16` and `--torch_compile` on the script. |
 | `--mpirun_hostfile` | Only needed because accelerate cannot do multi-process CPU without MPI. torchrun does it natively over gloo, so this is a limitation torchrun *removes*. |
 
+**Elasticity and preemption are not lost either.** For multi-GPU and DeepSpeed,
+`accelerate launch` runs torchrun itself — `import torch.distributed.run as distrib_run`,
+then `distrib_run.run(args)` — and its elastic flags (`--max_restarts`,
+`--monitor_interval`, `--rdzv_backend`, `--rdzv_conf`) are passed straight through to
+torchrun's own parser. Calling torchrun directly gives the same behaviour with one less
+layer. Elastic training is in any case not supported by the Trainer yet, for either
+launcher: `torch.go:109` carries the TODO to add it once JobSet supports elastic jobs.
+
 Supporting `accelerate launch` is **out of scope here** and left to a later discussion
 ([Open Question #7](#open-questions)).
 
