@@ -23,7 +23,7 @@
     - [I.2 `PET_*` is torchrun's private interface](#i2-pet_-is-torchruns-private-interface)
     - [I.3 Proof of concept](#i3-proof-of-concept)
     - [I.4 Limitation: the TRL CLI and `accelerate launch`](#i4-limitation-the-trl-cli-and-accelerate-launch)
-    - [I.5 Why the plugin does not change](#i5-why-the-plugin-does-not-change)
+    - [I.5 What changes in the plugin](#i5-what-changes-in-the-plugin)
     - [I.6 New artifacts](#i6-new-artifacts)
   - [Part II: Client Side (`kubeflow/sdk`)](#part-ii-client-side-kubeflowsdk)
     - [II.1 Current limitations](#ii1-current-limitations)
@@ -106,7 +106,7 @@ A proof of concept for the server side was built and run on a cluster; its resul
 
 1. **Any control-plane change.** No CRD or schema change, no version bump, and no Go: the
    server-side work is a new image and new manifests. `EnforceMLPolicy` and `Validate` are
-   both unchanged — see [I.5](#i5-why-the-plugin-does-not-change).
+   both unchanged — see [I.5](#i5-what-changes-in-the-plugin).
 2. **A new framework plugin.** TRL reuses the torch plugin via `mlPolicy.torch`; no entry
    is added to `pkg/runtime/framework/plugins/registry.go`.
 3. **New runtime labels or conventions.** `trainer.kubeflow.org/framework` is unchanged.
@@ -275,21 +275,24 @@ accelerate is still in the image because TRL depends on it (`accelerate>=1.4.0`,
 torchrun exported.** The distinction matters for review: what is excluded here is a second
 launcher, not a library.
 
-### I.5 Why the plugin does not change
+### I.5 What changes in the plugin
 
-`EnforceMLPolicy` today supports the torchrun launcher through the `PET_*` variables, and
-that is exactly what TRL needs. Every run in [I.3](#i3-proof-of-concept) used an unmodified
-`torch.go`:
+Nothing. `EnforceMLPolicy` today supports the torchrun launcher through the `PET_*`
+variables, and that is what TRL needs — every run in [I.3](#i3-proof-of-concept) used an
+unmodified `torch.go`. `Validate` is unchanged too.
 
-- TRL under torchrun wants exactly the plugin's default behaviour — all five `PET_*`
-  injected, command untouched. The TorchTune branch exists only because `tune run` takes
-  rendezvous as a *command-line argument*; nothing analogous is needed here.
-- Which module torchrun runs (`trl.scripts.sft` vs `.dpo` vs `.grpo`) is declared in the
-  runtime manifest and shipped in the image. A TRL upgrade is an image rebuild, not a
-  controller release.
+The difference from TorchTune is where the training arguments are built:
 
-`Validate` is also unchanged: with torchrun as the launcher there is no CPU-multi-node
-failure mode left to reject at admission.
+| | TorchTune | TRL |
+|---|---|---|
+| Launcher | `tune run` | `torchrun` |
+| Rendezvous | a command-line argument, so the plugin rewrites the command (`torch.go:175-201`) | environment, so the command is left alone |
+| Who builds the arguments | the plugin, in Go: `torchtune.go` picks the recipe, adds `--config`, and appends the path overrides read from the runtime | the SDK, in Python: `TRLConfig.to_args()`, passed through unchanged as `args` |
+| Go needed | the existing branch | none |
+
+So supporting TRL adds no logic to the controller. Which module torchrun runs
+(`trl.scripts.sft` vs `.dpo` vs `.grpo`) is declared in the runtime manifest and shipped in
+the image, so a TRL upgrade is an image rebuild rather than a controller release.
 
 ### I.6 New artifacts
 
@@ -817,7 +820,7 @@ cases, asserted alongside each other so the paths stay visibly distinct: a
 `[torchrun, -m, trl.scripts.sft]` command is left alone and gets all five `PET_*`,
 including the master vars the TorchTune path suppresses; a `[tune, run]` command is still
 rewritten. The first is the regression guard for
-[I.5](#i5-why-the-plugin-does-not-change) — it fails the moment anyone adds a TRL branch to
+[I.5](#i5-what-changes-in-the-plugin) — it fails the moment anyone adds a TRL branch to
 the plugin.
 
 **Manifest tests** — each `manifests/base/runtimes/trl/*.yaml` carries `framework: trl`,
