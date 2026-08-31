@@ -186,6 +186,17 @@ func TestServerErrorResponses(t *testing.T) {
 				Code:    http.StatusUnprocessableEntity,
 			},
 		},
+		"trailing closing delimiter fails with 422 unprocessable entity": {
+			url:        "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
+			body:       `{}]`,
+			authorized: true,
+			wantResponse: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: "Invalid payload",
+				Reason:  metav1.StatusReasonInvalid,
+				Code:    http.StatusUnprocessableEntity,
+			},
+		},
 		"oversized payload fails with 413 payload too large error": {
 			url: "/apis/trainer.kubeflow.org/v1alpha1/namespaces/default/trainjobs/test-job/status",
 			// Generate ~1MB payload (exceeds 64kB limit)
