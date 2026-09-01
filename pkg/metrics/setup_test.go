@@ -31,10 +31,10 @@ import (
 type fakeControlManager struct {
 	ctrl.Manager
 
-	initialisedConfig 			*rest.Config
-	httpClient        			    *http.Client
-	addError   		 			error
-	serverAdded				 bool
+	initialisedConfig *rest.Config
+	httpClient        *http.Client
+	addError          error
+	serverAdded       bool
 }
 
 func (mgr *fakeControlManager) GetConfig() *rest.Config {
@@ -52,63 +52,63 @@ func (mgr *fakeControlManager) Add(_ manager.Runnable) error {
 
 func TestSetupServer(t *testing.T) {
 	tests := map[string]struct {
-		cfg 								   *configapi.ControllerMetrics
-		tlsOpts 		 					*configapi.TLSOptions
-		wantServerAdded			bool
-		addError							error
-		wantError						    bool
-	} {
+		cfg             *configapi.ControllerMetrics
+		tlsOpts         *configapi.TLSOptions
+		wantServerAdded bool
+		addError        error
+		wantError       bool
+	}{
 
-		"insecure metrics server is added" : {
+		"insecure metrics server is added": {
 			cfg: &configapi.ControllerMetrics{
-				BindAddress: ":8443",
+				BindAddress:   ":8443",
 				SecureServing: ptr.To(false),
 			},
 			wantServerAdded: true,
 		},
 
-		"secure metrics server is added" : {
+		"secure metrics server is added": {
 			cfg: &configapi.ControllerMetrics{
-				BindAddress: ":8443",
+				BindAddress:   ":8443",
 				SecureServing: ptr.To(true),
 			},
-			tlsOpts: &configapi.TLSOptions{},
+			tlsOpts:         &configapi.TLSOptions{},
 			wantServerAdded: true,
 		},
 
-		"metrics server is added when SecureServing is not specified" : {
+		"metrics server is added when SecureServing is not specified": {
 			cfg: &configapi.ControllerMetrics{
 				BindAddress: ":8443",
 			},
 			wantServerAdded: true,
 		},
 
-		"metrics server is disabled when BindAddress is zero" : {
+		"metrics server is disabled when BindAddress is zero": {
 			cfg: &configapi.ControllerMetrics{
 				BindAddress: "0",
 			},
 			wantServerAdded: false,
 		},
 
-		"metrics server is added when authentication is enabled" : {
+		"metrics server is added when authentication is enabled": {
 			cfg: &configapi.ControllerMetrics{
-				BindAddress: ":8443",
+				BindAddress:   ":8443",
 				SecureServing: ptr.To(true),
 				Auth: &configapi.MetricsAuthConfig{
 					Enabled: ptr.To(true),
 				},
 			},
-			tlsOpts: &configapi.TLSOptions{},
+			tlsOpts:         &configapi.TLSOptions{},
 			wantServerAdded: true,
 		},
 
-		"returns error when metrics server addition fails" : {
+		"returns error when metrics server addition fails": {
 			cfg: &configapi.ControllerMetrics{
-				BindAddress: ":8443",
+				BindAddress:   ":8443",
 				SecureServing: ptr.To(false),
 			},
-			addError: errors.New("failed to add metrics server"),
-			wantError: true,
+			addError:        errors.New("failed to add metrics server"),
+			wantError:       true,
 			wantServerAdded: true,
 		},
 	}
@@ -121,7 +121,7 @@ func TestSetupServer(t *testing.T) {
 					Host: "https://127.0.0.1",
 				},
 				httpClient: &http.Client{},
-				addError: testCase.addError,
+				addError:   testCase.addError,
 			}
 			err := SetupServer(fakeManager, testCase.cfg, testCase.tlsOpts)
 
