@@ -43,6 +43,9 @@ const (
 	// LabelTrainJobName identifies which TrainJob a Pod belongs to.
 	LabelTrainJobName string = "trainer.kubeflow.org/trainjob-name"
 
+	// TrainJobNetworkPolicySuffix is the name suffix for the NetworkPolicy that isolates the Pods of a TrainJob.
+	TrainJobNetworkPolicySuffix string = "-network-policy"
+
 	// LabelSupport indicates support status for a runtime, e.g. "deprecated".
 	LabelSupport string = "trainer.kubeflow.org/support"
 

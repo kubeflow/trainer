@@ -32,6 +32,10 @@ const (
 	//
 	// Enables status server allowing TrainJob pods to update their status.
 	TrainJobStatus featuregate.Feature = "TrainJobStatus"
+	
+	// Enables automatic NetworkPolicy creation that isolates the Pods of each
+	// TrainJob, so that only Pods belonging to the same TrainJob can reach them.
+	TrainJobNetworkPolicy featuregate.Feature = "TrainJobNetworkPolicy"
 )
 
 // defaultFeatureGates consists of all known Trainer-specific feature keys.
@@ -42,6 +46,8 @@ const (
 // when adding or removing one entry.
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	TrainJobStatus: {Default: false, PreRelease: featuregate.Alpha},
+
+	TrainJobNetworkPolicy: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 // Enabled is helper for `utilfeature.DefaultFeatureGate.Enabled()`

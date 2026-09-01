@@ -1,0 +1,106 @@
+/*
+Copyright 2026 The Kubeflow Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package networkpolicy
+
+import (
+	"context"
+
+	networkingv1 "k8s.io/api/networking/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	networkingv1ac "k8s.io/client-go/applyconfigurations/networking/v1"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+
+	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/runtime"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
+)
+
+// NetworkPolicy isolates the Pods of a TrainJob by generating a NetworkPolicy that
+// only admits ingress traffic from Pods belonging to the same TrainJob.
+//
+// Egress is deliberately left unrestricted: the dataset and model initializers must
+// reach external storage (e.g. Hugging Face, S3) and every Pod needs cluster DNS, and
+// those endpoints cannot be inferred from the TrainJob alone.
+type NetworkPolicy struct {
+	client client.Client
+}
+
+var _ framework.ComponentBuilderPlugin = (*NetworkPolicy)(nil)
+var _ framework.WatchExtensionPlugin = (*NetworkPolicy)(nil)
+
+const Name = "NetworkPolicy"
+
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;get;list;watch;update;patch
+
+func New(_ context.Context, client client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
+	return &NetworkPolicy{
+		client: client,
+	}, nil
+}
+
+func (n *NetworkPolicy) Name() string {
+	return Name
+}
+
+// Build materializes the NetworkPolicy that isolates the Pods of the given TrainJob.
+// The Pods are selected through constants.LabelTrainJobName, which the runtime stamps
+// on every Pod template it generates.
+func (n *NetworkPolicy) Build(_ context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
+	if info == nil || trainJob == nil {
+		return nil, nil
+	}
+
+	trainJobPods := metav1ac.LabelSelector().
+		WithMatchLabels(map[string]string{constants.LabelTrainJobName: trainJob.Name})
+
+	networkPolicy := networkingv1ac.NetworkPolicy(trainJob.Name+constants.TrainJobNetworkPolicySuffix, trainJob.Namespace).
+		WithSpec(networkingv1ac.NetworkPolicySpec().
+			WithPodSelector(trainJobPods).
+			WithPolicyTypes(networkingv1.PolicyTypeIngress).
+			WithIngress(networkingv1ac.NetworkPolicyIngressRule().
+				WithFrom(networkingv1ac.NetworkPolicyPeer().
+					WithPodSelector(trainJobPods))))
+
+	networkPolicy.WithOwnerReferences(metav1ac.OwnerReference().
+		WithAPIVersion(trainer.GroupVersion.String()).
+		WithKind(trainer.TrainJobKind).
+		WithName(trainJob.Name).
+		WithUID(trainJob.UID).
+		WithController(true).
+		WithBlockOwnerDeletion(true))
+
+	return []apiruntime.ApplyConfiguration{networkPolicy}, nil
+}
+
+func (n *NetworkPolicy) ReconcilerBuilders() []runtime.ReconcilerBuilder {
+	return []runtime.ReconcilerBuilder{
+		func(b *builder.Builder, cl client.Client, cache cache.Cache) *builder.Builder {
+			return b.Watches(
+				&networkingv1.NetworkPolicy{},
+				handler.EnqueueRequestForOwner(
+					n.client.Scheme(), n.client.RESTMapper(), &trainer.TrainJob{}, handler.OnlyControllerOwner(),
+				),
+			)
+		},
+	}
+}
