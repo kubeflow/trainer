@@ -253,10 +253,7 @@ func (r *TrainingRuntime) newRuntimeInfo(
 		)
 	}
 
-	info := runtime.NewInfo(opts...)
-	info.Scheduler.PodLabels[constants.LabelTrainJobName] = trainJob.Name
-
-	return info, nil
+	return runtime.NewInfo(opts...), nil
 }
 
 func (r *TrainingRuntime) mergeRuntimePatches(trainJob *trainer.TrainJob, jobSetTemplateSpec *trainer.JobSetTemplateSpec) error {

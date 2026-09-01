@@ -49,7 +49,6 @@ func torchTuneResWithCPU(gpu string) corev1.ResourceList {
 func wantJobSetWithMergedGPU(ns, name, uid string, requests corev1.ResourceList, gpu string) *jobsetv1alpha2.JobSet {
 	jobSet := testingutil.MakeJobSetWrapper(ns, name).
 		ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), name, uid).
-		PodLabel(constants.LabelTrainJobName, name).
 		Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
 		Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 		Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -130,7 +129,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Suspend(true).
 					Label("conflictLabel", "override").
 					Annotation("conflictAnnotation", "override").
@@ -201,7 +199,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -502,7 +499,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					ServiceAccountName(constants.Node, "override-sa").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -749,7 +745,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -824,7 +819,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -926,7 +920,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -1007,7 +1000,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
@@ -1085,7 +1077,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
@@ -1153,7 +1144,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -1256,7 +1246,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -1357,7 +1346,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -1478,7 +1466,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -1618,7 +1605,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -1760,7 +1746,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -1903,7 +1888,6 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 			wantObjs: []runtime.Object{
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -2023,7 +2007,6 @@ test-job-node-0-1.test-job slots=8
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
 					LauncherReplica().
-					PodLabel(constants.LabelTrainJobName, "test-job").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).

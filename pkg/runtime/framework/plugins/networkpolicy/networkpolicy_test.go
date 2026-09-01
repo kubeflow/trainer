@@ -37,10 +37,12 @@ import (
 
 func TestNetworkPolicy(t *testing.T) {
 	cases := map[string]struct {
-		info           *runtime.Info
-		trainJob       *trainerv1alpha1.TrainJob
-		wantObjs       []apiruntime.Object
-		wantBuildError error
+		info                  *runtime.Info
+		trainJob              *trainerv1alpha1.TrainJob
+		wantInfo              *runtime.Info
+		wantObjs              []apiruntime.Object
+		wantBuildError        error
+		wantPreBuildSyncError error
 	}{
 		"no action when info is nil": {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
@@ -48,10 +50,14 @@ func TestNetworkPolicy(t *testing.T) {
 				Obj(),
 		},
 		"no action when trainJob is nil": {
-			info: &runtime.Info{},
+			info:     &runtime.Info{Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)}},
+			wantInfo: &runtime.Info{Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)}},
 		},
 		"succeeded to build NetworkPolicy isolating the TrainJob Pods": {
-			info: &runtime.Info{},
+			info: &runtime.Info{Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)}},
+			wantInfo: &runtime.Info{Scheduler: &runtime.Scheduler{PodLabels: map[string]string{
+				constants.LabelTrainJobName: "test-job",
+			}}},
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				UID("uid").
 				Obj(),
@@ -90,7 +96,10 @@ func TestNetworkPolicy(t *testing.T) {
 			},
 		},
 		"NetworkPolicy is scoped to the TrainJob namespace and name": {
-			info: &runtime.Info{},
+			info: &runtime.Info{Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)}},
+			wantInfo: &runtime.Info{Scheduler: &runtime.Scheduler{PodLabels: map[string]string{
+				constants.LabelTrainJobName: "alpha",
+			}}},
 			trainJob: utiltesting.MakeTrainJobWrapper("tenant-a", "alpha").
 				UID("alpha-uid").
 				Obj(),
@@ -144,7 +153,16 @@ func TestNetworkPolicy(t *testing.T) {
 				t.Fatalf("Failed to create plugin: %v", err)
 			}
 
-			objs, err := plugin.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
+			err = plugin.(framework.PreComponentBuilderPlugin).PreBuildSync(tc.info, tc.trainJob)
+			if diff := gocmp.Diff(tc.wantPreBuildSyncError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from PreBuildSync (-want, +got): %s", diff)
+			}
+			if diff := gocmp.Diff(tc.wantInfo, tc.info); len(diff) != 0 {
+				t.Errorf("Unexpected info from PreBuildSync (-want, +got): %s", diff)
+			}
+
+			var objs []apiruntime.ApplyConfiguration
+			objs, err = plugin.(framework.ComponentBuilderPlugin).Build(ctx, tc.info, tc.trainJob)
 			if diff := gocmp.Diff(tc.wantBuildError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error from Build (-want, +got): %s", diff)
 			}

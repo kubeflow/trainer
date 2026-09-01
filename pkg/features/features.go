@@ -32,7 +32,7 @@ const (
 	//
 	// Enables status server allowing TrainJob pods to update their status.
 	TrainJobStatus featuregate.Feature = "TrainJobStatus"
-	
+
 	// Enables automatic NetworkPolicy creation that isolates the Pods of each
 	// TrainJob, so that only Pods belonging to the same TrainJob can reach them.
 	TrainJobNetworkPolicy featuregate.Feature = "TrainJobNetworkPolicy"

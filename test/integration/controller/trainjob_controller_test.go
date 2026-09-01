@@ -156,7 +156,6 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Label("testingKey", "testingVal").
 							Annotation("testingKey", "testingVal").
 							PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, trainJobKey.Name).
-							PodLabel(constants.LabelTrainJobName, trainJobKey.Name).
 							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 							Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -274,7 +273,6 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							Label("testingKey", "testingVal").
 							Annotation("testingKey", "testingVal").
 							PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, trainJobKey.Name).
-							PodLabel(constants.LabelTrainJobName, trainJobKey.Name).
 							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 							Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -383,7 +381,6 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					g.Expect(jobSet).Should(gomega.BeComparableTo(
 						testingutil.MakeJobSetWrapper(ns.Name, graceJobKey.Name).
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), graceJobKey.Name, string(graceJob.UID)).
-							PodLabel(constants.LabelTrainJobName, graceJobKey.Name).
 							Suspend(true).
 							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -440,7 +437,6 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					g.Expect(jobSet).Should(gomega.BeComparableTo(
 						testingutil.MakeJobSetWrapper(ns.Name, trainJobKey.Name).
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
-							PodLabel(constants.LabelTrainJobName, trainJobKey.Name).
 							Suspend(false).
 							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -991,7 +987,6 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					g.Expect(jobSet).Should(gomega.BeComparableTo(
 						testingutil.MakeJobSetWrapper(ns.Name, trainJobKey.Name).
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
-							PodLabel(constants.LabelTrainJobName, trainJobKey.Name).
 							Suspend(false).
 							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -1121,7 +1116,6 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
 							Suspend(false).
 							LauncherReplica().
-							PodLabel(constants.LabelTrainJobName, trainJobKey.Name).
 							DependsOn(
 								constants.Launcher,
 								jobsetv1alpha2.DependsOn{
@@ -1715,7 +1709,6 @@ alpha-node-0-1.alpha slots=8
 					g.Expect(jobSet).Should(gomega.BeComparableTo(
 						testingutil.MakeJobSetWrapper(ns.Name, trainJobKey.Name).
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
-							PodLabel(constants.LabelTrainJobName, trainJobKey.Name).
 							Suspend(false).
 							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Launcher).
@@ -2039,7 +2032,6 @@ alpha-node-0-1.alpha slots=8
 					g.Expect(jobSet).Should(gomega.BeComparableTo(
 						testingutil.MakeJobSetWrapper(ns.Name, trainJobKey.Name).
 							ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
-							PodLabel(constants.LabelTrainJobName, trainJobKey.Name).
 							Suspend(false).
 							Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
 							Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
