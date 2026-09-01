@@ -1,22 +1,14 @@
 # Overview
 
-Kubeflow Trainer is a **Kubernetes-native distributed AI platform** for scalable large language model (LLM) fine-tuning and training of AI models across a wide range of frameworks, including PyTorch, MLX, HuggingFace, DeepSpeed, JAX, XGBoost, and more.
+This guide gives an overview for Kubeflow Trainer project.
 
-## What is Kubeflow Trainer?
+## What is Kubeflow Trainer
 
-Kubeflow Trainer brings **MPI to Kubernetes** for multi-node, multi-GPU distributed jobs across HPC clusters. It integrates seamlessly with the Cloud Native AI ecosystem through tools like:
-
-- **[Kueue](https://kueue.sigs.k8s.io/)** for topology-aware scheduling and multi-cluster dispatch
-- **[Slurm Bridge](https://github.com/SlinkyProject/slurm-bridge)** for scheduling on hybrid Kubernetes and Slurm clusters
-- **[JobSet](https://github.com/kubernetes-sigs/jobset)** and **[LeaderWorkerSet](https://github.com/kubernetes-sigs/lws)** for orchestration
-- **[Coscheduling](https://github.com/kubernetes-sigs/scheduler-plugins/blob/master/pkg/coscheduling/README.md)** for gang scheduling with the Kubernetes scheduler
-- **[Volcano](https://volcano.sh/en/)** for batch scheduling
-- **[YuniKorn](https://yunikorn.apache.org/docs/)** for resource optimization
-- **[KAI Scheduler](https://github.com/NVIDIA/KAI-Scheduler)** for GPU-aware gang scheduling
-
-The platform features **distributed data caching** using [Apache Arrow](https://arrow.apache.org/) and [Apache DataFusion](https://datafusion.apache.org/) for zero-copy tensor streaming directly to GPU nodes, maximizing training performance.
-
-![Kubeflow Trainer Tech Stack](../images/trainer-tech-stack.drawio.svg)
+```{include} ../../README.md
+:start-after: <!-- overview-start -->
+:end-before: <!-- overview-end -->
+:relative-docs: docs/
+```
 
 ## Who is This For?
 
@@ -29,6 +21,7 @@ Kubeflow Trainer documentation is organized around three key personas:
 ML engineers and data scientists who use the **Kubeflow Python SDK** and **TrainJob APIs** to train and fine-tune models at scale.
 
 **What you'll find:**
+
 - Training guides for PyTorch, JAX, DeepSpeed, MLX
 - LLM fine-tuning blueprints with TorchTune
 - Local execution backends for development
@@ -38,6 +31,7 @@ ML engineers and data scientists who use the **Kubeflow Python SDK** and **Train
 DevOps engineers and cluster operators who **deploy and manage** Kubeflow Trainer on Kubernetes clusters.
 
 **What you'll find:**
+
 - Installation and configuration guides
 - Runtime and policy management
 - Integration with schedulers (Kueue, Slurm Bridge, Volcano)
@@ -48,6 +42,7 @@ DevOps engineers and cluster operators who **deploy and manage** Kubeflow Traine
 Open source developers who want to **contribute** to the Kubeflow Trainer project.
 
 **What you'll find:**
+
 - Architecture documentation
 - Development workflow
 - Contributing guidelines
@@ -102,8 +97,6 @@ Watch the **KubeCon + CloudNativeCon 2024** introduction to Kubeflow Trainer:
   </iframe>
 </div>
 ```
-
-
 
 ## Next Steps
 

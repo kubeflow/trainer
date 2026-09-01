@@ -33,10 +33,10 @@ represents plugin configuration to enable gang scheduling using that specific in
 specify one of the supported policies in the `PodGroupPolicy` API to enable gang scheduling with
 supported plugins.
 
-The `coscheduling` and `volcano` policies are supported. The other integrations do not use the
-`PodGroupPolicy` API: Kueue admits the TrainJob with its own quota and suspend mechanism, KAI
-Scheduler creates its PodGroup with the `podgrouper` component, and Slurm Bridge schedules the
-PodGroup that the `coscheduling` policy creates.
+The `coscheduling` and `volcano` policies are direct `PodGroupPolicy` sources. Slurm Bridge requires
+the `coscheduling` policy to create a PodGroup for gang scheduling. Kueue and KAI Scheduler use
+different mechanisms: Kueue admits the TrainJob with its own quota and suspend mechanism, and KAI
+Scheduler creates its PodGroup with the `podgrouper` component.
 
 ## Next Steps
 

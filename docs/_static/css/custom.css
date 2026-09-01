@@ -268,13 +268,13 @@ li::marker {
 }
 
 /* Sidebar: always expand the User Guides and Operator Guides sections */
-.sidebar-tree .toctree-l1 > .toctree-checkbox[aria-label$="of User Guides"] ~ ul,
-.sidebar-tree .toctree-l1 > .toctree-checkbox[aria-label$="of Operator Guides"] ~ ul {
+.sidebar-tree .toctree-l1 > .toctree-checkbox[aria-label*="User Guides"] ~ ul,
+.sidebar-tree .toctree-l1 > .toctree-checkbox[aria-label*="Operator Guides"] ~ ul {
     display: block;
 }
 
-.sidebar-tree .toctree-l1 > .toctree-checkbox[aria-label$="of User Guides"] ~ label,
-.sidebar-tree .toctree-l1 > .toctree-checkbox[aria-label$="of Operator Guides"] ~ label {
+.sidebar-tree .toctree-l1 > .toctree-checkbox[aria-label*="User Guides"] ~ label,
+.sidebar-tree .toctree-l1 > .toctree-checkbox[aria-label*="Operator Guides"] ~ label {
     display: none;
 }
 
