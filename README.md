@@ -14,6 +14,9 @@
 
 Latest News 🔥
 
+- [2026/08] Kubeflow Trainer v2.3.0 is officially released with the runtime snapshot mechanism for
+  decoupled runtime lifecycle, enhanced MPI support, and proposal Megatron-LM examples. Check out
+  [the GitHub release notes](https://github.com/kubeflow/trainer/releases/tag/v2.3.0).
 - [2026/03] Kubeflow Trainer v2.2 is officially released with support for JAX and XGBoost
   Training Runtimes, enhanced observability with metrics propagation to TrainJob status,
   and Flux Framework integration for HPC and MPI workloads. Check out
