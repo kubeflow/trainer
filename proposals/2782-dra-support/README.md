@@ -601,7 +601,9 @@ construction, where the controller's `client.Client` and `context.Context` are a
 available. After claims are applied to the merged `JobSetTemplateSpec`, the core runtime
 starts from the **`node` container's `resources.claims`** (not the aggregated pod-level
 `resourceClaims`, which may also carry claims consumed only by sidecars or init containers,
-e.g. a GPU monitoring sidecar) and resolves each referenced `resourceClaims` entry by name:
+e.g. a GPU monitoring sidecar) and resolves only the **first** entry in that list by name
+(supporting multiple claims per node container is future work, if users need it for
+node-local resources):
 
 - For `ResourceClaimTemplateName`: look up the `ResourceClaimTemplate` and inspect
   `spec.spec.devices.requests[]`.
@@ -612,9 +614,11 @@ This mirrors how `GetNumGPUPerNode()` already reads only the `node` container's
 `resources.requests`/`limits`, so a claim wired solely to another container never counts
 toward `numProcPerNode`.
 
-For each device request, the controller checks whether the request `name`
+Within that single claim, the controller checks whether each device request's `name`
 (`spec.devices.requests[].name`) contains "gpu" (same heuristic as `GetNumGPUPerNode`
 matching resource names containing "gpu") and sums the `count` for matching requests.
+If the first claim yields no GPU count (e.g. it is a NIC claim), the count is 0 and the
+user sets `numProcPerNode` explicitly.
 The request name is used rather than `deviceClassName` because it is free text the admin
 fully controls when authoring the template, while DeviceClass names are defined by the
 installed DRA drivers.
