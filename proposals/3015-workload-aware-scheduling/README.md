@@ -713,10 +713,10 @@ type TrainingRuntimeSpec struct {
 // Gang-of-Gangs PodGroup hierarchies linking a parent PodGroup to leaf PodGroups
 // are not created without that gate:
 //   - the TrainJob-level (level 1) model: set schedulingPolicy, schedulingConstraints,
-//     disruptionMode, and/or resourceClaims to configure a single PodGroup covering the whole
+//     and/or disruptionMode to configure a single PodGroup covering the whole
 //     TrainJob, and leave replicatedJobs unset.
 //   - the per-ReplicatedJob (level 2) model: set replicatedJobs and leave schedulingPolicy,
-//     schedulingConstraints, disruptionMode, and resourceClaims unset at the top level.
+//     schedulingConstraints, and disruptionMode unset at the top level.
 //     Every ReplicatedJob in the runtime template must then be targeted by exactly one
 //     replicatedJobs entry, since there is no top-level policy for an untargeted
 //     ReplicatedJob to fall back to.
@@ -737,13 +737,6 @@ type Scheduling struct {
     // disruptionMode defines how the Pods of the entire TrainJob (level 1) can be disrupted.
     // +optional
     DisruptionMode *schedulingv1alpha2.DisruptionMode `json:"disruptionMode,omitempty"`
-
-    // resourceClaims specifies dynamic resource claims shared by every Pod created by the
-    // TrainJob (level 1).
-    // +optional
-    // +listType=atomic
-    // +kubebuilder:validation:MaxItems=4
-    ResourceClaims []schedulingv1alpha2.PodGroupResourceClaim `json:"resourceClaims,omitempty"`
 
     // replicatedJobs specifies per-ReplicatedJob (level 2) scheduling configuration.
     // Without the TrainJobCompositePodGroup feature gate, this field is mutually exclusive with
@@ -784,13 +777,6 @@ type ReplicatedJobScheduling struct {
     // disrupted.
     // +optional
     DisruptionMode *schedulingv1alpha2.DisruptionMode `json:"disruptionMode,omitempty"`
-
-    // resourceClaims specifies dynamic resource claims shared by the Pods created by the
-    // targeted ReplicatedJobs.
-    // +optional
-    // +listType=atomic
-    // +kubebuilder:validation:MaxItems=4
-    ResourceClaims []schedulingv1alpha2.PodGroupResourceClaim `json:"resourceClaims,omitempty"`
 
     // job defines Job-level (level 3) scheduling configuration, where every replica of the
     // targeted ReplicatedJobs forms its own independent gang, so one PodGroup is created per
@@ -864,10 +850,9 @@ The TrainingRuntime and ClusterTrainingRuntime validation enforces that:
 - When `replicatedJobs` is set and no level 1 field is set, every ReplicatedJob in the runtime
   template is targeted by exactly one entry, since there is no level 1 policy for an untargeted
   ReplicatedJob to fall back to.
-- Setting a level 1 `schedulingPolicy`, `schedulingConstraints`, `disruptionMode`, or
-  `resourceClaims` together with `replicatedJobs` is rejected unless the
-  `TrainJobCompositePodGroup` feature gate is enabled, since without a `CompositePodGroup` there is
-  nothing to reconcile the two levels.
+- Setting a level 1 `schedulingPolicy`, `schedulingConstraints`, or `disruptionMode` together with
+  `replicatedJobs` is rejected unless the `TrainJobCompositePodGroup` feature gate is enabled,
+  since without a `CompositePodGroup` there is nothing to reconcile the two levels.
 - Setting `job` on an entry together with that entry's own `schedulingPolicy`,
   `schedulingConstraints`, `disruptionMode`, or `resourceClaims` is rejected unless the
   `TrainJobCompositePodGroup` feature gate is enabled, for the same reason one level down. Without that
@@ -1098,8 +1083,7 @@ In `pkg/runtime/framework/plugins/workload`:
 - `Workload` and `PodGroup` build output, including correct `controllerRef` and
   `ownerReferences` shape (Workload: controller ownerRef to TrainJob; PodGroup: controller
   ownerRef to TrainJob and non-controller ownerRef to Workload).
-- Propagation of `schedulingConstraints`, `disruptionMode`, and `resourceClaims` from each level
-  to the generated templates.
+- Propagation of `schedulingConstraints`, and `disruptionMode` from each level to the generated templates.
 - Naming patterns conform to [Naming Conventions](#naming-conventions) and respect length
   limits, including truncation for long TrainJob and ReplicatedJob names and distinct names per
   replica in level 3.
