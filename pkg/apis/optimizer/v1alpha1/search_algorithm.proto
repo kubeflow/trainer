@@ -1,0 +1,267 @@
+/*
+Copyright The Kubeflow Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+syntax = "proto3";
+
+package trainer.optimizer.v1alpha1;
+
+option go_package = "github.com/kubeflow/trainer/v2/pkg/apis/optimizer/v1alpha1;optimizerv1alpha1";
+
+// SearchAlgorithmService generates hyperparameter suggestions for an
+// OptimizationJob. The OptimizationJob controller is the only client.
+//
+// The service is a pure function of its request. It MUST NOT require any state
+// that survives a process restart: the controller reconstructs the full trial
+// history from child TrainJobs on every reconcile and sends it with each call.
+// A provider MAY cache a study in memory as an optimization, but dropping that
+// cache MUST NOT change the observable result beyond sampler randomness.
+service SearchAlgorithmService {
+  // Validate reports whether this provider can serve the given specification.
+  // The controller calls it once, before creating any TrainJob, so that an
+  // unsupported search space surfaces as a condition on the OptimizationJob
+  // rather than as a failed trial.
+  rpc Validate(ValidateRequest) returns (ValidateResponse);
+
+  // Suggest returns parameter assignments for trials the controller is about
+  // to create. The controller allocates trial names before calling, so the
+  // response can be bound to specific TrainJobs without a second round trip.
+  rpc Suggest(SuggestRequest) returns (SuggestResponse);
+}
+
+// ---------------------------------------------------------------------------
+// Requests and responses
+// ---------------------------------------------------------------------------
+
+message ValidateRequest {
+  // spec is the optimization specification to validate.
+  OptimizationSpec spec = 1;
+}
+
+message ValidateResponse {
+  // issues is empty when the specification is supported. Each entry is a
+  // human-readable reason the provider cannot serve the request, suitable for
+  // surfacing in an OptimizationJob condition message.
+  repeated ValidationIssue issues = 1;
+}
+
+message ValidationIssue {
+  // parameter is the name of the offending parameter, when the issue is
+  // attributable to one. Empty for specification-level issues.
+  optional string parameter = 1;
+
+  // message describes why the specification cannot be served.
+  string message = 2;
+}
+
+message SuggestRequest {
+  // spec is the optimization specification. It is immutable for the lifetime
+  // of an OptimizationJob (enforced by CEL on OptimizationJobSpec), so a
+  // provider MAY key a cached study on it.
+  OptimizationSpec spec = 1;
+
+  // trials is the complete history the controller knows about, reconstructed
+  // from child TrainJobs. It includes trials in every state, not only
+  // succeeded ones: a provider needs failures to avoid re-proposing a region
+  // that cannot be evaluated.
+  //
+  // Size note: this grows with the trial count. OptimizationJobSpec caps
+  // numTrials at 100 today, which keeps a request well inside gRPC's default
+  // 4 MiB receive limit. If that cap is raised, this field is what will exceed
+  // it first, and the request should gain a cursor rather than the limit being
+  // raised.
+  repeated TrialRecord trials = 2;
+
+  // trial_names are the names of the TrainJobs the controller has allocated
+  // and is about to create. The provider MUST return exactly one suggestion
+  // per name, in the same order.
+  //
+  // Allocating names before asking is what makes the call idempotent: a
+  // reconcile that is retried after a crash re-sends the same names, and the
+  // controller can detect that those TrainJobs already exist.
+  repeated string trial_names = 3;
+}
+
+message SuggestResponse {
+  // suggestions has one entry per entry in trial_names, in the same order.
+  repeated Suggestion suggestions = 1;
+}
+
+message Suggestion {
+  // trial_name echoes the requested name this suggestion is for.
+  string trial_name = 1;
+
+  // assignments is the value chosen for every parameter in the search space.
+  repeated ParameterAssignment assignments = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Specification
+// ---------------------------------------------------------------------------
+
+// OptimizationSpec mirrors the parts of OptimizationJobSpec a provider needs.
+// It deliberately omits fields that are the controller's concern, such as
+// numTrials, parallelTrials and the TrainJob template.
+message OptimizationSpec {
+  // objective is the metric being optimized. OptimizationJobSpec permits
+  // exactly one objective today; this is a repeated field so that
+  // multi-objective optimization does not require a breaking change.
+  repeated Objective objectives = 1;
+
+  // parameters is the search space.
+  repeated Parameter parameters = 2;
+
+  // algorithm selects the sampler.
+  SearchAlgorithm algorithm = 3;
+}
+
+message Objective {
+  // metric is the name of the metric reported by the training job.
+  string metric = 1;
+
+  // direction is whether the metric should be minimized or maximized.
+  ObjectiveDirection direction = 2;
+}
+
+enum ObjectiveDirection {
+  OBJECTIVE_DIRECTION_UNSPECIFIED = 0;
+  OBJECTIVE_DIRECTION_MINIMIZE = 1;
+  OBJECTIVE_DIRECTION_MAXIMIZE = 2;
+}
+
+message Parameter {
+  // name is the hyperparameter name.
+  string name = 1;
+
+  // search_space is the domain to sample from.
+  SearchSpace search_space = 2;
+}
+
+// SearchSpace mirrors the discriminated union in the CRD. Using a oneof rather
+// than a type enum plus a shared bounds message means an unsupported
+// combination, such as bounds on a categorical parameter, cannot be expressed
+// on the wire at all.
+message SearchSpace {
+  oneof space {
+    UniformSpace uniform = 1;
+    LogUniformSpace log_uniform = 2;
+    CategoricalSpace categorical = 3;
+  }
+}
+
+message UniformSpace {
+  // min and max are decimal strings, carried verbatim from the CRD, which
+  // encodes them as strings to avoid float parsing differences between the
+  // Go controller and a Python provider. A provider MUST parse them with a
+  // decimal-aware parser and MUST NOT round-trip them through float32.
+  string min = 1;
+  string max = 2;
+
+  // type is the underlying numeric type. An Int parameter is sampled over
+  // integers; a Float parameter over reals.
+  ParameterType type = 3;
+}
+
+message LogUniformSpace {
+  // min and max are decimal strings. min is guaranteed positive by CEL
+  // validation on the CRD.
+  string min = 1;
+  string max = 2;
+
+  // type is the underlying numeric type.
+  ParameterType type = 3;
+}
+
+message CategoricalSpace {
+  // choices is the set of values to sample from.
+  repeated string choices = 1;
+}
+
+enum ParameterType {
+  PARAMETER_TYPE_UNSPECIFIED = 0;
+  PARAMETER_TYPE_INT = 1;
+  PARAMETER_TYPE_FLOAT = 2;
+}
+
+// SearchAlgorithm mirrors the CRD union. A provider that receives an algorithm
+// it does not implement MUST fail Validate rather than silently substituting
+// another sampler.
+message SearchAlgorithm {
+  oneof algorithm {
+    RandomAlgorithm random = 1;
+    GridAlgorithm grid = 2;
+  }
+}
+
+message RandomAlgorithm {
+  // seed makes sampling reproducible. Absent means the provider chooses.
+  optional int64 seed = 1;
+}
+
+message GridAlgorithm {}
+
+// ---------------------------------------------------------------------------
+// Trial history
+// ---------------------------------------------------------------------------
+
+message TrialRecord {
+  // name is the TrainJob name. It is the identity of the trial and is stable
+  // across restarts of both the controller and the provider.
+  string name = 1;
+
+  // assignments is what was suggested for this trial.
+  repeated ParameterAssignment assignments = 2;
+
+  // state is the observed outcome.
+  TrialState state = 3;
+
+  // objective_value is the final value of the objective metric. It is set when
+  // state is SUCCEEDED or EARLY_STOPPED, and unset otherwise. Explicit
+  // presence matters: a metric of 0.0 is a legitimate result and must be
+  // distinguishable from "not reported".
+  optional string objective_value = 4;
+}
+
+enum TrialState {
+  TRIAL_STATE_UNSPECIFIED = 0;
+
+  // The trial is created or running. It has no result yet, but a provider
+  // should account for it so that parallel suggestions do not collapse onto
+  // the same region.
+  TRIAL_STATE_RUNNING = 1;
+
+  // The trial finished and reported the objective metric.
+  TRIAL_STATE_SUCCEEDED = 2;
+
+  // The trial finished without a usable objective value: the TrainJob failed,
+  // was evicted, or never reported the metric. A provider MUST record this as
+  // a failure rather than ignoring it, so the region is not re-proposed and no
+  // in-flight trial is leaked.
+  TRIAL_STATE_FAILED = 3;
+
+  // The trial was stopped before completion by a pruning decision. Reserved
+  // for the pruning work tracked in #3802; providers may treat it as FAILED
+  // until then.
+  TRIAL_STATE_EARLY_STOPPED = 4;
+}
+
+message ParameterAssignment {
+  // name is the hyperparameter name.
+  string name = 1;
+
+  // value is the assigned value, encoded as a string for the same reason the
+  // bounds are.
+  string value = 2;
+}
