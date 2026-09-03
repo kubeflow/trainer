@@ -29,10 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -2107,6 +2109,217 @@ func TestTorchEnforceMLPolicy(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
+		"DRA GPU count sets PET_NPROC_PER_NODE to auto": {
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+			info: withDRAGPUCount(runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			), 8),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						DRAGPUCount:       8,
+						Containers: []runtime.Container{{
+							Name:  constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{ContainerPort: ptr.To[int32](constants.ContainerTrainerPort)}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{Name: ptr.To(constants.TorchEnvNumNodes), Value: ptr.To("1")},
+								{Name: ptr.To(constants.TorchEnvNumProcPerNode), Value: ptr.To("auto")},
+								{Name: ptr.To(constants.TorchEnvNodeRank), ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+									FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{FieldPath: ptr.To(constants.JobCompletionIndexFieldPath)},
+								}},
+								{Name: ptr.To(constants.TorchEnvMasterAddr), Value: ptr.To("test-job-node-0-0.test-job")},
+								{Name: ptr.To(constants.TorchEnvMasterPort), Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort))},
+							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
+		"explicit numProcPerNode wins over the DRA GPU count": {
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumProcPerNode(2).Obj()).
+				Obj(),
+			info: withDRAGPUCount(runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			), 8),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						DRAGPUCount:       8,
+						Containers: []runtime.Container{{
+							Name:  constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{ContainerPort: ptr.To[int32](constants.ContainerTrainerPort)}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{Name: ptr.To(constants.TorchEnvNumNodes), Value: ptr.To("1")},
+								{Name: ptr.To(constants.TorchEnvNumProcPerNode), Value: ptr.To("2")},
+								{Name: ptr.To(constants.TorchEnvNodeRank), ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+									FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{FieldPath: ptr.To(constants.JobCompletionIndexFieldPath)},
+								}},
+								{Name: ptr.To(constants.TorchEnvMasterAddr), Value: ptr.To("test-job-node-0-0.test-job")},
+								{Name: ptr.To(constants.TorchEnvMasterPort), Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort))},
+							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
+		"extended GPU resource wins over the DRA GPU count": {
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+			info: withDRAGPUCount(runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+				runtime.WithTemplateSpecObjApply(nodeContainerJobSetSpec(
+					corev1ac.ResourceRequirements().WithRequests(corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}),
+				)),
+			), 8),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: nodeContainerJobSetSpec(
+						corev1ac.ResourceRequirements().WithRequests(corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}),
+					),
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						DRAGPUCount:       8,
+						Containers: []runtime.Container{{
+							Name:  constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{ContainerPort: ptr.To[int32](constants.ContainerTrainerPort)}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{Name: ptr.To(constants.TorchEnvNumNodes), Value: ptr.To("1")},
+								{Name: ptr.To(constants.TorchEnvNumProcPerNode), Value: ptr.To("auto")},
+								{Name: ptr.To(constants.TorchEnvNodeRank), ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+									FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{FieldPath: ptr.To(constants.JobCompletionIndexFieldPath)},
+								}},
+								{Name: ptr.To(constants.TorchEnvMasterAddr), Value: ptr.To("test-job-node-0-0.test-job")},
+								{Name: ptr.To(constants.TorchEnvMasterPort), Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort))},
+							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
+		"zero DRA GPU count falls back to CPU": {
+			trainJob: utiltesting.MakeTrainJobWrapper("default", "test-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						Container("test:image", nil, nil, corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("4"),
+						}).
+						Obj(),
+				).
+				Obj(),
+			info: withDRAGPUCount(runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							TorchPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			), 0),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](1),
+						SinglePodRequests: make(corev1.ResourceList),
+						Containers: []runtime.Container{{
+							Name:  constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{ContainerPort: ptr.To[int32](constants.ContainerTrainerPort)}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{Name: ptr.To(constants.TorchEnvNumNodes), Value: ptr.To("1")},
+								{Name: ptr.To(constants.TorchEnvNumProcPerNode), Value: ptr.To("4")},
+								{Name: ptr.To(constants.TorchEnvNodeRank), ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+									FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{FieldPath: ptr.To(constants.JobCompletionIndexFieldPath)},
+								}},
+								{Name: ptr.To(constants.TorchEnvMasterAddr), Value: ptr.To("test-job-node-0-0.test-job")},
+								{Name: ptr.To(constants.TorchEnvMasterPort), Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort))},
+							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -2596,6 +2809,112 @@ func TestTorchValidate(t *testing.T) {
 				),
 			},
 		},
+		"warning when node container has DRA claims but no GPU count is resolved": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+					).
+					Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+				runtime.WithTemplateSpecObjApply(nodeContainerJobSetSpec(
+					corev1ac.ResourceRequirements().WithClaims(corev1ac.ResourceClaim().WithName("gpu")),
+				)),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+			wantWarnings: admission.Warnings{draGPUCountUnresolvedWarning},
+		},
+		"no warning when numProcPerNode is set": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+					).
+					Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+				runtime.WithTemplateSpecObjApply(nodeContainerJobSetSpec(
+					corev1ac.ResourceRequirements().WithClaims(corev1ac.ResourceClaim().WithName("gpu")),
+				)),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumProcPerNode(4).Obj()).
+				Obj(),
+		},
+		"no warning when the DRA GPU count is resolved": {
+			info: withDRAGPUCount(runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+					).
+					Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+				runtime.WithTemplateSpecObjApply(nodeContainerJobSetSpec(
+					corev1ac.ResourceRequirements().WithClaims(corev1ac.ResourceClaim().WithName("gpu")),
+				)),
+			), 8),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+		},
+		"no warning when an extended GPU resource is set": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+					).
+					Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+				runtime.WithTemplateSpecObjApply(nodeContainerJobSetSpec(
+					corev1ac.ResourceRequirements().
+						WithRequests(corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")}).
+						WithClaims(corev1ac.ResourceClaim().WithName("gpu")),
+				)),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+		},
+		"no warning on update": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						TorchPolicy().
+						Obj(),
+					).
+					Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+				runtime.WithTemplateSpecObjApply(nodeContainerJobSetSpec(
+					corev1ac.ResourceRequirements().WithClaims(corev1ac.ResourceClaim().WithName("gpu")),
+				)),
+			),
+			oldObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().Obj()).
+				Obj(),
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -2616,4 +2935,32 @@ func TestTorchValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// withDRAGPUCount sets the DRA GPU count on the trainer PodSet, which runtime.WithPodSet cannot do.
+func withDRAGPUCount(info *runtime.Info, count int) *runtime.Info {
+	info.FindPodSetByAncestor(constants.AncestorTrainer).DRAGPUCount = count
+	return info
+}
+
+// nodeContainerJobSetSpec builds a runtime template whose node container carries the given resources.
+func nodeContainerJobSetSpec(res *corev1ac.ResourceRequirementsApplyConfiguration) *jobsetv1alpha2ac.JobSetSpecApplyConfiguration {
+	return jobsetv1alpha2ac.JobSetSpec().
+		WithReplicatedJobs(
+			jobsetv1alpha2ac.ReplicatedJob().
+				WithName(constants.Node).
+				WithTemplate(batchv1ac.JobTemplateSpec().
+					WithSpec(batchv1ac.JobSpec().
+						WithTemplate(corev1ac.PodTemplateSpec().
+							WithSpec(corev1ac.PodSpec().
+								WithContainers(
+									corev1ac.Container().
+										WithName(constants.Node).
+										WithResources(res),
+								),
+							),
+						),
+					),
+				),
+		)
 }

@@ -84,6 +84,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobStatus":                   schema_pkg_apis_trainer_v1alpha1_TrainJobStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainJobTemplateSpec":             schema_pkg_apis_trainer_v1alpha1_TrainJobTemplateSpec(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Trainer":                          schema_pkg_apis_trainer_v1alpha1_Trainer(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerResourceClaim":             schema_pkg_apis_trainer_v1alpha1_TrainerResourceClaim(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerStatus":                    schema_pkg_apis_trainer_v1alpha1_TrainerStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntime":                  schema_pkg_apis_trainer_v1alpha1_TrainingRuntime(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainingRuntimeList":              schema_pkg_apis_trainer_v1alpha1_TrainingRuntimeList(ref),
@@ -649,6 +650,12 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerPatch(ref common.ReferenceCallbac
 							},
 						},
 					},
+					"resources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "resources patches the container's compute resources, including the resources.claims that reference the Pod's resourceClaims. For the node container, trainer.resourcesPerNode takes precedence for requests and limits, and trainer.resourceClaimsPerNode for claims.",
+							Ref:         ref(corev1.ResourceRequirements{}.OpenAPIModelName()),
+						},
+					},
 					"securityContext": {
 						SchemaProps: spec.SchemaProps{
 							Description: "securityContext patches the container's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
@@ -660,7 +667,7 @@ func schema_pkg_apis_trainer_v1alpha1_ContainerPatch(ref common.ReferenceCallbac
 			},
 		},
 		Dependencies: []string{
-			corev1.EnvVar{}.OpenAPIModelName(), corev1.SecurityContext{}.OpenAPIModelName(), corev1.VolumeMount{}.OpenAPIModelName()},
+			corev1.EnvVar{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.SecurityContext{}.OpenAPIModelName(), corev1.VolumeMount{}.OpenAPIModelName()},
 	}
 }
 
@@ -1732,6 +1739,28 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecPatch(ref common.ReferenceCallback)
 							},
 						},
 					},
+					"resourceClaims": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "resourceClaims patches the Pod's resourceClaims. Containers consume a claim by referencing its name in resources.claims.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(corev1.PodResourceClaim{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 					"initContainers": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -1878,7 +1907,7 @@ func schema_pkg_apis_trainer_v1alpha1_PodSpecPatch(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ContainerPatch", corev1.Affinity{}.OpenAPIModelName(), corev1.LocalObjectReference{}.OpenAPIModelName(), corev1.PodSchedulingGate{}.OpenAPIModelName(), corev1.PodSecurityContext{}.OpenAPIModelName(), corev1.Toleration{}.OpenAPIModelName(), corev1.Volume{}.OpenAPIModelName()},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ContainerPatch", corev1.Affinity{}.OpenAPIModelName(), corev1.LocalObjectReference{}.OpenAPIModelName(), corev1.PodResourceClaim{}.OpenAPIModelName(), corev1.PodSchedulingGate{}.OpenAPIModelName(), corev1.PodSecurityContext{}.OpenAPIModelName(), corev1.Toleration{}.OpenAPIModelName(), corev1.Volume{}.OpenAPIModelName()},
 	}
 }
 
@@ -2519,6 +2548,28 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 							Ref:         ref(corev1.ResourceRequirements{}.OpenAPIModelName()),
 						},
 					},
+					"resourceClaimsPerNode": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "resourceClaimsPerNode defines the DRA ResourceClaims for each training node. The controller adds these claims to the trainer node Pod's resourceClaims and wires container-level resources.claims on the node container. To attach a claim to other containers, use the runtimePatches API. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerResourceClaim"),
+									},
+								},
+							},
+						},
+					},
 					"numProcPerNode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "numProcPerNode is the number of processes/workers/slots on every training node. For the MPI runtime only int value can be set to represent number of slots per node. For the Torch runtime the value defaults to `auto` and can be overridden with an int.",
@@ -2530,7 +2581,35 @@ func schema_pkg_apis_trainer_v1alpha1_Trainer(ref common.ReferenceCallback) comm
 			},
 		},
 		Dependencies: []string{
-			corev1.EnvVar{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName()},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.TrainerResourceClaim", corev1.EnvVar{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_TrainerResourceClaim(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TrainerResourceClaim references a ResourceClaimTemplate for every training node Pod.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name uniquely identifies this resource claim inside the Pod and is what the node container's resources.claims entry references.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceClaimTemplateName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "resourceClaimTemplateName is the name of a ResourceClaimTemplate in the TrainJob namespace. A separate ResourceClaim is created from it for every training node Pod.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "resourceClaimTemplateName"},
+			},
+		},
 	}
 }
 
@@ -2818,7 +2897,7 @@ func schema_pkg_apis_trainer_v1alpha1_XGBoostMLPolicySource(ref common.Reference
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "XGBoostMLPolicySource represents an XGBoost runtime configuration. The number of workers per node is automatically derived from container GPU resources:\n  - GPU training: 1 worker per GPU (from resourcesPerNode)\n  - CPU training: 1 worker per node (each worker utilizes all available CPU cores\n    via XGBoost's multi-threaded execution, controlled by the nthread parameter)\n\nDMLC_NUM_WORKER = numNodes × workersPerNode (where workersPerNode = GPU count or 1)",
+				Description: "XGBoostMLPolicySource represents an XGBoost runtime configuration. The number of workers per node is automatically derived from container GPU resources:\n  - GPU training: 1 worker per GPU (from resourcesPerNode or the DRA ResourceClaimTemplate\n    referenced by the node container)\n  - CPU training: 1 worker per node (each worker utilizes all available CPU cores\n    via XGBoost's multi-threaded execution, controlled by the nthread parameter)\n\nDMLC_NUM_WORKER = numNodes × workersPerNode (where workersPerNode = GPU count or 1)",
 				Type:        []string{"object"},
 			},
 		},

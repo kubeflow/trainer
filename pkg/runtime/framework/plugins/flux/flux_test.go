@@ -25,6 +25,7 @@ import (
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -524,6 +525,7 @@ func TestGetOriginalCommand(t *testing.T) {
 func TestOptionalTrainerFields(t *testing.T) {
 	cases := map[string]struct {
 		podSetCount int32
+		draGPUCount int
 		jobTrainer  *trainer.Trainer
 		// wantCommand is only asserted when set.
 		wantCommand []string
@@ -553,6 +555,21 @@ func TestOptionalTrainerFields(t *testing.T) {
 			wantFlags:     "-N 3 -n 6",
 			wantViewImage: "example.com/flux-view:test",
 			wantHostlist:  "test-job-node-0-[0-2]",
+		},
+		"extended GPU resource adds the gpus-per-task flag": {
+			podSetCount: 2,
+			jobTrainer: utiltesting.MakeTrainJobTrainerWrapper().
+				Container("image", nil, nil, corev1.ResourceList{"example.com/gpu": resource.MustParse("2")}).
+				Obj(),
+			wantFlags:    "-N 2 -n 2 -g 2",
+			wantHostlist: "test-job-node-0-[0-1]",
+		},
+		"DRA GPU count adds the same gpus-per-task flag": {
+			podSetCount:  2,
+			draGPUCount:  2,
+			jobTrainer:   utiltesting.MakeTrainJobTrainerWrapper().Obj(),
+			wantFlags:    "-N 2 -n 2 -g 2",
+			wantHostlist: "test-job-node-0-[0-1]",
 		},
 	}
 
@@ -592,10 +609,11 @@ func TestOptionalTrainerFields(t *testing.T) {
 						),
 					PodSets: []runtime.PodSet{
 						{
-							Name:       constants.Node,
-							Ancestor:   ptr.To(constants.AncestorTrainer),
-							Count:      ptr.To(tc.podSetCount),
-							Containers: []runtime.Container{{Name: constants.Node, Command: []string{"python", "train.py"}}},
+							Name:        constants.Node,
+							Ancestor:    ptr.To(constants.AncestorTrainer),
+							Count:       ptr.To(tc.podSetCount),
+							DRAGPUCount: tc.draGPUCount,
+							Containers:  []runtime.Container{{Name: constants.Node, Command: []string{"python", "train.py"}}},
 						},
 					},
 				},

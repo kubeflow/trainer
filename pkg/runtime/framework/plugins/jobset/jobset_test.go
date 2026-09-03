@@ -2186,6 +2186,193 @@ func TestValidate(t *testing.T) {
 				field.InternalError(runtimePatchesPath, fmt.Errorf("client error")),
 			},
 		},
+		"dangling container claim via runtimePatches is rejected": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.Node),
+														Resources: &corev1ac.ResourceRequirementsApplyConfiguration{
+															Claims: []corev1ac.ResourceClaimApplyConfiguration{
+																{Name: ptr.To("gpu")},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				RuntimePatches([]trainer.RuntimePatch{
+					{
+						Manager: "test.io/manager",
+						TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+							Template: &trainer.JobSetTemplatePatch{
+								Spec: &trainer.JobSetSpecPatch{
+									ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+										Name: constants.Node,
+										Template: &trainer.JobTemplatePatch{
+											Spec: &trainer.JobSpecPatch{
+												Template: &trainer.PodTemplatePatch{
+													Spec: &trainer.PodSpecPatch{
+														Containers: []trainer.ContainerPatch{{
+															Name: constants.Node,
+															Resources: &corev1.ResourceRequirements{
+																Claims: []corev1.ResourceClaim{{Name: "gpu"}},
+															},
+														}},
+													},
+												},
+											},
+										},
+									}},
+								},
+							},
+						},
+					},
+				}).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimePatchesPath, "gpu",
+					fmt.Sprintf("container %q in job %q references resourceClaim %q which is not defined in the Pod's resourceClaims", constants.Node, constants.Node, "gpu")),
+			},
+		},
+		"dangling init container claim in the runtime is rejected": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												InitContainers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.ModelInitializer),
+														Resources: &corev1ac.ResourceRequirementsApplyConfiguration{
+															Claims: []corev1ac.ResourceClaimApplyConfiguration{
+																{Name: ptr.To("gpu")},
+															},
+														},
+													},
+												},
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.Node),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimeRefPath, "gpu",
+					fmt.Sprintf("container %q in job %q references resourceClaim %q which is not defined in the Pod's resourceClaims", constants.ModelInitializer, constants.Node, "gpu")),
+			},
+		},
+		"container claim referencing a defined pod resourceClaim is accepted": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												ResourceClaims: []corev1ac.PodResourceClaimApplyConfiguration{
+													{
+														Name:                      ptr.To("gpu"),
+														ResourceClaimTemplateName: ptr.To("tmpl"),
+													},
+												},
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.Node),
+														Resources: &corev1ac.ResourceRequirementsApplyConfiguration{
+															Claims: []corev1ac.ResourceClaimApplyConfiguration{
+																{Name: ptr.To("gpu")},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+		},
+		"one of two container claims is dangling": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+						ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+							{
+								Name: ptr.To(constants.Node),
+								Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+									Spec: &batchv1ac.JobSpecApplyConfiguration{
+										Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+											Spec: &corev1ac.PodSpecApplyConfiguration{
+												ResourceClaims: []corev1ac.PodResourceClaimApplyConfiguration{
+													{
+														Name:                      ptr.To("gpu"),
+														ResourceClaimTemplateName: ptr.To("tmpl"),
+													},
+												},
+												Containers: []corev1ac.ContainerApplyConfiguration{
+													{
+														Name: ptr.To(constants.Node),
+														Resources: &corev1ac.ResourceRequirementsApplyConfiguration{
+															Claims: []corev1ac.ResourceClaimApplyConfiguration{
+																{Name: ptr.To("gpu")},
+																{Name: ptr.To("nic")},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(runtimeRefPath, "nic",
+					fmt.Sprintf("container %q in job %q references resourceClaim %q which is not defined in the Pod's resourceClaims", constants.Node, constants.Node, "nic")),
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

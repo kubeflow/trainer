@@ -37,6 +37,10 @@ type ContainerPatchApplyConfiguration struct {
 	Env []v1.EnvVarApplyConfiguration `json:"env,omitempty"`
 	// volumeMounts are the volumes to mount into the container's filesystem.
 	VolumeMounts []v1.VolumeMountApplyConfiguration `json:"volumeMounts,omitempty"`
+	// resources patches the container's compute resources, including the resources.claims
+	// that reference the Pod's resourceClaims. For the node container, trainer.resourcesPerNode
+	// takes precedence for requests and limits, and trainer.resourceClaimsPerNode for claims.
+	Resources *v1.ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 	// securityContext patches the container's security context.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
@@ -79,6 +83,14 @@ func (b *ContainerPatchApplyConfiguration) WithVolumeMounts(values ...*v1.Volume
 		}
 		b.VolumeMounts = append(b.VolumeMounts, *values[i])
 	}
+	return b
+}
+
+// WithResources sets the Resources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Resources field is set to the value of the last call.
+func (b *ContainerPatchApplyConfiguration) WithResources(value *v1.ResourceRequirementsApplyConfiguration) *ContainerPatchApplyConfiguration {
+	b.Resources = value
 	return b
 }
 

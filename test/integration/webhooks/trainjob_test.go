@@ -741,6 +741,101 @@ var _ = ginkgo.Describe("TrainJob marker validations and defaulting", ginkgo.Ord
 						Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create TrainJob with claims in resourcesPerNode",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "claims-in-resources-per-node").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Trainer(&trainer.Trainer{
+							ResourcesPerNode: &corev1.ResourceRequirements{Claims: []corev1.ResourceClaim{{Name: "gpu"}}},
+						}).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
+			ginkgo.Entry("Should fail to create TrainJob with a container claim that has no Pod-level resourceClaim",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "dangling-container-claim").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "acme.io/manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: constants.Node,
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																Containers: []trainer.ContainerPatch{{
+																	Name: constants.Node,
+																	Resources: &corev1.ResourceRequirements{
+																		Claims: []corev1.ResourceClaim{{Name: "dangling"}},
+																	},
+																}},
+															},
+														},
+													},
+												},
+											}},
+										},
+									},
+								},
+							},
+						}).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
+			ginkgo.Entry("Should succeed to create TrainJob with resourceClaimsPerNode",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "resource-claims-per-node").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						Trainer(
+							testingutil.MakeTrainJobTrainerWrapper().
+								ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "gpu-template"}).
+								Obj()).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should succeed to create TrainJob with a runtimePatches resourceClaim consumed by a container",
+				func() *trainer.TrainJob {
+					return testingutil.MakeTrainJobWrapper(ns.Name, "runtime-patches-resource-claim").
+						RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "testing").
+						RuntimePatches([]trainer.RuntimePatch{
+							{
+								Manager: "acme.io/manager",
+								TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+									Template: &trainer.JobSetTemplatePatch{
+										Spec: &trainer.JobSetSpecPatch{
+											ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+												Name: constants.Node,
+												Template: &trainer.JobTemplatePatch{
+													Spec: &trainer.JobSpecPatch{
+														Template: &trainer.PodTemplatePatch{
+															Spec: &trainer.PodSpecPatch{
+																ResourceClaims: []corev1.PodResourceClaim{{
+																	Name:                      "gpu",
+																	ResourceClaimTemplateName: ptr.To("gpu-template"),
+																}},
+																Containers: []trainer.ContainerPatch{{
+																	Name: constants.Node,
+																	Resources: &corev1.ResourceRequirements{
+																		Claims: []corev1.ResourceClaim{{Name: "gpu"}},
+																	},
+																}},
+															},
+														},
+													},
+												},
+											}},
+										},
+									},
+								},
+							},
+						}).
+						Obj()
+				},
+				gomega.Succeed()),
 		)
 		ginkgo.DescribeTable("Defaulting TrainJob on creation", func(trainJob func() *trainer.TrainJob, wantTrainJob func() *trainer.TrainJob) {
 			created := trainJob()

@@ -35,6 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_env_var import IoK8sApiCoreV1EnvVar
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_resource_requirements import IoK8sApiCoreV1ResourceRequirements
+from kubeflow_trainer_api.models.trainer_v1alpha1_trainer_resource_claim import TrainerV1alpha1TrainerResourceClaim
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -48,8 +49,9 @@ class TrainerV1alpha1Trainer(BaseModel):
     image: Optional[StrictStr] = Field(default=None, description="image is the container image for the training container.")
     num_nodes: Optional[StrictInt] = Field(default=None, description="numNodes is the number of training nodes.", alias="numNodes")
     num_proc_per_node: Optional[StrictInt] = Field(default=None, description="numProcPerNode is the number of processes/workers/slots on every training node. For the MPI runtime only int value can be set to represent number of slots per node. For the Torch runtime the value defaults to `auto` and can be overridden with an int.", alias="numProcPerNode")
+    resource_claims_per_node: Optional[List[TrainerV1alpha1TrainerResourceClaim]] = Field(default=None, description="resourceClaimsPerNode defines the DRA ResourceClaims for each training node. The controller adds these claims to the trainer node Pod's resourceClaims and wires container-level resources.claims on the node container. To attach a claim to other containers, use the runtimePatches API. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/", alias="resourceClaimsPerNode")
     resources_per_node: Optional[IoK8sApiCoreV1ResourceRequirements] = Field(default=None, description="resourcesPerNode defines the compute resources for each training node.", alias="resourcesPerNode")
-    __properties: ClassVar[List[str]] = ["args", "command", "env", "image", "numNodes", "numProcPerNode", "resourcesPerNode"]
+    __properties: ClassVar[List[str]] = ["args", "command", "env", "image", "numNodes", "numProcPerNode", "resourceClaimsPerNode", "resourcesPerNode"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -97,6 +99,13 @@ class TrainerV1alpha1Trainer(BaseModel):
                 if _item_env:
                     _items.append(_item_env.to_dict())
             _dict['env'] = _items
+        # override the default output from pydantic by calling `to_dict()` of each item in resource_claims_per_node (list)
+        _items = []
+        if self.resource_claims_per_node:
+            for _item_resource_claims_per_node in self.resource_claims_per_node:
+                if _item_resource_claims_per_node:
+                    _items.append(_item_resource_claims_per_node.to_dict())
+            _dict['resourceClaimsPerNode'] = _items
         # override the default output from pydantic by calling `to_dict()` of resources_per_node
         if self.resources_per_node:
             _dict['resourcesPerNode'] = self.resources_per_node.to_dict()
@@ -118,6 +127,7 @@ class TrainerV1alpha1Trainer(BaseModel):
             "image": obj.get("image"),
             "numNodes": obj.get("numNodes"),
             "numProcPerNode": obj.get("numProcPerNode"),
+            "resourceClaimsPerNode": [TrainerV1alpha1TrainerResourceClaim.from_dict(_item) for _item in obj["resourceClaimsPerNode"]] if obj.get("resourceClaimsPerNode") is not None else None,
             "resourcesPerNode": IoK8sApiCoreV1ResourceRequirements.from_dict(obj["resourcesPerNode"]) if obj.get("resourcesPerNode") is not None else None
         })
         return _obj

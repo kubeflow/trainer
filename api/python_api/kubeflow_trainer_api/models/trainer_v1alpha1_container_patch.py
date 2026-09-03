@@ -34,6 +34,7 @@ import json
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_env_var import IoK8sApiCoreV1EnvVar
+from kubeflow_trainer_api.models.io_k8s_api_core_v1_resource_requirements import IoK8sApiCoreV1ResourceRequirements
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_security_context import IoK8sApiCoreV1SecurityContext
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_volume_mount import IoK8sApiCoreV1VolumeMount
 from typing import Optional, Set
@@ -45,9 +46,10 @@ class TrainerV1alpha1ContainerPatch(BaseModel):
     """ # noqa: E501
     env: Optional[List[IoK8sApiCoreV1EnvVar]] = Field(default=None, description="env is the list of environment variables to set in the container. These values will be merged with the Runtime's environments. These values can't be set for container with the name: `node`, `dataset-initializer`, or `model-initializer`. For those containers the envs can only be set via Trainer or Initializer APIs.")
     name: StrictStr = Field(description="name for the container. Runtime must have this container.")
+    resources: Optional[IoK8sApiCoreV1ResourceRequirements] = Field(default=None, description="resources patches the container's compute resources, including the resources.claims that reference the Pod's resourceClaims. For the node container, trainer.resourcesPerNode takes precedence for requests and limits, and trainer.resourceClaimsPerNode for claims.")
     security_context: Optional[IoK8sApiCoreV1SecurityContext] = Field(default=None, description="securityContext patches the container's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/", alias="securityContext")
     volume_mounts: Optional[List[IoK8sApiCoreV1VolumeMount]] = Field(default=None, description="volumeMounts are the volumes to mount into the container's filesystem.", alias="volumeMounts")
-    __properties: ClassVar[List[str]] = ["env", "name", "securityContext", "volumeMounts"]
+    __properties: ClassVar[List[str]] = ["env", "name", "resources", "securityContext", "volumeMounts"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -95,6 +97,9 @@ class TrainerV1alpha1ContainerPatch(BaseModel):
                 if _item_env:
                     _items.append(_item_env.to_dict())
             _dict['env'] = _items
+        # override the default output from pydantic by calling `to_dict()` of resources
+        if self.resources:
+            _dict['resources'] = self.resources.to_dict()
         # override the default output from pydantic by calling `to_dict()` of security_context
         if self.security_context:
             _dict['securityContext'] = self.security_context.to_dict()
@@ -119,6 +124,7 @@ class TrainerV1alpha1ContainerPatch(BaseModel):
         _obj = cls.model_validate({
             "env": [IoK8sApiCoreV1EnvVar.from_dict(_item) for _item in obj["env"]] if obj.get("env") is not None else None,
             "name": obj.get("name"),
+            "resources": IoK8sApiCoreV1ResourceRequirements.from_dict(obj["resources"]) if obj.get("resources") is not None else None,
             "securityContext": IoK8sApiCoreV1SecurityContext.from_dict(obj["securityContext"]) if obj.get("securityContext") is not None else None,
             "volumeMounts": [IoK8sApiCoreV1VolumeMount.from_dict(_item) for _item in obj["volumeMounts"]] if obj.get("volumeMounts") is not None else None
         })

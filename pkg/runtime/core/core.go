@@ -29,6 +29,7 @@ import (
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainingruntimes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=clustertrainingruntimes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;get;list;watch;update;patch
+// +kubebuilder:rbac:groups=resource.k8s.io,resources=resourceclaimtemplates;resourceclaims,verbs=get;list;watch
 
 var runtimes map[string]runtime.Runtime
 

@@ -922,6 +922,74 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
 			},
 		},
+		"DRA GPU count sets workers per node": {
+			info: withDRAGPUCount(runtime.NewInfo(
+				runtime.WithMLPolicySource(
+					utiltesting.MakeMLPolicyWrapper().
+						WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+							XGBoostPolicy().
+							Obj(),
+						).
+						Obj(),
+				),
+				runtime.WithPodSet(constants.Node, ptr.To(constants.AncestorTrainer), 1, corev1.PodSpec{}, corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().WithName(constants.Node)),
+				),
+			), 2),
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "dra-job").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						Obj()).
+				Obj(),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						XGBoostPolicy().
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{{
+						Name:              constants.Node,
+						Ancestor:          ptr.To(constants.AncestorTrainer),
+						Count:             ptr.To[int32](2),
+						SinglePodRequests: make(corev1.ResourceList),
+						DRAGPUCount:       2,
+						Containers: []runtime.Container{{
+							Name: constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To(constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.XGBoostEnvTrackerURI),
+									Value: ptr.To(fmt.Sprintf("dra-job-%s-0-0.dra-job", constants.Node)),
+								},
+								{
+									Name:  ptr.To(constants.XGBoostEnvTrackerPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name: ptr.To(constants.XGBoostEnvTaskID),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.XGBoostEnvNumWorker),
+									Value: ptr.To("4"),
+								},
+							},
+						}},
+					}},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -951,4 +1019,10 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 			}
 		})
 	}
+}
+
+// withDRAGPUCount sets the DRA GPU count on the trainer PodSet, which runtime.WithPodSet cannot do.
+func withDRAGPUCount(info *runtime.Info, count int) *runtime.Info {
+	info.FindPodSetByAncestor(constants.AncestorTrainer).DRAGPUCount = count
+	return info
 }

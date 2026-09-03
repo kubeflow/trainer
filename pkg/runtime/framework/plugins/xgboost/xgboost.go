@@ -107,7 +107,7 @@ func (x *XGBoost) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob
 				resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
 			}
 			// Step 3: Derive GPU count from the final resolved resources.
-			if gpuCount := runtime.GetNumGPUPerNode(&resourcesPerNode); gpuCount > 0 {
+			if gpuCount := runtime.GetNumGPUPerNodeWithDRA(info, &resourcesPerNode); gpuCount > 0 {
 				numWorkersPerNode = int32(gpuCount)
 			}
 			totalWorkers := numNodes * numWorkersPerNode

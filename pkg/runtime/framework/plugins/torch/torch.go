@@ -40,6 +40,12 @@ import (
 
 type Torch struct{}
 
+// draGPUCountUnresolvedWarning is emitted on create when the node container has DRA claims
+// but neither an extended GPU resource nor the ResourceClaimTemplate yields a GPU count.
+const draGPUCountUnresolvedWarning = "spec.trainer.numProcPerNode is not set and the GPU count could not be resolved " +
+	"from the DRA ResourceClaimTemplate; torchrun will fall back to the CPU count. " +
+	"Set numProcPerNode explicitly or name the GPU device request with \"gpu\""
+
 var _ framework.EnforceMLPolicyPlugin = (*Torch)(nil)
 var _ framework.CustomValidationPlugin = (*Torch)(nil)
 
@@ -53,8 +59,9 @@ func (t *Torch) Name() string {
 	return Name
 }
 
-func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, oldObj, newObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
+	var warnings admission.Warnings
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Torch == nil {
 		return nil, allErrs
 	}
@@ -83,7 +90,23 @@ func (t *Torch) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newObj
 			allErrs = append(allErrs, torchTuneErrs...)
 		}
 	}
-	return nil, allErrs
+
+	// Warn only on create when the node container has DRA claims but no GPU count can be resolved,
+	// since torchrun would silently fall back to the CPU count.
+	if oldObj == nil {
+		runtimeRes := runtime.ExtractResourcePerNodeFromRuntime(runtimeInfo)
+		resourcesPerNode := ptr.Deref(runtimeRes, corev1.ResourceRequirements{})
+		if jobTrainer := newObj.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
+			resourcesPerNode = *jobTrainer.ResourcesPerNode
+		}
+		numProcPerNodeSet := newObj.Spec.Trainer != nil && newObj.Spec.Trainer.NumProcPerNode != nil
+		if runtimeRes != nil && len(runtimeRes.Claims) > 0 && !numProcPerNodeSet &&
+			runtime.GetNumGPUPerNodeWithDRA(runtimeInfo, &resourcesPerNode) == 0 {
+			warnings = append(warnings, draGPUCountUnresolvedWarning)
+		}
+	}
+
+	return warnings, allErrs
 }
 
 func validateEnvInjectionTargets(info *runtime.Info, fldPath *field.Path) field.ErrorList {
@@ -128,7 +151,7 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
 		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
 	}
-	gpuQ := runtime.GetNumGPUPerNode(&resourcesPerNode)
+	gpuQ := runtime.GetNumGPUPerNodeWithDRA(info, &resourcesPerNode)
 	// If no GPU is set in resource, calculate numProcPerNode based on CPU.
 	if numProcPerNode.String() == "auto" && gpuQ == 0 {
 		numProcPerNode = intstr.FromInt(max(1, getNumCPUPerNode(&resourcesPerNode)))

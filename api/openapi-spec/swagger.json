@@ -13902,6 +13902,14 @@
             "description": "name for the container. Runtime must have this container.",
             "type": "string"
           },
+          "resources": {
+            "description": "resources patches the container's compute resources, including the resources.claims that reference the Pod's resourceClaims. For the node container, trainer.resourcesPerNode takes precedence for requests and limits, and trainer.resourceClaimsPerNode for claims.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements"
+              }
+            ]
+          },
           "securityContext": {
             "description": "securityContext patches the container's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
             "allOf": [
@@ -14747,6 +14755,22 @@
               "default": ""
             }
           },
+          "resourceClaims": {
+            "description": "resourceClaims patches the Pod's resourceClaims. Containers consume a claim by referencing its name in resources.claims.",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.PodResourceClaim"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
           "schedulingGates": {
             "description": "schedulingGates patches the scheduling gates for the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/",
             "type": "array",
@@ -15279,6 +15303,22 @@
             "type": "integer",
             "format": "int32"
           },
+          "resourceClaimsPerNode": {
+            "description": "resourceClaimsPerNode defines the DRA ResourceClaims for each training node. The controller adds these claims to the trainer node Pod's resourceClaims and wires container-level resources.claims on the node container. To attach a claim to other containers, use the runtimePatches API. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/",
+            "type": "array",
+            "items": {
+              "default": {},
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/trainer.v1alpha1.TrainerResourceClaim"
+                }
+              ]
+            },
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
           "resourcesPerNode": {
             "description": "resourcesPerNode defines the compute resources for each training node.",
             "allOf": [
@@ -15286,6 +15326,24 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements"
               }
             ]
+          }
+        }
+      },
+      "trainer.v1alpha1.TrainerResourceClaim": {
+        "description": "TrainerResourceClaim references a ResourceClaimTemplate for every training node Pod.",
+        "type": "object",
+        "required": [
+          "name",
+          "resourceClaimTemplateName"
+        ],
+        "properties": {
+          "name": {
+            "description": "name uniquely identifies this resource claim inside the Pod and is what the node container's resources.claims entry references.",
+            "type": "string"
+          },
+          "resourceClaimTemplateName": {
+            "description": "resourceClaimTemplateName is the name of a ResourceClaimTemplate in the TrainJob namespace. A separate ResourceClaim is created from it for every training node Pod.",
+            "type": "string"
           }
         }
       },
@@ -15492,7 +15550,7 @@
         }
       },
       "trainer.v1alpha1.XGBoostMLPolicySource": {
-        "description": "XGBoostMLPolicySource represents an XGBoost runtime configuration. The number of workers per node is automatically derived from container GPU resources:\n  - GPU training: 1 worker per GPU (from resourcesPerNode)\n  - CPU training: 1 worker per node (each worker utilizes all available CPU cores\n    via XGBoost's multi-threaded execution, controlled by the nthread parameter)\n\nDMLC_NUM_WORKER = numNodes × workersPerNode (where workersPerNode = GPU count or 1)",
+        "description": "XGBoostMLPolicySource represents an XGBoost runtime configuration. The number of workers per node is automatically derived from container GPU resources:\n  - GPU training: 1 worker per GPU (from resourcesPerNode or the DRA ResourceClaimTemplate\n    referenced by the node container)\n  - CPU training: 1 worker per node (each worker utilizes all available CPU cores\n    via XGBoost's multi-threaded execution, controlled by the nthread parameter)\n\nDMLC_NUM_WORKER = numNodes × workersPerNode (where workersPerNode = GPU count or 1)",
         "type": "object"
       }
     }
