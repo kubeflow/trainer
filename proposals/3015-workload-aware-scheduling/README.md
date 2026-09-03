@@ -4,7 +4,7 @@
 
 This document proposes integrating the Kubernetes Workload API into Kubeflow Trainer to enable
 native workload aware scheduling for TrainJobs. The Workload API, introduced in Kubernetes v1.35 (alpha)
-and targeting v1.37 (beta), provides multiple features to enhance AI workload scheduling orchestration
+and promoted to beta in Kubernetes v1.37, provides multiple features to enhance AI workload scheduling orchestration
 including gang-scheduling: [KEP-4671](https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/4671-gang-scheduling),
 topology-aware scheduling: [KEP-5732](https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/5732-topology-aware-workload-scheduling),
 DRA: [KEP-5729](https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/5729-resourceclaim-support-for-workloads),
@@ -93,9 +93,9 @@ The key design principles are:
 1. **Lifecycle via `ownerReferences`.** The TrainJob controller sets `ownerReferences` on the
    `Workload` and `PodGroup` so Kubernetes garbage collection removes them when the TrainJob is
    deleted.
-1. **`numNodes` is immutable while gang is active.** Updates to `numNodes` are rejected by
-   validation when the resulting policy is gang scheduling, because the Workload API does not
-   support changing `minCount` after creation. Future work will define an elastic story.
+1. **`numNodes` is immutable while gang is active.** Although, the PodGroup API supports changes to
+   `minCount`, we need to enable elastic TrainJob capability to make it work. We will track this as
+   a future work.
 
 ### User Stories
 
@@ -682,9 +682,9 @@ graduate upstream:
 
 ```go
 // +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.podGroupPolicy))",message="scheduling and podGroupPolicy are mutually exclusive"
-// +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template.spec.scheduling))",message="JobSet scheduling must not be set, it is owned by the TrainJob controller"
-// +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec.scheduling)))",message="Job scheduling must not be set, it is owned by the TrainJob controller"
-// +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec.template.spec.schedulingGroup)))",message="Pod schedulingGroup must not be set, it is owned by the TrainJob controller"
+// +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template) && has(self.template.spec) && has(self.template.spec.scheduling))",message="JobSet scheduling must not be set, it is owned by the TrainJob controller"
+// +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template) && has(self.template.spec) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec.scheduling)))",message="Job scheduling must not be set, it is owned by the TrainJob controller"
+// +kubebuilder:validation:XValidation:rule="!(has(self.scheduling) && has(self.template) && has(self.template.spec) && self.template.spec.replicatedJobs.exists(r, has(r.template.spec.template.spec.schedulingGroup)))",message="Pod schedulingGroup must not be set, it is owned by the TrainJob controller"
 type TrainingRuntimeSpec struct {
 
     // scheduling defines the Workload-Aware Scheduling configuration for TrainJobs which
