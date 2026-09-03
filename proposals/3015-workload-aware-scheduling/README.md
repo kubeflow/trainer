@@ -96,6 +96,11 @@ The key design principles are:
 1. **`numNodes` is immutable while gang is active.** Although, the PodGroup API supports changes to
    `minCount`, we need to enable elastic TrainJob capability to make it work. We will track this as
    a future work.
+1. **TrainJob hierarchy scheduling.** The API schema is intentionally designed to represent the full
+   CompositePodGroup (CPG) hierarchy (Level 1 root CPG -> Level 2 child CPGs -> Level 3 leaf PGs).
+   The single-level mutual exclusivity in alpha is not an API limitation, but a temporary validation
+   restriction while CPG is in Kubernetes alpha stage. After CPG graduation that validation rule will
+   be dropped to unlock multi-level hierarchies without any API schema changes.
 
 ### User Stories
 
@@ -649,10 +654,8 @@ Level 3 is most useful for runtimes whose ReplicatedJobs set `replicas > 1`. The
 runtimes map `trainJob.spec.trainer.numNodes` to Job `parallelism` with `replicas: 1`, so for them
 level 2 and level 3 produce the same single PodGroup per ReplicatedJob.
 
-In alpha, level 1 and level 2 are **mutually exclusive**, because linking a TrainJob-wide policy
-to per-ReplicatedJob policies requires a `CompositePodGroup`, which is not created in alpha. Level
-3 composes with level 2: a `replicatedJobs` entry either configures one shared PodGroup for its
-targets, or sets `job` to configure one PodGroup per replica.
+In alpha, level 1, level 2, and level 3 scheduling configurations are **mutually exclusive**, because
+it requires a `CompositePodGroup` to orchestrate hierarchy. We will relax this rule in the future iterations.
 
 ### Gang of Gangs Support
 
