@@ -167,7 +167,7 @@ spec:
 When the feature gate is enabled, the TrainJob controller will create the following resources:
 
 ```yaml
-apiVersion: scheduling.k8s.io/v1alpha2
+apiVersion: scheduling.k8s.io/v1beta1
 kind: Workload
 metadata:
   name: my-job-<hash>
@@ -196,7 +196,7 @@ kind: PodGroup
 metadata:
   name: <workload-name>-<hash>
   ownerReferences:
-    - apiVersion: scheduling.k8s.io/v1alpha2
+    - apiVersion: scheduling.k8s.io/v1beta1
       kind: Workload
       name: <workload-name>
     - apiVersion: trainer.kubeflow.org/v1alpha1
@@ -308,7 +308,7 @@ The TrainJob controller will create a single `Workload` with one `PodGroupTempla
 the `launcher` and `node` ReplicatedJobs:
 
 ```yaml
-apiVersion: scheduling.k8s.io/v1alpha2
+apiVersion: scheduling.k8s.io/v1beta1
 kind: Workload
 metadata:
   name: my-job-<hash>
@@ -337,7 +337,7 @@ kind: PodGroup
 metadata:
   name: <workload-name>-launcher-node-<hash>
   ownerReferences:
-    - apiVersion: scheduling.k8s.io/v1alpha2
+    - apiVersion: scheduling.k8s.io/v1beta1
       kind: Workload
       name: <workload-name>
     - apiVersion: trainer.kubeflow.org/v1alpha1
@@ -486,7 +486,7 @@ initializers and one for the trainer. The initializer `PodGroupTemplate` uses a 
 enable lazy-loading:
 
 ```yaml
-apiVersion: scheduling.k8s.io/v1alpha2
+apiVersion: scheduling.k8s.io/v1beta1
 kind: Workload
 metadata:
   name: my-job-<hash>
@@ -518,7 +518,7 @@ kind: PodGroup
 metadata:
   name: <workload-name>-dataset-initializer-model-initializer-<hash>
   ownerReferences:
-    - apiVersion: scheduling.k8s.io/v1alpha2
+    - apiVersion: scheduling.k8s.io/v1beta1
       kind: Workload
       name: <workload-name>
     - apiVersion: trainer.kubeflow.org/v1alpha1
@@ -538,7 +538,7 @@ kind: PodGroup
 metadata:
   name: <workload-name>-node-<hash>
   ownerReferences:
-    - apiVersion: scheduling.k8s.io/v1alpha2
+    - apiVersion: scheduling.k8s.io/v1beta1
       kind: Workload
       name: <workload-name>
     - apiVersion: trainer.kubeflow.org/v1alpha1
@@ -727,16 +727,16 @@ type Scheduling struct {
     // schedulingPolicy is nil and replicatedJobs is not set.
     // +optional
     // +kubebuilder:validation:XValidation:rule="!has(self.gang) || !has(self.gang.minCount)",message="gang.minCount is computed from numNodes and must not be set"
-    SchedulingPolicy *schedulingv1alpha2.PodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty"`
+    SchedulingPolicy *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
     // schedulingConstraints defines TrainJob-level (level 1) topology constraints for every
     // Pod created by the TrainJob.
     // +optional
-    SchedulingConstraints *schedulingv1alpha2.PodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty"`
+    SchedulingConstraints *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty"`
 
     // disruptionMode defines how the Pods of the entire TrainJob (level 1) can be disrupted.
     // +optional
-    DisruptionMode *schedulingv1alpha2.DisruptionMode `json:"disruptionMode,omitempty"`
+    DisruptionMode *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode `json:"disruptionMode,omitempty"`
 
     // replicatedJobs specifies per-ReplicatedJob (level 2) scheduling configuration.
     // Without the TrainJobCompositePodGroup feature gate, this field is mutually exclusive with
@@ -766,17 +766,17 @@ type ReplicatedJobScheduling struct {
     // targeted ReplicatedJobs. Defaults to Gang when not specified.
     // +optional
     // +kubebuilder:validation:XValidation:rule="!has(self.gang) || !has(self.gang.minCount)",message="gang.minCount is computed from numNodes and must not be set"
-    SchedulingPolicy *schedulingv1alpha2.PodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty"`
+    SchedulingPolicy *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
     // schedulingConstraints defines level 2 topology constraints for the Pods created by the
     // targeted ReplicatedJobs.
     // +optional
-    SchedulingConstraints *schedulingv1alpha2.PodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty"`
+    SchedulingConstraints *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty"`
 
     // disruptionMode defines how the Pods created by the targeted ReplicatedJobs can be
     // disrupted.
     // +optional
-    DisruptionMode *schedulingv1alpha2.DisruptionMode `json:"disruptionMode,omitempty"`
+    DisruptionMode *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode `json:"disruptionMode,omitempty"`
 
     // job defines Job-level (level 3) scheduling configuration, where every replica of the
     // targeted ReplicatedJobs forms its own independent gang, so one PodGroup is created per
@@ -796,15 +796,15 @@ type ReplicatedJobScheduling struct {
 type JobScheduling struct {
     // +optional
     // +kubebuilder:validation:XValidation:rule="!has(self.gang) || !has(self.gang.minCount)",message="gang.minCount is computed from numNodes and must not be set"
-    SchedulingPolicy *schedulingv1alpha2.PodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty"`
+    SchedulingPolicy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty"`
     // +optional
-    SchedulingConstraints *schedulingv1alpha2.PodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty"`
+    SchedulingConstraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty"`
     // +optional
-    DisruptionMode *schedulingv1alpha2.DisruptionMode `json:"disruptionMode,omitempty"`
+    DisruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode `json:"disruptionMode,omitempty"`
     // +optional
     // +listType=atomic
     // +kubebuilder:validation:MaxItems=4
-    ResourceClaims []schedulingv1alpha2.PodGroupResourceClaim `json:"resourceClaims,omitempty"`
+    ResourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim `json:"resourceClaims,omitempty"`
 }
 ```
 
