@@ -901,6 +901,10 @@ creating the `PodGroup` or Pods). On the next sync, the controller finds existin
 informers and continues without creating duplicates. It is also what makes runtime mutations safe:
 a TrainJob keeps the scheduling resources it started with.
 
+The TrainJob controller uses the [`workloadbuilder`](https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder)
+library (consumed from Kubernetes component-helpers) to construct `Workload` and `PodGroup` objects.
+This ensures consistency with the Kubernetes scheduling ecosystem and reduces implementation burden.
+
 The workflow is:
 
 1. **Skip if `spec.scheduling` is nil.** No `Workload`, no `PodGroup`, and no
@@ -910,16 +914,19 @@ The workflow is:
    `schedulingGroup.podGroupName`.
 1. **Discover or create `Workload`.** Look up `Workload` objects whose `spec.controllerRef`
    points to this TrainJob.
-   - **None found:** create a `Workload` with `ownerReference` and `spec.controllerRef` pointing
-     to this TrainJob, with one `PodGroupTemplate` per scheduling group resolved from
-     `spec.scheduling` as described in [Controller Integration](#controller-integration) and
+   - **None found:** Use `workloadbuilder.NewBuilder()` to construct a `Workload` object from the
+     resolved scheduling configuration. Set `ownerReference` with `controller: true` and
+     `spec.controllerRef` pointing to this TrainJob. The builder generates one `PodGroupTemplate`
+     per scheduling group as described in [Controller Integration](#controller-integration) and
      [Defaulting](#defaulting).
-   - **Exactly one found:** that is the `Workload` for this TrainJob. Do not modify it.
+   - **Exactly one found:** Use `workloadbuilder.NewBuilderFromExistingWorkload()` to load the
+     existing `Workload` and continue. Do not modify it.
 1. **Discover or create `PodGroups`.** For each `PodGroupTemplate` in the `Workload`, look up
    `PodGroup` objects whose `spec.podGroupTemplateRef.workloadName` and `podGroupTemplateName`
    match.
-   - **None found:** create a `PodGroup` with two `ownerReferences` (TrainJob with
-     `controller: true`, and `Workload`).
+   - **None found:** Use `workloadbuilder.Builder.NewPodGroup()` (or `.NewCompositePodGroup()`
+     when the `TrainJobCompositePodGroup` feature gate is enabled) to materialize a `PodGroup`
+     from the template. Set two `ownerReferences` (TrainJob with `controller: true`, and `Workload`).
    - **Exactly one found:** that is the `PodGroup` for this template. Do not modify it.
 1. **Create downstream resources.** Run the existing pod management logic (JobSet → Jobs →
    Pods). Each Pod template gets `spec.schedulingGroup.podGroupName` set to the `PodGroup` of the
@@ -1173,9 +1180,6 @@ alpha in v1.37.
   shared runtime.
 - **Additional Workload-API features**: incrementally adopt further topology-aware scheduling and
   DRA capabilities as those upstream KEPs progress.
-- **Integrate with workloadBuilder Library**: refactor the integration to use the
-  `workloadbuilder` library once [KEP-6089](https://github.com/kubernetes/enhancements/pull/6092)
-  is complete, as the JobSet integration does.
 - **Elastic TrainJob support**: define semantics for changing `numNodes` on a gang-scheduled
   TrainJob (either by patching the generated `minCount` in place, or by deleting and recreating the
   `Workload`/`PodGroup`), removing the current immutability restriction and the rejection of an
