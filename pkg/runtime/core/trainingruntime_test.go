@@ -2106,6 +2106,22 @@ test-job-node-0-1.test-job slots=8
 							Name:  constants.OpenMPIEnvKeyRSHArgs,
 							Value: constants.OpenMPIEnvDefaultValueRSHArgs,
 						},
+						corev1.EnvVar{
+							Name:  constants.PRTEEnvHostFileLocation,
+							Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),
+						},
+						corev1.EnvVar{
+							Name:  constants.PRTEEnvKeepFQDNHostNames,
+							Value: "false",
+						},
+						corev1.EnvVar{
+							Name:  constants.PRTEEnvDefaultSlots,
+							Value: "8",
+						},
+						corev1.EnvVar{
+							Name:  constants.PRTEEnvKeySSHArgs,
+							Value: constants.OpenMPIEnvDefaultValueRSHArgs,
+						},
 					).
 					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Obj(),
