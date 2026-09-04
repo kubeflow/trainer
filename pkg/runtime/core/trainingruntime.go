@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"time"
 
@@ -391,38 +392,51 @@ func applyTrainerResourceClaimsPerNode(podSpec *corev1ac.PodSpecApplyConfigurati
 				WithName(claim.Name).
 				WithResourceClaimTemplateName(claim.ResourceClaimTemplateName))
 		}
+	}
 
-		// Wire the claim into the node container's resources.claims.
-		for k := range podSpec.Containers {
-			if ptr.Deref(podSpec.Containers[k].Name, "") != constants.Node {
+	// Wire the claims into the node container's resources.claims, keeping them at the front of
+	// the list in the order they were declared. resolveDRAGPUCount reads the first entry, so a
+	// claim already wired by the runtime must not shadow the TrainJob's own claims.
+	for k := range podSpec.Containers {
+		if ptr.Deref(podSpec.Containers[k].Name, "") != constants.Node {
+			continue
+		}
+		if podSpec.Containers[k].Resources == nil {
+			podSpec.Containers[k].Resources = &corev1ac.ResourceRequirementsApplyConfiguration{}
+		}
+		existing := podSpec.Containers[k].Resources.Claims
+		isTrainerClaim := func(c corev1ac.ResourceClaimApplyConfiguration) bool {
+			return slices.ContainsFunc(claims, func(claim trainer.TrainerResourceClaim) bool {
+				return claim.Name == ptr.Deref(c.Name, "")
+			})
+		}
+		merged := make([]corev1ac.ResourceClaimApplyConfiguration, 0, len(existing)+len(claims))
+		for _, claim := range claims {
+			// Reuse the existing entry so a container-level request, which restricts the
+			// container to a subset of the claim's devices, survives.
+			if idx := slices.IndexFunc(existing, func(c corev1ac.ResourceClaimApplyConfiguration) bool {
+				return ptr.Deref(c.Name, "") == claim.Name
+			}); idx != -1 {
+				merged = append(merged, existing[idx])
 				continue
 			}
-			if podSpec.Containers[k].Resources == nil {
-				podSpec.Containers[k].Resources = &corev1ac.ResourceRequirementsApplyConfiguration{}
-			}
-			claimRef := corev1ac.ResourceClaim().WithName(claim.Name)
-			claimFound := false
-			for m := range podSpec.Containers[k].Resources.Claims {
-				if podSpec.Containers[k].Resources.Claims[m].Name != nil &&
-					*podSpec.Containers[k].Resources.Claims[m].Name == claim.Name {
-					podSpec.Containers[k].Resources.Claims[m] = *claimRef
-					claimFound = true
-					break
-				}
-			}
-			if !claimFound {
-				podSpec.Containers[k].Resources.Claims = append(
-					podSpec.Containers[k].Resources.Claims, *claimRef)
-			}
-			break
+			merged = append(merged, *corev1ac.ResourceClaim().WithName(claim.Name))
 		}
+		for _, c := range existing {
+			if !isTrainerClaim(c) {
+				merged = append(merged, c)
+			}
+		}
+		podSpec.Containers[k].Resources.Claims = merged
+		break
 	}
 }
 
 // draLookupTimeout bounds how long a single lookup waits for the ResourceClaimTemplate or
 // ResourceClaim to be fetched, so a missing RBAC rule or unreachable API server degrades to
-// an unknown GPU count instead of blocking the reconciler.
-const draLookupTimeout = 10 * time.Second
+// an unknown GPU count instead of blocking the reconciler. newRuntimeInfo also runs from
+// ValidateObjects, so this has to stay well inside the webhook timeout.
+const draLookupTimeout = 2 * time.Second
 
 // resolveDRAGPUCount reads the first resources.claims entry of the node container, resolves the
 // referenced pod-level resourceClaim to its ResourceClaimTemplate or ResourceClaim, and returns
@@ -456,7 +470,7 @@ func (r *TrainingRuntime) resolveDRAGPUCount(ctx context.Context, namespace stri
 			var rct resourcev1.ResourceClaimTemplate
 			if err := r.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: *pc.ResourceClaimTemplateName}, &rct); err != nil {
 				log := ctrl.LoggerFrom(ctx)
-				log.V(0).Info("Failed to resolve ResourceClaimTemplate for DRA GPU detection", "name", *pc.ResourceClaimTemplateName, "error", err)
+				log.V(2).Info("Failed to resolve ResourceClaimTemplate for DRA GPU detection", "name", *pc.ResourceClaimTemplateName, "error", err)
 				return 0
 			}
 			return runtime.NumGPUFromDeviceRequests(rct.Spec.Spec.Devices.Requests)
@@ -465,7 +479,7 @@ func (r *TrainingRuntime) resolveDRAGPUCount(ctx context.Context, namespace stri
 			var rc resourcev1.ResourceClaim
 			if err := r.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: *pc.ResourceClaimName}, &rc); err != nil {
 				log := ctrl.LoggerFrom(ctx)
-				log.V(0).Info("Failed to resolve ResourceClaim for DRA GPU detection", "name", *pc.ResourceClaimName, "error", err)
+				log.V(2).Info("Failed to resolve ResourceClaim for DRA GPU detection", "name", *pc.ResourceClaimName, "error", err)
 				return 0
 			}
 			return runtime.NumGPUFromDeviceRequests(rc.Spec.Devices.Requests)

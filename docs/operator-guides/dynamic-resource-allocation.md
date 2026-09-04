@@ -17,7 +17,7 @@ to understand the basics of Kubeflow Trainer.
 ## Prerequisites
 
 - Kubeflow Trainer v2.4.0 or later installed on your cluster.
-- Kubernetes v1.36 or later, where the `Exactly` device request API shape
+- Kubernetes v1.34 or later, where DRA is GA and the `Exactly` device request API shape
   (`resource.k8s.io/v1`) used by Trainer is available.
 - A DRA driver installed for your hardware (for example, the NVIDIA DRA driver for GPUs).
 - The `DynamicResourceAllocation` alpha feature gate enabled on the Trainer controller. To enable
