@@ -25,13 +25,13 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// ClusterTrainingRuntimes returns a ClusterTrainingRuntimeInformer.
-	ClusterTrainingRuntimes() ClusterTrainingRuntimeInformer
+	ClusterTrainingRuntimes() TypedClusterTrainingRuntimeInformer
 	// OptimizationJobs returns a OptimizationJobInformer.
-	OptimizationJobs() OptimizationJobInformer
+	OptimizationJobs() TypedOptimizationJobInformer
 	// TrainJobs returns a TrainJobInformer.
-	TrainJobs() TrainJobInformer
+	TrainJobs() TypedTrainJobInformer
 	// TrainingRuntimes returns a TrainingRuntimeInformer.
-	TrainingRuntimes() TrainingRuntimeInformer
+	TrainingRuntimes() TypedTrainingRuntimeInformer
 }
 
 type version struct {
@@ -45,22 +45,22 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// ClusterTrainingRuntimes returns a ClusterTrainingRuntimeInformer.
-func (v *version) ClusterTrainingRuntimes() ClusterTrainingRuntimeInformer {
+// ClusterTrainingRuntimes returns a TypedClusterTrainingRuntimeInformer.
+func (v *version) ClusterTrainingRuntimes() TypedClusterTrainingRuntimeInformer {
 	return &clusterTrainingRuntimeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// OptimizationJobs returns a OptimizationJobInformer.
-func (v *version) OptimizationJobs() OptimizationJobInformer {
+// OptimizationJobs returns a TypedOptimizationJobInformer.
+func (v *version) OptimizationJobs() TypedOptimizationJobInformer {
 	return &optimizationJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// TrainJobs returns a TrainJobInformer.
-func (v *version) TrainJobs() TrainJobInformer {
+// TrainJobs returns a TypedTrainJobInformer.
+func (v *version) TrainJobs() TypedTrainJobInformer {
 	return &trainJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// TrainingRuntimes returns a TrainingRuntimeInformer.
-func (v *version) TrainingRuntimes() TrainingRuntimeInformer {
+// TrainingRuntimes returns a TypedTrainingRuntimeInformer.
+func (v *version) TrainingRuntimes() TypedTrainingRuntimeInformer {
 	return &trainingRuntimeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

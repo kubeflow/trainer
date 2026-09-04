@@ -41,7 +41,7 @@ class IoK8sApiAutoscalingV2MetricValueStatus(BaseModel):
     """
     MetricValueStatus holds the current value for a metric
     """ # noqa: E501
-    average_utilization: Optional[StrictInt] = Field(default=None, description="currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.", alias="averageUtilization")
+    average_utilization: Optional[StrictInt] = Field(default=None, description="averageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.", alias="averageUtilization")
     average_value: Optional[IoK8sApimachineryPkgApiResourceQuantity] = Field(default=None, description="averageValue is the current value of the average of the metric across all relevant pods (as a quantity)", alias="averageValue")
     value: Optional[IoK8sApimachineryPkgApiResourceQuantity] = Field(default=None, description="value is the current value of the metric (as a quantity).")
     __properties: ClassVar[List[str]] = ["averageUtilization", "averageValue", "value"]

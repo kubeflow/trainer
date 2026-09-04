@@ -33,7 +33,8 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_api_resource_quantity import IoK8sApimachineryPkgApiResourceQuantity
+from kubeflow_trainer_api.models.io_k8s_api_core_v1_node_allocatable_mapped_resources import IoK8sApiCoreV1NodeAllocatableMappedResources
+from kubeflow_trainer_api.models.io_k8s_api_core_v1_node_allocatable_overhead_resources import IoK8sApiCoreV1NodeAllocatableOverheadResources
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -42,9 +43,10 @@ class IoK8sApiCoreV1NodeAllocatableResourceClaimStatus(BaseModel):
     NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
     """ # noqa: E501
     containers: Optional[List[StrictStr]] = Field(default=None, description="Containers lists the names of all containers in this pod that reference the claim.")
+    mapping: Optional[List[IoK8sApiCoreV1NodeAllocatableMappedResources]] = Field(default=None, description="Mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field. This is used by kubelet for pod level and container-level cgroup enforcement.")
+    overhead: Optional[List[IoK8sApiCoreV1NodeAllocatableOverheadResources]] = Field(default=None, description="Overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field. This is used by kubelet for pod level and container-level cgroup enforcement.")
     resource_claim_name: StrictStr = Field(description="ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.", alias="resourceClaimName")
-    resources: Dict[str, IoK8sApimachineryPkgApiResourceQuantity] = Field(description="Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.")
-    __properties: ClassVar[List[str]] = ["containers", "resourceClaimName", "resources"]
+    __properties: ClassVar[List[str]] = ["containers", "mapping", "overhead", "resourceClaimName"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -85,13 +87,20 @@ class IoK8sApiCoreV1NodeAllocatableResourceClaimStatus(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each value in resources (dict)
-        _field_dict = {}
-        if self.resources:
-            for _key_resources in self.resources:
-                if self.resources[_key_resources]:
-                    _field_dict[_key_resources] = self.resources[_key_resources].to_dict()
-            _dict['resources'] = _field_dict
+        # override the default output from pydantic by calling `to_dict()` of each item in mapping (list)
+        _items = []
+        if self.mapping:
+            for _item_mapping in self.mapping:
+                if _item_mapping:
+                    _items.append(_item_mapping.to_dict())
+            _dict['mapping'] = _items
+        # override the default output from pydantic by calling `to_dict()` of each item in overhead (list)
+        _items = []
+        if self.overhead:
+            for _item_overhead in self.overhead:
+                if _item_overhead:
+                    _items.append(_item_overhead.to_dict())
+            _dict['overhead'] = _items
         return _dict
 
     @classmethod
@@ -105,13 +114,9 @@ class IoK8sApiCoreV1NodeAllocatableResourceClaimStatus(BaseModel):
 
         _obj = cls.model_validate({
             "containers": obj.get("containers"),
-            "resourceClaimName": obj.get("resourceClaimName") if obj.get("resourceClaimName") is not None else '',
-            "resources": dict(
-                (_k, IoK8sApimachineryPkgApiResourceQuantity.from_dict(_v))
-                for _k, _v in obj["resources"].items()
-            )
-            if obj.get("resources") is not None
-            else None
+            "mapping": [IoK8sApiCoreV1NodeAllocatableMappedResources.from_dict(_item) for _item in obj["mapping"]] if obj.get("mapping") is not None else None,
+            "overhead": [IoK8sApiCoreV1NodeAllocatableOverheadResources.from_dict(_item) for _item in obj["overhead"]] if obj.get("overhead") is not None else None,
+            "resourceClaimName": obj.get("resourceClaimName") if obj.get("resourceClaimName") is not None else ''
         })
         return _obj
 

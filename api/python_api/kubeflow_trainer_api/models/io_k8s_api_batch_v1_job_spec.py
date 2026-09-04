@@ -33,6 +33,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, field_validator
 from typing import Any, ClassVar, Dict, List, Optional
+from kubeflow_trainer_api.models.io_k8s_api_batch_v1_job_scheduling_configuration import IoK8sApiBatchV1JobSchedulingConfiguration
 from kubeflow_trainer_api.models.io_k8s_api_batch_v1_pod_failure_policy import IoK8sApiBatchV1PodFailurePolicy
 from kubeflow_trainer_api.models.io_k8s_api_batch_v1_success_policy import IoK8sApiBatchV1SuccessPolicy
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_template_spec import IoK8sApiCoreV1PodTemplateSpec
@@ -55,12 +56,13 @@ class IoK8sApiBatchV1JobSpec(BaseModel):
     parallelism: Optional[StrictInt] = Field(default=None, description="Specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/")
     pod_failure_policy: Optional[IoK8sApiBatchV1PodFailurePolicy] = Field(default=None, description="Specifies the policy of handling failed pods. In particular, it allows to specify the set of actions and conditions which need to be satisfied to take the associated action. If empty, the default behaviour applies - the counter of failed pods, represented by the jobs's .status.failed field, is incremented and it is checked against the backoffLimit. This field cannot be used in combination with restartPolicy=OnFailure.", alias="podFailurePolicy")
     pod_replacement_policy: Optional[StrictStr] = Field(default=None, description="podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods   when they are terminating (has a metadata.deletionTimestamp) or failed. - Failed means to wait until a previously created Pod is fully terminated (has phase   Failed or Succeeded) before creating a replacement Pod.  When using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.  Possible enum values:  - `\"Failed\"` means to wait until a previously created Pod is fully terminated (has phase Failed or Succeeded) before creating a replacement Pod.  - `\"TerminatingOrFailed\"` means that we recreate pods when they are terminating (has a metadata.deletionTimestamp) or failed.", alias="podReplacementPolicy")
+    scheduling: Optional[IoK8sApiBatchV1JobSchedulingConfiguration] = Field(default=None, description="scheduling defines the Workload-aware Scheduling configuration for this Job. When set, it specifies the scheduling policy (basic or gang), topology constraints, disruption mode, and shared resource claims. When omitted, the Job defaults to the basic scheduling policy, which behaves as standard pod-by-pod scheduling. This field is alpha-level and requires the WorkloadWithJob feature gate. This field is immutable, including whether it is set at all, only policy.gang.minCount may be changed after creation.")
     selector: Optional[IoK8sApimachineryPkgApisMetaV1LabelSelector] = Field(default=None, description="A label query over pods that should match the pod count. Normally, the system sets this field for you. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors")
     success_policy: Optional[IoK8sApiBatchV1SuccessPolicy] = Field(default=None, description="successPolicy specifies the policy when the Job can be declared as succeeded. If empty, the default behavior applies - the Job is declared as succeeded only when the number of succeeded pods equals to the completions. When the field is specified, it must be immutable and works only for the Indexed Jobs. Once the Job meets the SuccessPolicy, the lingering pods are terminated.", alias="successPolicy")
     suspend: Optional[StrictBool] = Field(default=None, description="suspend specifies whether the Job controller should create Pods or not. If a Job is created with suspend set to true, no Pods are created by the Job controller. If a Job is suspended after creation (i.e. the flag goes from false to true), the Job controller will delete all active Pods associated with this Job. Users must design their workload to gracefully handle this. Suspending a Job will reset the StartTime field of the Job, effectively resetting the ActiveDeadlineSeconds timer too. Defaults to false.")
     template: IoK8sApiCoreV1PodTemplateSpec = Field(description="Describes the pod that will be created when executing a job. The only allowed template.spec.restartPolicy values are \"Never\" or \"OnFailure\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/")
     ttl_seconds_after_finished: Optional[StrictInt] = Field(default=None, description="ttlSecondsAfterFinished limits the lifetime of a Job that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the Job finishes, it is eligible to be automatically deleted. When the Job is being deleted, its lifecycle guarantees (e.g. finalizers) will be honored. If this field is unset, the Job won't be automatically deleted. If this field is set to zero, the Job becomes eligible to be deleted immediately after it finishes.", alias="ttlSecondsAfterFinished")
-    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "backoffLimit", "backoffLimitPerIndex", "completionMode", "completions", "managedBy", "manualSelector", "maxFailedIndexes", "parallelism", "podFailurePolicy", "podReplacementPolicy", "selector", "successPolicy", "suspend", "template", "ttlSecondsAfterFinished"]
+    __properties: ClassVar[List[str]] = ["activeDeadlineSeconds", "backoffLimit", "backoffLimitPerIndex", "completionMode", "completions", "managedBy", "manualSelector", "maxFailedIndexes", "parallelism", "podFailurePolicy", "podReplacementPolicy", "scheduling", "selector", "successPolicy", "suspend", "template", "ttlSecondsAfterFinished"]
 
     @field_validator('completion_mode')
     def completion_mode_validate_enum(cls, value):
@@ -124,6 +126,9 @@ class IoK8sApiBatchV1JobSpec(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of pod_failure_policy
         if self.pod_failure_policy:
             _dict['podFailurePolicy'] = self.pod_failure_policy.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of scheduling
+        if self.scheduling:
+            _dict['scheduling'] = self.scheduling.to_dict()
         # override the default output from pydantic by calling `to_dict()` of selector
         if self.selector:
             _dict['selector'] = self.selector.to_dict()
@@ -156,6 +161,7 @@ class IoK8sApiBatchV1JobSpec(BaseModel):
             "parallelism": obj.get("parallelism"),
             "podFailurePolicy": IoK8sApiBatchV1PodFailurePolicy.from_dict(obj["podFailurePolicy"]) if obj.get("podFailurePolicy") is not None else None,
             "podReplacementPolicy": obj.get("podReplacementPolicy"),
+            "scheduling": IoK8sApiBatchV1JobSchedulingConfiguration.from_dict(obj["scheduling"]) if obj.get("scheduling") is not None else None,
             "selector": IoK8sApimachineryPkgApisMetaV1LabelSelector.from_dict(obj["selector"]) if obj.get("selector") is not None else None,
             "successPolicy": IoK8sApiBatchV1SuccessPolicy.from_dict(obj["successPolicy"]) if obj.get("successPolicy") is not None else None,
             "suspend": obj.get("suspend"),

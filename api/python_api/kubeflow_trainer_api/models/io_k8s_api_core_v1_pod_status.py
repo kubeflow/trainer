@@ -41,6 +41,7 @@ from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_condition import IoK8sAp
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_extended_resource_claim_status import IoK8sApiCoreV1PodExtendedResourceClaimStatus
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_ip import IoK8sApiCoreV1PodIP
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_resource_claim_status import IoK8sApiCoreV1PodResourceClaimStatus
+from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_volume_health import IoK8sApiCoreV1PodVolumeHealth
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_resource_requirements import IoK8sApiCoreV1ResourceRequirements
 from kubeflow_trainer_api.models.io_k8s_apimachinery_pkg_api_resource_quantity import IoK8sApimachineryPkgApiResourceQuantity
 from typing import Optional, Set
@@ -71,7 +72,8 @@ class IoK8sApiCoreV1PodStatus(BaseModel):
     resource_claim_statuses: Optional[List[IoK8sApiCoreV1PodResourceClaimStatus]] = Field(default=None, description="Status of resource claims.", alias="resourceClaimStatuses")
     resources: Optional[IoK8sApiCoreV1ResourceRequirements] = Field(default=None, description="Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources")
     start_time: Optional[datetime] = Field(default=None, description="RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.", alias="startTime")
-    __properties: ClassVar[List[str]] = ["allocatedResources", "conditions", "containerStatuses", "ephemeralContainerStatuses", "extendedResourceClaimStatus", "hostIP", "hostIPs", "initContainerStatuses", "message", "nodeAllocatableResourceClaimStatuses", "nominatedNodeName", "observedGeneration", "phase", "podIP", "podIPs", "qosClass", "reason", "resize", "resourceClaimStatuses", "resources", "startTime"]
+    volume_health: Optional[List[IoK8sApiCoreV1PodVolumeHealth]] = Field(default=None, description="volumeHealth contains node-reported health for each volume the pod is using. Populated by the kubelet on the pod's node.", alias="volumeHealth")
+    __properties: ClassVar[List[str]] = ["allocatedResources", "conditions", "containerStatuses", "ephemeralContainerStatuses", "extendedResourceClaimStatus", "hostIP", "hostIPs", "initContainerStatuses", "message", "nodeAllocatableResourceClaimStatuses", "nominatedNodeName", "observedGeneration", "phase", "podIP", "podIPs", "qosClass", "reason", "resize", "resourceClaimStatuses", "resources", "startTime", "volumeHealth"]
 
     @field_validator('phase')
     def phase_validate_enum(cls, value):
@@ -201,6 +203,13 @@ class IoK8sApiCoreV1PodStatus(BaseModel):
         # override the default output from pydantic by calling `to_dict()` of resources
         if self.resources:
             _dict['resources'] = self.resources.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of each item in volume_health (list)
+        _items = []
+        if self.volume_health:
+            for _item_volume_health in self.volume_health:
+                if _item_volume_health:
+                    _items.append(_item_volume_health.to_dict())
+            _dict['volumeHealth'] = _items
         return _dict
 
     @classmethod
@@ -238,7 +247,8 @@ class IoK8sApiCoreV1PodStatus(BaseModel):
             "resize": obj.get("resize"),
             "resourceClaimStatuses": [IoK8sApiCoreV1PodResourceClaimStatus.from_dict(_item) for _item in obj["resourceClaimStatuses"]] if obj.get("resourceClaimStatuses") is not None else None,
             "resources": IoK8sApiCoreV1ResourceRequirements.from_dict(obj["resources"]) if obj.get("resources") is not None else None,
-            "startTime": obj.get("startTime")
+            "startTime": obj.get("startTime"),
+            "volumeHealth": [IoK8sApiCoreV1PodVolumeHealth.from_dict(_item) for _item in obj["volumeHealth"]] if obj.get("volumeHealth") is not None else None
         })
         return _obj
 

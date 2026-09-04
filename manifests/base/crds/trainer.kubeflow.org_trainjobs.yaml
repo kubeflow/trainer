@@ -96,7 +96,8 @@ spec:
                                   description: Selects a key of a ConfigMap.
                                   properties:
                                     key:
-                                      description: The key to select.
+                                      description: The key to select from the ConfigMap's
+                                        Data field.
                                       type: string
                                     name:
                                       default: ""
@@ -271,7 +272,8 @@ spec:
                                   description: Selects a key of a ConfigMap.
                                   properties:
                                     key:
-                                      description: The key to select.
+                                      description: The key to select from the ConfigMap's
+                                        Data field.
                                       type: string
                                     name:
                                       default: ""
@@ -1618,7 +1620,12 @@ spec:
                                                                           key:
                                                                             description: The
                                                                               key
-                                                                              to select.
+                                                                              to select
+                                                                              from
+                                                                              the
+                                                                              ConfigMap's
+                                                                              Data
+                                                                              field.
                                                                             type: string
                                                                           name:
                                                                             default: ""
@@ -2030,10 +2037,20 @@ spec:
                                                                   of a Volume within
                                                                   a container.
                                                                 properties:
-                                                                  mountPath:
+                                                                  bindMountOptions:
                                                                     description: |-
-                                                                      Path within the container at which the volume should be mounted.  Must
-                                                                      not contain ':'.
+                                                                      bindMountOptions is the list of additional bind mount options to apply when
+                                                                      mounting this volume into the container.
+                                                                    items:
+                                                                      type: string
+                                                                    type: array
+                                                                    x-kubernetes-list-type: set
+                                                                  mountPath:
+                                                                    description: Path
+                                                                      within the container
+                                                                      at which the
+                                                                      volume should
+                                                                      be mounted.
                                                                     type: string
                                                                   mountPropagation:
                                                                     description: |-
@@ -2162,7 +2179,12 @@ spec:
                                                                           key:
                                                                             description: The
                                                                               key
-                                                                              to select.
+                                                                              to select
+                                                                              from
+                                                                              the
+                                                                              ConfigMap's
+                                                                              Data
+                                                                              field.
                                                                             type: string
                                                                           name:
                                                                             default: ""
@@ -2574,10 +2596,20 @@ spec:
                                                                   of a Volume within
                                                                   a container.
                                                                 properties:
-                                                                  mountPath:
+                                                                  bindMountOptions:
                                                                     description: |-
-                                                                      Path within the container at which the volume should be mounted.  Must
-                                                                      not contain ':'.
+                                                                      bindMountOptions is the list of additional bind mount options to apply when
+                                                                      mounting this volume into the container.
+                                                                    items:
+                                                                      type: string
+                                                                    type: array
+                                                                    x-kubernetes-list-type: set
+                                                                  mountPath:
+                                                                    description: Path
+                                                                      within the container
+                                                                      at which the
+                                                                      volume should
+                                                                      be mounted.
                                                                     type: string
                                                                   mountPropagation:
                                                                     description: |-
@@ -3144,6 +3176,14 @@ spec:
                                                                     by default.'
                                                                   format: int32
                                                                   type: integer
+                                                                defaultUser:
+                                                                  description: 'defaultUser
+                                                                    is Optional: The
+                                                                    owner UID of the
+                                                                    created files
+                                                                    by default.'
+                                                                  format: int64
+                                                                  type: integer
                                                                 items:
                                                                   description: |-
                                                                     items if unspecified, each key-value pair in the Data field of the referenced
@@ -3175,6 +3215,12 @@ spec:
                                                                           May not be an absolute path.
                                                                           May not contain the path element '..'.
                                                                         type: string
+                                                                      user:
+                                                                        description: |-
+                                                                          user is Optional: The owner UID of the created file.
+                                                                          If specified, the item-level user field takes precedence over defaultUser.
+                                                                        format: int64
+                                                                        type: integer
                                                                     required:
                                                                     - key
                                                                     - path
@@ -3260,6 +3306,14 @@ spec:
                                                                     on created files
                                                                     by default.'
                                                                   format: int32
+                                                                  type: integer
+                                                                defaultUser:
+                                                                  description: 'defaultUser
+                                                                    is Optional: The
+                                                                    owner UID of the
+                                                                    created files
+                                                                    by default.'
+                                                                  format: int64
                                                                   type: integer
                                                                 items:
                                                                   description: Items
@@ -3368,6 +3422,12 @@ spec:
                                                                         - resource
                                                                         type: object
                                                                         x-kubernetes-map-type: atomic
+                                                                      user:
+                                                                        description: |-
+                                                                          user is Optional: The owner UID of the created file.
+                                                                          If specified, the item-level user field takes precedence over defaultUser.
+                                                                        format: int64
+                                                                        type: integer
                                                                     required:
                                                                     - path
                                                                     type: object
@@ -3386,6 +3446,12 @@ spec:
                                                                     medium should
                                                                     back this directory.
                                                                   type: string
+                                                                mode:
+                                                                  description: |-
+                                                                    mode specifies the permission bits for the emptyDir directory, in numeric
+                                                                    notation (e.g., 0755, 01777).
+                                                                  format: int32
+                                                                  type: integer
                                                                 sizeLimit:
                                                                   anyOf:
                                                                   - type: integer
@@ -4108,6 +4174,14 @@ spec:
                                                                     by default.
                                                                   format: int32
                                                                   type: integer
+                                                                defaultUser:
+                                                                  description: 'defaultUser
+                                                                    is Optional: The
+                                                                    owner UID of the
+                                                                    created files
+                                                                    by default.'
+                                                                  format: int64
+                                                                  type: integer
                                                                 sources:
                                                                   description: |-
                                                                     sources is the list of volume projections. Each entry in this list
@@ -4215,6 +4289,12 @@ spec:
                                                                               Select all ClusterTrustBundles that match this signer name.
                                                                               Mutually-exclusive with name.
                                                                             type: string
+                                                                          user:
+                                                                            description: |-
+                                                                              user is Optional: The owner UID of the created file.
+                                                                              If specified, the item-level user field takes precedence over defaultUser.
+                                                                            format: int64
+                                                                            type: integer
                                                                         required:
                                                                         - path
                                                                         type: object
@@ -4271,6 +4351,12 @@ spec:
                                                                                     May not be an absolute path.
                                                                                     May not contain the path element '..'.
                                                                                   type: string
+                                                                                user:
+                                                                                  description: |-
+                                                                                    user is Optional: The owner UID of the created file.
+                                                                                    If specified, the item-level user field takes precedence over defaultUser.
+                                                                                  format: int64
+                                                                                  type: integer
                                                                               required:
                                                                               - key
                                                                               - path
@@ -4447,6 +4533,12 @@ spec:
                                                                                   - resource
                                                                                   type: object
                                                                                   x-kubernetes-map-type: atomic
+                                                                                user:
+                                                                                  description: |-
+                                                                                    user is Optional: The owner UID of the created file.
+                                                                                    If specified, the item-level user field takes precedence over defaultUser.
+                                                                                  format: int64
+                                                                                  type: integer
                                                                               required:
                                                                               - path
                                                                               type: object
@@ -4507,6 +4599,12 @@ spec:
                                                                               to this
                                                                               signer.
                                                                             type: string
+                                                                          user:
+                                                                            description: |-
+                                                                              user is Optional: The owner UID of the created file.
+                                                                              If specified, the item-level user field takes precedence over defaultUser.
+                                                                            format: int64
+                                                                            type: integer
                                                                           userAnnotations:
                                                                             additionalProperties:
                                                                               type: string
@@ -4570,6 +4668,12 @@ spec:
                                                                                     May not be an absolute path.
                                                                                     May not contain the path element '..'.
                                                                                   type: string
+                                                                                user:
+                                                                                  description: |-
+                                                                                    user is Optional: The owner UID of the created file.
+                                                                                    If specified, the item-level user field takes precedence over defaultUser.
+                                                                                  format: int64
+                                                                                  type: integer
                                                                               required:
                                                                               - key
                                                                               - path
@@ -4624,6 +4728,12 @@ spec:
                                                                               path is the path relative to the mount point of the file to project the
                                                                               token into.
                                                                             type: string
+                                                                          user:
+                                                                            description: |-
+                                                                              user is Optional: The owner UID of the created file.
+                                                                              If specified, the item-level user field takes precedence over defaultUser.
+                                                                            format: int64
+                                                                            type: integer
                                                                         required:
                                                                         - path
                                                                         type: object
@@ -4848,6 +4958,14 @@ spec:
                                                                     by default.'
                                                                   format: int32
                                                                   type: integer
+                                                                defaultUser:
+                                                                  description: 'defaultUser
+                                                                    is Optional: The
+                                                                    owner UID of the
+                                                                    created files
+                                                                    by default.'
+                                                                  format: int64
+                                                                  type: integer
                                                                 items:
                                                                   description: |-
                                                                     items If unspecified, each key-value pair in the Data field of the referenced
@@ -4879,6 +4997,12 @@ spec:
                                                                           May not be an absolute path.
                                                                           May not contain the path element '..'.
                                                                         type: string
+                                                                      user:
+                                                                        description: |-
+                                                                          user is Optional: The owner UID of the created file.
+                                                                          If specified, the item-level user field takes precedence over defaultUser.
+                                                                        format: int64
+                                                                        type: integer
                                                                     required:
                                                                     - key
                                                                     - path
@@ -5090,7 +5214,8 @@ spec:
                               description: Selects a key of a ConfigMap.
                               properties:
                                 key:
-                                  description: The key to select.
+                                  description: The key to select from the ConfigMap's
+                                    Data field.
                                   type: string
                                 name:
                                   default: ""
