@@ -919,6 +919,73 @@ trainJob-node-1-0.trainJob slots=1
 	}
 }
 
+func TestMPIEnforceMLPolicyPropagatesTrainerEnv(t *testing.T) {
+	info := &runtime.Info{
+		RuntimePolicy: runtime.RuntimePolicy{
+			MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+				MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
+				Obj(),
+		},
+		TemplateSpec: runtime.TemplateSpec{
+			PodSets: []runtime.PodSet{
+				{
+					Name: constants.Launcher,
+					Count: ptr.To[int32](1),
+					Endpoints: func(yield func(string) bool) {
+						yield("trainJob-launcher-0-0.trainJob")
+					},
+					Containers: []runtime.Container{{Name: constants.Node}},
+				},
+				{
+					Name:     constants.Node,
+					Ancestor: ptr.To(constants.AncestorTrainer),
+					Count:    ptr.To[int32](1),
+					Endpoints: func(yield func(string) bool) {
+						yield("trainJob-node-1-0.trainJob")
+					},
+					Containers: []runtime.Container{{Name: constants.Node}},
+				},
+			},
+		},
+	}
+	trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+		UID("trainJob").
+		Trainer(
+			utiltesting.MakeTrainJobTrainerWrapper().
+				NumNodes(1).
+				Env(corev1.EnvVar{Name: "CUSTOM_ENV", Value: "custom-value"}).
+				Obj(),
+		).
+		Obj()
+	p, err := New(context.Background(), utiltesting.NewClientBuilder().Build(), nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to initialize MPI plugin: %v", err)
+	}
+	if err := p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(info, trainJob); err != nil {
+		t.Fatalf("EnforceMLPolicy returned unexpected error: %v", err)
+	}
+	for _, podSet := range info.TemplateSpec.PodSets {
+		for _, container := range podSet.Containers {
+			if container.Name != constants.Node {
+				continue
+			}
+			actual := map[string]string{}
+			for _, env := range container.Env {
+				if env.Name != nil {
+					actual[*env.Name] = ptr.Deref(env.Value, "")
+				}
+			}
+			if got := actual["CUSTOM_ENV"]; got != "custom-value" {
+				t.Fatalf("podSet %q container %q missing CUSTOM_ENV: got %q", podSet.Name, container.Name, got)
+			}
+			if podSet.Name == constants.Launcher {
+				if got := actual[constants.OpenMPIEnvHostFileLocation]; got == "" {
+					t.Fatalf("launcher container %q missing required OpenMPI env %q", container.Name, constants.OpenMPIEnvHostFileLocation)
+				}
+			}
+		}
+	}
+}
 func TestValidate(t *testing.T) {
 	cases := map[string]struct {
 		info         *runtime.Info
