@@ -32,6 +32,7 @@ import (
 	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -312,6 +313,44 @@ func TestDefault(t *testing.T) {
 }
 
 func TestValidateCreate(t *testing.T) {
+	runtimePatch := func(rJobName string, podSpecPatch trainer.PodSpecPatch) []trainer.RuntimePatch {
+		return []trainer.RuntimePatch{{
+			Manager: "test.io/manager",
+			TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+				Template: &trainer.JobSetTemplatePatch{
+					Spec: &trainer.JobSetSpecPatch{
+						ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+							Name: rJobName,
+							Template: &trainer.JobTemplatePatch{
+								Spec: &trainer.JobSpecPatch{
+									Template: &trainer.PodTemplatePatch{Spec: &podSpecPatch},
+								},
+							},
+						}},
+					},
+				},
+			},
+		}}
+	}
+	patchForUnknownReplicatedJob := runtimePatch("unknown-job", trainer.PodSpecPatch{
+		NodeSelector: map[string]string{"zone": "a"},
+	})
+	patchForUnknownContainer := runtimePatch(constants.Node, trainer.PodSpecPatch{
+		Containers: []trainer.ContainerPatch{{Name: "unknown-container"}},
+	})
+	patchForUnknownInitContainer := runtimePatch(constants.Node, trainer.PodSpecPatch{
+		InitContainers: []trainer.ContainerPatch{{Name: constants.Node}},
+	})
+	patchWithEmptyVolcanoQueue := []trainer.RuntimePatch{{
+		Manager: "test.io/manager",
+		TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+			Template: &trainer.JobSetTemplatePatch{
+				Metadata: &metav1.ObjectMeta{
+					Annotations: map[string]string{volcanov1beta1.QueueNameAnnotationKey: ""},
+				},
+			},
+		},
+	}}
 	cases := map[string]struct {
 		obj                    *trainer.TrainJob
 		clusterTrainingRuntime *trainer.ClusterTrainingRuntime
@@ -349,6 +388,87 @@ func TestValidateCreate(t *testing.T) {
 				},
 			},
 			wantWarnings: nil,
+		},
+		"runtimePatches reference a replicated job that the runtime does not have": {
+			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				RuntimePatches(patchForUnknownReplicatedJob).
+				Obj(),
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "spec.runtimePatches",
+					BadValue: patchForUnknownReplicatedJob,
+				},
+			},
+		},
+		"runtimePatches reference a container that the runtime does not have": {
+			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				RuntimePatches(patchForUnknownContainer).
+				Obj(),
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "spec.runtimePatches",
+					BadValue: patchForUnknownContainer,
+				},
+			},
+		},
+		"runtimePatches reference an initContainer that the runtime does not have": {
+			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				RuntimePatches(patchForUnknownInitContainer).
+				Obj(),
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "spec.runtimePatches",
+					BadValue: patchForUnknownInitContainer,
+				},
+			},
+		},
+		"runtimePatches set an empty Volcano queue name": {
+			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				RuntimePatches(patchWithEmptyVolcanoQueue).
+				Obj(),
+			clusterTrainingRuntime: testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").
+				RuntimeSpec(trainer.TrainingRuntimeSpec{
+					Template: trainer.JobSetTemplateSpec{
+						Spec: testingutil.MakeJobSetWrapper("", "").Obj().Spec,
+					},
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				}).Obj(),
+			wantError: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "spec.annotations[" + volcanov1beta1.QueueNameAnnotationKey + "]",
+					BadValue: "",
+				},
+			},
 		},
 		"deprecated runtime referenced": {
 			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").

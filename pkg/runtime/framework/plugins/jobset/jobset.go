@@ -58,6 +58,13 @@ var (
 	runtimePatchesPath = field.NewPath("spec").Child("runtimePatches")
 )
 
+// containerNames holds the initContainer and container names declared by a replicated job.
+// They are kept apart because a patch may only target the list the container is declared in.
+type containerNames struct {
+	initContainers sets.Set[string]
+	containers     sets.Set[string]
+}
+
 type JobSet struct {
 	client     client.Client
 	restMapper meta.RESTMapper
@@ -96,24 +103,26 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	}
 
 	// TODO (andreyvelich): Refactor this test to verify the ancestor label in PodTemplate.
-	rJobContainerNames := make(map[string]sets.Set[string])
+	rJobContainerNames := make(map[string]containerNames)
 	for _, rJob := range jobSetSpec.ReplicatedJobs {
-		rJobContainerNames[*rJob.Name] = sets.New[string]()
-
-		// Names of initContainer and containers are unique.
+		names := containerNames{
+			initContainers: sets.New[string](),
+			containers:     sets.New[string](),
+		}
 		for _, c := range rJob.Template.Spec.Template.Spec.InitContainers {
-			rJobContainerNames[*rJob.Name].Insert(*c.Name)
+			names.initContainers.Insert(*c.Name)
 		}
 		for _, c := range rJob.Template.Spec.Template.Spec.Containers {
-			rJobContainerNames[*rJob.Name].Insert(*c.Name)
+			names.containers.Insert(*c.Name)
 		}
+		rJobContainerNames[*rJob.Name] = names
 	}
 
 	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Dataset != nil {
-		containers, ok := rJobContainerNames[constants.DatasetInitializer]
+		names, ok := rJobContainerNames[constants.DatasetInitializer]
 		if !ok {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input datasetConfig", constants.DatasetInitializer)))
-		} else if !containers.Has(constants.DatasetInitializer) {
+		} else if !names.containers.Has(constants.DatasetInitializer) {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.DatasetInitializer, constants.DatasetInitializer)))
 		} else {
 			hasVolumeMount := false
@@ -140,10 +149,10 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 	}
 
 	if newObj.Spec.Initializer != nil && newObj.Spec.Initializer.Model != nil {
-		containers, ok := rJobContainerNames[constants.ModelInitializer]
+		names, ok := rJobContainerNames[constants.ModelInitializer]
 		if !ok {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have %s job when trainJob is configured with input modelConfig", constants.ModelInitializer)))
-		} else if !containers.Has(constants.ModelInitializer) {
+		} else if !names.containers.Has(constants.ModelInitializer) {
 			allErrs = append(allErrs, field.Invalid(runtimeRefPath, newObj.Spec.RuntimeRef, fmt.Sprintf("must have container with name - %s in the %s job", constants.ModelInitializer, constants.ModelInitializer)))
 		} else {
 			hasVolumeMount := false
@@ -179,7 +188,7 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 			continue
 		}
 		for _, rJobPatch := range runtimePatch.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs {
-			containers, ok := rJobContainerNames[rJobPatch.Name]
+			names, ok := rJobContainerNames[rJobPatch.Name]
 			if !ok {
 				allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 					"must not have replicated job that doesn't exist in the runtime job template"))
@@ -191,13 +200,13 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 			}
 			podSpecPatch := rJobPatch.Template.Spec.Template.Spec
 			for _, c := range podSpecPatch.InitContainers {
-				if !containers.Has(c.Name) {
+				if !names.initContainers.Has(c.Name) {
 					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 						fmt.Sprintf("must not have initContainer that doesn't exist in the runtime job %s", rJobPatch.Name)))
 				}
 			}
 			for _, c := range podSpecPatch.Containers {
-				if !containers.Has(c.Name) {
+				if !names.containers.Has(c.Name) {
 					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 						fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", rJobPatch.Name)))
 				} else if len(c.Env) > 0 && (c.Name == constants.DatasetInitializer || c.Name == constants.ModelInitializer || c.Name == constants.Node) {
