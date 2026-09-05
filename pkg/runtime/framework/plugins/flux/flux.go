@@ -425,7 +425,7 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
 		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
 	}
-	gpus := runtime.GetNumGPUPerNode(&resourcesPerNode)
+	gpus := runtime.GetNumGPUPerNodeWithDRA(info, &resourcesPerNode)
 
 	// Resource file for cluster includes GPUs or not
 	// flux R encode --hosts=${hosts} --cores=0-1 --gpu=0

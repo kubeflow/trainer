@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	resourcehelpers "k8s.io/component-helpers/resource"
@@ -78,6 +79,9 @@ type PodSet struct {
 	// The total PodSet requests can be calculated with
 	// SinglePodRequests x Count.
 	SinglePodRequests corev1.ResourceList
+	// DRAGPUCount is the number of GPUs resolved from the first DRA claim
+	// referenced by the node container. 0 when unknown.
+	DRAGPUCount int
 }
 
 type Container struct {
@@ -276,6 +280,12 @@ func ExtractResourcePerNodeFromRuntime(info *Info) *corev1.ResourceRequirements 
 						if container.Resources.Requests != nil {
 							res.Requests = *container.Resources.Requests
 						}
+						for _, claim := range container.Resources.Claims {
+							res.Claims = append(res.Claims, corev1.ResourceClaim{
+								Name:    ptr.Deref(claim.Name, ""),
+								Request: ptr.Deref(claim.Request, ""),
+							})
+						}
 						return res
 					}
 				}
@@ -295,6 +305,51 @@ func GetNumGPUPerNode(res *corev1.ResourceRequirements) int {
 		gpuQ = limitGpuQ
 	}
 	return gpuQ
+}
+
+// GetNumGPUPerNodeWithDRA returns the GPU count from extended resources, falling back to the
+// DRA GPU count resolved on the trainer PodSet when no extended GPU resource is set.
+func GetNumGPUPerNodeWithDRA(info *Info, res *corev1.ResourceRequirements) int {
+	if n := GetNumGPUPerNode(res); n > 0 {
+		return n
+	}
+	if info == nil {
+		return 0
+	}
+	ps := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	if ps == nil {
+		ps = info.FindPodSetByName(constants.Node)
+	}
+	if ps == nil {
+		return 0
+	}
+	return ps.DRAGPUCount
+}
+
+// NumGPUFromDeviceRequests sums exactly.count for requests whose name contains "gpu",
+// using ExactCount mode and not adminAccess. firstAvailable / All / adminAccess requests contribute 0.
+func NumGPUFromDeviceRequests(requests []resourcev1.DeviceRequest) int {
+	total := 0
+	for _, req := range requests {
+		if req.Exactly == nil {
+			continue
+		}
+		if req.Exactly.AllocationMode != "" && req.Exactly.AllocationMode != resourcev1.DeviceAllocationModeExactCount {
+			continue
+		}
+		if ptr.Deref(req.Exactly.AdminAccess, false) {
+			continue
+		}
+		if !strings.Contains(strings.ToLower(req.Name), "gpu") {
+			continue
+		}
+		count := int(req.Exactly.Count)
+		if count == 0 {
+			count = 1
+		}
+		total += count
+	}
+	return total
 }
 
 func numGPU(resourcePerNode corev1.ResourceList) int {

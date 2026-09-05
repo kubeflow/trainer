@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -726,6 +727,187 @@ func TestFindContainerByName(t *testing.T) {
 			got := tc.info.FindPodSetByAncestor(tc.psAncestor)
 			if diff := cmp.Diff(tc.want, got); len(diff) != 0 {
 				t.Errorf("Unexpected PodSet (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNumGPUFromDeviceRequests(t *testing.T) {
+	cases := map[string]struct {
+		requests []resourcev1.DeviceRequest
+		wantGPU  int
+	}{
+		"gpu exact count": {
+			requests: []resourcev1.DeviceRequest{{
+				Name: "gpu",
+				Exactly: &resourcev1.ExactDeviceRequest{
+					DeviceClassName: "gpu.nvidia.com",
+					Count:           8,
+				},
+			}},
+			wantGPU: 8,
+		},
+		"two gpu requests summed": {
+			requests: []resourcev1.DeviceRequest{
+				{
+					Name: "gpu-a100",
+					Exactly: &resourcev1.ExactDeviceRequest{
+						DeviceClassName: "gpu.nvidia.com",
+						Count:           4,
+					},
+				},
+				{
+					Name: "gpu-h100",
+					Exactly: &resourcev1.ExactDeviceRequest{
+						DeviceClassName: "gpu.nvidia.com",
+						Count:           4,
+					},
+				},
+			},
+			wantGPU: 8,
+		},
+		"nic-only returns 0": {
+			requests: []resourcev1.DeviceRequest{{
+				Name: "rdma-nic",
+				Exactly: &resourcev1.ExactDeviceRequest{
+					DeviceClassName: "nic.mellanox.com",
+					Count:           2,
+				},
+			}},
+			wantGPU: 0,
+		},
+		"firstAvailable returns 0": {
+			requests: []resourcev1.DeviceRequest{{
+				Name:           "gpu",
+				FirstAvailable: []resourcev1.DeviceSubRequest{{}},
+			}},
+			wantGPU: 0,
+		},
+		"allocationMode All returns 0": {
+			requests: []resourcev1.DeviceRequest{{
+				Name: "gpu",
+				Exactly: &resourcev1.ExactDeviceRequest{
+					DeviceClassName: "gpu.nvidia.com",
+					AllocationMode:  resourcev1.DeviceAllocationModeAll,
+				},
+			}},
+			wantGPU: 0,
+		},
+		"adminAccess returns 0": {
+			requests: []resourcev1.DeviceRequest{{
+				Name: "gpu",
+				Exactly: &resourcev1.ExactDeviceRequest{
+					DeviceClassName: "gpu.nvidia.com",
+					Count:           4,
+					AdminAccess:     ptr.To(true),
+				},
+			}},
+			wantGPU: 0,
+		},
+		"count unset defaults to 1": {
+			requests: []resourcev1.DeviceRequest{{
+				Name: "gpu",
+				Exactly: &resourcev1.ExactDeviceRequest{
+					DeviceClassName: "gpu.nvidia.com",
+				},
+			}},
+			wantGPU: 1,
+		},
+		"name case-insensitive": {
+			requests: []resourcev1.DeviceRequest{{
+				Name: "NVIDIA-GPU",
+				Exactly: &resourcev1.ExactDeviceRequest{
+					DeviceClassName: "gpu.nvidia.com",
+					Count:           2,
+				},
+			}},
+			wantGPU: 2,
+		},
+		"nil requests returns 0": {
+			requests: nil,
+			wantGPU:  0,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := NumGPUFromDeviceRequests(tc.requests)
+			if got != tc.wantGPU {
+				t.Errorf("NumGPUFromDeviceRequests() = %d, want %d", got, tc.wantGPU)
+			}
+		})
+	}
+}
+
+func TestGetNumGPUPerNodeWithDRA(t *testing.T) {
+	cases := map[string]struct {
+		info    *Info
+		res     *corev1.ResourceRequirements
+		wantGPU int
+	}{
+		"extended resource wins over DRA": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: PodSets{{
+						Name:        "trainer",
+						Ancestor:    ptr.To(constants.AncestorTrainer),
+						DRAGPUCount: 8,
+					}},
+				},
+			},
+			res: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"nvidia.com/gpu": resource.MustParse("4"),
+				},
+			},
+			wantGPU: 4,
+		},
+		"DRA fallback when no extended GPU": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: PodSets{{
+						Name:        "trainer",
+						Ancestor:    ptr.To(constants.AncestorTrainer),
+						DRAGPUCount: 8,
+					}},
+				},
+			},
+			res:     &corev1.ResourceRequirements{},
+			wantGPU: 8,
+		},
+		"nil info returns 0": {
+			info:    nil,
+			res:     &corev1.ResourceRequirements{},
+			wantGPU: 0,
+		},
+		"no trainer podset falls back to node name": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: PodSets{{
+						Name:        constants.Node,
+						DRAGPUCount: 4,
+					}},
+				},
+			},
+			res:     &corev1.ResourceRequirements{},
+			wantGPU: 4,
+		},
+		"no matching podset returns 0": {
+			info: &Info{
+				TemplateSpec: TemplateSpec{
+					PodSets: PodSets{{
+						Name: "other",
+					}},
+				},
+			},
+			res:     &corev1.ResourceRequirements{},
+			wantGPU: 0,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := GetNumGPUPerNodeWithDRA(tc.info, tc.res)
+			if got != tc.wantGPU {
+				t.Errorf("GetNumGPUPerNodeWithDRA() = %d, want %d", got, tc.wantGPU)
 			}
 		})
 	}

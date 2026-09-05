@@ -35,6 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_affinity import IoK8sApiCoreV1Affinity
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_local_object_reference import IoK8sApiCoreV1LocalObjectReference
+from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_resource_claim import IoK8sApiCoreV1PodResourceClaim
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_scheduling_gate import IoK8sApiCoreV1PodSchedulingGate
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_pod_security_context import IoK8sApiCoreV1PodSecurityContext
 from kubeflow_trainer_api.models.io_k8s_api_core_v1_toleration import IoK8sApiCoreV1Toleration
@@ -52,13 +53,14 @@ class TrainerV1alpha1PodSpecPatch(BaseModel):
     image_pull_secrets: Optional[List[IoK8sApiCoreV1LocalObjectReference]] = Field(default=None, description="imagePullSecrets patches the image pull secrets for the Pods in the target job templates.", alias="imagePullSecrets")
     init_containers: Optional[List[TrainerV1alpha1ContainerPatch]] = Field(default=None, description="initContainers patches the init containers in the target job templates.", alias="initContainers")
     node_selector: Optional[Dict[str, StrictStr]] = Field(default=None, description="nodeSelector patches the node selector to place Pods on specific nodes.", alias="nodeSelector")
+    resource_claims: Optional[List[IoK8sApiCoreV1PodResourceClaim]] = Field(default=None, description="resourceClaims patches the Pod's resourceClaims. Containers consume a claim by referencing its name in resources.claims.", alias="resourceClaims")
     scheduling_gates: Optional[List[IoK8sApiCoreV1PodSchedulingGate]] = Field(default=None, description="schedulingGates patches the scheduling gates for the Pods in the target job templates. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-scheduling-readiness/", alias="schedulingGates")
     security_context: Optional[IoK8sApiCoreV1PodSecurityContext] = Field(default=None, description="securityContext patches the Pod's security context. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/", alias="securityContext")
     service_account_name: Optional[StrictStr] = Field(default=None, description="serviceAccountName patches the service account for the Pods in the target job templates.", alias="serviceAccountName")
     termination_grace_period_seconds: Optional[StrictInt] = Field(default=None, description="terminationGracePeriodSeconds patches the termination grace period for Pods in the target job templates.", alias="terminationGracePeriodSeconds")
     tolerations: Optional[List[IoK8sApiCoreV1Toleration]] = Field(default=None, description="tolerations patches the Pod's tolerations.")
     volumes: Optional[List[IoK8sApiCoreV1Volume]] = Field(default=None, description="volumes patches the Pod's volumes.")
-    __properties: ClassVar[List[str]] = ["affinity", "containers", "imagePullSecrets", "initContainers", "nodeSelector", "schedulingGates", "securityContext", "serviceAccountName", "terminationGracePeriodSeconds", "tolerations", "volumes"]
+    __properties: ClassVar[List[str]] = ["affinity", "containers", "imagePullSecrets", "initContainers", "nodeSelector", "resourceClaims", "schedulingGates", "securityContext", "serviceAccountName", "terminationGracePeriodSeconds", "tolerations", "volumes"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -123,6 +125,13 @@ class TrainerV1alpha1PodSpecPatch(BaseModel):
                 if _item_init_containers:
                     _items.append(_item_init_containers.to_dict())
             _dict['initContainers'] = _items
+        # override the default output from pydantic by calling `to_dict()` of each item in resource_claims (list)
+        _items = []
+        if self.resource_claims:
+            for _item_resource_claims in self.resource_claims:
+                if _item_resource_claims:
+                    _items.append(_item_resource_claims.to_dict())
+            _dict['resourceClaims'] = _items
         # override the default output from pydantic by calling `to_dict()` of each item in scheduling_gates (list)
         _items = []
         if self.scheduling_gates:
@@ -164,6 +173,7 @@ class TrainerV1alpha1PodSpecPatch(BaseModel):
             "imagePullSecrets": [IoK8sApiCoreV1LocalObjectReference.from_dict(_item) for _item in obj["imagePullSecrets"]] if obj.get("imagePullSecrets") is not None else None,
             "initContainers": [TrainerV1alpha1ContainerPatch.from_dict(_item) for _item in obj["initContainers"]] if obj.get("initContainers") is not None else None,
             "nodeSelector": obj.get("nodeSelector"),
+            "resourceClaims": [IoK8sApiCoreV1PodResourceClaim.from_dict(_item) for _item in obj["resourceClaims"]] if obj.get("resourceClaims") is not None else None,
             "schedulingGates": [IoK8sApiCoreV1PodSchedulingGate.from_dict(_item) for _item in obj["schedulingGates"]] if obj.get("schedulingGates") is not None else None,
             "securityContext": IoK8sApiCoreV1PodSecurityContext.from_dict(obj["securityContext"]) if obj.get("securityContext") is not None else None,
             "serviceAccountName": obj.get("serviceAccountName"),

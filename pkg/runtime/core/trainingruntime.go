@@ -22,9 +22,12 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
@@ -105,7 +109,7 @@ func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.Trai
 		}
 	}
 
-	info, err := r.RuntimeInfo(trainJob, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy)
+	info, err := r.RuntimeInfo(ctx, trainJob, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy)
 	if err != nil {
 		return nil, err
 	}
@@ -119,14 +123,14 @@ func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.Trai
 //  2. EnforcePodSpec, for the PodSet concerns enabled outside of MLPolicy and PodGroupPolicy APIs.
 //  3. PreBuildSync, which consolidates the Info object with the concrete runtime template.
 func (r *TrainingRuntime) RuntimeInfo(
-	trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
+	ctx context.Context, trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
 ) (*runtime.Info, error) {
 
 	jobSetTemplateSpec, ok := runtimeTemplateSpec.(trainer.JobSetTemplateSpec)
 	if !ok {
 		return nil, fmt.Errorf("unsupported runtimeTemplateSpec")
 	}
-	info, err := r.newRuntimeInfo(trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy)
+	info, err := r.newRuntimeInfo(ctx, trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +151,7 @@ func (r *TrainingRuntime) RuntimeInfo(
 }
 
 func (r *TrainingRuntime) newRuntimeInfo(
-	trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
+	ctx context.Context, trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
 ) (*runtime.Info, error) {
 	propagationLabels := maps.Clone(jobSetTemplateSpec.Labels)
 	propagationAnnotations := maps.Clone(jobSetTemplateSpec.Annotations)
@@ -191,6 +195,8 @@ func (r *TrainingRuntime) newRuntimeInfo(
 		runtime.WithTemplateSpecObjApply(jobSetSpecApply),
 	}
 
+	draCounts := make([]int, len(jobSetSpecApply.ReplicatedJobs))
+
 	for i, rJob := range jobSetSpecApply.ReplicatedJobs {
 		// TODO: Support multiple replicas ('.template.spec.replicatedJobs[*].replicas') for replicated Jobs.
 		// REF: https://github.com/kubeflow/trainer/issues/2318
@@ -204,44 +210,54 @@ func (r *TrainingRuntime) newRuntimeInfo(
 				ancestor = &labelAncestor
 			}
 		}
-		if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
-			isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer && mlPolicy != nil
-			isMPILauncherAsNode := mlPolicy != nil && mlPolicy.MPI != nil &&
-				ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && *rJob.Name == constants.Node
-			if isTrainerAncestor || isMPILauncherAsNode {
-				if applyPodSpec := jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec; applyPodSpec != nil {
-					for k := range applyPodSpec.Containers {
-						if ptr.Deref(applyPodSpec.Containers[k].Name, "") != constants.Node {
-							continue
-						}
-						var baseRes corev1.ResourceRequirements
-						if r := applyPodSpec.Containers[k].Resources; r != nil {
-							if r.Limits != nil {
-								baseRes.Limits = *r.Limits
+		isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer && mlPolicy != nil
+		isMPILauncherAsNode := mlPolicy != nil && mlPolicy.MPI != nil &&
+			ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && ptr.Deref(rJob.Name, "") == constants.Node
+		if isTrainerAncestor || isMPILauncherAsNode {
+			if applyPodSpec := jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec; applyPodSpec != nil {
+				if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
+					if jobTrainer.ResourcesPerNode != nil {
+						for k := range applyPodSpec.Containers {
+							if ptr.Deref(applyPodSpec.Containers[k].Name, "") != constants.Node {
+								continue
 							}
-							if r.Requests != nil {
-								baseRes.Requests = *r.Requests
+							var baseRes corev1.ResourceRequirements
+							if r := applyPodSpec.Containers[k].Resources; r != nil {
+								if r.Limits != nil {
+									baseRes.Limits = *r.Limits
+								}
+								if r.Requests != nil {
+									baseRes.Requests = *r.Requests
+								}
 							}
+							mergedRes, mergeErr := trainingruntimeutil.MergeResourceRequirements(
+								baseRes, *trainJob.Spec.Trainer.ResourcesPerNode)
+							if mergeErr != nil {
+								return nil, mergeErr
+							}
+							applyRes := &corev1ac.ResourceRequirementsApplyConfiguration{}
+							if mergedRes.Limits != nil {
+								limits := maps.Clone(mergedRes.Limits)
+								applyRes.Limits = &limits
+							}
+							if mergedRes.Requests != nil {
+								requests := maps.Clone(mergedRes.Requests)
+								applyRes.Requests = &requests
+							}
+							// Preserve existing DRA claims — resourcesPerNode only overrides requests/limits.
+							if old := applyPodSpec.Containers[k].Resources; old != nil {
+								applyRes.Claims = old.Claims
+							}
+							applyPodSpec.Containers[k].Resources = applyRes
+							jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Resources = mergedRes
+							break
 						}
-						mergedRes, mergeErr := trainingruntimeutil.MergeResourceRequirements(
-							baseRes, *trainJob.Spec.Trainer.ResourcesPerNode)
-						if mergeErr != nil {
-							return nil, mergeErr
-						}
-						applyRes := &corev1ac.ResourceRequirementsApplyConfiguration{}
-						if mergedRes.Limits != nil {
-							limits := maps.Clone(mergedRes.Limits)
-							applyRes.Limits = &limits
-						}
-						if mergedRes.Requests != nil {
-							requests := maps.Clone(mergedRes.Requests)
-							applyRes.Requests = &requests
-						}
-						applyPodSpec.Containers[k].Resources = applyRes
-						jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Resources = mergedRes
-						break
+					}
+					if len(jobTrainer.ResourceClaimsPerNode) > 0 {
+						applyTrainerResourceClaimsPerNode(applyPodSpec, jobTrainer.ResourceClaimsPerNode)
 					}
 				}
+				draCounts[i] = r.resolveDRAGPUCount(ctx, trainJob.Namespace, applyPodSpec)
 			}
 		}
 		opts = append(opts, runtime.WithPodSet(
@@ -253,7 +269,13 @@ func (r *TrainingRuntime) newRuntimeInfo(
 		)
 	}
 
-	return runtime.NewInfo(opts...), nil
+	info := runtime.NewInfo(opts...)
+	for i, count := range draCounts {
+		if count > 0 && i < len(info.TemplateSpec.PodSets) {
+			info.TemplateSpec.PodSets[i].DRAGPUCount = count
+		}
+	}
+	return info, nil
 }
 
 func (r *TrainingRuntime) mergeRuntimePatches(trainJob *trainer.TrainJob, jobSetTemplateSpec *trainer.JobSetTemplateSpec) error {
@@ -343,10 +365,126 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
-	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
+	info, _ := r.newRuntimeInfo(ctx, new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
 	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)
 	if len(fwWarnings) != 0 {
 		warnings = append(warnings, fwWarnings...)
 	}
 	return warnings, errs
+}
+
+// applyTrainerResourceClaimsPerNode upserts the TrainJob's resourceClaimsPerNode into the Pod's
+// resourceClaims by name and references every claim from the node container's resources.claims.
+func applyTrainerResourceClaimsPerNode(podSpec *corev1ac.PodSpecApplyConfiguration, claims []trainer.TrainerResourceClaim) {
+	for _, claim := range claims {
+		found := false
+		for j := range podSpec.ResourceClaims {
+			if podSpec.ResourceClaims[j].Name != nil && *podSpec.ResourceClaims[j].Name == claim.Name {
+				podSpec.ResourceClaims[j] = *corev1ac.PodResourceClaim().
+					WithName(claim.Name).
+					WithResourceClaimTemplateName(claim.ResourceClaimTemplateName)
+				found = true
+				break
+			}
+		}
+		if !found {
+			podSpec.ResourceClaims = append(podSpec.ResourceClaims, *corev1ac.PodResourceClaim().
+				WithName(claim.Name).
+				WithResourceClaimTemplateName(claim.ResourceClaimTemplateName))
+		}
+	}
+
+	// Wire the claims into the node container's resources.claims, keeping them at the front of
+	// the list in the order they were declared. resolveDRAGPUCount reads the first entry, so a
+	// claim already wired by the runtime must not shadow the TrainJob's own claims.
+	for k := range podSpec.Containers {
+		if ptr.Deref(podSpec.Containers[k].Name, "") != constants.Node {
+			continue
+		}
+		if podSpec.Containers[k].Resources == nil {
+			podSpec.Containers[k].Resources = &corev1ac.ResourceRequirementsApplyConfiguration{}
+		}
+		existing := podSpec.Containers[k].Resources.Claims
+		isTrainerClaim := func(c corev1ac.ResourceClaimApplyConfiguration) bool {
+			return slices.ContainsFunc(claims, func(claim trainer.TrainerResourceClaim) bool {
+				return claim.Name == ptr.Deref(c.Name, "")
+			})
+		}
+		merged := make([]corev1ac.ResourceClaimApplyConfiguration, 0, len(existing)+len(claims))
+		for _, claim := range claims {
+			// Reuse the existing entry so a container-level request, which restricts the
+			// container to a subset of the claim's devices, survives.
+			if idx := slices.IndexFunc(existing, func(c corev1ac.ResourceClaimApplyConfiguration) bool {
+				return ptr.Deref(c.Name, "") == claim.Name
+			}); idx != -1 {
+				merged = append(merged, existing[idx])
+				continue
+			}
+			merged = append(merged, *corev1ac.ResourceClaim().WithName(claim.Name))
+		}
+		for _, c := range existing {
+			if !isTrainerClaim(c) {
+				merged = append(merged, c)
+			}
+		}
+		podSpec.Containers[k].Resources.Claims = merged
+		break
+	}
+}
+
+// draLookupTimeout bounds how long a single lookup waits for the ResourceClaimTemplate or
+// ResourceClaim to be fetched, so a missing RBAC rule or unreachable API server degrades to
+// an unknown GPU count instead of blocking the reconciler. newRuntimeInfo also runs from
+// ValidateObjects, so this has to stay well inside the webhook timeout.
+const draLookupTimeout = 2 * time.Second
+
+// resolveDRAGPUCount reads the first resources.claims entry of the node container, resolves the
+// referenced pod-level resourceClaim to its ResourceClaimTemplate or ResourceClaim, and returns
+// the GPU count from the device requests. It returns 0 when nothing is referenced or the object
+// cannot be read: GPU detection never fails the TrainJob.
+func (r *TrainingRuntime) resolveDRAGPUCount(ctx context.Context, namespace string, podSpec *corev1ac.PodSpecApplyConfiguration) int {
+	// Find the node container's first claim reference.
+	var claimName string
+	for _, c := range podSpec.Containers {
+		if ptr.Deref(c.Name, "") != constants.Node {
+			continue
+		}
+		if c.Resources == nil || len(c.Resources.Claims) == 0 {
+			return 0
+		}
+		claimName = ptr.Deref(c.Resources.Claims[0].Name, "")
+		break
+	}
+	if claimName == "" {
+		return 0
+	}
+	ctx, cancel := context.WithTimeout(ctx, draLookupTimeout)
+	defer cancel()
+
+	// Resolve the pod-level claim to find the template or direct claim name.
+	for _, pc := range podSpec.ResourceClaims {
+		if ptr.Deref(pc.Name, "") != claimName {
+			continue
+		}
+		if pc.ResourceClaimTemplateName != nil && *pc.ResourceClaimTemplateName != "" {
+			var rct resourcev1.ResourceClaimTemplate
+			if err := r.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: *pc.ResourceClaimTemplateName}, &rct); err != nil {
+				log := ctrl.LoggerFrom(ctx)
+				log.V(2).Info("Failed to resolve ResourceClaimTemplate for DRA GPU detection", "name", *pc.ResourceClaimTemplateName, "error", err)
+				return 0
+			}
+			return runtime.NumGPUFromDeviceRequests(rct.Spec.Spec.Devices.Requests)
+		}
+		if pc.ResourceClaimName != nil && *pc.ResourceClaimName != "" {
+			var rc resourcev1.ResourceClaim
+			if err := r.client.Get(ctx, client.ObjectKey{Namespace: namespace, Name: *pc.ResourceClaimName}, &rc); err != nil {
+				log := ctrl.LoggerFrom(ctx)
+				log.V(2).Info("Failed to resolve ResourceClaim for DRA GPU detection", "name", *pc.ResourceClaimName, "error", err)
+				return 0
+			}
+			return runtime.NumGPUFromDeviceRequests(rc.Spec.Devices.Requests)
+		}
+		return 0
+	}
+	return 0
 }

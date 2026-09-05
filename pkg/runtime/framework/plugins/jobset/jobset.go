@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -203,6 +204,32 @@ func (j *JobSet) Validate(ctx context.Context, info *runtime.Info, oldObj, newOb
 				} else if len(c.Env) > 0 && (c.Name == constants.DatasetInitializer || c.Name == constants.ModelInitializer || c.Name == constants.Node) {
 					allErrs = append(allErrs, field.Invalid(runtimePatchesPath, newObj.Spec.RuntimePatches,
 						fmt.Sprintf("must not have envs for the %s, %s, %s containers", constants.DatasetInitializer, constants.ModelInitializer, constants.Node)))
+				}
+			}
+		}
+	}
+
+	// Every container resources.claims entry must reference a Pod-level resourceClaims entry,
+	// otherwise the API server rejects the Pod only after the JobSet is created.
+	claimsPath := runtimeRefPath
+	if len(newObj.Spec.RuntimePatches) > 0 {
+		claimsPath = runtimePatchesPath
+	}
+	for _, rJob := range jobSetSpec.ReplicatedJobs {
+		podSpec := rJob.Template.Spec.Template.Spec
+		podClaims := sets.New[string]()
+		for _, pc := range podSpec.ResourceClaims {
+			podClaims.Insert(ptr.Deref(pc.Name, ""))
+		}
+		for _, c := range slices.Concat(podSpec.InitContainers, podSpec.Containers) {
+			if c.Resources == nil {
+				continue
+			}
+			for _, claim := range c.Resources.Claims {
+				if name := ptr.Deref(claim.Name, ""); !podClaims.Has(name) {
+					allErrs = append(allErrs, field.Invalid(claimsPath, name,
+						fmt.Sprintf("container %q in job %q references resourceClaim %q which is not defined in the Pod's resourceClaims",
+							ptr.Deref(c.Name, ""), ptr.Deref(rJob.Name, ""), name)))
 				}
 			}
 		}

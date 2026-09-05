@@ -1825,6 +1825,65 @@ spec:
                                                               maxLength: 253
                                                               minLength: 1
                                                               type: string
+                                                            resources:
+                                                              description: |-
+                                                                resources patches the container's compute resources, including the resources.claims
+                                                                that reference the Pod's resourceClaims.
+                                                              properties:
+                                                                claims:
+                                                                  description: |-
+                                                                    Claims lists the names of resources, defined in spec.resourceClaims,
+                                                                    that are used by this container.
+                                                                  items:
+                                                                    description: ResourceClaim
+                                                                      references one
+                                                                      entry in PodSpec.ResourceClaims.
+                                                                    properties:
+                                                                      name:
+                                                                        description: |-
+                                                                          Name must match the name of one entry in pod.spec.resourceClaims of
+                                                                          the Pod where this field is used.
+                                                                        type: string
+                                                                      request:
+                                                                        description: Request
+                                                                          is the name
+                                                                          chosen for
+                                                                          a request
+                                                                          in the referenced
+                                                                          claim.
+                                                                        type: string
+                                                                    required:
+                                                                    - name
+                                                                    type: object
+                                                                  type: array
+                                                                  x-kubernetes-list-map-keys:
+                                                                  - name
+                                                                  x-kubernetes-list-type: map
+                                                                limits:
+                                                                  additionalProperties:
+                                                                    anyOf:
+                                                                    - type: integer
+                                                                    - type: string
+                                                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                                                    x-kubernetes-int-or-string: true
+                                                                  description: |-
+                                                                    Limits describes the maximum amount of compute resources allowed.
+                                                                    More info: https://kubernetes.
+                                                                  type: object
+                                                                requests:
+                                                                  additionalProperties:
+                                                                    anyOf:
+                                                                    - type: integer
+                                                                    - type: string
+                                                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                                                    x-kubernetes-int-or-string: true
+                                                                  description: Requests
+                                                                    describes the
+                                                                    minimum amount
+                                                                    of compute resources
+                                                                    required.
+                                                                  type: object
+                                                              type: object
                                                             securityContext:
                                                               description: |-
                                                                 securityContext patches the container's security context.
@@ -2369,6 +2428,65 @@ spec:
                                                               maxLength: 253
                                                               minLength: 1
                                                               type: string
+                                                            resources:
+                                                              description: |-
+                                                                resources patches the container's compute resources, including the resources.claims
+                                                                that reference the Pod's resourceClaims.
+                                                              properties:
+                                                                claims:
+                                                                  description: |-
+                                                                    Claims lists the names of resources, defined in spec.resourceClaims,
+                                                                    that are used by this container.
+                                                                  items:
+                                                                    description: ResourceClaim
+                                                                      references one
+                                                                      entry in PodSpec.ResourceClaims.
+                                                                    properties:
+                                                                      name:
+                                                                        description: |-
+                                                                          Name must match the name of one entry in pod.spec.resourceClaims of
+                                                                          the Pod where this field is used.
+                                                                        type: string
+                                                                      request:
+                                                                        description: Request
+                                                                          is the name
+                                                                          chosen for
+                                                                          a request
+                                                                          in the referenced
+                                                                          claim.
+                                                                        type: string
+                                                                    required:
+                                                                    - name
+                                                                    type: object
+                                                                  type: array
+                                                                  x-kubernetes-list-map-keys:
+                                                                  - name
+                                                                  x-kubernetes-list-type: map
+                                                                limits:
+                                                                  additionalProperties:
+                                                                    anyOf:
+                                                                    - type: integer
+                                                                    - type: string
+                                                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                                                    x-kubernetes-int-or-string: true
+                                                                  description: |-
+                                                                    Limits describes the maximum amount of compute resources allowed.
+                                                                    More info: https://kubernetes.
+                                                                  type: object
+                                                                requests:
+                                                                  additionalProperties:
+                                                                    anyOf:
+                                                                    - type: integer
+                                                                    - type: string
+                                                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                                                    x-kubernetes-int-or-string: true
+                                                                  description: Requests
+                                                                    describes the
+                                                                    minimum amount
+                                                                    of compute resources
+                                                                    required.
+                                                                  type: object
+                                                              type: object
                                                             securityContext:
                                                               description: |-
                                                                 securityContext patches the container's security context.
@@ -2643,6 +2761,41 @@ spec:
                                                           to place Pods on specific
                                                           nodes.
                                                         type: object
+                                                      resourceClaims:
+                                                        description: |-
+                                                          resourceClaims patches the Pod's resourceClaims. Containers consume a claim by
+                                                          referencing its name in resources.claims.
+                                                        items:
+                                                          description: |-
+                                                            PodResourceClaim references exactly one ResourceClaim, either directly
+                                                            or by naming a ResourceClaimTemplate which is then...
+                                                          properties:
+                                                            name:
+                                                              description: |-
+                                                                Name uniquely identifies this resource claim inside the pod.
+                                                                This must be a DNS_LABEL.
+                                                              type: string
+                                                            resourceClaimName:
+                                                              description: |-
+                                                                ResourceClaimName is the name of a ResourceClaim object in the same
+                                                                namespace as this pod.
+                                                              type: string
+                                                            resourceClaimTemplateName:
+                                                              description: |-
+                                                                ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+                                                                object in the same namespace as this pod.
+                                                              type: string
+                                                          required:
+                                                          - name
+                                                          type: object
+                                                        maxItems: 32
+                                                        type: array
+                                                        x-kubernetes-list-map-keys:
+                                                        - name
+                                                        x-kubernetes-list-type: map
+                                                        x-kubernetes-validations:
+                                                        - message: field is immutable
+                                                          rule: self == oldSelf
                                                       schedulingGates:
                                                         description: |-
                                                           schedulingGates patches the scheduling gates for the Pods in the target job templates.
@@ -5230,6 +5383,35 @@ spec:
                     x-kubernetes-validations:
                     - message: numProcPerNode must be greater than or equal to 1
                       rule: self >= 1
+                  resourceClaimsPerNode:
+                    description: resourceClaimsPerNode defines the DRA ResourceClaims
+                      for each training node.
+                    items:
+                      description: TrainerResourceClaim references a ResourceClaimTemplate
+                        for every training node Pod.
+                      properties:
+                        name:
+                          description: |-
+                            name uniquely identifies this resource claim inside the Pod and is what the node
+                            container's resources.claims entry references.
+                          maxLength: 253
+                          minLength: 1
+                          type: string
+                        resourceClaimTemplateName:
+                          description: resourceClaimTemplateName is the name of a
+                            ResourceClaimTemplate in the TrainJob namespace.
+                          maxLength: 253
+                          minLength: 1
+                          type: string
+                      required:
+                      - name
+                      - resourceClaimTemplateName
+                      type: object
+                    maxItems: 32
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                   resourcesPerNode:
                     description: resourcesPerNode defines the compute resources for
                       each training node.
@@ -5279,6 +5461,10 @@ spec:
                           resources required.
                         type: object
                     type: object
+                    x-kubernetes-validations:
+                    - message: claims must not be set in resourcesPerNode; use resourceClaimsPerNode
+                        instead
+                      rule: '!has(self.claims) || size(self.claims) == 0'
                 type: object
                 x-kubernetes-validations:
                 - message: field is immutable

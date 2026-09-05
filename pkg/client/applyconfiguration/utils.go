@@ -112,6 +112,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.TorchMLPolicySourceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Trainer"):
 		return &trainerv1alpha1.TrainerApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("TrainerResourceClaim"):
+		return &trainerv1alpha1.TrainerResourceClaimApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainerStatus"):
 		return &trainerv1alpha1.TrainerStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("TrainingRuntime"):
