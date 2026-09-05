@@ -1223,6 +1223,22 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 									Name:  constants.OpenMPIEnvKeyRSHArgs,
 									Value: constants.OpenMPIEnvDefaultValueRSHArgs,
 								},
+								corev1.EnvVar{
+									Name:  constants.PRTEEnvHostFileLocation,
+									Value: fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName),
+								},
+								corev1.EnvVar{
+									Name:  constants.PRTEEnvKeepFQDNHostNames,
+									Value: "false",
+								},
+								corev1.EnvVar{
+									Name:  constants.PRTEEnvDefaultSlots,
+									Value: "8",
+								},
+								corev1.EnvVar{
+									Name:  constants.PRTEEnvKeySSHArgs,
+									Value: constants.OpenMPIEnvDefaultValueRSHArgs,
+								},
 							).
 							Env(constants.Node, constants.Node,
 								corev1.EnvVar{
