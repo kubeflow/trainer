@@ -155,6 +155,11 @@ spec:
                             rule: double(self.min) > 0.0
                           - message: min must be strictly less than max
                             rule: double(self.min) < double(self.max)
+                          - message: min and max must be integers written without
+                              a fractional part or exponent, with at most 15 digits,
+                              when type is Int
+                            rule: self.type != 'Int' || (self.min.matches('^-?(0|[1-9][0-9]{0,14})$')
+                              && self.max.matches('^-?(0|[1-9][0-9]{0,14})$'))
                         uniform:
                           description: uniform is the uniform search space.
                           properties:
@@ -187,6 +192,11 @@ spec:
                           x-kubernetes-validations:
                           - message: min must be strictly less than max
                             rule: double(self.min) < double(self.max)
+                          - message: min and max must be integers written without
+                              a fractional part or exponent, with at most 15 digits,
+                              when type is Int
+                            rule: self.type != 'Int' || (self.min.matches('^-?(0|[1-9][0-9]{0,14})$')
+                              && self.max.matches('^-?(0|[1-9][0-9]{0,14})$'))
                       type: object
                       x-kubernetes-validations:
                       - message: exactly one of the fields in [uniform logUniform
