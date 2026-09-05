@@ -122,6 +122,16 @@ You can use [the PyIceberg library](https://py.iceberg.apache.org/#write-a-pyarr
 distributed processing engine like [Apache Spark](https://spark.apache.org/documentation.html)
 to prepare your Iceberg table in S3.
 
+:::{note}
+
+The cache selects its storage backend from the scheme of the metadata location, so an Iceberg
+table on a local filesystem also works. This is intended for development and testing rather than
+for TrainJobs, since every cache node has to be able to read the same path. See the
+[data cache README](https://github.com/kubeflow/trainer/tree/master/pkg/data_cache#option-1-local-table-testing)
+for how to generate one and run a cache cluster against it.
+
+:::
+
 ## Running the Example
 
 Open the [fine-tune-with-cache.ipynb](https://github.com/kubeflow/trainer/tree/master/examples/pytorch/data-cache/fine-tune-with-cache.ipynb)
