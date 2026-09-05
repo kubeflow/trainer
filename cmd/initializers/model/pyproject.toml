@@ -3,7 +3,7 @@ name = "model-initializer"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-  "huggingface-hub>=1.28.0,<1.29",
+  "huggingface-hub>=1.29.0,<1.30",
   "opendal>=0.47.6",
 ]
 
