@@ -1,0 +1,328 @@
+apiVersion: trainer.kubeflow.org/v1alpha1
+kind: TrainJob
+metadata:
+  name: yolo-coco-object-detection
+  namespace: default
+spec:
+  runtimeRef:
+    name: torch-distributed
+  trainer:
+    image: tensorflow/tensorflow:2.15.0-gpu
+    command:
+      - python
+      - -c
+      - |
+        import os
+        import json
+        import numpy as np
+        import tensorflow as tf
+        from tensorflow import keras
+        from tensorflow.keras import layers
+        import urllib.request
+        import zipfile
+        import shutil
+        
+        print("=" * 80)
+        print("YOLO Object Detection Training on COCO Dataset")
+        print("=" * 80)
+        
+        # Check TensorFlow and GPU
+        print(f"\nTensorFlow version: {tf.__version__}")
+        gpus = tf.config.list_physical_devices('GPU')
+        print(f"GPU devices: {len(gpus)}")
+        for gpu in gpus:
+            print(f"  {gpu}")
+        
+        # Setup distributed strategy
+        tf_config = os.environ.get('TF_CONFIG')
+        if tf_config:
+            print(f"\nDistributed Training Configuration:")
+            config = json.loads(tf_config)
+            print(f"  Task: {config['task']['type']}:{config['task']['index']}")
+            strategy = tf.distribute.MultiWorkerMirroredStrategy()
+            print(f"  Replicas: {strategy.num_replicas_in_sync}")
+        else:
+            strategy = tf.distribute.OneDeviceStrategy(device="/gpu:0" if gpus else "/cpu:0")
+            print("\nSingle device training")
+        
+        # Configuration
+        IMAGE_SIZE = 416
+        BATCH_SIZE = 16
+        NUM_CLASSES = 80  # COCO has 80 classes
+        EPOCHS = 20
+        LEARNING_RATE = 0.001
+        
+        # COCO class names
+        COCO_CLASSES = [
+            'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck',
+            'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench',
+            'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra',
+            'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+            'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove',
+            'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup',
+            'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange',
+            'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+            'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse',
+            'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
+            'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier',
+            'toothbrush'
+        ]
+        
+        print(f"\nTraining Configuration:")
+        print(f"  Image size: {IMAGE_SIZE}x{IMAGE_SIZE}")
+        print(f"  Batch size: {BATCH_SIZE}")
+        print(f"  Epochs: {EPOCHS}")
+        print(f"  Learning rate: {LEARNING_RATE}")
+        print(f"  Number of classes: {NUM_CLASSES}")
+        
+        # Download COCO dataset from Kaggle
+        # Note: In production, mount a PVC with pre-downloaded data
+        print("\n" + "=" * 80)
+        print("Downloading COCO Dataset")
+        print("=" * 80)
+        print("Note: Using a small subset for demonstration")
+        print("For full training, mount a PVC with complete COCO dataset")
+        
+        # Create data directory
+        os.makedirs('/tmp/coco_data', exist_ok=True)
+        
+        # For this example, we'll use TensorFlow Datasets which handles COCO
+        print("\nInstalling tensorflow-datasets...")
+        import subprocess
+        subprocess.run(['pip', 'install', '-q', 'tensorflow-datasets', 'pycocotools'], check=True)
+        
+        import tensorflow_datasets as tfds
+        
+        print("\nLoading COCO dataset (this may take a few minutes)...")
+        # Load a subset for demonstration (use 'train' for full dataset)
+        dataset_train = tfds.load(
+            'coco/2017',
+            split='train[:1000]',  # Use first 1000 images for demo
+            shuffle_files=True,
+            as_supervised=False,
+        )
+        
+        dataset_val = tfds.load(
+            'coco/2017',
+            split='validation[:200]',  # Use 200 validation images
+            shuffle_files=False,
+            as_supervised=False,
+        )
+        
+        print("✓ Dataset loaded successfully")
+        
+        # Preprocessing function
+        def preprocess_data(example):
+            """Preprocess COCO data for YOLO training."""
+            image = example['image']
+            objects = example['objects']
+            
+            # Resize image
+            image = tf.image.resize(image, [IMAGE_SIZE, IMAGE_SIZE])
+            image = image / 255.0  # Normalize to [0, 1]
+            
+            # For this demo, create simplified labels
+            # In production, implement proper YOLO label encoding
+            # Shape: [grid_size, grid_size, num_anchors * (5 + num_classes)]
+            grid_size = IMAGE_SIZE // 8  # 52 for 416x416
+            num_anchors = 3
+            label_shape = (grid_size, grid_size, num_anchors * (5 + NUM_CLASSES))
+            
+            # Initialize with zeros
+            labels = tf.zeros(label_shape, dtype=tf.float32)
+            
+            # In production, encode bounding boxes into YOLO format here
+            # For now, use simplified labels for demonstration
+            
+            return image, labels
+        
+        print("\nPreprocessing dataset...")
+        train_dataset = dataset_train.map(
+            preprocess_data,
+            num_parallel_calls=tf.data.AUTOTUNE
+        )
+        train_dataset = train_dataset.batch(BATCH_SIZE)
+        train_dataset = train_dataset.prefetch(tf.data.AUTOTUNE)
+        
+        val_dataset = dataset_val.map(
+            preprocess_data,
+            num_parallel_calls=tf.data.AUTOTUNE
+        )
+        val_dataset = val_dataset.batch(BATCH_SIZE)
+        val_dataset = val_dataset.prefetch(tf.data.AUTOTUNE)
+        
+        print("✓ Dataset preprocessing complete")
+        
+        # Build YOLOv3-tiny model
+        print("\n" + "=" * 80)
+        print("Building YOLOv3-tiny Model")
+        print("=" * 80)
+        
+        def build_yolov3_tiny(input_shape, num_classes):
+            """Build YOLOv3-tiny architecture."""
+            inputs = keras.Input(shape=input_shape)
+            
+            # Backbone
+            x = layers.Conv2D(16, 3, padding='same', activation='leaky_relu')(inputs)
+            x = layers.MaxPooling2D(2)(x)
+            
+            x = layers.Conv2D(32, 3, padding='same', activation='leaky_relu')(x)
+            x = layers.MaxPooling2D(2)(x)
+            
+            x = layers.Conv2D(64, 3, padding='same', activation='leaky_relu')(x)
+            x = layers.MaxPooling2D(2)(x)
+            
+            x = layers.Conv2D(128, 3, padding='same', activation='leaky_relu')(x)
+            x = layers.MaxPooling2D(2)(x)
+            
+            x = layers.Conv2D(256, 3, padding='same', activation='leaky_relu')(x)
+            route_1 = x
+            x = layers.MaxPooling2D(2)(x)
+            
+            x = layers.Conv2D(512, 3, padding='same', activation='leaky_relu')(x)
+            x = layers.MaxPooling2D(2, strides=1, padding='same')(x)
+            
+            x = layers.Conv2D(1024, 3, padding='same', activation='leaky_relu')(x)
+            
+            # Detection head 1
+            x = layers.Conv2D(256, 1, padding='same', activation='leaky_relu')(x)
+            route_2 = x
+            x = layers.Conv2D(512, 3, padding='same', activation='leaky_relu')(x)
+            output_1 = layers.Conv2D(3 * (5 + num_classes), 1, padding='same')(x)
+            
+            # Detection head 2
+            x = layers.Conv2D(128, 1, padding='same', activation='leaky_relu')(route_2)
+            x = layers.UpSampling2D(2)(x)
+            x = layers.Concatenate()([x, route_1])
+            x = layers.Conv2D(256, 3, padding='same', activation='leaky_relu')(x)
+            output_2 = layers.Conv2D(3 * (5 + num_classes), 1, padding='same')(x)
+            
+            model = keras.Model(inputs=inputs, outputs=[output_1, output_2])
+            return model
+        
+        # YOLO loss function
+        def yolo_loss(y_true, y_pred):
+            """Simplified YOLO loss function."""
+            # In production, implement proper YOLO loss with:
+            # - Localization loss (IoU-based)
+            # - Objectness loss (binary cross-entropy)
+            # - Classification loss (categorical cross-entropy)
+            return tf.reduce_mean(tf.square(y_true - y_pred))
+        
+        # Build and compile model
+        with strategy.scope():
+            model = build_yolov3_tiny(
+                input_shape=(IMAGE_SIZE, IMAGE_SIZE, 3),
+                num_classes=NUM_CLASSES
+            )
+            
+            optimizer = keras.optimizers.Adam(learning_rate=LEARNING_RATE)
+            
+            model.compile(
+                optimizer=optimizer,
+                loss=[yolo_loss, yolo_loss],
+                metrics=['mae']
+            )
+        
+        print(f"\n✓ Model built successfully")
+        print(f"  Total parameters: {model.count_params():,}")
+        
+        # Callbacks
+        callbacks = [
+            keras.callbacks.ModelCheckpoint(
+                filepath='/tmp/checkpoints/yolo_epoch_{epoch:02d}_loss_{loss:.4f}.h5',
+                save_freq='epoch',
+                save_best_only=True,
+                monitor='loss',
+                verbose=1
+            ),
+            keras.callbacks.TensorBoard(
+                log_dir='/tmp/logs',
+                histogram_freq=1,
+                write_graph=True
+            ),
+            keras.callbacks.ReduceLROnPlateau(
+                monitor='loss',
+                factor=0.5,
+                patience=3,
+                min_lr=1e-7,
+                verbose=1
+            ),
+            keras.callbacks.EarlyStopping(
+                monitor='loss',
+                patience=5,
+                restore_best_weights=True,
+                verbose=1
+            ),
+        ]
+        
+        # Training
+        print("\n" + "=" * 80)
+        print("Starting Training on COCO Dataset")
+        print("=" * 80)
+        
+        history = model.fit(
+            train_dataset,
+            epochs=EPOCHS,
+            validation_data=val_dataset,
+            callbacks=callbacks,
+            verbose=1
+        )
+        
+        # Results
+        print("\n" + "=" * 80)
+        print("Training Results")
+        print("=" * 80)
+        print(f"Final training loss: {history.history['loss'][-1]:.6f}")
+        print(f"Final validation loss: {history.history['val_loss'][-1]:.6f}")
+        print(f"Best training loss: {min(history.history['loss']):.6f}")
+        print(f"Best validation loss: {min(history.history['val_loss']):.6f}")
+        
+        # Save final model
+        if not tf_config or json.loads(tf_config)['task']['index'] == 0:
+            model_path = '/tmp/yolo_coco_final.h5'
+            model.save(model_path)
+            print(f"\n✓ Final model saved to: {model_path}")
+            
+            # Save training history
+            history_path = '/tmp/training_history.json'
+            with open(history_path, 'w') as f:
+                json.dump(history.history, f, indent=2)
+            print(f"✓ Training history saved to: {history_path}")
+        
+        # Test inference on a sample
+        print("\n" + "=" * 80)
+        print("Testing Inference")
+        print("=" * 80)
+        
+        # Get a sample from validation set
+        for images, _ in val_dataset.take(1):
+            predictions = model.predict(images[:1], verbose=0)
+            print(f"Input shape: {images[0].shape}")
+            print(f"Prediction 1 shape: {predictions[0].shape}")
+            print(f"Prediction 2 shape: {predictions[1].shape}")
+            print(f"Prediction 1 range: [{predictions[0].min():.4f}, {predictions[0].max():.4f}]")
+            print(f"Prediction 2 range: [{predictions[1].min():.4f}, {predictions[1].max():.4f}]")
+        
+        print("\n" + "=" * 80)
+        print("✅ YOLO COCO Training Completed Successfully!")
+        print("=" * 80)
+        print("\nNext Steps:")
+        print("1. Implement proper YOLO loss function")
+        print("2. Add mAP evaluation metrics")
+        print("3. Implement non-maximum suppression (NMS)")
+        print("4. Add data augmentation")
+        print("5. Train on full COCO dataset")
+        print("6. Fine-tune hyperparameters")
+    
+    numNodes: 2
+    resourcesPerNode:
+      limits:
+        nvidia.com/gpu: 1
+        memory: 32Gi
+        cpu: 8
+      requests:
+        nvidia.com/gpu: 1
+        memory: 32Gi
+        cpu: 8
+
