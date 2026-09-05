@@ -5285,7 +5285,6 @@ spec:
             type: object
           status:
             description: status of TrainJob.
-            minProperties: 1
             properties:
               conditions:
                 description: conditions for the TrainJob.
