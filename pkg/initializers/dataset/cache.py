@@ -132,7 +132,14 @@ class CacheInitializer(utils.DatasetProvider):
             )
         except ApiException as e:
             logging.error(f"Failed to get TrainJob {train_job_name}: {e}")
-            return
+            raise
+
+        created_service_account = False
+        created_leader_worker_set = False
+        created_service = False
+        lws_name = f"{train_job_name}-cache"
+        service_name = f"{train_job_name}-cache-service"
+        service_account_name = f"{train_job_name}-cache"
 
         try:
             # Create ServiceAccount
@@ -152,6 +159,7 @@ class CacheInitializer(utils.DatasetProvider):
                 core_v1.create_namespaced_service_account(
                     namespace=namespace, body=service_account
                 )
+                created_service_account = True
                 logging.info(f"Created ServiceAccount {service_account.metadata.name}")
             except ApiException as e:
                 if e.status == 409:
@@ -268,14 +276,24 @@ class CacheInitializer(utils.DatasetProvider):
             }
 
             # Create LeaderWorkerSet
-            custom_api.create_namespaced_custom_object(
-                group="leaderworkerset.x-k8s.io",
-                version="v1",
-                namespace=namespace,
-                plural="leaderworkersets",
-                body=lws_body,
-            )
-            logging.info(f"Created LeaderWorkerSet {lws_body['metadata']['name']}")
+            try:
+                custom_api.create_namespaced_custom_object(
+                    group="leaderworkerset.x-k8s.io",
+                    version="v1",
+                    namespace=namespace,
+                    plural="leaderworkersets",
+                    body=lws_body,
+                )
+                created_leader_worker_set = True
+                logging.info(f"Created LeaderWorkerSet {lws_body['metadata']['name']}")
+            except ApiException as e:
+                if e.status == 409:
+                    logging.info(
+                        f"LeaderWorkerSet {lws_body['metadata']['name']} "
+                        f"already exists, skipping creation"
+                    )
+                else:
+                    raise e
 
             # Create Service
             service = client.V1Service(
@@ -296,6 +314,7 @@ class CacheInitializer(utils.DatasetProvider):
 
             try:
                 core_v1.create_namespaced_service(namespace=namespace, body=service)
+                created_service = True
                 logging.info(f"Created Service {service.metadata.name}")
             except ApiException as e:
                 if e.status == 409:
@@ -309,38 +328,57 @@ class CacheInitializer(utils.DatasetProvider):
             # Wait for LeaderWorkerSet to become ready
             # TODO:// refactor to use watch API
             while True:
-                try:
-                    lws = custom_api.get_namespaced_custom_object(
-                        group="leaderworkerset.x-k8s.io",
-                        version="v1",
-                        plural="leaderworkersets",
-                        name=lws_body["metadata"]["name"],
-                        namespace=namespace,
+                lws = custom_api.get_namespaced_custom_object(
+                    group="leaderworkerset.x-k8s.io",
+                    version="v1",
+                    plural="leaderworkersets",
+                    name=lws_body["metadata"]["name"],
+                    namespace=namespace,
+                )
+
+                conditions = lws.get("status", {}).get("conditions", [])
+                if any(
+                    c["type"] == "Available" and c["status"] == "True"
+                    for c in conditions
+                ):
+                    logging.info(
+                        f"LeaderWorkerSet {lws_body['metadata']['name']} is ready"
                     )
+                    break
 
-                    conditions = lws.get("status", {}).get("conditions", [])
-                    if any(
-                        c["type"] == "Available" and c["status"] == "True"
-                        for c in conditions
-                    ):
-                        logging.info(
-                            f"LeaderWorkerSet {lws_body['metadata']['name']} is ready"
-                        )
-                        break
-
-                    time.sleep(5)
-                except ApiException as e:
-                    raise e
+                time.sleep(5)
 
         except ApiException as e:
             logging.error(f"Cache cluster creation failed: {e}")
-            # Cleanup on failure
-            try:
-                core_v1.delete_namespaced_service_account(
-                    name=f"{train_job_name}-cache", namespace=namespace
-                )
-            except Exception as cleanup_error:
-                logging.error(f"Error cleaning up ServiceAccount: {cleanup_error}")
-            return
+            if created_service:
+                try:
+                    core_v1.delete_namespaced_service(
+                        name=service_name, namespace=namespace
+                    )
+                except Exception as cleanup_error:
+                    logging.error(f"Error cleaning up Service: {cleanup_error}")
+            if created_leader_worker_set:
+                try:
+                    custom_api.delete_namespaced_custom_object(
+                        group="leaderworkerset.x-k8s.io",
+                        version="v1",
+                        namespace=namespace,
+                        plural="leaderworkersets",
+                        name=lws_name,
+                    )
+                except Exception as cleanup_error:
+                    logging.error(
+                        f"Error cleaning up LeaderWorkerSet: {cleanup_error}"
+                    )
+            if created_service_account:
+                try:
+                    core_v1.delete_namespaced_service_account(
+                        name=service_account_name, namespace=namespace
+                    )
+                except Exception as cleanup_error:
+                    logging.error(
+                        f"Error cleaning up ServiceAccount: {cleanup_error}"
+                    )
+            raise
 
         logging.info("Cache cluster creation completed")
