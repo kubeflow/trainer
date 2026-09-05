@@ -24,8 +24,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
+	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 	volcanov1beta1 "volcano.sh/apis/pkg/apis/scheduling/v1beta1"
 
@@ -1540,4 +1543,26 @@ func (s *SecretWrapper) ControllerReference(gvk schema.GroupVersionKind, name, u
 
 func (s *SecretWrapper) Obj() *corev1.Secret {
 	return &s.Secret
+}
+
+// MakeJobSetSpecApplyWithNodeResources returns the JobSetSpec ApplyConfiguration that Info carries for a
+// trainer node container requesting res. The Runtime resources and the TrainJob
+// `.spec.trainer.resourcesPerNode` override are already merged into it by the time plugins run.
+func MakeJobSetSpecApplyWithNodeResources(res corev1.ResourceList) *jobsetv1alpha2ac.JobSetSpecApplyConfiguration {
+	return jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+		jobsetv1alpha2ac.ReplicatedJob().
+			WithName(constants.Node).
+			WithTemplate(batchv1ac.JobTemplateSpec().
+				WithSpec(batchv1ac.JobSpec().
+					WithTemplate(corev1ac.PodTemplateSpec().
+						WithSpec(corev1ac.PodSpec().
+							WithContainers(corev1ac.Container().
+								WithName(constants.Node).
+								WithResources(corev1ac.ResourceRequirements().WithRequests(res)),
+							),
+						),
+					),
+				),
+			),
+	)
 }

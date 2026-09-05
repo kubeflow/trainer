@@ -260,6 +260,8 @@ func RuntimeRefToRuntimeRegistryKey(runtimeRef trainer.RuntimeRef) string {
 }
 
 // ExtractResourcePerNodeFromRuntime extracts the Trainer resource per node from the Info object.
+// The TrainJob `.spec.trainer.resourcesPerNode` override is already merged into the Info template
+// before plugins run, so callers must not re-apply it on top of the returned resources.
 func ExtractResourcePerNodeFromRuntime(info *Info) *corev1.ResourceRequirements {
 	if jobSetSpec, ok := TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info); ok {
 		for _, rJob := range jobSetSpec.ReplicatedJobs {
