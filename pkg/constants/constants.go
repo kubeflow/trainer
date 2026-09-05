@@ -276,6 +276,18 @@ const (
 
 	// XGBoostEnvNumWorker is the env name for the total number of workers.
 	XGBoostEnvNumWorker string = "DMLC_NUM_WORKER"
+
+	// Distributed envs for JAX.
+	// Ref: https://jax.readthedocs.io/en/latest/multi_process.html
+
+	// JAXEnvNumProcesses is the env name for the total number of JAX processes.
+	JAXEnvNumProcesses string = "JAX_NUM_PROCESSES"
+
+	// JAXEnvProcessID is the env name for the JAX process ID (rank).
+	JAXEnvProcessID string = "JAX_PROCESS_ID"
+
+	// JAXEnvCoordinatorAddress is the env name for the coordinator address.
+	JAXEnvCoordinatorAddress string = "JAX_COORDINATOR_ADDRESS"
 )
 
 const (
@@ -304,6 +316,9 @@ var (
 
 	// MPIReservedEnvNames is MPI reserved env names that users must not set manually.
 	MPIReservedEnvNames = sets.New(OpenMPIEnvHostFileLocation, OpenMPIEnvKeyRSHArgs, OpenMPIEnvKeepFQDNHostNames, OpenMPIEnvDefaultSlots)
+
+	// JAXReservedEnvNames is JAX reserved env names that should not be set by users.
+	JAXReservedEnvNames = sets.New(JAXEnvNumProcesses, JAXEnvProcessID, JAXEnvCoordinatorAddress)
 
 	// ResourceInUseFinalizer is a finalizer for managed resources which is used by other resources.
 	ResourceInUseFinalizer = fmt.Sprintf("%s/resource-in-use", trainer.GroupVersion.Group)
