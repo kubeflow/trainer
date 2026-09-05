@@ -869,6 +869,240 @@ trainJob-node-1-0.trainJob slots=1
 			},
 			wantBuildError: errorGetSSHAuthSecretFromAPI,
 		},
+		"MPICH implementation is supported": {
+			info: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationMPICH, ptr.To("/root/.ssh"), ptr.To(true)).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Launcher,
+							Count: ptr.To[int32](1),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-launcher-0-0.trainJob")
+							},
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+							}},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				UID("trainJob").
+				Obj(),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationMPICH, ptr.To("/root/.ssh"), ptr.To(true)).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Launcher,
+							Count: ptr.To[int32](1),
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().
+										WithName(constants.MPISSHAuthVolumeName).
+										WithMountPath("/root/.ssh"),
+									*corev1ac.VolumeMount().
+										WithName(constants.MPIHostfileVolumeName).
+										WithMountPath("/etc/mpi"),
+								},
+								Env: []corev1ac.EnvVarApplyConfiguration{
+									*corev1ac.EnvVar().
+										WithName(constants.OpenMPIEnvHostFileLocation).
+										WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+								},
+							}},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(constants.MPISSHAuthVolumeName).
+									WithSecret(corev1ac.SecretVolumeSource().
+										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
+										WithItems(
+											corev1ac.KeyToPath().
+												WithKey(corev1.SSHAuthPrivateKey).
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
+											corev1ac.KeyToPath().
+												WithKey(constants.MPISSHPublicKey).
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
+											corev1ac.KeyToPath().
+												WithKey(constants.MPISSHPublicKey).
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
+										),
+									),
+								*corev1ac.Volume().
+									WithName(constants.MPIHostfileVolumeName).
+									WithConfigMap(corev1ac.ConfigMapVolumeSource().
+										WithName(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix)).
+										WithItems(
+											corev1ac.KeyToPath().
+												WithKey(constants.MPIHostfileName).
+												WithPath(constants.MPIHostfileName).
+												WithMode(0444),
+										),
+									),
+							},
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-launcher-0-0.trainJob")
+							},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			wantObjs: []apiruntime.Object{
+				utiltesting.MakeSecretWrapper(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
+					WithImmutable(true).
+					WithType(corev1.SecretTypeSSHAuth).
+					WithData(map[string][]byte{
+						constants.MPISSHPublicKey: []byte("EXIST"),
+						corev1.SSHAuthPrivateKey:  []byte("EXIST"),
+					}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
+					Obj(),
+				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
+					WithData(map[string]string{
+						constants.MPIHostfileName: `trainJob-launcher-0-0.trainJob slots=1
+`,
+					}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
+					Obj(),
+			},
+		},
+		"Intel implementation is supported": {
+			info: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationIntel, ptr.To("/root/.ssh"), ptr.To(true)).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Launcher,
+							Count: ptr.To[int32](1),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-launcher-0-0.trainJob")
+							},
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+							}},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				UID("trainJob").
+				Obj(),
+			wantInfo: &runtime.Info{
+				Labels:      make(map[string]string),
+				Annotations: make(map[string]string),
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationIntel, ptr.To("/root/.ssh"), ptr.To(true)).
+						Obj(),
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Launcher,
+							Count: ptr.To[int32](1),
+							Containers: []runtime.Container{{
+								Name: constants.Node,
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().
+										WithName(constants.MPISSHAuthVolumeName).
+										WithMountPath("/root/.ssh"),
+									*corev1ac.VolumeMount().
+										WithName(constants.MPIHostfileVolumeName).
+										WithMountPath("/etc/mpi"),
+								},
+								Env: []corev1ac.EnvVarApplyConfiguration{
+									*corev1ac.EnvVar().
+										WithName(constants.OpenMPIEnvHostFileLocation).
+										WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+								},
+							}},
+							Volumes: []corev1ac.VolumeApplyConfiguration{
+								*corev1ac.Volume().
+									WithName(constants.MPISSHAuthVolumeName).
+									WithSecret(corev1ac.SecretVolumeSource().
+										WithSecretName(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix)).
+										WithDefaultMode(constants.MPISSHAuthDefaultMode).
+										WithItems(
+											corev1ac.KeyToPath().
+												WithKey(corev1.SSHAuthPrivateKey).
+												WithPath(constants.MPISSHPrivateKeyFile).
+												WithMode(constants.MPISSHPrivateKeyFileMode),
+											corev1ac.KeyToPath().
+												WithKey(constants.MPISSHPublicKey).
+												WithPath(constants.MPISSHPublicKeyFile).
+												WithMode(constants.MPISSHPublicKeyFileMode),
+											corev1ac.KeyToPath().
+												WithKey(constants.MPISSHPublicKey).
+												WithPath(constants.MPISSHAuthorizedKeys).
+												WithMode(constants.MPISSHPublicKeyFileMode),
+										),
+									),
+								*corev1ac.Volume().
+									WithName(constants.MPIHostfileVolumeName).
+									WithConfigMap(corev1ac.ConfigMapVolumeSource().
+										WithName(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix)).
+										WithItems(
+											corev1ac.KeyToPath().
+												WithKey(constants.MPIHostfileName).
+												WithPath(constants.MPIHostfileName).
+												WithMode(0444),
+										),
+									),
+							},
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-launcher-0-0.trainJob")
+							},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{PodLabels: make(map[string]string)},
+			},
+			wantObjs: []apiruntime.Object{
+				utiltesting.MakeSecretWrapper(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
+					WithImmutable(true).
+					WithType(corev1.SecretTypeSSHAuth).
+					WithData(map[string][]byte{
+						constants.MPISSHPublicKey: []byte("EXIST"),
+						corev1.SSHAuthPrivateKey:  []byte("EXIST"),
+					}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
+					Obj(),
+				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
+					WithData(map[string]string{
+						constants.MPIHostfileName: `trainJob-launcher-0-0.trainJob slots=1
+`,
+					}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
+					Obj(),
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
