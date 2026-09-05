@@ -14205,6 +14205,24 @@
           }
         }
       },
+      "trainer.v1alpha1.LogNormalSpace": {
+        "description": "LogNormalSpace defines a continuous log-normal distribution, that is a distribution whose logarithm is normal with center Mean and standard deviation StdDev. Mean and StdDev are therefore expressed in log space, so Mean may be negative while the sampled values are always positive.",
+        "type": "object",
+        "required": [
+          "mean",
+          "stdDev"
+        ],
+        "properties": {
+          "mean": {
+            "description": "mean is the center of the log-normal search space, in log space.",
+            "type": "string"
+          },
+          "stdDev": {
+            "description": "stdDev is the standard deviation of the log-normal search space, in log space.",
+            "type": "string"
+          }
+        }
+      },
       "trainer.v1alpha1.LogUniformSpace": {
         "description": "LogUniformSpace defines a continuous log-uniform distribution over [Min, Max].",
         "type": "object",
@@ -14394,6 +14412,24 @@
           },
           "storageUri": {
             "description": "storageUri is the URI for the model provider. If set, it may be empty, or it must be a valid URI format (e.g., s3://bucket/path, gs://bucket/path).",
+            "type": "string"
+          }
+        }
+      },
+      "trainer.v1alpha1.NormalSpace": {
+        "description": "NormalSpace defines a continuous normal (Gaussian) distribution centered on Mean with standard deviation StdDev.",
+        "type": "object",
+        "required": [
+          "mean",
+          "stdDev"
+        ],
+        "properties": {
+          "mean": {
+            "description": "mean is the center of the normal search space.",
+            "type": "string"
+          },
+          "stdDev": {
+            "description": "stdDev is the standard deviation of the normal search space.",
             "type": "string"
           }
         }
@@ -14978,12 +15014,30 @@
               }
             ]
           },
+          "logNormal": {
+            "description": "logNormal is the log-normal search space.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.LogNormalSpace"
+              }
+            ]
+          },
           "logUniform": {
             "description": "logUniform is the log-uniform search space.",
             "default": {},
             "allOf": [
               {
                 "$ref": "#/components/schemas/trainer.v1alpha1.LogUniformSpace"
+              }
+            ]
+          },
+          "normal": {
+            "description": "normal is the normal (Gaussian) search space.",
+            "default": {},
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/trainer.v1alpha1.NormalSpace"
               }
             ]
           },

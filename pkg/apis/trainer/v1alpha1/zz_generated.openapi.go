@@ -53,12 +53,14 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobSpecPatch":                     schema_pkg_apis_trainer_v1alpha1_JobSpecPatch(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobStatus":                        schema_pkg_apis_trainer_v1alpha1_JobStatus(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.JobTemplatePatch":                 schema_pkg_apis_trainer_v1alpha1_JobTemplatePatch(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogNormalSpace":                   schema_pkg_apis_trainer_v1alpha1_LogNormalSpace(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogUniformSpace":                  schema_pkg_apis_trainer_v1alpha1_LogUniformSpace(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicy":                         schema_pkg_apis_trainer_v1alpha1_MLPolicy(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MLPolicySource":                   schema_pkg_apis_trainer_v1alpha1_MLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.MPIMLPolicySource":                schema_pkg_apis_trainer_v1alpha1_MPIMLPolicySource(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Metric":                           schema_pkg_apis_trainer_v1alpha1_Metric(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.ModelInitializer":                 schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref),
+		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.NormalSpace":                      schema_pkg_apis_trainer_v1alpha1_NormalSpace(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.Objective":                        schema_pkg_apis_trainer_v1alpha1_Objective(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJob":                  schema_pkg_apis_trainer_v1alpha1_OptimizationJob(ref),
 		"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.OptimizationJobList":              schema_pkg_apis_trainer_v1alpha1_OptimizationJobList(ref),
@@ -1077,6 +1079,34 @@ func schema_pkg_apis_trainer_v1alpha1_JobTemplatePatch(ref common.ReferenceCallb
 	}
 }
 
+func schema_pkg_apis_trainer_v1alpha1_LogNormalSpace(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "LogNormalSpace defines a continuous log-normal distribution, that is a distribution whose logarithm is normal with center Mean and standard deviation StdDev. Mean and StdDev are therefore expressed in log space, so Mean may be negative while the sampled values are always positive.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"mean": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mean is the center of the log-normal search space, in log space.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"stdDev": {
+						SchemaProps: spec.SchemaProps{
+							Description: "stdDev is the standard deviation of the log-normal search space, in log space.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"mean", "stdDev"},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_trainer_v1alpha1_LogUniformSpace(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -1324,6 +1354,34 @@ func schema_pkg_apis_trainer_v1alpha1_ModelInitializer(ref common.ReferenceCallb
 		},
 		Dependencies: []string{
 			corev1.EnvVar{}.OpenAPIModelName(), corev1.LocalObjectReference{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_trainer_v1alpha1_NormalSpace(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NormalSpace defines a continuous normal (Gaussian) distribution centered on Mean with standard deviation StdDev.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"mean": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mean is the center of the normal search space.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"stdDev": {
+						SchemaProps: spec.SchemaProps{
+							Description: "stdDev is the standard deviation of the normal search space.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"mean", "stdDev"},
+			},
+		},
 	}
 }
 
@@ -2120,6 +2178,20 @@ func schema_pkg_apis_trainer_v1alpha1_SearchSpace(ref common.ReferenceCallback) 
 							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogUniformSpace"),
 						},
 					},
+					"normal": {
+						SchemaProps: spec.SchemaProps{
+							Description: "normal is the normal (Gaussian) search space.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.NormalSpace"),
+						},
+					},
+					"logNormal": {
+						SchemaProps: spec.SchemaProps{
+							Description: "logNormal is the log-normal search space.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogNormalSpace"),
+						},
+					},
 					"categorical": {
 						SchemaProps: spec.SchemaProps{
 							Description: "categorical is the categorical search space.",
@@ -2131,7 +2203,7 @@ func schema_pkg_apis_trainer_v1alpha1_SearchSpace(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CategoricalSpace", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogUniformSpace", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.UniformSpace"},
+			"github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.CategoricalSpace", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogNormalSpace", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.LogUniformSpace", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.NormalSpace", "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1.UniformSpace"},
 	}
 }
 

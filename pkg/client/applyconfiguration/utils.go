@@ -62,6 +62,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.JobStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("JobTemplatePatch"):
 		return &trainerv1alpha1.JobTemplatePatchApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("LogNormalSpace"):
+		return &trainerv1alpha1.LogNormalSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LogUniformSpace"):
 		return &trainerv1alpha1.LogUniformSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Metric"):
@@ -74,6 +76,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &trainerv1alpha1.ModelInitializerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("MPIMLPolicySource"):
 		return &trainerv1alpha1.MPIMLPolicySourceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("NormalSpace"):
+		return &trainerv1alpha1.NormalSpaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Objective"):
 		return &trainerv1alpha1.ObjectiveApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("OptimizationJob"):
