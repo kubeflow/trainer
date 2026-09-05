@@ -730,3 +730,161 @@ func TestFindContainerByName(t *testing.T) {
 		})
 	}
 }
+
+func TestGetNumGPUPerNode(t *testing.T) {
+	cases := map[string]struct {
+		res        *corev1.ResourceRequirements
+		wantNumGPU int
+	}{
+		"nil resources": {
+			res:        nil,
+			wantNumGPU: 0,
+		},
+		"no GPU resources": {
+			res: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+			},
+			wantNumGPU: 0,
+		},
+		"single nvidia GPU resource": {
+			res: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					"nvidia.com/gpu": resource.MustParse("8"),
+				},
+			},
+			wantNumGPU: 8,
+		},
+		"falls back to limits when requests carry no GPU": {
+			res: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+				Limits: corev1.ResourceList{
+					"nvidia.com/gpu": resource.MustParse("2"),
+				},
+			},
+			wantNumGPU: 2,
+		},
+		// GPU sharing stacks request a device count alongside memory and core
+		// resources whose names also contain "gpu". Only the device count may win.
+		"HAMi: gpu alongside gpumem": {
+			res: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"nvidia.com/gpu":    resource.MustParse("1"),
+					"nvidia.com/gpumem": resource.MustParse("3000"),
+				},
+			},
+			wantNumGPU: 1,
+		},
+		"HAMi: gpu alongside gpumem-percentage and gpucores": {
+			res: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"nvidia.com/gpu":               resource.MustParse("2"),
+					"nvidia.com/gpumem-percentage": resource.MustParse("50"),
+					"nvidia.com/gpucores":          resource.MustParse("50"),
+				},
+			},
+			wantNumGPU: 2,
+		},
+		"Volcano vGPU: number alongside memory and cores": {
+			res: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"volcano.sh/vgpu-number": resource.MustParse("1"),
+					"volcano.sh/vgpu-memory": resource.MustParse("3000"),
+					"volcano.sh/vgpu-cores":  resource.MustParse("50"),
+				},
+			},
+			wantNumGPU: 1,
+		},
+		"Alibaba: gpu-count alongside gpu-mem": {
+			res: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"aliyun.com/gpu-count": resource.MustParse("2"),
+					"aliyun.com/gpu-mem":   resource.MustParse("4096"),
+				},
+			},
+			wantNumGPU: 2,
+		},
+		"Intel: i915 alongside tiles and millicores": {
+			res: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"gpu.intel.com/i915":       resource.MustParse("1"),
+					"gpu.intel.com/tiles":      resource.MustParse("2"),
+					"gpu.intel.com/millicores": resource.MustParse("500"),
+				},
+			},
+			wantNumGPU: 1,
+		},
+		"AMD GPU resource": {
+			res: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"amd.com/gpu": resource.MustParse("4"),
+				},
+			},
+			wantNumGPU: 4,
+		},
+		// Vendor names outside the known list must keep resolving.
+		"custom vendor GPU resource": {
+			res: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("4"),
+					"example.com/gpu":  resource.MustParse("3"),
+				},
+			},
+			wantNumGPU: 3,
+		},
+		// Time-sliced NVIDIA devices are advertised under a .shared suffix.
+		"NVIDIA time-sliced GPU resource": {
+			res: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"nvidia.com/gpu.shared": resource.MustParse("4"),
+				},
+			},
+			wantNumGPU: 4,
+		},
+		// Intel splits its device count by kernel driver, and the "gpu" substring is in
+		// the domain rather than the resource name.
+		"Intel xe device count": {
+			res: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"gpu.intel.com/xe":         resource.MustParse("2"),
+					"gpu.intel.com/millicores": resource.MustParse("500"),
+				},
+			},
+			wantNumGPU: 2,
+		},
+		// The vendor domain must not disqualify a device count, only the resource name.
+		"vendor domain containing a hint word": {
+			res: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"memverge.com/gpu": resource.MustParse("2"),
+				},
+			},
+			wantNumGPU: 2,
+		},
+		// A memory-only request declares no device count, so 0 is correct. Returning
+		// 3000 here would be read as 3000 devices by every ML policy plugin.
+		"GPU memory without a device count": {
+			res: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					"nvidia.com/gpumem": resource.MustParse("3000"),
+				},
+			},
+			wantNumGPU: 0,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Repeated because the previous implementation scanned the resource map
+			// directly and returned a value that varied with map iteration order.
+			for range 100 {
+				if diff := cmp.Diff(tc.wantNumGPU, GetNumGPUPerNode(tc.res)); len(diff) != 0 {
+					t.Fatalf("Unexpected GPU count (-want,+got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
