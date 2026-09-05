@@ -500,6 +500,34 @@ func TestGetOriginalCommand(t *testing.T) {
 			want: "python train.py --epochs 10",
 		},
 		{
+			name: "the Runtime args are wrapped when the TrainJob overrides neither",
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().NumNodes(1).Obj()).
+				Obj(),
+			info: runtimeInfoWithTrainerContainer([]string{"train.sh"}, []string{"--epochs", "10"}),
+			want: "train.sh --epochs 10",
+		},
+		{
+			name: "the TrainJob args replace the Runtime ones",
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					Container("image", nil, []string{"--epochs", "3"}, nil).
+					Obj()).
+				Obj(),
+			info: runtimeInfoWithTrainerContainer([]string{"train.sh"}, []string{"--epochs", "10"}),
+			want: "train.sh --epochs 3",
+		},
+		{
+			name: "the Runtime args survive a TrainJob that overrides only the command",
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					Container("image", []string{"job.sh"}, nil, nil).
+					Obj()).
+				Obj(),
+			info: runtimeInfoWithTrainerContainer([]string{"train.sh"}, []string{"--epochs", "10"}),
+			want: "job.sh --epochs 10",
+		},
+		{
 			name: "command and args with extra spaces",
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
 				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
@@ -518,6 +546,22 @@ func TestGetOriginalCommand(t *testing.T) {
 				t.Errorf("getOriginalCommand() = %q; want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func runtimeInfoWithTrainerContainer(command, args []string) *runtime.Info {
+	return &runtime.Info{
+		TemplateSpec: runtime.TemplateSpec{
+			PodSets: []runtime.PodSet{{
+				Name:     constants.Node,
+				Ancestor: ptr.To(constants.AncestorTrainer),
+				Containers: []runtime.Container{{
+					Name:    constants.Node,
+					Command: command,
+					Args:    args,
+				}},
+			}},
+		},
 	}
 }
 
