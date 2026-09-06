@@ -173,6 +173,11 @@ manifests: controller-gen ## Generate manifests.
 		output:crd:artifacts:config=manifests/base/crds \
 		output:rbac:artifacts:config=manifests/base/rbac \
 		output:webhook:artifacts:config=manifests/base/webhook
+	@# controller-gen does not implement the +k8s:maxItems marker that upstream
+	@# Kubernetes types use to bound their lists, so the generated CRDs end up
+	@# with CEL rules on unbounded lists that the API server refuses to install.
+	@# Restore those bounds and verify the CRDs would be accepted.
+	go run ./hack/crdschema manifests/base/crds/trainer.kubeflow.org_*.yaml
 	@# controller-gen emits no license header. Prepend the year-less
 	@# boilerplate to each generated manifest. controller-gen rewrites these
 	@# files in full on every run, so prepending here once is idempotent.

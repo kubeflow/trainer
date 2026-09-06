@@ -619,6 +619,7 @@ spec:
                                             required:
                                             - name
                                             type: object
+                                          maxItems: 4
                                           type: array
                                           x-kubernetes-list-map-keys:
                                           - name
