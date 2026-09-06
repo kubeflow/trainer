@@ -22,18 +22,18 @@ set -o pipefail
 set -x
 
 if [ -z "${NOTEBOOK_INPUT}" ]; then
-    echo "NOTEBOOK_INPUT env variable must be set to run this script."
-    exit 1
+  echo "NOTEBOOK_INPUT env variable must be set to run this script."
+  exit 1
 fi
 
 if [ -z "${NOTEBOOK_OUTPUT}" ]; then
-    echo "NOTEBOOK_OUTPUT env variable must be set to run this script."
-    exit 1
+  echo "NOTEBOOK_OUTPUT env variable must be set to run this script."
+  exit 1
 fi
 
 if [ -z "${PAPERMILL_TIMEOUT}" ]; then
-    echo "PAPERMILL_TIMEOUT env variable must be set to run this script."
-    exit 1
+  echo "PAPERMILL_TIMEOUT env variable must be set to run this script."
+  exit 1
 fi
 
 # PAPERMILL_PARAMS should contain full papermill parameter flags.
@@ -41,26 +41,26 @@ fi
 PAPERMILL_PARAMS="${PAPERMILL_PARAMS:-}"
 
 print_results() {
-    # Only run kubectl commands if we're testing Kubernetes notebooks
-    if command -v kubectl &> /dev/null && kubectl cluster-info &> /dev/null; then
-        # Always show TrainJob status
-        kubectl describe trainjob
-        kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
-        kubectl wait trainjob --for=condition=Complete --all --timeout 30s
+  # Only run kubectl commands if we're testing Kubernetes notebooks
+  if command -v kubectl &> /dev/null && kubectl cluster-info &> /dev/null; then
+    # Always show TrainJob status
+    kubectl describe trainjob
+    kubectl logs -n kubeflow-system -l app.kubernetes.io/name=trainer
+    kubectl wait trainjob --for=condition=Complete --all --timeout 30s
 
-        # Only check pod logs if pods exist (not for local backends)
-        if kubectl get pods -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node --no-headers 2>/dev/null | grep -q .; then
-            echo "Found training pods - showing pod details and logs"
-            kubectl get pods
-            kubectl describe pod
-            kubectl logs -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node,batch.kubernetes.io/job-completion-index=0 --tail -1
-        else
-            echo "No training pods found (local backend used - training runs outside Kubernetes)"
-        fi
+    # Only check pod logs if pods exist (not for local backends)
+    if kubectl get pods -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node --no-headers 2> /dev/null | grep -q .; then
+      echo "Found training pods - showing pod details and logs"
+      kubectl get pods
+      kubectl describe pod
+      kubectl logs -l jobset.sigs.k8s.io/replicatedjob-name=trainer-node,batch.kubernetes.io/job-completion-index=0 --tail -1
     else
-        echo "Skipping kubectl commands (not a Kubernetes test)"
+      echo "No training pods found (local backend used - training runs outside Kubernetes)"
     fi
+  else
+    echo "Skipping kubectl commands (not a Kubernetes test)"
+  fi
 }
 
 (papermill "${NOTEBOOK_INPUT}" "${NOTEBOOK_OUTPUT}" ${PAPERMILL_PARAMS} --execution-timeout "${PAPERMILL_TIMEOUT}" && print_results) ||
-    (print_results && exit 1)
+  (print_results && exit 1)

@@ -43,7 +43,7 @@ echo "${hosts}" > ${installRoot}/etc/flux/system/hostlist
 
 # Write the broker configuration
 mkdir -p ${installRoot}/etc/flux/config
-cat <<EOT >> ${installRoot}/etc/flux/config/broker.toml
+cat << EOT >> ${installRoot}/etc/flux/config/broker.toml
 %s
 EOT
 

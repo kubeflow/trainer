@@ -36,7 +36,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: 3.12
+          python-version: "3.12"
 
       - name: Check KubeLinter
         run: make lint-manifests
@@ -46,3 +46,15 @@ jobs:
 
       - name: Check boilerplate headers
         run: make verify-boilerplate
+
+      - name: Check shell script formatting
+        run: |
+          make shell-fmt
+          if ! git diff --quiet; then
+            echo "Shell scripts are not formatted. Run 'make shell-fmt' and commit the changes."
+            git diff
+            exit 1
+          fi
+
+      - name: Run shellcheck
+        run: make shell-lint
