@@ -3,7 +3,7 @@
 Authors:
 
 - Yassin Nouh - [@YassinNouh21](https://github.com/YassinNouh21)
-- Shady Zaher - [@szaher](https://github.com/szaher)
+- Saad Zaher - [@szaher](https://github.com/szaher)
 
 Creation date: 2026-02-11
 
@@ -130,8 +130,8 @@ TrainerClient().train(
             model_name_or_path="Qwen/Qwen2.5-0.5B",
             dataset_name="trl-lib/Capybara",
             learning_rate=2e-5,
+            num_nodes=2,
         ),
-        num_nodes=2,
     ),
 )
 ```
@@ -144,6 +144,10 @@ before the job is submitted, not a flag TRL silently ignores at runtime:
 
 ```python
 TrainerClient().train(
+    initializer=Initializer(
+        model=HuggingFaceModelInitializer(storage_uri="hf://Qwen/Qwen2.5-0.5B"),
+        dataset=HuggingFaceDatasetInitializer(storage_uri="hf://trl-lib/tldr"),
+    ),
     trainer=BuiltinTrainer(
         config=TRLConfig(
             method=TRLGRPOConfig(
@@ -151,15 +155,15 @@ TrainerClient().train(
                 num_generations=8,
                 reward_funcs=["think_format_reward"],
             ),
-            model_name_or_path="Qwen/Qwen2.5-0.5B",
-            dataset_name="trl-lib/tldr",
             learning_rate=1e-6,
+            num_nodes=2,
+            resources_per_node={"gpu": 1},
         ),
-        num_nodes=2,
-        resources_per_node={"gpu": 1},
     ),
 )
 ```
+
+The model and dataset come from the `Initializer` here, so the config names neither.
 
 #### Story 4: Community adds a framework out of tree
 
@@ -190,8 +194,9 @@ this — see [What torchrun gives up](#what-torchrun-gives-up).
 | Risk | Mitigation |
 |---|---|
 | **A silently degraded run looks like success.** The `trl-demo` failure exited 0 on both pods, so a two-node job that trained two isolated copies was indistinguishable from one that trained jointly. torchrun-first removes that particular cause, not the class. | The E2E test asserts the achieved world size from the logs, not just `Complete`. Closing the class needs a runtime→status channel, which is out of scope here — see [Open Questions](#open-questions). |
-| **TRL's surface is not frozen**, and typed configs mirroring its flags will drift. TRL moved PPO to `trl.experimental` in a minor release. | The configs target the *script flags*, not the Python API, so a TRL upgrade changes the image rather than the SDK types, and drift is confined to the per-method config classes. The launch-path proof re-runs on every `trl` version bump. |
+| **TRL's surface is not frozen**, and typed configs mirroring its flags will drift. TRL moved PPO to `trl.experimental` and then dropped it from the package altogether. | The configs target the *script flags*, not the Python API, so a TRL upgrade changes the image rather than the SDK types, and drift is confined to the per-method config classes. The launch-path proof re-runs on every `trl` version bump. |
 | **TRL ignores unknown flags.** `trl/scripts/*.py` parse with `fail_with_unknown_args=False`, so a misapplied flag is dropped rather than rejected. | The typed per-method configs make a wrong-method parameter a construction-time `TypeError` in the SDK, before the TrainJob is created. This is the primary reason for the config shape in [Choosing the config shape](#choosing-the-config-shape). |
+| **`extra_args` reopens the silent-ignore hole** for anything passed through it, since those flags are not typed and TRL will not reject them. | Accepted by design: it is the escape hatch for the 161 shared flags, documented as unvalidated. Everything the KEP types is still checked at construction. |
 | **A framework registered twice** (in-tree and out-of-tree) claims the same label. | Registration is explicit and import-ordered; a later registration wins, which is what lets a fork shadow a stalled in-tree config. Documented, not silent. |
 
 ## Design Details
@@ -216,8 +221,9 @@ trainer container:
 | `PET_MASTER_ADDR` | `<trainjob>-node-0-0.<trainjob>` | `torch.go:161-162` |
 | `PET_MASTER_PORT` | `29500` | `torch.go:163-165` |
 
-It also opens port 29500 for the headless service, and rejects a `TrainJob` that tries to set
-any of those five variables itself.
+It also opens port 29500 for the headless service, and `Validate` rejects a `TrainJob` that tries
+to set any of those five variables itself (`torch.go:67-77`, against
+`constants.TorchRunReservedEnvNames`).
 
 There is exactly one framework-specific branch: when `spec.trainer.command` equals
 `["tune", "run"]`, the plugin withholds `PET_MASTER_ADDR` / `PET_MASTER_PORT` and rewrites the
@@ -270,59 +276,51 @@ torchrun-native frameworks in the Trainer already use, Megatron included.
 
 #### Proof of concept
 
-Three runs — two on the cluster, one reproducible locally — all with the exact `PET_*`
-variables the unmodified torch plugin injects. The only difference is what consumed them.
+Three runs, all with the exact `PET_*` variables the unmodified torch plugin injects. The only
+difference is what consumed them.
 
-| Run | Where | Consumer of `PET_*` | Outcome |
-|---|---|---|---|
-| `probe-rendezvous` | cluster, 2 CPU nodes | bare `torchrun` | `[Gloo] Rank 1 is connected to 1 peer ranks`, then `rank=1 world_size=2 allreduce=2.0`. **Real rendezvous** from the plugin's injected env. |
-| torchrun + TRL script | Linux container, 2 simulated nodes | `torchrun -m trl.scripts.sft` — the runtime's exact command | First-step `epoch` moved from `0.05882` (1/17, single-node control) to `0.1111` (1/9): the dataset sharded across 2 ranks. **World size 2**, both launches completed. |
-| `trl-demo` | cluster, 2 CPU nodes | `trl sft` → `accelerate launch`, via a flag-translating entrypoint | Flags translated **correctly** per pod, yet `epoch` advanced `1/52002` per step instead of `2/52002`: **world size 1**. Both pods `Succeeded`, TrainJob `Complete` — a silent failure. |
+- **Cluster, bare torchrun.** Two CPU pods reached `world_size=2` with a Gloo all-reduce summing
+  to `2.0` — real rendezvous from the plugin's injected env, so the plugin→torchrun half holds on
+  real infrastructure.
+- **Container, `torchrun -m trl.scripts.sft`** — the runtime's exact command, with only the five
+  `PET_*` set and no topology flags. The first-step `epoch` moved from `0.05882` (1/17, single-node
+  control) to `0.1111` (1/9), so the dataset sharded across 2 ranks: **world size 2**.
+- **Cluster, `trl sft` → `accelerate launch`.** Flags translated correctly per pod, yet the run
+  stayed at **world size 1** while both pods reported `Succeeded` and the TrainJob `Complete` — the
+  silent failure that rules the CLI out.
 
-The probe proves the plugin→torchrun half on real infrastructure: each rank contributes `1.0`
-to a Gloo all-reduce, so a sum of `2.0` can only come from two processes that exchanged data.
-The container run proves the torchrun→TRL half with TRL's real `sft.py`, launched with **only**
-the five `PET_*` variables set — no topology flags, no CLI. The epoch value cannot lie: 17
-examples become 9 steps/epoch only when the data is split across 2 workers, and a worker that
-failed to connect would hang rather than complete. The run is committed as
-`examples/trl/local_torchrun_proof.sh` (needs only docker) and used `--use_cpu`, so reproducing
-it — and the eventual cluster E2E — needs no GPUs.
+Full write-up, the reproduction script (docker only, `--use_cpu`, no GPUs) and the draft image and
+manifests: [`examples/trl/README.md` on the PoC branch](https://github.com/YassinNouh21/trainer/blob/01b96f38608467d96acfc01c7500d49ebeca5d6f/examples/trl/README.md).
 
-**What is not yet proven.** The two halves were verified separately: cross-pod rendezvous on
-the cluster, and the TRL script under torchrun locally. Running the TRL script across two real
-pods is the remaining step, and it is the first item of the E2E phase. Nothing in the two
-results suggests it will behave differently — the local run used the manifest's exact command,
-and the pod-to-pod path is what the probe already exercised — but it has not been run.
+**What is not yet proven.** The two halves were verified separately — cross-pod rendezvous on the
+cluster, and the TRL script under torchrun in a container. Running the TRL script across two real
+pods is the remaining step and the first item of the E2E phase.
 
 #### Limitation: the TRL CLI and `accelerate launch`
 
-The TRL CLI cannot be the runtime command. `trl-demo` failed for two causes, both in
-accelerate's launcher and both **exiting 0** — JobSet observes completion, the TrainJob reports
-`Succeeded`, and no signal reaches the control plane:
+The TRL CLI cannot be the runtime command. The `accelerate launch` run failed for two causes,
+both in accelerate's launcher and both **exiting 0**, so JobSet observes completion, the TrainJob
+reports `Succeeded`, and no signal reaches the control plane:
 
-1. **`--use_cpu` disables every distributed path** *(demonstrated on the cluster)*. Each
-   distributed branch in `launch_command` is guarded `... and not args.cpu`, so a CPU run falls
-   through to `simple_launcher`, which never sets `RANK` / `WORLD_SIZE`.
-2. **`--multi_gpu` is inferred only from local device count** *(from source)*. Accelerate
-   auto-enables it when `torch.cuda.device_count() > 1` in the current process — never true at
-   one GPU per pod.
+1. **`--use_cpu` disables every distributed path**, so a CPU run falls through to the simple
+   launcher, which never sets `RANK` / `WORLD_SIZE`. Demonstrated on the cluster.
+2. **Multi-GPU is inferred from the local device count** in the current process, which is never
+   above one at one GPU per pod.
 
-Both are properties of the *launcher* and vanish when torchrun launches the script: the
-container run in [Proof of concept](#proof-of-concept) used `--use_cpu` and still reached world
-size 2, because in-process accelerate reads the env torchrun had already exported.
+Both are properties of the *launcher* and vanish when torchrun launches the script: the container
+run above used `--use_cpu` and still reached world size 2, because in-process accelerate reads the
+env torchrun had already exported. The source-level detail is in the
+[PoC write-up](https://github.com/YassinNouh21/trainer/blob/01b96f38608467d96acfc01c7500d49ebeca5d6f/examples/trl/README.md).
 
-Choosing torchrun is also the pattern the Trainer already follows for other frameworks —
-Megatron runs under the torchrun launcher today — so TRL joins an established path rather than
-introducing a second one. Axolotl and LlamaFactory can both be launched by torchrun as well,
-which is a useful signal for later frameworks but not part of this proposal.
+Choosing torchrun is also the pattern the Trainer already follows — Megatron runs under the
+torchrun launcher today — so TRL joins an established path rather than introducing a second one.
 
 ##### What torchrun gives up
 
 Most of what `accelerate launch` configures is also exposed by HF `TrainingArguments`, so it
-survives as ordinary script flags: `--deepspeed`, `--fsdp`, `--fsdp_config`,
-`--accelerator_config`, `--bf16` / `--fp16`, `--gradient_checkpointing`, `--torch_compile`,
-`--ddp_backend`. DeepSpeed and FSDP are therefore **not** lost. What is genuinely unavailable
-under torchrun:
+survives as ordinary script flags: `--deepspeed`, `--fsdp`, `--fsdp_config`, `--bf16` / `--fp16`,
+`--gradient_checkpointing`, `--torch_compile`, `--ddp_backend`. DeepSpeed and FSDP are therefore
+**not** lost. What is genuinely unavailable under torchrun:
 
 | Not available | Impact |
 |---|---|
@@ -332,16 +330,15 @@ under torchrun:
 | `--mixed_precision`, `--dynamo_backend` at launch time | Covered by `--bf16` / `--fp16` and `--torch_compile` on the script. |
 | `--mpirun_hostfile` | Only needed because accelerate cannot do multi-process CPU without MPI. torchrun does it natively over gloo, so this is a limitation torchrun *removes*. |
 
-**Elasticity and preemption are not lost either.** For multi-GPU and DeepSpeed,
-`accelerate launch` runs torchrun itself — `import torch.distributed.run as distrib_run`, then
-`distrib_run.run(args)` — and its elastic flags (`--max_restarts`, `--monitor_interval`,
-`--rdzv_backend`, `--rdzv_conf`) are passed straight through to torchrun's own parser. Calling
-torchrun directly gives the same behaviour with one less layer.
+Elasticity is not lost either: for multi-GPU and DeepSpeed, `accelerate launch` runs torchrun
+itself and passes its elastic flags straight through, so calling torchrun directly gives the same
+behaviour with one less layer. Elastic training is in any case unsupported by the Trainer for
+either launcher (`torch.go:109`).
 
 **In short: we do not use accelerate's launcher — torchrun launches TRL's script directly.**
-accelerate is still in the image because TRL depends on it (`accelerate>=1.4.0`, and HF
-`Trainer` cannot be imported without it), but in-process it only reads the variables torchrun
-exported. What is excluded here is a second launcher, not a library.
+accelerate is still in the image because TRL depends on it (`accelerate>=1.4.0`, and HF `Trainer`
+cannot be imported without it), but in-process it only reads the variables torchrun exported. What
+is excluded here is a second launcher, not a library.
 
 #### What changes in the plugin
 
@@ -431,10 +428,10 @@ points:
 
 | # | Coupling | Location |
 |---|---|---|
-| 1 | `BuiltinTrainer.config` annotated with the concrete `TorchTuneConfig` | `types.py:226-236` |
-| 2 | Framework identifier derived by reflecting on that annotation | `types.py:239-240` |
-| 3 | `trainer_type` and entrypoint selected by string-comparing the label against it | `utils.py:114-119`, `:140-158` |
-| 4 | Config-to-argument translation guarded by `isinstance(..., TorchTuneConfig)` | `utils.py:451-452` |
+| 1 | `BuiltinTrainer.config` annotated with the concrete `TorchTuneConfig` | `types.py:241` |
+| 2 | Framework identifier derived by reflecting on that annotation (`BuiltinTrainer.__annotations__["config"].__name__`) | `types.py:245` |
+| 3 | `trainer_type` and entrypoint selected by string-comparing the label against it | `utils.py:125-129`, `:152-159` |
+| 4 | Config-to-argument translation guarded by `isinstance(..., TorchTuneConfig)` | `utils.py:465` |
 
 Coupling #3 is the one that blocks everything else. `trainer_type` is not a field on the
 Runtime CR; the SDK computes it as `BUILTIN_TRAINER if framework == TORCH_TUNE else
@@ -530,6 +527,8 @@ class TRLGRPOConfig(TRLMethodConfig):
     loss_type: Optional[Literal[
         "grpo", "dr_grpo", "dapo", "bnpo", "cispo", "sapo", "luspo", "vespo"]] = None
     num_generations: Optional[int] = None
+    # Upstream reward_funcs lives on GRPOScriptArguments, not GRPOConfig;
+    # merged here on purpose so one object covers the method's whole surface.
     reward_funcs: Optional[list[str]] = None
 
 
@@ -544,8 +543,9 @@ class TRLConfig(FrameworkConfig):
 
     method: TRLMethodConfig                         # the typed slot
 
-    model_name_or_path: str
-    dataset_name: str
+    # Normally supplied by the Initializer; set these only without one.
+    model_name_or_path: Optional[str] = None
+    dataset_name: Optional[str] = None
 
     learning_rate: Optional[float] = None
     num_train_epochs: Optional[int] = None
@@ -557,14 +557,23 @@ class TRLConfig(FrameworkConfig):
     lora_alpha: Optional[int] = None
     lora_target_modules: Optional[list[str]] = None
 
+    # Kubeflow placement, never rendered as flags. Mirrors TorchTuneConfig.
+    num_nodes: Optional[int] = None
+    resources_per_node: Optional[dict] = None
+
+    # Escape hatch for the shared TRL flags this class does not type.
+    extra_args: Optional[dict[str, str]] = None
+
     def to_args(self) -> list[str]:
         """[trl.scripts.<module>, --flag, value, ...]: the module name first
-        (torchrun's -m positional), then shared flags, then the method's own.
-        Bools become store_true flags, lists expand after their flag."""
+        (torchrun's -m positional), then shared flags, the method's own, then
+        extra_args. Bools become store_true flags, lists expand after their
+        flag. num_nodes and resources_per_node are never rendered."""
         return (
             [f"trl.scripts.{self.method.module}"]
             + self._shared_args()
             + self.method.to_args()
+            + self._extra_args()
         )
 ```
 
@@ -577,21 +586,50 @@ arguments, please refer to the `TrainingArguments` documentation." Splitting alo
 seam means each field is declared once, and the split matches upstream rather than inventing
 one.
 
-`model_name_or_path` and `dataset_name` come from `ModelConfig` and `ScriptArguments`, which
-are also method-independent, so they belong outside too.
+The split is also lopsided, which is what makes it worth making once: **161 flags are shared**
+(`TrainingArguments` 133, `ModelConfig` 19, `ScriptArguments` 6, `DatasetMixtureConfig` 3),
+against 11 to 79 that are method-specific, GRPO being the 79. Under a per-method design those
+161 would be re-frozen in every exported constructor.
+
+`model_name_or_path` and `dataset_name` come from `ModelConfig` and `ScriptArguments`, which are
+also method-independent, so they belong outside too. Both are `Optional`: see
+[Where the model and dataset come from](#where-the-model-and-dataset-come-from).
+
+`num_nodes` and `resources_per_node` are not TRL flags at all — they are Kubeflow placement
+knobs, and they sit here because `TorchTuneConfig` already carries them and `BuiltinTrainer` has
+no fields of its own. `to_args()` never renders them.
+
+`extra_args` is the escape hatch for the shared flags this class does not type. 161 is too many
+to enumerate, and a user who needs `--gradient_accumulation_steps` should not have to wait for an
+SDK release. It is rendered last, so it can also override anything above it.
+
+##### Where the model and dataset come from
+
+TorchTune takes both from the runtime plus the `Initializer` and has no model or dataset fields
+on its config at all. TRL's scripts need `--model_name_or_path` and `--dataset_name` as flags, so
+naming them on the config would create a second source with no stated precedence.
+
+The rule: **the `Initializer` wins, and the config fields are the no-initializer path.** When an
+`Initializer` is present the backend appends `--model_name_or_path=/workspace/model` and
+`--dataset_name=/workspace/dataset` — the same "staging knowledge the backend owns" rule the KEP
+already applies to TorchTune's `dataset.data_files=` overrides, and the same
+`constants.MODEL_PATH` / `DATASET_PATH` the SDK already defines. Setting both an `Initializer`
+and the matching config field is a `ValueError` at submit rather than a silent precedence rule.
 
 #### Choosing the config shape
 
-Three shapes were considered. The one above is B.
+Four shapes were considered. The one above is C. The full comparison, with the upstream field
+counts behind it, is in the [design note](https://claude.ai/code/artifact/29468417-11ca-42d8-a8d2-b23c0939a14c).
 
-| | **A. Flat + method enum** | **B. Typed slot** (chosen) | **C. Top-level per-method configs** |
-|---|---|---|---|
-| Call | `TRLConfig(method=TRLMethod.GRPO, beta=0.04)` | `TRLConfig(method=TRLGRPOConfig(beta=0.04), ...)` | `BuiltinTrainer(config=TRLGRPOConfig(...))` |
-| Wrong-method parameter | accepted, then **silently dropped by TRL** | `TypeError` at construction | `TypeError` at construction |
-| Conflicting field types | **cannot be typed** — see below | each declared once, correctly | each declared once, correctly |
-| Shared fields | declared once | declared once | **duplicated** per class, or need a shared base |
-| Registry | one config per framework ✓ | one config per framework ✓ | **N configs claim one label** — needs a registry redesign |
-| Adding a method | one enum member + one map entry | one dataclass | one dataclass + a new export + registry change |
+| | **A. Flat + method enum** | **B. Per-method configs** | **C. Typed slot** (chosen) | **D. C + shared model/dataset specs** |
+|---|---|---|---|---|
+| Call | `TRLConfig(method=TRLMethod.GRPO, beta=0.04)` | `BuiltinTrainer(config=TRLGRPOConfig(...))` | `TRLConfig(method=TRLGRPOConfig(...), ...)` | four nested objects |
+| Objects per job | 1 | 1 | 2 | 4 |
+| Wrong-method parameter | accepted, then **silently dropped by TRL** | `TypeError` at construction | `TypeError` at construction | as C |
+| Conflicting field types | **cannot be typed** | each declared once, correctly | each declared once, correctly | as C |
+| The 161 shared flags | one signature | **re-frozen in every export** | one signature | one signature |
+| Registry | one config per framework ✓ | **N configs claim one label** | one config per framework ✓ | one config per framework ✓ |
+| Adding a method | one enum member + one map entry | one dataclass + a new export + registry change | one dataclass | one dataclass |
 
 **Why A cannot be typed.** The same parameter name has a different type and different valid
 values per method, verified against TRL's config sources:
@@ -600,6 +638,7 @@ values per method, verified against TRL's config sources:
 |---|---|---|---|
 | `loss_type` | `str \| None`; `'nll'`, `'dft'`, `'chunked_nll'` | `list[str]`, default `["sigmoid"]`; 15 values, combinable | `str`, default `"dapo"`; `'grpo'`, `'dr_grpo'`, `'dapo'`, `'bnpo'`, `'cispo'`, … |
 | `beta` | — | `float = 0.1`, deviation from the **reference model** | `float = 0.0`, **KL coefficient** |
+| `shuffle_dataset` | `bool = False` | — | `bool \| None = True` |
 
 A flat dataclass must pick one annotation for `loss_type`, so it is either wrong for two
 methods or degraded to `Any`. And `beta` is one name for two different quantities with
@@ -608,18 +647,25 @@ different defaults, which no annotation can disambiguate.
 **Why the type error matters here specifically.** TRL's scripts call
 `parser.parse_args_and_config(fail_with_unknown_args=False)`, so an argument that does not
 belong to the method being run is **ignored, not rejected**. A user who sets `num_generations`
-on an SFT job gets a successful run that silently ignored it. Shape A pushes that detection to
-nowhere; shape B turns it into a `TypeError` before the TrainJob is created.
+on an SFT job gets a successful run that silently ignored it. Shape A pushes that detection
+nowhere; the typed slot turns it into a `TypeError` before the TrainJob is created.
 
 The current draft's `_METHOD_SCOPED_FIELDS` map was an attempt to recover this at runtime. It
 has to be maintained either way, so expressing it as subclasses removes a hand-maintained map
 rather than adding one.
 
-**Why not C.** It reads best at the call site, but the registry is keyed one config per
-framework label, and three classes claiming `trl` would need it redesigned to represent one
-framework's internal methods. Shared fields would also be duplicated across the three classes
-or hoisted into a shared base — at which point the base *is* shape B's outer config, without
-the single entry point.
+**Why not B.** It reads best at the call site and is closest to TRL's own shape, but the registry
+is keyed one config per framework label, and three classes claiming `trl` would need it redesigned
+to represent one framework's internal methods. The 161 shared flags would also be copied into
+every public signature, so adding one shared field would touch three frozen constructors, then
+six, then eighteen — or they get hoisted into a shared base, at which point the base *is* the
+outer config, without the single entry point.
+
+**Why not D.** Grouping the shared fields further into model, dataset and training specs is
+tempting, but the surface is shared only as a concept: TRL wants `--dataset_name`, LlamaFactory
+wants `--dataset`, and TorchTune wants Hydra overrides like `model.lora_rank=16` and could not use
+the block at all. It also costs four objects per job for one framework, and it is a one-way door —
+moving fields into `config.model` later is a breaking change.
 
 **Precedent.** The typed slot is the ordinary shape for "one of N variants, plus shared
 settings": Keras `compile(optimizer=...)` takes an `Optimizer` instance with the shared
@@ -638,6 +684,10 @@ DPO / GRPO axis — TRL's README calls them "fine-tuning methods" reached "via t
 matches how sibling KEPs name a variant slot after the concept
 (KEP-3562's `algorithm=RandomSearch()`).
 
+The classes are `TRLSFTConfig` rather than `SFTConfig` for two more reasons: it matches the
+existing `TorchTuneConfig` naming, and it avoids shadowing `from trl import SFTTrainer` in the
+same notebook. It also lets `LlamaFactorySFTConfig` land later without asymmetry.
+
 #### Wiring it up
 
 `BuiltinTrainer` stays exactly where it is and keeps its construction signature; only its
@@ -652,7 +702,7 @@ BuiltinTrainer(config=TRLConfig(...))         # new, same machinery
 Three call sites change, and each one *loses* a branch:
 
 - **`get_runtime_trainer()` resolves the command through the registry**, replacing the
-  `framework == TORCH_TUNE` branch at `utils.py:150-158` and deleting
+  `framework == TORCH_TUNE` branch at `utils.py:152-159` and deleting
   `constants.TORCH_TUNE_COMMAND`:
 
   ```python
@@ -664,12 +714,12 @@ Three call sites change, and each one *loses* a branch:
   ```
 
 - **`trainer_type` comes from the registry**: `BUILTIN_TRAINER` when `get_framework()` finds a
-  registered config, `CUSTOM_TRAINER` otherwise — replacing `utils.py:114-119` and deleting the
+  registered config, `CUSTOM_TRAINER` otherwise — replacing `utils.py:125-129` and deleting the
   `TORCH_TUNE` constant. The framework label stays the sole discovery key.
 
 - **The backend has no framework branch.** One line —
   `trainer_cr.args = trainer.config.to_args()` — deletes the `isinstance` check at
-  `utils.py:451-452` rather than relocating it. `command` still comes from the runtime, exactly
+  `utils.py:465` rather than relocating it. `command` still comes from the runtime, exactly
   as today.
 
 `RuntimeTrainer.command` stays the field consumers read. It is not config-specific:
@@ -700,7 +750,7 @@ Two details preserved from the TorchTune path:
 
 | Framework | Post-training methods | Maintenance | Argument shape | torchrun path |
 |---|---|---|---|---|
-| TRL | one plain script per method under `trl/scripts/` — `sft`, `dpo`, `grpo`, `kto`, `reward`, `rloo`; PPO moved to `trl.experimental` in 0.29 ([trl#4466](https://github.com/huggingface/trl/issues/4466)) | Active (Hugging Face) | flags | native: `torchrun -m trl.scripts.<method>` |
+| TRL | one plain script per method under `trl/scripts/` — `sft`, `dpo`, `grpo`, `kto`, `reward`, `rloo`; PPO was moved to `trl.experimental` ([trl#4466](https://github.com/huggingface/trl/issues/4466)) and has since been removed entirely | Active (Hugging Face) | flags | native: `torchrun -m trl.scripts.<method>` |
 | TorchTune | SFT only, in the Kubeflow integration | Stopped 15 Jul 2025 ([#2883](https://github.com/meta-pytorch/torchtune/issues/2883)) | flags | via `tune run` (plugin rewrites the command) |
 | LlamaFactory | Broad, but built on HF `Trainer` and PEFT | Active | config file | wrapped: needs `FORCE_TORCHRUN=1` and renamed env |
 | Axolotl | Broad, but its GRPO is TRL's `GRPOTrainer` | Active | config file | native with `--launcher torchrun` (default is accelerate) |
@@ -756,9 +806,9 @@ TRL branch to the plugin.
 `mlPolicy.torch: {}`, `command: [torchrun, -m, trl.scripts.sft]`, and mounts `initializer` at
 `/workspace`.
 
-**Launch-path test** — `examples/trl/local_torchrun_proof.sh` (already committed and passing,
-see [Proof of concept](#proof-of-concept)): two `torchrun -m trl.scripts.sft` launches with only
-the five `PET_*` variables set must form world size 2, asserted by the per-step epoch value
+**Launch-path test** — the proof script from the [PoC branch](https://github.com/YassinNouh21/trainer/blob/01b96f38608467d96acfc01c7500d49ebeca5d6f/examples/trl/README.md), moved into
+`examples/trl/` as part of S1: two `torchrun -m trl.scripts.sft` launches with only the five
+`PET_*` variables set must form world size 2, asserted by the per-step epoch value
 (`0.0588` → `0.1111`); the single-node control run guards the assertion itself. Re-run on every
 `trl` version bump in `requirements.txt`.
 
@@ -769,6 +819,10 @@ Client side:
 - `to_args()` for each of `TRLSFTConfig`, `TRLDPOConfig`, `TRLGRPOConfig`: the module name is
   the first element; bools render as store_true flags; lists expand after their flag.
 - Passing a method-specific parameter to the wrong method config raises `TypeError`.
+- Setting both an `Initializer` and `model_name_or_path` (or `dataset_name`) raises `ValueError`
+  at submit; with an `Initializer` alone the rendered args carry the `/workspace` paths.
+- `num_nodes` and `resources_per_node` never appear in `to_args()` output; `extra_args` renders
+  last.
 - `register_framework` rejects a config declaring no framework or no command.
 - `get_runtime_trainer()` resolves `trainer_type` and `command` from the registry for both
   `torchtune` and `trl`, and falls through to torch/mpi/default for unregistered labels.
@@ -805,7 +859,7 @@ the client-side integration tests need a TRL runtime to run against.
 
 | Phase | Contents |
 |---|---|
-| S1 | `cmd/trainers/trl/` with pinned versions, the launch-path proof script, image publishing in the existing workflow |
+| S1 | `cmd/trainers/trl/` with pinned versions and the launch-path proof script, both promoted from the [PoC branch](https://github.com/YassinNouh21/trainer/blob/01b96f38608467d96acfc01c7500d49ebeca5d6f/examples/trl/README.md); image publishing in the existing workflow |
 | S2 | `manifests/base/runtimes/trl/` + kustomization entry, manifest tests, an `examples/trl/` TrainJob |
 | S3 | The `torch_test.go` regression cases, then the two-node cluster E2E (CPU is sufficient — the launch path is device-agnostic) |
 
@@ -874,7 +928,17 @@ TRL reachable from Python.
    understand the torchrun limitations first, which this KEP now records. It is deliberately
    kept separate from shipping TRL, along with dynamic registration (see #2): both would need
    their own design discussion, and neither blocks TRL.
-4. **Does a compute-profile runtime axis appear for GRPO?** GRPO rollouts can use a vLLM server,
+4. **Flat exports, or a `kubeflow.trainer.trl` submodule?** `TRLSFTConfig` in the existing flat
+   `__all__` matches today's `__init__.py`; a submodule keeps the top level at one name per
+   framework. Frozen once shipped, so it needs a decision before the first release rather than
+   after.
+5. **Do we expose experimental TRL methods?** PPO is the cautionary case: it was moved to
+   `trl.experimental` ([trl#4466](https://github.com/huggingface/trl/issues/4466)) and has since
+   been removed from the package entirely. Exporting a config for a method upstream later drops
+   leaves us holding a public name. The proposal is to export only methods with a stable
+   `trl/scripts/` module, and if experimental ones are ever wanted, to put them in a namespace
+   carrying no stability promise.
+6. **Does a compute-profile runtime axis appear for GRPO?** GRPO rollouts can use a vLLM server,
    which may justify a second TRL runtime. Deferred until there is a working GRPO E2E to measure.
 
 ## Implementation History
@@ -884,9 +948,13 @@ TRL reachable from Python.
 - **2026-08-16**: transferred to `kubeflow/trainer` as KEP-2839 and extended with the server
   side ([#3930](https://github.com/kubeflow/trainer/pull/3930)), superseding
   [#3263](https://github.com/kubeflow/trainer/pull/3263).
-- **2026-08-30**: proof-of-concept results added; torchrun confirmed as the launcher and the
-  `accelerate launch` route recorded as a limitation.
-- **2026-09-02**: reviewed on the Kubeflow Trainer community call. Agreed: restructure to the
+- **2026-08-23**: proof of concept built on the `poc/trl-torch-plugin` branch (pinned at
+  [`01b96f3`](https://github.com/YassinNouh21/trainer/tree/01b96f38608467d96acfc01c7500d49ebeca5d6f)); torchrun confirmed as the
+  launcher and the `accelerate launch` route recorded as a limitation.
+- **2026-08-30**: config-shape options compared in a [design note](https://claude.ai/code/artifact/29468417-11ca-42d8-a8d2-b23c0939a14c); the typed slot chosen.
+- **2026-09-02**: reviewed on the Kubeflow Trainer community call. The client-side design here
+  supersedes the parallel SDK proposal in
+  [sdk#627](https://github.com/kubeflow/sdk/pull/627), which covered the same ground. Agreed: restructure to the
   community KEP template with the server and client designs separated; drop the general SDK
   trainer hierarchy inherited from sdk#285; give `TRLConfig` a typed per-method slot instead of
   a flat config with a method enum; do **not** mirror TorchTune's per-model-family runtime
@@ -906,7 +974,7 @@ TRL reachable from Python.
 
 ## Alternatives
 
-### A flat `TRLConfig` with a method enum
+### A. A flat `TRLConfig` with a method enum
 
 The shape in the previous draft: `TRLConfig(method=TRLMethod.GRPO, beta=0.04, ...)` with a
 `_METHOD_SCOPED_FIELDS` map validating at construction. Rejected because `loss_type` and `beta`
@@ -914,12 +982,19 @@ have conflicting types and meanings across methods, so the flat class cannot be 
 because the runtime map has to be hand-maintained anyway. See
 [Choosing the config shape](#choosing-the-config-shape).
 
-### Top-level per-method configs
+### B. Top-level per-method configs
 
 `BuiltinTrainer(config=TRLGRPOConfig(...))`, with no outer TRL config. Reads best at the call
-site, but three classes would claim the `trl` label in a registry keyed one config per
-framework, and the shared fields would be duplicated or hoisted into a base that then *is* the
-outer config. See [Choosing the config shape](#choosing-the-config-shape).
+site, but three classes would claim the `trl` label in a registry keyed one config per framework,
+and the 161 shared flags would be re-frozen in every public signature or hoisted into a base that
+then *is* the outer config. See [Choosing the config shape](#choosing-the-config-shape).
+
+### D. Shared model, dataset and training specs
+
+Grouping the shared fields into nested `ModelSpec` / `DatasetSpec` objects. Rejected because the
+surface is shared only as a concept — TRL, LlamaFactory and TorchTune each name these differently,
+and TorchTune's Hydra overrides could not use the block at all — and because it is a one-way door:
+moving a field into `config.model` later is a breaking change.
 
 ### One trainer class per framework (`TRLTrainer`, `TorchTuneTrainer`)
 
@@ -959,7 +1034,11 @@ controller's release cycle.
   [#3718](https://github.com/kubeflow/trainer/pull/3718)
 - Earlier drafts, superseded: [trainer#3263](https://github.com/kubeflow/trainer/pull/3263),
   [sdk#285](https://github.com/kubeflow/sdk/issues/285),
-  [sdk#310 registry PoC](https://github.com/kubeflow/sdk/pull/310)
+  [sdk#627](https://github.com/kubeflow/sdk/pull/627) (KEP-626, the SDK-side twin of this
+  proposal), [sdk#310 registry PoC](https://github.com/kubeflow/sdk/pull/310)
+- Proof of concept: [`poc/trl-torch-plugin`](https://github.com/YassinNouh21/trainer/tree/01b96f38608467d96acfc01c7500d49ebeca5d6f)
+  — the TRL image, runtime manifest, example TrainJob and the launch-path proof script
+- Config-shape comparison: [design note](https://claude.ai/code/artifact/29468417-11ca-42d8-a8d2-b23c0939a14c)
 - [Runtime guide — the framework label](https://www.kubeflow.org/docs/components/trainer/operator-guides/runtime/)
 - [SDK types](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/types/types.py),
   [SDK TrainerClient](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/api/trainer_client.py)
@@ -980,10 +1059,10 @@ controller's release cycle.
 - `accelerate.state.PartialState` — in-process env detection: `LOCAL_RANK != -1` → multi-GPU
   (nccl); `WORLD_SIZE > 1` on CPU → multi-CPU (gloo). This is what makes the script work under
   torchrun with no launcher flags.
-- `accelerate.commands.launch` — the *launcher* limitations recorded above: `launch_command`'s
-  distributed branches are each guarded `and not args.cpu`; `prepare_simple_launcher_cmd_env`
-  sets `MASTER_ADDR` / `MASTER_PORT` but never `RANK` / `WORLD_SIZE`; the `multi_gpu`
-  auto-enable guard is keyed on `torch.cuda.device_count()`.
-- [trl#4466](https://github.com/huggingface/trl/issues/4466) — PPO moved to experimental.
+- `accelerate.commands.launch` — the source behind the two *launcher* limitations recorded above;
+  the line-level detail is in the
+  [PoC write-up](https://github.com/YassinNouh21/trainer/blob/01b96f38608467d96acfc01c7500d49ebeca5d6f/examples/trl/README.md).
+- [trl#4466](https://github.com/huggingface/trl/issues/4466) — PPO moved to experimental; it is
+  absent from `trl/trainer/` and `trl/experimental/` at main.
   [torchtune#2883](https://github.com/meta-pytorch/torchtune/issues/2883) — development halted,
   15 July 2025.
