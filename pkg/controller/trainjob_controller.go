@@ -128,6 +128,12 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	deadlineResult := r.reconcileDeadline(ctx, &trainJob)
 
+	if trainjob.IsTrainJobFinished(&trainJob) && runtime != nil {
+		if cleanUpErr := runtime.TerminalCleanup(ctx, &trainJob); cleanUpErr != nil {
+			err = errors.Join(err, cleanUpErr)
+		}
+	}
+
 	if !equality.Semantic.DeepEqual(trainJob.Status, prevTrainJob.Status) {
 		// TODO(astefanutti): Consider using SSA once controller-runtime client has SSA support
 		// for sub-resources. See: https://github.com/kubernetes-sigs/controller-runtime/issues/3183

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -65,10 +66,11 @@ type Volcano struct {
 var _ framework.EnforcePodGroupPolicyPlugin = (*Volcano)(nil)
 var _ framework.ComponentBuilderPlugin = (*Volcano)(nil)
 var _ framework.WatchExtensionPlugin = (*Volcano)(nil)
+var _ framework.TerminalCleanupPlugin = (*Volcano)(nil)
 
 const Name = "Volcano"
 
-// +kubebuilder:rbac:groups=scheduling.volcano.sh,resources=podgroups,verbs=create;get;list;watch;update;patch
+// +kubebuilder:rbac:groups=scheduling.volcano.sh,resources=podgroups,verbs=create;get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups=node.k8s.io,resources=runtimeclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=limitranges,verbs=get;list;watch
 
@@ -209,6 +211,20 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		WithBlockOwnerDeletion(true))
 
 	return []apiruntime.ApplyConfiguration{pg}, nil
+}
+
+func (v *Volcano) TerminalCleanup(ctx context.Context, trainJob *trainer.TrainJob) error {
+	if trainJob == nil || !meta.IsStatusConditionTrue(trainJob.Status.Conditions, trainer.TrainJobFailed) {
+		return nil
+	}
+	podGroup := &volcanov1beta1.PodGroup{}
+	if err := v.client.Get(ctx, client.ObjectKeyFromObject(trainJob), podGroup); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	if metav1.IsControlledBy(podGroup, trainJob) {
+		return client.IgnoreNotFound(v.client.Delete(ctx, podGroup))
+	}
+	return nil
 }
 
 type PodGroupRuntimeClassHandler struct {

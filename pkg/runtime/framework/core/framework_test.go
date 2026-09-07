@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -129,6 +130,9 @@ func TestNew(t *testing.T) {
 					&mpi.MPI{},
 				},
 				trainJobStatusPlugin: &jobset.JobSet{},
+				terminalCleanupPlugins: []framework.TerminalCleanupPlugin{
+					&volcano.Volcano{},
+				},
 			},
 		},
 		"indexer key for trainingRuntime and runtimeClass is an empty": {
@@ -2676,3 +2680,65 @@ func TestRunPreComponentBuilderPlugins(t *testing.T) {
 		})
 	}
 }
+
+type fakeTerminalCleanupPlugin struct {
+	err error
+}
+
+var _ framework.TerminalCleanupPlugin = (*fakeTerminalCleanupPlugin)(nil)
+
+const fakeTerminalCleanupPluginName = "fake-terminal-cleanup"
+
+func (f *fakeTerminalCleanupPlugin) Name() string { return fakeTerminalCleanupPluginName }
+func (f *fakeTerminalCleanupPlugin) TerminalCleanup(context.Context, *trainer.TrainJob) error {
+	return f.err
+}
+
+func TestRunTerminalCleanupPlugins(t *testing.T) {
+	errCleanupFailed := errors.New("cleanup failed")
+	cases := map[string]struct {
+		registry  fwkplugins.Registry
+		trainJob  *trainer.TrainJob
+		wantError error
+	}{
+		"terminal cleanup plugin succeeds": {
+			registry: fwkplugins.Registry{
+				fakeTerminalCleanupPluginName: func(context.Context, client.Client, client.FieldIndexer, *configapi.Configuration) (framework.Plugin, error) {
+					return &fakeTerminalCleanupPlugin{err: nil}, nil
+				},
+			},
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+		},
+		"terminal cleanup plugin fails": {
+			registry: fwkplugins.Registry{
+				fakeTerminalCleanupPluginName: func(context.Context, client.Client, client.FieldIndexer, *configapi.Configuration) (framework.Plugin, error) {
+					return &fakeTerminalCleanupPlugin{err: errCleanupFailed}, nil
+				},
+			},
+			trainJob:  testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+			wantError: errCleanupFailed,
+		},
+		"empty registry": {
+			registry: fwkplugins.Registry{},
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").Obj(),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+			cliBuilder := testingutil.NewClientBuilder()
+			fwk, err := New(ctx, cliBuilder.Build(), tc.registry, testingutil.AsIndex(cliBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = fwk.RunTerminalCleanupPlugins(ctx, tc.trainJob)
+			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+

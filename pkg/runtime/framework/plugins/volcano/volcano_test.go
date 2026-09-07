@@ -28,6 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
@@ -524,3 +525,129 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestVolcano_TerminalCleanup(t *testing.T) {
+	trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+		UID("test-uid").
+		Obj()
+
+	failedTrainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+		UID("test-uid").
+		Obj()
+	failedTrainJob.Status.Conditions = []metav1.Condition{
+		{
+			Type:   trainer.TrainJobFailed,
+			Status: metav1.ConditionTrue,
+		},
+	}
+
+	completeTrainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+		UID("test-uid").
+		Obj()
+	completeTrainJob.Status.Conditions = []metav1.Condition{
+		{
+			Type:   trainer.TrainJobComplete,
+			Status: metav1.ConditionTrue,
+		},
+	}
+
+	controlledPodGroup := &volcanov1beta1.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job",
+			Namespace: metav1.NamespaceDefault,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: trainer.GroupVersion.String(),
+					Kind:       trainer.TrainJobKind,
+					Name:       "test-job",
+					UID:        "test-uid",
+					Controller: ptr.To(true),
+				},
+			},
+		},
+	}
+
+	uncontrolledPodGroup := &volcanov1beta1.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job",
+			Namespace: metav1.NamespaceDefault,
+		},
+	}
+
+	cases := map[string]struct {
+		trainJob     *trainer.TrainJob
+		existingObjs []client.Object
+		wantDeleted  bool
+		wantErr      error
+	}{
+		"trainjob is nil": {
+			trainJob: nil,
+		},
+		"trainjob is not failed (no conditions)": {
+			trainJob:     trainJob,
+			existingObjs: []client.Object{controlledPodGroup},
+			wantDeleted:  false,
+		},
+		"trainjob is complete (not failed)": {
+			trainJob:     completeTrainJob,
+			existingObjs: []client.Object{controlledPodGroup},
+			wantDeleted:  false,
+		},
+		"trainjob is failed but podgroup does not exist": {
+			trainJob:     failedTrainJob,
+			existingObjs: nil,
+			wantDeleted:  false,
+		},
+		"trainjob is failed and podgroup exists and is controlled": {
+			trainJob:     failedTrainJob,
+			existingObjs: []client.Object{controlledPodGroup.DeepCopy()},
+			wantDeleted:  true,
+		},
+		"trainjob is failed but podgroup is not controlled by trainjob": {
+			trainJob:     failedTrainJob,
+			existingObjs: []client.Object{uncontrolledPodGroup.DeepCopy()},
+			wantDeleted:  false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			clientBuilder := utiltesting.NewClientBuilder().WithObjects(tc.existingObjs...)
+			cli := clientBuilder.Build()
+
+			v, err := New(ctx, cli, nil, nil)
+			if err != nil {
+				t.Fatalf("failed to init Volcano plugin: %v", err)
+			}
+
+			cleanupPlugin, ok := v.(framework.TerminalCleanupPlugin)
+			if !ok {
+				t.Fatalf("Volcano does not implement framework.TerminalCleanupPlugin")
+			}
+
+			err = cleanupPlugin.TerminalCleanup(ctx, tc.trainJob)
+			if diff := gocmp.Diff(tc.wantErr, err, cmpopts.EquateErrors()); diff != "" {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+
+			if tc.trainJob != nil {
+				var pg volcanov1beta1.PodGroup
+				getErr := cli.Get(ctx, client.ObjectKey{Namespace: tc.trainJob.Namespace, Name: tc.trainJob.Name}, &pg)
+				if tc.wantDeleted {
+					if !apierrors.IsNotFound(getErr) {
+						t.Errorf("expected PodGroup to be deleted, got err: %v", getErr)
+					}
+				} else if len(tc.existingObjs) > 0 {
+					if getErr != nil {
+						t.Errorf("expected PodGroup to still exist, got err: %v", getErr)
+					}
+				}
+			}
+		})
+	}
+}
+
