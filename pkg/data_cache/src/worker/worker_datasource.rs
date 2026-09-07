@@ -542,7 +542,10 @@ async fn filter_and_create_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testkit::local_table::LocalIcebergTable;
+    use arrow::array::UInt64Array;
     use arrow_schema::{DataType, Field, Schema};
+    use datafusion::prelude::SessionContext;
 
     #[test]
     fn fails_when_source_schema_contains_cache_index() {
@@ -574,5 +577,128 @@ mod tests {
             !collision,
             "Should not detect cache_index collision when column is absent"
         );
+    }
+
+    /// Reads the data files of a local table and asserts that the worker returns
+    /// every row, indexed from the offset the head node assigned.
+    #[tokio::test]
+    async fn local_iceberg_table_rows_are_read_with_cache_index()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let warehouse = tempfile::tempdir()?;
+        let table = LocalIcebergTable::create(warehouse.path(), &[3, 2]).await?;
+
+        let start_index = 100;
+        let data_source = WorkerDataSource::new(
+            table.metadata_location().to_string(),
+            table.table_name(),
+            table.schema_name(),
+            table.data_file_paths().to_vec(),
+            start_index,
+        )
+        .await?;
+
+        assert!(
+            data_source
+                .schema()
+                .field_with_name(CACHE_INDEX_COLUMN)
+                .is_ok(),
+            "worker should append the cache index column to the table schema"
+        );
+
+        let session_ctx = SessionContext::new();
+        let plan = data_source
+            .scan(&session_ctx.state(), None, &[], None)
+            .await?;
+        let batches =
+            datafusion::physical_plan::common::collect(plan.execute(0, session_ctx.task_ctx())?)
+                .await?;
+
+        let cache_index_position = data_source.schema().index_of(CACHE_INDEX_COLUMN)?;
+        let mut cache_indexes = Vec::new();
+        for batch in &batches {
+            let column = batch
+                .column(cache_index_position)
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .ok_or("cache_index is not a UInt64Array")?;
+            cache_indexes.extend(column.values().iter().copied());
+        }
+
+        assert_eq!(
+            cache_indexes.len() as u64,
+            table.row_count(),
+            "worker should read every row of the local table"
+        );
+
+        let expected: Vec<u64> = (start_index..start_index + table.row_count()).collect();
+        assert_eq!(
+            cache_indexes, expected,
+            "cache index should continue from the offset assigned by the head node"
+        );
+
+        Ok(())
+    }
+
+    /// Only the files the head node assigned should be read, even though the
+    /// table metadata lists more.
+    #[tokio::test]
+    async fn local_iceberg_table_reads_only_assigned_files()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let warehouse = tempfile::tempdir()?;
+        let table = LocalIcebergTable::create(warehouse.path(), &[3, 2]).await?;
+
+        let assigned = vec![table.data_file_paths()[0].clone()];
+        let data_source = WorkerDataSource::new(
+            table.metadata_location().to_string(),
+            table.table_name(),
+            table.schema_name(),
+            assigned,
+            0,
+        )
+        .await?;
+
+        let session_ctx = SessionContext::new();
+        let plan = data_source
+            .scan(&session_ctx.state(), None, &[], None)
+            .await?;
+        let batches =
+            datafusion::physical_plan::common::collect(plan.execute(0, session_ctx.task_ctx())?)
+                .await?;
+
+        let rows: usize = batches.iter().map(|batch| batch.num_rows()).sum();
+        assert_eq!(rows, 3, "worker should read only the assigned data file");
+
+        Ok(())
+    }
+
+    /// The collision check rejects a table that already defines `cache_index`.
+    ///
+    /// Unlike the schema-only tests above, this drives `WorkerDataSource::new`
+    /// against a real table, so it fails if the production check is removed.
+    #[tokio::test]
+    async fn rejects_local_table_that_already_has_cache_index()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let warehouse = tempfile::tempdir()?;
+        let table =
+            LocalIcebergTable::create_with_value_column(warehouse.path(), CACHE_INDEX_COLUMN, &[1])
+                .await?;
+
+        let error = WorkerDataSource::new(
+            table.metadata_location().to_string(),
+            table.table_name(),
+            table.schema_name(),
+            table.data_file_paths().to_vec(),
+            0,
+        )
+        .await
+        .expect_err("a table with a cache_index column should be rejected");
+
+        assert!(
+            error.to_string().contains(CACHE_INDEX_COLUMN),
+            "error should name the conflicting column, got: {}",
+            error
+        );
+
+        Ok(())
     }
 }
