@@ -478,6 +478,48 @@ func TestBuilderTrainer(t *testing.T) {
 				},
 			},
 		},
+		"MPI worker node receives Image but not Command without ancestor label": {
+			jobSet: makeJobSet("", constants.Node, 4, "worker"),
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Trainer: &trainer.Trainer{
+						Image:   ptr.To("docker.io/my-org/train:latest"),
+						Command: []string{"torchrun", "--nproc_per_node=4"},
+						Args:    []string{"train.py", "--epochs=10"},
+					},
+				},
+			},
+			info: &runtime.Info{},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name:  ptr.To(constants.Node),
+													Image: ptr.To("docker.io/my-org/train:latest"),
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: "",
+									},
+								},
+							},
+							Name:     ptr.To("worker"),
+							Replicas: ptr.To[int32](4),
+						},
+					},
+				},
+			},
+		},
 		"trainer ancestor merges Trainer.Env and upserts duplicate container env keys": {
 			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
 				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
