@@ -458,11 +458,20 @@ class FrameworkConfig(abc.ABC):
 
     @abstractmethod
     def to_args(self) -> list[str]:
-        """Render this config as arguments for `command`."""
+        """Render this config's own fields as arguments for `command`."""
+
+    def to_initializer_args(self, initializer: Optional["Initializer"]) -> list[str]:
+        """Render the flags that point the framework at what the Initializer
+        staged under /workspace. Default: none."""
+        return []
 ```
 
-`to_args()` renders only the config's own fields and takes no initializer: configs stay plain
-dataclasses, so nothing in `types.py` needs to know how a backend stages data.
+Two methods because the two inputs differ. `to_args()` is the config's own fields.
+`to_initializer_args()` exists because the model and dataset flags still belong to the framework
+even though the `Initializer` owns the download: TRL needs `--model_name_or_path` and
+`--dataset_name`, TorchTune needs `dataset.data_files=`, and only the config knows its own
+spelling. The staged paths are SDK constants (`constants.MODEL_PATH`, `DATASET_PATH`), so the
+config never imports a backend.
 
 The framework label resolves through a registry rather than a constant. It serves exactly one
 lookup — `get_runtime_trainer()`'s — and is the out-of-tree extension path:
@@ -488,7 +497,8 @@ shape). There is no automatic discovery: a config must be imported before it can
 constructed, and importing it registers it.
 
 `TorchTuneConfig` keeps every field and its signature, gaining `framework = "torchtune"`,
-`command = ("tune", "run")`, and a `to_args()` delegating to the existing emitter.
+`command = ("tune", "run")`, a `to_args()` delegating to the existing emitter, and a
+`to_initializer_args()` carrying the `dataset.data_files=` / `data_dir=` overrides it emits today.
 
 #### `TRLConfig` and the per-method configs
 
@@ -578,6 +588,11 @@ class TRLConfig(FrameworkConfig):
             + self.method.to_args()
             + self._extra_args()
         )
+
+    def to_initializer_args(self, initializer) -> list[str]:
+        """--model_name_or_path=/workspace/model and
+        --dataset_name=/workspace/dataset/<subpath>, using the same subpath
+        helper as TorchTuneConfig. Absent initializer: raises ValueError."""
 ```
 
 ##### Why the shared fields sit on the outer config
@@ -609,10 +624,10 @@ SDK release. It is rendered last, so it can also override anything above it.
 
 From `train(initializer=...)`, and nowhere else — exactly as for TorchTune, whose config has no
 model or dataset fields either. The SDK writes the `Initializer` into `TrainJob.spec.initializer`
-as it does today, the runtime's initializer jobs download into `/workspace`, and the backend
-appends `--model_name_or_path=/workspace/model` and `--dataset_name=/workspace/dataset/<subpath>`
-after `to_args()`. The subpath derivation already exists for TorchTune's `dataset.data_files=`
-override and becomes a shared helper rather than a second copy.
+as it does today, the runtime's initializer jobs download into `/workspace`, and
+`TRLConfig.to_initializer_args()` renders `--model_name_or_path=/workspace/model` and
+`--dataset_name=/workspace/dataset/<subpath>`. The subpath derivation already exists for
+TorchTune's `dataset.data_files=` override and becomes a shared helper rather than a second copy.
 
 Three reasons for having no string fields on the config:
 
@@ -730,8 +745,8 @@ Three call sites change, and each one *loses* a branch:
   `TORCH_TUNE` constant. The framework label stays the sole discovery key.
 
 - **The backend has no framework branch.** One line —
-  `trainer_cr.args = trainer.config.to_args()` — deletes the `isinstance` check at
-  `utils.py:465` rather than relocating it. `command` still comes from the runtime, exactly
+  `trainer_cr.args = config.to_args() + config.to_initializer_args(initializer)` — deletes
+  the `isinstance` check at `utils.py:465` rather than relocating it. `command` still comes from the runtime, exactly
   as today.
 
 `RuntimeTrainer.command` stays the field consumers read. It is not config-specific:
@@ -744,10 +759,11 @@ the one-time change this KEP is buying.
 
 Two details preserved from the TorchTune path:
 
-- **Initializer-derived path arguments stay in the backend.** The `dataset.data_files=` /
-  `data_dir=` overrides for TorchTune and the `--model_name_or_path` / `--dataset_name` paths for
-  TRL are both staging knowledge the backend owns; they are appended to whatever `to_args()`
-  renders, through one shared subpath helper.
+- **Initializer-derived path arguments move onto the config.** TorchTune's `dataset.data_files=`
+  / `data_dir=` overrides, computed today inside the backend from the HF dataset initializer,
+  become `TorchTuneConfig.to_initializer_args()`; TRL's `--model_name_or_path` /
+  `--dataset_name` are `TRLConfig.to_initializer_args()`. Both use one shared subpath helper,
+  and the backend stops knowing either spelling.
 - **`TorchTuneConfig.to_args()` delegates to the existing emitter.** `get_args_from_peft_config`
   maps `LoraConfig` onto nested `model.*` keys; a flat `key=value` walk would emit `lora_rank=8`
   instead of `model.lora_rank=8` and fail the job. The emitters move verbatim to
@@ -798,7 +814,7 @@ config and is chosen with `train(runtime=...)` — no SDK field.
 |---|---|
 | `CustomTrainer`, `CustomTrainerContainer` | **No change.** All fields retained. |
 | `BuiltinTrainer` | **Construction signature unchanged**; produces byte-identical `TrainJob` arguments for TorchTune. `config` widens to `FrameworkConfig`. Nothing deprecated. |
-| `TorchTuneConfig` | **No change** to fields or signature; gains two `ClassVar`s and `to_args()`. |
+| `TorchTuneConfig` | **No change** to fields or signature; gains two `ClassVar`s, `to_args()` and `to_initializer_args()`. |
 | `TrainerClient.train()` | **No change** to the signature. |
 | `TrainJobTemplate` | **No change.** |
 | Python version | No new floor. `kw_only=True` needs 3.10, already the SDK's minimum. |
@@ -831,8 +847,10 @@ Client side:
 - `to_args()` for each of `TRLSFTConfig`, `TRLDPOConfig`, `TRLGRPOConfig`: the module name is
   the first element; bools render as store_true flags; lists expand after their flag.
 - Passing a method-specific parameter to the wrong method config raises `TypeError`.
-- A `TRLConfig` submitted without an `Initializer` raises `ValueError`; with one, the rendered
-  args carry the `/workspace` model and dataset paths.
+- `TRLConfig.to_initializer_args()` raises `ValueError` without an `Initializer`; with one it
+  yields the `/workspace` model and dataset paths.
+- `TorchTuneConfig.to_initializer_args()` matches the `dataset.data_files=` / `data_dir=` output
+  of the current backend code byte for byte.
 - `num_nodes` and `resources_per_node` never appear in `to_args()` output; `extra_args` renders
   last.
 - `register_framework` rejects a config declaring no framework or no command.
@@ -845,7 +863,7 @@ Client side:
 
 - With the `trl-distributed` runtime installed, `BuiltinTrainer(config=TRLConfig(...))` resolves
   it by label, yields `trainer_type == BUILTIN_TRAINER`, and emits `command: [torchrun, -m]`
-  with `args == config.to_args()` (module name first). This is the **cross-repo contract**: it
+  with `args == config.to_args() + config.to_initializer_args(initializer)` (module name first). This is the **cross-repo contract**: it
   fails if either side changes the label or the launch shape.
 - `BuiltinTrainer(config=TorchTuneConfig(...))` produces byte-identical `TrainJob` arguments to
   the current implementation.
