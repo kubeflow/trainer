@@ -19,6 +19,7 @@ package core
 import (
 	"context"
 	"errors"
+	"slices"
 
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -57,7 +58,16 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 		return nil, err
 	}
 
-	for name, factory := range r {
+	// Instantiate plugins in a deterministic order for consistency across restarts.
+	// The order is arbitrary.
+	names := make([]string, 0, len(r))
+	for name := range r {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	for _, name := range names {
+		factory := r[name]
 		plugin, err := factory(ctx, c, indexer, cfg)
 		if err != nil {
 			return nil, err
