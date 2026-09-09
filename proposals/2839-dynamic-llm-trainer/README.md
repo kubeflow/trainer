@@ -114,7 +114,7 @@ the first framework to join it.
 As a platform admin, I install the Trainer and get a `trl-distributed`
 `ClusterTrainingRuntime` alongside the TorchTune runtimes. I did not have to build an image or
 write a plugin, and I can verify the runtime is correct by submitting a raw-YAML `TrainJob`
-against it before anyone uses the SDK.
+with `spec.initializer` set against it before anyone uses the SDK.
 
 #### Story 2: Data scientist runs supervised fine-tuning
 
@@ -124,17 +124,21 @@ As a data scientist, I fine-tune a model with TRL from the SDK using the same
 ```python
 TrainerClient().train(
     runtime=TrainerClient().get_runtime("trl-distributed"),
+    initializer=Initializer(
+        model=HuggingFaceModelInitializer(storage_uri="hf://Qwen/Qwen2.5-0.5B"),
+        dataset=HuggingFaceDatasetInitializer(storage_uri="hf://trl-lib/Capybara"),
+    ),
     trainer=BuiltinTrainer(
         config=TRLConfig(
             method=TRLSFTConfig(packing=True),
-            model_name_or_path="Qwen/Qwen2.5-0.5B",
-            dataset_name="trl-lib/Capybara",
             learning_rate=2e-5,
             num_nodes=2,
         ),
     ),
 )
 ```
+
+The model and dataset are given exactly as for TorchTune, through the `Initializer`.
 
 #### Story 3: Data scientist runs GRPO
 
@@ -163,7 +167,7 @@ TrainerClient().train(
 )
 ```
 
-The model and dataset come from the `Initializer` here, so the config names neither.
+The config carries only TRL flags; where the model and dataset come from is unchanged.
 
 #### Story 4: Community adds a framework out of tree
 
@@ -368,7 +372,8 @@ installing pinned `trl` + dependencies. accelerate is among them — TRL require
 in-process; its launcher is never invoked.
 
 **2. `manifests/base/runtimes/trl/`** — a **single** `ClusterTrainingRuntime`, `trl-distributed`.
-Initializer replicatedJobs are identical to the TorchTune runtimes and omitted here:
+It keeps the same two initializer replicatedJobs as the TorchTune runtimes, but pins no
+`STORAGE_URI`; the TrainJob supplies both. They are omitted here:
 
 ```yaml
 kind: ClusterTrainingRuntime
@@ -543,10 +548,8 @@ class TRLConfig(FrameworkConfig):
 
     method: TRLMethodConfig                         # the typed slot
 
-    # Normally supplied by the Initializer; set these only without one.
-    model_name_or_path: Optional[str] = None
-    dataset_name: Optional[str] = None
-
+    # No model or dataset fields: both come from train(initializer=...),
+    # exactly as for TorchTuneConfig.
     learning_rate: Optional[float] = None
     num_train_epochs: Optional[int] = None
     per_device_train_batch_size: Optional[int] = None
@@ -591,8 +594,7 @@ The split is also lopsided, which is what makes it worth making once: **161 flag
 against 11 to 79 that are method-specific, GRPO being the 79. Under a per-method design those
 161 would be re-frozen in every exported constructor.
 
-`model_name_or_path` and `dataset_name` come from `ModelConfig` and `ScriptArguments`, which are
-also method-independent, so they belong outside too. Both are `Optional`: see
+The model and dataset are not fields at all; see
 [Where the model and dataset come from](#where-the-model-and-dataset-come-from).
 
 `num_nodes` and `resources_per_node` are not TRL flags at all — they are Kubeflow placement
@@ -605,16 +607,26 @@ SDK release. It is rendered last, so it can also override anything above it.
 
 ##### Where the model and dataset come from
 
-TorchTune takes both from the runtime plus the `Initializer` and has no model or dataset fields
-on its config at all. TRL's scripts need `--model_name_or_path` and `--dataset_name` as flags, so
-naming them on the config would create a second source with no stated precedence.
+From `train(initializer=...)`, and nowhere else — exactly as for TorchTune, whose config has no
+model or dataset fields either. The SDK writes the `Initializer` into `TrainJob.spec.initializer`
+as it does today, the runtime's initializer jobs download into `/workspace`, and the backend
+appends `--model_name_or_path=/workspace/model` and `--dataset_name=/workspace/dataset/<subpath>`
+after `to_args()`. The subpath derivation already exists for TorchTune's `dataset.data_files=`
+override and becomes a shared helper rather than a second copy.
 
-The rule: **the `Initializer` wins, and the config fields are the no-initializer path.** When an
-`Initializer` is present the backend appends `--model_name_or_path=/workspace/model` and
-`--dataset_name=/workspace/dataset` — the same "staging knowledge the backend owns" rule the KEP
-already applies to TorchTune's `dataset.data_files=` overrides, and the same
-`constants.MODEL_PATH` / `DATASET_PATH` the SDK already defines. Setting both an `Initializer`
-and the matching config field is a `ValueError` at submit rather than a silent precedence rule.
+Three reasons for having no string fields on the config:
+
+- **One habit for both frameworks.** A TorchTune user already knows how to give TRL a model.
+- **A string is ambiguous.** `Qwen/Qwen2.5-0.5B` is a hub id, `/mnt/data/model` is a folder,
+  `s3://bucket/model` needs credentials. The SDK would have to guess. `Initializer` already knows,
+  and already covers S3, the data cache, and secrets for gated models.
+- **No tie-break rule.** Two ways to name a model need a rule for when both are set. One way
+  does not.
+
+A `TRLConfig` submitted without an `Initializer` is a `ValueError` in the SDK, since the
+runtime's initializer jobs would otherwise start with no `STORAGE_URI` and fail late. A shortcut
+such as `Initializer.from_hf(model=..., dataset=...)` can come later and would help TorchTune
+users equally; it is not part of this KEP.
 
 #### Choosing the config shape
 
@@ -732,10 +744,10 @@ the one-time change this KEP is buying.
 
 Two details preserved from the TorchTune path:
 
-- **TorchTune's initializer-derived dataset overrides stay in the backend.** The
-  `dataset.data_files=` / `data_dir=` args are computed from the HF dataset initializer, which
-  is staging knowledge the backend owns; they are appended to whatever `to_args()` renders.
-  `TRLConfig` needs nothing from the initializer.
+- **Initializer-derived path arguments stay in the backend.** The `dataset.data_files=` /
+  `data_dir=` overrides for TorchTune and the `--model_name_or_path` / `--dataset_name` paths for
+  TRL are both staging knowledge the backend owns; they are appended to whatever `to_args()`
+  renders, through one shared subpath helper.
 - **`TorchTuneConfig.to_args()` delegates to the existing emitter.** `get_args_from_peft_config`
   maps `LoraConfig` onto nested `model.*` keys; a flat `key=value` walk would emit `lora_rank=8`
   instead of `model.lora_rank=8` and fail the job. The emitters move verbatim to
@@ -819,8 +831,8 @@ Client side:
 - `to_args()` for each of `TRLSFTConfig`, `TRLDPOConfig`, `TRLGRPOConfig`: the module name is
   the first element; bools render as store_true flags; lists expand after their flag.
 - Passing a method-specific parameter to the wrong method config raises `TypeError`.
-- Setting both an `Initializer` and `model_name_or_path` (or `dataset_name`) raises `ValueError`
-  at submit; with an `Initializer` alone the rendered args carry the `/workspace` paths.
+- A `TRLConfig` submitted without an `Initializer` raises `ValueError`; with one, the rendered
+  args carry the `/workspace` model and dataset paths.
 - `num_nodes` and `resources_per_node` never appear in `to_args()` output; `extra_args` renders
   last.
 - `register_framework` rejects a config declaring no framework or no command.
@@ -952,6 +964,8 @@ TRL reachable from Python.
   [`01b96f3`](https://github.com/YassinNouh21/trainer/tree/01b96f38608467d96acfc01c7500d49ebeca5d6f)); torchrun confirmed as the
   launcher and the `accelerate launch` route recorded as a limitation.
 - **2026-08-30**: config-shape options compared in a [design note](https://claude.ai/code/artifact/29468417-11ca-42d8-a8d2-b23c0939a14c); the typed slot chosen.
+- **2026-09-09**: model and dataset come from `Initializer` only, as for TorchTune; no string
+  fields on `TRLConfig`.
 - **2026-09-02**: reviewed on the Kubeflow Trainer community call. The client-side design here
   supersedes the parallel SDK proposal in
   [sdk#627](https://github.com/kubeflow/sdk/pull/627), which covered the same ground. Agreed: restructure to the
