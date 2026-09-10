@@ -28,8 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
@@ -74,6 +76,62 @@ func wantJobSetWithMergedGPU(ns, name, uid string, requests corev1.ResourceList,
 	return jobSet
 }
 
+// draTorchRuntimeSpec builds a Torch runtime whose node container requests CPU only, so the
+// PET_NPROC_PER_NODE value shows whether a DRA GPU count was resolved ("auto") or not ("1").
+func draTorchRuntimeSpec(requests corev1.ResourceList) *testingutil.TrainingRuntimeSpecWrapper {
+	return testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+		WithMLPolicy(
+			testingutil.MakeMLPolicyWrapper().
+				WithNumNodes(1).
+				WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+					TorchPolicy().
+					Obj(),
+				).
+				Obj(),
+		).
+		Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, requests)
+}
+
+// wantDRATorchJobSet builds the JobSet expected from draTorchRuntimeSpec with the given PET_NPROC_PER_NODE.
+func wantDRATorchJobSet(requests corev1.ResourceList, numProcPerNode string) *testingutil.JobSetWrapper {
+	return testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+		ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+		Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
+		Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+		Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+		NumNodes(1).
+		Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, requests).
+		ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
+		Env(constants.Node, constants.Node,
+			[]corev1.EnvVar{
+				{
+					Name:  constants.TorchEnvNumNodes,
+					Value: "1",
+				},
+				{
+					Name:  constants.TorchEnvNumProcPerNode,
+					Value: numProcPerNode,
+				},
+				{
+					Name: constants.TorchEnvNodeRank,
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: constants.JobCompletionIndexFieldPath,
+						},
+					},
+				},
+				{
+					Name:  constants.TorchEnvMasterAddr,
+					Value: fmt.Sprintf("test-job-%s-0-0.test-job", constants.Node),
+				},
+				{
+					Name:  constants.TorchEnvMasterPort,
+					Value: fmt.Sprintf("%d", constants.ContainerTrainerPort),
+				},
+			}...,
+		)
+}
+
 func TestTrainingRuntimeNewObjects(t *testing.T) {
 	resRequests := corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("1"),
@@ -83,6 +141,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 	cases := map[string]struct {
 		trainingRuntime *trainer.TrainingRuntime
 		trainJob        *trainer.TrainJob
+		objs            []client.Object
 		ObjCmpOpts      []cmp.Option
 		wantObjs        []runtime.Object
 		wantError       error
@@ -2141,7 +2200,113 @@ test-job-node-0-1.test-job slots=8
 				wantJobSetWithMergedGPU(metav1.NamespaceDefault, "test-job", "uid", resRequests, "4"),
 			},
 		},
-		// Failed test cases.
+		// Test cases for the DRA resourceClaimsPerNode.
+		"resourceClaimsPerNode is added to the Pod resourceClaims and the node container claims": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				draTorchRuntimeSpec(resRequests).Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "tmpl"}).
+						Obj(),
+				).
+				Obj(),
+			wantObjs: []runtime.Object{
+				wantDRATorchJobSet(resRequests, "1").
+					PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("tmpl")}).
+					ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
+					Obj(),
+			},
+		},
+		"runtime claim with the same name is replaced by resourceClaimsPerNode": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				draTorchRuntimeSpec(resRequests).
+					PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("tmpl-a")}).
+					ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "tmpl-b"}).
+						Obj(),
+				).
+				Obj(),
+			// Only tmpl-b is seeded, so PET_NPROC_PER_NODE=auto proves the TrainJob's template was resolved.
+			wantObjs: []runtime.Object{
+				wantDRATorchJobSet(resRequests, "1").
+					PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("tmpl-b")}).
+					ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
+					Obj(),
+			},
+		},
+		"resourcesPerNode keeps the runtime's DRA claims": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				draTorchRuntimeSpec(resRequests).
+					PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("tmpl")}).
+					ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+						Obj(),
+				).
+				Obj(),
+			wantObjs: []runtime.Object{
+				wantDRATorchJobSet(resRequests, "1").
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("tmpl")}).
+					ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
+					Obj(),
+			},
+		},
+		"resourceClaimsPerNode preserves the container claim request and keeps its claim first": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				draTorchRuntimeSpec(resRequests).
+					PodResourceClaims(constants.Node,
+						corev1.PodResourceClaim{Name: "nic", ResourceClaimTemplateName: ptr.To("nic-tmpl")},
+						corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("tmpl-a")},
+					).
+					ContainerResourceClaims(constants.Node, constants.Node,
+						corev1.ResourceClaim{Name: "nic"},
+						corev1.ResourceClaim{Name: "gpu", Request: "gpu-0"},
+					).
+					Obj(),
+			).Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Trainer(
+					testingutil.MakeTrainJobTrainerWrapper().
+						ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: "tmpl"}).
+						Obj(),
+				).
+				Obj(),
+			// resourceClaimsPerNode wins on the template name, but the runtime's container-level
+			// request, which restricts the container to a subset of the claim's devices, is kept.
+			// The "gpu" claim also moves ahead of "nic" so the GPU count resolves.
+			wantObjs: []runtime.Object{
+				wantDRATorchJobSet(resRequests, "1").
+					PodResourceClaims(constants.Node,
+						corev1.PodResourceClaim{Name: "nic", ResourceClaimTemplateName: ptr.To("nic-tmpl")},
+						corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("tmpl")},
+					).
+					ContainerResourceClaims(constants.Node, constants.Node,
+						corev1.ResourceClaim{Name: "gpu", Request: "gpu-0"},
+						corev1.ResourceClaim{Name: "nic"},
+					).
+					Obj(),
+			},
+		},
 		"missing trainingRuntime resource": {
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job-3").
 				UID("uid").
@@ -2181,6 +2346,7 @@ test-job-node-0-1.test-job slots=8
 			if tc.trainingRuntime != nil {
 				clientBuilder.WithObjects(tc.trainingRuntime)
 			}
+			clientBuilder.WithObjects(tc.objs...)
 			c := clientBuilder.Build()
 
 			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
@@ -2235,6 +2401,152 @@ func TestRuntimeInfo(t *testing.T) {
 
 			if !strings.Contains(err.Error(), "unsupported runtimeTemplateSpec") {
 				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestApplyTrainerPodResourceClaims(t *testing.T) {
+	cases := map[string]struct {
+		podSpec *corev1ac.PodSpecApplyConfiguration
+		claims  []trainer.TrainerResourceClaim
+		want    []corev1ac.PodResourceClaimApplyConfiguration
+	}{
+		"no claims leaves the pod resourceClaims untouched": {
+			podSpec: corev1ac.PodSpec().WithResourceClaims(
+				corev1ac.PodResourceClaim().WithName("nic").WithResourceClaimTemplateName("nic-tmpl"),
+			),
+			want: []corev1ac.PodResourceClaimApplyConfiguration{
+				*corev1ac.PodResourceClaim().WithName("nic").WithResourceClaimTemplateName("nic-tmpl"),
+			},
+		},
+		"new claims are appended in declaration order": {
+			podSpec: corev1ac.PodSpec().WithResourceClaims(
+				corev1ac.PodResourceClaim().WithName("nic").WithResourceClaimTemplateName("nic-tmpl"),
+			),
+			claims: []trainer.TrainerResourceClaim{
+				{Name: "gpu", ResourceClaimTemplateName: "gpu-tmpl"},
+				{Name: "fpga", ResourceClaimTemplateName: "fpga-tmpl"},
+			},
+			want: []corev1ac.PodResourceClaimApplyConfiguration{
+				*corev1ac.PodResourceClaim().WithName("nic").WithResourceClaimTemplateName("nic-tmpl"),
+				*corev1ac.PodResourceClaim().WithName("gpu").WithResourceClaimTemplateName("gpu-tmpl"),
+				*corev1ac.PodResourceClaim().WithName("fpga").WithResourceClaimTemplateName("fpga-tmpl"),
+			},
+		},
+		"same-name claim is replaced in place": {
+			podSpec: corev1ac.PodSpec().WithResourceClaims(
+				corev1ac.PodResourceClaim().WithName("gpu").WithResourceClaimName("direct-claim"),
+				corev1ac.PodResourceClaim().WithName("nic").WithResourceClaimTemplateName("nic-tmpl"),
+			),
+			claims: []trainer.TrainerResourceClaim{
+				{Name: "gpu", ResourceClaimTemplateName: "gpu-tmpl"},
+			},
+			want: []corev1ac.PodResourceClaimApplyConfiguration{
+				*corev1ac.PodResourceClaim().WithName("gpu").WithResourceClaimTemplateName("gpu-tmpl"),
+				*corev1ac.PodResourceClaim().WithName("nic").WithResourceClaimTemplateName("nic-tmpl"),
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			applyTrainerPodResourceClaims(tc.podSpec, tc.claims)
+			if diff := cmp.Diff(tc.want, tc.podSpec.ResourceClaims); len(diff) != 0 {
+				t.Errorf("Unexpected pod resourceClaims (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestApplyTrainerNodeResources(t *testing.T) {
+	cases := map[string]struct {
+		container        *corev1ac.ContainerApplyConfiguration
+		resourcesPerNode *corev1.ResourceRequirements
+		claims           []trainer.TrainerResourceClaim
+		wantResources    *corev1ac.ResourceRequirementsApplyConfiguration
+		wantMerged       *corev1.ResourceRequirements
+	}{
+		"nil resourcesPerNode and no claims leaves the container untouched": {
+			container: corev1ac.Container().WithName(constants.Node).WithResources(
+				corev1ac.ResourceRequirements().WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}),
+			),
+			wantResources: corev1ac.ResourceRequirements().
+				WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}),
+		},
+		"resourcesPerNode merges requests and limits and keeps the existing claims": {
+			container: corev1ac.Container().WithName(constants.Node).WithResources(
+				corev1ac.ResourceRequirements().
+					WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1"), corev1.ResourceMemory: resource.MustParse("1Gi")}).
+					WithClaims(corev1ac.ResourceClaim().WithName("nic")),
+			),
+			resourcesPerNode: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4")},
+				Limits:   corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")},
+			},
+			wantResources: corev1ac.ResourceRequirements().
+				WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4"), corev1.ResourceMemory: resource.MustParse("1Gi")}).
+				WithLimits(corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")}).
+				WithClaims(corev1ac.ResourceClaim().WithName("nic")),
+			wantMerged: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4"), corev1.ResourceMemory: resource.MustParse("1Gi")},
+				Limits:   corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")},
+			},
+		},
+		"claims are wired onto a container without resources": {
+			container: corev1ac.Container().WithName(constants.Node),
+			claims:    []trainer.TrainerResourceClaim{{Name: "gpu", ResourceClaimTemplateName: "gpu-tmpl"}},
+			wantResources: corev1ac.ResourceRequirements().
+				WithClaims(corev1ac.ResourceClaim().WithName("gpu")),
+		},
+		"claims go first, an existing same-name entry keeps its request, other existing claims follow": {
+			container: corev1ac.Container().WithName(constants.Node).WithResources(
+				corev1ac.ResourceRequirements().WithClaims(
+					corev1ac.ResourceClaim().WithName("nic"),
+					corev1ac.ResourceClaim().WithName("gpu").WithRequest("half"),
+				),
+			),
+			claims: []trainer.TrainerResourceClaim{
+				{Name: "gpu", ResourceClaimTemplateName: "gpu-tmpl"},
+				{Name: "fpga", ResourceClaimTemplateName: "fpga-tmpl"},
+			},
+			wantResources: corev1ac.ResourceRequirements().WithClaims(
+				corev1ac.ResourceClaim().WithName("gpu").WithRequest("half"),
+				corev1ac.ResourceClaim().WithName("fpga"),
+				corev1ac.ResourceClaim().WithName("nic"),
+			),
+		},
+		"resourcesPerNode and claims are applied together": {
+			container: corev1ac.Container().WithName(constants.Node).WithResources(
+				corev1ac.ResourceRequirements().
+					WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}).
+					WithClaims(corev1ac.ResourceClaim().WithName("nic")),
+			),
+			resourcesPerNode: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+			},
+			claims: []trainer.TrainerResourceClaim{{Name: "gpu", ResourceClaimTemplateName: "gpu-tmpl"}},
+			wantResources: corev1ac.ResourceRequirements().
+				WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")}).
+				WithClaims(
+					corev1ac.ResourceClaim().WithName("gpu"),
+					corev1ac.ResourceClaim().WithName("nic"),
+				),
+			wantMerged: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			gotMerged, err := applyTrainerNodeResources(tc.container, tc.resourcesPerNode, tc.claims)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tc.wantResources, tc.container.Resources); len(diff) != 0 {
+				t.Errorf("Unexpected container resources (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantMerged, gotMerged); len(diff) != 0 {
+				t.Errorf("Unexpected merged resources (-want,+got):\n%s", diff)
 			}
 		})
 	}
