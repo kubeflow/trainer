@@ -252,12 +252,12 @@ func TestBuilderInitializer(t *testing.T) {
 															Value: ptr.To("keep-me"),
 														},
 														{
-															Name:  ptr.To(jobsetplgconsts.InitializerEnvStorageUri),
-															Value: ptr.To("hf://my-org/my-dataset"),
-														},
-														{
 															Name:  ptr.To("CUSTOM_FROM_USER"),
 															Value: ptr.To("user-value"),
+														},
+														{
+															Name:  ptr.To(jobsetplgconsts.InitializerEnvStorageUri),
+															Value: ptr.To("hf://my-org/my-dataset"),
 														},
 													},
 												},
@@ -268,6 +268,110 @@ func TestBuilderInitializer(t *testing.T) {
 								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
 									Labels: map[string]string{
 										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									},
+								},
+							},
+							Name:     ptr.To("initializer-job"),
+							Replicas: ptr.To[int32](1),
+						},
+					},
+				},
+			},
+		},
+		"dataset initializer storageUri takes precedence over STORAGE_URI in env": {
+			jobSet: makeJobSet(constants.DatasetInitializer, constants.DatasetInitializer, 2, "initializer-job"),
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Initializer: &trainer.Initializer{
+						Dataset: &trainer.DatasetInitializer{
+							StorageUri: ptr.To("hf://tatsu-lab/alpaca"),
+							Env: []corev1.EnvVar{
+								{
+									Name:  jobsetplgconsts.InitializerEnvStorageUri,
+									Value: "hf://other/repo",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.DatasetInitializer),
+													Env: []corev1ac.EnvVarApplyConfiguration{
+														{
+															Name:  ptr.To(jobsetplgconsts.InitializerEnvStorageUri),
+															Value: ptr.To("hf://tatsu-lab/alpaca"),
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									},
+								},
+							},
+							Name:     ptr.To("initializer-job"),
+							Replicas: ptr.To[int32](1),
+						},
+					},
+				},
+			},
+		},
+		"model initializer storageUri takes precedence over STORAGE_URI in env": {
+			jobSet: makeJobSet(constants.ModelInitializer, constants.ModelInitializer, 2, "initializer-job"),
+			trainJob: &trainer.TrainJob{
+				Spec: trainer.TrainJobSpec{
+					Initializer: &trainer.Initializer{
+						Model: &trainer.ModelInitializer{
+							StorageUri: ptr.To("hf://meta-llama/Llama-3"),
+							Env: []corev1.EnvVar{
+								{
+									Name:  jobsetplgconsts.InitializerEnvStorageUri,
+									Value: "hf://other/model",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										Spec: &corev1ac.PodSpecApplyConfiguration{
+											Containers: []corev1ac.ContainerApplyConfiguration{
+												{
+													Name: ptr.To(constants.ModelInitializer),
+													Env: []corev1ac.EnvVarApplyConfiguration{
+														{
+															Name:  ptr.To(jobsetplgconsts.InitializerEnvStorageUri),
+															Value: ptr.To("hf://meta-llama/Llama-3"),
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.ModelInitializer,
 									},
 								},
 							},
