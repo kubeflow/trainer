@@ -1051,6 +1051,126 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 			})
 		})
 
+		ginkgo.Context("Integration tests for Dynamic Resource Allocation", func() {
+			// torchRuntimeSpec returns the Torch runtime spec used by the DRA tests: the node
+			// container only requests CPU and memory.
+			torchRuntimeSpec := func() *testingutil.TrainingRuntimeSpecWrapper {
+				return testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(100).
+							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+								TorchPolicy().
+								Obj(),
+							).
+							Obj(),
+					).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests)
+			}
+			// newTrainJob returns a TrainJob that consumes the "gpu" claim from the given
+			// ResourceClaimTemplate on every training node.
+			newTrainJob := func(templateName string) *trainer.TrainJob {
+				return testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							ResourceClaimsPerNode(trainer.TrainerResourceClaim{Name: "gpu", ResourceClaimTemplateName: templateName}).
+							Obj()).
+					Obj()
+			}
+			// wantJobSet returns the JobSet expected for newTrainJob: the node Pod requests the "gpu"
+			// claim from the given ResourceClaimTemplate and the node container consumes it.
+			// PET_NPROC_PER_NODE falls back to the CPU count since no GPU resource is requested.
+			wantJobSet := func(templateName string) *jobsetv1alpha2.JobSet {
+				return testingutil.MakeJobSetWrapper(ns.Name, trainJobKey.Name).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), trainJobKey.Name, string(trainJob.UID)).
+					Suspend(false).
+					Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+					NumNodes(100).
+					Container(constants.Node, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort, Protocol: "TCP"}}).
+					PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To(templateName)}).
+					ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
+					Env(constants.Node, constants.Node,
+						[]corev1.EnvVar{
+							{
+								Name:  constants.TorchEnvNumNodes,
+								Value: "100",
+							},
+							{
+								Name:  constants.TorchEnvNumProcPerNode,
+								Value: "1",
+							},
+							{
+								Name: constants.TorchEnvNodeRank,
+								ValueFrom: &corev1.EnvVarSource{
+									FieldRef: &corev1.ObjectFieldSelector{
+										FieldPath: constants.JobCompletionIndexFieldPath,
+									},
+								},
+							},
+							{
+								Name:  constants.TorchEnvMasterAddr,
+								Value: fmt.Sprintf("alpha-%s-0-0.alpha", constants.Node),
+							},
+							{
+								Name:  constants.TorchEnvMasterPort,
+								Value: fmt.Sprintf("%d", constants.ContainerTrainerPort),
+							},
+						}...,
+					).
+					Obj()
+			}
+
+			ginkgo.It("Should wire resourceClaimsPerNode into the JobSet", func() {
+				ginkgo.By("Creating Torch TrainingRuntime and TrainJob")
+				trainingRuntime = testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").
+					RuntimeSpec(torchRuntimeSpec().Obj()).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				trainJob = newTrainJob("gpu-template")
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if the JobSet consumes the claim")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(jobSet).Should(gomega.BeComparableTo(wantJobSet("gpu-template"), util.IgnoreObjectMetadata))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("Should replace a runtime resourceClaim with the same name from resourceClaimsPerNode", func() {
+				ginkgo.By("Creating Torch TrainingRuntime with a gpu claim and TrainJob")
+				trainingRuntime = testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").
+					RuntimeSpec(torchRuntimeSpec().
+						PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("template-a")}).
+						ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
+						Obj()).
+					Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				trainJob = newTrainJob("template-b")
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking if the JobSet references template-b with exactly one gpu container claim")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					g.Expect(jobSet).Should(gomega.BeComparableTo(wantJobSet("template-b"), util.IgnoreObjectMetadata))
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
+		})
+
 		ginkgo.Context("Integration Tests for the OpenMPI Runtime", func() {
 			var (
 				cmKey  client.ObjectKey

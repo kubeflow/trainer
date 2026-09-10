@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
+	"github.com/kubeflow/trainer/v2/pkg/constants"
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 	"github.com/kubeflow/trainer/v2/test/integration/framework"
 )
@@ -102,6 +103,16 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 						Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create ClusterTrainingRuntime with a container claim that has no Pod-level resourceClaim",
+				func() *trainer.ClusterTrainingRuntime {
+					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeForbiddenError()),
 		)
 	})
 })

@@ -408,6 +408,38 @@ func (j *JobSetWrapper) VolumeMounts(rJobName, containerName string, vms ...core
 	return j
 }
 
+func (j *JobSetWrapper) PodResourceClaims(rJobName string, claims ...corev1.PodResourceClaim) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.ResourceClaims = append(
+				j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.ResourceClaims,
+				claims...,
+			)
+		}
+	}
+	return j
+}
+
+func (j *JobSetWrapper) ContainerResourceClaims(rJobName, containerName string, claims ...corev1.ResourceClaim) *JobSetWrapper {
+	for i, rJob := range j.Spec.ReplicatedJobs {
+		if rJob.Name != rJobName {
+			continue
+		}
+		podSpec := &j.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec
+		for k := range podSpec.InitContainers {
+			if podSpec.InitContainers[k].Name == containerName {
+				podSpec.InitContainers[k].Resources.Claims = append(podSpec.InitContainers[k].Resources.Claims, claims...)
+			}
+		}
+		for k := range podSpec.Containers {
+			if podSpec.Containers[k].Name == containerName {
+				podSpec.Containers[k].Resources.Claims = append(podSpec.Containers[k].Resources.Claims, claims...)
+			}
+		}
+	}
+	return j
+}
+
 func (j *JobSetWrapper) Env(rJobName, containerName string, envs ...corev1.EnvVar) *JobSetWrapper {
 	for i, rJob := range j.Spec.ReplicatedJobs {
 		if rJob.Name == rJobName {
@@ -707,6 +739,11 @@ func (t *TrainJobTrainerWrapper) Container(image string, command []string, args 
 
 func (t *TrainJobTrainerWrapper) Env(env ...corev1.EnvVar) *TrainJobTrainerWrapper {
 	t.Trainer.Env = env
+	return t
+}
+
+func (t *TrainJobTrainerWrapper) ResourceClaimsPerNode(claims ...trainer.TrainerResourceClaim) *TrainJobTrainerWrapper {
+	t.Trainer.ResourceClaimsPerNode = claims
 	return t
 }
 
@@ -1225,6 +1262,38 @@ func (s *TrainingRuntimeSpecWrapper) Env(rJobName, containerName string, envs ..
 						s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Env,
 						envs...)
 				}
+			}
+		}
+	}
+	return s
+}
+
+func (s *TrainingRuntimeSpecWrapper) PodResourceClaims(rJobName string, claims ...corev1.PodResourceClaim) *TrainingRuntimeSpecWrapper {
+	for i, rJob := range s.Template.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.ResourceClaims = append(
+				s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.ResourceClaims,
+				claims...,
+			)
+		}
+	}
+	return s
+}
+
+func (s *TrainingRuntimeSpecWrapper) ContainerResourceClaims(rJobName, containerName string, claims ...corev1.ResourceClaim) *TrainingRuntimeSpecWrapper {
+	for i, rJob := range s.Template.Spec.ReplicatedJobs {
+		if rJob.Name != rJobName {
+			continue
+		}
+		podSpec := &s.Template.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec
+		for k := range podSpec.InitContainers {
+			if podSpec.InitContainers[k].Name == containerName {
+				podSpec.InitContainers[k].Resources.Claims = append(podSpec.InitContainers[k].Resources.Claims, claims...)
+			}
+		}
+		for k := range podSpec.Containers {
+			if podSpec.Containers[k].Name == containerName {
+				podSpec.Containers[k].Resources.Claims = append(podSpec.Containers[k].Resources.Claims, claims...)
 			}
 		}
 	}
