@@ -301,6 +301,10 @@ func (r *TrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *trainer.
 	return r.framework.RunTrainJobStatusPlugin(ctx, trainJob)
 }
 
+func (r *TrainingRuntime) TerminalCleanup(ctx context.Context, trainJob *trainer.TrainJob) error {
+	return r.framework.RunTerminalCleanupPlugins(ctx, trainJob)
+}
+
 func (r *TrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 	var builders []runtime.ReconcilerBuilder
 	for _, ex := range r.framework.WatchExtensionPlugins() {

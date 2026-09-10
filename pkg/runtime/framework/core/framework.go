@@ -46,6 +46,7 @@ type Framework struct {
 	preComponentBuilderPlugins   []framework.PreComponentBuilderPlugin
 	componentBuilderPlugins      []framework.ComponentBuilderPlugin
 	trainJobStatusPlugin         framework.TrainJobStatusPlugin
+	terminalCleanupPlugins       []framework.TerminalCleanupPlugin
 }
 
 func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer client.FieldIndexer, cfg *configapi.Configuration) (*Framework, error) {
@@ -89,6 +90,9 @@ func New(ctx context.Context, c client.Client, r fwkplugins.Registry, indexer cl
 				return nil, errorTooManyTrainJobStatusPlugin
 			}
 			f.trainJobStatusPlugin = p
+		}
+		if p, ok := plugin.(framework.TerminalCleanupPlugin); ok {
+			f.terminalCleanupPlugins = append(f.terminalCleanupPlugins, p)
 		}
 	}
 	f.plugins = plugins
@@ -177,6 +181,16 @@ func (f *Framework) RunTrainJobStatusPlugin(ctx context.Context, trainJob *train
 		return f.trainJobStatusPlugin.Status(ctx, trainJob)
 	}
 	return nil, nil
+}
+
+func (f *Framework) RunTerminalCleanupPlugins(ctx context.Context, trainJob *trainer.TrainJob) error {
+	var errs error
+	for _, plugin := range f.terminalCleanupPlugins {
+		if err := plugin.TerminalCleanup(ctx, trainJob); err != nil {
+			errs = errors.Join(errs, err)
+		}
+	}
+	return errs
 }
 
 func (f *Framework) WatchExtensionPlugins() []framework.WatchExtensionPlugin {

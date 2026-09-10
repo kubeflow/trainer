@@ -82,3 +82,10 @@ type TrainJobStatusPlugin interface {
 	Plugin
 	Status(ctx context.Context, trainJob *trainer.TrainJob) (*trainer.TrainJobStatus, error)
 }
+
+// TerminalCleanupPlugin cleans up auxiliary or side resources associated with a TrainJob
+// when it reaches a terminal condition (such as Failed).
+type TerminalCleanupPlugin interface {
+	Plugin
+	TerminalCleanup(ctx context.Context, trainJob *trainer.TrainJob) error
+}

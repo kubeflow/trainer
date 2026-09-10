@@ -92,6 +92,10 @@ func (r *ClusterTrainingRuntime) TrainJobStatus(ctx context.Context, trainJob *t
 	return r.TrainingRuntime.TrainJobStatus(ctx, trainJob)
 }
 
+func (r *ClusterTrainingRuntime) TerminalCleanup(ctx context.Context, trainJob *trainer.TrainJob) error {
+	return r.TrainingRuntime.TerminalCleanup(ctx, trainJob)
+}
+
 func (r *ClusterTrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 	return nil
 }

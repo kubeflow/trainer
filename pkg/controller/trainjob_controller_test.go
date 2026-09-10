@@ -25,14 +25,21 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -213,3 +220,122 @@ func TestReconcileDeadline(t *testing.T) {
 		})
 	}
 }
+
+type fakeRuntime struct {
+	cleanedUp bool
+	status    *trainer.TrainJobStatus
+}
+
+var _ jobruntimes.Runtime = (*fakeRuntime)(nil)
+
+func (f *fakeRuntime) NewObjects(context.Context, *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
+	return nil, nil
+}
+func (f *fakeRuntime) RuntimeInfo(*trainer.TrainJob, any, *trainer.MLPolicy, *trainer.PodGroupPolicy) (*jobruntimes.Info, error) {
+	return nil, nil
+}
+func (f *fakeRuntime) TrainJobStatus(context.Context, *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
+	return f.status, nil
+}
+func (f *fakeRuntime) EventHandlerRegistrars() []jobruntimes.ReconcilerBuilder {
+	return nil
+}
+func (f *fakeRuntime) ValidateObjects(context.Context, *trainer.TrainJob, *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	return nil, nil
+}
+func (f *fakeRuntime) TerminalCleanup(context.Context, *trainer.TrainJob) error {
+	f.cleanedUp = true
+	return nil
+}
+
+func TestReconcile_TerminalCleanup(t *testing.T) {
+	runtimeGVK := schema.GroupVersionKind{
+		Group:   trainer.GroupVersion.Group,
+		Version: trainer.GroupVersion.Version,
+		Kind:    trainer.TrainingRuntimeKind,
+	}
+	runtimeKey := jobruntimes.RuntimeRefToRuntimeRegistryKey(trainer.RuntimeRef{
+		APIGroup: &runtimeGVK.Group,
+		Kind:     &runtimeGVK.Kind,
+		Name:     "test-runtime",
+	})
+
+	cases := map[string]struct {
+		trainJob      *trainer.TrainJob
+		runtimeStatus *trainer.TrainJobStatus
+		wantCleanedUp bool
+	}{
+		"trainJob is failed by condition": {
+			trainJob: func() *trainer.TrainJob {
+				tj := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "failed-job").
+					RuntimeRef(runtimeGVK, "test-runtime").
+					Obj()
+				tj.Status.Conditions = []metav1.Condition{
+					{
+						Type:   trainer.TrainJobFailed,
+						Status: metav1.ConditionTrue,
+					},
+				}
+				return tj
+			}(),
+			wantCleanedUp: true,
+		},
+		"trainJob is complete by condition": {
+			trainJob: func() *trainer.TrainJob {
+				tj := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "complete-job").
+					RuntimeRef(runtimeGVK, "test-runtime").
+					Obj()
+				tj.Status.Conditions = []metav1.Condition{
+					{
+						Type:   trainer.TrainJobComplete,
+						Status: metav1.ConditionTrue,
+					},
+				}
+				return tj
+			}(),
+			wantCleanedUp: true,
+		},
+		"trainJob is active and not finished": {
+			trainJob: func() *trainer.TrainJob {
+				return utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "active-job").
+					RuntimeRef(runtimeGVK, "test-runtime").
+					Obj()
+			}(),
+			wantCleanedUp: false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			fakeRT := &fakeRuntime{status: tc.runtimeStatus}
+			cli := utiltesting.NewClientBuilder().WithObjects(tc.trainJob).Build()
+
+			r := &TrainJobReconciler{
+				client:   cli,
+				recorder: events.NewFakeRecorder(10),
+				runtimes: map[string]jobruntimes.Runtime{
+					runtimeKey: fakeRT,
+				},
+			}
+
+			_, err := r.Reconcile(ctx, ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: tc.trainJob.Namespace,
+					Name:      tc.trainJob.Name,
+				},
+			})
+			if err != nil {
+				t.Fatalf("Unexpected reconcile error: %v", err)
+			}
+
+			if fakeRT.cleanedUp != tc.wantCleanedUp {
+				t.Errorf("TerminalCleanup called = %v, want %v", fakeRT.cleanedUp, tc.wantCleanedUp)
+			}
+		})
+	}
+}
+
