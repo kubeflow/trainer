@@ -168,7 +168,7 @@ effectiveValue = trainJob.spec.<field>  (if set)
 
 The runtime value comes from the snapshot ConfigMap written by `pkg/runtime/core/snapshot.go` on the first reconcile, not from the live runtime. Editing `runPolicy` therefore only affects TrainJobs created afterwards.
 
-An unset TrainJob field means "inherit", so a TrainJob can change a runtime default but not switch it off. `activeDeadlineSeconds` has no wire value meaning "no deadline" at all, since the non-pointer `int64` with `Minimum=1` makes `0` indistinguishable from unset. Whether to add an explicit opt-out is unresolved.
+An unset TrainJob field means "inherit", so a TrainJob can change a runtime default but not switch it off. `activeDeadlineSeconds` has no wire value meaning "no deadline" at all, since the non-pointer `int64` with `Minimum=1` makes `0` indistinguishable from unset. Phase 1 ships without an opt-out, matching other Runtime defaults such as `env`, which a TrainJob also cannot remove.
 
 ### User Examples
 
