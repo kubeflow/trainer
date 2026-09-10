@@ -111,6 +111,32 @@ manager:
     traffic.sidecar.istio.io/excludeInboundPorts: "9443"
 ```
 
+### Grafana dashboard
+
+The chart can optionally install Grafana dashboards (as ConfigMaps) for controller health and TrainJob lifecycle observability.
+Dashboards are disabled by default and are intended for clusters that run Grafana with a dashboard sidecar that imports dashboards from labeled ConfigMaps.
+
+To enable all dashboards:
+
+```bash
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+  --version 2.1.0 \
+  --set grafanaDashboard.defaultEnabled=true
+```
+
+To enable specific dashboards:
+
+```bash
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+  --version 2.1.0 \
+  --set grafanaDashboard.controllerHealth.enabled=true
+```
+
+> **Prerequisite:** Prometheus must be configured to scrape the controller's
+> metrics endpoint (port 8443, HTTPS). The chart does not include a ServiceMonitor.
+
+If your Grafana sidecar uses a different label selector, override `grafanaDashboard.labels` accordingly.
+
 {{ template "chart.valuesSection" . }}
 
 {{- define "chart.maintainersTable" -}}

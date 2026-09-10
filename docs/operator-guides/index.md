@@ -83,6 +83,20 @@ Integrate with Kueue, Slurm Bridge, KAI Scheduler, Coscheduling, and Volcano
 
 :::::
 
+## Observability
+
+:::::{grid} 1 1 2 2
+:gutter: 3
+
+::::{grid-item-card} Prometheus Monitoring
+:link: monitoring
+:link-type: doc
+
+Monitor the Trainer controller with Prometheus metrics and Grafana dashboards
+::::
+
+:::::
+
 ----
 
 ```{toctree}
@@ -97,4 +111,5 @@ job-template
 runtime-patches
 extension-framework
 job-scheduling/index
+monitoring
 ```
