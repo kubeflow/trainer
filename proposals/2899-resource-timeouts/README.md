@@ -23,7 +23,9 @@ Currently, `TrainJob` resources persist in the cluster indefinitely after comple
 - Add `ActiveDeadlineSeconds` to `TrainJobSpec` for data scientists to control individual job timeouts
 - Add `TTLSecondsAfterFinished` to `TrainJobSpec` for data scientists to control post-finish cleanup of individual jobs
 - Add a `RunPolicy` struct to `TrainingRuntimeSpec` so platform admins can set default `ActiveDeadlineSeconds` and `TTLSecondsAfterFinished` for all TrainJobs using a runtime, with per-TrainJob overrides
+- Add `StartTime` and `CompletionTime` to `TrainJobStatus` and use them as the reference points for deadline and TTL calculation
 - Expose `ActiveDeadlineSeconds` and `TTLSecondsAfterFinished` in the Kubeflow Python SDK for data scientists
+- Keep MultiKueue working when `TTLSecondsAfterFinished` is set: a worker-cluster TTL must never delete a TrainJob before its terminal status has been synchronized back to the manager cluster
 - Follow Kubernetes Job/JobSet patterns and existing Trainer API conventions
 
 ### Non-Goals
@@ -72,33 +74,40 @@ As a **Data Scientist**, I want finished TrainJobs and their pods, services, and
 
 #### TrainJobSpec Changes
 
-Add `ActiveDeadlineSeconds` to `TrainJobSpec` in `pkg/apis/trainer/v1alpha1/trainjob_types.go`:
+`ActiveDeadlineSeconds` already ships. Add `TTLSecondsAfterFinished` alongside it in `pkg/apis/trainer/v1alpha1/trainjob_types.go`:
 
 ```go
 type TrainJobSpec struct {
     // ... existing fields ...
 
-    // ActiveDeadlineSeconds specifies the duration in seconds relative to the TrainJob
+    // activeDeadlineSeconds specifies the duration in seconds relative to the TrainJob
     // start time (which resets on resume from suspension) that the TrainJob may be active
     // before the system tries to terminate it. Value must be a positive integer.
     // Once reached, all running Pods are terminated and the TrainJob status becomes
     // Failed with reason: DeadlineExceeded.
+    // TODO(beta): replace with *int64 to match batch/v1.JobSpec.
     // +optional
     // +kubebuilder:validation:Minimum=1
     // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="field is immutable"
-    ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
+    ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds,omitempty"`
 
-    // TTLSecondsAfterFinished specifies the duration in seconds the TrainJob is retained after it
+    // ttlSecondsAfterFinished specifies the duration in seconds the TrainJob is retained after it
     // reaches a terminal state (Complete or Failed), after which the TrainJob and its child
     // resources become eligible for automatic deletion. Value must be a non-negative integer;
-    // 0 means delete immediately after finishing. Overrides the runtime default in
-    // spec.runPolicy.ttlSecondsAfterFinished. Following Kubernetes Job semantics, this field is
-    // mutable after creation.
+    // 0 means delete immediately after finishing. Overrides the referenced runtime's
+    // spec.runPolicy.ttlSecondsAfterFinished default. Following Kubernetes Job semantics, this
+    // field is mutable after creation.
     // +optional
     // +kubebuilder:validation:Minimum=0
-    TTLSecondsAfterFinished *int64 `json:"ttlSecondsAfterFinished,omitempty"`
+    TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 }
 ```
+
+New fields use pointers, matching `batch/v1.JobSpec`. The shipped `ActiveDeadlineSeconds` stays a non-pointer `int64` because changing it is a breaking change to a released field; it flips at beta promotion.
+
+#### TrainJobStatus Changes
+
+Add `StartTime` and `CompletionTime` (`*metav1.Time`) to `TrainJobStatus`, with the same semantics as [Kubernetes Job](https://github.com/kubernetes/api/blob/master/batch/v1/types.go) and [JobSet](https://github.com/kubernetes-sigs/jobset/pull/1306): `startTime` resets on each resume from suspension, `completionTime` is set once the TrainJob is terminal. They become the reference points for deadline and TTL, which the controller infers from conditions today.
 
 #### TrainingRuntimeSpec Changes
 
@@ -108,7 +117,7 @@ Add a `RunPolicy` struct to `TrainingRuntimeSpec` (used by both `ClusterTraining
 type TrainingRuntimeSpec struct {
     // ... existing fields ...
 
-    // RunPolicy defines lifecycle defaults applied to TrainJobs that reference this runtime.
+    // runPolicy defines lifecycle defaults applied to TrainJobs that reference this runtime.
     // Each field is a default that a TrainJob can override on its own spec.
     // +optional
     RunPolicy *RunPolicy `json:"runPolicy,omitempty"`
@@ -116,18 +125,18 @@ type TrainingRuntimeSpec struct {
 
 // RunPolicy holds runtime-level lifecycle defaults for TrainJobs using this runtime.
 type RunPolicy struct {
-    // ActiveDeadlineSeconds is the default maximum active duration in seconds for TrainJobs that
+    // activeDeadlineSeconds is the default maximum active duration in seconds for TrainJobs that
     // reference this runtime. A TrainJob's own spec.activeDeadlineSeconds takes precedence.
     // +optional
     // +kubebuilder:validation:Minimum=1
     ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 
-    // TTLSecondsAfterFinished is the default retention duration in seconds after a TrainJob using
+    // ttlSecondsAfterFinished is the default retention duration in seconds after a TrainJob using
     // this runtime reaches a terminal state, after which it is eligible for automatic deletion.
     // A TrainJob's own spec.ttlSecondsAfterFinished takes precedence.
     // +optional
     // +kubebuilder:validation:Minimum=0
-    TTLSecondsAfterFinished *int64 `json:"ttlSecondsAfterFinished,omitempty"`
+    TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
 }
 ```
 
@@ -157,7 +166,9 @@ effectiveValue = trainJob.spec.<field>  (if set)
               else unset (no enforcement / no auto-cleanup)
 ```
 
-Resolution happens per reconcile, so a runtime default cannot silently override a value the user explicitly set on the TrainJob.
+The runtime value comes from the snapshot ConfigMap written by `pkg/runtime/core/snapshot.go` on the first reconcile, not from the live runtime. Editing `runPolicy` therefore only affects TrainJobs created afterwards.
+
+An unset TrainJob field means "inherit", so a TrainJob can change a runtime default but not switch it off. `activeDeadlineSeconds` has no wire value meaning "no deadline" at all, since the non-pointer `int64` with `Minimum=1` makes `0` indistinguishable from unset. Whether to add an explicit opt-out is unresolved.
 
 ### User Examples
 
@@ -236,14 +247,14 @@ spec:
 
 2. **Deadline Enforcement:**
     - Check if job is running and effective deadline is set
-    - Calculate `deadline = startTime + effectiveActiveDeadlineSeconds` (where `startTime` is reset on each resume from suspension)
-    - If exceeded, mark TrainJob as Failed (`Reason: DeadlineExceeded`); the runtime framework handles cleanup of the underlying JobSet
+    - Calculate `deadline = status.startTime + effectiveActiveDeadlineSeconds` (where `status.startTime` is reset on each resume from suspension)
+    - If exceeded, mark TrainJob as Failed (`Reason: DeadlineExceeded`) and delete the child JobSet directly, as `reconcileDeadline` does today
     - Otherwise, requeue at `deadline`
 
 3. **TTL Enforcement:**
     - Only applies once the TrainJob is finished (`Complete` or `Failed` condition is true)
-    - Calculate `expiry = finishTime + effectiveTTLSecondsAfterFinished`, where `finishTime` is the transition time of the terminal condition
-    - If `expiry` has passed, delete the TrainJob; owner references cascade the delete to the child JobSet, Jobs, Pods, and Services, matching Kubernetes Job `ttlSecondsAfterFinished` semantics
+    - Calculate `expiry = status.completionTime + effectiveTTLSecondsAfterFinished`
+    - If `expiry` has passed, delete the TrainJob; owner references cascade the delete to the child JobSet, Jobs, Pods, and Services, matching Kubernetes Job `ttlSecondsAfterFinished` semantics. This requires adding `delete` to the controller's TrainJob RBAC marker in `pkg/controller/trainjob_controller.go` (today `get;list;watch;update;patch`) and re-running `make generate`
     - Otherwise, requeue at `expiry`
     - TTL deletes the TrainJob itself rather than only the child JobSet. This avoids the JobSet-recreation loop from [#3779](https://github.com/kubeflow/trainer/issues/3779): once the parent TrainJob is gone there is nothing left to reconcile, so no new JobSet is created with a reset restart count
 
@@ -273,9 +284,8 @@ return ctrl.Result{RequeueAfter: requeueAfter}, nil
 The controller is stateless and stores no timers in memory. On restart:
 
 1. Controller-runtime triggers initial sync, reconciling all TrainJobs
-2. For each TrainJob, deadlines are recalculated from:
-   - The last resume time (or `metadata.creationTimestamp` if never suspended) for deadline calculation
-3. If deadline already expired during downtime, action is taken immediately
+2. For each TrainJob, deadlines and expiries are recalculated from `status.startTime` and `status.completionTime`
+3. If a deadline or a TTL already expired during downtime, action is taken immediately
 4. Otherwise, appropriate requeue times are set
 
 This design ensures no TrainJobs are "forgotten" after a controller restart.
@@ -287,12 +297,20 @@ This design ensures no TrainJobs are "forgotten" after a controller restart.
 - `Minimum=1` on `ActiveDeadlineSeconds` (`TrainJobSpec` and `RunPolicy`)
 - `Minimum=0` on `TTLSecondsAfterFinished` (`TrainJobSpec` and `RunPolicy`)
 - `XValidation: self == oldSelf` on `ActiveDeadlineSeconds` (`TrainJobSpec`) - immutable after creation
-- `TTLSecondsAfterFinished` is mutable after creation, matching Kubernetes Job behavior (users may extend or shorten retention on a finished job)
+- `TTLSecondsAfterFinished` is mutable on `TrainJobSpec`, matching Kubernetes Job: a user may extend or shorten retention on a finished TrainJob
+- Both `RunPolicy` fields are mutable. Because the runtime value is read from the snapshot, editing a runtime does not change the effective value for existing TrainJobs
 
-**Cross-field CEL markers** on `TrainingRuntimeSpec` to prevent conflicting lifecycle fields in the JobSet/Job template:
+**Cross-field CEL markers** on `TrainingRuntimeSpec` to prevent conflicting lifecycle fields in the JobSet/Job template. These paths must be unset:
 
-- `self.template.spec.replicatedJobs.all(rj, !has(rj.template.spec.activeDeadlineSeconds))` - Job-level deadline would terminate pods independently from TrainJob deadline tracking
-- `!has(self.template.spec.ttlSecondsAfterFinished)` - JobSet-level TTL would delete the JobSet out from under the TrainJob and trigger the recreation loop in [#3779](https://github.com/kubeflow/trainer/issues/3779); TTL must be expressed via `runPolicy` or the TrainJob so the controller owns cleanup
+- `template.spec.ttlSecondsAfterFinished` - JobSet-level TTL would delete the JobSet out from under the TrainJob and trigger the recreation loop in [#3779](https://github.com/kubeflow/trainer/issues/3779); TTL must be expressed via `runPolicy` or the TrainJob so the controller owns cleanup
+- `template.spec.replicatedJobs[].template.spec.ttlSecondsAfterFinished` - Job-level TTL would delete child Jobs the TrainJob still tracks
+- `template.spec.replicatedJobs[].template.spec.activeDeadlineSeconds` and `template.spec.replicatedJobs[].template.spec.template.spec.activeDeadlineSeconds` - Job- and Pod-level deadlines would terminate pods independently from TrainJob deadline tracking
+
+`spec.template`, `spec.template.spec`, and every level below `replicatedJobs[].template` are optional in the generated CRD, which carries `minProperties: 1` and no `required` lists, so each rule needs `!has()` guards at every level. An unguarded traversal raises `no such key` and rejects the runtime:
+
+```
+!has(self.template) || !has(self.template.spec) || !has(self.template.spec.ttlSecondsAfterFinished)
+```
 
 ### Interaction with Suspend
 
@@ -300,6 +318,16 @@ Matching Kubernetes Job behavior (K8s 1.35+ with `MutableSchedulingDirectivesFor
 
 - If a TrainJob is created in a suspended state, the timer does not start until the TrainJob is first unsuspended
 - When a running TrainJob is suspended, the controller clears the internal start time reference. On resume, the start time is reset to the current time, and the full `ActiveDeadlineSeconds` window applies from that point
+
+### Interaction with MultiKueue
+
+A worker-cluster TTL that deletes the remote TrainJob before its terminal status syncs back makes MultiKueue treat the remote as missing and dispatch the job again. Kueue fixed this for batch Job by clearing `spec.ttlSecondsAfterFinished` on the remote copy ([kueue#14734](https://github.com/kubernetes-sigs/kueue/pull/14734)); other integrations are tracked in [kueue#14779](https://github.com/kubernetes-sigs/kueue/issues/14779).
+
+Two items for TrainJob:
+
+1. The MultiKueue adapter deep-copies `TrainJobSpec`, so a TrainJob-level TTL propagates. Kueue needs the same fix, which is only possible once this API is released and vendored into Kueue.
+
+2. MultiKueue does not copy runtimes, so Kueue cannot strip `runPolicy.ttlSecondsAfterFinished` from a worker-cluster runtime. Admins must leave it unset there, documented alongside the existing requirement to pre-create the runtimes.
 
 ### Test Plan
 
@@ -323,6 +351,9 @@ to implement this enhancement.
 - TTL on unfinished job → no deletion
 - TTL expired on finished job → TrainJob deleted (children cascade)
 - TTL not reached on finished job → requeue at expiry
+- `ttlSecondsAfterFinished: 0` on a finished job → deleted immediately
+- Runtime template setting JobSet-level TTL → rejected by validation
+- Runtime setting only `runPolicy`, with no `template` → accepted, CEL guards do not error
 
 #### Integration Tests
 
@@ -330,6 +361,10 @@ to implement this enhancement.
     - End-to-end deadline enforcement from TrainJob
     - Suspended TrainJob → deadline timer does not start until first unsuspend
     - Running TrainJob suspended and resumed → deadline timer resets (full duration available again)
+    - TTL from the TrainJob → TrainJob and its child JobSet deleted after expiry
+    - TTL from `runPolicy` with no TrainJob value → runtime default applied
+    - TrainJob TTL set alongside a `runPolicy` default → TrainJob value wins
+    - `runPolicy` edited after the TrainJob was admitted → the snapshot value is still applied
 
 #### E2E Tests
 
@@ -349,7 +384,7 @@ The initial `RunPolicy` struct holds `ActiveDeadlineSeconds` and `TTLSecondsAfte
 - **2025-10-20**: Issue opened [#2899](https://github.com/kubeflow/trainer/issues/2899)
 - **2026-01-04**: Initial KEP drafted
 - **2026-01-22**: KEP updated with layered API design (TrainJob + TrainingRuntime)
-- **2026-02-28**: `ActiveDeadlineSeconds` on `TrainJobSpec` shipped in v2.2
+- **2026-03-19**: `ActiveDeadlineSeconds` on `TrainJobSpec` shipped in v2.2.0 ([#3258](https://github.com/kubeflow/trainer/pull/3258))
 - **2026-07-28**: KEP extended with `TTLSecondsAfterFinished` and the `RunPolicy` runtime defaults, prompted by [#3779](https://github.com/kubeflow/trainer/issues/3779)
 - **TBD**: TTL alpha implementation
 
