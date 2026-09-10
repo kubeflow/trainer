@@ -25,7 +25,8 @@
 #     "dataset-initializer", and "model-initializer" containers).
 #   - runtimePatches expose JobSet metadata, Job metadata, Pod metadata, and
 #     a restricted set of Pod spec fields (serviceAccountName, volumes,
-#     nodeSelector, affinity, tolerations, etc.).
+#     resourceClaims, nodeSelector, affinity, tolerations, etc.). Container
+#     patches may set resources.claims to consume a DRA resourceClaim.
 #
 # Apply: kubectl apply -f 02-runtime-patches.yaml
 # Check: kubectl describe trainjob runtime-patches-example
