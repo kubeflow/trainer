@@ -279,8 +279,20 @@ type Trainer struct {
 	NumNodes *int32 `json:"numNodes,omitempty"`
 
 	// resourcesPerNode defines the compute resources for each training node.
+	// +kubebuilder:validation:XValidation:rule="!has(self.claims) || size(self.claims) == 0",message="claims must not be set in resourcesPerNode; use resourceClaimsPerNode instead"
 	// +optional
 	ResourcesPerNode *corev1.ResourceRequirements `json:"resourcesPerNode,omitempty"`
+
+	// resourceClaimsPerNode defines the DRA ResourceClaims for each training node.
+	// These claims are added to the trainer node Pod's resourceClaims and automatically
+	// referenced in the node container's resources.claims. To attach a claim to another
+	// container (sidecar or init), use the runtimePatches API.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=32
+	// +optional
+	ResourceClaimsPerNode []TrainerResourceClaim `json:"resourceClaimsPerNode,omitempty"`
 
 	// numProcPerNode is the number of processes/workers/slots on every training node.
 	// For the MPI runtime only int value can be set to represent number of slots per node.
@@ -288,6 +300,24 @@ type Trainer struct {
 	// +kubebuilder:validation:XValidation:rule="self >= 1",message="numProcPerNode must be greater than or equal to 1"
 	// +optional
 	NumProcPerNode *int32 `json:"numProcPerNode,omitempty"`
+}
+
+// TrainerResourceClaim references a ResourceClaimTemplate for every training node Pod.
+type TrainerResourceClaim struct {
+	// name uniquely identifies this resource claim inside the Pod and is what the node
+	// container's resources.claims entry references. Must be a DNS label.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+	// +required
+	Name string `json:"name,omitempty"`
+
+	// resourceClaimTemplateName is the name of a ResourceClaimTemplate in the TrainJob namespace.
+	// A separate ResourceClaim is created from it for every training node Pod.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +required
+	ResourceClaimTemplateName string `json:"resourceClaimTemplateName,omitempty"`
 }
 
 // RuntimePatch represents a custom patch applied to the TrainJob's training runtime template.
@@ -404,6 +434,18 @@ type PodSpecPatch struct {
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
+	// resourceClaims patches the Pod's resourceClaims, typically for sidecar and init containers.
+	// For the node container, prefer resourceClaimsPerNode on the trainer, which replaces a
+	// same-name Pod claim; use this field there only to reference a pre-created ResourceClaim.
+	// Containers consume a claim by referencing its name in their resources.claims, usually in
+	// the same runtimePatch.
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=32
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="field is immutable"
+	// +optional
+	ResourceClaims []corev1.PodResourceClaim `json:"resourceClaims,omitempty"`
+
 	// initContainers patches the init containers in the target job templates.
 	// +listType=map
 	// +listMapKey=name
@@ -488,6 +530,13 @@ type ContainerPatch struct {
 	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// resources patches the container's compute resources.
+	// For the node container, resourcesPerNode on the trainer overrides patched requests and
+	// limits per key, and resourceClaimsPerNode on the trainer is placed ahead of patched claims;
+	// prefer those fields over patching the node container.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// securityContext patches the container's security context.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/

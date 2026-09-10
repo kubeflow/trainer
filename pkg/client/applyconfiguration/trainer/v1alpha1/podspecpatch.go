@@ -32,6 +32,12 @@ type PodSpecPatchApplyConfiguration struct {
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 	// volumes patches the Pod's volumes.
 	Volumes []v1.VolumeApplyConfiguration `json:"volumes,omitempty"`
+	// resourceClaims patches the Pod's resourceClaims, typically for sidecar and init containers.
+	// For the node container, prefer resourceClaimsPerNode on the trainer, which replaces a
+	// same-name Pod claim; use this field there only to reference a pre-created ResourceClaim.
+	// Containers consume a claim by referencing its name in their resources.claims, usually in
+	// the same runtimePatch.
+	ResourceClaims []corev1.PodResourceClaim `json:"resourceClaims,omitempty"`
 	// initContainers patches the init containers in the target job templates.
 	InitContainers []ContainerPatchApplyConfiguration `json:"initContainers,omitempty"`
 	// containers patches specific containers in the target job templates.
@@ -78,6 +84,16 @@ func (b *PodSpecPatchApplyConfiguration) WithVolumes(values ...*v1.VolumeApplyCo
 			panic("nil value passed to WithVolumes")
 		}
 		b.Volumes = append(b.Volumes, *values[i])
+	}
+	return b
+}
+
+// WithResourceClaims adds the given value to the ResourceClaims field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ResourceClaims field.
+func (b *PodSpecPatchApplyConfiguration) WithResourceClaims(values ...corev1.PodResourceClaim) *PodSpecPatchApplyConfiguration {
+	for i := range values {
+		b.ResourceClaims = append(b.ResourceClaims, values[i])
 	}
 	return b
 }
