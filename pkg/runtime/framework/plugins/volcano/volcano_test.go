@@ -496,6 +496,99 @@ func TestValidate(t *testing.T) {
 			},
 			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
 		},
+		"a valid priorityClassName on one ReplicatedJob must not skip validation of the rest": {
+			info: runtime.NewInfo(
+				runtime.WithPodGroupPolicy(&trainer.PodGroupPolicy{
+					PodGroupPolicySource: trainer.PodGroupPolicySource{
+						Volcano: &trainer.VolcanoPodGroupPolicySource{},
+					},
+				}),
+				runtime.WithTemplateSpecObjApply(
+					jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-cluster-critical"),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("non-existent"),
+											),
+										),
+									),
+								),
+						),
+				),
+			),
+			objs: []client.Object{
+				&schedulingv1.PriorityClass{
+					ObjectMeta: metav1.ObjectMeta{Name: "system-cluster-critical"},
+					Value:      2000000000,
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("templateSpec").Child("priorityClassName"),
+					"non-existent",
+					`PriorityClass "non-existent" doesn't exist: priorityclasses.scheduling.k8s.io "non-existent" not found`,
+				),
+			},
+		},
+		"built-in system priorityClassNames are validated like any other name": {
+			info: runtime.NewInfo(
+				runtime.WithPodGroupPolicy(&trainer.PodGroupPolicy{
+					PodGroupPolicySource: trainer.PodGroupPolicySource{
+						Volcano: &trainer.VolcanoPodGroupPolicySource{},
+					},
+				}),
+				runtime.WithTemplateSpecObjApply(
+					jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-cluster-critical"),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithPriorityClassName("system-node-critical"),
+											),
+										),
+									),
+								),
+						),
+				),
+			),
+			objs: []client.Object{
+				&schedulingv1.PriorityClass{
+					ObjectMeta: metav1.ObjectMeta{Name: "system-cluster-critical"},
+					Value:      2000000000,
+				},
+				&schedulingv1.PriorityClass{
+					ObjectMeta: metav1.ObjectMeta{Name: "system-node-critical"},
+					Value:      2000001000,
+				},
+			},
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").Obj(),
+		},
 	}
 
 	for name, tc := range cases {
