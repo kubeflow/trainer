@@ -126,6 +126,9 @@ func (r *TrainingRuntime) RuntimeInfo(
 	if !ok {
 		return nil, fmt.Errorf("unsupported runtimeTemplateSpec")
 	}
+	if err := r.mergeRuntimePatches(trainJob, &jobSetTemplateSpec); err != nil {
+		return nil, err
+	}
 	info, err := r.newRuntimeInfo(trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy)
 	if err != nil {
 		return nil, err
@@ -146,6 +149,11 @@ func (r *TrainingRuntime) RuntimeInfo(
 	return info, nil
 }
 
+// newRuntimeInfo builds the Info from the runtime template as it is declared. Only the build
+// path merges the TrainJob's runtimePatches into that template beforehand: validation compares
+// those patches against the runtime, and an Info that already carried them would accept every
+// patch. Metadata from the patches is propagated here in both cases, since the labels and
+// annotations the managers set are validated as well.
 func (r *TrainingRuntime) newRuntimeInfo(
 	trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
 ) (*runtime.Info, error) {
@@ -166,10 +174,6 @@ func (r *TrainingRuntime) newRuntimeInfo(
 				propagationAnnotations[k] = v
 			}
 		}
-	}
-	err := r.mergeRuntimePatches(trainJob, &jobSetTemplateSpec)
-	if err != nil {
-		return nil, err
 	}
 
 	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
