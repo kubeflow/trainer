@@ -21,6 +21,17 @@ import pkg.initializers.utils.utils as utils
 from pkg.initializers.dataset.cache import CacheInitializer, parse_cache_storage_uri
 
 
+def make_watch(objects):
+    """Build a mock watch.Watch() whose stream yields the given LWS objects.
+
+    An empty list models the stream ending without the Available condition,
+    which is what the client does once timeout_seconds elapses.
+    """
+    mock_w = MagicMock()
+    mock_w.stream.return_value = iter([{"object": obj} for obj in objects])
+    return mock_w
+
+
 @pytest.mark.parametrize(
     ("storage_uri", "expected"),
     [
@@ -77,6 +88,7 @@ def test_parse_cache_storage_uri(storage_uri, expected):
                 "readiness_period_seconds": "10",
                 "readiness_timeout_seconds": "5",
                 "readiness_failure_threshold": "3",
+                "cache_ready_timeout_seconds": "600",
             },
         ),
         (
@@ -103,6 +115,7 @@ def test_parse_cache_storage_uri(storage_uri, expected):
                 "readiness_period_seconds": "10",
                 "readiness_timeout_seconds": "5",
                 "readiness_failure_threshold": "3",
+                "cache_ready_timeout_seconds": "600",
             },
         ),
         (
@@ -131,6 +144,7 @@ def test_parse_cache_storage_uri(storage_uri, expected):
                 "readiness_period_seconds": "10",
                 "readiness_timeout_seconds": "5",
                 "readiness_failure_threshold": "3",
+                "cache_ready_timeout_seconds": "600",
             },
         ),
     ],
@@ -253,14 +267,16 @@ def test_download_dataset(test_name, test_case):
             "status": {"conditions": [{"type": "Available", "status": "True"}]}
         }
 
-        # Set side_effect to return training job first, then ready LWS status
         mock_custom_api.get_namespaced_custom_object.side_effect = [
-            mock_training_job,  # First call for training job
-            mock_lws_ready,  # Second call for LWS status check
+            mock_training_job,  # Only call left is the TrainJob owner lookup
         ]
 
-        # Execute cache cluster creation
-        cache_initializer_instance.download_dataset()
+        # Readiness now comes from the watch stream rather than a poll.
+        with patch("pkg.initializers.dataset.cache.watch") as mock_watch:
+            mock_watch.Watch.return_value = make_watch([mock_lws_ready])
+
+            # Execute cache cluster creation
+            cache_initializer_instance.download_dataset()
 
         # Verify Kubernetes client calls were made
         mock_config.load_incluster_config.assert_called_once()
@@ -317,13 +333,124 @@ def test_download_dataset_service_already_exists():
         mock_lws_ready = {
             "status": {"conditions": [{"type": "Available", "status": "True"}]}
         }
-        mock_custom_api.get_namespaced_custom_object.side_effect = [
-            mock_training_job,
-            mock_lws_ready,
-        ]
+        mock_custom_api.get_namespaced_custom_object.side_effect = [mock_training_job]
 
-        # Must not raise.
-        cache_initializer_instance.download_dataset()
+        with patch("pkg.initializers.dataset.cache.watch") as mock_watch:
+            mock_watch.Watch.return_value = make_watch([mock_lws_ready])
+
+            # Must not raise.
+            cache_initializer_instance.download_dataset()
 
         # Must not trigger cleanup of the ServiceAccount.
         mock_core_v1.delete_namespaced_service_account.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("test_name", "events"),
+    [
+        ("stream ends with no events at all", []),
+        (
+            "stream only ever reports a non-Available condition",
+            [{"status": {"conditions": [{"type": "Available", "status": "False"}]}}],
+        ),
+        ("object has no status block", [{}]),
+    ],
+)
+def test_download_dataset_readiness_timeout(test_name, events):
+    """The watch stream ending without an Available condition means
+    timeout_seconds elapsed. That must surface as a TimeoutError rather than
+    hanging forever, which is what the old poll loop did."""
+
+    print(f"Running test: {test_name}")
+
+    cache_initializer_instance = CacheInitializer()
+
+    config = {
+        "storage_uri": "cache://test_schema/test_table",
+        "train_job_name": "timeout-job",
+        "cache_image": "test-image:latest",
+        "iam_role": "arn:aws:iam::123456789012:role/test-role",
+        "metadata_loc": "s3://test-bucket/metadata",
+        "cache_ready_timeout_seconds": "30",
+    }
+
+    with patch.object(utils, "get_config_from_env", return_value=config):
+        cache_initializer_instance.load_config()
+
+    with patch(
+        "pkg.initializers.dataset.cache.get_namespace", return_value="test-namespace"
+    ), patch("pkg.initializers.dataset.cache.config"), patch(
+        "pkg.initializers.dataset.cache.client"
+    ) as mock_client, patch(
+        "pkg.initializers.dataset.cache.watch"
+    ) as mock_watch:
+
+        mock_custom_api = MagicMock()
+        mock_client.CustomObjectsApi.return_value = mock_custom_api
+        mock_custom_api.get_namespaced_custom_object.side_effect = [
+            {
+                "apiVersion": "trainer.kubeflow.org/v1alpha1",
+                "kind": "TrainJob",
+                "metadata": {"name": "timeout-job", "uid": "test-uid"},
+            }
+        ]
+
+        mock_w = make_watch(events)
+        mock_watch.Watch.return_value = mock_w
+
+        with pytest.raises(TimeoutError, match="did not become ready within 30s"):
+            cache_initializer_instance.download_dataset()
+
+        # The watch must be closed even on the timeout path.
+        mock_w.stop.assert_called()
+
+    print("Test execution completed")
+
+
+def test_download_dataset_watch_uses_configured_timeout():
+    """The overall wait must come from cache_ready_timeout_seconds, not from
+    readiness_timeout_seconds, which is the per-probe timeout."""
+
+    cache_initializer_instance = CacheInitializer()
+
+    config = {
+        "storage_uri": "cache://test_schema/test_table",
+        "train_job_name": "timeout-config-job",
+        "cache_image": "test-image:latest",
+        "iam_role": "arn:aws:iam::123456789012:role/test-role",
+        "metadata_loc": "s3://test-bucket/metadata",
+        "readiness_timeout_seconds": "5",
+        "cache_ready_timeout_seconds": "900",
+    }
+
+    with patch.object(utils, "get_config_from_env", return_value=config):
+        cache_initializer_instance.load_config()
+
+    with patch(
+        "pkg.initializers.dataset.cache.get_namespace", return_value="test-namespace"
+    ), patch("pkg.initializers.dataset.cache.config"), patch(
+        "pkg.initializers.dataset.cache.client"
+    ) as mock_client, patch(
+        "pkg.initializers.dataset.cache.watch"
+    ) as mock_watch:
+
+        mock_custom_api = MagicMock()
+        mock_client.CustomObjectsApi.return_value = mock_custom_api
+        mock_custom_api.get_namespaced_custom_object.side_effect = [
+            {
+                "apiVersion": "trainer.kubeflow.org/v1alpha1",
+                "kind": "TrainJob",
+                "metadata": {"name": "timeout-config-job", "uid": "test-uid"},
+            }
+        ]
+
+        mock_w = make_watch(
+            [{"status": {"conditions": [{"type": "Available", "status": "True"}]}}]
+        )
+        mock_watch.Watch.return_value = mock_w
+
+        cache_initializer_instance.download_dataset()
+
+        _, kwargs = mock_w.stream.call_args
+        assert kwargs["timeout_seconds"] == 900
+        assert kwargs["field_selector"] == "metadata.name=timeout-config-job-cache"

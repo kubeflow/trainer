@@ -78,3 +78,6 @@ class CacheDatasetInitializer:
     readiness_period_seconds: str = "10"
     readiness_timeout_seconds: str = "5"
     readiness_failure_threshold: str = "3"
+    # Overall wait for the cache cluster to report Available. Distinct from
+    # readiness_timeout_seconds, which is the per-probe timeout.
+    cache_ready_timeout_seconds: str = "600"
