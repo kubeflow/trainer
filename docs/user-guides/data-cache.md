@@ -65,10 +65,15 @@ Alternatively, you can install the data cache resources using Helm charts:
 ```bash
 helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
     --set dataCache.enabled=true \
+    --set dataCache.runtimes.torchDistributedWithCache.enabled=true \
+    --set 'dataCache.namespaces={default}' \
     --namespace kubeflow-system \
     --create-namespace \
     --version ${VERSION#v}
 ```
+
+`dataCache.namespaces` lists the existing namespaces where TrainJobs with data cache run. The chart
+creates the initializer ServiceAccount and RoleBinding in each of them.
 
 For the available Helm values to configure data cache, see the
 [kubeflow-trainer Helm chart documentation](https://github.com/kubeflow/trainer/tree/master/charts/kubeflow-trainer).
@@ -81,14 +86,11 @@ in your cluster.
 
 :::
 
-:::{warning}
+:::{note}
 
-Helm charts don't install RBAC in the user namespace. You have to deploy RBAC separately
-in each namespace where you want to create TrainJobs:
-
-```bash
-kubectl apply  --server-side -n <NAMESPACE> -k "https://github.com/kubeflow/trainer.git/manifests/overlays/data-cache/namespace-rbac"
-```
+Add namespaces later with `helm upgrade` and the extended `dataCache.namespaces` list. Applying
+`manifests/overlays/data-cache/namespace-rbac` by hand instead leaves those resources outside the
+Helm release, and a later upgrade that lists the same namespace fails on ownership.
 
 :::
 
