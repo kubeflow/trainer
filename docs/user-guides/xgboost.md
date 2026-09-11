@@ -41,8 +41,9 @@ DMLC_NUM_WORKER = numNodes × workersPerNode
 
 - **CPU training**: 1 worker per node. Each worker uses OpenMP to parallelize
  across all available CPU cores.
-- **GPU training**: 1 worker per GPU. The GPU count is derived from
- `resourcesPerNode` limits in the TrainJob.
+- **GPU training**: 1 worker per GPU. The GPU count is derived from the trainer
+ node resources, which merge the TrainJob's `resourcesPerNode` onto the ones
+ declared by the Runtime.
 
 ## Distributed Training Function
 
