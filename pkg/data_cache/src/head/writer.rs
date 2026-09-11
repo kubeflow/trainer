@@ -222,6 +222,12 @@ pub async fn send_record_batch(
     while let Some(item) = stream.next().await {
         match item {
             Ok(rb) => {
+                // A worker that was assigned no data files produces an empty batch,
+                // which carries no worker id to route on. Those workers are told that
+                // they own nothing by `Distributor::assign_empty_partitions`.
+                if rb.num_rows() == 0 {
+                    continue;
+                }
                 info!("sending rb :{:?}", rb);
                 let worker_ids = rb.column_by_name("worker_ids").ok_or_else(|| {
                     DataFusionError::Execution("worker_ids column not found".to_string())
@@ -328,5 +334,81 @@ impl ExecutorClient {
             .await
             .map_err(|e| DataFusionError::Execution(format!("Error calling do_put: {}", e)))?;
         Ok(Box::pin(EmptyRecordBatchStream::new(schema)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::config::DatasetConfig;
+    use arrow::array::ArrayRef;
+    use arrow_schema::{Field, Schema};
+    use datafusion::datasource::memory::MemorySourceConfig;
+    use datafusion::prelude::SessionContext;
+
+    fn test_config() -> Arc<CacheConfig> {
+        Arc::new(CacheConfig {
+            dataset: DatasetConfig {
+                metadata_loc: String::new(),
+                schema_name: String::new(),
+                table_name: String::new(),
+            },
+            connect_timeout: Duration::from_secs(1),
+        })
+    }
+
+    fn assignment_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![Field::new(
+            "worker_ids",
+            DataType::UInt64,
+            false,
+        )]))
+    }
+
+    /// A worker that was assigned no data files produces an empty batch. Routing on
+    /// it used to fail the whole partition with "No worker ID found", which aborted
+    /// the stream before any batch queued behind it could be delivered.
+    #[tokio::test]
+    async fn test_send_record_batch_skips_empty_batches() -> Result<()> {
+        let schema = assignment_schema();
+        let empty = RecordBatch::new_empty(schema.clone());
+        let input = MemorySourceConfig::try_new_exec(&[vec![empty]], schema.clone(), None)?;
+
+        let ctx = SessionContext::new();
+        let stream = send_record_batch(
+            input,
+            ctx.task_ctx(),
+            0,
+            Arc::new(HashMap::new()),
+            test_config(),
+        )
+        .await?;
+
+        let batches: Vec<RecordBatch> = stream.try_collect().await?;
+        assert!(batches.is_empty());
+        Ok(())
+    }
+
+    /// A non-empty batch still has to be routed, and an unknown worker id is still
+    /// an error rather than something to skip over.
+    #[tokio::test]
+    async fn test_send_record_batch_rejects_unknown_worker() -> Result<()> {
+        let schema = assignment_schema();
+        let worker_ids: ArrayRef = Arc::new(UInt64Array::from(vec![7]));
+        let batch = RecordBatch::try_new(schema.clone(), vec![worker_ids])?;
+        let input = MemorySourceConfig::try_new_exec(&[vec![batch]], schema.clone(), None)?;
+
+        let ctx = SessionContext::new();
+        let result = send_record_batch(
+            input,
+            ctx.task_ctx(),
+            0,
+            Arc::new(HashMap::new()),
+            test_config(),
+        )
+        .await;
+
+        assert!(result.is_err());
+        Ok(())
     }
 }
