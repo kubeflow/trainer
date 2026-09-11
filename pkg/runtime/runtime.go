@@ -285,6 +285,10 @@ func ExtractResourcePerNodeFromRuntime(info *Info) *corev1.ResourceRequirements 
 	return nil
 }
 
+// nonDeviceCountHints identify GPU-adjacent resources that quantify something other than
+// a number of devices, such as nvidia.com/gpumem or volcano.sh/vgpu-cores.
+var nonDeviceCountHints = []string{"mem", "core", "percentage", "tile"}
+
 // GetNumGPUPerNode returns the GPU count if found in container resources.
 func GetNumGPUPerNode(res *corev1.ResourceRequirements) int {
 	if res == nil {
@@ -297,11 +301,37 @@ func GetNumGPUPerNode(res *corev1.ResourceRequirements) int {
 	return gpuQ
 }
 
+// numGPU returns the number of GPU devices requested in resourcePerNode.
+//
+// A container may request several resources whose names contain "gpu", for example the
+// nvidia.com/gpu, nvidia.com/gpumem and nvidia.com/gpucores trio used by GPU sharing
+// stacks. Only the first is a device count, so names denoting memory, cores, tiles, or
+// percentages are skipped. The remaining candidates are visited in sorted order rather
+// than by ranging over the map, whose iteration order is not stable and would otherwise
+// make the result vary between calls.
+//
+// The skipped units are deliberately matched instead of enumerating known device-count
+// resources: unit names are few and shared across vendors, whereas resource names are
+// unbounded and include in-house device plugins.
 func numGPU(resourcePerNode corev1.ResourceList) int {
-	for resName, resQ := range resourcePerNode {
-		if strings.Contains(strings.ToLower(resName.String()), "gpu") {
-			return int(resQ.Value())
+	for _, resName := range slices.Sorted(maps.Keys(resourcePerNode)) {
+		name := strings.ToLower(resName.String())
+		if !strings.Contains(name, "gpu") {
+			continue
 		}
+		// Match the hints against the resource name alone rather than the whole string,
+		// so that a vendor domain such as memverge.com does not disqualify a device count.
+		path := name
+		if _, after, found := strings.Cut(name, "/"); found {
+			path = after
+		}
+		if slices.ContainsFunc(nonDeviceCountHints, func(hint string) bool {
+			return strings.Contains(path, hint)
+		}) {
+			continue
+		}
+		resQ := resourcePerNode[resName]
+		return int(resQ.Value())
 	}
 	return 0
 }
