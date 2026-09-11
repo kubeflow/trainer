@@ -27,6 +27,10 @@ type SearchSpaceApplyConfiguration struct {
 	Uniform *UniformSpaceApplyConfiguration `json:"uniform,omitempty"`
 	// logUniform is the log-uniform search space.
 	LogUniform *LogUniformSpaceApplyConfiguration `json:"logUniform,omitempty"`
+	// normal is the normal (Gaussian) search space.
+	Normal *NormalSpaceApplyConfiguration `json:"normal,omitempty"`
+	// logNormal is the log-normal search space.
+	LogNormal *LogNormalSpaceApplyConfiguration `json:"logNormal,omitempty"`
 	// categorical is the categorical search space.
 	Categorical *CategoricalSpaceApplyConfiguration `json:"categorical,omitempty"`
 }
@@ -50,6 +54,22 @@ func (b *SearchSpaceApplyConfiguration) WithUniform(value *UniformSpaceApplyConf
 // If called multiple times, the LogUniform field is set to the value of the last call.
 func (b *SearchSpaceApplyConfiguration) WithLogUniform(value *LogUniformSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
 	b.LogUniform = value
+	return b
+}
+
+// WithNormal sets the Normal field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Normal field is set to the value of the last call.
+func (b *SearchSpaceApplyConfiguration) WithNormal(value *NormalSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
+	b.Normal = value
+	return b
+}
+
+// WithLogNormal sets the LogNormal field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LogNormal field is set to the value of the last call.
+func (b *SearchSpaceApplyConfiguration) WithLogNormal(value *LogNormalSpaceApplyConfiguration) *SearchSpaceApplyConfiguration {
+	b.LogNormal = value
 	return b
 }
 
