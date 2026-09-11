@@ -525,6 +525,10 @@ func TestOptionalTrainerFields(t *testing.T) {
 	cases := map[string]struct {
 		podSetCount int32
 		jobTrainer  *trainer.Trainer
+		// runtimeNumProcPerNode: nil simulates a runtime template constructed without API
+		// server defaulting; the test case "runtime num proc per node is not set" depends on
+		// this staying nil.
+		runtimeNumProcPerNode *int32
 		// wantCommand is only asserted when set.
 		wantCommand []string
 		wantFlags   string
@@ -533,16 +537,18 @@ func TestOptionalTrainerFields(t *testing.T) {
 		wantHostlist  string
 	}{
 		"trainer is not set": {
-			podSetCount:  3,
-			wantCommand:  []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", "python train.py"},
-			wantFlags:    "-N 3 -n 3",
-			wantHostlist: "test-job-node-0-[0-2]",
+			podSetCount:           3,
+			runtimeNumProcPerNode: ptr.To[int32](1),
+			wantCommand:           []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", "python train.py"},
+			wantFlags:             "-N 3 -n 3",
+			wantHostlist:          "test-job-node-0-[0-2]",
 		},
 		"num nodes is not set": {
-			podSetCount:  2,
-			jobTrainer:   utiltesting.MakeTrainJobTrainerWrapper().Container("image", []string{"python", "train.py"}, nil, nil).Obj(),
-			wantFlags:    "-N 2 -n 2",
-			wantHostlist: "test-job-node-0-[0-1]",
+			podSetCount:           2,
+			jobTrainer:            utiltesting.MakeTrainJobTrainerWrapper().Container("image", []string{"python", "train.py"}, nil, nil).Obj(),
+			runtimeNumProcPerNode: ptr.To[int32](1),
+			wantFlags:             "-N 2 -n 2",
+			wantHostlist:          "test-job-node-0-[0-1]",
 		},
 		"env and num proc per node from the TrainJob are applied": {
 			podSetCount: 3,
@@ -550,9 +556,19 @@ func TestOptionalTrainerFields(t *testing.T) {
 				NumProcPerNode(2).
 				Env(corev1.EnvVar{Name: "FLUX_VIEW_IMAGE", Value: "example.com/flux-view:test"}).
 				Obj(),
-			wantFlags:     "-N 3 -n 6",
-			wantViewImage: "example.com/flux-view:test",
-			wantHostlist:  "test-job-node-0-[0-2]",
+			runtimeNumProcPerNode: ptr.To[int32](1),
+			wantFlags:             "-N 3 -n 6",
+			wantViewImage:         "example.com/flux-view:test",
+			wantHostlist:          "test-job-node-0-[0-2]",
+		},
+		// Regression test: a runtime template built without going through API server
+		// defaulting (e.g. constructed directly, as in this test) leaves NumProcPerNode
+		// nil. generateFluxEntrypoint must fall back to the documented default of 1
+		// instead of dereferencing the nil pointer.
+		"runtime num proc per node is not set": {
+			podSetCount:  2,
+			wantFlags:    "-N 2 -n 2",
+			wantHostlist: "test-job-node-0-[0-1]",
 		},
 	}
 
@@ -569,7 +585,7 @@ func TestOptionalTrainerFields(t *testing.T) {
 				RuntimePolicy: runtime.RuntimePolicy{
 					MLPolicySource: &trainer.MLPolicySource{
 						Flux: &trainer.FluxMLPolicySource{
-							NumProcPerNode: ptr.To[int32](1),
+							NumProcPerNode: tc.runtimeNumProcPerNode,
 						},
 					},
 				},
