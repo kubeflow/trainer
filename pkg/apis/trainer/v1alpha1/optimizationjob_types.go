@@ -18,6 +18,11 @@ package v1alpha1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+const (
+	// OptimizationJobKind is the Kind name for the OptimizationJob.
+	OptimizationJobKind string = "OptimizationJob"
+)
+
 // +kubebuilder:validation:Enum=Maximize;Minimize
 type ObjectiveDirection string
 
