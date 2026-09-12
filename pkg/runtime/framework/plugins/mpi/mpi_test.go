@@ -869,6 +869,42 @@ trainJob-node-1-0.trainJob slots=1
 			},
 			wantBuildError: errorGetSSHAuthSecretFromAPI,
 		},
+		"nil NumProcPerNode in runtime and trainjob defaults safely without panic": {
+			info: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(nil, trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
+						Obj(),
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				UID("trainJob").
+				Obj(),
+			wantInfo: &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(nil, trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(false)).
+						Obj(),
+				},
+			},
+			wantObjs: []apiruntime.Object{
+				utiltesting.MakeSecretWrapper(fmt.Sprintf("trainJob%s", constants.MPISSHAuthSecretSuffix), metav1.NamespaceDefault).
+					WithImmutable(true).
+					WithType(corev1.SecretTypeSSHAuth).
+					WithData(map[string][]byte{
+						constants.MPISSHPublicKey: []byte("EXIST"),
+						corev1.SSHAuthPrivateKey:  []byte("EXIST"),
+					}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
+					Obj(),
+				utiltesting.MakeConfigMapWrapper(fmt.Sprintf("trainJob%s", constants.MPIHostfileConfigMapSuffix), metav1.NamespaceDefault).
+					WithData(map[string]string{
+						constants.MPIHostfileName: "",
+					}).
+					ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "trainJob", "trainJob").
+					Obj(),
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -128,7 +128,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumProcPerNode != nil {
 		info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode = trainJob.Spec.Trainer.NumProcPerNode
 		// If numProcPerNode is set to 1 in runtime, we make it equal to number of GPUs.
-	} else if *info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode == 1 {
+	} else if ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode, 1) == 1 {
 		resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
 		if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
 			resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
@@ -217,7 +217,7 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 							WithValue("true"),
 						*corev1ac.EnvVar().
 							WithName(constants.OpenMPIEnvDefaultSlots).
-							WithValue(strconv.Itoa(int(*info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode))),
+							WithValue(strconv.Itoa(int(ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.NumProcPerNode, 1)))),
 						*corev1ac.EnvVar().
 							WithName(constants.OpenMPIEnvKeyRSHArgs).
 							WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
