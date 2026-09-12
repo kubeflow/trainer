@@ -416,7 +416,10 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.NumProcPerNode != nil {
 		tasks = *jobTrainer.NumProcPerNode
 	} else {
-		tasks = *info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode
+		// NumProcPerNode defaults to 1 via the FluxMLPolicySource CRD schema, but that default
+		// is only applied by the API server. Objects built without going through it (unit
+		// tests, or a runtime read before the default existed) may still have it unset.
+		tasks = ptr.Deref(info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode, 1)
 	}
 	flags = fmt.Sprintf("-N %d -n %d", numNodes, tasks*numNodes)
 
