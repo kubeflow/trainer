@@ -127,7 +127,7 @@ Device: Device(gpu, 0)
 
 ## Fine-Tune LLM with MLX and TrainJob
 
-The following sections describe how to fine-tune Llama using MLX and Kubeflow Trainer.
+The following sections describe how to fine-tune Qwen2.5 using MLX and Kubeflow Trainer.
 
 ### Configure MLX Training Function
 
@@ -146,7 +146,7 @@ them on every training node.
 Your training function might look like this:
 
 ```py
-def fine_tune_llama():
+def fine_tune_qwen():
     import types
     import os
     import mlx.core as mx
@@ -157,7 +157,7 @@ def fine_tune_llama():
 
     # Set parameters for the mlx-lm.
     args = types.SimpleNamespace()
-    args.model = "meta-llama/Llama-3.2-3B-Instruct"
+    args.model = "Qwen/Qwen2.5-1.5B-Instruct"
     args.data = "mlx-community/WikiSQL"
     args.train = True
 
@@ -166,12 +166,11 @@ def fine_tune_llama():
         if not hasattr(args, k):
             setattr(args, k, v)
 
-    # Load pre-trained model and dataset, set your HF token.
-    os.environ["HF_TOKEN"] = "<YOUR_HF_TOKEN>"  # Replace with your Hugging Face token.
+    # Load pre-trained model and dataset.
     model, tokenizer = load(args.model)
     train_set, valid_set, _ = load_dataset(args, tokenizer)
 
-    # Start the Llama distributed fine-tuning.
+    # Start the Qwen distributed fine-tuning.
     train_model(args, model, train_set, valid_set)
 
     # Evaluate the fine-tuned adapter.
@@ -201,7 +200,7 @@ from kubeflow.trainer import TrainerClient, CustomTrainer
 job_id = TrainerClient().train(
     runtime="mlx-distributed",
     trainer=CustomTrainer(
-        func=fine_tune_llama,
+        func=fine_tune_qwen,
         num_nodes=2,
         resources_per_node={
             "gpu": 1,
@@ -261,7 +260,7 @@ For more information, check the [official MLX guides](https://ml-explore.github.
 ## Next Steps
 
 - Check out [the distributed MNIST example with MLX](https://github.com/kubeflow/trainer/tree/master/examples/mlx/image-classification/mnist.ipynb).
-- Follow [the complete example](https://github.com/kubeflow/trainer/tree/master/examples/mlx/language-modeling/fine-tune-llama.ipynb)
- to fine-tune Llama3.2 with MLX and Kubeflow Trainer.
+- Follow [the complete example](https://github.com/kubeflow/trainer/tree/master/examples/mlx/language-modeling/fine-tune-qwen.ipynb)
+ to fine-tune Qwen2.5 with MLX and Kubeflow Trainer.
 - Explore [the official MLX documentation](https://ml-explore.github.io/mlx/build/html/index.html).
 - Learn more about `TrainerClient()` APIs [in the Kubeflow SDK](https://github.com/kubeflow/sdk/blob/main/kubeflow/trainer/api/trainer_client.py).
