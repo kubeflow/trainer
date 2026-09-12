@@ -19,6 +19,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -186,6 +187,43 @@ func TestNew(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewPluginOrderIsDeterministic(t *testing.T) {
+	// Verify the implementation detail that plugins are executed in name order.
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	clientBuilder := testingutil.NewClientBuilder()
+	registry := fwkplugins.NewRegistry()
+
+	fwk, err := New(ctx, clientBuilder.Build(), registry, testingutil.AsIndex(clientBuilder), nil)
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+
+	assertSorted := func(phase string, names []string) {
+		if !slices.IsSorted(names) {
+			t.Errorf("%s plugins are not in canonical name-sorted order: %v", phase, names)
+		}
+	}
+
+	mlNames := make([]string, len(fwk.enforceMLPlugins))
+	for i, p := range fwk.enforceMLPlugins {
+		mlNames[i] = p.(framework.Plugin).Name()
+	}
+	assertSorted("enforceMLPlugins", mlNames)
+
+	buildNames := make([]string, len(fwk.componentBuilderPlugins))
+	for i, p := range fwk.componentBuilderPlugins {
+		buildNames[i] = p.(framework.Plugin).Name()
+	}
+	assertSorted("componentBuilderPlugins", buildNames)
+
+	validationNames := make([]string, len(fwk.customValidationPlugins))
+	for i, p := range fwk.customValidationPlugins {
+		validationNames[i] = p.(framework.Plugin).Name()
+	}
+	assertSorted("customValidationPlugins", validationNames)
 }
 
 func TestRunEnforceMLPolicyPlugins(t *testing.T) {
