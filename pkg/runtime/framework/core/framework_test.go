@@ -30,8 +30,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,6 +48,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
@@ -68,6 +71,8 @@ import (
 // we can delegate the actual plugin testing to each plugin directories, and implement detailed unit testing.
 
 func TestNew(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobStatus, false)
+
 	cases := map[string]struct {
 		registry                                                               fwkplugins.Registry
 		emptyCoSchedulingIndexerTrainingRuntimeContainerRuntimeClassKey        bool
@@ -189,6 +194,8 @@ func TestNew(t *testing.T) {
 }
 
 func TestRunEnforceMLPolicyPlugins(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobStatus, false)
+
 	cases := map[string]struct {
 		registry        fwkplugins.Registry
 		runtimeInfo     *runtime.Info
@@ -353,6 +360,8 @@ func TestRunEnforceMLPolicyPlugins(t *testing.T) {
 }
 
 func TestRunEnforcePodGroupPolicyPlugins(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobStatus, false)
+
 	cases := map[string]struct {
 		registry        fwkplugins.Registry
 		runtimeInfo     *runtime.Info
@@ -448,6 +457,8 @@ func TestRunEnforcePodGroupPolicyPlugins(t *testing.T) {
 }
 
 func TestRunCustomValidationPlugins(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobStatus, false)
+
 	cases := map[string]struct {
 		registry     fwkplugins.Registry
 		oldObj       *trainer.TrainJob
@@ -505,6 +516,8 @@ func nodeContainerRequests(cpu, memory string) *corev1ac.ResourceRequirementsApp
 }
 
 func TestRunComponentBuilderPlugins(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobStatus, false)
+
 	cases := map[string]struct {
 		registry        fwkplugins.Registry
 		runtimeInfo     *runtime.Info
@@ -2283,6 +2296,8 @@ test-job-node-0-1.test-job slots=1
 }
 
 func TestWatchExtensionPlugins(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobStatus, false)
+
 	cases := map[string]struct {
 		registry    fwkplugins.Registry
 		wantPlugins []framework.WatchExtensionPlugin
@@ -2351,6 +2366,8 @@ func (f fakeTrainJobStatusPlugin) Status(context.Context, *trainer.TrainJob) (*t
 }
 
 func TestTrainJobStatusPlugins(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobStatus, false)
+
 	lastTransitionTime := metav1.Time{Time: time.Now()}.Rfc3339Copy()
 	cases := map[string]struct {
 		registry   fwkplugins.Registry
@@ -2567,6 +2584,7 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 }
 
 func TestRunPreComponentBuilderPlugins(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TrainJobStatus, false)
 	cases := map[string]struct {
 		registry        fwkplugins.Registry
 		runtimeInfo     *runtime.Info
