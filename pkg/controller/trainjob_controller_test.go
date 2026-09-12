@@ -23,16 +23,21 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -209,6 +214,112 @@ func TestReconcileDeadline(t *testing.T) {
 				t.Errorf("Expected the child JobSet to be preserved, got error: %v", gotJobSetErr)
 			case !tc.wantJobSet && !apierrors.IsNotFound(gotJobSetErr):
 				t.Errorf("Expected the child JobSet to be absent, got error: %v", gotJobSetErr)
+			}
+		})
+	}
+}
+
+// fakeRuntime is a minimal jobruntimes.Runtime stub that records whether NewObjects and
+// DeleteObjects were invoked, without needing a real TrainingRuntime/ClusterTrainingRuntime
+// or plugin registry.
+type fakeRuntime struct {
+	objsToDelete []client.Object
+
+	newObjectsCalled    bool
+	deleteObjectsCalled bool
+}
+
+func (f *fakeRuntime) NewObjects(context.Context, *trainer.TrainJob) ([]apiruntime.ApplyConfiguration, error) {
+	f.newObjectsCalled = true
+	return nil, nil
+}
+
+func (f *fakeRuntime) DeleteObjects(context.Context, *trainer.TrainJob) ([]client.Object, error) {
+	f.deleteObjectsCalled = true
+	return f.objsToDelete, nil
+}
+
+func (f *fakeRuntime) RuntimeInfo(*trainer.TrainJob, any, *trainer.MLPolicy, *trainer.PodGroupPolicy) (*jobruntimes.Info, error) {
+	return nil, nil
+}
+
+func (f *fakeRuntime) TrainJobStatus(context.Context, *trainer.TrainJob) (*trainer.TrainJobStatus, error) {
+	return nil, nil
+}
+
+func (f *fakeRuntime) EventHandlerRegistrars() []jobruntimes.ReconcilerBuilder {
+	return nil
+}
+
+func (f *fakeRuntime) ValidateObjects(context.Context, *trainer.TrainJob, *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	return nil, nil
+}
+
+var _ jobruntimes.Runtime = (*fakeRuntime)(nil)
+
+// TestReconcileObjects covers the branch between materializing new objects and cleaning up
+// stale ones in isolation, independently of any concrete plugin.
+func TestReconcileObjects(t *testing.T) {
+	runningTrainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-trainjob").Obj()
+	failedTrainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-trainjob").
+		Conditions(metav1.Condition{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue}).
+		Obj()
+
+	cases := map[string]struct {
+		trainJob          *trainer.TrainJob
+		objsToDelete      []client.Object
+		seedObjs          []client.Object
+		wantNewObjsCalled bool
+		wantDeleted       bool
+	}{
+		"running TrainJob still materializes new objects": {
+			trainJob:          runningTrainJob,
+			wantNewObjsCalled: true,
+		},
+		"failed TrainJob skips materializing new objects but still cleans up": {
+			trainJob: failedTrainJob,
+			objsToDelete: []client.Object{
+				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "to-delete", Namespace: metav1.NamespaceDefault}},
+			},
+			seedObjs: []client.Object{
+				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "to-delete", Namespace: metav1.NamespaceDefault}},
+			},
+			wantDeleted: true,
+		},
+		"cleanup tolerates an object that is already gone": {
+			trainJob: failedTrainJob,
+			objsToDelete: []client.Object{
+				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "already-gone", Namespace: metav1.NamespaceDefault}},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			cli := utiltesting.NewClientBuilder().WithObjects(tc.seedObjs...).Build()
+			fr := &fakeRuntime{objsToDelete: tc.objsToDelete}
+			r := &TrainJobReconciler{client: cli}
+
+			if err := r.reconcileObjects(ctx, fr, tc.trainJob); err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			// DeleteObjects must run on every call, regardless of the TrainJob's status.
+			if !fr.deleteObjectsCalled {
+				t.Error("Expected DeleteObjects to be called")
+			}
+			if fr.newObjectsCalled != tc.wantNewObjsCalled {
+				t.Errorf("NewObjects called = %v, want %v", fr.newObjectsCalled, tc.wantNewObjsCalled)
+			}
+			for _, obj := range tc.objsToDelete {
+				err := cli.Get(ctx, client.ObjectKeyFromObject(obj), &corev1.ConfigMap{})
+				if tc.wantDeleted && !apierrors.IsNotFound(err) {
+					t.Errorf("Expected %s to be deleted, got error: %v", obj.GetName(), err)
+				}
 			}
 		})
 	}

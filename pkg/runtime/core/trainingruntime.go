@@ -112,6 +112,28 @@ func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.Trai
 	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
 }
 
+// DeleteObjects returns the previously materialized objects that should now be removed
+// for the TrainJob. If the referenced TrainingRuntime can no longer be resolved (e.g. it
+// was deleted after the TrainJob finished), there is no PodGroupPolicy left to check
+// plugins against, so it returns no objects rather than an error.
+func (r *TrainingRuntime) DeleteObjects(ctx context.Context, trainJob *trainer.TrainJob) ([]client.Object, error) {
+	var trainingRuntime trainer.TrainingRuntime
+	if err := getRuntimeSnapshot(ctx, r.client, trainJob, &trainingRuntime); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("unable to get runtime snapshot: %w", err)
+		}
+		if err := r.client.Get(ctx, client.ObjectKey{Namespace: trainJob.Namespace, Name: trainJob.Spec.RuntimeRef.Name}, &trainingRuntime); err != nil {
+			return nil, client.IgnoreNotFound(err)
+		}
+	}
+
+	info, err := r.RuntimeInfo(trainJob, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy)
+	if err != nil {
+		return nil, err
+	}
+	return r.framework.RunComponentDeleterPlugins(ctx, info, trainJob)
+}
+
 // RuntimeInfo builds the Info object for a TrainJob and consolidates it through the
 // Build Phase extension points, in this order:
 //  1. EnforceMLPolicy, then EnforcePodGroupPolicy, for the parameters declared in the
