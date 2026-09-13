@@ -101,6 +101,7 @@ spec:
                       description: name is the name of the hyperparameter.
                       maxLength: 64
                       minLength: 1
+                      pattern: ^[A-Za-z_][A-Za-z0-9_]*$
                       type: string
                     searchSpace:
                       description: searchSpace is the search space for the hyperparameter.
