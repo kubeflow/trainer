@@ -229,6 +229,7 @@ type Parameter struct {
 	// name is the name of the hyperparameter.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=64
+	// +kubebuilder:validation:Pattern="^[A-Za-z_][A-Za-z0-9_]*$"
 	// +required
 	Name string `json:"name,omitempty"`
 
