@@ -165,6 +165,10 @@ dataCache:
   # -- Enable/disable data cache support (LWS dependency, ClusterRole).
   # Set to `true` to install data cache components.
   enabled: false
+  # -- Namespaces to create the cache initializer ServiceAccount and RoleBinding in.
+  # The namespaces must already exist.
+  namespaces: []
+  # - default
   lws:
     # -- Whether to install LeaderWorkerSet as a dependency.
     # Set to `false` if LeaderWorkerSet is already installed in the cluster.
