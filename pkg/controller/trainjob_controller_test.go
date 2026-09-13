@@ -18,17 +18,20 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -187,7 +190,10 @@ func TestReconcileDeadline(t *testing.T) {
 				clock:  clocktesting.NewFakePassiveClock(tc.now),
 			}
 
-			gotResult := r.reconcileDeadline(ctx, tc.trainJob)
+			gotResult, gotErr := r.reconcileDeadline(ctx, tc.trainJob)
+			if gotErr != nil {
+				t.Fatalf("reconcileDeadline() error = %v", gotErr)
+			}
 
 			if diff := cmp.Diff(tc.wantResult, gotResult); len(diff) != 0 {
 				t.Errorf("Unexpected ctrl.Result (-want, +got): \n%s", diff)
@@ -211,5 +217,52 @@ func TestReconcileDeadline(t *testing.T) {
 				t.Errorf("Expected the child JobSet to be absent, got error: %v", gotJobSetErr)
 			}
 		})
+	}
+}
+
+func TestReconcileDeadline_RetryJobSetDeletion(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	t.Cleanup(cancel)
+
+	trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "train-job").
+		ActiveDeadlineSeconds(1).
+		Obj()
+	trainJob.CreationTimestamp = metav1.NewTime(time.Now().Add(-time.Minute))
+	jobSet := &jobsetv1alpha2.JobSet{
+		ObjectMeta: metav1.ObjectMeta{Name: trainJob.Name, Namespace: trainJob.Namespace},
+	}
+
+	deleteErr := errors.New("error deleting JobSet")
+	deleteCalls := 0
+	clientBuilder := utiltesting.NewClientBuilder().WithObjects(jobSet)
+	clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+		Delete: func(ctx context.Context, cli client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+			deleteCalls++
+			if deleteCalls == 1 {
+				return deleteErr
+			}
+			return cli.Delete(ctx, obj, opts...)
+		},
+	})
+	cli := clientBuilder.Build()
+	r := NewTrainJobReconciler(cli, nil, nil)
+
+	if _, err := r.reconcileDeadline(ctx, trainJob); !errors.Is(err, deleteErr) {
+		t.Fatalf("reconcileDeadline() error = %v, want %v", err, deleteErr)
+	}
+	deadlineCond := meta.FindStatusCondition(trainJob.Status.Conditions, trainer.TrainJobFailed)
+	if deadlineCond == nil || deadlineCond.Reason != trainer.TrainJobDeadlineExceededReason {
+		t.Fatalf("reconcileDeadline() condition = %v, want reason %q", deadlineCond, trainer.TrainJobDeadlineExceededReason)
+	}
+
+	if _, err := r.reconcileDeadline(ctx, trainJob); err != nil {
+		t.Fatalf("reconcileDeadline() retry returned error: %v", err)
+	}
+	if deleteCalls != 2 {
+		t.Errorf("reconcileDeadline() delete calls = %d, want 2", deleteCalls)
+	}
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(jobSet), &jobsetv1alpha2.JobSet{}); !apierrors.IsNotFound(err) {
+		t.Errorf("Get() error = %v, want NotFound", err)
 	}
 }
