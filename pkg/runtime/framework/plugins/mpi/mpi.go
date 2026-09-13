@@ -117,8 +117,9 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 	if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.NumNodes != nil {
 		if node := info.FindPodSetByName(constants.Node); node != nil && node.Count != nil {
 			if ptr.Deref(info.RuntimePolicy.MLPolicySource.MPI.RunLauncherAsNode, false) {
-				// When runLauncherAsNode is enabled, 1 nodes should be allocated to launcher.
-				*node.Count = max(*trainJob.Spec.Trainer.NumNodes-1, 1)
+				// When runLauncherAsNode is enabled, 1 node should be allocated to launcher.
+				// For numNodes=1, the launcher is the only node and no worker is created.
+				*node.Count = max(*trainJob.Spec.Trainer.NumNodes-1, 0)
 			} else {
 				*node.Count = *trainJob.Spec.Trainer.NumNodes
 			}
