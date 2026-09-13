@@ -13,10 +13,9 @@
 # limitations under the License.
 
 import logging
-import time
 from urllib.parse import urlparse
 
-from kubernetes import client, config
+from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
 
 import pkg.initializers.types.types as types
@@ -89,6 +88,7 @@ class CacheInitializer(utils.DatasetProvider):
         readiness_period = int(self.config.readiness_period_seconds)
         readiness_timeout = int(self.config.readiness_timeout_seconds)
         readiness_failure_threshold = int(self.config.readiness_failure_threshold)
+        cache_ready_timeout = int(self.config.cache_ready_timeout_seconds)
         namespace = get_namespace()
         metadata_loc = self.config.metadata_loc
         table_name = self.table_name
@@ -306,31 +306,37 @@ class CacheInitializer(utils.DatasetProvider):
                 else:
                     raise e
 
-            # Wait for LeaderWorkerSet to become ready
-            # TODO:// refactor to use watch API
-            while True:
-                try:
-                    lws = custom_api.get_namespaced_custom_object(
-                        group="leaderworkerset.x-k8s.io",
-                        version="v1",
-                        plural="leaderworkersets",
-                        name=lws_body["metadata"]["name"],
-                        namespace=namespace,
-                    )
-
-                    conditions = lws.get("status", {}).get("conditions", [])
+            # Wait for LeaderWorkerSet to become ready. The watch delivers the
+            # current state as an ADDED event before any updates, so a cluster
+            # that is already available is picked up on the first event.
+            lws_name = lws_body["metadata"]["name"]
+            w = watch.Watch()
+            try:
+                for event in w.stream(
+                    custom_api.list_namespaced_custom_object,
+                    group="leaderworkerset.x-k8s.io",
+                    version="v1",
+                    plural="leaderworkersets",
+                    namespace=namespace,
+                    field_selector=f"metadata.name={lws_name}",
+                    timeout_seconds=cache_ready_timeout,
+                ):
+                    conditions = event["object"].get("status", {}).get("conditions", [])
                     if any(
                         c["type"] == "Available" and c["status"] == "True"
                         for c in conditions
                     ):
-                        logging.info(
-                            f"LeaderWorkerSet {lws_body['metadata']['name']} is ready"
-                        )
+                        logging.info(f"LeaderWorkerSet {lws_name} is ready")
                         break
-
-                    time.sleep(5)
-                except ApiException as e:
-                    raise e
+                else:
+                    # The stream ended without the Available condition, which
+                    # means timeout_seconds elapsed first.
+                    raise TimeoutError(
+                        f"LeaderWorkerSet {lws_name} did not become ready within "
+                        f"{cache_ready_timeout}s"
+                    )
+            finally:
+                w.stop()
 
         except ApiException as e:
             logging.error(f"Cache cluster creation failed: {e}")
