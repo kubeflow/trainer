@@ -431,7 +431,10 @@ async fn partition_tasks(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testkit::local_table::LocalIcebergTable;
+    use arrow::array::Array;
     use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::physical_plan::ExecutionPlanProperties;
     use datafusion::prelude::SessionContext;
     use iceberg::spec::DataFileFormat;
 
@@ -647,6 +650,94 @@ mod tests {
 
             expected_start += group_records[group_idx];
         }
+
+        Ok(())
+    }
+
+    /// Loads a table from the local filesystem and asserts that the head node
+    /// plans it into one partition per worker.
+    ///
+    /// This is the only test that drives `DataFileTableProvider::new`, and so the
+    /// only one that covers `FileIO`/`StaticTable` resolution end to end.
+    #[tokio::test]
+    async fn local_iceberg_table_is_planned_across_workers()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let warehouse = tempfile::tempdir()?;
+        let table = LocalIcebergTable::create(warehouse.path(), &[3, 2]).await?;
+
+        let provider = DataFileTableProvider::new(
+            &table.metadata_location().to_string(),
+            &table.table_name(),
+            &table.schema_name(),
+            create_test_schema(),
+            2,
+        )
+        .await?;
+
+        let session_ctx = SessionContext::new();
+        let plan = provider.scan(&session_ctx.state(), None, &[], None).await?;
+        assert_eq!(plan.output_partitioning().partition_count(), 2);
+
+        let mut planned_paths = Vec::new();
+        let mut planned_rows = 0u64;
+
+        for partition in 0..2 {
+            let batches = datafusion::physical_plan::common::collect(
+                plan.execute(partition, session_ctx.task_ctx())?,
+            )
+            .await?;
+
+            for batch in batches {
+                let starts = batch
+                    .column(1)
+                    .as_any()
+                    .downcast_ref::<UInt64Array>()
+                    .ok_or("row_start_indexes is not a UInt64Array")?;
+                let ends = batch
+                    .column(2)
+                    .as_any()
+                    .downcast_ref::<UInt64Array>()
+                    .ok_or("row_end_indexes is not a UInt64Array")?;
+                let paths = batch
+                    .column(3)
+                    .as_any()
+                    .downcast_ref::<arrow::array::GenericListArray<i32>>()
+                    .ok_or("file_paths is not a ListArray")?;
+
+                for row in 0..batch.num_rows() {
+                    let path_values = paths.value(row);
+                    let path_values = path_values
+                        .as_any()
+                        .downcast_ref::<arrow::array::StringViewArray>()
+                        .ok_or("file_paths items are not a StringViewArray")?;
+
+                    // A worker with no files reports an empty range rather than a
+                    // one-row range, so it must not contribute to the row total.
+                    if path_values.is_empty() {
+                        continue;
+                    }
+
+                    planned_rows += ends.value(row) - starts.value(row) + 1;
+                    for path in 0..path_values.len() {
+                        planned_paths.push(path_values.value(path).to_string());
+                    }
+                }
+            }
+        }
+
+        planned_paths.sort();
+        let mut expected_paths = table.data_file_paths().to_vec();
+        expected_paths.sort();
+
+        assert_eq!(
+            planned_paths, expected_paths,
+            "every data file in the local table should be assigned to a worker"
+        );
+        assert_eq!(
+            planned_rows,
+            table.row_count(),
+            "planned row ranges should cover every row in the local table"
+        );
 
         Ok(())
     }
