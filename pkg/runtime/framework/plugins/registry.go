@@ -29,6 +29,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jax"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/mpi"
+	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/networkpolicy"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/plainml"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/torch"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/trainjobstatus"
@@ -53,6 +54,10 @@ func NewRegistry() Registry {
 
 	if features.Enabled(features.TrainJobStatus) {
 		registry[trainjobstatus.Name] = trainjobstatus.New
+	}
+
+	if features.Enabled(features.TrainJobNetworkPolicy) {
+		registry[networkpolicy.Name] = networkpolicy.New
 	}
 
 	return registry
