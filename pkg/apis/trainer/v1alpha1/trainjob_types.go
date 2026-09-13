@@ -50,6 +50,7 @@ type TrainJob struct {
 
 	// status of TrainJob.
 	// +optional
+	//nolint:kubeapilinter // optionalfields: an empty status is valid and must stay representable.
 	Status TrainJobStatus `json:"status,omitzero"`
 }
 
@@ -496,7 +497,6 @@ type ContainerPatch struct {
 }
 
 // TrainJobStatus represents the current status of TrainJob.
-// +kubebuilder:validation:MinProperties=1
 type TrainJobStatus struct {
 	// conditions for the TrainJob.
 	// +optional
