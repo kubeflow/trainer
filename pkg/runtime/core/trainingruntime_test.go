@@ -2239,3 +2239,113 @@ func TestRuntimeInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestTrainingRuntimeNewObjectsResolvedNodeResources(t *testing.T) {
+	cases := map[string]struct {
+		runtimeResources   corev1.ResourceList
+		trainJobResources  corev1.ResourceList
+		wantNodeResources  corev1.ResourceList
+		wantNumProcPerNode string
+	}{
+		"GPUs declared by the Runtime survive a TrainJob override of other resources": {
+			runtimeResources: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("8"),
+				"nvidia.com/gpu":   resource.MustParse("4"),
+			},
+			trainJobResources: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("16Gi")},
+			wantNodeResources: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("8"),
+				corev1.ResourceMemory: resource.MustParse("16Gi"),
+				"nvidia.com/gpu":      resource.MustParse("4"),
+			},
+			wantNumProcPerNode: "auto",
+		},
+		"TrainJob CPUs override the Runtime ones": {
+			runtimeResources:  corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("8")},
+			trainJobResources: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+			wantNodeResources: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+			// No GPU anywhere, so torchrun gets one process per CPU.
+			wantNumProcPerNode: "2",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "torch-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "torch-runtime").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(1).
+							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().TorchPolicy().Obj()).
+							Obj(),
+					).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, tc.runtimeResources).
+					Obj(),
+			).Obj()
+
+			trainerSpec := testingutil.MakeTrainJobTrainerWrapper().NumNodes(1).Obj()
+			trainerSpec.ResourcesPerNode = &corev1.ResourceRequirements{Requests: tc.trainJobResources}
+			trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "torch-job").
+				UID("uid").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "torch-runtime").
+				Trainer(trainerSpec).
+				Obj()
+
+			clientBuilder := testingutil.NewClientBuilder().WithObjects(trainingRuntime)
+			c := clientBuilder.Build()
+			runtimeInstance, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			objs, err := runtimeInstance.NewObjects(ctx, trainJob)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resultObjs, err := testingutil.ToObject(c.Scheme(), objs...)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			nodeContainer := findTrainerNodeContainer(t, resultObjs)
+			if diff := cmp.Diff(tc.wantNodeResources, nodeContainer.Resources.Requests); len(diff) != 0 {
+				t.Errorf("Unexpected node container resources (-want,+got):\n%s", diff)
+			}
+			var gotNumProcPerNode string
+			for _, env := range nodeContainer.Env {
+				if env.Name == constants.TorchEnvNumProcPerNode {
+					gotNumProcPerNode = env.Value
+				}
+			}
+			if gotNumProcPerNode != tc.wantNumProcPerNode {
+				t.Errorf("Unexpected %s: got %q, want %q", constants.TorchEnvNumProcPerNode, gotNumProcPerNode, tc.wantNumProcPerNode)
+			}
+		})
+	}
+}
+
+func findTrainerNodeContainer(t *testing.T, objs []runtime.Object) corev1.Container {
+	t.Helper()
+	for _, obj := range objs {
+		jobSet, ok := obj.(*jobsetv1alpha2.JobSet)
+		if !ok {
+			continue
+		}
+		for _, rJob := range jobSet.Spec.ReplicatedJobs {
+			if rJob.Name != constants.Node {
+				continue
+			}
+			for _, container := range rJob.Template.Spec.Template.Spec.Containers {
+				if container.Name == constants.Node {
+					return container
+				}
+			}
+		}
+	}
+	t.Fatalf("JobSet does not have the %s container in the %s replicated job", constants.Node, constants.Node)
+	return corev1.Container{}
+}
