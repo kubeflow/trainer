@@ -54,7 +54,13 @@ func (jc *JobController) DeletePodsAndServices(runtimeObject runtime.Object, run
 		// Note that pending pod will turn into running once schedulable,
 		// not cleaning it may leave orphan running pod in the future,
 		// we should treat it equivalent to running phase here.
-		if commonutil.IsFinished(jobStatus) && *runPolicy.CleanPodPolicy == apiv1.CleanPodPolicyRunning && pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
+		// Also, failed pods with RestartPolicy != Never will keep restarting, turn into running,
+		// causing resource leak after job is finished, so we should clean them too.
+		if commonutil.IsFinished(jobStatus) &&
+			*runPolicy.CleanPodPolicy == apiv1.CleanPodPolicyRunning &&
+			pod.Status.Phase != corev1.PodRunning &&
+			pod.Status.Phase != corev1.PodPending &&
+			!(pod.Status.Phase == corev1.PodFailed && pod.Spec.RestartPolicy != corev1.RestartPolicyNever) {
 			continue
 		}
 		if err := jc.PodControl.DeletePod(pod.Namespace, pod.Name, runtimeObject); err != nil {
