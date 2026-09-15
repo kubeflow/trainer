@@ -99,6 +99,9 @@ manager:
 |-----|------|---------|-------------|
 | nameOverride | string | `""` | String to partially override release name. |
 | fullnameOverride | string | `""` | String to fully override release name. |
+| namespace.create | bool | `true` | Whether the chart creates the release namespace. Set to `false` if the namespace is created out of band (for example with `helm install --create-namespace`) and labelled separately. |
+| namespace.labels | object | `{"pod-security.kubernetes.io/enforce":"baseline"}` | Labels to set on the release namespace. The Pod Security Admission level is applied here so a default install enforces it on the namespace where TrainJobs run. |
+| namespace.annotations | object | `{}` | Annotations to set on the release namespace. |
 | crds.enabled | bool | `true` | Whether to install the Trainer CRDs (TrainJob, TrainingRuntime, ClusterTrainingRuntime) with the chart. Set to `false` if you manage the CRDs outside of the chart (for example, applying them separately). This replaces Helm's built-in `--skip-crds` flag, which no longer applies now that the CRDs are chart templates. |
 | jobset.install | bool | `true` | Whether to install jobset as a dependency managed by trainer. This must be set to `false` if jobset controller/webhook has already been installed into the cluster. |
 | jobset.fullnameOverride | string | `"jobset"` | String to fully override jobset release name. |
