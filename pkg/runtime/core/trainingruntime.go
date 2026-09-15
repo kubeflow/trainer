@@ -24,12 +24,14 @@ import (
 	"maps"
 	"sort"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -44,6 +46,7 @@ import (
 	fwkcore "github.com/kubeflow/trainer/v2/pkg/runtime/framework/core"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
 	idxer "github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
+	trainingruntimeutil "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
 
 var (
@@ -109,6 +112,12 @@ func (r *TrainingRuntime) NewObjects(ctx context.Context, trainJob *trainer.Trai
 	return r.framework.RunComponentBuilderPlugins(ctx, info, trainJob)
 }
 
+// RuntimeInfo builds the Info object for a TrainJob and consolidates it through the
+// Build Phase extension points, in this order:
+//  1. EnforceMLPolicy, then EnforcePodGroupPolicy, for the parameters declared in the
+//     runtime `.spec.mlPolicy` and `.spec.podGroupPolicy`.
+//  2. EnforcePodSpec, for the PodSet concerns enabled outside of MLPolicy and PodGroupPolicy APIs.
+//  3. PreBuildSync, which consolidates the Info object with the concrete runtime template.
 func (r *TrainingRuntime) RuntimeInfo(
 	trainJob *trainer.TrainJob, runtimeTemplateSpec any, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
 ) (*runtime.Info, error) {
@@ -124,12 +133,13 @@ func (r *TrainingRuntime) RuntimeInfo(
 	if err = r.framework.RunEnforceMLPolicyPlugins(info, trainJob); err != nil {
 		return nil, err
 	}
-
 	if err = r.framework.RunEnforcePodGroupPolicyPlugins(info, trainJob); err != nil {
 		return nil, err
 	}
-
-	if err = r.framework.RunPodNetworkPlugins(info, trainJob); err != nil {
+	if err = r.framework.RunEnforcePodSpecPlugins(info, trainJob); err != nil {
+		return nil, err
+	}
+	if err = r.framework.RunPreComponentBuilderPlugins(info, trainJob); err != nil {
 		return nil, err
 	}
 
@@ -161,6 +171,7 @@ func (r *TrainingRuntime) newRuntimeInfo(
 	if err != nil {
 		return nil, err
 	}
+
 	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: jobsetv1alpha2.GroupVersion.String(),
@@ -189,18 +200,48 @@ func (r *TrainingRuntime) newRuntimeInfo(
 			if labelAncestor, ok := metadata.Labels[constants.LabelTrainJobAncestor]; ok {
 				if labelAncestor == constants.AncestorTrainer && mlPolicy != nil {
 					count = ptr.Deref(mlPolicy.NumNodes, 1)
-
-					// Apply resourcesPerNode from TrainJob to the template spec
-					if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
-						for j := range jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
-							if jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Name == constants.Node {
-								jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Resources = *trainJob.Spec.Trainer.ResourcesPerNode.DeepCopy()
-								break
-							}
-						}
-					}
 				}
 				ancestor = &labelAncestor
+			}
+		}
+		if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
+			isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer && mlPolicy != nil
+			isMPILauncherAsNode := mlPolicy != nil && mlPolicy.MPI != nil &&
+				ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && *rJob.Name == constants.Node
+			if isTrainerAncestor || isMPILauncherAsNode {
+				if applyPodSpec := jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec; applyPodSpec != nil {
+					for k := range applyPodSpec.Containers {
+						if ptr.Deref(applyPodSpec.Containers[k].Name, "") != constants.Node {
+							continue
+						}
+						var baseRes corev1.ResourceRequirements
+						if r := applyPodSpec.Containers[k].Resources; r != nil {
+							if r.Limits != nil {
+								baseRes.Limits = *r.Limits
+							}
+							if r.Requests != nil {
+								baseRes.Requests = *r.Requests
+							}
+						}
+						mergedRes, mergeErr := trainingruntimeutil.MergeResourceRequirements(
+							baseRes, *trainJob.Spec.Trainer.ResourcesPerNode)
+						if mergeErr != nil {
+							return nil, mergeErr
+						}
+						applyRes := &corev1ac.ResourceRequirementsApplyConfiguration{}
+						if mergedRes.Limits != nil {
+							limits := maps.Clone(mergedRes.Limits)
+							applyRes.Limits = &limits
+						}
+						if mergedRes.Requests != nil {
+							requests := maps.Clone(mergedRes.Requests)
+							applyRes.Requests = &requests
+						}
+						applyPodSpec.Containers[k].Resources = applyRes
+						jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Resources = mergedRes
+						break
+					}
+				}
 			}
 		}
 		opts = append(opts, runtime.WithPodSet(
@@ -269,16 +310,43 @@ func (r *TrainingRuntime) EventHandlerRegistrars() []runtime.ReconcilerBuilder {
 }
 
 func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+	// Validate against the snapshot the TrainJob was built from, falling back to the live
+	// runtime when no snapshot exists yet, as NewObjects does.
 	trainingRuntime := &trainer.TrainingRuntime{}
-	if err := r.client.Get(ctx, client.ObjectKey{
-		Namespace: new.Namespace,
-		Name:      new.Spec.RuntimeRef.Name,
-	}, trainingRuntime); err != nil {
-		return nil, field.ErrorList{
-			field.Invalid(field.NewPath("spec", "runtimeRef"), new.Spec.RuntimeRef,
-				fmt.Sprintf("%v: specified trainingRuntime must be created before the TrainJob is created", err)),
+	if err := getRuntimeSnapshot(ctx, r.client, new, trainingRuntime); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, field.ErrorList{
+				field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get runtime snapshot: %w", err)),
+			}
+		}
+		trainingRuntime = &trainer.TrainingRuntime{}
+		if err := r.client.Get(ctx, client.ObjectKey{
+			Namespace: new.Namespace,
+			Name:      new.Spec.RuntimeRef.Name,
+		}, trainingRuntime); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, field.ErrorList{
+					field.InternalError(field.NewPath("spec", "runtimeRef"), fmt.Errorf("unable to get trainingRuntime: %w", err)),
+				}
+			}
+			return nil, field.ErrorList{
+				field.Invalid(field.NewPath("spec", "runtimeRef"), new.Spec.RuntimeRef,
+					fmt.Sprintf("%v: specified trainingRuntime must be created before the TrainJob is created", err)),
+			}
 		}
 	}
+	var warnings admission.Warnings
+	if trainingruntimeutil.IsSupportDeprecated(trainingRuntime.Labels) {
+		warnings = append(warnings, fmt.Sprintf(
+			"Referenced TrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
+			trainingRuntime.Name,
+			constants.RuntimeDeprecationPolicyURL,
+		))
+	}
 	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
-	return r.framework.RunCustomValidationPlugins(ctx, info, old, new)
+	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)
+	if len(fwWarnings) != 0 {
+		warnings = append(warnings, fwWarnings...)
+	}
+	return warnings, errs
 }

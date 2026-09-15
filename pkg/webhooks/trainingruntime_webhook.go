@@ -29,6 +29,7 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	trainingruntime "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
 
 const (
@@ -60,7 +61,15 @@ func setupWebhookForTrainingRuntime(mgr ctrl.Manager) error {
 func (w *TrainingRuntimeValidator) ValidateCreate(ctx context.Context, obj *trainer.TrainingRuntime) (admission.Warnings, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("trainingruntime-webhook")
 	log.V(5).Info("Validating create", "trainingRuntime", klog.KObj(obj))
-	return nil, validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
+	var warnings admission.Warnings
+	if trainingruntime.IsSupportDeprecated(obj.Labels) {
+		warnings = append(warnings, fmt.Sprintf(
+			"TrainingRuntime \"%s\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: %s",
+			obj.Name,
+			constants.RuntimeDeprecationPolicyURL,
+		))
+	}
+	return warnings, validateReplicatedJobs(obj.Spec.Template.Spec.ReplicatedJobs).ToAggregate()
 }
 
 func validateReplicatedJobs(rJobs []jobsetv1alpha2.ReplicatedJob) field.ErrorList {

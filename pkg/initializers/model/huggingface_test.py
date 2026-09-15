@@ -110,7 +110,7 @@ def test_download_model(test_name, test_case):
         mock_download.assert_called_once_with(
             repo_id=test_case["expected_repo_id"],
             local_dir=utils.MODEL_PATH,
-            allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt"],
+            allow_patterns=["*.json", "*.safetensors", "*.model", "*.txt", "*.gguf"],
             ignore_patterns=test_case["config"]["ignore_patterns"],
         )
     print("Test execution completed")

@@ -659,6 +659,18 @@ func (t *TrainJobWrapper) ManagedBy(m string) *TrainJobWrapper {
 	return t
 }
 
+func (t *TrainJobWrapper) CreationTimestamp(creationTimestamp metav1.Time) *TrainJobWrapper {
+	t.ObjectMeta.CreationTimestamp = creationTimestamp
+	return t
+}
+
+func (t *TrainJobWrapper) Conditions(conditions ...metav1.Condition) *TrainJobWrapper {
+	if len(conditions) != 0 {
+		t.Status.Conditions = append(t.Status.Conditions, conditions...)
+	}
+	return t
+}
+
 func (t *TrainJobWrapper) Obj() *trainer.TrainJob {
 	return &t.TrainJob
 }
@@ -1134,6 +1146,18 @@ func (s *TrainingRuntimeSpecWrapper) LauncherReplica() *TrainingRuntimeSpecWrapp
 					},
 				},
 			}
+		}
+	}
+	return s
+}
+
+func (s *TrainingRuntimeSpecWrapper) DependsOn(
+	rJobName string,
+	dependsOn ...jobsetv1alpha2.DependsOn,
+) *TrainingRuntimeSpecWrapper {
+	for i, rJob := range s.Template.Spec.ReplicatedJobs {
+		if rJob.Name == rJobName {
+			s.Template.Spec.ReplicatedJobs[i].DependsOn = dependsOn
 		}
 	}
 	return s

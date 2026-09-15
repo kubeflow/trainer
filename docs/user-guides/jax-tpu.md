@@ -1,7 +1,7 @@
 # JAX on TPU Guide
 
-This guide describes how to use TrainJob to train or fine-tune AI models with
-[JAX](https://jax.readthedocs.io/) on Cloud TPU on Google Kubernetes Engine (GKE).
+This guide describes how to run [JAX](https://jax.readthedocs.io/) on Cloud TPU on Google Kubernetes
+Engine (GKE) with TrainJob to train or fine-tune AI models.
 
 ---
 

@@ -28,35 +28,36 @@ logging.basicConfig(
 def main():
     logging.info("Starting dataset initialization")
 
-    try:
-        storage_uri = os.environ[utils.STORAGE_URI_ENV]
-    except Exception as e:
-        logging.error("STORAGE_URI env variable must be set.")
-        raise e
+    storage_uri = os.getenv(utils.STORAGE_URI_ENV)
+    if not storage_uri:
+        raise ValueError("STORAGE_URI environment variable must be set")
 
-    match urlparse(storage_uri).scheme:
+    scheme = urlparse(storage_uri).scheme
+
+    match scheme:
         # TODO (andreyvelich): Implement more dataset providers.
         case utils.HF_SCHEME:
             from pkg.initializers.dataset.huggingface import HuggingFace
 
-            hf = HuggingFace()
-            hf.load_config()
-            hf.download_dataset()
+            provider_cls = HuggingFace
         case utils.CACHE_SCHEME:
             from pkg.initializers.dataset.cache import CacheInitializer
 
-            cache = CacheInitializer()
-            cache.load_config()
-            cache.download_dataset()
+            provider_cls = CacheInitializer
         case utils.S3_SCHEME:
             from pkg.initializers.dataset.s3 import S3
 
-            s3 = S3()
-            s3.load_config()
-            s3.download_dataset()
+            provider_cls = S3
         case _:
-            logging.error("STORAGE_URI must have the valid dataset provider")
-            raise Exception
+            raise ValueError(
+                f"Unsupported dataset storage URI scheme {scheme!r}: "
+                f"expected one of {utils.HF_SCHEME!r}, "
+                f"{utils.CACHE_SCHEME!r}, or {utils.S3_SCHEME!r}"
+            )
+
+    provider = provider_cls()
+    provider.load_config()
+    provider.download_dataset()
 
 
 if __name__ == "__main__":

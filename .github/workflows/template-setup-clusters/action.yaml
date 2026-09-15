@@ -33,6 +33,13 @@ runs:
         ref: ${{ github.event.pull_request.head.sha }}
         path: ${{ env.GOPATH }}/src/github.com/kubeflow/trainer
 
+    - name: Check out Kubeflow SDK
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      with:
+        repository: kubeflow/sdk
+        ref: main
+        path: ${{ env.GOPATH }}/src/github.com/kubeflow/sdk
+
     - name: Setup Go
       uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
       with:
@@ -43,14 +50,23 @@ runs:
       with:
         python-version: 3.12
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
     - name: Install dependencies
       shell: bash
+      working-directory: ${{ env.GOPATH }}/src/github.com/kubeflow/sdk
       run: |
-        echo "Install Papermill"
-        pip install papermill==2.6.0 jupyter==1.1.1 ipykernel==6.29.5
+        echo "Install Kubeflow SDK with the Notebook dependencies (Kubeflow APIs from master)"
+        make install-dev extras=docker groups="--no-default-groups --group notebooks"
 
-        echo "Install Kubeflow SDK with Docker support for local Notebooks"
-        pip install "kubeflow[docker] @ git+https://github.com/kubeflow/sdk.git@main"
+        echo "Override Kubeflow Trainer API models with this PR's version"
+        uv pip install -e "${{ env.GOPATH }}/src/github.com/kubeflow/trainer/api/python_api"
+
+        # Trainer's hack/e2e-run-notebook.sh calls `papermill` from PATH
+        echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
     - name: Setup cluster
       shell: bash

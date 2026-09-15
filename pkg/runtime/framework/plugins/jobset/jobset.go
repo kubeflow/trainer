@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -65,7 +66,7 @@ type JobSet struct {
 }
 
 var _ framework.WatchExtensionPlugin = (*JobSet)(nil)
-var _ framework.PodNetworkPlugin = (*JobSet)(nil)
+var _ framework.PreComponentBuilderPlugin = (*JobSet)(nil)
 var _ framework.ComponentBuilderPlugin = (*JobSet)(nil)
 var _ framework.TrainJobStatusPlugin = (*JobSet)(nil)
 var _ framework.CustomValidationPlugin = (*JobSet)(nil)
@@ -269,7 +270,18 @@ func (j *JobSet) ReconcilerBuilders() []runtime.ReconcilerBuilder {
 	}
 }
 
-func (j *JobSet) IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) error {
+// PreBuildSync consolidates the Info object with the JobSet template before any
+// component is materialized.
+func (j *JobSet) PreBuildSync(info *runtime.Info, trainJob *trainer.TrainJob) error {
+	if err := j.syncPodNetwork(info, trainJob); err != nil {
+		return err
+	}
+	return j.syncParallelCount(info)
+}
+
+// SyncPodNetwork identifies the Pod-to-Pod communication network endpoints for each Pod
+// and stores them in PodSets.Endpoints.
+func (j *JobSet) syncPodNetwork(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil || trainJob == nil {
 		return nil
 	}
@@ -292,6 +304,30 @@ func (j *JobSet) IdentifyPodNetwork(info *runtime.Info, trainJob *trainer.TrainJ
 						return
 					}
 				}
+			}
+		}
+	}
+	return nil
+}
+
+// SyncParallelCount propagates PodSets.Count into template-level Parallelism/Completions.
+func (j *JobSet) syncParallelCount(info *runtime.Info) error {
+	if info == nil {
+		return nil
+	}
+	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](info)
+	if !ok || jobSetSpec == nil {
+		return nil
+	}
+	for _, ps := range info.TemplateSpec.PodSets {
+		if ps.Count == nil {
+			continue
+		}
+		for rJobIdx := range jobSetSpec.ReplicatedJobs {
+			if jobSetSpec.ReplicatedJobs[rJobIdx].Name != nil && *jobSetSpec.ReplicatedJobs[rJobIdx].Name == ps.Name {
+				jobSetSpec.ReplicatedJobs[rJobIdx].Template.Spec.Parallelism = ps.Count
+				jobSetSpec.ReplicatedJobs[rJobIdx].Template.Spec.Completions = ps.Count
+				break
 			}
 		}
 	}
@@ -331,17 +367,13 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 	}
 
 	for psIdx, ps := range info.TemplateSpec.PodSets {
-		if ps.Count != nil {
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Parallelism = ps.Count
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Completions = ps.Count
-		}
 		apply.UpsertVolumes(&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Volumes, ps.Volumes...)
 		for containerIdx, container := range ps.Containers {
 			if len(container.Command) > 0 {
 				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Command = container.Command
 			}
 			if container.Image != "" {
-				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Image = &container.Image
+				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Image = ptr.To(container.Image)
 			}
 			apply.UpsertEnvVars(
 				&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.Containers[containerIdx].Env,
@@ -359,13 +391,20 @@ func (j *JobSet) Build(ctx context.Context, info *runtime.Info, trainJob *traine
 		initContainers := jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers
 		for containerIdx, container := range ps.InitContainers {
 			if containerIdx >= len(initContainers) {
-				return nil, fmt.Errorf("podSet %q initContainer %q does not have a matching initContainer in the runtime template", ps.Name, container.Name)
+				// Auto-append a new initContainer slot so plugins only need to
+				// write to the PodSet abstraction (PodSet → runtime.Container → JobSet).
+				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers = append(
+					jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers,
+					*corev1ac.Container().WithName(container.Name),
+				)
+				// Refresh the local slice after append.
+				initContainers = jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers
 			}
 			if len(container.Command) > 0 {
 				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Command = container.Command
 			}
 			if container.Image != "" {
-				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Image = &container.Image
+				jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Image = ptr.To(container.Image)
 			}
 			apply.UpsertEnvVars(
 				&jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers[containerIdx].Env,

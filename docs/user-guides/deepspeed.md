@@ -1,6 +1,7 @@
 # DeepSpeed Guide
 
-This guide describes how to use TrainJob to train or fine-tune AI models with [DeepSpeed](https://www.deepspeed.ai/).
+This guide describes how to run [DeepSpeed](https://www.deepspeed.ai/) on Kubernetes with TrainJob
+to train or fine-tune AI models.
 
 ## Prerequisites
 

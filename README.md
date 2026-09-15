@@ -14,6 +14,9 @@
 
 Latest News 🔥
 
+- [2026/08] Kubeflow Trainer v2.3.0 is officially released with the runtime snapshot mechanism for
+  decoupled runtime lifecycle, enhanced MPI support, and proposal Megatron-LM examples. Check out
+  [the GitHub release notes](https://github.com/kubeflow/trainer/releases/tag/v2.3.0).
 - [2026/03] Kubeflow Trainer v2.2 is officially released with support for JAX and XGBoost
   Training Runtimes, enhanced observability with metrics propagation to TrainJob status,
   and Flux Framework integration for HPC and MPI workloads. Check out
@@ -41,9 +44,11 @@ Latest News 🔥
 
 ## Overview
 
+<!-- overview-start -->
+
 Kubeflow Trainer is a Kubernetes-native distributed AI platform for scalable large language model
 (LLM) fine-tuning and training of AI models across a wide range of frameworks, including
-PyTorch, MLX, HuggingFace, DeepSpeed, JAX, XGBoost, and more.
+PyTorch, MLX, HuggingFace, DeepSpeed, Megatron-LM, JAX, XGBoost, and more.
 
 Kubeflow Trainer brings MPI to Kubernetes, orchestrating multi-node, multi-GPU distributed
 jobs efficiently across high-performance computing (HPC) clusters. This enables high-throughput
@@ -52,8 +57,13 @@ ultra-fast synchronization between GPUs nodes.
 
 Kubeflow Trainer seamlessly integrates with the Cloud Native AI ecosystem, including
 [Kueue](https://kueue.sigs.k8s.io/docs/tasks/run/trainjobs/) for topology-aware scheduling and
-multi-cluster job dispatching, as well as [JobSet](https://github.com/kubernetes-sigs/jobset) and
-[LeaderWorkerSet](https://github.com/kubernetes-sigs/lws) for AI workload orchestration.
+multi-cluster job dispatching, [Slurm Bridge](https://github.com/SlinkyProject/slurm-bridge) for
+scheduling on hybrid Kubernetes and Slurm clusters, and [KAI Scheduler](https://github.com/NVIDIA/KAI-Scheduler) for
+GPU aware scheduling.
+
+Kubeflow Trainer reuses existing Kubernetes-native building blocks like
+[JobSet](https://github.com/kubernetes-sigs/jobset) and [LeaderWorkerSet](https://github.com/kubernetes-sigs/lws)
+for AI workload orchestration.
 
 Kubeflow Trainer provides a distributed data cache designed to stream large-scale data with zero-copy
 transfer directly to GPU nodes. This ensures memory-efficient training jobs while maximizing
@@ -61,6 +71,8 @@ GPU utilization.
 
 With [the Kubeflow Python SDK](https://github.com/kubeflow/sdk), AI practitioners can effortlessly
 develop and fine-tune LLMs while leveraging the Kubeflow Trainer APIs: TrainJob and Runtimes.
+
+<!-- overview-end -->
 
 <h1 align="center">
     <img src="./docs/images/trainer-tech-stack.drawio.svg" alt="logo" width="500">
@@ -85,11 +97,18 @@ to install and get started with Kubeflow Trainer.
 
 ## Community
 
-The following links provide information on how to get involved in the community:
+<!-- community-start -->
+
+The following links provide information on how to get involved with the Kubeflow Trainer community:
 
 - Join our [`#kubeflow-trainer` Slack channel](https://www.kubeflow.org/docs/about/community/#kubeflow-slack).
-- Attend [the bi-weekly AutoML and Training Working Group](https://bit.ly/2PWVCkV) community meeting.
-- Check out [who is using Kubeflow Trainer](ADOPTERS.md).
+- Attend [the bi-weekly Kubeflow Trainer and Katib call](https://bit.ly/kf-trainer-meeting).
+- If you use Kubeflow Trainer, add yourself to [the ADOPTERS file](https://github.com/kubeflow/trainer/blob/master/ADOPTERS.md).
+
+Kubeflow Trainer is a Kubeflow subproject. Refer to
+[the Kubeflow community page](https://www.kubeflow.org/docs/about/community/) for more information.
+
+<!-- community-end -->
 
 ## Contributing
 

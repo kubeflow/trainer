@@ -35,7 +35,7 @@ Decoupling TrainJob behavior from runtime objects would also enable removing the
 
 * **Mutable TrainJobs**: we are not proposing any changes to the existing immutable fields of TrainJobs. These fields will remain immutable.
 * **Remove the existing implementation-level protections**: e.g. like not updating JobSets once they are created.
-* **Remove finalizer on runtimes**: removing the finalizer from `TrainingRuntimes` and `ClusterTrainingRuntimes` is out of scope for this KEP. However, this KEP creates the foundation to enable finalizer removal in future work.
+* Runtime finalizers have now been removed because runtime snapshots decouple TrainJobs from runtime lifecycle.
 
 ## Proposal
 

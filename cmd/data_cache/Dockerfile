@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM rust:1.97-bullseye AS builder
+FROM rust:1.98-bookworm AS builder
 
 WORKDIR /workspace
 
@@ -20,7 +20,7 @@ ENV RUST_LOG=info
 
 # Install system dependencies
 RUN apt-get update && \
-    apt-get -y install libssl-dev openssl zlib1g zlib1g-dev libpq-dev cmake protobuf-compiler netcat curl && \
+    apt-get -y install libssl-dev openssl zlib1g zlib1g-dev libpq-dev cmake protobuf-compiler netcat-openbsd curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Install cargo-chef for better caching

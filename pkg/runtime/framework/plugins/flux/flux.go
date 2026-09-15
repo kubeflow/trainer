@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	jobsetapply "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
 	configapi "github.com/kubeflow/trainer/v2/pkg/apis/config/v1alpha1"
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
@@ -101,22 +100,10 @@ func (f *Flux) Name() string {
 	return Name
 }
 
-func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobObj *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
+func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, _ *trainer.TrainJob) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
 	if runtimeInfo == nil || runtimeInfo.RuntimePolicy.MLPolicySource == nil || runtimeInfo.RuntimePolicy.MLPolicySource.Flux == nil {
 		return nil, allErrs
-	}
-
-	fluxPolicy := runtimeInfo.RuntimePolicy.MLPolicySource.Flux
-
-	// We require at least 1 proc per node. Zero or fewer does not make sense.
-	numProcPerNode := fluxPolicy.NumProcPerNode
-	if newJobObj.Spec.Trainer != nil && newJobObj.Spec.Trainer.NumProcPerNode != nil {
-		numProcPerNode = newJobObj.Spec.Trainer.NumProcPerNode
-	}
-	if numProcPerNode != nil && *numProcPerNode < 1 {
-		numProcPerNodePath := field.NewPath("spec").Child("trainer").Child("numProcPerNode")
-		allErrs = append(allErrs, field.Invalid(numProcPerNodePath, *numProcPerNode, "must be greater than or equal to 1 for Flux TrainJob"))
 	}
 
 	// Iterate through Trainer's internal PodSet abstraction
@@ -132,7 +119,6 @@ func (f *Flux) Validate(_ context.Context, runtimeInfo *runtime.Info, _, newJobO
 	return nil, allErrs
 }
 
-// EnforceMLPolicy updates the JobSet
 func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) error {
 	if info == nil || info.RuntimePolicy.MLPolicySource == nil || info.RuntimePolicy.MLPolicySource.Flux == nil {
 		return nil
@@ -149,32 +135,30 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 	originalCmd := getOriginalCommand(trainJob, info)
 
 	// Update the command here so we wrap the original command saved earlier
-	// Also clear existing args so only the Flux entrypoint controls execution
+	// Also clear existing args so only the Flux entrypoint controls execution.
+	// The JobSet builder only propagates a command from a non-nil Trainer, so one has to
+	// exist to carry the Flux entrypoint even when the TrainJob did not set it.
+	if trainJob.Spec.Trainer == nil {
+		trainJob.Spec.Trainer = &trainer.Trainer{}
+	}
 	trainJob.Spec.Trainer.Command = []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", originalCmd}
 	trainJob.Spec.Trainer.Args = nil
 
 	// Define the Init Container. This has a spack view with flux pre-built, and we add to an emptyDir
 	// with configuration that is then accessible to the application. The OS/version should match.
-	// For VolumeMounts, you can still use corev1ac because runtime.Container
-	// methods accept the corev1ac types for nested fields
-	fluxInstaller := corev1ac.Container().
-		WithName(constants.FluxInstallerContainerName).
-		WithImage(settings["FLUX_VIEW_IMAGE"]).
-		WithCommand([]string{"/bin/bash", "/etc/flux-config/init.sh"}...).
-		WithVolumeMounts(
-			corev1ac.VolumeMount().
+	fluxInstaller := runtime.Container{
+		Name:    constants.FluxInstallerContainerName,
+		Image:   settings["FLUX_VIEW_IMAGE"],
+		Command: []string{"/bin/bash", "/etc/flux-config/init.sh"},
+		VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+			*corev1ac.VolumeMount().
 				WithName(constants.FluxInstallVolumeName).
 				WithMountPath(constants.FluxVolumePath),
-			corev1ac.VolumeMount().
+			*corev1ac.VolumeMount().
 				WithName(configMapName).
 				WithMountPath(constants.FluxConfigVolumeName).
 				WithReadOnly(true),
-		)
-
-	// Making changes directly to the PodSet allows them to persist
-	jobSetSpec, ok := runtime.TemplateSpecApply[jobsetapply.JobSetSpecApplyConfiguration](info)
-	if !ok {
-		return nil
+		},
 	}
 
 	// Update the PodSets (Abstractions for the ReplicatedJobs)
@@ -191,10 +175,12 @@ func (f *Flux) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) e
 		apply.UpsertVolumes(&info.TemplateSpec.PodSets[psIdx].Volumes, sharedVolumes...)
 		apply.UpsertVolumes(&info.TemplateSpec.PodSets[psIdx].Volumes, *curveVolume)
 
-		// Important! We have to add this to the JobSet to actually take
-		jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers = append(
-			jobSetSpec.ReplicatedJobs[psIdx].Template.Spec.Template.Spec.InitContainers,
-			*fluxInstaller,
+		// Append to the PodSet abstract structure.
+		// The JobSet plugin's Build() sync loop will automatically create a
+		// matching initContainer slot in the JobSetSpec.
+		info.TemplateSpec.PodSets[psIdx].InitContainers = append(
+			info.TemplateSpec.PodSets[psIdx].InitContainers,
+			fluxInstaller,
 		)
 
 		// Update Containers in the PodSet
@@ -287,9 +273,11 @@ func (f *Flux) brokerSettingsFromEnvironment(trainJob *trainer.TrainJob, info *r
 
 	// TrainJob (user) gets first preference
 	// If the variable name matches one of our Flux settings, override it
-	for _, envar := range trainJob.Spec.Trainer.Env {
-		if _, ok := settings[envar.Name]; ok {
-			settings[envar.Name] = envar.Value
+	if trainJob.Spec.Trainer != nil {
+		for _, envar := range trainJob.Spec.Trainer.Env {
+			if _, ok := settings[envar.Name]; ok {
+				settings[envar.Name] = envar.Value
+			}
 		}
 	}
 	return settings
@@ -325,9 +313,11 @@ func (f *Flux) buildInitScriptConfigMap(
 	settings map[string]string,
 ) (*corev1ac.ConfigMapApplyConfiguration, error) {
 
+	numNodes := getNumNodes(info)
+
 	// The entrypoint script finishes Flux setup and executes the wrapped application
-	initScript := generateInitEntrypoint(trainJob, settings)
-	entrypointScript := f.generateFluxEntrypoint(trainJob, info)
+	initScript := generateInitEntrypoint(trainJob, settings, numNodes)
+	entrypointScript := f.generateFluxEntrypoint(trainJob, info, numNodes)
 
 	// Build the ConfigMap using the Apply Configuration pattern
 	configMapName := fmt.Sprintf("%s-flux-entrypoint", trainJob.Name)
@@ -405,8 +395,16 @@ func getOriginalCommand(trainJob *trainer.TrainJob, info *runtime.Info) string {
 	return strings.TrimSpace(fullCommand)
 }
 
+// getNumNodes returns the node count for the Flux job. The trainer PodSet already carries
+// the TrainJob's numNodes by the time the component builder plugins run, so the runtime is
+// the single source for it here.
+func getNumNodes(info *runtime.Info) int32 {
+	trainerPS := info.FindPodSetByAncestor(constants.AncestorTrainer)
+	return ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
+}
+
 // generateFluxEntrypoint generates the flux entrypoint to prepare the view and run the job
-func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.Info) string {
+func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.Info, numNodes int32) string {
 	mainHost := fmt.Sprintf("%s-%s-0-0", trainJob.Name, constants.Node)
 
 	// Derive number of tasks
@@ -415,13 +413,12 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	var tasks int32
 	var flags string
 
-	nodes := *trainJob.Spec.Trainer.NumNodes
-	if trainJob.Spec.Trainer.NumProcPerNode != nil {
-		tasks = *trainJob.Spec.Trainer.NumProcPerNode
+	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.NumProcPerNode != nil {
+		tasks = *jobTrainer.NumProcPerNode
 	} else {
 		tasks = *info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode
 	}
-	flags = fmt.Sprintf("-N %d -n %d", nodes, tasks*nodes)
+	flags = fmt.Sprintf("-N %d -n %d", numNodes, tasks*numNodes)
 
 	// Derive number of GPUs from resources. In Flux, -g is --gpus-per-task
 	resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
@@ -446,6 +443,7 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 func generateInitEntrypoint(
 	trainJob *trainer.TrainJob,
 	settings map[string]string,
+	numNodes int32,
 ) string {
 
 	// fluxRoot for the view is in /opt/view/lib
@@ -453,11 +451,9 @@ func generateInitEntrypoint(
 	// github.com:converged-computing/flux-views.git
 	fluxRoot := "/opt/view"
 	mainHost := fmt.Sprintf("%s-0", trainJob.Name)
-	size := *trainJob.Spec.Trainer.NumNodes
 
 	// Generate hostlists. The hostname (prefix) is the trainJob Name
-	// We need the initial jobset size, and container command	size := *trainJob.Spec.Trainer.NumNodes
-	hosts := generateHostlist(trainJob.Name, size)
+	hosts := generateHostlist(trainJob.Name, numNodes)
 	brokerConfig := generateBrokerConfig(trainJob, hosts, settings)
 
 	return fmt.Sprintf(initTemplate, fluxRoot, mainHost, hosts, brokerConfig)

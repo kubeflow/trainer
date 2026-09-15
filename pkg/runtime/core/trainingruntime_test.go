@@ -39,6 +39,41 @@ import (
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
+func torchTuneResWithCPU(gpu string) corev1.ResourceList {
+	return corev1.ResourceList{
+		corev1.ResourceCPU: resource.MustParse("1"),
+		"example.com/gpu":  resource.MustParse(gpu),
+	}
+}
+
+func wantJobSetWithMergedGPU(ns, name, uid string, requests corev1.ResourceList, gpu string) *jobsetv1alpha2.JobSet {
+	jobSet := testingutil.MakeJobSetWrapper(ns, name).
+		ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), name, uid).
+		Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
+		Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+		Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+		NumNodes(1).
+		Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, requests).
+		Obj()
+	for i := range jobSet.Spec.ReplicatedJobs {
+		if jobSet.Spec.ReplicatedJobs[i].Name != constants.Node {
+			continue
+		}
+		for j := range jobSet.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
+			container := &jobSet.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j]
+			if container.Name != constants.Node {
+				continue
+			}
+			if container.Resources.Limits == nil {
+				container.Resources.Limits = corev1.ResourceList{}
+			}
+			container.Resources.Limits["nvidia.com/gpu"] = resource.MustParse(gpu)
+			return jobSet
+		}
+	}
+	return jobSet
+}
+
 func TestTrainingRuntimeNewObjects(t *testing.T) {
 	resRequests := corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("1"),
@@ -1561,7 +1596,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								"dataset=torchtune.datasets.instruct_dataset",
 								"dataset.source=parquet",
 							},
-							corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
+							torchTuneResWithCPU("2"),
 						).
 						NumNodes(1).
 						Obj(),
@@ -1596,7 +1631,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							"dataset=torchtune.datasets.instruct_dataset",
 							"dataset.source=parquet",
 						},
-						corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
+						torchTuneResWithCPU("2"),
 					).
 					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
 					Env(constants.Node, constants.Node,
@@ -1702,7 +1737,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								"dataset=torchtune.datasets.instruct_dataset",
 								"dataset.source=parquet",
 							},
-							corev1.ResourceList{"example.com/gpu": resource.MustParse("1")},
+							torchTuneResWithCPU("1"),
 						).
 						NumNodes(1).
 						Obj(),
@@ -1737,7 +1772,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							"dataset=torchtune.datasets.instruct_dataset",
 							"dataset.source=parquet",
 						},
-						corev1.ResourceList{"example.com/gpu": resource.MustParse("1")},
+						torchTuneResWithCPU("1"),
 					).
 					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
 					Env(constants.Node, constants.Node,
@@ -1844,7 +1879,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 								"dataset=torchtune.datasets.instruct_dataset",
 								"dataset.source=parquet",
 							},
-							corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
+							torchTuneResWithCPU("2"),
 						).
 						NumNodes(1).
 						Obj(),
@@ -1881,7 +1916,7 @@ func TestTrainingRuntimeNewObjects(t *testing.T) {
 							"dataset=torchtune.datasets.instruct_dataset",
 							"dataset.source=parquet",
 						},
-						corev1.ResourceList{"example.com/gpu": resource.MustParse("2")},
+						torchTuneResWithCPU("2"),
 					).
 					ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
 					Env(constants.Node, constants.Node,
@@ -2074,6 +2109,36 @@ test-job-node-0-1.test-job slots=8
 					).
 					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Obj(),
+			},
+		},
+		"merged resourcesPerNode keeps runtime resources when trainjob sets gpu only": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+				testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(1).
+							Obj(),
+					).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj(),
+			).Obj(),
+			trainJob: func() *trainer.TrainJob {
+				trainerSpec := testingutil.MakeTrainJobTrainerWrapper().
+					NumNodes(1).
+					Obj()
+				trainerSpec.ResourcesPerNode = &corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						"nvidia.com/gpu": resource.MustParse("4"),
+					},
+				}
+				return testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+					UID("uid").
+					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+					Trainer(trainerSpec).
+					Obj()
+			}(),
+			wantObjs: []runtime.Object{
+				wantJobSetWithMergedGPU(metav1.NamespaceDefault, "test-job", "uid", resRequests, "4"),
 			},
 		},
 		// Failed test cases.

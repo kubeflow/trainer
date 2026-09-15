@@ -41,6 +41,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/config"
 	"github.com/kubeflow/trainer/v2/pkg/controller"
 	"github.com/kubeflow/trainer/v2/pkg/features"
+	"github.com/kubeflow/trainer/v2/pkg/metrics"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
 	"github.com/kubeflow/trainer/v2/pkg/statusserver"
@@ -138,12 +139,22 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	setupProbeEndpoints(mgr, certsReady)
+	setupProbeEndpoints(mgr, certsReady, options)
 	runtimes, err := runtimecore.New(ctx, mgr.GetClient(), mgr.GetFieldIndexer(), &cfg)
 	if err != nil {
 		setupLog.Error(err, "Could not initialize runtimes")
 		os.Exit(1)
 	}
+
+	// The status server probes must be registered before the manager starts,
+	// because controller-runtime rejects check registrations afterwards.
+	if features.Enabled(features.TrainJobStatus) {
+		if err := statusserver.RegisterProbes(mgr, cfg.StatusServer); err != nil {
+			setupLog.Error(err, "Could not register runtime status server probes")
+			os.Exit(1)
+		}
+	}
+
 	// Set up controllers and other components using goroutines to start the manager quickly.
 	go setupManagerComponents(mgr, runtimes, &cfg, certsReady)
 
@@ -168,6 +179,11 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 		os.Exit(1)
 	}
 
+	if err := metrics.SetupServer(mgr, &cfg.Metrics, cfg.TLS); err != nil {
+		setupLog.Error(err, "Could not create metrics server")
+		os.Exit(1)
+	}
+
 	if features.Enabled(features.TrainJobStatus) {
 		if err := statusserver.SetupServer(mgr, cfg.StatusServer, cfg.TLS); err != nil {
 			setupLog.Error(err, "Could not create runtime status server")
@@ -176,8 +192,9 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 	}
 }
 
-func setupProbeEndpoints(mgr ctrl.Manager, certsReady <-chan struct{}) {
-	defer setupLog.Info("Probe endpoints are configured on healthz and readyz")
+func setupProbeEndpoints(mgr ctrl.Manager, certsReady <-chan struct{}, options ctrl.Options) {
+	defer setupLog.Info("Probe endpoints are configured",
+		"liveness", options.LivenessEndpointName, "readiness", options.ReadinessEndpointName)
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

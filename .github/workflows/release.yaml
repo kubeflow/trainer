@@ -26,21 +26,23 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   prepare:
     name: Prepare release branch
     runs-on: ubuntu-latest
     environment:
       name: release
-    permissions:
-      contents: write
     outputs:
       version: ${{ steps.vars.outputs.version }}
       branch: ${{ steps.vars.outputs.branch }}
       is-prerelease: ${{ steps.vars.outputs.is-prerelease }}
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -123,12 +125,12 @@ jobs:
 
     steps:
       - name: Checkout release branch
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.prepare.outputs.branch }}
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
 
@@ -149,13 +151,11 @@ jobs:
   create-tag:
     name: Create and push tag
     needs: [prepare, build]
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout release branch
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.branch }}
@@ -170,9 +170,27 @@ jobs:
           git tag "$TAG"
           git push origin "$TAG"
 
+  publish-images:
+    name: Build and Publish Images
+    needs: [prepare, build, create-tag]
+    uses: ./.github/workflows/build-and-push-images.yaml
+    with:
+      ref: ${{ needs.prepare.outputs.version }}
+      version: ${{ needs.prepare.outputs.version }}
+      publish: true
+    secrets: inherit
+
+  publish-charts:
+    name: Publish Helm Charts
+    needs: [prepare, publish-images]
+    uses: ./.github/workflows/publish-helm-charts.yaml
+    with:
+      ref: ${{ needs.prepare.outputs.version }}
+    secrets: inherit
+
   publish-pypi:
     name: Publish to PyPI
-    needs: [prepare, build, create-tag]
+    needs: [prepare, build, create-tag, publish-images, publish-charts]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -188,23 +206,20 @@ jobs:
           path: dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           print-hash: true
+          skip-existing: true
 
   github-release:
     name: Create GitHub release
-    needs: [prepare, build, create-tag, publish-pypi]
-    permissions:
-      contents: write
+    needs:
+      [prepare, build, create-tag, publish-images, publish-charts, publish-pypi]
     runs-on: ubuntu-latest
-    environment:
-      name: release
-      url: https://github.com/kubeflow/trainer/releases
 
     steps:
       - name: Checkout release branch
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.branch }}
@@ -246,8 +261,16 @@ jobs:
           tag_name: ${{ needs.prepare.outputs.version }}
           name: ${{ needs.prepare.outputs.version }}
           body: ${{ steps.changelog.outputs.changelog }}
-          draft: false
+          # Create the release as a draft so assets are uploaded before publication.
+          # With immutable releases enabled, a published release locks its assets, so
+          # they must be attached while the release is still a draft.
+          draft: true
           prerelease: ${{ needs.prepare.outputs.is-prerelease == 'true' }}
           generate_release_notes: false
           files: |
             dist/*
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ needs.prepare.outputs.version }}" --draft=false

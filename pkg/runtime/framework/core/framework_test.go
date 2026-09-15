@@ -118,7 +118,7 @@ func TestNew(t *testing.T) {
 					&jobset.JobSet{},
 					&mpi.MPI{},
 				},
-				podNetworkPlugins: []framework.PodNetworkPlugin{
+				preComponentBuilderPlugins: []framework.PreComponentBuilderPlugin{
 					&jobset.JobSet{},
 				},
 				componentBuilderPlugins: []framework.ComponentBuilderPlugin{
@@ -497,6 +497,13 @@ func TestRunCustomValidationPlugins(t *testing.T) {
 	}
 }
 
+func nodeContainerRequests(cpu, memory string) *corev1ac.ResourceRequirementsApplyConfiguration {
+	return corev1ac.ResourceRequirements().WithRequests(corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse(cpu),
+		corev1.ResourceMemory: resource.MustParse(memory),
+	})
+}
+
 func TestRunComponentBuilderPlugins(t *testing.T) {
 	cases := map[string]struct {
 		registry        fwkplugins.Registry
@@ -689,6 +696,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 												WithContainers(
 													corev1ac.Container().
 														WithName(constants.Node).
+														WithResources(nodeContainerRequests("1", "4Gi")).
 														WithImage("test:runtime").
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
@@ -723,6 +731,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 												WithContainers(
 													corev1ac.Container().
 														WithName(constants.Node).
+														WithResources(nodeContainerRequests("1", "4Gi")).
 														WithCommand("command:openssh").
 														WithArgs("args:openssh").
 														WithImage("test:openssh").
@@ -854,11 +863,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 												WithContainers(
 													corev1ac.Container().
 														WithName(constants.Node).
-														WithResources(corev1ac.ResourceRequirements().
-															WithRequests(corev1.ResourceList{
-																corev1.ResourceCPU:    resource.MustParse("1"),
-																corev1.ResourceMemory: resource.MustParse("4Gi"),
-															})).
+														WithResources(nodeContainerRequests("1", "4Gi")).
 														WithImage("test:trainjob").
 														WithCommand("trainjob").
 														WithArgs("trainjob").
@@ -952,11 +957,7 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 														WithName(constants.Node).
 														WithArgs("args:openssh").
 														WithCommand("command:openssh").
-														WithResources(corev1ac.ResourceRequirements().
-															WithRequests(corev1.ResourceList{
-																corev1.ResourceCPU:    resource.MustParse("1"),
-																corev1.ResourceMemory: resource.MustParse("4Gi"),
-															})).
+														WithResources(nodeContainerRequests("1", "4Gi")).
 														WithImage("test:openssh").
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
@@ -1499,6 +1500,7 @@ test-job-node-0-1.test-job slots=1
 												WithContainers(
 													corev1ac.Container().
 														WithName(constants.Node).
+														WithResources(nodeContainerRequests("2", "8Gi")).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -1640,11 +1642,7 @@ test-job-node-0-1.test-job slots=1
 														WithImage("test:trainjob").
 														WithCommand("trainjob").
 														WithArgs("trainjob").
-														WithResources(corev1ac.ResourceRequirements().
-															WithRequests(corev1.ResourceList{
-																corev1.ResourceCPU:    resource.MustParse("2"),
-																corev1.ResourceMemory: resource.MustParse("8Gi"),
-															})).
+														WithResources(nodeContainerRequests("2", "8Gi")).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -1930,6 +1928,7 @@ test-job-node-0-1.test-job slots=1
 												WithContainers(
 													corev1ac.Container().
 														WithName(constants.Node).
+														WithResources(nodeContainerRequests("1", "4Gi")).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -2153,11 +2152,7 @@ test-job-node-0-1.test-job slots=1
 														WithImage("test:trainjob").
 														WithCommand("trainjob").
 														WithArgs("trainjob").
-														WithResources(corev1ac.ResourceRequirements().
-															WithRequests(corev1.ResourceList{
-																corev1.ResourceCPU:    resource.MustParse("1"),
-																corev1.ResourceMemory: resource.MustParse("4Gi"),
-															})).
+														WithResources(nodeContainerRequests("1", "4Gi")).
 														WithVolumeMounts(
 															corev1ac.VolumeMount().
 																WithName(jobsetplgconsts.VolumeNameInitializer).
@@ -2571,7 +2566,7 @@ func TestTrainJobStatusPlugins(t *testing.T) {
 	}
 }
 
-func TestPodNetworkPlugins(t *testing.T) {
+func TestRunPreComponentBuilderPlugins(t *testing.T) {
 	cases := map[string]struct {
 		registry        fwkplugins.Registry
 		runtimeInfo     *runtime.Info
@@ -2579,7 +2574,7 @@ func TestPodNetworkPlugins(t *testing.T) {
 		wantError       error
 		wantRuntimeInfo *runtime.Info
 	}{
-		"Pod network is calculated by jobset plugin": {
+		"Pod network and parallel count are synced by jobset plugin": {
 			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
 				Obj(),
 			registry: fwkplugins.NewRegistry(),
@@ -2638,8 +2633,8 @@ func TestPodNetworkPlugins(t *testing.T) {
 								WithName(constants.Node).
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
-										WithParallelism(1).
-										WithCompletions(1).
+										WithParallelism(2).
+										WithCompletions(2).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -2671,7 +2666,7 @@ func TestPodNetworkPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = fwk.RunPodNetworkPlugins(tc.runtimeInfo, tc.trainJob)
+			err = fwk.RunPreComponentBuilderPlugins(tc.runtimeInfo, tc.trainJob)
 			if diff := cmp.Diff(tc.wantError, err); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}

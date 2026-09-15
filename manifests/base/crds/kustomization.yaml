@@ -16,5 +16,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - trainer.kubeflow.org_clustertrainingruntimes.yaml
+  - trainer.kubeflow.org_optimizationjobs.yaml
   - trainer.kubeflow.org_trainingruntimes.yaml
   - trainer.kubeflow.org_trainjobs.yaml

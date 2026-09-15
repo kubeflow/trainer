@@ -21,10 +21,13 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  workflow_call:
+    inputs:
+      ref:
+        description: git ref (tag) to check out and publish the chart from
+        required: false
+        type: string
+        default: ""
 
 env:
   CHART_PATH: charts/kubeflow-trainer
@@ -38,10 +41,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Checkout to the release tag when called from the release workflow.
+          ref: ${{ inputs.ref }}
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -49,7 +55,7 @@ jobs:
 
       - name: Build, package, and push Helm chart
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "${{ github.ref }}" == refs/tags/* || -n "${{ inputs.ref }}" ]]; then
             VERSION=$(grep '^version:' ${{ env.CHART_PATH }}/Chart.yaml | awk '{print $2}')
           else
             VERSION="0.0.0-sha-$(git rev-parse --short=7 HEAD)"

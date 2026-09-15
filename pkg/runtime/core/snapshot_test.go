@@ -534,6 +534,18 @@ func TestCreateRuntimeSnapshot(t *testing.T) {
 				t.Fatalf("ConfigMap missing %q data key", runtimeDataKey)
 			}
 
+			// Verify YAML contains expected apiVersion and kind
+			wantGVK, err := c.GroupVersionKindFor(tc.runtimeObj)
+			if err != nil {
+				t.Fatalf("Failed to get GVK: %v", err)
+			}
+			if !strings.Contains(runtimeYAML, "apiVersion: "+wantGVK.GroupVersion().String()) {
+				t.Errorf("Stored YAML missing apiVersion %s:\n%s", wantGVK.GroupVersion().String(), runtimeYAML)
+			}
+			if !strings.Contains(runtimeYAML, "kind: "+wantGVK.Kind) {
+				t.Errorf("Stored YAML missing kind %s:\n%s", wantGVK.Kind, runtimeYAML)
+			}
+
 			// Verify YAML can be unmarshaled back to runtime object
 			var unmarshalledRuntime interface{}
 			switch tc.runtimeObj.(type) {
@@ -562,7 +574,7 @@ func TestRuntimeSnapshotRoundTrip(t *testing.T) {
 		corev1.ResourceMemory: resource.MustParse("4Gi"),
 	}
 
-	originalRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("complex-runtime").
+	clusterRuntimeWithMeta := testingutil.MakeClusterTrainingRuntimeWrapper("complex-runtime").
 		RuntimeSpec(
 			testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeClusterTrainingRuntimeWrapper("complex-runtime").Spec).
 				Container(constants.Node, constants.Node, "test:runtime:v1.2.3", []string{"torchrun", "train.py"}, []string{"--epochs=10"}, resRequests).
@@ -574,34 +586,75 @@ func TestRuntimeSnapshotRoundTrip(t *testing.T) {
 				Obj(),
 		).Obj()
 
-	trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-		UID("test-uid-12345").
-		RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "complex-runtime").
-		Obj()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-
-	c := testingutil.NewClientBuilder().Build()
-
-	// Store the runtime
-	if err := createRuntimeSnapshot(ctx, c, trainJob, originalRuntime); err != nil {
-		t.Fatalf("Failed to create snapshot: %v", err)
+	trainingRuntimeWithoutMeta := &trainer.TrainingRuntime{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-runtime-no-typemeta",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: testingutil.MakeTrainingRuntimeSpecWrapper(trainer.TrainingRuntimeSpec{}).
+			Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+			Obj(),
 	}
 
-	// Retrieve the runtime
-	retrievedRuntime := &trainer.ClusterTrainingRuntime{}
-	if err := getRuntimeSnapshot(ctx, c, trainJob, retrievedRuntime); err != nil {
-		t.Fatalf("Failed to get snapshot: %v", err)
+	cases := map[string]struct {
+		trainJob         *trainer.TrainJob
+		inputRuntimeObj  client.Object
+		retrievedRuntime client.Object
+		wantKind         string
+		wantGroup        string
+	}{
+		"preserves data for ClusterTrainingRuntime with initial TypeMeta": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("test-uid-12345").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "complex-runtime").
+				Obj(),
+			inputRuntimeObj:  clusterRuntimeWithMeta,
+			retrievedRuntime: &trainer.ClusterTrainingRuntime{},
+			wantKind:         trainer.ClusterTrainingRuntimeKind,
+			wantGroup:        trainer.GroupVersion.Group,
+		},
+		"populates GVK and preserves data for TrainingRuntime without initial TypeMeta": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("test-uid-67890").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime-no-typemeta").
+				Obj(),
+			inputRuntimeObj:  trainingRuntimeWithoutMeta,
+			retrievedRuntime: &trainer.TrainingRuntime{},
+			wantKind:         trainer.TrainingRuntimeKind,
+			wantGroup:        trainer.GroupVersion.Group,
+		},
 	}
 
-	// Verify round-trip preserves data
-	if diff := cmp.Diff(originalRuntime.Spec, retrievedRuntime.Spec); diff != "" {
-		t.Errorf("Runtime spec mismatch after round-trip (-want +got):\n%s", diff)
-	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
 
-	// Verify metadata is preserved
-	if originalRuntime.Name != retrievedRuntime.Name {
-		t.Errorf("Runtime name mismatch: expected %s, got %s", originalRuntime.Name, retrievedRuntime.Name)
+			c := testingutil.NewClientBuilder().Build()
+
+			// Store the runtime
+			if err := createRuntimeSnapshot(ctx, c, tc.trainJob, tc.inputRuntimeObj); err != nil {
+				t.Fatalf("Failed to create snapshot: %v", err)
+			}
+
+			// Retrieve the runtime
+			if err := getRuntimeSnapshot(ctx, c, tc.trainJob, tc.retrievedRuntime); err != nil {
+				t.Fatalf("Failed to get snapshot: %v", err)
+			}
+
+			// Verify GVK was populated and matches
+			gvk := tc.retrievedRuntime.GetObjectKind().GroupVersionKind()
+			if gvk.Kind != tc.wantKind {
+				t.Errorf("Expected kind %s, got %s", tc.wantKind, gvk.Kind)
+			}
+			if gvk.Group != tc.wantGroup {
+				t.Errorf("Expected group %s, got %s", tc.wantGroup, gvk.Group)
+			}
+
+			// Verify metadata and spec are preserved
+			if diff := cmp.Diff(tc.inputRuntimeObj, tc.retrievedRuntime); diff != "" {
+				t.Errorf("Runtime mismatch after round-trip (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

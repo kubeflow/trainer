@@ -42,13 +42,14 @@ jobs:
           scopes: |
             api
             ci
+            controller
             deps
             docs
             examples
-            exporter
+            framework
             initializer
+            kep
             manifests
-            operator
             runtimes
             scripts
             test

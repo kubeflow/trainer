@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"os"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -48,6 +49,17 @@ func fromFile(path string, scheme *runtime.Scheme, cfg *configapi.Configuration)
 	return nil
 }
 
+// healthEndpointPath returns the probe endpoint name as a rooted path.
+func healthEndpointPath(name string) string {
+	// controller-runtime registers the name as an http.ServeMux pattern, which panics on
+	// a pattern that has no leading slash, and the API and the shipped manifests spell
+	// the names without one.
+	if name == "" || strings.HasPrefix(name, "/") {
+		return name
+	}
+	return "/" + name
+}
+
 // addTo applies the configuration to controller runtime Options.
 func addTo(o *ctrl.Options, cfg *configapi.Configuration) {
 	tlsOpts := []func(*tls.Config){
@@ -57,9 +69,10 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration) {
 	}
 
 	o.Metrics = metricsserver.Options{
-		BindAddress:   cfg.Metrics.BindAddress,
-		SecureServing: cfg.Metrics.SecureServing != nil && *cfg.Metrics.SecureServing,
-		TLSOpts:       tlsOpts,
+		// The metrics server is always started manually in setupManagerComponents
+		// after certificates are guaranteed to be present. Disable the manager's
+		// built-in metrics server to prevent it from racing for the same port.
+		BindAddress: "0",
 	}
 
 	if cfg.Webhook.Port != nil {
@@ -74,6 +87,8 @@ func addTo(o *ctrl.Options, cfg *configapi.Configuration) {
 	}
 
 	o.HealthProbeBindAddress = cfg.Health.HealthProbeBindAddress
+	o.ReadinessEndpointName = healthEndpointPath(cfg.Health.ReadinessEndpointName)
+	o.LivenessEndpointName = healthEndpointPath(cfg.Health.LivenessEndpointName)
 
 	if cfg.LeaderElection != nil {
 		if cfg.LeaderElection.LeaderElect != nil {

@@ -78,7 +78,7 @@ kubeflow/trainer/
 │   │       │   ├── jobset/                # JobSet plugin
 │   │       │   └── ...
 │   │       └── interface.go           # Framework interface definitions
-│   │       └── runtime.go             # Implementation of Info object which carries information trough the plugin chain.
+│   │       └── runtime.go             # Implementation of Info object which carries information through the plugin chain.
 │   ├── statusserver/                  # TrainJob status collection HTTPS server
 │   ├── webhooks/                    # Kubernetes validation/mutation webhooks for Trainer
 │   ├── data_cache/                  # Distributed in-memory cache (Rust)

@@ -119,6 +119,23 @@ func TestUpsertPort(t *testing.T) {
 					WithContainerPort(8080),
 			},
 		},
+		"match by port number when the existing port sets an explicit protocol": {
+			existing: []corev1ac.ContainerPortApplyConfiguration{
+				*corev1ac.ContainerPort().
+					WithContainerPort(8080).
+					WithProtocol(corev1.ProtocolTCP),
+			},
+			toUpsert: []corev1ac.ContainerPortApplyConfiguration{
+				*corev1ac.ContainerPort().
+					WithName("http").
+					WithContainerPort(8080),
+			},
+			want: []corev1ac.ContainerPortApplyConfiguration{
+				*corev1ac.ContainerPort().
+					WithName("http").
+					WithContainerPort(8080),
+			},
+		},
 		"insert new port": {
 			existing: []corev1ac.ContainerPortApplyConfiguration{
 				*corev1ac.ContainerPort().WithContainerPort(8080),
@@ -127,7 +144,50 @@ func TestUpsertPort(t *testing.T) {
 				*corev1ac.ContainerPort().WithContainerPort(9090),
 			},
 			want: []corev1ac.ContainerPortApplyConfiguration{
+				*corev1ac.ContainerPort().WithContainerPort(8080),
 				*corev1ac.ContainerPort().WithContainerPort(9090),
+			},
+		},
+		"insert new unnamed port without dropping the existing unnamed ports": {
+			existing: []corev1ac.ContainerPortApplyConfiguration{
+				*corev1ac.ContainerPort().WithContainerPort(8080),
+				*corev1ac.ContainerPort().
+					WithName("metrics").
+					WithContainerPort(9090),
+			},
+			toUpsert: []corev1ac.ContainerPortApplyConfiguration{
+				*corev1ac.ContainerPort().WithContainerPort(29500),
+			},
+			want: []corev1ac.ContainerPortApplyConfiguration{
+				*corev1ac.ContainerPort().WithContainerPort(8080),
+				*corev1ac.ContainerPort().
+					WithName("metrics").
+					WithContainerPort(9090),
+				*corev1ac.ContainerPort().WithContainerPort(29500),
+			},
+		},
+		"insert new port with the same number and a different protocol": {
+			existing: []corev1ac.ContainerPortApplyConfiguration{
+				*corev1ac.ContainerPort().
+					WithName("dns-tcp").
+					WithContainerPort(53).
+					WithProtocol(corev1.ProtocolTCP),
+			},
+			toUpsert: []corev1ac.ContainerPortApplyConfiguration{
+				*corev1ac.ContainerPort().
+					WithName("dns-udp").
+					WithContainerPort(53).
+					WithProtocol(corev1.ProtocolUDP),
+			},
+			want: []corev1ac.ContainerPortApplyConfiguration{
+				*corev1ac.ContainerPort().
+					WithName("dns-tcp").
+					WithContainerPort(53).
+					WithProtocol(corev1.ProtocolTCP),
+				*corev1ac.ContainerPort().
+					WithName("dns-udp").
+					WithContainerPort(53).
+					WithProtocol(corev1.ProtocolUDP),
 			},
 		},
 		"insert new port with different names": {

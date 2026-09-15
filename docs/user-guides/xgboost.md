@@ -1,7 +1,7 @@
 # XGBoost Guide
 
-This guide describes how to use TrainJob to run distributed
-[XGBoost](https://xgboost.readthedocs.io/) training on Kubernetes.
+This guide describes how to run distributed [XGBoost](https://xgboost.readthedocs.io/) training on
+Kubernetes with TrainJob.
 
 ## Prerequisites
 

@@ -1,7 +1,7 @@
 # JAX Guide
 
-This guide describes how to use TrainJob to train or fine-tune AI models with
-[JAX](https://jax.readthedocs.io/).
+This guide describes how to run [JAX](https://jax.readthedocs.io/) on Kubernetes with TrainJob to
+train or fine-tune AI models.
 
 ---
 

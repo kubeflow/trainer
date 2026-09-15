@@ -315,6 +315,7 @@ func TestValidateCreate(t *testing.T) {
 	cases := map[string]struct {
 		obj                    *trainer.TrainJob
 		clusterTrainingRuntime *trainer.ClusterTrainingRuntime
+		trainingRuntime        *trainer.TrainingRuntime
 		wantError              field.ErrorList
 		wantWarnings           admission.Warnings
 	}{
@@ -369,6 +370,26 @@ func TestValidateCreate(t *testing.T) {
 			wantError:    nil,
 			wantWarnings: admission.Warnings{"Referenced ClusterTrainingRuntime \"test-runtime\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: " + constants.RuntimeDeprecationPolicyURL},
 		},
+		"deprecated namespaced TrainingRuntime referenced": {
+			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Obj(),
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").
+				Label(constants.LabelSupport, constants.SupportDeprecated).
+				Obj(),
+			wantError:    nil,
+			wantWarnings: admission.Warnings{"Referenced TrainingRuntime \"test-runtime\" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: " + constants.RuntimeDeprecationPolicyURL},
+		},
+		"non-deprecated namespaced TrainingRuntime referenced": {
+			obj: testingutil.MakeTrainJobWrapper("default", "valid-job-name").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				Obj(),
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper("default", "test-runtime").
+				Label(constants.LabelSupport, "stable").
+				Obj(),
+			wantError:    nil,
+			wantWarnings: nil,
+		},
 	}
 
 	for name, tc := range cases {
@@ -382,6 +403,9 @@ func TestValidateCreate(t *testing.T) {
 			clientBuilder := testingutil.NewClientBuilder()
 			if tc.clusterTrainingRuntime != nil {
 				clientBuilder = clientBuilder.WithObjects(tc.clusterTrainingRuntime)
+			}
+			if tc.trainingRuntime != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.trainingRuntime)
 			}
 
 			runtimes, err := runtimecore.New(context.Background(), clientBuilder.Build(), testingutil.AsIndex(clientBuilder), nil)

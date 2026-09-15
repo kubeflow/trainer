@@ -187,6 +187,7 @@ func TestJobSet(t *testing.T) {
 								WithTemplate(batchv1ac.JobTemplateSpec().
 									WithSpec(batchv1ac.JobSpec().
 										WithParallelism(2).
+										WithCompletions(2).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -310,6 +311,172 @@ func TestJobSet(t *testing.T) {
 				},
 			},
 		},
+		"parallelism and completions are synced for multiple podSets matched by replicatedJob name": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Obj(),
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Launcher,
+							Count: ptr.To[int32](1),
+						},
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](5),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(2).
+										WithCompletions(2).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+			wantInfo: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Launcher,
+							Count: ptr.To[int32](1),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-launcher-0-0.trainJob")
+							},
+						},
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](5),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-node-0-0.trainJob")
+								yield("trainJob-node-0-1.trainJob")
+								yield("trainJob-node-0-2.trainJob")
+								yield("trainJob-node-0-3.trainJob")
+								yield("trainJob-node-0-4.trainJob")
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Launcher).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(5).
+										WithCompletions(5).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+		},
+		"podSet with no matching replicatedJob name is skipped": {
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "non-existent",
+							Count: ptr.To[int32](3),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+			wantInfo: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "non-existent",
+							Count: ptr.To[int32](3),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -322,7 +489,7 @@ func TestJobSet(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
 			}
-			err = p.(framework.PodNetworkPlugin).IdentifyPodNetwork(tc.info, tc.trainJob)
+			err = p.(framework.PreComponentBuilderPlugin).PreBuildSync(tc.info, tc.trainJob)
 			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
 				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 			}
@@ -331,7 +498,7 @@ func TestJobSet(t *testing.T) {
 				cmpopts.SortMaps(func(a, b string) bool { return a < b }),
 				utiltesting.PodSetEndpointsCmpOpts,
 			); len(diff) != 0 {
-				t.Errorf("Unexpected Info from IdentifyPodNetwork (-want,+got):\n%s", diff)
+				t.Errorf("Unexpected Info from PreBuildSync (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -2131,8 +2298,6 @@ func TestBuild(t *testing.T) {
 								Replicas: 0,
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
-										Parallelism: ptr.To[int32](2),
-										Completions: ptr.To[int32](2),
 										Template: corev1.PodTemplateSpec{
 											Spec: corev1.PodSpec{
 												InitContainers: []corev1.Container{
@@ -2226,8 +2391,6 @@ func TestBuild(t *testing.T) {
 								Replicas: 0,
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
-										Parallelism: ptr.To[int32](1),
-										Completions: ptr.To[int32](1),
 										Template: corev1.PodTemplateSpec{
 											Spec: corev1.PodSpec{
 												InitContainers: []corev1.Container{
@@ -2313,8 +2476,6 @@ func TestBuild(t *testing.T) {
 								Replicas: 0,
 								Template: batchv1.JobTemplateSpec{
 									Spec: batchv1.JobSpec{
-										Parallelism: ptr.To[int32](3),
-										Completions: ptr.To[int32](3),
 										Template: corev1.PodTemplateSpec{
 											Spec: corev1.PodSpec{
 												InitContainers: []corev1.Container{
@@ -2334,12 +2495,13 @@ func TestBuild(t *testing.T) {
 				},
 			},
 		},
-		"return error when podSet initContainers are missing from apply configuration": {
+		"auto-append initContainers from podSet when missing from apply configuration": {
 			info: &runtime.Info{
 				TemplateSpec: runtime.TemplateSpec{
 					PodSets: []runtime.PodSet{{
 						Name:           constants.Node,
-						InitContainers: []runtime.Container{{Name: "preflight-check"}},
+						InitContainers: []runtime.Container{{Name: "preflight-check", Image: "check:latest", Command: []string{"/run-check"}}},
+						Containers:     []runtime.Container{{Name: constants.Node}},
 					}},
 					ObjApply: jobsetv1alpha2ac.JobSetSpec().
 						WithReplicatedJobs(jobsetv1alpha2ac.ReplicatedJob().
@@ -2359,7 +2521,38 @@ func TestBuild(t *testing.T) {
 			},
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
 				Obj(),
-			wantError: fmt.Errorf("podSet %q initContainer %q does not have a matching initContainer in the runtime template", constants.Node, "preflight-check"),
+			wantObjs: []apiruntime.Object{
+				&jobsetv1alpha2.JobSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "trainJob",
+						Namespace: metav1.NamespaceDefault,
+						OwnerReferences: []metav1.OwnerReference{
+							{APIVersion: trainer.GroupVersion.String(), Kind: trainer.TrainJobKind, Name: "trainJob", Controller: ptr.To(true)},
+						},
+					},
+					Spec: jobsetv1alpha2.JobSetSpec{
+						ReplicatedJobs: []jobsetv1alpha2.ReplicatedJob{
+							{
+								Name: constants.Node,
+								Template: batchv1.JobTemplateSpec{
+									Spec: batchv1.JobSpec{
+										Template: corev1.PodTemplateSpec{
+											Spec: corev1.PodSpec{
+												InitContainers: []corev1.Container{
+													{Name: "preflight-check", Image: "check:latest", Command: []string{"/run-check"}},
+												},
+												Containers: []corev1.Container{
+													{Name: constants.Node},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 	for name, tc := range cases {

@@ -1,7 +1,6 @@
-# Developer Guide
+# Contributing Guide
 
-This guide explains how to contribute to the Kubeflow Trainer V2 project.
-For the Kubeflow Trainer documentation, please check [the official Kubeflow documentation](https://trainer.kubeflow.org/en/latest/overview/index.html).
+This guide explains how to contribute to [the Kubeflow Trainer project](https://trainer.kubeflow.org/en/latest/).
 
 ## AI Assistant Tooling
 
@@ -9,6 +8,33 @@ The Kubeflow community allows the use of AI assistant tooling for contributions.
 Before using AI agents, please review the
 [Kubeflow AI Policy](https://www.kubeflow.org/docs/about/ai_policy/) to understand
 the guidelines and responsibilities for such contributions.
+
+## Project Board
+
+The Kubeflow Trainer community uses the
+[Kubeflow Trainer project board](https://github.com/orgs/kubeflow/projects/85/views/2)
+to track ongoing work and to triage incoming issues. The board gives maintainers and
+contributors visibility into upcoming workstreams and into the pull requests that need
+attention.
+
+The board currently tracks:
+
+- Bugs that have been reported and triaged.
+- Open issues, including the ones that are ready to be picked up by new contributors.
+- Progress on [Kubeflow Enhancement Proposals (KEPs)](#kubeflow-enhancement-proposal-kep).
+- Pull requests that are tracked for the upcoming release.
+
+If you are looking for something to work on, start with the board and pick an issue that
+is not assigned yet. Comment on the issue to let the community know that you are working
+on it before you open a pull request.
+
+When you open an issue or a pull request, a maintainer adds it to the board during triage.
+Please keep the status of your items up to date so that the board reflects the real state
+of the work.
+
+The board is still a work in progress. If you have feedback on how it can be improved,
+share it in the [`#kubeflow-trainer` Slack channel](https://www.kubeflow.org/docs/about/community/#kubeflow-slack)
+or open an issue in this repository.
 
 ## Requirements
 
@@ -96,7 +122,7 @@ Make sure to install [pre-commit](https://pre-commit.com/) (`pip install pre-com
 
 The pre-commit hooks ensure code quality and consistency. They are executed in CI. PRs that fail to comply with the hooks will not be able to pass the corresponding CI gate. The hooks are only executed against staged files unless you run `pre-commit run --all`, in which case, they'll be executed against every file in the repository.
 
-Specific programmatically generated files listed in the `exclude` field in [.pre-commit-config.yaml](../../.pre-commit-config.yaml) are deliberately excluded from the hooks.
+Specific programmatically generated files listed in the `exclude` field in [.pre-commit-config.yaml](https://github.com/kubeflow/trainer/blob/master/.pre-commit-config.yaml) are deliberately excluded from the hooks.
 
 ## Best Practices
 
@@ -108,7 +134,7 @@ The PR titles are used to generated changelog for releases.
 PR titles must:
 
 - Follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/).
-- Have an appropriate [type and scope](./.github/workflows/check-pr-title.yaml)
+- Have an appropriate [type and scope](https://github.com/kubeflow/trainer/blob/master/.github/workflows/check-pr-title.yaml)
 
 Examples:
 
@@ -122,7 +148,7 @@ For any significant features or enhancement for Kubeflow Trainer project we foll
 [Kubeflow Enhancement Proposal process](https://github.com/kubeflow/community/tree/master/proposals).
 
 If you want to submit a significant change to the Kubeflow Trainer, please submit a new KEP under
-[./proposals](./proposals/) directory.
+[./proposals](https://github.com/kubeflow/trainer/tree/master/proposals) directory.
 
 ### Go Development
 

@@ -132,16 +132,6 @@ func TestFlux(t *testing.T) {
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().WithName(constants.Node),
-												).
-												WithInitContainers(
-													corev1ac.Container().
-														WithName(constants.FluxInstallerContainerName).
-														WithImage(constants.FluxInstallerImage).
-														WithCommand("/bin/bash", "/etc/flux-config/init.sh").
-														WithVolumeMounts(
-															corev1ac.VolumeMount().WithName(constants.FluxInstallVolumeName).WithMountPath(constants.FluxVolumePath),
-															corev1ac.VolumeMount().WithName(configMapName).WithMountPath(constants.FluxConfigVolumeName).WithReadOnly(true),
-														),
 												),
 											),
 										),
@@ -153,6 +143,15 @@ func TestFlux(t *testing.T) {
 							Name:     constants.Node,
 							Ancestor: ptr.To(constants.AncestorTrainer),
 							Count:    ptr.To[int32](1),
+							InitContainers: []runtime.Container{{
+								Name:    constants.FluxInstallerContainerName,
+								Image:   constants.FluxInstallerImage,
+								Command: []string{"/bin/bash", "/etc/flux-config/init.sh"},
+								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
+									*corev1ac.VolumeMount().WithName(constants.FluxInstallVolumeName).WithMountPath(constants.FluxVolumePath),
+									*corev1ac.VolumeMount().WithName(configMapName).WithMountPath(constants.FluxConfigVolumeName).WithReadOnly(true),
+								},
+							}},
 							Containers: []runtime.Container{{
 								Name: constants.Node,
 								VolumeMounts: []corev1ac.VolumeMountApplyConfiguration{
@@ -245,49 +244,6 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			newObj: &trainer.TrainJob{},
-		},
-		"invalid when runtime policy numProcPerNode is less than one": {
-			info: &runtime.Info{
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicySource: &trainer.MLPolicySource{
-						Flux: &trainer.FluxMLPolicySource{
-							NumProcPerNode: ptr.To[int32](0),
-						},
-					},
-				},
-			},
-			newObj: &trainer.TrainJob{},
-			wantError: field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec").Child("trainer").Child("numProcPerNode"),
-					int32(0),
-					"must be greater than or equal to 1 for Flux TrainJob",
-				),
-			},
-		},
-		"invalid when trainJob numProcPerNode is less than one": {
-			info: &runtime.Info{
-				RuntimePolicy: runtime.RuntimePolicy{
-					MLPolicySource: &trainer.MLPolicySource{
-						Flux: &trainer.FluxMLPolicySource{
-							NumProcPerNode: ptr.To[int32](1),
-						},
-					},
-				},
-			},
-			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
-				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
-					NumProcPerNode(0).
-					Obj(),
-				).
-				Obj(),
-			wantError: field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec").Child("trainer").Child("numProcPerNode"),
-					int32(0),
-					"must be greater than or equal to 1 for Flux TrainJob",
-				),
-			},
 		},
 		"invalid when node podSet includes reserved flux installer init container": {
 			info: &runtime.Info{
@@ -560,6 +516,177 @@ func TestGetOriginalCommand(t *testing.T) {
 			got := getOriginalCommand(tc.trainJob, tc.info)
 			if got != tc.want {
 				t.Errorf("getOriginalCommand() = %q; want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestOptionalTrainerFields(t *testing.T) {
+	cases := map[string]struct {
+		podSetCount int32
+		jobTrainer  *trainer.Trainer
+		// wantCommand is only asserted when set.
+		wantCommand []string
+		wantFlags   string
+		// wantViewImage defaults to constants.FluxInstallerImage when empty.
+		wantViewImage string
+		wantHostlist  string
+	}{
+		"trainer is not set": {
+			podSetCount:  3,
+			wantCommand:  []string{"/bin/bash", "/etc/flux-config/entrypoint.sh", "python train.py"},
+			wantFlags:    "-N 3 -n 3",
+			wantHostlist: "test-job-node-0-[0-2]",
+		},
+		"num nodes is not set": {
+			podSetCount:  2,
+			jobTrainer:   utiltesting.MakeTrainJobTrainerWrapper().Container("image", []string{"python", "train.py"}, nil, nil).Obj(),
+			wantFlags:    "-N 2 -n 2",
+			wantHostlist: "test-job-node-0-[0-1]",
+		},
+		"env and num proc per node from the TrainJob are applied": {
+			podSetCount: 3,
+			jobTrainer: utiltesting.MakeTrainJobTrainerWrapper().
+				NumProcPerNode(2).
+				Env(corev1.EnvVar{Name: "FLUX_VIEW_IMAGE", Value: "example.com/flux-view:test"}).
+				Obj(),
+			wantFlags:     "-N 3 -n 6",
+			wantViewImage: "example.com/flux-view:test",
+			wantHostlist:  "test-job-node-0-[0-2]",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cli := utiltesting.NewClientBuilder().Build()
+			p, err := New(ctx, cli, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize Flux plugin: %v", err)
+			}
+
+			info := &runtime.Info{
+				RuntimePolicy: runtime.RuntimePolicy{
+					MLPolicySource: &trainer.MLPolicySource{
+						Flux: &trainer.FluxMLPolicySource{
+							NumProcPerNode: ptr.To[int32](1),
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					ObjApply: v1alpha2.JobSetSpec().
+						WithReplicatedJobs(
+							v1alpha2.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+					PodSets: []runtime.PodSet{
+						{
+							Name:       constants.Node,
+							Ancestor:   ptr.To(constants.AncestorTrainer),
+							Count:      ptr.To(tc.podSetCount),
+							Containers: []runtime.Container{{Name: constants.Node, Command: []string{"python", "train.py"}}},
+						},
+					},
+				},
+			}
+			trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				UID("test-uid").
+				Trainer(tc.jobTrainer).
+				Obj()
+
+			if err = p.(framework.EnforceMLPolicyPlugin).EnforceMLPolicy(info, trainJob); err != nil {
+				t.Fatalf("Unexpected error from EnforceMLPolicy: %v", err)
+			}
+
+			// The Flux entrypoint has to wrap the runtime's command even when the TrainJob
+			// carried no trainer of its own.
+			if tc.wantCommand != nil {
+				if diff := gocmp.Diff(tc.wantCommand, trainJob.Spec.Trainer.Command); len(diff) != 0 {
+					t.Errorf("Unexpected trainer command (-want, +got): %s", diff)
+				}
+			}
+
+			var viewImage string
+			for _, ic := range info.FindPodSetByAncestor(constants.AncestorTrainer).InitContainers {
+				if ic.Name == constants.FluxInstallerContainerName {
+					viewImage = ic.Image
+				}
+			}
+			if want := cmp.Or(tc.wantViewImage, constants.FluxInstallerImage); viewImage != want {
+				t.Errorf("flux-installer image = %q; want %q", viewImage, want)
+			}
+
+			var objs []apiruntime.ApplyConfiguration
+			if objs, err = p.(framework.ComponentBuilderPlugin).Build(ctx, info, trainJob); err != nil {
+				t.Fatalf("Unexpected error from Build: %v", err)
+			}
+			typedObjs, err := utiltesting.ToObject(cli.Scheme(), objs...)
+			if err != nil {
+				t.Fatalf("Failed to convert objects: %v", err)
+			}
+
+			var configMap *corev1.ConfigMap
+			for _, obj := range typedObjs {
+				if cm, ok := obj.(*corev1.ConfigMap); ok {
+					configMap = cm
+				}
+			}
+			if configMap == nil {
+				t.Fatal("Build did not return the Flux entrypoint ConfigMap")
+			}
+			if !strings.Contains(configMap.Data["entrypoint.sh"], tc.wantFlags) {
+				t.Errorf("entrypoint.sh does not contain the Flux flags %q", tc.wantFlags)
+			}
+			if !strings.Contains(configMap.Data["init.sh"], tc.wantHostlist) {
+				t.Errorf("init.sh does not contain the hostlist %q", tc.wantHostlist)
+			}
+		})
+	}
+}
+
+func TestGetNumNodes(t *testing.T) {
+	cases := map[string]struct {
+		podSets []runtime.PodSet
+		want    int32
+	}{
+		"count of the trainer PodSet": {
+			podSets: []runtime.PodSet{{
+				Name:     constants.Node,
+				Ancestor: ptr.To(constants.AncestorTrainer),
+				Count:    ptr.To[int32](3),
+			}},
+			want: 3,
+		},
+		"trainer PodSet is matched by ancestor rather than by name": {
+			podSets: []runtime.PodSet{{
+				Name:     "worker",
+				Ancestor: ptr.To(constants.AncestorTrainer),
+				Count:    ptr.To[int32](5),
+			}},
+			want: 5,
+		},
+		"single node when the runtime has no trainer PodSet": {
+			podSets: []runtime.PodSet{{Name: constants.DatasetInitializer}},
+			want:    1,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			info := &runtime.Info{TemplateSpec: runtime.TemplateSpec{PodSets: tc.podSets}}
+			if got := getNumNodes(info); got != tc.want {
+				t.Errorf("getNumNodes() = %d; want %d", got, tc.want)
 			}
 		})
 	}
