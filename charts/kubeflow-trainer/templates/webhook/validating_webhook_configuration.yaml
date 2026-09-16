@@ -99,3 +99,25 @@ webhooks:
     operations:
     - CREATE
     - UPDATE
+- name: validator.optimizationjob.trainer.kubeflow.org
+  admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "trainer.webhook.service.name" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-trainer-kubeflow-org-v1alpha1-optimizationjob
+  sideEffects: None
+  {{- with .Values.webhook.failurePolicy }}
+  failurePolicy: {{ . }}
+  {{- end }}
+  rules:
+  - apiGroups:
+    - trainer.kubeflow.org
+    apiVersions:
+    - v1alpha1
+    resources:
+    - optimizationjobs
+    operations:
+    - CREATE
+    - UPDATE
