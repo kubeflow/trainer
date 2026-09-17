@@ -24,8 +24,10 @@ option go_package = "github.com/kubeflow/trainer/v2/pkg/apis/optimizer/v1alpha1;
 // OptimizationJob. The OptimizationJob controller is the only client.
 //
 // The service is a pure function of its request. It MUST NOT require any state
-// that survives a process restart: the controller reconstructs the full trial
-// history from child TrainJobs on every reconcile and sends it with each call.
+// that survives a process restart: the controller rebuilds the full trial
+// history on every reconcile and sends it with each call. Where the controller
+// keeps that history is its own concern (child TrainJobs today, OptimizationJob
+// status under KEP-3744); this contract is the same either way.
 // A provider MAY cache a study in memory as an optimization, but dropping that
 // cache MUST NOT change the observable result beyond sampler randomness.
 service SearchAlgorithmService {
@@ -72,10 +74,9 @@ message SuggestRequest {
   // provider MAY key a cached study on it.
   OptimizationSpec spec = 1;
 
-  // trials is the complete history the controller knows about, reconstructed
-  // from child TrainJobs. It includes trials in every state, not only
-  // succeeded ones: a provider needs failures to avoid re-proposing a region
-  // that cannot be evaluated.
+  // trials is the complete history the controller knows about. It includes
+  // trials in every state, not only succeeded ones: a provider needs failures
+  // to avoid re-proposing a region that cannot be evaluated.
   //
   // Size note: this grows with the trial count. OptimizationJobSpec caps
   // numTrials at 100 today, which keeps a request well inside gRPC's default
@@ -159,6 +160,10 @@ message SearchSpace {
     LogUniformSpace log_uniform = 2;
     CategoricalSpace categorical = 3;
   }
+
+  // 4 and 5 are held for the normal and log-normal spaces added to the CRD in
+  // #3908, so that adding them here later does not renumber anything.
+  reserved 4, 5;
 }
 
 message UniformSpace {
@@ -227,11 +232,20 @@ message TrialRecord {
   // state is the observed outcome.
   TrialState state = 3;
 
-  // objective_value is the final value of the objective metric. It is set when
-  // state is SUCCEEDED or EARLY_STOPPED, and unset otherwise. Explicit
-  // presence matters: a metric of 0.0 is a legitimate result and must be
-  // distinguishable from "not reported".
-  optional string objective_value = 4;
+  // objective_values holds one entry per objective in OptimizationSpec, in any
+  // order. It is populated when state is SUCCEEDED or EARLY_STOPPED, and empty
+  // otherwise. A metric that was not reported is left out rather than sent as
+  // zero, since 0.0 is a legitimate result.
+  repeated ObjectiveValue objective_values = 4;
+}
+
+message ObjectiveValue {
+  // metric is the objective metric name, matching Objective.metric.
+  string metric = 1;
+
+  // value is the observed value, encoded as a string for the same reason the
+  // bounds are.
+  string value = 2;
 }
 
 enum TrialState {

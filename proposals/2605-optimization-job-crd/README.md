@@ -457,11 +457,11 @@ Three properties this KEP already commits to are not expressible through the Kat
 
 **History carries trial state.** `TrialRecord.state` distinguishes `RUNNING`, `SUCCEEDED`, `FAILED` and `EARLY_STOPPED`, so a provider can record a failure as a terminal state rather than leaving a trial in flight.
 
-**Search space and algorithm are `oneof`s, mirroring the CRD.** An unsupported combination, such as numeric bounds on a categorical parameter, cannot be expressed on the wire. The distribution defect above originates in a flat message where every field is always present.
+**Search space and algorithm are `oneof`s, mirroring the CRD.** An unsupported combination, such as numeric bounds on a categorical parameter, cannot be expressed on the wire. The distribution defect above originates in a flat message where every field is always present. Field numbers 4 and 5 in `SearchSpace` are reserved for the normal and log-normal spaces proposed in #3908, so adding them renumbers nothing.
 
 **Numeric bounds stay decimal strings.** The CRD encodes `min` and `max` as strings with a regex permitting exponent notation, to avoid float parsing differences between the Go controller and a Python provider. The schema carries them verbatim.
 
-`objective_value` uses explicit presence, since a metric of `0.0` is a valid result and has to be distinguishable from a trial that reported nothing.
+`TrialRecord.objective_values` carries one entry per objective rather than a single value, so multi-objective runs do not need a breaking change to the record. A metric that was not reported is left out rather than sent as zero, since `0.0` is a valid result.
 
 **Message size**
 
