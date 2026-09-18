@@ -24,6 +24,7 @@ type ObjectiveDirection string
 const (
 	ObjectiveDirectionMaximize ObjectiveDirection = "Maximize"
 	ObjectiveDirectionMinimize ObjectiveDirection = "Minimize"
+	OptimizationJobKind                           = "OptimizationJob"
 )
 
 // OptimizationJob is the Schema for the optimizationjobs API.
