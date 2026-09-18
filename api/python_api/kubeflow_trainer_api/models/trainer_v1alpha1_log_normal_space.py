@@ -38,10 +38,10 @@ from typing_extensions import Self
 
 class TrainerV1alpha1LogNormalSpace(BaseModel):
     """
-    LogNormalSpace defines a continuous log-normal distribution.
+    LogNormalSpace defines a continuous log-normal distribution, that is a distribution whose logarithm is normal with center Mean and standard deviation StdDev. Mean and StdDev are therefore expressed in log space, so Mean may be negative while the sampled values are always positive.
     """ # noqa: E501
-    mean: StrictStr
-    std_dev: StrictStr = Field(alias="stdDev")
+    mean: StrictStr = Field(description="mean is the center of the log-normal search space, in log space.")
+    std_dev: StrictStr = Field(description="stdDev is the standard deviation of the log-normal search space, in log space.", alias="stdDev")
     __properties: ClassVar[List[str]] = ["mean", "stdDev"]
 
     model_config = ConfigDict(
@@ -95,8 +95,8 @@ class TrainerV1alpha1LogNormalSpace(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "mean": obj.get("mean") if obj.get("mean") is not None else '',
-            "stdDev": obj.get("stdDev") if obj.get("stdDev") is not None else ''
+            "mean": obj.get("mean"),
+            "stdDev": obj.get("stdDev")
         })
         return _obj
 
