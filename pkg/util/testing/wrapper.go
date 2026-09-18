@@ -1240,6 +1240,14 @@ func (s *TrainingRuntimeSpecWrapper) PodGroupPolicyCoscheduling(src *trainer.Cos
 	return s
 }
 
+func (s *TrainingRuntimeSpecWrapper) PodGroupPolicyVolcano(src *trainer.VolcanoPodGroupPolicySource) *TrainingRuntimeSpecWrapper {
+	if s.PodGroupPolicy == nil {
+		s.PodGroupPolicy = &trainer.PodGroupPolicy{}
+	}
+	s.PodGroupPolicy.Volcano = src
+	return s
+}
+
 func (s *TrainingRuntimeSpecWrapper) PodGroupPolicyCoschedulingSchedulingTimeout(timeout int32) *TrainingRuntimeSpecWrapper {
 	if s.PodGroupPolicy == nil || s.PodGroupPolicy.Coscheduling == nil {
 		return s.PodGroupPolicyCoscheduling(&trainer.CoschedulingPodGroupPolicySource{

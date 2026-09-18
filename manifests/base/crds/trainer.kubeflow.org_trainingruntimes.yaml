@@ -209,6 +209,10 @@ spec:
                         type: object
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: Only one of the podGroupPolicy can be configured
+                  rule: '[has(self.coscheduling), has(self.volcano)].filter(x, x).size()
+                    <= 1'
               template:
                 description: template for the JobSet which will be used by TrainJob.
                 minProperties: 1
