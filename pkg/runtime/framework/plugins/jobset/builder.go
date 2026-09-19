@@ -122,13 +122,19 @@ func (b *Builder) Trainer(info *runtime.Info, trainJob *trainer.TrainJob) *Build
 			// REF: https://github.com/kubeflow/trainer/issues/2318
 			b.Spec.ReplicatedJobs[i].Replicas = ptr.To[int32](1)
 			// Update values for the Trainer container.
-			for j, container := range rJob.Template.Spec.Template.Spec.Containers {
-				if *container.Name == constants.Node {
-					// Update values from the TrainJob trainer.
-					if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
-						if image := jobTrainer.Image; image != nil {
-							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Image = image
-						}
+		}
+
+		for j, container := range rJob.Template.Spec.Template.Spec.Containers {
+			if *container.Name != constants.Node {
+				continue
+			}
+			// Update values from the TrainJob trainer.
+			if ancestor == constants.AncestorTrainer || ancestor == "" {
+				if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
+					if image := jobTrainer.Image; image != nil {
+						b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Image = image
+					}
+					if ancestor == constants.AncestorTrainer {
 						if command := jobTrainer.Command; command != nil {
 							b.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j].Command = command
 						}
