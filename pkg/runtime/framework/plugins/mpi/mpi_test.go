@@ -596,6 +596,18 @@ trainJob-node-1-1.trainJob slots=1
 									*corev1ac.EnvVar().
 										WithName(constants.OpenMPIEnvKeyRSHArgs).
 										WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvHostFileLocation).
+										WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvKeepFQDNHostNames).
+										WithValue("false"),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvDefaultSlots).
+										WithValue("1"),
+									*corev1ac.EnvVar().
+										WithName(constants.PRTEEnvKeySSHArgs).
+										WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 								},
 							}},
 							Volumes: []corev1ac.VolumeApplyConfiguration{
@@ -1078,6 +1090,30 @@ func TestValidate(t *testing.T) {
 						{Name: constants.OpenMPIEnvKeyRSHArgs, Value: "custom-args"},
 					},
 					fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", []string{constants.OpenMPIEnvHostFileLocation, constants.OpenMPIEnvKeyRSHArgs}),
+				),
+			},
+		},
+		"trainer has reserved PRTE env": {
+			info: runtime.NewInfo(
+				runtime.WithMLPolicySource(utiltesting.MakeMLPolicyWrapper().
+					WithMLPolicySource(*utiltesting.MakeMLPolicySourceWrapper().
+						MPIPolicy(ptr.To[int32](1), trainer.MPIImplementationOpenMPI, nil, nil).
+						Obj(),
+					).
+					Obj(),
+				),
+			),
+			newObj: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "test").
+				Trainer(utiltesting.MakeTrainJobTrainerWrapper().
+					Env(corev1.EnvVar{Name: constants.PRTEEnvHostFileLocation, Value: "/custom/hostfile"}).
+					Obj(),
+				).
+				Obj(),
+			wantError: field.ErrorList{
+				field.Invalid(
+					field.NewPath("spec").Child("trainer").Child("env"),
+					[]corev1.EnvVar{{Name: constants.PRTEEnvHostFileLocation, Value: "/custom/hostfile"}},
+					fmt.Sprintf("must not have reserved envs, invalid envs configured: %v", []string{constants.PRTEEnvHostFileLocation}),
 				),
 			},
 		},
