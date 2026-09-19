@@ -133,10 +133,16 @@ runtimePatches:
                           volumeMounts:
                             - name: workspace
                               mountPath: /workspace
+                          resources:
+                            claims:              # DRA, requires the DynamicResourceAllocation gate
+                              - name: gpu
                       volumes:
                         - name: workspace
                           persistentVolumeClaim:
                             claimName: user-pvc
+                      resourceClaims:
+                        - name: gpu
+                          resourceClaimTemplateName: gpu-claim-template
 ```
 
 ## Ownership Model
@@ -256,6 +262,42 @@ way to pass environment variables.
 
 ### Trainer Container Fields
 
-You cannot override `command`, `args`, `image`, or `resources` for the `trainer` container in the
+You cannot override `command`, `args`, or `image` for the `trainer` container in the
 `node` replicatedJob using `RuntimePatches`. Use the `Trainer` API fields in the TrainJob spec for
 those.
+
+Container `resources` can be patched, but for the `node` container `spec.trainer.resourcesPerNode`
+is merged on top of the patched requests and limits, and `spec.trainer.resourceClaimsPerNode` is
+merged on top of the patched claims. See the
+[Dynamic Resource Allocation guide](dynamic-resource-allocation) for details.
+
+### Pod-Level Resource Claims
+
+You can add DRA `resourceClaims` to the Pod spec and reference them from any container's
+`resources.claims`. This requires the `DynamicResourceAllocation` feature gate. Pod-level
+`resourceClaims` merge with the runtime's entries by `name`, while a patched container
+`resources.claims` list replaces the runtime's list for that container. Every referenced claim
+must exist in the Pod's `resourceClaims`, otherwise the TrainJob is rejected. Like `volumes`,
+`resourceClaims` is immutable after creation.
+
+```yaml
+runtimePatches:
+  - manager: trainer.kubeflow.org/kubeflow-sdk
+    trainingRuntimeSpec:
+      template:
+        spec:
+          replicatedJobs:
+            - name: node
+              template:
+                spec:
+                  template:
+                    spec:
+                      resourceClaims:
+                        - name: gpu
+                          resourceClaimTemplateName: gpu-claim-template
+                      containers:
+                        - name: node
+                          resources:
+                            claims:
+                              - name: gpu
+```
