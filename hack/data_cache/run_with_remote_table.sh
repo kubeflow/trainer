@@ -16,8 +16,8 @@
 
 # Check for required arguments
 if [ $# -lt 5 ]; then
-    echo "Usage: $0 <iam-role-arn> <metadata-loc> <table-name> <schema-name> <aws-profile> [environment]"
-    exit 1
+  echo "Usage: $0 <iam-role-arn> <metadata-loc> <table-name> <schema-name> <aws-profile> [environment]"
+  exit 1
 fi
 
 IAM_ROLE_ARN="$1"
@@ -51,23 +51,23 @@ export RUNTIME_ENV="$ENVIRONMENT"
 
 # Function to cleanup processes on exit
 cleanup() {
-    echo ""
-    echo "Stopping services..."
-    kill -9 $WORKER1_PID $WORKER2_PID $HEAD_PID 2>/dev/null || true
-    wait $WORKER1_PID $WORKER2_PID $HEAD_PID 2>/dev/null || true
-    rm -rf /tmp/test_metadata
+  echo ""
+  echo "Stopping services..."
+  kill -9 $WORKER1_PID $WORKER2_PID $HEAD_PID 2> /dev/null || true
+  wait $WORKER1_PID $WORKER2_PID $HEAD_PID 2> /dev/null || true
+  rm -rf /tmp/test_metadata
 
-    # Kill any remaining processes on the ports
-    echo "Cleaning up ports..."
-    for port in 8080 8081 8082 50051 50052 50053; do
-        pid=$(lsof -ti :$port 2>/dev/null)
-        if [ ! -z "$pid" ]; then
-            echo "  Killing process on port $port (PID: $pid)"
-            kill -9 $pid 2>/dev/null || true
-        fi
-    done
+  # Kill any remaining processes on the ports
+  echo "Cleaning up ports..."
+  for port in 8080 8081 8082 50051 50052 50053; do
+    pid=$(lsof -ti :$port 2> /dev/null)
+    if [ ! -z "$pid" ]; then
+      echo "  Killing process on port $port (PID: $pid)"
+      kill -9 $pid 2> /dev/null || true
+    fi
+  done
 
-    exit 0
+  exit 0
 }
 
 # Set up signal handlers for graceful shutdown
@@ -76,78 +76,78 @@ trap cleanup SIGINT SIGTERM
 # Kill any existing processes on the ports we need
 echo "Checking for existing processes on required ports..."
 for port in 8080 8081 8082 50051 50052 50053; do
-    pid=$(lsof -ti :$port 2>/dev/null)
-    if [ ! -z "$pid" ]; then
-        echo "  Killing existing process on port $port (PID: $pid)"
-        kill -9 $pid 2>/dev/null || true
-        sleep 1
-    fi
+  pid=$(lsof -ti :$port 2> /dev/null)
+  if [ ! -z "$pid" ]; then
+    echo "  Killing existing process on port $port (PID: $pid)"
+    kill -9 $pid 2> /dev/null || true
+    sleep 1
+  fi
 done
 echo "Port cleanup complete."
 echo ""
 
 # Function to check if a service port is open
 check_service_port() {
-    local host=$1
-    local port=$2
-    local service_name=$3
+  local host=$1
+  local port=$2
+  local service_name=$3
 
-    echo "Waiting for $service_name to be available on $host:$port..."
-    while ! nc -z "$host" "$port" 2>/dev/null; do
-        echo "  $service_name not available yet, waiting 2 seconds..."
-        sleep 2
-    done
-    echo "  $service_name port is open!"
+  echo "Waiting for $service_name to be available on $host:$port..."
+  while ! nc -z "$host" "$port" 2> /dev/null; do
+    echo "  $service_name not available yet, waiting 2 seconds..."
+    sleep 2
+  done
+  echo "  $service_name port is open!"
 }
 
 # Function to check if a service is ready using readiness probe
 check_service_ready() {
-    local grpc_host=$1
-    local grpc_port=$2
-    local health_port=$3
-    local service_name=$4
+  local grpc_host=$1
+  local grpc_port=$2
+  local health_port=$3
+  local service_name=$4
 
-    echo "Checking $service_name readiness (Health port: $health_port)..."
+  echo "Checking $service_name readiness (Health port: $health_port)..."
 
-    # First wait for the health check port to be open
-    local max_port_wait=30
-    local port_wait_count=0
-    while ! nc -z "$grpc_host" "$health_port" 2>/dev/null; do
-        port_wait_count=$((port_wait_count + 1))
-        if [ $port_wait_count -ge $max_port_wait ]; then
-            echo "  ERROR: $service_name health endpoint not available after ${max_port_wait} attempts"
-            return 1
-        fi
-        sleep 2
-    done
+  # First wait for the health check port to be open
+  local max_port_wait=30
+  local port_wait_count=0
+  while ! nc -z "$grpc_host" "$health_port" 2> /dev/null; do
+    port_wait_count=$((port_wait_count + 1))
+    if [ $port_wait_count -ge $max_port_wait ]; then
+      echo "  ERROR: $service_name health endpoint not available after ${max_port_wait} attempts"
+      return 1
+    fi
+    sleep 2
+  done
 
-    # Then check the readiness probe endpoint
-    local max_ready_wait=60
-    local ready_wait_count=0
-    while true; do
-        ready_wait_count=$((ready_wait_count + 1))
-        if [ $ready_wait_count -ge $max_ready_wait ]; then
-            echo "  ERROR: $service_name readiness probe never returned 200 after ${max_ready_wait} attempts"
-            return 1
-        fi
+  # Then check the readiness probe endpoint
+  local max_ready_wait=60
+  local ready_wait_count=0
+  while true; do
+    ready_wait_count=$((ready_wait_count + 1))
+    if [ $ready_wait_count -ge $max_ready_wait ]; then
+      echo "  ERROR: $service_name readiness probe never returned 200 after ${max_ready_wait} attempts"
+      return 1
+    fi
 
-        # Use curl with timeout and capture the response
-        http_code=$(curl -s -o /dev/null -w "%{http_code}" --http1.1 --max-time 5 "http://$grpc_host:$health_port/ready" 2>/dev/null || echo "000")
+    # Use curl with timeout and capture the response
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" --http1.1 --max-time 5 "http://$grpc_host:$health_port/ready" 2> /dev/null || echo "000")
 
-        if [ "$http_code" = "200" ]; then
-            echo "  $service_name is ready!"
-            break
-        elif [ "$http_code" = "503" ]; then
-            # Service not ready yet, keep waiting
-            sleep 2
-        elif [ "$http_code" = "000" ]; then
-            echo "  Connection failed, retrying..."
-            sleep 2
-        else
-            echo "  Unexpected HTTP code: $http_code, retrying..."
-            sleep 2
-        fi
-    done
+    if [ "$http_code" = "200" ]; then
+      echo "  $service_name is ready!"
+      break
+    elif [ "$http_code" = "503" ]; then
+      # Service not ready yet, keep waiting
+      sleep 2
+    elif [ "$http_code" = "000" ]; then
+      echo "  Connection failed, retrying..."
+      sleep 2
+    else
+      echo "  Unexpected HTTP code: $http_code, retrying..."
+      sleep 2
+    fi
+  done
 }
 
 echo "Starting worker node 1..."
