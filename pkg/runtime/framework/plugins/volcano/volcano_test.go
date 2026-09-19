@@ -28,6 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
@@ -215,7 +216,7 @@ func TestVolcano(t *testing.T) {
 			expectEnforcePodGroupError: nil,
 			expectBuildError:           nil,
 		},
-		"PodGroup exists but trainjob suspended": {
+		"PodGroup exists and trainjob suspended": {
 			trainJob: &trainer.TrainJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "job-update", Namespace: "test-ns", UID: "2"},
 				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(true)},
@@ -265,6 +266,87 @@ func TestVolcano(t *testing.T) {
 					},
 				},
 			},
+			// Build() defers entirely to Delete() while suspended (see the comment in
+			// Build() on the oscillation this avoids), so it must not (re)apply the
+			// PodGroup here even though one already exists.
+			expectObjs:                 nil,
+			expectEnforcePodGroupError: nil,
+			expectBuildError:           nil,
+		},
+		"PodGroup does not exist and trainjob suspended": {
+			trainJob: &trainer.TrainJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "job-suspended-new", Namespace: "test-ns", UID: "4"},
+				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(true)},
+			},
+			info: &runtime.Info{
+				TemplateSpec: createBaseInfo.TemplateSpec,
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{},
+			},
+			objs: nil,
+			expectInfo: &runtime.Info{
+				TemplateSpec: createBaseInfo.TemplateSpec,
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{
+					PodAnnotations: map[string]string{
+						volcanov1beta1.KubeGroupNameAnnotationKey: "job-suspended-new",
+					},
+				},
+			},
+			// Regression guard for the create/delete oscillation: a suspended TrainJob
+			// whose PodGroup was already removed (e.g. by Delete()) must not have it
+			// recreated on the next reconcile while still suspended.
+			expectObjs:                 nil,
+			expectEnforcePodGroupError: nil,
+			expectBuildError:           nil,
+		},
+		"PodGroup does not exist and trainjob resumed from suspend": {
+			trainJob: &trainer.TrainJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "job-resumed", Namespace: "test-ns", UID: "5"},
+				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(false)},
+			},
+			info: &runtime.Info{
+				TemplateSpec: createBaseInfo.TemplateSpec,
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{},
+			},
+			objs: nil,
+			expectInfo: &runtime.Info{
+				TemplateSpec: createBaseInfo.TemplateSpec,
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainer.PodGroupPolicy{
+						PodGroupPolicySource: trainer.PodGroupPolicySource{
+							Volcano: &trainer.VolcanoPodGroupPolicySource{},
+						},
+					},
+				},
+				Scheduler: &runtime.Scheduler{
+					PodAnnotations: map[string]string{
+						volcanov1beta1.KubeGroupNameAnnotationKey: "job-resumed",
+					},
+				},
+			},
+			// Once resumed, Build() must recreate the PodGroup exactly as if this were
+			// a first-time create: no state carries over from before it was deleted
+			// while suspended.
 			expectObjs: []apiruntime.Object{
 				&volcanov1beta1.PodGroup{
 					TypeMeta: metav1.TypeMeta{
@@ -272,14 +354,14 @@ func TestVolcano(t *testing.T) {
 						Kind:       "PodGroup",
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "job-update",
+						Name:      "job-resumed",
 						Namespace: "test-ns",
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion:         trainer.GroupVersion.String(),
 								Kind:               trainer.TrainJobKind,
-								Name:               "job-update",
-								UID:                types.UID(strconv.Itoa(2)),
+								Name:               "job-resumed",
+								UID:                types.UID(strconv.Itoa(5)),
 								Controller:         ptr.To(true),
 								BlockOwnerDeletion: ptr.To(true),
 							},
@@ -291,12 +373,7 @@ func TestVolcano(t *testing.T) {
 							corev1.ResourceCPU:    resource.MustParse("2300m"),
 							corev1.ResourceMemory: resource.MustParse("3Gi"),
 						},
-						Queue:             "q1",
 						PriorityClassName: "high-priority",
-						NetworkTopology: &volcanov1beta1.NetworkTopologySpec{
-							Mode:               volcanov1beta1.HardNetworkTopologyMode,
-							HighestTierAllowed: ptr.To(1),
-						},
 					},
 				},
 			},
@@ -392,6 +469,191 @@ func TestVolcano(t *testing.T) {
 			}
 			if diff := gocmp.Diff(c.expectObjs, typedObjs, objCmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestVolcano_Delete(t *testing.T) {
+	errorGetPodGroup := errors.New("error when getting existing PodGroup")
+
+	ownedPodGroup := &volcanov1beta1.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-trainjob",
+			Namespace: "test-ns",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         trainer.GroupVersion.String(),
+					Kind:               trainer.TrainJobKind,
+					Name:               "test-trainjob",
+					UID:                types.UID("1"),
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+		},
+	}
+	notOwnedPodGroup := &volcanov1beta1.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: "test-ns"},
+	}
+
+	failedTrainJob := &trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: "test-ns", UID: "1"},
+		Status: trainer.TrainJobStatus{
+			Conditions: []metav1.Condition{
+				{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue},
+			},
+		},
+	}
+
+	volcanoInfo := &runtime.Info{
+		RuntimePolicy: runtime.RuntimePolicy{
+			PodGroupPolicy: &trainer.PodGroupPolicy{
+				PodGroupPolicySource: trainer.PodGroupPolicySource{
+					Volcano: &trainer.VolcanoPodGroupPolicySource{},
+				},
+			},
+		},
+	}
+
+	cases := map[string]struct {
+		info          *runtime.Info
+		trainJob      *trainer.TrainJob
+		objs          []client.Object
+		withError     bool
+		withNoKindErr bool
+		wantObjs      []client.Object
+	}{
+		"nil info": {
+			info:     nil,
+			trainJob: failedTrainJob,
+			objs:     []client.Object{ownedPodGroup},
+			wantObjs: nil,
+		},
+		"nil trainjob": {
+			info:     volcanoInfo,
+			trainJob: nil,
+			objs:     []client.Object{ownedPodGroup},
+			wantObjs: nil,
+		},
+		"runtime not configured for Volcano is left alone": {
+			info:     &runtime.Info{},
+			trainJob: failedTrainJob,
+			objs:     []client.Object{ownedPodGroup},
+			wantObjs: nil,
+		},
+		"running trainjob is not touched": {
+			info: volcanoInfo,
+			trainJob: &trainer.TrainJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: "test-ns", UID: "1"},
+			},
+			objs:     []client.Object{ownedPodGroup},
+			wantObjs: nil,
+		},
+		"complete trainjob returns its PodGroup": {
+			info: volcanoInfo,
+			trainJob: &trainer.TrainJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: "test-ns", UID: "1"},
+				Status: trainer.TrainJobStatus{
+					Conditions: []metav1.Condition{
+						{Type: trainer.TrainJobComplete, Status: metav1.ConditionTrue},
+					},
+				},
+			},
+			objs:     []client.Object{ownedPodGroup},
+			wantObjs: []client.Object{ownedPodGroup},
+		},
+		"failed trainjob returns its PodGroup": {
+			info:     volcanoInfo,
+			trainJob: failedTrainJob,
+			objs:     []client.Object{ownedPodGroup},
+			wantObjs: []client.Object{ownedPodGroup},
+		},
+		"suspended trainjob returns its PodGroup": {
+			info: volcanoInfo,
+			trainJob: &trainer.TrainJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: "test-ns", UID: "1"},
+				Spec:       trainer.TrainJobSpec{Suspend: ptr.To(true)},
+			},
+			objs:     []client.Object{ownedPodGroup},
+			wantObjs: []client.Object{ownedPodGroup},
+		},
+		"suspend field nil defaults to not-suspended": {
+			info: volcanoInfo,
+			trainJob: &trainer.TrainJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: "test-ns", UID: "1"},
+			},
+			objs:     []client.Object{ownedPodGroup},
+			wantObjs: nil,
+		},
+		"PodGroup already deleted is idempotent": {
+			info:     volcanoInfo,
+			trainJob: failedTrainJob,
+			objs:     nil,
+			wantObjs: nil,
+		},
+		"PodGroup not controlled by this trainjob is left alone": {
+			info:     volcanoInfo,
+			trainJob: failedTrainJob,
+			objs:     []client.Object{notOwnedPodGroup},
+			wantObjs: nil,
+		},
+		"Get error is propagated": {
+			info:      volcanoInfo,
+			trainJob:  failedTrainJob,
+			objs:      []client.Object{ownedPodGroup},
+			withError: true,
+			wantObjs:  nil,
+		},
+		"Volcano CRD not installed is tolerated like NotFound": {
+			info:          volcanoInfo,
+			trainJob:      failedTrainJob,
+			objs:          []client.Object{ownedPodGroup},
+			withNoKindErr: true,
+			wantObjs:      nil,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			clientBuilder := utiltesting.NewClientBuilder().WithObjects(c.objs...)
+			switch {
+			case c.withError:
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						return errorGetPodGroup
+					},
+				})
+			case c.withNoKindErr:
+				clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						return &apimeta.NoKindMatchError{GroupKind: volcanov1beta1.SchemeGroupVersion.WithKind("PodGroup").GroupKind()}
+					},
+				})
+			}
+			cli := clientBuilder.Build()
+			plugin, err := New(ctx, cli, utiltesting.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatalf("Failed to create plugin: %v", err)
+			}
+
+			gotObjs, err := plugin.(framework.ComponentDeleterPlugin).Delete(ctx, c.info, c.trainJob)
+
+			var wantErr error
+			if c.withError {
+				wantErr = errorGetPodGroup
+			}
+			if diff := gocmp.Diff(wantErr, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from Delete (-want, +got): %s", diff)
+			}
+			if diff := gocmp.Diff(c.wantObjs, gotObjs,
+				cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion"),
+			); len(diff) != 0 {
+				t.Errorf("Unexpected objects from Delete (-want, +got): %s", diff)
 			}
 		})
 	}

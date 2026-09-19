@@ -128,6 +128,9 @@ func TestNew(t *testing.T) {
 					&jobset.JobSet{},
 					&mpi.MPI{},
 				},
+				componentDeleterPlugins: []framework.ComponentDeleterPlugin{
+					&volcano.Volcano{},
+				},
 				trainJobStatusPlugin: &jobset.JobSet{},
 			},
 		},
@@ -2276,6 +2279,97 @@ test-job-node-0-1.test-job slots=1
 			}
 
 			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {
+				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRunComponentDeleterPlugins(t *testing.T) {
+	ownedPodGroup := &volcanov1beta1.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-trainjob",
+			Namespace: metav1.NamespaceDefault,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         trainer.GroupVersion.String(),
+					Kind:               trainer.TrainJobKind,
+					Name:               "test-trainjob",
+					UID:                "1",
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
+				},
+			},
+		},
+	}
+	failedTrainJob := &trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: metav1.NamespaceDefault, UID: "1"},
+		Status: trainer.TrainJobStatus{
+			Conditions: []metav1.Condition{
+				{Type: trainer.TrainJobFailed, Status: metav1.ConditionTrue},
+			},
+		},
+	}
+	runningTrainJob := &trainer.TrainJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-trainjob", Namespace: metav1.NamespaceDefault, UID: "1"},
+	}
+
+	volcanoInfo := &runtime.Info{
+		RuntimePolicy: runtime.RuntimePolicy{
+			PodGroupPolicy: &trainer.PodGroupPolicy{
+				PodGroupPolicySource: trainer.PodGroupPolicySource{
+					Volcano: &trainer.VolcanoPodGroupPolicySource{},
+				},
+			},
+		},
+	}
+
+	cases := map[string]struct {
+		registry  fwkplugins.Registry
+		info      *runtime.Info
+		objs      []client.Object
+		trainJob  *trainer.TrainJob
+		wantObjs  []client.Object
+		wantError error
+	}{
+		"empty registry returns nothing": {
+			registry: fwkplugins.Registry{},
+			info:     volcanoInfo,
+			trainJob: failedTrainJob,
+			wantObjs: nil,
+		},
+		"failed trainjob: volcano returns its PodGroup": {
+			registry: fwkplugins.NewRegistry(),
+			info:     volcanoInfo,
+			objs:     []client.Object{ownedPodGroup},
+			trainJob: failedTrainJob,
+			wantObjs: []client.Object{ownedPodGroup},
+		},
+		"running trainjob: nothing to delete": {
+			registry: fwkplugins.NewRegistry(),
+			info:     volcanoInfo,
+			objs:     []client.Object{ownedPodGroup},
+			trainJob: runningTrainJob,
+			wantObjs: nil,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			clientBuilder := testingutil.NewClientBuilder().WithObjects(tc.objs...)
+			fwk, err := New(ctx, clientBuilder.Build(), tc.registry, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			gotObjs, err := fwk.RunComponentDeleterPlugins(ctx, tc.info, tc.trainJob)
+			if diff := cmp.Diff(tc.wantError, err, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantObjs, gotObjs, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion")); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
 			}
 		})
