@@ -17,8 +17,6 @@ limitations under the License.
 package webhooks
 
 import (
-	"fmt"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -92,7 +90,8 @@ var _ = ginkgo.Describe("OptimizationJob API validation", ginkgo.Ordered, func()
 
 	ginkgo.DescribeTable("validates parameter names at admission",
 		func(parameterName string, shouldSucceed bool) {
-			job := makeOptimizationJob(ns.Name, fmt.Sprintf("parameter-name-%d", ginkgo.GinkgoRandomSeed()), parameterName)
+			jobName := "train-job"
+			job := makeOptimizationJob(ns.Name, jobName, parameterName)
 			err := k8sClient.Create(ctx, job)
 			if shouldSucceed {
 				gomega.Expect(err).Should(gomega.Succeed())
@@ -103,9 +102,12 @@ var _ = ginkgo.Describe("OptimizationJob API validation", ginkgo.Ordered, func()
 		ginkgo.Entry("accepts underscore-separated names", "learning_rate", true),
 		ginkgo.Entry("accepts names beginning with underscore", "_lr", true),
 		ginkgo.Entry("accepts alphanumeric names", "batch_size2", true),
+		ginkgo.Entry("accepts uppercase names", "LearningRate", true),
 		ginkgo.Entry("rejects names containing slash", "weight/decay", false),
 		ginkgo.Entry("rejects names containing spaces", "n layers", false),
 		ginkgo.Entry("rejects names beginning with a digit", "1learning_rate", false),
 		ginkgo.Entry("rejects names containing hyphen", "learning-rate", false),
+		ginkgo.Entry("rejects names containing equals sign", "a=b", false),
+		ginkgo.Entry("rejects non-ASCII names", "lré", false),
 	)
 })

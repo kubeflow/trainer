@@ -226,7 +226,7 @@ type CategoricalSpace struct {
 }
 
 type Parameter struct {
-	// name is the name of the hyperparameter.
+	// name is the name of the hyperparameter. Only letters, digits and underscores are allowed, and it cannot start with a digit.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=64
 	// +kubebuilder:validation:Pattern="^[A-Za-z_][A-Za-z0-9_]*$"
