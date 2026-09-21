@@ -122,8 +122,13 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	setSuspendedCondition(&trainJob)
 
-	if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
-		err = errors.Join(err, statusErr)
+	// The runtime is only derived from the registry, so it is nil when the runtimeRef is
+	// unsupported. The failed condition set above is the status in that case, and deriving
+	// it from the runtime would dereference a nil interface.
+	if ok {
+		if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
+			err = errors.Join(err, statusErr)
+		}
 	}
 
 	deadlineResult := r.reconcileDeadline(ctx, &trainJob)
