@@ -30,4 +30,4 @@ spec:
           secret:
             name: kubeflow-trainer-webhook-cert
             key: ca.crt
-        serverName: kubeflow-trainer-controller-manager..svc
+        serverName: kubeflow-trainer-controller-manager.kubeflow-system.svc
