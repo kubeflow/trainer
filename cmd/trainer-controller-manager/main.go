@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"errors"
 	"flag"
 	"net/http"
@@ -46,6 +47,7 @@ import (
 	runtimecore "github.com/kubeflow/trainer/v2/pkg/runtime/core"
 	"github.com/kubeflow/trainer/v2/pkg/statusserver"
 	"github.com/kubeflow/trainer/v2/pkg/util/cert"
+	"github.com/kubeflow/trainer/v2/pkg/util/tlsconfig"
 	"github.com/kubeflow/trainer/v2/pkg/webhooks"
 )
 
@@ -71,6 +73,9 @@ func init() {
 func main() {
 	var configFile string
 	var featureGates string
+	var tlsMinVersion string
+	var tlsCipherSuites string
+	var tlsCurvePreferences string
 
 	flag.StringVar(&configFile, "config", "",
 		"The controller will load its initial configuration from this file. "+
@@ -79,6 +84,9 @@ func main() {
 	flag.StringVar(&featureGates, "feature-gates", "",
 		"A comma-separated list of key=value pairs that describe feature gates. "+
 			"Command-line feature gates override those specified in the config file.")
+	flag.StringVar(&tlsMinVersion, "tlsMinVersion", "", "Override the minimum TLS version for all controller TLS servers (VersionTLS12 or VersionTLS13).")
+	flag.StringVar(&tlsCipherSuites, "tlsCipherSuites", "", "Override TLS cipher suites for all controller TLS servers using comma-separated Go cipher names. TLS 1.3 cipher suites cannot be configured.")
+	flag.StringVar(&tlsCurvePreferences, "tlsCurvePreferences", "", "Override TLS curve preferences for all controller TLS servers using comma-separated numeric Go CurveID values.")
 
 	zapOpts := zap.Options{
 		TimeEncoder: zapcore.RFC3339NanoTimeEncoder,
@@ -94,6 +102,18 @@ func main() {
 	if err != nil {
 		setupLog.Error(err, "Unable to load configuration")
 		os.Exit(1)
+	}
+	configMinVersion := ""
+	if cfg.TLS != nil {
+		configMinVersion = cfg.TLS.MinVersion
+	}
+	flagTLSOpts, err := tlsconfig.FromFlags(configMinVersion, tlsMinVersion, tlsCipherSuites, tlsCurvePreferences)
+	if err != nil {
+		setupLog.Error(err, "Unable to parse TLS command-line options")
+		os.Exit(1)
+	}
+	if flagTLSOpts != nil {
+		config.ApplyTLSOptions(&options, &cfg, flagTLSOpts)
 	}
 
 	// Set feature gates from config file first
@@ -156,7 +176,7 @@ func main() {
 	}
 
 	// Set up controllers and other components using goroutines to start the manager quickly.
-	go setupManagerComponents(mgr, runtimes, &cfg, certsReady)
+	go setupManagerComponents(mgr, runtimes, &cfg, certsReady, flagTLSOpts)
 
 	setupLog.Info("Starting manager")
 	if err = mgr.Start(ctx); err != nil {
@@ -165,7 +185,7 @@ func main() {
 	}
 }
 
-func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, cfg *configapi.Configuration, certsReady <-chan struct{}) {
+func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtime, cfg *configapi.Configuration, certsReady <-chan struct{}, optionalTLSOpts ...func(*tls.Config)) {
 	setupLog.Info("Waiting for certificate generation to complete")
 	<-certsReady
 	setupLog.Info("Certs ready")
@@ -179,13 +199,13 @@ func setupManagerComponents(mgr ctrl.Manager, runtimes map[string]runtime.Runtim
 		os.Exit(1)
 	}
 
-	if err := metrics.SetupServer(mgr, &cfg.Metrics, cfg.TLS); err != nil {
+	if err := metrics.SetupServer(mgr, &cfg.Metrics, cfg.TLS, optionalTLSOpts...); err != nil {
 		setupLog.Error(err, "Could not create metrics server")
 		os.Exit(1)
 	}
 
 	if features.Enabled(features.TrainJobStatus) {
-		if err := statusserver.SetupServer(mgr, cfg.StatusServer, cfg.TLS); err != nil {
+		if err := statusserver.SetupServer(mgr, cfg.StatusServer, cfg.TLS, optionalTLSOpts...); err != nil {
 			setupLog.Error(err, "Could not create runtime status server")
 			os.Exit(1)
 		}
