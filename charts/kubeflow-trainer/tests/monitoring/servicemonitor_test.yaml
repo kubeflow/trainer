@@ -1,0 +1,53 @@
+# Copyright 2026 The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Test ServiceMonitor
+
+templates:
+  - monitoring/servicemonitor.yaml
+
+release:
+  name: kubeflow-trainer
+  namespace: kubeflow-system
+
+tests:
+  - it: Should not create a ServiceMonitor by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: Should create a TLS ServiceMonitor when enabled
+    set:
+      metrics.serviceMonitor.enabled: true
+    asserts:
+      - containsDocument:
+          apiVersion: monitoring.coreos.com/v1
+          kind: ServiceMonitor
+          name: kubeflow-trainer-metrics-monitor
+          namespace: kubeflow-system
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: kubeflow-trainer
+      - equal:
+          path: spec.endpoints[0].port
+          value: monitoring-port
+      - equal:
+          path: spec.endpoints[0].scheme
+          value: https
+      - equal:
+          path: spec.endpoints[0].tlsConfig.ca.secret.name
+          value: kubeflow-trainer-webhook-cert
+      - equal:
+          path: spec.endpoints[0].tlsConfig.serverName
+          value: kubeflow-trainer-controller-manager.kubeflow-system.svc

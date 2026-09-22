@@ -18,28 +18,4 @@ kind: Kustomization
 namespace: kubeflow-system
 
 resources:
-  - ../manager
   - monitor.yaml
-
-patches:
-  - path: service-labels-patch.yaml
-    target:
-      group: ""
-      version: v1
-      kind: Service
-      name: kubeflow-trainer-controller-manager
-
-replacements:
-  - source:
-      kind: Service
-      name: kubeflow-trainer-controller-manager
-      fieldPath: metadata.namespace
-    targets:
-      - select:
-          kind: ServiceMonitor
-          name: kubeflow-trainer-controller-manager-metrics-monitor
-        fieldPaths:
-          - spec.endpoints.0.tlsConfig.serverName
-        options:
-          delimiter: "."
-          index: 1

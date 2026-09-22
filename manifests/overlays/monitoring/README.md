@@ -1,7 +1,7 @@
 # Prometheus monitoring overlay
 
-This overlay adds a `ServiceMonitor` for the Trainer controller metrics
-endpoint. It expects the Prometheus Operator CRDs to be installed.
+This overlay adds a `ServiceMonitor` for an already-installed Trainer
+controller. It expects the Prometheus Operator CRDs to be installed.
 
 The endpoint uses HTTPS and validates the certificate generated for the
 `kubeflow-trainer-controller-manager` Service with the existing
