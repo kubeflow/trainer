@@ -174,13 +174,13 @@ impl Distributor {
 
     /// Sends an empty assignment to every worker that was given no data files.
     ///
-    /// `distribute_data_files` routes each assignment by the `worker_ids` column of
-    /// the batch that carries it, so a worker that holds no data files is never a
-    /// destination. Such a worker never handles a `do_put`, never registers its
-    /// memtable and therefore fails its readiness probe for the lifetime of the pod,
-    /// which keeps the LeaderWorkerSet from ever becoming available. Telling it
-    /// explicitly that it owns nothing lets it register an empty memtable and report
-    /// ready.
+    /// `DistributedWriterExec` (via `send_record_batch`) routes each assignment by
+    /// the `worker_ids` column of the batch that carries it, so a worker that holds
+    /// no data files is never a destination. Such a worker never handles a `do_put`,
+    /// never registers its memtable and therefore fails its readiness probe for the
+    /// lifetime of the pod, which keeps the LeaderWorkerSet from ever becoming
+    /// available. Telling it explicitly that it owns nothing lets it register an
+    /// empty memtable and report ready.
     async fn assign_empty_partitions(&self) -> Result<()> {
         let batches = self
             .ctx
@@ -192,7 +192,10 @@ impl Distributor {
         let mut assigned: HashSet<u64> = HashSet::new();
         for batch in &batches {
             let worker_ids = batch
-                .column(0)
+                .column_by_name("worker_ids")
+                .ok_or_else(|| {
+                    DataFusionError::Execution("worker_ids column not found".to_string())
+                })?
                 .as_any()
                 .downcast_ref::<UInt64Array>()
                 .ok_or_else(|| {
