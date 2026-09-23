@@ -113,9 +113,11 @@ func (c *CoScheduling) Build(ctx context.Context, info *runtime.Info, trainJob *
 		count := *ps.Count
 		totalMembers += count
 		for resName, quantity := range ps.SinglePodRequests {
-			quantity.Mul(int64(count))
+			// DeepCopy so Mul does not mutate the caller's PodSet requests.
+			scaled := quantity.DeepCopy()
+			scaled.Mul(int64(count))
 			current := totalResources[resName]
-			current.Add(quantity)
+			current.Add(scaled)
 			totalResources[resName] = current
 		}
 	}
