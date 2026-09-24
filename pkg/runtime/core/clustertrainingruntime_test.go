@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	schedulerpluginsv1alpha1 "sigs.k8s.io/scheduler-plugins/apis/scheduling/v1alpha1"
 
@@ -178,6 +179,89 @@ func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 
 			if diff := cmp.Diff(tc.wantObjs, resultObjs, cmpOpts...); len(diff) != 0 {
 				t.Errorf("Unexpected objects (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestClusterTrainingRuntimeValidateObjects(t *testing.T) {
+	validRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj()
+
+	deprecatedRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("deprecated-runtime").Obj()
+	deprecatedRuntime.Labels = map[string]string{
+		constants.LabelSupport: constants.SupportDeprecated,
+	}
+
+	cases := map[string]struct {
+		trainJob        *trainer.TrainJob
+		existingRuntime *trainer.ClusterTrainingRuntime
+		wantErrs        field.ErrorList
+		wantWarnings    admission.Warnings
+	}{
+		"succeeds when runtime exists and is valid": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				Obj(),
+			existingRuntime: validRuntime,
+			wantErrs:        nil,
+			wantWarnings:    nil,
+		},
+		"returns field error when runtime does not exist": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "nonexistent-runtime").
+				Obj(),
+			existingRuntime: nil,
+			wantErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "RuntimeRef"), trainer.RuntimeRef{
+					Name:     "nonexistent-runtime",
+					APIGroup: ptr.To(trainer.GroupVersion.Group),
+					Kind:     ptr.To(trainer.ClusterTrainingRuntimeKind),
+				}, ""),
+			},
+			wantWarnings: nil,
+		},
+		"returns warning when runtime is deprecated": {
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "deprecated-runtime").
+				Obj(),
+			existingRuntime: deprecatedRuntime,
+			wantErrs:        nil,
+			wantWarnings: admission.Warnings{
+				`Referenced ClusterTrainingRuntime "deprecated-runtime" is deprecated and will be removed in a future release of Kubeflow Trainer. See runtime deprecation policy: ` + constants.RuntimeDeprecationPolicyURL,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			clientBuilder := testingutil.NewClientBuilder()
+			if tc.existingRuntime != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.existingRuntime)
+			}
+			c := clientBuilder.Build()
+
+			// Initialize the runtime factory (ClusterTrainingRuntime requires TrainingRuntime to be initialized first)
+			_, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize TrainingRuntime: %v", err)
+			}
+
+			clTrainingRuntime, err := NewClusterTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			warnings, fieldErrors := clTrainingRuntime.ValidateObjects(ctx, nil, tc.trainJob)
+
+			if diff := cmp.Diff(tc.wantErrs, fieldErrors, cmpopts.IgnoreFields(field.Error{}, "Detail")); diff != "" {
+				t.Errorf("Unexpected field errors (-want,+got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff(tc.wantWarnings, warnings); diff != "" {
+				t.Errorf("Unexpected warnings (-want,+got):\n%s", diff)
 			}
 		})
 	}
