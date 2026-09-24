@@ -164,9 +164,11 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		count := *ps.Count
 		totalMembers += count
 		for resName, quantity := range ps.SinglePodRequests {
-			quantity.Mul(int64(count))
+			// DeepCopy so Mul does not mutate the caller's Info.TemplateSpec resources.
+			scaled := quantity.DeepCopy()
+			scaled.Mul(int64(count))
 			current := totalResources[resName]
-			current.Add(quantity)
+			current.Add(scaled)
 			totalResources[resName] = current
 		}
 	}
@@ -197,7 +199,7 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 	if volcanoSpec.NetworkTopology != nil {
 		pg.Spec.WithNetworkTopology(volcanov1beta1ac.NetworkTopologySpec().
 			WithMode(volcanoSpec.NetworkTopology.Mode).
-			WithHighestTierAllowed(*volcanoSpec.NetworkTopology.HighestTierAllowed))
+			WithHighestTierAllowed(ptr.Deref(volcanoSpec.NetworkTopology.HighestTierAllowed, 1)))
 	}
 
 	pg.WithOwnerReferences(metav1ac.OwnerReference().
