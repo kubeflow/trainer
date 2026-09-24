@@ -95,8 +95,9 @@ spec:
                 items:
                   properties:
                     name:
-                      description: name is the name of the hyperparameter. Only letters, digits and
-                        underscores are allowed, and it cannot start with a digit.
+                      description: name is the name of the hyperparameter. Only letters,
+                        digits and underscores are allowed, and it cannot start with
+                        a digit.
                       maxLength: 64
                       minLength: 1
                       pattern: ^[A-Za-z_][A-Za-z0-9_]*$
