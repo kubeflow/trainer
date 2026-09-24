@@ -25,6 +25,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -33,6 +35,7 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	jobruntimes "github.com/kubeflow/trainer/v2/pkg/runtime"
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
@@ -211,5 +214,53 @@ func TestReconcileDeadline(t *testing.T) {
 				t.Errorf("Expected the child JobSet to be absent, got error: %v", gotJobSetErr)
 			}
 		})
+	}
+}
+
+// TestReconcileUnsupportedRuntime covers the branch where spec.runtimeRef resolves to no
+// registered runtime. The reconciler reports that with a failed condition, so it must not
+// also derive the status from the runtime it did not find.
+func TestReconcileUnsupportedRuntime(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "unsupported-job").
+		RuntimeRef(schema.GroupVersionKind{
+			Group: "example.com",
+			Kind:  "NoSuchRuntime",
+		}, "no-such-runtime").
+		Obj()
+
+	cli := utiltesting.NewClientBuilder().
+		WithObjects(trainJob).
+		WithStatusSubresource(trainJob).
+		Build()
+
+	r := &TrainJobReconciler{
+		client:   cli,
+		recorder: events.NewFakeRecorder(1),
+		clock:    clocktesting.NewFakePassiveClock(time.Now()),
+		// Empty registry: nothing matches the runtimeRef above.
+		runtimes: map[string]jobruntimes.Runtime{},
+	}
+
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(trainJob)})
+	if err == nil {
+		t.Fatal("Expected an error for the unsupported runtime, got nil")
+	}
+
+	var got trainer.TrainJob
+	if getErr := cli.Get(ctx, client.ObjectKeyFromObject(trainJob), &got); getErr != nil {
+		t.Fatalf("Unexpected error getting the TrainJob: %v", getErr)
+	}
+	wantConditions := []metav1.Condition{{
+		Type:    trainer.TrainJobFailed,
+		Status:  metav1.ConditionTrue,
+		Message: "unsupported runtime: NoSuchRuntime.example.com",
+		Reason:  trainer.TrainJobRuntimeNotSupportedReason,
+	}}
+	if diff := cmp.Diff(wantConditions, got.Status.Conditions,
+		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime", "ObservedGeneration"),
+	); len(diff) != 0 {
+		t.Errorf("Unexpected TrainJob conditions (-want, +got): \n%s", diff)
 	}
 }
