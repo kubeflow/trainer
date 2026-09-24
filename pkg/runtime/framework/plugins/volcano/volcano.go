@@ -19,7 +19,6 @@ package volcano
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -257,7 +256,10 @@ func (h *PodGroupRuntimeClassHandler) queueSuspendedTrainJobs(ctx context.Contex
 	var trainJobs []trainer.TrainJob
 	for _, trainingRuntime := range trainingRuntimes.Items {
 		var trainJobsWithTrainingRuntime trainer.TrainJobList
-		err := h.client.List(ctx, &trainJobsWithTrainingRuntime, client.MatchingFields{indexer.TrainJobRuntimeRefKey: trainingRuntime.Name})
+		err := h.client.List(ctx, &trainJobsWithTrainingRuntime,
+			client.InNamespace(trainingRuntime.Namespace),
+			client.MatchingFields{indexer.TrainJobRuntimeRefKey: trainingRuntime.Name},
+		)
 		if err != nil {
 			return err
 		}
@@ -271,13 +273,17 @@ func (h *PodGroupRuntimeClassHandler) queueSuspendedTrainJobs(ctx context.Contex
 		}
 		trainJobs = append(trainJobs, trainJobsWithClTrainingRuntime.Items...)
 	}
-	trainJobs = slices.CompactFunc(trainJobs, func(a, b trainer.TrainJob) bool {
-		return a.Name == b.Name
-	})
+	queuedTrainJobs := make(map[client.ObjectKey]struct{}, len(trainJobs))
 	for _, trainJob := range trainJobs {
-		if ptr.Deref(trainJob.Spec.Suspend, false) {
-			q.Add(reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&trainJob)})
+		if !ptr.Deref(trainJob.Spec.Suspend, false) {
+			continue
 		}
+		key := client.ObjectKeyFromObject(&trainJob)
+		if _, queued := queuedTrainJobs[key]; queued {
+			continue
+		}
+		q.Add(reconcile.Request{NamespacedName: key})
+		queuedTrainJobs[key] = struct{}{}
 	}
 	return nil
 }
