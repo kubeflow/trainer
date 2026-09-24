@@ -93,6 +93,32 @@ manager:
     traffic.sidecar.istio.io/excludeInboundPorts: "9443"
 ```
 
+### Grafana dashboard
+
+The chart can optionally install Grafana dashboards (as ConfigMaps) for controller health and TrainJob lifecycle observability.
+Dashboards are disabled by default and are intended for clusters that run Grafana with a dashboard sidecar that imports dashboards from labeled ConfigMaps.
+
+To enable all dashboards:
+
+```bash
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+  --version 2.1.0 \
+  --set grafanaDashboard.defaultEnabled=true
+```
+
+To enable specific dashboards:
+
+```bash
+helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
+  --version 2.1.0 \
+  --set grafanaDashboard.controllerHealth.enabled=true
+```
+
+> **Prerequisite:** Prometheus must be configured to scrape the controller's
+> metrics endpoint (port 8443, HTTPS). The chart does not include a ServiceMonitor.
+
+If your Grafana sidecar uses a different label selector, override `grafanaDashboard.labels` accordingly.
+
 ## Values
 
 | Key | Type | Default | Description |
@@ -128,6 +154,11 @@ manager:
 | manager.config.statusServer.qps | int | `5` | QPS rate limit for the TrainJob Status Server api client |
 | manager.config.statusServer.burst | int | `10` | Burst rate limit for the TrainJob Status Server api client |
 | webhook.failurePolicy | string | `"Fail"` | Specifies how unrecognized errors are handled. Available options are `Ignore` or `Fail`. |
+| grafanaDashboard.defaultEnabled | bool | `false` | Enable all default Grafana dashboards when set to true. Individual dashboard settings will be ignored if this is enabled. Intended for environments running Grafana with sidecar dashboard auto-discovery. |
+| grafanaDashboard.labels | object | `{"grafana_dashboard":"1"}` | Labels applied to the dashboard ConfigMaps. Match your Grafana sidecar label selector. |
+| grafanaDashboard.annotations | object | `{}` | Annotations applied to the dashboard ConfigMaps. Use to set Grafana folder: grafana_folder: "Kubeflow" |
+| grafanaDashboard.controllerHealth | object | `{"enabled":false}` | Controller health and TrainJob lifecycle dashboard |
+| grafanaDashboard.controllerHealth.enabled | bool | `false` | Enable deployment of the controller health dashboard |
 | dataCache.enabled | bool | `false` | Enable/disable data cache support (LWS dependency, ClusterRole). Set to `true` to install data cache components. |
 | dataCache.lws.install | bool | `true` | Whether to install LeaderWorkerSet as a dependency. Set to `false` if LeaderWorkerSet is already installed in the cluster. |
 | dataCache.lws.fullnameOverride | string | `"lws"` | String to fully override LeaderWorkerSet release name. |
