@@ -55,12 +55,18 @@ func wantJobSetWithMergedGPU(ns, name, uid string, requests corev1.ResourceList,
 		NumNodes(1).
 		Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, requests).
 		Obj()
-	for i := range jobSet.Spec.ReplicatedJobs {
-		if jobSet.Spec.ReplicatedJobs[i].Name != constants.Node {
+	setNodeGPULimit(jobSet.Spec.ReplicatedJobs, gpu)
+	return jobSet
+}
+
+// setNodeGPULimit sets the nvidia.com/gpu limit on the node container of the node replicated job.
+func setNodeGPULimit(rJobs []jobsetv1alpha2.ReplicatedJob, gpu string) {
+	for i := range rJobs {
+		if rJobs[i].Name != constants.Node {
 			continue
 		}
-		for j := range jobSet.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers {
-			container := &jobSet.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[j]
+		for j := range rJobs[i].Template.Spec.Template.Spec.Containers {
+			container := &rJobs[i].Template.Spec.Template.Spec.Containers[j]
 			if container.Name != constants.Node {
 				continue
 			}
@@ -68,10 +74,9 @@ func wantJobSetWithMergedGPU(ns, name, uid string, requests corev1.ResourceList,
 				container.Resources.Limits = corev1.ResourceList{}
 			}
 			container.Resources.Limits["nvidia.com/gpu"] = resource.MustParse(gpu)
-			return jobSet
+			return
 		}
 	}
-	return jobSet
 }
 
 func TestTrainingRuntimeNewObjects(t *testing.T) {
@@ -2109,6 +2114,86 @@ test-job-node-0-1.test-job slots=8
 					).
 					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
 					Obj(),
+			},
+		},
+		"merged resourcesPerNode keeps the runtime GPUs for the Torch plugin when trainjob overrides only cpu": {
+			trainingRuntime: func() *trainer.TrainingRuntime {
+				trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").RuntimeSpec(
+					testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Spec).
+						WithMLPolicy(
+							testingutil.MakeMLPolicyWrapper().
+								WithNumNodes(1).
+								WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+									TorchPolicy().
+									Obj(),
+								).
+								Obj(),
+						).
+						Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+						Obj(),
+				).Obj()
+				setNodeGPULimit(trainingRuntime.Spec.Template.Spec.ReplicatedJobs, "4")
+				return trainingRuntime
+			}(),
+			trainJob: func() *trainer.TrainJob {
+				trainerSpec := testingutil.MakeTrainJobTrainerWrapper().
+					NumNodes(1).
+					Obj()
+				trainerSpec.ResourcesPerNode = &corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("8"),
+					},
+				}
+				return testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+					UID("uid").
+					RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+					Trainer(trainerSpec).
+					Obj()
+			}(),
+			wantObjs: []runtime.Object{
+				func() *jobsetv1alpha2.JobSet {
+					jobSet := testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
+						ControllerReference(trainer.SchemeGroupVersion.WithKind(trainer.TrainJobKind), "test-job", "uid").
+						Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node, constants.Launcher).
+						Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
+						Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
+						NumNodes(1).
+						Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("8"),
+						}).
+						ContainerTrainerPorts([]corev1.ContainerPort{{ContainerPort: constants.ContainerTrainerPort}}).
+						Env(constants.Node, constants.Node,
+							[]corev1.EnvVar{
+								{
+									Name:  constants.TorchEnvNumNodes,
+									Value: "1",
+								},
+								{
+									Name:  constants.TorchEnvNumProcPerNode,
+									Value: "auto",
+								},
+								{
+									Name: constants.TorchEnvNodeRank,
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: constants.JobCompletionIndexFieldPath,
+										},
+									},
+								},
+								{
+									Name:  constants.TorchEnvMasterAddr,
+									Value: fmt.Sprintf("test-job-%s-0-0.test-job", constants.Node),
+								},
+								{
+									Name:  constants.TorchEnvMasterPort,
+									Value: fmt.Sprintf("%d", constants.ContainerTrainerPort),
+								},
+							}...,
+						).
+						Obj()
+					setNodeGPULimit(jobSet.Spec.ReplicatedJobs, "4")
+					return jobSet
+				}(),
 			},
 		},
 		"merged resourcesPerNode keeps runtime resources when trainjob sets gpu only": {

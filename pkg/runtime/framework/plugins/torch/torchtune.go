@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
@@ -54,9 +53,9 @@ func validateTorchTune(runtimeInfo *runtime.Info, newObj *trainer.TrainJob) (adm
 	if newObj.Spec.Trainer.NumProcPerNode != nil {
 		numProcPerNode = intstr.FromInt32(*newObj.Spec.Trainer.NumProcPerNode)
 	}
-	resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(runtimeInfo), corev1.ResourceRequirements{})
-	if jobTrainer := newObj.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
-		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
+	resourcesPerNode, err := runtime.ResourcesPerNode(runtimeInfo, newObj)
+	if err != nil {
+		return nil, append(allErrs, field.InternalError(specPath.Child("trainer").Child("resourcesPerNode"), err))
 	}
 	_, config := getRecipeAndConfig(numNodes, numProcPerNode, runtime.GetNumGPUPerNode(&resourcesPerNode), newObj)
 	if strings.Contains(config, constants.TorchTuneQLoRAFinetuneDistributedConfigSuffix) {

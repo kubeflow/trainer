@@ -31,6 +31,7 @@ import (
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	trainingruntimeutil "github.com/kubeflow/trainer/v2/pkg/util/trainingruntime"
 )
 
 type Info struct {
@@ -283,6 +284,20 @@ func ExtractResourcePerNodeFromRuntime(info *Info) *corev1.ResourceRequirements 
 		}
 	}
 	return nil
+}
+
+// ResourcesPerNode returns the resources of the trainer node container after the TrainJob's
+// resourcesPerNode has been overlaid on the runtime's values, key by key.
+// Plugins must resolve resources through this function rather than reading
+// trainJob.Spec.Trainer.ResourcesPerNode directly: a TrainJob that overrides only some keys
+// (for example cpu) still runs with the accelerators the runtime declares, and those are what
+// the plugins must size their processes for.
+func ResourcesPerNode(info *Info, trainJob *trainer.TrainJob) (corev1.ResourceRequirements, error) {
+	resources := ptr.Deref(ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
+	if trainJob == nil || trainJob.Spec.Trainer == nil || trainJob.Spec.Trainer.ResourcesPerNode == nil {
+		return resources, nil
+	}
+	return trainingruntimeutil.MergeResourceRequirements(resources, *trainJob.Spec.Trainer.ResourcesPerNode)
 }
 
 // GetNumGPUPerNode returns the GPU count if found in container resources.

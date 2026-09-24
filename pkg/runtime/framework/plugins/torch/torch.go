@@ -124,9 +124,9 @@ func (t *Torch) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) 
 	}
 
 	// Determine numProcPerNode based on the resourcesPerNode.
-	resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
-	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
-		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
+	resourcesPerNode, err := runtime.ResourcesPerNode(info, trainJob)
+	if err != nil {
+		return err
 	}
 	gpuQ := runtime.GetNumGPUPerNode(&resourcesPerNode)
 	// If no GPU is set in resource, calculate numProcPerNode based on CPU.
