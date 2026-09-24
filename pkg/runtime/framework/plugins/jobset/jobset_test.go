@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	batchv1ac "k8s.io/client-go/applyconfigurations/batch/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -38,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
+	jobsetconsts "sigs.k8s.io/jobset/pkg/constants"
 
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
@@ -47,10 +49,7 @@ import (
 	utiltesting "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
-// TODO: Add tests for all Interfaces.
-// REF: https://github.com/kubeflow/trainer/issues/2468
-
-func TestJobSet(t *testing.T) {
+func TestPreBuildSync(t *testing.T) {
 	cases := map[string]struct {
 		trainJob  *trainer.TrainJob
 		info      *runtime.Info
@@ -61,7 +60,7 @@ func TestJobSet(t *testing.T) {
 			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
 				Obj(),
 		},
-		"no action when trainJob is not nil": {
+		"no action when trainJob is nil": {
 			info: &runtime.Info{
 				Labels: map[string]string{"key": "value"},
 			},
@@ -464,6 +463,135 @@ func TestJobSet(t *testing.T) {
 									WithSpec(batchv1ac.JobSpec().
 										WithParallelism(1).
 										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+		},
+		"endpoints are calculated for multiple replicas and replicated jobs": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Obj(),
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](2),
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(2).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(1).
+										WithCompletions(1).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+			wantInfo: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  constants.Node,
+							Count: ptr.To[int32](2),
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-node-0-0.trainJob")
+								yield("trainJob-node-0-1.trainJob")
+								yield("trainJob-node-1-0.trainJob")
+								yield("trainJob-node-1-1.trainJob")
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithReplicas(2).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(2).
+										WithCompletions(2).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+		},
+		"default pod count is used for endpoints when podSet count is nil": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				Obj(),
+			info: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name: constants.Node,
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(2).
+										WithCompletions(2).
+										WithTemplate(corev1ac.PodTemplateSpec().
+											WithSpec(corev1ac.PodSpec().
+												WithContainers(
+													corev1ac.Container().WithName(constants.Node),
+												),
+											),
+										),
+									),
+								),
+						),
+				},
+			},
+			wantInfo: &runtime.Info{
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name: constants.Node,
+							Endpoints: func(yield func(string) bool) {
+								yield("trainJob-node-0-0.trainJob")
+							},
+						},
+					},
+					ObjApply: jobsetv1alpha2ac.JobSetSpec().
+						WithReplicatedJobs(
+							jobsetv1alpha2ac.ReplicatedJob().
+								WithName(constants.Node).
+								WithTemplate(batchv1ac.JobTemplateSpec().
+									WithSpec(batchv1ac.JobSpec().
+										WithParallelism(2).
+										WithCompletions(2).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
@@ -2595,6 +2723,311 @@ func TestBuild(t *testing.T) {
 				}),
 			); len(diff) != 0 {
 				t.Errorf("Unexpected objects from Build (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestReconcilerBuilders(t *testing.T) {
+	cases := map[string]struct {
+		wantBuilders int
+	}{
+		"jobset plugin returns a reconciler builder to watch JobSets": {
+			wantBuilders: 1,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+			cli := utiltesting.NewClientBuilder().Build()
+			p, err := New(ctx, cli, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+			builders := p.(framework.WatchExtensionPlugin).ReconcilerBuilders()
+			if len(builders) != tc.wantBuilders {
+				t.Errorf("Unexpected number of reconciler builders: want %d, got %d", tc.wantBuilders, len(builders))
+			}
+			for i, b := range builders {
+				if b == nil {
+					t.Errorf("Reconciler builder at index %d is nil", i)
+				}
+			}
+		})
+	}
+}
+
+func TestStatus(t *testing.T) {
+	lastTransitionTime := metav1.Now().Rfc3339Copy()
+	errorGetJobSetFromAPI := fmt.Errorf("failed to get JobSet from API during Status")
+	errorJobSetNotFound := apierrors.NewNotFound(
+		schema.GroupResource{Group: jobsetv1alpha2.GroupVersion.Group, Resource: "jobsets"}, "testing")
+	cases := map[string]struct {
+		trainJob   *trainer.TrainJob
+		jobSet     *jobsetv1alpha2.JobSet
+		clientErr  error
+		wantStatus *trainer.TrainJobStatus
+		wantError  error
+	}{
+		"error when getting JobSet fails": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				Obj(),
+			clientErr: errorGetJobSetFromAPI,
+			wantError: errorGetJobSetFromAPI,
+		},
+		"nil status when JobSet is not found and TrainJob is finished": {
+			trainJob: func() *trainer.TrainJob {
+				trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").Obj()
+				trainJob.Status.Conditions = []metav1.Condition{{
+					Type:               trainer.TrainJobComplete,
+					Status:             metav1.ConditionTrue,
+					LastTransitionTime: lastTransitionTime,
+					Reason:             jobsetconsts.AllJobsCompletedReason,
+					Message:            jobsetconsts.AllJobsCompletedMessage,
+				}}
+				return trainJob
+			}(),
+		},
+		"error when JobSet is not found and TrainJob is not finished": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				Obj(),
+			clientErr: errorJobSetNotFound,
+			wantError: errorJobSetNotFound,
+		},
+		"empty status when JobSet has no terminal condition": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				Obj(),
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				Conditions(metav1.Condition{
+					Type:    string(jobsetv1alpha2.JobSetSuspended),
+					Reason:  jobsetconsts.JobSetSuspendedReason,
+					Message: jobsetconsts.JobSetSuspendedMessage,
+					Status:  metav1.ConditionFalse,
+				}).
+				Obj(),
+			wantStatus: &trainer.TrainJobStatus{},
+		},
+		"empty status when JobSet completed condition is not true": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				Obj(),
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				Conditions(metav1.Condition{
+					Type:               string(jobsetv1alpha2.JobSetCompleted),
+					LastTransitionTime: lastTransitionTime,
+					Message:            jobsetconsts.AllJobsCompletedMessage,
+					Reason:             jobsetconsts.AllJobsCompletedReason,
+					Status:             metav1.ConditionFalse,
+				}).
+				Obj(),
+			wantStatus: &trainer.TrainJobStatus{},
+		},
+		"complete condition is mapped from the JobSet completed condition": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				Obj(),
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				Conditions(metav1.Condition{
+					Type:               string(jobsetv1alpha2.JobSetCompleted),
+					LastTransitionTime: lastTransitionTime,
+					Message:            jobsetconsts.AllJobsCompletedMessage,
+					Reason:             jobsetconsts.AllJobsCompletedReason,
+					Status:             metav1.ConditionTrue,
+				}).
+				Obj(),
+			wantStatus: &trainer.TrainJobStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               trainer.TrainJobComplete,
+						LastTransitionTime: lastTransitionTime,
+						Message:            jobsetconsts.AllJobsCompletedMessage,
+						Reason:             jobsetconsts.AllJobsCompletedReason,
+						Status:             metav1.ConditionTrue,
+					},
+				},
+			},
+		},
+		"failed condition is mapped from the JobSet failed condition": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				Obj(),
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				Conditions(metav1.Condition{
+					Type:               string(jobsetv1alpha2.JobSetFailed),
+					LastTransitionTime: lastTransitionTime,
+					Message:            jobsetconsts.FailedJobsMessage,
+					Reason:             jobsetconsts.FailedJobsReason,
+					Status:             metav1.ConditionTrue,
+				}).
+				Obj(),
+			wantStatus: &trainer.TrainJobStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               trainer.TrainJobFailed,
+						LastTransitionTime: lastTransitionTime,
+						Message:            jobsetconsts.FailedJobsMessage,
+						Reason:             jobsetconsts.FailedJobsReason,
+						Status:             metav1.ConditionTrue,
+					},
+				},
+			},
+		},
+		"jobs status is mapped from multiple replicated jobs statuses": {
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").
+				Obj(),
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				ReplicatedJobsStatuses([]jobsetv1alpha2.ReplicatedJobStatus{
+					{
+						Name:      constants.DatasetInitializer,
+						Ready:     1,
+						Succeeded: 1,
+						Failed:    0,
+						Active:    0,
+						Suspended: 0,
+					},
+					{
+						Name:      constants.Node,
+						Ready:     2,
+						Succeeded: 0,
+						Failed:    1,
+						Active:    2,
+						Suspended: 0,
+					},
+				}).
+				Obj(),
+			wantStatus: &trainer.TrainJobStatus{
+				JobsStatus: []trainer.JobStatus{
+					{
+						Name:      constants.DatasetInitializer,
+						Ready:     ptr.To[int32](1),
+						Succeeded: ptr.To[int32](1),
+						Failed:    ptr.To[int32](0),
+						Active:    ptr.To[int32](0),
+						Suspended: ptr.To[int32](0),
+					},
+					{
+						Name:      constants.Node,
+						Ready:     ptr.To[int32](2),
+						Succeeded: ptr.To[int32](0),
+						Failed:    ptr.To[int32](1),
+						Active:    ptr.To[int32](2),
+						Suspended: ptr.To[int32](0),
+					},
+				},
+			},
+		},
+		"stale TrainJob jobs status is replaced by the JobSet replicated jobs status": {
+			trainJob: func() *trainer.TrainJob {
+				trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").Obj()
+				trainJob.Status.JobsStatus = []trainer.JobStatus{{
+					Name:      "stale-job",
+					Ready:     ptr.To[int32](0),
+					Succeeded: ptr.To[int32](0),
+					Failed:    ptr.To[int32](0),
+					Active:    ptr.To[int32](5),
+					Suspended: ptr.To[int32](0),
+				}}
+				return trainJob
+			}(),
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				ReplicatedJobsStatuses([]jobsetv1alpha2.ReplicatedJobStatus{
+					{
+						Name:      constants.Node,
+						Ready:     1,
+						Succeeded: 0,
+						Failed:    0,
+						Active:    1,
+						Suspended: 0,
+					},
+				}).
+				Obj(),
+			wantStatus: &trainer.TrainJobStatus{
+				JobsStatus: []trainer.JobStatus{
+					{
+						Name:      constants.Node,
+						Ready:     ptr.To[int32](1),
+						Succeeded: ptr.To[int32](0),
+						Failed:    ptr.To[int32](0),
+						Active:    ptr.To[int32](1),
+						Suspended: ptr.To[int32](0),
+					},
+				},
+			},
+		},
+		"existing TrainJob status conditions are preserved": {
+			trainJob: func() *trainer.TrainJob {
+				trainJob := utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "testing").Obj()
+				trainJob.Status.Conditions = []metav1.Condition{{
+					Type:               trainer.TrainJobSuspended,
+					Status:             metav1.ConditionFalse,
+					LastTransitionTime: lastTransitionTime,
+					Reason:             trainer.TrainJobResumedReason,
+					Message:            "TrainJob is resumed",
+				}}
+				return trainJob
+			}(),
+			jobSet: utiltesting.MakeJobSetWrapper(metav1.NamespaceDefault, "testing").
+				Conditions(metav1.Condition{
+					Type:               string(jobsetv1alpha2.JobSetCompleted),
+					LastTransitionTime: lastTransitionTime,
+					Message:            jobsetconsts.AllJobsCompletedMessage,
+					Reason:             jobsetconsts.AllJobsCompletedReason,
+					Status:             metav1.ConditionTrue,
+				}).
+				Obj(),
+			wantStatus: &trainer.TrainJobStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               trainer.TrainJobSuspended,
+						Status:             metav1.ConditionFalse,
+						LastTransitionTime: lastTransitionTime,
+						Reason:             trainer.TrainJobResumedReason,
+						Message:            "TrainJob is resumed",
+					},
+					{
+						Type:               trainer.TrainJobComplete,
+						LastTransitionTime: lastTransitionTime,
+						Message:            jobsetconsts.AllJobsCompletedMessage,
+						Reason:             jobsetconsts.AllJobsCompletedReason,
+						Status:             metav1.ConditionTrue,
+					},
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+
+			clientBuilder := utiltesting.NewClientBuilder()
+			if tc.jobSet != nil {
+				clientBuilder = clientBuilder.WithObjects(tc.jobSet)
+			}
+			if tc.clientErr != nil {
+				clientBuilder = clientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+						if _, ok := obj.(*jobsetv1alpha2.JobSet); ok {
+							return tc.clientErr
+						}
+						return cli.Get(ctx, key, obj, opts...)
+					},
+				})
+			}
+			cli := clientBuilder.Build()
+
+			p, err := New(ctx, cli, nil, nil)
+			if err != nil {
+				t.Fatalf("Failed to initialize JobSet plugin: %v", err)
+			}
+			gotStatus, gotErr := p.(framework.TrainJobStatusPlugin).Status(ctx, tc.trainJob)
+			if diff := cmp.Diff(tc.wantError, gotErr, cmpopts.EquateErrors()); len(diff) != 0 {
+				t.Errorf("Unexpected error from Status (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantStatus, gotStatus); len(diff) != 0 {
+				t.Errorf("Unexpected status from Status (-want,+got):\n%s", diff)
 			}
 		})
 	}
