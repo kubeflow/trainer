@@ -49,8 +49,6 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 )
 
-// TODO : Support MPICH and IntelMPI implementations.
-
 type MPI struct {
 	client client.Client
 	scheme *apiruntime.Scheme
@@ -222,6 +220,13 @@ func (m *MPI) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 							WithName(constants.OpenMPIEnvKeyRSHArgs).
 							WithValue(constants.OpenMPIEnvDefaultValueRSHArgs),
 					)
+				case trainer.MPIImplementationMPICH, trainer.MPIImplementationIntel:
+					apply.UpsertEnvVars(
+						&info.TemplateSpec.PodSets[psIdx].Containers[cIdx].Env,
+						*corev1ac.EnvVar().
+							WithName(constants.OpenMPIEnvHostFileLocation).
+							WithValue(fmt.Sprintf("%s/%s", constants.MPIHostfileDir, constants.MPIHostfileName)),
+					)
 				default:
 					return fmt.Errorf("MPI implementation for %v doesn't supported", info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation)
 				}
@@ -320,7 +325,7 @@ func (m *MPI) buildHostFileConfigMap(info *runtime.Info, trainJob *trainer.Train
 			continue
 		}
 		switch *info.RuntimePolicy.MLPolicySource.MPI.MPIImplementation {
-		case trainer.MPIImplementationOpenMPI:
+		case trainer.MPIImplementationOpenMPI, trainer.MPIImplementationMPICH, trainer.MPIImplementationIntel:
 			for e := range ps.Endpoints {
 				fmt.Fprintf(&hostFile, "%s slots=%d\n", e, slots)
 			}
