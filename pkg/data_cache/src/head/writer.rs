@@ -109,7 +109,7 @@ pub struct DistributedWriterExec {
     input: Arc<dyn ExecutionPlan>,
     worker_map: Arc<HashMap<String, String>>,
     schema: SchemaRef,
-    plan_properties: PlanProperties,
+    plan_properties: Arc<PlanProperties>,
     config: Arc<CacheConfig>,
 }
 
@@ -139,13 +139,13 @@ impl DistributedWriterExec {
         config: Arc<CacheConfig>,
     ) -> Self {
         // TODO:// revisit plan_properties
-        let eq_properties = EquivalenceProperties::new_with_orderings(schema.clone(), &[]);
-        let plan_properties = PlanProperties::new(
+        let eq_properties = EquivalenceProperties::new(schema.clone());
+        let plan_properties = Arc::new(PlanProperties::new(
             eq_properties,                                     // Equivalence Properties
             Partitioning::UnknownPartitioning(num_partitions), // Output Partitioning
             EmissionType::Both,
             Boundedness::Bounded, // Execution Mode
-        );
+        ));
         Self {
             input,
             worker_map,
@@ -165,7 +165,7 @@ impl ExecutionPlan for DistributedWriterExec {
         self
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.plan_properties
     }
 

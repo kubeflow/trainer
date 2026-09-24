@@ -30,9 +30,10 @@ use futures::StreamExt;
 use futures::stream::iter;
 use iceberg::TableIdent;
 use iceberg::expr::Predicate;
-use iceberg::io::FileIO;
+use iceberg::io::FileIOBuilder;
 use iceberg::scan::{FileScanTask, FileScanTaskStream};
 use iceberg::table::{StaticTable, Table};
+use iceberg_storage_opendal::OpenDalResolvingStorageFactory;
 use std::any::Any;
 use std::fmt::Formatter;
 use std::sync::Arc;
@@ -91,10 +92,7 @@ impl DataFileTableProvider {
         arrow_schema: SchemaRef,
         num_workers: usize,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let file_io = FileIO::from_path(metadata_loc)
-            .map_err(|e| format!("Failed to create FileIO: {}", e))?
-            .build()
-            .map_err(|e| format!("Failed to build FileIO: {}", e))?;
+        let file_io = FileIOBuilder::new(Arc::new(OpenDalResolvingStorageFactory::new())).build();
         let table_indent = TableIdent::from_strs([schema_name, table_name])
             .map_err(|e| format!("Failed to create table ident: {}", e))?;
         let static_table = StaticTable::from_metadata_file(metadata_loc, table_indent, file_io)
@@ -195,19 +193,19 @@ pub struct DataFileTableExec {
     _predicates: Option<Predicate>,
     schema: SchemaRef,
     partitions: Arc<Vec<TaskGroup>>,
-    plan_properties: PlanProperties,
+    plan_properties: Arc<PlanProperties>,
 }
 
 impl DataFileTableExec {
     fn new(schema: SchemaRef, partitions: Arc<Vec<TaskGroup>>) -> Self {
         // TODO:// revisit plan_properties
-        let eq_properties = EquivalenceProperties::new_with_orderings(schema.clone(), &[]);
-        let plan_properties = PlanProperties::new(
+        let eq_properties = EquivalenceProperties::new(schema.clone());
+        let plan_properties = Arc::new(PlanProperties::new(
             eq_properties,
             Partitioning::UnknownPartitioning(partitions.len()), // TODO:// address partitioning during scan
             EmissionType::Both,
             Boundedness::Bounded,
-        );
+        ));
         Self {
             _projection: None,
             _predicates: None,
@@ -241,7 +239,7 @@ impl ExecutionPlan for DataFileTableExec {
         self
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.plan_properties
     }
 
@@ -497,12 +495,17 @@ mod tests {
             start: 0,
             length: record_count,
             record_count: Some(record_count),
+            file_size_in_bytes: record_count,
             data_file_path: String::from(file_path),
             schema: create_iceberg_schema(),
             project_field_ids: vec![],
             predicate: None,
             data_file_format: DataFileFormat::Parquet,
             deletes: vec![],
+            partition: None,
+            partition_spec: None,
+            name_mapping: None,
+            case_sensitive: true,
         }
     }
 
