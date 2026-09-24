@@ -122,5 +122,6 @@ async fn connect_to_host(
 ) -> Result<FlightServiceClient<Channel>, Box<dyn std::error::Error>> {
     let address = format!("{}", endpoint);
     info!("{}", address);
-    Ok(FlightServiceClient::connect(address).await?)
+    let channel = Channel::from_shared(address)?.connect().await?;
+    Ok(FlightServiceClient::new(channel))
 }
