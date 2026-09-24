@@ -66,39 +66,39 @@ func (j *Jax) EnforceMLPolicy(info *runtime.Info, trainJob *trainer.TrainJob) er
 		*trainerPS.Count = *trainJob.Spec.Trainer.NumNodes
 	}
 
-	var trainerContainer *runtime.Container
-	if trainJob.Spec.Trainer != nil {
-		if trainerContainer = info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
-			// Get the number of nodes for distributed setup
-			numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
+	// The trainer container is resolved regardless of whether the TrainJob sets
+	// spec.trainer, so a TrainJob that relies on the runtime template still gets
+	// the distributed envs and the trainer port.
+	if trainerContainer := info.FindContainerByPodSetAncestorContainerName(constants.AncestorTrainer, constants.Node); trainerContainer != nil {
+		// Get the number of nodes for distributed setup
+		numNodes := ptr.Deref(ptr.Deref(trainerPS, runtime.PodSet{}).Count, 1)
 
-			// Set JAX distributed environment variables
-			apply.UpsertEnvVars(&trainerContainer.Env,
-				// Total number of JAX processes (one per node/host)
-				*corev1ac.EnvVar().
-					WithName("JAX_NUM_PROCESSES").
-					WithValue(fmt.Sprintf("%d", numNodes)),
+		// Set JAX distributed environment variables
+		apply.UpsertEnvVars(&trainerContainer.Env,
+			// Total number of JAX processes (one per node/host)
+			*corev1ac.EnvVar().
+				WithName("JAX_NUM_PROCESSES").
+				WithValue(fmt.Sprintf("%d", numNodes)),
 
-				// Process ID - derived from job completion index
-				*corev1ac.EnvVar().
-					WithName("JAX_PROCESS_ID").
-					WithValueFrom(corev1ac.EnvVarSource().
-						WithFieldRef(corev1ac.ObjectFieldSelector().
-							WithFieldPath(constants.JobCompletionIndexFieldPath))),
+			// Process ID - derived from job completion index
+			*corev1ac.EnvVar().
+				WithName("JAX_PROCESS_ID").
+				WithValueFrom(corev1ac.EnvVarSource().
+					WithFieldRef(corev1ac.ObjectFieldSelector().
+						WithFieldPath(constants.JobCompletionIndexFieldPath))),
 
-				// Coordinator address - first pod in the headless service
-				*corev1ac.EnvVar().
-					WithName("JAX_COORDINATOR_ADDRESS").
-					WithValue(fmt.Sprintf("%s-%s-0-0.%s:%d",
-						trainJob.Name,
-						constants.Node,
-						trainJob.Name,
-						constants.ContainerTrainerPort)),
-			)
+			// Coordinator address - first pod in the headless service
+			*corev1ac.EnvVar().
+				WithName("JAX_COORDINATOR_ADDRESS").
+				WithValue(fmt.Sprintf("%s-%s-0-0.%s:%d",
+					trainJob.Name,
+					constants.Node,
+					trainJob.Name,
+					constants.ContainerTrainerPort)),
+		)
 
-			// Add container port for the headless service (needed for pod-to-pod communication)
-			apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
-		}
+		// Add container port for the headless service (needed for pod-to-pod communication)
+		apply.UpsertPort(&trainerContainer.Ports, *corev1ac.ContainerPort().WithContainerPort(constants.ContainerTrainerPort))
 	}
 
 	return nil

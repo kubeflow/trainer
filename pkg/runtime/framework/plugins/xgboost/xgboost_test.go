@@ -243,7 +243,7 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 				),
 			),
 		},
-		"no env injection when trainJob.Spec.Trainer is nil": {
+		"DMLC envs are injected from the runtime template when trainJob.Spec.Trainer is omitted": {
 			info: runtime.NewInfo(
 				runtime.WithMLPolicySource(
 					utiltesting.MakeMLPolicyWrapper().
@@ -274,6 +274,31 @@ func TestXGBoostEnforceMLPolicy(t *testing.T) {
 						SinglePodRequests: make(corev1.ResourceList),
 						Containers: []runtime.Container{{
 							Name: constants.Node,
+							Ports: []corev1ac.ContainerPortApplyConfiguration{{
+								ContainerPort: ptr.To[int32](constants.ContainerTrainerPort),
+							}},
+							Env: []corev1ac.EnvVarApplyConfiguration{
+								{
+									Name:  ptr.To(constants.XGBoostEnvTrackerURI),
+									Value: ptr.To(fmt.Sprintf("test-job-%s-0-0.test-job", constants.Node)),
+								},
+								{
+									Name:  ptr.To(constants.XGBoostEnvTrackerPort),
+									Value: ptr.To(fmt.Sprintf("%d", constants.ContainerTrainerPort)),
+								},
+								{
+									Name: ptr.To(constants.XGBoostEnvTaskID),
+									ValueFrom: &corev1ac.EnvVarSourceApplyConfiguration{
+										FieldRef: &corev1ac.ObjectFieldSelectorApplyConfiguration{
+											FieldPath: ptr.To(constants.JobCompletionIndexFieldPath),
+										},
+									},
+								},
+								{
+									Name:  ptr.To(constants.XGBoostEnvNumWorker),
+									Value: ptr.To("1"),
+								},
+							},
 						}},
 					}},
 				},
