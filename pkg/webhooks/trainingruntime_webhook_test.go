@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
 
@@ -122,6 +123,38 @@ func TestValidateReplicatedJobs(t *testing.T) {
 					[]corev1.Container{{Name: "test"}}, ""),
 				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).Child("template").Child("spec").Child("template").Child("spec").Child("containers"),
 					[]corev1.Container{{Name: "test"}}, ""),
+			},
+		},
+		"container claim referencing a pod resourceClaim": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+				PodResourceClaims(constants.Node, corev1.PodResourceClaim{Name: "gpu", ResourceClaimTemplateName: ptr.To("gpu-template")}).
+				ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
+				Obj().Spec.ReplicatedJobs,
+		},
+		"container claim without a matching pod resourceClaim": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+				ContainerResourceClaims(constants.Node, constants.Node, corev1.ResourceClaim{Name: "gpu"}).
+				Obj().Spec.ReplicatedJobs,
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).
+					Child("template").Child("spec").Child("template").Child("spec").Child("containers").Index(0).
+					Child("resources").Child("claims").Index(0),
+					"gpu", ""),
+			},
+		},
+		"initContainer claim without a matching pod resourceClaim": {
+			rJobs: testingutil.MakeJobSetWrapper("ns", "valid").
+				Replicas(1, constants.Node, constants.DatasetInitializer, constants.ModelInitializer).
+				InitContainer(constants.Node, "init", "test").
+				ContainerResourceClaims(constants.Node, "init", corev1.ResourceClaim{Name: "gpu"}).
+				Obj().Spec.ReplicatedJobs,
+			wantError: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("template").Child("spec").Child("replicatedJobs").Index(2).
+					Child("template").Child("spec").Child("template").Child("spec").Child("initContainers").Index(0).
+					Child("resources").Child("claims").Index(0),
+					"gpu", ""),
 			},
 		},
 	}

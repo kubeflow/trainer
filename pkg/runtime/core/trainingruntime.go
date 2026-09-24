@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +43,7 @@ import (
 	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/apply"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
+	"github.com/kubeflow/trainer/v2/pkg/features"
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	fwkcore "github.com/kubeflow/trainer/v2/pkg/runtime/framework/core"
 	fwkplugins "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins"
@@ -204,41 +206,26 @@ func (r *TrainingRuntime) newRuntimeInfo(
 				ancestor = &labelAncestor
 			}
 		}
-		if trainJob.Spec.Trainer != nil && trainJob.Spec.Trainer.ResourcesPerNode != nil {
-			isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer && mlPolicy != nil
-			isMPILauncherAsNode := mlPolicy != nil && mlPolicy.MPI != nil &&
-				ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && *rJob.Name == constants.Node
-			if isTrainerAncestor || isMPILauncherAsNode {
-				if applyPodSpec := jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec; applyPodSpec != nil {
+		isTrainerAncestor := ancestor != nil && *ancestor == constants.AncestorTrainer && mlPolicy != nil
+		isMPILauncherAsNode := mlPolicy != nil && mlPolicy.MPI != nil &&
+			ptr.Deref(mlPolicy.MPI.RunLauncherAsNode, false) && ptr.Deref(rJob.Name, "") == constants.Node
+		if isTrainerAncestor || isMPILauncherAsNode {
+			if applyPodSpec := jobSetSpecApply.ReplicatedJobs[i].Template.Spec.Template.Spec; applyPodSpec != nil {
+				if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil {
+					applyTrainerPodResourceClaims(applyPodSpec, jobTrainer.ResourceClaimsPerNode)
+					hasNodeResources := jobTrainer.ResourcesPerNode != nil ||
+						(features.Enabled(features.DynamicResourceAllocation) && len(jobTrainer.ResourceClaimsPerNode) > 0)
 					for k := range applyPodSpec.Containers {
-						if ptr.Deref(applyPodSpec.Containers[k].Name, "") != constants.Node {
+						if ptr.Deref(applyPodSpec.Containers[k].Name, "") != constants.Node || !hasNodeResources {
 							continue
 						}
-						var baseRes corev1.ResourceRequirements
-						if r := applyPodSpec.Containers[k].Resources; r != nil {
-							if r.Limits != nil {
-								baseRes.Limits = *r.Limits
-							}
-							if r.Requests != nil {
-								baseRes.Requests = *r.Requests
-							}
-						}
-						mergedRes, mergeErr := trainingruntimeutil.MergeResourceRequirements(
-							baseRes, *trainJob.Spec.Trainer.ResourcesPerNode)
+						mergedRes, mergeErr := mergeTrainerNodeResources(&applyPodSpec.Containers[k], jobTrainer.ResourcesPerNode, jobTrainer.ResourceClaimsPerNode)
 						if mergeErr != nil {
 							return nil, mergeErr
 						}
-						applyRes := &corev1ac.ResourceRequirementsApplyConfiguration{}
-						if mergedRes.Limits != nil {
-							limits := maps.Clone(mergedRes.Limits)
-							applyRes.Limits = &limits
-						}
-						if mergedRes.Requests != nil {
-							requests := maps.Clone(mergedRes.Requests)
-							applyRes.Requests = &requests
-						}
-						applyPodSpec.Containers[k].Resources = applyRes
+						// Keep the typed template in sync since it feeds PodSet.SinglePodRequests.
 						jobSetTemplateSpec.Spec.ReplicatedJobs[i].Template.Spec.Template.Spec.Containers[k].Resources = mergedRes
+						applyPodSpec.Containers[k].Resources = toApplyConfig(mergedRes)
 						break
 					}
 				}
@@ -349,4 +336,81 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 		warnings = append(warnings, fwWarnings...)
 	}
 	return warnings, errs
+}
+
+// applyTrainerPodResourceClaims upserts the TrainJob's resourceClaimsPerNode into the Pod's
+// resourceClaims by name. It is a no-op while the DynamicResourceAllocation gate is disabled.
+func applyTrainerPodResourceClaims(podSpec *corev1ac.PodSpecApplyConfiguration, claims []trainer.TrainerResourceClaim) {
+	if !features.Enabled(features.DynamicResourceAllocation) {
+		return
+	}
+	for _, claim := range claims {
+		podClaim := corev1ac.PodResourceClaim().
+			WithName(claim.Name).
+			WithResourceClaimTemplateName(claim.ResourceClaimTemplateName)
+		if idx := slices.IndexFunc(podSpec.ResourceClaims, func(c corev1ac.PodResourceClaimApplyConfiguration) bool {
+			return c.Name != nil && *c.Name == claim.Name
+		}); idx != -1 {
+			podSpec.ResourceClaims[idx] = *podClaim
+			continue
+		}
+		podSpec.ResourceClaims = append(podSpec.ResourceClaims, *podClaim)
+	}
+}
+
+// mergeTrainerNodeResources merges the TrainJob's resourcesPerNode and resourceClaimsPerNode over the
+// runtime node container's resources with strategic merge patch: requests and limits merge per key
+// and claims merge by name, so a claim already wired by the runtime, including its request, is kept.
+// Claims are ignored while the DynamicResourceAllocation gate is disabled.
+func mergeTrainerNodeResources(
+	runtimeNode *corev1ac.ContainerApplyConfiguration, resourcesPerNode *corev1.ResourceRequirements, resourceClaimsPerNode []trainer.TrainerResourceClaim,
+) (corev1.ResourceRequirements, error) {
+	var nodeRes corev1.ResourceRequirements
+	if resourcesPerNode != nil {
+		nodeRes.Limits = resourcesPerNode.Limits
+		nodeRes.Requests = resourcesPerNode.Requests
+	}
+	if features.Enabled(features.DynamicResourceAllocation) {
+		// The node container consumes every claim declared in resourceClaimsPerNode.
+		for _, claim := range resourceClaimsPerNode {
+			nodeRes.Claims = append(nodeRes.Claims, corev1.ResourceClaim{Name: claim.Name})
+		}
+	}
+
+	var runtimeRes corev1.ResourceRequirements
+	if runtimeNode != nil && runtimeNode.Resources != nil {
+		if runtimeNode.Resources.Limits != nil {
+			runtimeRes.Limits = *runtimeNode.Resources.Limits
+		}
+		if runtimeNode.Resources.Requests != nil {
+			runtimeRes.Requests = *runtimeNode.Resources.Requests
+		}
+		for _, claim := range runtimeNode.Resources.Claims {
+			runtimeRes.Claims = append(runtimeRes.Claims, corev1.ResourceClaim{
+				Name:    ptr.Deref(claim.Name, ""),
+				Request: ptr.Deref(claim.Request, ""),
+			})
+		}
+	}
+
+	return trainingruntimeutil.MergeResourceRequirements(runtimeRes, nodeRes)
+}
+
+// toApplyConfig converts typed ResourceRequirements to the apply configuration used in the JobSet template.
+func toApplyConfig(res corev1.ResourceRequirements) *corev1ac.ResourceRequirementsApplyConfiguration {
+	out := corev1ac.ResourceRequirements()
+	if res.Limits != nil {
+		out.WithLimits(maps.Clone(res.Limits))
+	}
+	if res.Requests != nil {
+		out.WithRequests(maps.Clone(res.Requests))
+	}
+	for _, claim := range res.Claims {
+		c := corev1ac.ResourceClaim().WithName(claim.Name)
+		if claim.Request != "" {
+			c.WithRequest(claim.Request)
+		}
+		out.WithClaims(c)
+	}
+	return out
 }
