@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2 "sigs.k8s.io/jobset/api/jobset/v1alpha2"
@@ -2235,6 +2236,90 @@ func TestRuntimeInfo(t *testing.T) {
 
 			if !strings.Contains(err.Error(), "unsupported runtimeTemplateSpec") {
 				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestTrainingRuntimeValidateObjects(t *testing.T) {
+	runtimePatchesPath := field.NewPath("spec").Child("runtimePatches")
+	containerPatch := func(rJobName, containerName string) []trainer.RuntimePatch {
+		return []trainer.RuntimePatch{{
+			Manager: "test.io/manager",
+			TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+				Template: &trainer.JobSetTemplatePatch{
+					Spec: &trainer.JobSetSpecPatch{
+						ReplicatedJobs: []trainer.ReplicatedJobPatch{{
+							Name: rJobName,
+							Template: &trainer.JobTemplatePatch{
+								Spec: &trainer.JobSpecPatch{
+									Template: &trainer.PodTemplatePatch{
+										Spec: &trainer.PodSpecPatch{
+											Containers: []trainer.ContainerPatch{{
+												Name:         containerName,
+												VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}},
+											}},
+										},
+									},
+								},
+							},
+						}},
+					},
+				},
+			},
+		}}
+	}
+
+	cases := map[string]struct {
+		trainingRuntime *trainer.TrainingRuntime
+		trainJob        *trainer.TrainJob
+		wantErrs        field.ErrorList
+	}{
+		"runtimePatches targeting a job and container of the runtime are accepted": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(containerPatch(constants.Node, constants.Node)).
+				Obj(),
+		},
+		"runtimePatches targeting a replicated job the runtime doesn't define are rejected": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(containerPatch("nodes", constants.Node)).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(runtimePatchesPath, nil, "must not have replicated job that doesn't exist in the runtime job template"),
+			},
+		},
+		"runtimePatches targeting a container the runtime doesn't define are rejected": {
+			trainingRuntime: testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj(),
+			trainJob: testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches(containerPatch(constants.Node, "nod")).
+				Obj(),
+			wantErrs: field.ErrorList{
+				field.Invalid(runtimePatchesPath, nil, fmt.Sprintf("must not have container that doesn't exist in the runtime job %s", constants.Node)),
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var cancel func()
+			ctx, cancel = context.WithCancel(ctx)
+			t.Cleanup(cancel)
+			clientBuilder := testingutil.NewClientBuilder().WithObjects(tc.trainingRuntime)
+			c := clientBuilder.Build()
+
+			trainingRuntime, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, errs := trainingRuntime.ValidateObjects(ctx, nil, tc.trainJob)
+			if diff := cmp.Diff(tc.wantErrs, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue")); len(diff) != 0 {
+				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
 			}
 		})
 	}
