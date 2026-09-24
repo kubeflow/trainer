@@ -323,7 +323,10 @@ func (f *Flux) buildInitScriptConfigMap(
 
 	// The entrypoint script finishes Flux setup and executes the wrapped application
 	initScript := generateInitEntrypoint(trainJob, settings, numNodes)
-	entrypointScript := f.generateFluxEntrypoint(trainJob, info, numNodes)
+	entrypointScript, err := f.generateFluxEntrypoint(trainJob, info, numNodes)
+	if err != nil {
+		return nil, err
+	}
 
 	// Build the ConfigMap using the Apply Configuration pattern
 	configMapName := fmt.Sprintf("%s-flux-entrypoint", trainJob.Name)
@@ -410,7 +413,7 @@ func getNumNodes(info *runtime.Info) int32 {
 }
 
 // generateFluxEntrypoint generates the flux entrypoint to prepare the view and run the job
-func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.Info, numNodes int32) string {
+func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.Info, numNodes int32) (string, error) {
 	mainHost := fmt.Sprintf("%s-%s-0-0", trainJob.Name, constants.Node)
 
 	// Derive number of tasks
@@ -427,9 +430,9 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	flags = fmt.Sprintf("-N %d -n %d", numNodes, tasks*numNodes)
 
 	// Derive number of GPUs from resources. In Flux, -g is --gpus-per-task
-	resourcesPerNode := ptr.Deref(runtime.ExtractResourcePerNodeFromRuntime(info), corev1.ResourceRequirements{})
-	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.ResourcesPerNode != nil {
-		resourcesPerNode = ptr.Deref(jobTrainer.ResourcesPerNode, corev1.ResourceRequirements{})
+	resourcesPerNode, err := runtime.ResourcesPerNode(info, trainJob)
+	if err != nil {
+		return "", err
 	}
 	gpus := runtime.GetNumGPUPerNode(&resourcesPerNode)
 
@@ -442,7 +445,7 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 		gpuSpec := generateRange(int32(gpus), 0)
 		Rspec = fmt.Sprintf("%s --gpu=%s", Rspec, gpuSpec)
 	}
-	return fmt.Sprintf(entrypointTemplate, Rspec, mainHost, flags)
+	return fmt.Sprintf(entrypointTemplate, Rspec, mainHost, flags), nil
 }
 
 // generateInitEntrypoint generates the flux entrypoint to prepare flux
