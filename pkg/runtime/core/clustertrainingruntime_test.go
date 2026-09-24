@@ -34,6 +34,70 @@ import (
 	testingutil "github.com/kubeflow/trainer/v2/pkg/util/testing"
 )
 
+func TestClusterTrainingRuntimeValidateObjectsRejectsUnknownRuntimePatchTargets(t *testing.T) {
+	cases := map[string]trainer.ReplicatedJobPatch{
+		"unknown replicated job": {Name: "missing-job"},
+		"unknown container": {
+			Name: constants.Node,
+			Template: &trainer.JobTemplatePatch{
+				Spec: &trainer.JobSpecPatch{
+					Template: &trainer.PodTemplatePatch{
+						Spec: &trainer.PodSpecPatch{Containers: []trainer.ContainerPatch{{Name: "missing-container"}}},
+					},
+				},
+			},
+		},
+		"unknown init container": {
+			Name: constants.Node,
+			Template: &trainer.JobTemplatePatch{
+				Spec: &trainer.JobSpecPatch{
+					Template: &trainer.PodTemplatePatch{
+						Spec: &trainer.PodSpecPatch{InitContainers: []trainer.ContainerPatch{{Name: "missing-init-container"}}},
+					},
+				},
+			},
+		},
+	}
+
+	for name, patch := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			clusterRuntime := testingutil.MakeClusterTrainingRuntimeWrapper("test-runtime").Obj()
+			trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.ClusterTrainingRuntimeKind), "test-runtime").
+				RuntimePatches([]trainer.RuntimePatch{{
+					Manager: "test.io/manager",
+					TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+						Template: &trainer.JobSetTemplatePatch{
+							Spec: &trainer.JobSetSpecPatch{ReplicatedJobs: []trainer.ReplicatedJobPatch{patch}},
+						},
+					},
+				}}).
+				Obj()
+
+			clientBuilder := testingutil.NewClientBuilder().WithObjects(clusterRuntime)
+			c := clientBuilder.Build()
+			if _, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil); err != nil {
+				t.Fatal(err)
+			}
+			clusterRuntimeAdapter, err := NewClusterTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, errs := clusterRuntimeAdapter.ValidateObjects(ctx, nil, trainJob)
+			if len(errs) == 0 {
+				t.Fatal("expected validation error for a RuntimePatch targeting an unknown runtime object")
+			}
+			if got, want := errs[0].Field, "spec.runtimePatches"; got != want {
+				t.Errorf("unexpected error field: got %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestClusterTrainingRuntimeNewObjects(t *testing.T) {
 
 	resRequests := corev1.ResourceList{

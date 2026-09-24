@@ -2205,6 +2205,82 @@ test-job-node-0-1.test-job slots=8
 	}
 }
 
+func TestTrainingRuntimeValidateObjectsRejectsUnknownRuntimePatchTargets(t *testing.T) {
+	cases := map[string]struct {
+		patch       trainer.ReplicatedJobPatch
+		wantMessage string
+	}{
+		"unknown replicated job": {
+			patch:       trainer.ReplicatedJobPatch{Name: "missing-job"},
+			wantMessage: "must not have replicated job that doesn't exist in the runtime job template",
+		},
+		"unknown container": {
+			patch: trainer.ReplicatedJobPatch{
+				Name: constants.Node,
+				Template: &trainer.JobTemplatePatch{
+					Spec: &trainer.JobSpecPatch{
+						Template: &trainer.PodTemplatePatch{
+							Spec: &trainer.PodSpecPatch{Containers: []trainer.ContainerPatch{{Name: "missing-container"}}},
+						},
+					},
+				},
+			},
+			wantMessage: "must not have container that doesn't exist in the runtime job node",
+		},
+		"unknown init container": {
+			patch: trainer.ReplicatedJobPatch{
+				Name: constants.Node,
+				Template: &trainer.JobTemplatePatch{
+					Spec: &trainer.JobSpecPatch{
+						Template: &trainer.PodTemplatePatch{
+							Spec: &trainer.PodSpecPatch{InitContainers: []trainer.ContainerPatch{{Name: "missing-init-container"}}},
+						},
+					},
+				},
+			},
+			wantMessage: "must not have initContainer that doesn't exist in the runtime job node",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+
+			trainingRuntime := testingutil.MakeTrainingRuntimeWrapper(metav1.NamespaceDefault, "test-runtime").Obj()
+			trainJob := testingutil.MakeTrainJobWrapper(metav1.NamespaceDefault, "test-job").
+				RuntimeRef(trainer.SchemeGroupVersion.WithKind(trainer.TrainingRuntimeKind), "test-runtime").
+				RuntimePatches([]trainer.RuntimePatch{{
+					Manager: "test.io/manager",
+					TrainingRuntimeSpec: &trainer.TrainingRuntimeSpecPatch{
+						Template: &trainer.JobSetTemplatePatch{
+							Spec: &trainer.JobSetSpecPatch{ReplicatedJobs: []trainer.ReplicatedJobPatch{tc.patch}},
+						},
+					},
+				}}).
+				Obj()
+
+			clientBuilder := testingutil.NewClientBuilder().WithObjects(trainingRuntime)
+			c := clientBuilder.Build()
+			runtimeAdapter, err := NewTrainingRuntime(ctx, c, testingutil.AsIndex(clientBuilder), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, errs := runtimeAdapter.ValidateObjects(ctx, nil, trainJob)
+			if len(errs) == 0 {
+				t.Fatal("expected validation error for a RuntimePatch targeting an unknown runtime object")
+			}
+			if got, want := errs[0].Field, "spec.runtimePatches"; got != want {
+				t.Errorf("unexpected error field: got %q, want %q", got, want)
+			}
+			if got, want := errs[0].Detail, tc.wantMessage; got != want {
+				t.Errorf("unexpected error detail: got %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 func TestRuntimeInfo(t *testing.T) {
 	tests := map[string]struct {
 		templateType string

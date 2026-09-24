@@ -131,7 +131,10 @@ func (r *ClusterTrainingRuntime) ValidateObjects(ctx context.Context, old, new *
 		))
 	}
 
-	info, _ := r.newRuntimeInfo(new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy)
+	info, err := r.newRuntimeInfo(new, clusterTrainingRuntime.Spec.Template, clusterTrainingRuntime.Spec.MLPolicy, clusterTrainingRuntime.Spec.PodGroupPolicy, false)
+	if err != nil {
+		return nil, field.ErrorList{field.InternalError(field.NewPath("spec", "RuntimeRef"), err)}
+	}
 	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)
 	if len(fwWarnings) != 0 {
 		warnings = append(warnings, fwWarnings...)

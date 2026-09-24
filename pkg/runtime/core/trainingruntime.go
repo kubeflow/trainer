@@ -126,7 +126,7 @@ func (r *TrainingRuntime) RuntimeInfo(
 	if !ok {
 		return nil, fmt.Errorf("unsupported runtimeTemplateSpec")
 	}
-	info, err := r.newRuntimeInfo(trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy)
+	info, err := r.newRuntimeInfo(trainJob, jobSetTemplateSpec, mlPolicy, podGroupPolicy, true)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func (r *TrainingRuntime) RuntimeInfo(
 }
 
 func (r *TrainingRuntime) newRuntimeInfo(
-	trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy,
+	trainJob *trainer.TrainJob, jobSetTemplateSpec trainer.JobSetTemplateSpec, mlPolicy *trainer.MLPolicy, podGroupPolicy *trainer.PodGroupPolicy, applyRuntimePatches bool,
 ) (*runtime.Info, error) {
 	propagationLabels := maps.Clone(jobSetTemplateSpec.Labels)
 	propagationAnnotations := maps.Clone(jobSetTemplateSpec.Annotations)
@@ -167,9 +167,10 @@ func (r *TrainingRuntime) newRuntimeInfo(
 			}
 		}
 	}
-	err := r.mergeRuntimePatches(trainJob, &jobSetTemplateSpec)
-	if err != nil {
-		return nil, err
+	if applyRuntimePatches {
+		if err := r.mergeRuntimePatches(trainJob, &jobSetTemplateSpec); err != nil {
+			return nil, err
+		}
 	}
 
 	jobSetSpecApply, err := apply.FromTypedObjWithFields[jobsetv1alpha2ac.JobSetSpecApplyConfiguration](&jobsetv1alpha2.JobSet{
@@ -343,7 +344,10 @@ func (r *TrainingRuntime) ValidateObjects(ctx context.Context, old, new *trainer
 			constants.RuntimeDeprecationPolicyURL,
 		))
 	}
-	info, _ := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy) // ignoring the error here as the runtime configured should be valid
+	info, err := r.newRuntimeInfo(new, trainingRuntime.Spec.Template, trainingRuntime.Spec.MLPolicy, trainingRuntime.Spec.PodGroupPolicy, false)
+	if err != nil {
+		return nil, field.ErrorList{field.InternalError(field.NewPath("spec", "runtimeRef"), err)}
+	}
 	fwWarnings, errs := r.framework.RunCustomValidationPlugins(ctx, info, old, new)
 	if len(fwWarnings) != 0 {
 		warnings = append(warnings, fwWarnings...)
