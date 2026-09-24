@@ -89,18 +89,26 @@ class S3Storage(OpenDALStorage):
             # List all objects with the given prefix
             entries = self.op.list(prefix, recursive=True)
 
+            # OpenDAL, like S3 ListObjects, matches the prefix as a plain string, so
+            # "models/llama" also lists "models/llama-2/...". Keep only the object the
+            # prefix names itself and the objects below it.
+            base = prefix.rstrip("/")
+
             for entry in entries:
                 if entry.metadata.is_dir:
                     continue
 
                 key = entry.path
+                if base and key != base and not key.startswith(base + "/"):
+                    continue
+
                 if ignore_patterns:
                     if any(fnmatch.fnmatch(key, p) for p in ignore_patterns):
                         logging.info(f"Skipping ignored file: {key}")
                         continue
 
                 # Create relative path from the prefix
-                relative_path = key[len(prefix) :].lstrip("/")
+                relative_path = key[len(base) :].lstrip("/")
                 if not relative_path:
                     # If prefix matches exactly, use the filename
                     relative_path = Path(key).name
