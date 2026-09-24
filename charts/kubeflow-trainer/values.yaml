@@ -156,6 +156,11 @@ manager:
       burst: 10
     featureGates: {}
 
+metrics:
+  serviceMonitor:
+    # -- Whether to create a Prometheus Operator ServiceMonitor.
+    enabled: false
+
 webhook:
   # -- Specifies how unrecognized errors are handled.
   # Available options are `Ignore` or `Fail`.
