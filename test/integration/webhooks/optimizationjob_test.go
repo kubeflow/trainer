@@ -28,41 +28,6 @@ import (
 	"github.com/kubeflow/trainer/v2/test/integration/framework"
 )
 
-func makeOptimizationJob(namespace, name, parameterName string) *trainer.OptimizationJob {
-	return &trainer.OptimizationJob{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: trainer.GroupVersion.String(),
-			Kind:       "OptimizationJob",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: trainer.OptimizationJobSpec{
-			Objectives: []trainer.Objective{{
-				Metric:    "accuracy",
-				Direction: trainer.ObjectiveDirectionMaximize,
-			}},
-			Parameters: []trainer.Parameter{{
-				Name: parameterName,
-				SearchSpace: &trainer.SearchSpace{
-					Uniform: trainer.UniformSpace{
-						Min: "0.001",
-						Max: "0.1",
-					},
-				},
-			}},
-			NumTrials:      1,
-			ParallelTrials: 1,
-			TrainJobTemplate: trainer.TrainJobTemplateSpec{
-				Spec: trainer.TrainJobSpec{
-					RuntimeRef: trainer.RuntimeRef{Name: "runtime"},
-				},
-			},
-		},
-	}
-}
-
 var _ = ginkgo.Describe("OptimizationJob API validation", ginkgo.Ordered, func() {
 	var ns *corev1.Namespace
 
@@ -91,7 +56,28 @@ var _ = ginkgo.Describe("OptimizationJob API validation", ginkgo.Ordered, func()
 	ginkgo.DescribeTable("validates parameter names at admission",
 		func(parameterName string, shouldSucceed bool) {
 			jobName := "train-job"
-			job := makeOptimizationJob(ns.Name, jobName, parameterName)
+			job := testingutil.MakeOptimizationJobWrapper(ns.Name, jobName).
+				Objectives(trainer.Objective{
+					Metric:    "accuracy",
+					Direction: trainer.ObjectiveDirectionMaximize,
+				}).
+				Parameters(trainer.Parameter{
+					Name: parameterName,
+					SearchSpace: &trainer.SearchSpace{
+						Uniform: trainer.UniformSpace{
+							Min: "0.001",
+							Max: "0.1",
+						},
+					},
+				}).
+				NumTrials(1).
+				ParallelTrials(1).
+				TrainJobTemplate(trainer.TrainJobTemplateSpec{
+					Spec: trainer.TrainJobSpec{
+						RuntimeRef: trainer.RuntimeRef{Name: "runtime"},
+					},
+				}).
+				Obj()
 			err := k8sClient.Create(ctx, job)
 			if shouldSucceed {
 				gomega.Expect(err).Should(gomega.Succeed())
