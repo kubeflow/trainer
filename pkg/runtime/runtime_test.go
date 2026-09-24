@@ -28,6 +28,7 @@ import (
 	"k8s.io/utils/ptr"
 	jobsetv1alpha2ac "sigs.k8s.io/jobset/client-go/applyconfiguration/jobset/v1alpha2"
 
+	trainer "github.com/kubeflow/trainer/v2/pkg/apis/trainer/v1alpha1"
 	"github.com/kubeflow/trainer/v2/pkg/constants"
 	jobsetplgconsts "github.com/kubeflow/trainer/v2/pkg/runtime/framework/plugins/jobset/constants"
 )
@@ -726,6 +727,88 @@ func TestFindContainerByName(t *testing.T) {
 			got := tc.info.FindPodSetByAncestor(tc.psAncestor)
 			if diff := cmp.Diff(tc.want, got); len(diff) != 0 {
 				t.Errorf("Unexpected PodSet (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestResourcesPerNode(t *testing.T) {
+	nodeObjApply := func(res *corev1ac.ResourceRequirementsApplyConfiguration) *jobsetv1alpha2ac.JobSetSpecApplyConfiguration {
+		return jobsetv1alpha2ac.JobSetSpec().WithReplicatedJobs(
+			jobsetv1alpha2ac.ReplicatedJob().
+				WithName(constants.Node).
+				WithTemplate(batchv1ac.JobTemplateSpec().
+					WithSpec(batchv1ac.JobSpec().
+						WithTemplate(corev1ac.PodTemplateSpec().
+							WithSpec(corev1ac.PodSpec().
+								WithContainers(corev1ac.Container().
+									WithName(constants.Node).
+									WithResources(res),
+								),
+							),
+						),
+					),
+				),
+		)
+	}
+	trainJobWithResources := func(res *corev1.ResourceRequirements) *trainer.TrainJob {
+		return &trainer.TrainJob{Spec: trainer.TrainJobSpec{Trainer: &trainer.Trainer{ResourcesPerNode: res}}}
+	}
+	runtimeResources := corev1ac.ResourceRequirements().
+		WithLimits(corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")}).
+		WithRequests(corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")})
+
+	cases := map[string]struct {
+		info     *Info
+		trainJob *trainer.TrainJob
+		want     corev1.ResourceRequirements
+	}{
+		"runtime resources are used when the TrainJob does not set resourcesPerNode": {
+			info:     NewInfo(WithTemplateSpecObjApply(nodeObjApply(runtimeResources))),
+			trainJob: &trainer.TrainJob{},
+			want: corev1.ResourceRequirements{
+				Limits:   corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")},
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+			},
+		},
+		"TrainJob resourcesPerNode overrides matching keys and keeps the runtime accelerators": {
+			info: NewInfo(WithTemplateSpecObjApply(nodeObjApply(runtimeResources))),
+			trainJob: trainJobWithResources(&corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("8")},
+			}),
+			want: corev1.ResourceRequirements{
+				Limits:   corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("4")},
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("8")},
+			},
+		},
+		"TrainJob resourcesPerNode overrides the runtime accelerator count": {
+			info: NewInfo(WithTemplateSpecObjApply(nodeObjApply(runtimeResources))),
+			trainJob: trainJobWithResources(&corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")},
+			}),
+			want: corev1.ResourceRequirements{
+				Limits:   corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")},
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+			},
+		},
+		"TrainJob resourcesPerNode is used when the runtime declares no resources": {
+			info: NewInfo(),
+			trainJob: trainJobWithResources(&corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")},
+			}),
+			want: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{"nvidia.com/gpu": resource.MustParse("2")},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := ResourcesPerNode(tc.info, tc.trainJob)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.want, got); len(diff) != 0 {
+				t.Errorf("Unexpected resources (-want,+got):\n%s", diff)
 			}
 		})
 	}
