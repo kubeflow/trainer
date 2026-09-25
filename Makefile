@@ -189,9 +189,12 @@ manifests: controller-gen ## Generate manifests.
 			manifests/base/webhook/manifests.yaml; do \
 		{ cat $(BOILERPLATE_HEADER); echo; cat "$$f"; } > "$$f.tmp" && mv "$$f.tmp" "$$f"; \
 	done
-	# Prepend the Helm license block and wrap the chart CRD templates so
-	# installation can be toggled via `crds.enabled`.
+	# Annotate the chart CRD templates with `helm.sh/resource-policy: keep` (toggled
+	# via `crds.keep`) so that `helm uninstall` does not delete the CRDs and, with
+	# them, every custom resource in the cluster. Then prepend the Helm license block
+	# and wrap the templates so installation can be toggled via `crds.enabled`.
 	for f in $(TRAINER_CHART_DIR)/templates/crd/trainer.kubeflow.org_*.yaml; do \
+		awk '{ print } /^  annotations:$$/ && !done { print "    {{- if .Values.crds.keep }}"; print "    helm.sh/resource-policy: keep"; print "    {{- end }}"; done = 1 }' $$f > $$f.tmp && mv $$f.tmp $$f; \
 		{ cat $(HELM_BOILERPLATE_HEADER); echo; echo '{{- if .Values.crds.enabled }}'; cat $$f; echo '{{- end }}'; } > $$f.tmp && mv $$f.tmp $$f; \
 	done
 

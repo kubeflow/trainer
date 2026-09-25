@@ -27,6 +27,10 @@ crds:
   # Set to `false` if you manage the CRDs outside of the chart (for example, applying them separately).
   # This replaces Helm's built-in `--skip-crds` flag, which no longer applies now that the CRDs are chart templates.
   enabled: true
+  # -- Keep the CRDs on `helm uninstall` via the `helm.sh/resource-policy: keep` annotation.
+  # Deleting a CRD deletes every TrainJob, TrainingRuntime, ClusterTrainingRuntime and OptimizationJob
+  # in the cluster, so this is on by default; set to `false` to remove the CRDs with the release.
+  keep: true
 
 jobset:
   # -- Whether to install jobset as a dependency managed by trainer.
