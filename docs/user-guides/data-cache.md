@@ -75,9 +75,9 @@ For the available Helm values to configure data cache, see the
 
 :::{note}
 
-When `dataCache.lws.install` is set to `true` (the default), LeaderWorkerSet will be installed
-automatically. Set it to `false` if LeaderWorkerSet controller/webhook is already installed
-in your cluster.
+LeaderWorkerSet is installed automatically together with the data cache. Add
+`--set dataCache.lws.install=false` if the LeaderWorkerSet controller/webhook is already
+installed in your cluster.
 
 :::
 
