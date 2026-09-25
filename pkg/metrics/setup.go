@@ -35,7 +35,7 @@ import (
 // SetupServer creates and registers a metrics server with the manager.
 // It must be called only after the serving certificates are available on disk —
 // typically inside setupManagerComponents after certsReady fires.
-func SetupServer(mgr ctrl.Manager, cfg *configapi.ControllerMetrics, tlsOpts *configapi.TLSOptions) error {
+func SetupServer(mgr ctrl.Manager, cfg *configapi.ControllerMetrics, tlsOpts *configapi.TLSOptions, optionalTLSOpts ...func(*tls.Config)) error {
 	secureServing := cfg.SecureServing != nil && *cfg.SecureServing
 
 	opts := metricsserver.Options{
@@ -50,6 +50,11 @@ func SetupServer(mgr ctrl.Manager, cfg *configapi.ControllerMetrics, tlsOpts *co
 		opts.TLSOpts = []func(*tls.Config){
 			func(c *tls.Config) {
 				tlsconfig.Apply(c, tlsOpts)
+				for _, apply := range optionalTLSOpts {
+					if apply != nil {
+						apply(c)
+					}
+				}
 			},
 		}
 	}
