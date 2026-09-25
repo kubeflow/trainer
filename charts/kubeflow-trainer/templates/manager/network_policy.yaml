@@ -1,0 +1,63 @@
+{{- /*
+Copyright The Kubeflow Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/ -}}
+{{- if .Values.manager.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "trainer.manager.service.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "trainer.manager.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "trainer.manager.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    {{- if .Values.manager.networkPolicy.statusServer.enabled }}
+    - ports:
+        {{- toYaml .Values.manager.networkPolicy.statusServer.ports | nindent 8 }}
+      {{- if and .Values.manager.networkPolicy.statusServer.from (gt (len .Values.manager.networkPolicy.statusServer.from) 0) }}
+      from:
+        {{- toYaml .Values.manager.networkPolicy.statusServer.from | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.manager.networkPolicy.webhook.enabled }}
+    - ports:
+        {{- toYaml .Values.manager.networkPolicy.webhook.ports | nindent 8 }}
+      {{- if and .Values.manager.networkPolicy.webhook.from (gt (len .Values.manager.networkPolicy.webhook.from) 0) }}
+      from:
+        {{- toYaml .Values.manager.networkPolicy.webhook.from | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.manager.networkPolicy.metrics.enabled }}
+    - ports:
+        {{- toYaml .Values.manager.networkPolicy.metrics.ports | nindent 8 }}
+      {{- if and .Values.manager.networkPolicy.metrics.from (gt (len .Values.manager.networkPolicy.metrics.from) 0) }}
+      from:
+        {{- toYaml .Values.manager.networkPolicy.metrics.from | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.manager.networkPolicy.health.enabled }}
+    - ports:
+        {{- toYaml .Values.manager.networkPolicy.health.ports | nindent 8 }}
+      {{- if and .Values.manager.networkPolicy.health.from (gt (len .Values.manager.networkPolicy.health.from) 0) }}
+      from:
+        {{- toYaml .Values.manager.networkPolicy.health.from | nindent 8 }}
+      {{- end }}
+    {{- end }}
+{{- end }}
