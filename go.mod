@@ -22,10 +22,10 @@ require (
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/kube-openapi v0.0.0-20260721132016-d427ff9ee9ad
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd
-	sigs.k8s.io/controller-runtime v0.24.1
+	sigs.k8s.io/controller-runtime v0.25.1
 	sigs.k8s.io/jobset v0.12.0
 	sigs.k8s.io/kind v0.33.0
-	sigs.k8s.io/scheduler-plugins v0.35.4-devel
+	sigs.k8s.io/scheduler-plugins v0.36.4-devel
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2
 	sigs.k8s.io/yaml v1.6.0
 	volcano.sh/apis v1.13.1-0.20251028070205-46d20c0699e7
