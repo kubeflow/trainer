@@ -1636,7 +1636,7 @@ func schema_pkg_apis_trainer_v1alpha1_Parameter(ref common.ReferenceCallback) co
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "name is the name of the hyperparameter.",
+							Description: "name is the name of the hyperparameter. Only letters, digits and underscores are allowed, and it cannot start with a digit.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
