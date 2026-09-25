@@ -265,7 +265,7 @@ The new endpoint must rate-limit requests and cache TokenReview responses to avo
 
 Deliberate malicious attacks can be mitigated by validating the jwt token against the API server public key before performing the TokenReview request. Tokens that are definitely invalid would not cause any API server requests.
 
-The below summarises the volumes the control plane will inject if the feature gate is enabled:
+The below summarises the volumes the control plane will inject if the feature gate is enabled (the volume name `kubeflow-trainer-token` and mount path `/var/run/secrets/kubeflow/trainer` are reserved on trainer pods):
 ```yaml
 # mutated PodSpec
 spec:
