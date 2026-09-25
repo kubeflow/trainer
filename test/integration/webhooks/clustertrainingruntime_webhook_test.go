@@ -102,6 +102,27 @@ var _ = ginkgo.Describe("ClusterTrainingRuntime Webhook", ginkgo.Ordered, func()
 						Obj()
 				},
 				gomega.Succeed()),
+			ginkgo.Entry("Should succeed to create ClusterTrainingRuntime with only volcano podGroupPolicy",
+				func() *trainer.ClusterTrainingRuntime {
+					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							PodGroupPolicyVolcano(&trainer.VolcanoPodGroupPolicySource{}).
+							Obj()).
+						Obj()
+				},
+				gomega.Succeed()),
+			ginkgo.Entry("Should fail to create ClusterTrainingRuntime with both coscheduling and volcano podGroupPolicy",
+				func() *trainer.ClusterTrainingRuntime {
+					baseRuntime := testingutil.MakeClusterTrainingRuntimeWrapper(clTrainingRuntimeName)
+					return baseRuntime.
+						RuntimeSpec(testingutil.MakeTrainingRuntimeSpecWrapper(baseRuntime.Spec).
+							PodGroupPolicyCoschedulingSchedulingTimeout(60).
+							PodGroupPolicyVolcano(&trainer.VolcanoPodGroupPolicySource{}).
+							Obj()).
+						Obj()
+				},
+				testingutil.BeInvalidError()),
 		)
 	})
 })

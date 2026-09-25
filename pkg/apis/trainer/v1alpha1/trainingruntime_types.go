@@ -133,6 +133,7 @@ type JobSetTemplateSpec struct {
 }
 
 // PodGroupPolicy represents a PodGroup configuration for gang-scheduling.
+// +kubebuilder:validation:AtMostOneOf=coscheduling;volcano
 type PodGroupPolicy struct {
 	// Configuration for gang-scheduling using various plugins.
 	PodGroupPolicySource `json:",inline"`

@@ -212,6 +212,11 @@ spec:
                         type: object
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: at most one of the fields in [coscheduling volcano] may
+                    be set
+                  rule: '[has(self.coscheduling),has(self.volcano)].filter(x,x==true).size()
+                    <= 1'
               template:
                 description: template for the JobSet which will be used by TrainJob.
                 minProperties: 1
