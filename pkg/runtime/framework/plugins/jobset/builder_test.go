@@ -1030,6 +1030,244 @@ func TestBuilderPodLabels(t *testing.T) {
 	}
 }
 
+func TestBuilderPodAncestorLabels(t *testing.T) {
+	cases := map[string]struct {
+		jobSet     *jobsetv1alpha2ac.JobSetApplyConfiguration
+		wantJobSet *jobsetv1alpha2ac.JobSetApplyConfiguration
+	}{
+		"ancestor label propagated to Pod template and existing Pod labels preserved": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Name: ptr.To("trainer-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+										"unrelated-job-label":           "job-value",
+									},
+								},
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+											Labels: map[string]string{
+												"existing-pod-label": "pod-value",
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: ptr.To("dataset-init-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									},
+								},
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+						},
+						{
+							Name: ptr.To("no-ancestor-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										"other-label": "value",
+									},
+								},
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Name: ptr.To("trainer-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+										"unrelated-job-label":           "job-value",
+									},
+								},
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+											Labels: map[string]string{
+												"existing-pod-label":            "pod-value",
+												constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: ptr.To("dataset-init-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+									},
+								},
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+											Labels: map[string]string{
+												constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: ptr.To("no-ancestor-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										"other-label": "value",
+									},
+								},
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"job ancestor label overrides existing conflicting pod ancestor label": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Name: ptr.To("trainer-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+											Labels: map[string]string{
+												constants.LabelTrainJobAncestor: "conflicting-label",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Name: ptr.To("trainer-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+								Spec: &batchv1ac.JobSpecApplyConfiguration{
+									Template: &corev1ac.PodTemplateSpecApplyConfiguration{
+										ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+											Labels: map[string]string{
+												constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"gracefully handles nil Template.Spec or nil Template.Spec.Template": {
+			jobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Name: ptr.To("nil-spec-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+							},
+						},
+						{
+							Name: ptr.To("nil-template-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+								Spec: &batchv1ac.JobSpecApplyConfiguration{},
+							},
+						},
+					},
+				},
+			},
+			wantJobSet: &jobsetv1alpha2ac.JobSetApplyConfiguration{
+				Spec: &jobsetv1alpha2ac.JobSetSpecApplyConfiguration{
+					ReplicatedJobs: []jobsetv1alpha2ac.ReplicatedJobApplyConfiguration{
+						{
+							Name: ptr.To("nil-spec-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+							},
+						},
+						{
+							Name: ptr.To("nil-template-job"),
+							Template: &batchv1ac.JobTemplateSpecApplyConfiguration{
+								ObjectMetaApplyConfiguration: &metav1ac.ObjectMetaApplyConfiguration{
+									Labels: map[string]string{
+										constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+									},
+								},
+								Spec: &batchv1ac.JobSpecApplyConfiguration{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			builder := NewBuilder(tc.jobSet)
+			got := builder.PodAncestorLabels().Build()
+			if diff := cmp.Diff(tc.wantJobSet, got); len(diff) != 0 {
+				t.Errorf("Unexpected JobSet from PodAncestorLabels (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestBuilderPodAnnotations(t *testing.T) {
 	cases := map[string]struct {
 		jobSet      *jobsetv1alpha2ac.JobSetApplyConfiguration

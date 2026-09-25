@@ -1,0 +1,159 @@
+# Copyright The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Test manager NetworkPolicy
+
+templates:
+  - manager/network_policy.yaml
+
+release:
+  name: kubeflow-trainer
+  namespace: kubeflow-system
+
+tests:
+  - it: Should not create manager NetworkPolicy by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: Should create manager NetworkPolicy with default values when enabled
+    set:
+      manager:
+        networkPolicy:
+          enabled: true
+    asserts:
+      - containsDocument:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          name: kubeflow-trainer-controller-manager
+          namespace: kubeflow-system
+      - equal:
+          path: spec.podSelector.matchLabels
+          value:
+            app.kubernetes.io/name: kubeflow-trainer
+            app.kubernetes.io/instance: kubeflow-trainer
+            app.kubernetes.io/part-of: kubeflow
+            app.kubernetes.io/component: manager
+      - equal:
+          path: spec.policyTypes
+          value:
+            - Ingress
+      - equal:
+          path: spec.ingress[0]
+          value:
+            ports:
+              - port: 10443
+                protocol: TCP
+            from:
+              - namespaceSelector: {}
+                podSelector:
+                  matchLabels:
+                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
+      - equal:
+          path: spec.ingress[1]
+          value:
+            ports:
+              - port: 9443
+                protocol: TCP
+      - equal:
+          path: spec.ingress[2]
+          value:
+            ports:
+              - port: 8443
+                protocol: TCP
+      - equal:
+          path: spec.ingress[3]
+          value:
+            ports:
+              - port: 8081
+                protocol: TCP
+
+  - it: Should omit individual ingress rule when disabled
+    set:
+      manager:
+        networkPolicy:
+          enabled: true
+          metrics:
+            enabled: false
+    asserts:
+      - lengthEqual:
+          path: spec.ingress
+          count: 3
+      - equal:
+          path: spec.ingress[0].ports[0].port
+          value: 10443
+      - equal:
+          path: spec.ingress[1].ports[0].port
+          value: 9443
+      - equal:
+          path: spec.ingress[2].ports[0].port
+          value: 8081
+
+  - it: Should support custom ports and sources
+    set:
+      manager:
+        networkPolicy:
+          enabled: true
+          statusServer:
+            ports:
+              - port: 20443
+                protocol: TCP
+            from:
+              - podSelector:
+                  matchLabels:
+                    custom-trainer: "true"
+          webhook:
+            ports:
+              - port: 9444
+                protocol: TCP
+            from:
+              - ipBlock:
+                  cidr: 10.0.0.0/16
+    asserts:
+      - equal:
+          path: spec.ingress[0]
+          value:
+            ports:
+              - port: 20443
+                protocol: TCP
+            from:
+              - podSelector:
+                  matchLabels:
+                    custom-trainer: "true"
+      - equal:
+          path: spec.ingress[1]
+          value:
+            ports:
+              - port: 9444
+                protocol: TCP
+            from:
+              - ipBlock:
+                  cidr: 10.0.0.0/16
+
+  - it: Should apply custom manager labels and selectorLabels
+    set:
+      manager:
+        networkPolicy:
+          enabled: true
+        labels:
+          custom-label: manager-label
+        selectorLabels:
+          custom-selector: manager-selector
+    asserts:
+      - equal:
+          path: metadata.labels.custom-label
+          value: manager-label
+      - equal:
+          path: spec.podSelector.matchLabels.custom-selector
+          value: manager-selector

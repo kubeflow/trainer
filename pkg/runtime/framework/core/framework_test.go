@@ -634,6 +634,9 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									}).
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
@@ -663,6 +666,9 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									}).
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor: constants.ModelInitializer,
+											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
@@ -692,6 +698,9 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									}).
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
@@ -727,6 +736,9 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 									}).
 									WithSpec(batchv1ac.JobSpec().
 										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor: "invalid",
+											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
@@ -792,7 +804,9 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithParallelism(1).
 										WithCompletions(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
-											WithLabels(map[string]string{}).
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
@@ -825,7 +839,9 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithParallelism(1).
 										WithCompletions(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
-											WithLabels(map[string]string{}).
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor: constants.ModelInitializer,
+											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
@@ -858,7 +874,9 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithParallelism(1).
 										WithCompletions(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
-											WithLabels(map[string]string{}).
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
@@ -950,7 +968,9 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 										WithParallelism(99).
 										WithCompletions(99).
 										WithTemplate(corev1ac.PodTemplateSpec().
-											WithLabels(map[string]string{}).
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor: "invalid",
+											}).
 											WithSpec(corev1ac.PodSpec().
 												WithContainers(
 													corev1ac.Container().
@@ -1312,6 +1332,10 @@ func TestRunComponentBuilderPlugins(t *testing.T) {
 					Parallelism(1, constants.Launcher, constants.ModelInitializer, constants.DatasetInitializer).
 					Completions(1, constants.Launcher, constants.ModelInitializer, constants.DatasetInitializer).
 					ReplicatedJobLabel(constants.LabelTrainJobAncestor, "trainer", constants.Launcher).
+					PodLabelForJobs(constants.LabelTrainJobAncestor, constants.DatasetInitializer, constants.DatasetInitializer).
+					PodLabelForJobs(constants.LabelTrainJobAncestor, constants.ModelInitializer, constants.ModelInitializer).
+					PodLabelForJobs(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Launcher).
+					PodLabelForJobs(constants.LabelTrainJobAncestor, "invalid", constants.Node).
 					Container(constants.Launcher, constants.Node, "test:trainjob", []string{"trainjob"}, []string{"trainjob"}, corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),
 						corev1.ResourceMemory: resource.MustParse("4Gi"),
@@ -1563,6 +1587,7 @@ test-job-node-0-1.test-job slots=1
 										WithCompletions(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor:        constants.DatasetInitializer,
 												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().
@@ -1598,6 +1623,7 @@ test-job-node-0-1.test-job slots=1
 										WithCompletions(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor:        constants.ModelInitializer,
 												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().
@@ -1633,6 +1659,7 @@ test-job-node-0-1.test-job slots=1
 										WithCompletions(100).
 										WithTemplate(corev1ac.PodTemplateSpec().
 											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor:        constants.AncestorTrainer,
 												schedulerpluginsv1alpha1.PodGroupLabel: "test-job",
 											}).
 											WithSpec(corev1ac.PodSpec().
@@ -1751,6 +1778,9 @@ test-job-node-0-1.test-job slots=1
 				testingutil.MakeJobSetWrapper(metav1.NamespaceDefault, "test-job").
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-job", "uid").
 					PodLabel(schedulerpluginsv1alpha1.PodGroupLabel, "test-job").
+					PodLabelForJobs(constants.LabelTrainJobAncestor, constants.DatasetInitializer, constants.DatasetInitializer).
+					PodLabelForJobs(constants.LabelTrainJobAncestor, constants.ModelInitializer, constants.ModelInitializer).
+					PodLabelForJobs(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Node).
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
 					Completions(1, constants.DatasetInitializer, constants.ModelInitializer).
@@ -2068,6 +2098,9 @@ test-job-node-0-1.test-job slots=1
 										WithParallelism(1).
 										WithCompletions(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor: constants.DatasetInitializer,
+											}).
 											WithAnnotations(map[string]string{
 												volcanov1beta1.KubeGroupNameAnnotationKey: "test-volcano-job",
 											}).
@@ -2104,6 +2137,9 @@ test-job-node-0-1.test-job slots=1
 										WithParallelism(1).
 										WithCompletions(1).
 										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor: constants.ModelInitializer,
+											}).
 											WithAnnotations(map[string]string{
 												volcanov1beta1.KubeGroupNameAnnotationKey: "test-volcano-job",
 											}).
@@ -2140,6 +2176,9 @@ test-job-node-0-1.test-job slots=1
 										WithParallelism(100).
 										WithCompletions(100).
 										WithTemplate(corev1ac.PodTemplateSpec().
+											WithLabels(map[string]string{
+												constants.LabelTrainJobAncestor: constants.AncestorTrainer,
+											}).
 											WithAnnotations(map[string]string{
 												volcanov1beta1.KubeGroupNameAnnotationKey: "test-volcano-job",
 											}).
@@ -2195,6 +2234,9 @@ test-job-node-0-1.test-job slots=1
 					ControllerReference(trainer.SchemeGroupVersion.WithKind("TrainJob"), "test-volcano-job", "uid").
 					Annotation(volcanov1beta1.QueueNameAnnotationKey, "q1").
 					PodAnnotation(volcanov1beta1.KubeGroupNameAnnotationKey, "test-volcano-job").
+					PodLabelForJobs(constants.LabelTrainJobAncestor, constants.DatasetInitializer, constants.DatasetInitializer).
+					PodLabelForJobs(constants.LabelTrainJobAncestor, constants.ModelInitializer, constants.ModelInitializer).
+					PodLabelForJobs(constants.LabelTrainJobAncestor, constants.AncestorTrainer, constants.Node).
 					PodPriorityClassName("system-node-critical").
 					Replicas(1, constants.DatasetInitializer, constants.ModelInitializer, constants.Node).
 					Parallelism(1, constants.DatasetInitializer, constants.ModelInitializer).
