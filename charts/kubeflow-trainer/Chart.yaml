@@ -30,7 +30,9 @@ dependencies:
 - name: lws
   repository: oci://registry.k8s.io/lws/charts
   version: 0.8.0
-  condition: dataCache.enabled,dataCache.lws.install
+  # Helm evaluates only the first of these paths that is set, so the opt-out
+  # comes first and dataCache.enabled applies when it is left unset.
+  condition: dataCache.lws.install,dataCache.enabled
 
 keywords:
 - kubeflow trainer

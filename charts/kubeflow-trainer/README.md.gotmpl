@@ -62,6 +62,10 @@ helm install kubeflow-trainer oci://ghcr.io/kubeflow/charts/kubeflow-trainer \
 > If you manage the CRDs out-of-band (previously via Helm's `--skip-crds` flag), set `--set crds.enabled=false` to skip
 > installing them with the chart.
 
+> [!NOTE]
+> Setting `dataCache.enabled=true` also installs LeaderWorkerSet as a chart dependency.
+> If LeaderWorkerSet is already installed in the cluster, add `--set dataCache.lws.install=false`.
+
 ### Install with ClusterTrainingRuntimes
 
 You can enable the default ClusterTrainingRuntimes together with the control plane in a single
