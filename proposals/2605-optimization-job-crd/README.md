@@ -154,7 +154,7 @@ type OptimizationJobSpec struct {
 	// +listType=map
         // +listMapKey=metric
         // +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=1
+	// +kubebuilder:validation:MaxItems=10
         // +required
 	Objectives []Objective `json:"objectives"`
 
