@@ -416,7 +416,11 @@ func (f *Flux) generateFluxEntrypoint(trainJob *trainer.TrainJob, info *runtime.
 	if jobTrainer := trainJob.Spec.Trainer; jobTrainer != nil && jobTrainer.NumProcPerNode != nil {
 		tasks = *jobTrainer.NumProcPerNode
 	} else {
-		tasks = *info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode
+		// NumProcPerNode defaults to 1 via the FluxMLPolicySource CRD schema, and Kubernetes
+		// applies structural schema defaults on read as well as on write. This ptr.Deref is
+		// a defensive guard against objects built without going through the API server (e.g.
+		// unit tests), consistent with getNumNodes, which already uses the same pattern.
+		tasks = ptr.Deref(info.RuntimePolicy.MLPolicySource.Flux.NumProcPerNode, 1)
 	}
 	flags = fmt.Sprintf("-N %d -n %d", numNodes, tasks*numNodes)
 
