@@ -181,6 +181,68 @@ func TestCoScheduling(t *testing.T) {
 					Obj(),
 			},
 		},
+		"succeeded to build PodGroup when ScheduleTimeoutSeconds is nil": {
+			info: &runtime.Info{
+				Scheduler: &runtime.Scheduler{},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
+						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
+								ScheduleTimeoutSeconds: nil,
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "node",
+							Count: ptr.To[int32](1),
+						},
+					},
+				},
+			},
+			trainJob: utiltesting.MakeTrainJobWrapper(metav1.NamespaceDefault, "trainJob").
+				UID("trainJob").
+				Trainer(
+					utiltesting.MakeTrainJobTrainerWrapper().
+						NumNodes(2).
+						Obj()).
+				Obj(),
+			wantInfo: &runtime.Info{
+				Scheduler: &runtime.Scheduler{
+					PodLabels: map[string]string{
+						"scheduling.x-k8s.io/pod-group": "trainJob",
+					},
+				},
+				RuntimePolicy: runtime.RuntimePolicy{
+					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
+						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
+								ScheduleTimeoutSeconds: nil,
+							},
+						},
+					},
+				},
+				TemplateSpec: runtime.TemplateSpec{
+					PodSets: []runtime.PodSet{
+						{
+							Name:  "node",
+							Count: ptr.To[int32](1),
+						},
+					},
+				},
+			},
+			objs: []client.Object{},
+			wantObjs: []apiruntime.Object{
+				utiltesting.MakeSchedulerPluginsPodGroup(metav1.NamespaceDefault, "trainJob").
+					MinMember(1).
+					MinResources(corev1.ResourceList{}).
+					SchedulingTimeout(60).
+					ControllerReference(trainerv1alpha1.GroupVersion.WithKind(trainerv1alpha1.TrainJobKind), "trainJob", "trainJob").
+					Obj(),
+			},
+		},
 		"succeeded to build PodGroup with multiple PodSets": {
 			info: &runtime.Info{
 				Scheduler: &runtime.Scheduler{},
