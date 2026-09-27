@@ -33,8 +33,8 @@ import (
 )
 
 const (
-	rJobReplicasErrorMsg         = "always must be 1"
-	rJobContainerNamesErrorMsg   = "must contain the required container for the ancestor: %s"
+	rJobReplicasErrorMsg          = "always must be 1"
+	rJobContainerNamesErrorMsg    = "must contain the required container for the ancestor: %s"
 	rJobPriorityClassNameErrorMsg = "must not be set on this replicatedJob: every Pod in a gang-scheduled TrainJob is scheduled at a single priority, so only the replicatedJob labelled with the %q ancestor may set it"
 )
 
