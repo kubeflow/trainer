@@ -79,6 +79,15 @@ tests:
       - notExists:
           path: spec.endpoints[0].tlsConfig
 
+  - it: Should fail when authentication is enabled without secure serving
+    set:
+      serviceMonitor.enabled: true
+      manager.config.metrics.auth.enabled: true
+      manager.config.metrics.secureServing: false
+    asserts:
+      - failedTemplate:
+          errorMessage: "manager.config.metrics.auth.enabled requires manager.config.metrics.secureServing to be true"
+
   - it: Should allow overriding the TLS configuration
     set:
       serviceMonitor.enabled: true

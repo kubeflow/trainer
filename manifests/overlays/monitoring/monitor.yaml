@@ -24,7 +24,6 @@ spec:
   endpoints:
     - port: monitoring-port
       scheme: https
-      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       tlsConfig:
         ca:
           secret:

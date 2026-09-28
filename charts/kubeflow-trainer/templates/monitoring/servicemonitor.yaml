@@ -15,6 +15,9 @@ limitations under the License.
 */ -}}
 
 {{- if .Values.serviceMonitor.enabled }}
+{{- if and .Values.manager.config.metrics.auth.enabled (not .Values.manager.config.metrics.secureServing) }}
+{{- fail "manager.config.metrics.auth.enabled requires manager.config.metrics.secureServing to be true" }}
+{{- end }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
