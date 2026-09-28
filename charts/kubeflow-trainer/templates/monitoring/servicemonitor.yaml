@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */ -}}
 
-{{- if .Values.metrics.serviceMonitor.enabled }}
+{{- if .Values.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -28,12 +28,16 @@ spec:
       {{- include "trainer.manager.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: monitoring-port
-      scheme: https
-      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      scheme: {{ if .Values.manager.config.metrics.secureServing }}https{{ else }}http{{ end }}
+      {{- if .Values.manager.config.metrics.auth.enabled }}
+      bearerTokenFile: {{ .Values.serviceMonitor.bearerTokenFile | quote }}
+      {{- end }}
+      {{- if .Values.manager.config.metrics.secureServing }}
       tlsConfig:
         ca:
           secret:
-            name: {{ include "trainer.webhook.secret.name" . }}
-            key: ca.crt
-        serverName: {{ include "trainer.manager.service.name" . }}.{{ .Release.Namespace }}.svc
+            name: {{ .Values.serviceMonitor.tlsConfig.ca.secret.name | default (include "trainer.webhook.secret.name" .) }}
+            key: {{ .Values.serviceMonitor.tlsConfig.ca.secret.key | default "ca.crt" }}
+        serverName: {{ .Values.serviceMonitor.tlsConfig.serverName | default (printf "%s.%s.svc" (include "trainer.manager.service.name" .) .Release.Namespace) }}
+      {{- end }}
 {{- end }}
