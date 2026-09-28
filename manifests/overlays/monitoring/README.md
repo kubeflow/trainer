@@ -7,6 +7,7 @@ The endpoint uses HTTPS and validates the certificate generated for the
 `kubeflow-trainer-controller-manager` Service with the existing
 `kubeflow-trainer-webhook-cert` Secret.
 
-Authentication is controlled by the controller configuration. If metrics
-authentication is enabled, the Prometheus service account must be granted
-permission to access `/metrics` by the platform-specific deployment.
+Authentication is controlled by the controller configuration. This static
+overlay assumes the metrics endpoint is served securely and does not add a
+bearer token; platform-specific deployments should add the ServiceMonitor
+authentication and RBAC required by their metrics configuration.

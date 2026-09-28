@@ -108,6 +108,15 @@ tests:
           path: data["controller_manager_config.yaml"]
           pattern: "burst: 100"
 
+  - it: should configure metrics authentication
+    set:
+      manager.config.metrics.auth.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["controller_manager_config.yaml"]
+          pattern: |
+            (?s)metrics:\s+bindAddress: :8443\s+secureServing: true\s+auth:\s+enabled: true
+
   - it: should render custom clientConnection qps and burst
     set:
       manager.config.clientConnection.qps: 200
