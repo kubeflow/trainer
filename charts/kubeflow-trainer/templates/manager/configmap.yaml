@@ -35,6 +35,8 @@ data:
     metrics:
       bindAddress: {{ .Values.manager.config.metrics.bindAddress | default ":8443" }}
       secureServing: {{ .Values.manager.config.metrics.secureServing }}
+      auth:
+        enabled: {{ .Values.manager.config.metrics.auth.enabled }}
 
     # Webhook configuration
     webhook:

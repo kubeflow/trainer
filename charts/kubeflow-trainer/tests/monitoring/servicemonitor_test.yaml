@@ -27,9 +27,9 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: Should create a TLS ServiceMonitor when enabled
+  - it: Should create a secure unauthenticated ServiceMonitor when enabled
     set:
-      metrics.serviceMonitor.enabled: true
+      serviceMonitor.enabled: true
     asserts:
       - containsDocument:
           apiVersion: monitoring.coreos.com/v1
@@ -45,9 +45,53 @@ tests:
       - equal:
           path: spec.endpoints[0].scheme
           value: https
+      - notExists:
+          path: spec.endpoints[0].bearerTokenFile
       - equal:
           path: spec.endpoints[0].tlsConfig.ca.secret.name
           value: kubeflow-trainer-webhook-cert
       - equal:
           path: spec.endpoints[0].tlsConfig.serverName
           value: kubeflow-trainer-controller-manager.kubeflow-system.svc
+
+  - it: Should configure bearer-token authentication when enabled
+    set:
+      serviceMonitor.enabled: true
+      manager.config.metrics.auth.enabled: true
+    asserts:
+      - equal:
+          path: spec.endpoints[0].scheme
+          value: https
+      - equal:
+          path: spec.endpoints[0].bearerTokenFile
+          value: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+  - it: Should use HTTP without TLS when secure serving is disabled
+    set:
+      serviceMonitor.enabled: true
+      manager.config.metrics.secureServing: false
+    asserts:
+      - equal:
+          path: spec.endpoints[0].scheme
+          value: http
+      - notExists:
+          path: spec.endpoints[0].bearerTokenFile
+      - notExists:
+          path: spec.endpoints[0].tlsConfig
+
+  - it: Should allow overriding the TLS configuration
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.tlsConfig.ca.secret.name: custom-metrics-ca
+      serviceMonitor.tlsConfig.ca.secret.key: tls.crt
+      serviceMonitor.tlsConfig.serverName: metrics.example.test
+    asserts:
+      - equal:
+          path: spec.endpoints[0].tlsConfig.ca.secret.name
+          value: custom-metrics-ca
+      - equal:
+          path: spec.endpoints[0].tlsConfig.ca.secret.key
+          value: tls.crt
+      - equal:
+          path: spec.endpoints[0].tlsConfig.serverName
+          value: metrics.example.test
