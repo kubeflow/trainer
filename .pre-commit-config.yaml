@@ -47,6 +47,24 @@ repos:
         name: cargo check (data_cache)
         files: ^pkg/data_cache/.*\.rs$
         args: [--manifest-path, pkg/data_cache/Cargo.toml]
+  - repo: local
+    hooks:
+      - id: shfmt
+        name: shfmt
+        description: Format shell scripts with shfmt
+        entry: make shell-fmt
+        language: system
+        types: [shell]
+        pass_filenames: false
+        require_serial: true
+      - id: shellcheck
+        name: shellcheck
+        description: Lint shell scripts with shellcheck
+        entry: make shell-lint
+        language: system
+        types: [shell]
+        pass_filenames: false
+        require_serial: true
 exclude: |
   (?x)^(
     docs/images/.*|
