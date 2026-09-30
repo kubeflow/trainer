@@ -354,7 +354,6 @@ After all steps, run the full CI-equivalent validation:
 
 ```bash
 go mod tidy
-make verify-boilerplate
 make generate
 make fmt
 make vet

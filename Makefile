@@ -26,7 +26,7 @@ PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 REPO := github.com/kubeflow/trainer
 TRAINER_CHART_DIR := $(PROJECT_DIR)/charts/kubeflow-trainer
 # Year-less copyright header prepended to generated manifests (controller-gen
-# emits none). Single source of truth shared with the boilerplate verifier.
+# emits none). The shared verifier uses its own templates from kubeflow/testing.
 BOILERPLATE_HEADER := $(PROJECT_DIR)/hack/boilerplate/boilerplate.sh.txt
 HELM_BOILERPLATE_HEADER := $(PROJECT_DIR)/hack/boilerplate/boilerplate.helm.txt
 # Location to install tool binaries
@@ -219,10 +219,6 @@ vet: ## Run go vet against the code.
 golangci-lint: golangci-lint-install golangci-lint-kal ## Run golangci-lint to verify Go files.
 	$(GOLANGCI_LINT) run --timeout 5m $(LINT_PKG)
 	$(GOLANGCI_LINT_KAL) run -v --config $(PROJECT_DIR)/.golangci-kal.yml
-
-.PHONY: verify-boilerplate
-verify-boilerplate: ## Verify copyright boilerplate headers in source files.
-	python3 hack/boilerplate/boilerplate.py --base-ref "$(TARGET_BRANCH)"
 
 # Instructions to run tests.
 .PHONY: test
