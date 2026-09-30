@@ -73,11 +73,12 @@ const Name = "Volcano"
 // +kubebuilder:rbac:groups="",resources=limitranges,verbs=get;list;watch
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=priorityclasses,verbs=get;list;watch
 
-func New(_ context.Context, client client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
+func New(ctx context.Context, client client.Client, _ client.FieldIndexer, _ *configapi.Configuration) (framework.Plugin, error) {
 	return &Volcano{
 		client:     client,
 		restMapper: client.RESTMapper(),
 		scheme:     client.Scheme(),
+		logger:     ctrl.LoggerFrom(ctx).WithValues("pluginName", Name),
 	}, nil
 }
 
