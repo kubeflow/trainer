@@ -187,9 +187,7 @@ func TestCoScheduling(t *testing.T) {
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
 						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
-							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
-								ScheduleTimeoutSeconds: nil,
-							},
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{},
 						},
 					},
 				},
@@ -218,9 +216,7 @@ func TestCoScheduling(t *testing.T) {
 				RuntimePolicy: runtime.RuntimePolicy{
 					PodGroupPolicy: &trainerv1alpha1.PodGroupPolicy{
 						PodGroupPolicySource: trainerv1alpha1.PodGroupPolicySource{
-							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{
-								ScheduleTimeoutSeconds: nil,
-							},
+							Coscheduling: &trainerv1alpha1.CoschedulingPodGroupPolicySource{},
 						},
 					},
 				},
