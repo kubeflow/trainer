@@ -27,6 +27,7 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -53,6 +54,7 @@ import (
 	"github.com/kubeflow/trainer/v2/pkg/runtime"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/framework"
 	"github.com/kubeflow/trainer/v2/pkg/runtime/indexer"
+	"github.com/kubeflow/trainer/v2/pkg/util/trainjob"
 )
 
 type Volcano struct {
@@ -64,11 +66,12 @@ type Volcano struct {
 
 var _ framework.EnforcePodGroupPolicyPlugin = (*Volcano)(nil)
 var _ framework.ComponentBuilderPlugin = (*Volcano)(nil)
+var _ framework.ComponentDeleterPlugin = (*Volcano)(nil)
 var _ framework.WatchExtensionPlugin = (*Volcano)(nil)
 
 const Name = "Volcano"
 
-// +kubebuilder:rbac:groups=scheduling.volcano.sh,resources=podgroups,verbs=create;get;list;watch;update;patch
+// +kubebuilder:rbac:groups=scheduling.volcano.sh,resources=podgroups,verbs=create;get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups=node.k8s.io,resources=runtimeclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=limitranges,verbs=get;list;watch
 
@@ -143,7 +146,17 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		return nil, nil
 	}
 
-	// Do not update the PodGroup if it already exists and the TrainJob is not suspended
+	// While suspended, Delete() owns the PodGroup's lifecycle entirely: never (re)create
+	// it here. Otherwise, recreating it once Delete() has removed it would race with
+	// Delete() removing it again on the next reconcile, for as long as the TrainJob stays
+	// suspended.
+	if ptr.Deref(trainJob.Spec.Suspend, false) {
+		return nil, nil
+	}
+
+	// Do not update the PodGroup if it already exists: minMember, minResources,
+	// priorityClassName and networkTopology are all derived from the runtime template and
+	// pod requests, none of which change once the TrainJob is running.
 	oldPodGroup := &volcanov1beta1.PodGroup{}
 	if err := v.client.Get(ctx, client.ObjectKeyFromObject(trainJob), oldPodGroup); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -151,7 +164,7 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		}
 		oldPodGroup = nil
 	}
-	if oldPodGroup != nil && !ptr.Deref(trainJob.Spec.Suspend, false) {
+	if oldPodGroup != nil {
 		return nil, nil
 	}
 
@@ -209,6 +222,40 @@ func (v *Volcano) Build(ctx context.Context, info *runtime.Info, trainJob *train
 		WithBlockOwnerDeletion(true))
 
 	return []apiruntime.ApplyConfiguration{pg}, nil
+}
+
+// Delete returns the PodGroup that should now be removed for the TrainJob, once it is no
+// longer running: either because it reached a Failed or Complete condition, or because it
+// is currently suspended. A suspended TrainJob runs no Pods, so its PodGroup would
+// otherwise keep reserving `minResources` capacity in the Volcano queue indefinitely.
+func (v *Volcano) Delete(ctx context.Context, info *runtime.Info, trainJob *trainer.TrainJob) ([]client.Object, error) {
+	if info == nil || info.RuntimePolicy.PodGroupPolicy == nil || info.RuntimePolicy.PodGroupPolicy.Volcano == nil || trainJob == nil || !shouldDeletePodGroup(trainJob) {
+		return nil, nil
+	}
+
+	podGroup := &volcanov1beta1.PodGroup{}
+	if err := v.client.Get(ctx, client.ObjectKeyFromObject(trainJob), podGroup); err != nil {
+		// Mirrors the guard in Build(): a cluster where the Volcano CRD isn't installed
+		// would otherwise fail this Get() client-side with a RESTMapper error rather than
+		// an apiserver NotFound. The info check above already keeps this from being
+		// reached for TrainJobs that don't use Volcano; this is defense in depth for a
+		// misconfigured cluster where one does but the CRD is missing anyway.
+		if apierrors.IsNotFound(err) || meta.IsNoMatchError(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if !metav1.IsControlledBy(podGroup, trainJob) {
+		return nil, nil
+	}
+	return []client.Object{podGroup}, nil
+}
+
+// shouldDeletePodGroup reports whether a TrainJob's PodGroup should be removed: once the
+// TrainJob is Failed, Complete, or suspended, no Pods are scheduled to run, so its
+// PodGroup no longer needs to hold gang-scheduling capacity in the Volcano queue.
+func shouldDeletePodGroup(trainJob *trainer.TrainJob) bool {
+	return trainjob.IsTrainJobFinished(trainJob) || ptr.Deref(trainJob.Spec.Suspend, false)
 }
 
 type PodGroupRuntimeClassHandler struct {

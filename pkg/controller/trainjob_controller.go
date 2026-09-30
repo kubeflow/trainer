@@ -105,7 +105,7 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if !ok {
 		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
-	} else if !trainjob.IsTrainJobFinished(&trainJob) {
+	} else {
 		err = r.reconcileObjects(ctx, runtime, &trainJob)
 		if err != nil {
 			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
@@ -141,12 +141,28 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 func (r *TrainJobReconciler) reconcileObjects(ctx context.Context, runtime jobruntimes.Runtime, trainJob *trainer.TrainJob) error {
-	objects, err := runtime.NewObjects(ctx, trainJob)
+	if !trainjob.IsTrainJobFinished(trainJob) {
+		objects, err := runtime.NewObjects(ctx, trainJob)
+		if err != nil {
+			return err
+		}
+		for _, object := range objects {
+			if err := r.client.Apply(ctx, object, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Runs regardless of whether the TrainJob is finished, so that plugins can also clean
+	// up objects that outlive a suspension rather than only a terminal condition (e.g. a
+	// gang-scheduling PodGroup, which would otherwise keep reserving scheduler queue
+	// capacity for a suspended TrainJob indefinitely).
+	toDelete, err := runtime.DeleteObjects(ctx, trainJob)
 	if err != nil {
 		return err
 	}
-	for _, object := range objects {
-		if err := r.client.Apply(ctx, object, client.FieldOwner("trainer"), client.ForceOwnership); err != nil {
+	for _, object := range toDelete {
+		if err := client.IgnoreNotFound(r.client.Delete(ctx, object)); err != nil {
 			return err
 		}
 	}
@@ -173,6 +189,9 @@ func (r *TrainJobReconciler) reconcileDeadline(ctx context.Context, trainJob *tr
 			"startTime", startTime,
 			"deadline", deadline)
 		setFailedCondition(trainJob, constants.TrainJobDeadlineExceededMessage, trainer.TrainJobDeadlineExceededReason)
+		// TODO(#3833): this direct deletion predates ComponentDeleterPlugin and does not
+		// retry on transient errors; consider migrating it to a JobSet Delete()
+		// implementation once that pattern is established.
 		jobSet := &jobsetv1alpha2.JobSet{
 			ObjectMeta: metav1.ObjectMeta{Name: trainJob.Name, Namespace: trainJob.Namespace},
 		}
