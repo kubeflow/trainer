@@ -105,31 +105,27 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if !ok {
 		err = fmt.Errorf("unsupported runtime: %s", runtimeRefGK)
 		setFailedCondition(&trainJob, fmt.Sprintf("unsupported runtime: %s", runtimeRefGK), trainer.TrainJobRuntimeNotSupportedReason)
-	} else if !trainjob.IsTrainJobFinished(&trainJob) {
-		err = r.reconcileObjects(ctx, runtime, &trainJob)
-		if err != nil {
-			// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
-			//  the creation of the runtime resources failed and the TrainJob is backed off until
-			//  the next retry attempt.
-			// The event message is truncated to stay within the maximum length limit (1024 chars).
-			message := fmt.Sprintf("TrainJob resources reconciliation failed: %.950v", err.Error())
-			if len(err.Error()) > 950 {
-				message = fmt.Sprintf("%s ...", message)
+	} else {
+		if !trainjob.IsTrainJobFinished(&trainJob) {
+			err = r.reconcileObjects(ctx, runtime, &trainJob)
+			if err != nil {
+				// TODO (astefanutti): the error should be surfaced in the TrainJob status to indicate
+				//  the creation of the runtime resources failed and the TrainJob is backed off until
+				//  the next retry attempt.
+				// The event message is truncated to stay within the maximum length limit (1024 chars).
+				message := fmt.Sprintf("TrainJob resources reconciliation failed: %.950v", err.Error())
+				if len(err.Error()) > 950 {
+					message = fmt.Sprintf("%s ...", message)
+				}
+				r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Reconciling", message)
 			}
-			r.recorder.Eventf(&trainJob, nil, corev1.EventTypeWarning, "TrainJobResourcesCreationFailed", "Reconciling", message)
 		}
-	}
-
-	setSuspendedCondition(&trainJob)
-
-	// The runtime is only derived from the registry, so it is nil when the runtimeRef is
-	// unsupported. The failed condition set above is the status in that case, and deriving
-	// it from the runtime would dereference a nil interface.
-	if ok {
 		if statusErr := setTrainJobStatus(ctx, runtime, &trainJob); statusErr != nil {
 			err = errors.Join(err, statusErr)
 		}
 	}
+
+	setSuspendedCondition(&trainJob)
 
 	deadlineResult := r.reconcileDeadline(ctx, &trainJob)
 
