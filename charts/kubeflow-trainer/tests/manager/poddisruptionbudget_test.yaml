@@ -1,0 +1,82 @@
+# Copyright 2026 The Kubeflow Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Test manager PodDisruptionBudget
+templates:
+  - manager/poddisruptionbudget.yaml
+release:
+  name: kubeflow-trainer
+  namespace: kubeflow-system
+
+tests:
+  - it: Should not render a PodDisruptionBudget by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: Should not render a PodDisruptionBudget when explicitly disabled
+    set:
+      manager:
+        podDisruptionBudget:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: Should fail when enabled with `manager.replicas` less than 2
+    set:
+      manager:
+        replicas: 1
+        podDisruptionBudget:
+          enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "manager.podDisruptionBudget.enabled is true but manager.replicas is 1: a PodDisruptionBudget on a single replica blocks voluntary node drains and evictions indefinitely. Set manager.replicas to 2 or more, or disable manager.podDisruptionBudget."
+
+  - it: Should render a PodDisruptionBudget when enabled with `manager.replicas` of 2 or more
+    set:
+      manager:
+        replicas: 2
+        podDisruptionBudget:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: metadata.name
+          value: kubeflow-trainer-controller-manager
+      - equal:
+          path: spec.minAvailable
+          value: 1
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/name: kubeflow-trainer
+            app.kubernetes.io/instance: kubeflow-trainer
+            app.kubernetes.io/part-of: kubeflow
+            app.kubernetes.io/component: manager
+
+  - it: Should use a custom minAvailable when set
+    set:
+      manager:
+        replicas: 3
+        podDisruptionBudget:
+          enabled: true
+          minAvailable: 2
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: 2

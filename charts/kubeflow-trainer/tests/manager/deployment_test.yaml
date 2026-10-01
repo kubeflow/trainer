@@ -340,6 +340,21 @@ tests:
                         values:
                           - another-node-label-value
 
+  - it: Should use the default soft podAntiAffinity when `controller.affinity` is not set
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity
+          value:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    topologyKey: kubernetes.io/hostname
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/part-of: kubeflow
+                        app.kubernetes.io/component: manager
+
   - it: Should add tolerations if `controller.tolerations` is set
     set:
       manager:
@@ -362,3 +377,43 @@ tests:
             - key: key2
               operator: Exists
               effect: NoSchedule
+
+  - it: Should not render topologySpreadConstraints by default
+    asserts:
+      - notExists:
+          path: spec.template.spec.topologySpreadConstraints
+
+  - it: Should render topologySpreadConstraints if `manager.topologySpreadConstraints` is set
+    set:
+      manager:
+        topologySpreadConstraints:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: manager
+    asserts:
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints
+          value:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: ScheduleAnyway
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: manager
+
+  - it: Should not render priorityClassName by default
+    asserts:
+      - notExists:
+          path: spec.template.spec.priorityClassName
+
+  - it: Should render priorityClassName if `manager.priorityClassName` is set
+    set:
+      manager:
+        priorityClassName: platform-critical
+    asserts:
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: platform-critical

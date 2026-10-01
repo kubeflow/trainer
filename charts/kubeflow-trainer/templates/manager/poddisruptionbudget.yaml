@@ -1,0 +1,36 @@
+{{- /*
+Copyright 2026 The Kubeflow Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/ -}}
+
+{{- if .Values.manager.podDisruptionBudget.enabled }}
+{{- if lt (.Values.manager.replicas | int) 2 }}
+{{- fail (printf "manager.podDisruptionBudget.enabled is true but manager.replicas is %d: a PodDisruptionBudget on a single replica blocks voluntary node drains and evictions indefinitely. Set manager.replicas to 2 or more, or disable manager.podDisruptionBudget." (.Values.manager.replicas | int)) }}
+{{- end }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "trainer.manager.deployment.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "trainer.manager.selectorLabels" . | nindent 4 }}
+    {{- with .Values.manager.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  minAvailable: {{ .Values.manager.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "trainer.manager.selectorLabels" . | nindent 6 }}
+{{- end }}
