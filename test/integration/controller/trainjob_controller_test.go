@@ -18,6 +18,7 @@ package controller
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
@@ -1272,6 +1273,67 @@ var _ = ginkgo.Describe("TrainJob controller", ginkgo.Ordered, func() {
 					},
 				),
 			)
+
+			ginkgo.It("Should wire resourceClaimsPerNode into both launcher and node Pods when the MPI launcher runs as a node", func() {
+				ginkgo.By("Creating OpenMPI TrainingRuntime with runLauncherAsNode and TrainJob")
+				spec := testingutil.MakeTrainingRuntimeSpecWrapper(testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").Spec).
+					LauncherReplica().
+					Replicas(1, constants.Launcher).
+					WithMLPolicy(
+						testingutil.MakeMLPolicyWrapper().
+							WithNumNodes(1).
+							WithMLPolicySource(*testingutil.MakeMLPolicySourceWrapper().
+								MPIPolicy(ptr.To[int32](8), trainer.MPIImplementationOpenMPI, ptr.To("/root/.ssh"), ptr.To(true)).
+								Obj(),
+							).
+							Obj(),
+					).
+					Container(constants.Node, constants.Node, "test:runtime", []string{"runtime"}, []string{"runtime"}, resRequests).
+					Obj()
+				// With runLauncherAsNode the launcher carries the trainer ancestor label, as in the
+				// deepspeed and mlx runtimes, and the node job is matched by name.
+				for i := range spec.Template.Spec.ReplicatedJobs {
+					rJob := &spec.Template.Spec.ReplicatedJobs[i]
+					switch rJob.Name {
+					case constants.Launcher:
+						rJob.Template.Labels = map[string]string{constants.LabelTrainJobAncestor: constants.AncestorTrainer}
+					case constants.Node:
+						delete(rJob.Template.Labels, constants.LabelTrainJobAncestor)
+					}
+				}
+				trainingRuntime = testingutil.MakeTrainingRuntimeWrapper(ns.Name, "alpha").RuntimeSpec(spec).Obj()
+				gomega.Expect(k8sClient.Create(ctx, trainingRuntime)).Should(gomega.Succeed())
+				gomega.Eventually(func(g gomega.Gomega) {
+					g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(trainingRuntime), trainingRuntime)).Should(gomega.Succeed())
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+				trainJob = testingutil.MakeTrainJobWrapper(ns.Name, "alpha").
+					RuntimeRef(trainer.GroupVersion.WithKind(trainer.TrainingRuntimeKind), "alpha").
+					Trainer(
+						testingutil.MakeTrainJobTrainerWrapper().
+							NumNodes(2).
+							NumProcPerNode(8).
+							Container("test:trainjob", []string{"trainjob"}, []string{"trainjob"}, resRequests).
+							ResourceClaimsPerNode(gpuPerNodeA...).
+							Obj()).
+					Obj()
+				trainJobKey = client.ObjectKeyFromObject(trainJob)
+				gomega.Expect(k8sClient.Create(ctx, trainJob)).Should(gomega.Succeed())
+
+				ginkgo.By("Checking that both the launcher and node Pods request the claim and their training containers consume it")
+				gomega.Eventually(func(g gomega.Gomega) {
+					jobSet := &jobsetv1alpha2.JobSet{}
+					g.Expect(k8sClient.Get(ctx, trainJobKey, jobSet)).Should(gomega.Succeed())
+					for _, rJobName := range []string{constants.Launcher, constants.Node} {
+						idx := slices.IndexFunc(jobSet.Spec.ReplicatedJobs, func(rJob jobsetv1alpha2.ReplicatedJob) bool { return rJob.Name == rJobName })
+						g.Expect(idx).ShouldNot(gomega.Equal(-1), "replicatedJob %s", rJobName)
+						podSpec := jobSet.Spec.ReplicatedJobs[idx].Template.Spec.Template.Spec
+						g.Expect(podSpec.ResourceClaims).Should(gomega.BeComparableTo([]corev1.PodResourceClaim{gpuTemplateA}), "pod resourceClaims of %s", rJobName)
+						cIdx := slices.IndexFunc(podSpec.Containers, func(c corev1.Container) bool { return c.Name == constants.Node })
+						g.Expect(cIdx).ShouldNot(gomega.Equal(-1), "node container of %s", rJobName)
+						g.Expect(podSpec.Containers[cIdx].Resources.Claims).Should(gomega.BeComparableTo([]corev1.ResourceClaim{gpuClaim}), "container claims of %s", rJobName)
+					}
+				}, util.Timeout, util.Interval).Should(gomega.Succeed())
+			})
 		})
 
 		ginkgo.Context("Integration Tests for the OpenMPI Runtime", func() {

@@ -114,6 +114,7 @@ spec:
   trainer:
     image: docker.io/my-training:latest
     numNodes: 4
+    numProcPerNode: 8
     resourceClaimsPerNode:
       - name: gpu
         resourceClaimTemplateName: gpu-claim-template
