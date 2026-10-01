@@ -8,8 +8,8 @@ pairs) directly into `TrainJob.status.trainerStatus` in real time. This eliminat
 to manually parse or scrape container logs to monitor training health and performance.
 
 :::{important}
-The TrainJob progress feature was introduced in Kubeflow Trainer v2.2.0 and requires the `TrainJobStatus` alpha
-feature gate to be enabled on the controller.
+The TrainJob progress feature was introduced in Kubeflow Trainer v2.2.0. The `TrainJobStatus`
+feature is a Beta feature and enabled by default, so no configuration is required for normal use.
 :::
 
 :::{note}
@@ -20,18 +20,20 @@ to understand the basics of Kubeflow Trainer.
 ## Prerequisites
 
 - Kubeflow Trainer v2.2.0 or later installed on your cluster.
-- The `TrainJobStatus` alpha feature gate enabled on the Trainer controller. To enable
-  it, pass the flag to the controller at startup:
-
-  ```bash
-  --feature-gates=TrainJobStatus=true
-  ```
-
-  Or, if deploying via Helm, set `manager.config.featureGates.TrainJobStatus=true`.
-
-  The command-line flag takes precedence over any value set in the controller config file.
-
 - For SDK-based progress reporting: Kubeflow SDK `>= 0.5.0`.
+
+`TrainJobStatus` is a Beta feature and is enabled by default, so no configuration is required for normal use.
+Administrators can opt out with:
+
+```bash
+--feature-gates=TrainJobStatus=false
+```
+
+For Helm:
+
+```bash
+manager.config.featureGates.TrainJobStatus=false
+```
 
 ## View TrainJob progress and metrics
 
@@ -124,9 +126,9 @@ trainer = Trainer(
     compute_metrics=compute_metrics,
 )
 
-# When running inside a Kubeflow TrainJob with TrainJobStatus enabled,
-# KubeflowTrainerCallback is auto-registered and reports the following
-# at each logging step: loss, learning_rate, epoch, completion percentage.
+# When running inside a Kubeflow TrainJob, KubeflowTrainerCallback is
+# auto-registered and reports the following at each logging step:
+# loss, learning_rate, epoch, completion percentage.
 # Any custom metrics returned by compute_metrics (like 'accuracy') are also automatically reported.
 trainer.train()
 ```
@@ -184,6 +186,7 @@ to the controller endpoint.
 #### Implementation Guidance
 
 When building a raw HTTP client:
+
 - **Client-side rate limiting**: Ensure your client throttles requests (e.g. at most once every 5 seconds) to avoid overloading the Kubernetes API server and controller.
 - **Token rotation**: The bearer token injected into the container is a JWT that periodically rotates. You should check the expiry of the JWT or ensure you re-read the token from the filesystem file (`KUBEFLOW_TRAINER_SERVER_TOKEN`) rather than caching it indefinitely.
 - **Error handling**: Ensure there's sufficient error handling (e.g., catching timeouts and transient network errors) to avoid breaking or impacting your main training loops.
