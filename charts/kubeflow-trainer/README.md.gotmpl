@@ -98,6 +98,8 @@ helm uninstall [RELEASE_NAME]
 ```
 
 This removes all the Kubernetes resources associated with the chart and deletes the release, except for the `crds`, those will have to be removed manually.
+The CRDs are kept through the `helm.sh/resource-policy: keep` annotation (`crds.keep`, enabled by default), because deleting
+them would also delete every TrainJob and runtime in the cluster.
 
 See [helm uninstall](https://helm.sh/docs/helm/helm_uninstall) for command documentation.
 
